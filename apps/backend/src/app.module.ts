@@ -1,12 +1,13 @@
 import { Module } from "@nestjs/common"
 import { ConfigModule } from "@nestjs/config"
-import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from "@nestjs/core"
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from "@nestjs/core"
 import { AuthModule } from "@thallesp/nestjs-better-auth"
 import { ZodSerializerInterceptor, ZodValidationPipe } from "nestjs-zod"
 
 import { getAuth } from "@repo/auth"
 
 import { HttpExceptionFilter } from "@/common/filters/http-exception.filter"
+import { RbacGuard } from "@/modules/v1/rbac/rbac.guard"
 import { V1Module } from "@/modules/v1/v1.module"
 
 import { ORPCCommonModule } from "./common/orpc/orpc.module"
@@ -40,6 +41,10 @@ import { env } from "./config/env.config"
 		{
 			provide: APP_FILTER,
 			useClass: HttpExceptionFilter,
+		},
+		{
+			provide: APP_GUARD,
+			useClass: RbacGuard,
 		},
 	],
 })

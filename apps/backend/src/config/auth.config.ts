@@ -5,6 +5,7 @@ import { toNodeHandler } from "better-auth/node"
 import { AUTH_BASE_PATH, getAuth } from "@repo/auth"
 
 import { getVersionKeys } from "@/config/api-versions.config"
+import { env } from "@/config/env.config"
 import { generateBetterAuthSchema } from "@/utils/openapi"
 
 const logger = new Logger("BetterAuthConfig")
@@ -21,12 +22,32 @@ interface JsonResponse {
  */
 function createAuthMiddleware(versionedAuthPaths: string[]) {
 	const handler = toNodeHandler(getAuth())
+	const allowedOrigins = env.CORS_ORIGINS.split(",").map(origin => origin.trim())
+
+	const applyAuthCorsHeaders = (req: IncomingMessage, res: ServerResponse): void => {
+		const requestOrigin = req.headers.origin
+
+		if (!requestOrigin || !allowedOrigins.includes(requestOrigin)) {
+			return
+		}
+
+		res.setHeader("Access-Control-Allow-Origin", requestOrigin)
+		res.setHeader("Access-Control-Allow-Credentials", "true")
+		res.setHeader("Vary", "Origin")
+	}
 
 	return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
 		const url = req.url ?? ""
 		const matchedPath = versionedAuthPaths.find(path => url.startsWith(path))
 
 		if (matchedPath) {
+			applyAuthCorsHeaders(req, res)
+
+			// Let Express/Nest CORS middleware answer preflight requests.
+			if (req.method === "OPTIONS") {
+				return next()
+			}
+
 			req.url = url.replace(matchedPath, AUTH_BASE_PATH)
 			return handler(req, res)
 		}

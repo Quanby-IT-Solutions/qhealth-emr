@@ -3,23 +3,6 @@
  */
 
 /**
- * Transform a single todo from API response (with string dates) to runtime type (with Date objects)
- */
-export function transformTodo<T extends { createdAt: string | Date }>(todo: T) {
-	return {
-		...todo,
-		createdAt: typeof todo.createdAt === "string" ? new Date(todo.createdAt) : todo.createdAt,
-	} as Omit<T, "createdAt"> & { createdAt: Date }
-}
-
-/**
- * Transform an array of todos from API response to runtime types
- */
-export function transformTodos<T extends { createdAt: string | Date }>(todos: T[]) {
-	return todos.map(transformTodo)
-}
-
-/**
  * Generic date field transformer for any entity
  * Useful for entities with multiple date fields
  */

@@ -73,9 +73,11 @@ export function Logo({
 		)
 	}
 
+	// When no href, render as a span to avoid nested button issues
+	// (e.g., when used inside SidebarMenuButton which is already a button)
 	return (
-		<Button size={size} variant={variant} className={cn("text-foreground", className)}>
+		<span className={cn(buttonVariants({ size, variant }), "text-foreground", className)}>
 			{content}
-		</Button>
+		</span>
 	)
 }

@@ -23,8 +23,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-	title: "Turbo Template",
-	description: "Turborepo monorepo template with Next.js, NestJS, and Flutter",
+	title: "QHealth EMR",
+	description: "QHealth Electronic Medical Records System",
 }
 
 export default function RootLayout({

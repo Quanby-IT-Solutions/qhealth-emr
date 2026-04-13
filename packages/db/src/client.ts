@@ -1,6 +1,8 @@
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres"
 
-import { schema } from "./schema.js"
+import * as dbSchema from "./schema/index.js"
+
+const schema = { ...dbSchema }
 
 /**
  * Type for the Drizzle database client

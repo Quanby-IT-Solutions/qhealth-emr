@@ -1,0 +1,617 @@
+"use client"
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+
+import { env } from "@/env"
+
+const API_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/nursing`
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+	const res = await fetch(url, {
+		credentials: "include",
+		...init,
+		headers: {
+			"Content-Type": "application/json",
+			...init?.headers,
+		},
+	})
+	if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+	return res.json() as Promise<T>
+}
+
+function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
+	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
+	if (entries.length === 0) return ""
+	return "?" + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
+}
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface VitalSign {
+	id: string
+	facilityId: string
+	encounterId: string | null
+	preEncounterId: string | null
+	temperature: string | null
+	bpSystolic: number | null
+	bpDiastolic: number | null
+	heartRate: number | null
+	respiratoryRate: number | null
+	spo2: string | null
+	painScore: number | null
+	weight: string | null
+	height: string | null
+	newsScore: number | null
+	newsRiskLevel: "low" | "medium" | "high" | null
+	recordedByStaffId: string
+	recordedAt: string
+	createdAt: string
+}
+
+interface MarEntry {
+	id: string
+	facilityId: string
+	encounterId: string | null
+	preEncounterId: string | null
+	medicationOrderId: string
+	scheduledTime: string
+	status: "due" | "given" | "missed" | "held" | "refused"
+	administeredDose: string | null
+	administeredRoute: string | null
+	prnReason: string | null
+	administeredByStaffId: string | null
+	administeredAt: string | null
+	notes: string | null
+	createdAt: string
+}
+
+interface TarEntry {
+	id: string
+	facilityId: string
+	encounterId: string | null
+	preEncounterId: string | null
+	treatmentDescription: string
+	scheduledTime: string
+	status: "due" | "given" | "missed" | "held" | "refused"
+	administeredByStaffId: string | null
+	administeredAt: string | null
+	notes: string | null
+	createdAt: string
+}
+
+interface IoEntry {
+	id: string
+	facilityId: string
+	encounterId: string | null
+	preEncounterId: string | null
+	ioType: "intake" | "output"
+	route: string
+	description: string | null
+	amountMl: string
+	recordedByStaffId: string
+	recordedAt: string
+	createdAt: string
+}
+
+interface IoBalanceResponse {
+	totalIntake: number
+	totalOutput: number
+	netBalance: number
+	periodStart: string
+	periodEnd: string
+}
+
+interface FlowsheetEntry {
+	id: string
+	facilityId: string
+	encounterId: string
+	parameterName: string
+	parameterValue: string
+	unit: string | null
+	recordedByStaffId: string
+	recordedAt: string
+	createdAt: string
+}
+
+interface ShiftHandoff {
+	id: string
+	facilityId: string
+	encounterId: string
+	outgoingStaffId: string
+	incomingStaffId: string | null
+	handoffNotes: string
+	status: "draft" | "signed"
+	signedAt: string | null
+	createdAt: string
+}
+
+interface GeneratedHandoffResponse {
+	activeProblems: { description: string; icd10Code: string | null }[]
+	currentMedications: { genericName: string; dose: string; frequency: string }[]
+	recentVitals: VitalSign | null
+	newsScore: number | null
+	newsRiskLevel: "low" | "medium" | "high" | null
+	ioBalance: IoBalanceResponse | null
+	pendingOrders: number
+}
+
+interface HaiTag {
+	id: string
+	facilityId: string
+	encounterId: string
+	haiType: "clabsi" | "cauti" | "vap" | "ssi" | "cdiff"
+	onsetDate: string
+	confirmedAt: string | null
+	resolvedAt: string | null
+	status: "suspected" | "confirmed" | "resolved"
+	notes: string | null
+	documentedByStaffId: string
+	createdAt: string
+	updatedAt: string
+}
+
+interface PaginatedResponse<T> {
+	data: T[]
+	total: number
+	page: number
+	limit: number
+	totalPages: number
+}
+
+// ============================================================================
+// Query Keys
+// ============================================================================
+
+export const nursingKeys = {
+	all: ["nursing"] as const,
+	vitals: (params: object) => [...nursingKeys.all, "vitals", params] as const,
+	vital: (id: string) => [...nursingKeys.all, "vital", id] as const,
+	marEntries: (params: object) => [...nursingKeys.all, "mar", params] as const,
+	marEntry: (id: string) => [...nursingKeys.all, "mar-entry", id] as const,
+	tarEntries: (params: object) => [...nursingKeys.all, "tar", params] as const,
+	tarEntry: (id: string) => [...nursingKeys.all, "tar-entry", id] as const,
+	ioEntries: (params: object) => [...nursingKeys.all, "io", params] as const,
+	ioBalance: (params: object) => [...nursingKeys.all, "io-balance", params] as const,
+	flowsheets: (params: object) => [...nursingKeys.all, "flowsheets", params] as const,
+	handoffs: (params: object) => [...nursingKeys.all, "handoffs", params] as const,
+	handoff: (id: string) => [...nursingKeys.all, "handoff", id] as const,
+	haiTags: (params: object) => [...nursingKeys.all, "hai-tags", params] as const,
+	haiTag: (id: string) => [...nursingKeys.all, "hai-tag", id] as const,
+}
+
+// ============================================================================
+// Vital Signs
+// ============================================================================
+
+interface VitalSignListParams {
+	facilityId: string
+	encounterId?: string
+	preEncounterId?: string
+	page?: number
+	limit?: number
+}
+
+export function useVitalsQuery(params: VitalSignListParams) {
+	return useQuery({
+		queryKey: nursingKeys.vitals(params),
+		queryFn: () =>
+			fetchJson<PaginatedResponse<VitalSign>>(
+				`${API_BASE}/vitals${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
+			),
+		enabled: !!(params.encounterId || params.preEncounterId),
+	})
+}
+
+export function useVitalQuery(id: string) {
+	return useQuery({
+		queryKey: nursingKeys.vital(id),
+		queryFn: () => fetchJson<VitalSign>(`${API_BASE}/vitals/${encodeURIComponent(id)}`),
+		enabled: !!id,
+	})
+}
+
+interface CreateVitalInput {
+	facilityId: string
+	encounterId?: string
+	preEncounterId?: string
+	temperature?: number
+	bpSystolic?: number
+	bpDiastolic?: number
+	heartRate?: number
+	respiratoryRate?: number
+	spo2?: number
+	painScore?: number
+	weight?: number
+	height?: number
+}
+
+export function useCreateVitalMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: CreateVitalInput) =>
+			fetchJson<VitalSign>(`${API_BASE}/vitals`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
+		},
+	})
+}
+
+// ============================================================================
+// MAR Entries
+// ============================================================================
+
+interface MarEntryListParams {
+	facilityId: string
+	encounterId?: string
+	preEncounterId?: string
+	status?: string
+	scheduledFrom?: string
+	scheduledTo?: string
+	page?: number
+	limit?: number
+}
+
+export function useMarEntriesQuery(params: MarEntryListParams) {
+	return useQuery({
+		queryKey: nursingKeys.marEntries(params),
+		queryFn: () =>
+			fetchJson<PaginatedResponse<MarEntry>>(
+				`${API_BASE}/mar${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
+			),
+		enabled: !!(params.encounterId || params.preEncounterId),
+	})
+}
+
+export function useMarEntryQuery(id: string) {
+	return useQuery({
+		queryKey: nursingKeys.marEntry(id),
+		queryFn: () => fetchJson<MarEntry>(`${API_BASE}/mar/${encodeURIComponent(id)}`),
+		enabled: !!id,
+	})
+}
+
+interface AdministerMarInput {
+	id: string
+	status: "due" | "given" | "missed" | "held" | "refused"
+	administeredDose?: string
+	administeredRoute?: string
+	prnReason?: string
+	notes?: string
+}
+
+export function useAdministerMarMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: AdministerMarInput) =>
+			fetchJson<MarEntry>(`${API_BASE}/mar/${encodeURIComponent(data.id)}/administer`, {
+				method: "PUT",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
+		},
+	})
+}
+
+// ============================================================================
+// TAR Entries
+// ============================================================================
+
+interface TarEntryListParams {
+	facilityId: string
+	encounterId?: string
+	preEncounterId?: string
+	status?: string
+	page?: number
+	limit?: number
+}
+
+export function useTarEntriesQuery(params: TarEntryListParams) {
+	return useQuery({
+		queryKey: nursingKeys.tarEntries(params),
+		queryFn: () =>
+			fetchJson<PaginatedResponse<TarEntry>>(
+				`${API_BASE}/tar${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
+			),
+		enabled: !!(params.encounterId || params.preEncounterId),
+	})
+}
+
+export function useTarEntryQuery(id: string) {
+	return useQuery({
+		queryKey: nursingKeys.tarEntry(id),
+		queryFn: () => fetchJson<TarEntry>(`${API_BASE}/tar/${encodeURIComponent(id)}`),
+		enabled: !!id,
+	})
+}
+
+interface CreateTarEntryInput {
+	facilityId: string
+	encounterId?: string
+	preEncounterId?: string
+	treatmentDescription: string
+	scheduledTime: string
+}
+
+export function useCreateTarEntryMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: CreateTarEntryInput) =>
+			fetchJson<TarEntry>(`${API_BASE}/tar`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
+		},
+	})
+}
+
+interface AdministerTarInput {
+	id: string
+	status: "due" | "given" | "missed" | "held" | "refused"
+	notes?: string
+}
+
+export function useAdministerTarMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: AdministerTarInput) =>
+			fetchJson<TarEntry>(`${API_BASE}/tar/${encodeURIComponent(data.id)}/administer`, {
+				method: "PUT",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
+		},
+	})
+}
+
+// ============================================================================
+// I/O Entries
+// ============================================================================
+
+interface IoEntryListParams {
+	facilityId: string
+	encounterId?: string
+	preEncounterId?: string
+	ioType?: "intake" | "output"
+	page?: number
+	limit?: number
+}
+
+export function useIoEntriesQuery(params: IoEntryListParams) {
+	return useQuery({
+		queryKey: nursingKeys.ioEntries(params),
+		queryFn: () =>
+			fetchJson<PaginatedResponse<IoEntry>>(
+				`${API_BASE}/io${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
+			),
+		enabled: !!(params.encounterId || params.preEncounterId),
+	})
+}
+
+interface CreateIoEntryInput {
+	facilityId: string
+	encounterId?: string
+	preEncounterId?: string
+	ioType: "intake" | "output"
+	route: string
+	description?: string
+	amountMl: number
+}
+
+export function useCreateIoEntryMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: CreateIoEntryInput) =>
+			fetchJson<IoEntry>(`${API_BASE}/io`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
+		},
+	})
+}
+
+interface IoBalanceParams {
+	encounterId: string
+	facilityId: string
+}
+
+export function useIoBalanceQuery(params: IoBalanceParams) {
+	return useQuery({
+		queryKey: nursingKeys.ioBalance(params),
+		queryFn: () =>
+			fetchJson<IoBalanceResponse>(
+				`${API_BASE}/io/balance${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
+			),
+		enabled: !!params.encounterId,
+	})
+}
+
+// ============================================================================
+// Flowsheets
+// ============================================================================
+
+interface FlowsheetListParams {
+	encounterId: string
+	facilityId: string
+	parameterName?: string
+	dateFrom?: string
+	dateTo?: string
+	page?: number
+	limit?: number
+}
+
+export function useFlowsheetsQuery(params: FlowsheetListParams) {
+	return useQuery({
+		queryKey: nursingKeys.flowsheets(params),
+		queryFn: () =>
+			fetchJson<PaginatedResponse<FlowsheetEntry>>(
+				`${API_BASE}/flowsheets${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
+			),
+		enabled: !!params.encounterId,
+	})
+}
+
+// ============================================================================
+// Shift Handoffs
+// ============================================================================
+
+interface HandoffListParams {
+	facilityId: string
+	encounterId?: string
+	outgoingStaffId?: string
+	page?: number
+	limit?: number
+}
+
+export function useHandoffsQuery(params: HandoffListParams) {
+	return useQuery({
+		queryKey: nursingKeys.handoffs(params),
+		queryFn: () =>
+			fetchJson<PaginatedResponse<ShiftHandoff>>(
+				`${API_BASE}/handoffs${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
+			),
+		enabled: !!(params.encounterId || params.outgoingStaffId),
+	})
+}
+
+export function useHandoffQuery(id: string) {
+	return useQuery({
+		queryKey: nursingKeys.handoff(id),
+		queryFn: () => fetchJson<ShiftHandoff>(`${API_BASE}/handoffs/${encodeURIComponent(id)}`),
+		enabled: !!id,
+	})
+}
+
+interface GenerateHandoffInput {
+	encounterId: string
+	facilityId: string
+}
+
+export function useGenerateHandoffMutation() {
+	return useMutation({
+		mutationFn: (data: GenerateHandoffInput) =>
+			fetchJson<GeneratedHandoffResponse>(`${API_BASE}/handoffs/generate`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+	})
+}
+
+interface CreateHandoffInput {
+	facilityId: string
+	encounterId: string
+	incomingStaffId?: string
+	handoffNotes?: string
+}
+
+export function useCreateHandoffMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: CreateHandoffInput) =>
+			fetchJson<ShiftHandoff>(`${API_BASE}/handoffs`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
+		},
+	})
+}
+
+export function useFinalizeHandoffMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: { id: string }) =>
+			fetchJson<ShiftHandoff>(`${API_BASE}/handoffs/${encodeURIComponent(data.id)}/finalize`, {
+				method: "PUT",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
+		},
+	})
+}
+
+// ============================================================================
+// HAI Tags
+// ============================================================================
+
+interface HaiTagListParams {
+	facilityId: string
+	encounterId?: string
+	haiType?: string
+	status?: string
+	page?: number
+	limit?: number
+}
+
+export function useHaiTagsQuery(params: HaiTagListParams) {
+	return useQuery({
+		queryKey: nursingKeys.haiTags(params),
+		queryFn: () =>
+			fetchJson<PaginatedResponse<HaiTag>>(
+				`${API_BASE}/hai-tags${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
+			),
+		enabled: !!params.encounterId,
+	})
+}
+
+export function useHaiTagQuery(id: string) {
+	return useQuery({
+		queryKey: nursingKeys.haiTag(id),
+		queryFn: () => fetchJson<HaiTag>(`${API_BASE}/hai-tags/${encodeURIComponent(id)}`),
+		enabled: !!id,
+	})
+}
+
+interface CreateHaiTagInput {
+	facilityId: string
+	encounterId: string
+	haiType: "clabsi" | "cauti" | "vap" | "ssi" | "cdiff"
+	onsetDate: string
+	notes?: string
+}
+
+export function useCreateHaiTagMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: CreateHaiTagInput) =>
+			fetchJson<HaiTag>(`${API_BASE}/hai-tags`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
+		},
+	})
+}
+
+interface UpdateHaiTagInput {
+	id: string
+	status?: "suspected" | "confirmed" | "resolved"
+	notes?: string
+}
+
+export function useUpdateHaiTagMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: UpdateHaiTagInput) =>
+			fetchJson<HaiTag>(`${API_BASE}/hai-tags/${encodeURIComponent(data.id)}`, {
+				method: "PUT",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
+		},
+	})
+}

@@ -1,7 +1,10 @@
-import Link from "next/link"
 import { redirect } from "next/navigation"
 
+import { SidebarInset, SidebarProvider } from "@/core/components/ui/sidebar"
+import { AppSidebar } from "@/features/app-shell/components/app-sidebar"
+import { AppTopbar } from "@/features/app-shell/components/app-topbar"
 import { getSession } from "@/services/better-auth/auth-server"
+import { NotificationProvider } from "@/services/notifications/notification-provider"
 
 export default async function SiteLayout({
 	children,
@@ -15,26 +18,14 @@ export default async function SiteLayout({
 	}
 
 	return (
-		<div className="container py-8">
-			<div className="grid min-h-[calc(100vh-6rem)] grid-cols-1 gap-6 md:grid-cols-[240px_1fr]">
-				<aside className="bg-card text-card-foreground hidden rounded-xl border p-4 md:block">
-					<nav className="space-y-1">
-						<Link
-							href="/dashboard"
-							className="hover:bg-accent hover:text-accent-foreground block rounded-md px-3 py-2 text-sm font-medium"
-						>
-							Dashboard
-						</Link>
-						<Link
-							href="/submit-ticket"
-							className="hover:bg-accent hover:text-accent-foreground block rounded-md px-3 py-2 text-sm font-medium"
-						>
-							Submit Ticket
-						</Link>
-					</nav>
-				</aside>
-				<main className="min-w-0">{children}</main>
-			</div>
-		</div>
+		<SidebarProvider>
+			<NotificationProvider staffId={session.user.id}>
+				<AppSidebar />
+				<SidebarInset>
+					<AppTopbar />
+					<div className="flex-1 overflow-auto p-4 md:p-6">{children}</div>
+				</SidebarInset>
+			</NotificationProvider>
+		</SidebarProvider>
 	)
 }
