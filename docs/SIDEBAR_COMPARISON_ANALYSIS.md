@@ -382,7 +382,7 @@ This document compares each role's **actual** sidebar visibility (computed from 
 
 | Role | Status | Issues |
 |------|--------|--------|
-| Administrator | 🔧 | Many items excluded due to comprehensive permissions |
+| Administrator | ✅ | None |
 | Registrar | ✅ | None |
 | Medical Social Worker | ✅ | None |
 | Triage Officer | ✅ | None |
