@@ -26,8 +26,8 @@ This document compares each role's **actual** sidebar visibility (computed from 
 |----------|----------|--------|--------|
 | **PRIMARY** | | | |
 | Dashboard | ✓ | ✓ | ✅ |
-| Register Patient | ✓ | ❌ (excluded by clinical_docs:sign) | ❌ |
-| Patients | ✓ | ❌ (excluded by reporting:edit) | ✅ (fixed - Admin has no reporting:edit) |
+| Register Patient | ✓ | ✓ (admin:view bypass) | ✅ |
+| Patients | ✓ | ✓ (admin:view bypass) | ✅ |
 | Scheduling | ✓ | ✓ (admin:view) | ✅ |
 | Bed Management | ✓ | ✓ (adt:edit) | ✅ |
 | Emergency | ✓ | ✓ (adt:create) | ✅ |
@@ -36,25 +36,25 @@ This document compares each role's **actual** sidebar visibility (computed from 
 | Laboratory | ✓ | ✓ (admin:view) | ✅ |
 | Radiology | ✓ | ✓ (admin:view) | ✅ |
 | Pharmacy | ✓ | ✓ (orders:verify) | ✅ |
-| Telemedicine | ✓ | ❌ (excluded by nursing:create) | ❌ |
-| Billing | ✓ | ❌ (excluded by clinical_docs:create) | ❌ |
+| Telemedicine | ✓ | ✓ (admin:view bypass) | ✅ |
+| Billing | ✓ | ✓ (admin:view bypass) | ✅ |
 | **SECONDARY** | | | |
-| Medical Records | ✓ | ❌ (excluded by clinical_docs:sign) | ❌ |
-| HIM Dashboard | ✓ | ❌ (excluded by clinical_docs:sign) | ❌ |
+| Medical Records | ✓ | ✓ (admin:view bypass) | ✅ |
+| HIM Dashboard | ✓ | ✓ (admin:view bypass) | ✅ |
 | NBS Logbook | ✓ | ✓ (admin:view) | ✅ |
-| SLA Dashboard | ✓ | ❌ (excluded by clinical_docs:create) | ❌ |
+| SLA Dashboard | ✓ | ✓ (admin:view bypass) | ✅ |
 | FHIR Export | ✓ | ✓ (admin:view) | ✅ |
 | SLA Configuration | ✓ | ✓ (admin:view) | ✅ |
-| Social Work (MSW) | ✓ | ❌ (excluded by clinical_docs:create) | ❌ |
+| Social Work (MSW) | ✓ | ✓ (admin:view bypass) | ✅ |
 | Nutrition | ✓ | ✓ (admin:view) | ✅ |
 | Blood Bank | ✓ | ✓ (admin:view) | ✅ |
 | Formulary | ✓ | ✓ (formulary:view) | ✅ |
 | Reporting | ✓ | ✓ (reporting:view) | ✅ |
-| Clinical Docs | ✓ | ❌ (excluded by clinical_docs:sign) | ❌ |
+| Clinical Docs | ✓ | ✓ (admin:view bypass) | ✅ |
 | Audit Trail | ✓ | ✓ (audit:view) | ✅ |
 | Administration | ✓ | ✓ (admin:view) | ✅ |
 
-**Issues Found:** Admin should see everything but is excluded from many items due to having comprehensive permissions that trigger excludes. **Recommendation:** Add `admin:view` exception to excludePermissions logic or explicitly include admin.
+**Status:** ✅ All correct. Admin now bypasses standard exclude rules unless an item explicitly excludes `admin:view` (used to keep the secondary Patients duplicate hidden).
 
 ---
 
@@ -361,15 +361,20 @@ This document compares each role's **actual** sidebar visibility (computed from 
 
 ### 18. Blood Bank Technician
 
-**Permissions:** `adt:view`, `orders:view/edit`
+**Permissions:** `adt:view`, `orders:view/edit`, `laboratory:view`
 
 | Nav Item | Expected | Actual | Status |
 |----------|----------|--------|--------|
 | **PRIMARY** | | | |
 | Dashboard | ✓ | ✓ | ✅ |
-| Patients | ✓ | ✓ (adt:view) | ✅ |
+| Laboratory | ✓ | ✓ (laboratory:view) | ✅ |
+| **SECONDARY** | | | |
+| Patients (secondary) | ✓ | ✓ (laboratory:view) | ✅ |
+| Blood Bank | ✓ | ✓ (laboratory:view) | ✅ |
 
-**Note:** Blood Bank Technician currently lacks `laboratory:view`, so they don't see Laboratory or Blood Bank nav. **Recommendation:** If Blood Bank functionality is needed, add `laboratory:view` to this role or create a dedicated `blood_bank` module.
+**Excluded correctly:** Patients (primary - laboratory:view)
+
+**Status:** ✅ All correct
 
 ---
 
@@ -394,15 +399,17 @@ This document compares each role's **actual** sidebar visibility (computed from 
 | HIM Coder | ✅ | None |
 | PIDSR Officer | ✅ | None |
 | Auditor | ✅ | None |
-| Blood Bank Technician | ⚠️ | Missing Blood Bank nav (needs laboratory:view) |
+| Blood Bank Technician | ✅ | None |
 
 ---
 
 ## Recommended Fixes
 
+No remaining sidebar fixes are required for TOR alignment based on the current `navigation.ts` and `seed-dev.ts` configuration.
+
 ### 1. Administrator Role Fix (Priority: High)
 
-The Administrator role is excluded from many nav items because it has all permissions, including those used in `excludePermissions`. 
+Implemented. The filter now gives admins a bypass for standard exclusions while still allowing explicit `admin:view` exclusions for deliberate de-duplication.
 
 **Solution:** Add `admin:view` bypass to the filter logic:
 
@@ -431,7 +438,7 @@ export function filterNavItems(
 
 ### 2. Blood Bank Technician Fix (Priority: Low)
 
-Add `laboratory:view` to Blood Bank Technician role in seed-dev.ts:
+Implemented. `laboratory:view` is now included for Blood Bank Technician in `seed-dev.ts` so the role receives Laboratory and Blood Bank navigation as required by the TOR.
 
 ```typescript
 "Blood Bank Technician": [
@@ -445,9 +452,4 @@ Add `laboratory:view` to Blood Bank Technician role in seed-dev.ts:
 
 ## Conclusion
 
-**16 of 18 roles** have correct sidebar navigation. The two issues are:
-
-1. **Administrator** - needs bypass logic to see all items
-2. **Blood Bank Technician** - needs `laboratory:view` permission added
-
-After implementing the Administrator fix, all clinical and administrative roles will have proper sidebar access aligned with TOR requirements.
+All reviewed roles now have sidebar access aligned with the TOR, with the Patients duplication intentionally removed for admin by keeping it only in the primary section.
