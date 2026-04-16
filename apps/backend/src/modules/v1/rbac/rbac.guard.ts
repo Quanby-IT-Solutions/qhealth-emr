@@ -51,6 +51,12 @@ export class RbacGuard implements CanActivate {
 	async canActivate(context: ExecutionContext): Promise<boolean> {
 		const request = context.switchToHttp().getRequest()
 
+		// Allow CORS preflight (OPTIONS) requests to pass through without auth
+		// so the browser can complete the CORS handshake before sending the actual request
+		if (request.method === "OPTIONS") {
+			return true
+		}
+
 		// Routes decorated with @AllowAnonymous() use key "PUBLIC" (nestjs-better-auth)
 		const isPublic = this.reflector.getAllAndOverride<boolean>("PUBLIC", [
 			context.getHandler(),

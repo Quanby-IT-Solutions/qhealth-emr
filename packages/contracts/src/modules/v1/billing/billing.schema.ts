@@ -89,7 +89,7 @@ export const ChargeMasterItemSchema = z.object({
 })
 
 export const ListChargeMasterInputSchema = PaginationInputSchema.extend({
-	facilityId: z.string().uuid(),
+	facilityId: z.string().uuid().optional(),
 	category: ChargeMasterCategoryEnum.optional(),
 	search: z.string().optional(),
 	isActive: z.coerce.boolean().optional(),
@@ -119,7 +119,7 @@ export const ChargeSchema = z.object({
 })
 
 export const ListChargesInputSchema = PaginationInputSchema.extend({
-	facilityId: z.string().uuid(),
+	facilityId: z.string().uuid().optional(),
 	encounterId: z.string().uuid(),
 	sourceType: ChargeSourceTypeEnum.optional(),
 })
@@ -295,6 +295,56 @@ export const FinalizeCf4InputSchema = z.object({
 })
 
 // ============================================================================
+// CF5 / DRG Shadow Billing
+// ============================================================================
+
+export const Cf5StatusEnum = z.enum(["draft", "submitted", "approved", "rejected"])
+
+export const DrgCodeSchema = z.object({
+	code: z.string(),
+	description: z.string(),
+	mdrg: z.string(),
+	weight: z.number(),
+	baseRate: z.number(),
+})
+
+export const Cf5AssignmentSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	drgCode: z.string(),
+	drgDescription: z.string(),
+	mdrg: z.string(),
+	drgWeight: z.number(),
+	computedRate: z.number(),
+	status: Cf5StatusEnum,
+	approvedBy: z.string().uuid().nullable(),
+	approvedAt: dateOrString.nullable(),
+	createdAt: dateOrString,
+	updatedAt: dateOrString,
+})
+
+export const GetCf5InputSchema = z.object({
+	encounterId: z.string().uuid(),
+})
+
+export const SearchDrgInputSchema = z.object({
+	search: z.string().min(1),
+})
+
+export const AssignDrgInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	drgCode: z.string().min(1),
+})
+
+export const ApproveCf5InputSchema = z.object({
+	id: z.string().uuid(),
+})
+
+// ============================================================================
 // Eligibility Checks (CEWS)
 // ============================================================================
 
@@ -364,6 +414,147 @@ export const UnbilledEncountersResponseSchema = PaginatedResponseSchema.extend({
 })
 
 // ============================================================================
+// Statement of Account (SOA)
+// ============================================================================
+
+export const SoaStatusEnum = z.enum(["draft", "final"])
+
+export const SoaLineSchema = z.object({
+	id: z.string().uuid(),
+	category: z.string(),
+	description: z.string(),
+	quantity: z.number(),
+	unitPrice: z.number(),
+	totalAmount: z.number(),
+})
+
+export const StatementOfAccountSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	patientName: z.string(),
+	patientMrn: z.string(),
+	soaNumber: z.string(),
+	lines: z.array(SoaLineSchema),
+	subtotal: z.number(),
+	philhealthDeduction: z.number(),
+	seniorPwdDiscount: z.number(),
+	malasakitDeduction: z.number(),
+	otherDeductions: z.number(),
+	netAmount: z.number(),
+	status: SoaStatusEnum,
+	generatedAt: dateOrString,
+})
+
+export const GetSoaInputSchema = z.object({
+	encounterId: z.string().uuid(),
+})
+
+export const GenerateSoaInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	patientId: z.string().uuid(),
+})
+
+export const FinalizeSoaInputSchema = z.object({
+	id: z.string().uuid(),
+})
+
+// ============================================================================
+// Konsulta Capitation
+// ============================================================================
+
+export const KonsultaStatusEnum = z.enum(["active", "exhausted", "inactive"])
+
+export const KonsultaBenefitSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	philhealthMemberId: z.string(),
+	benefitYear: z.number().int(),
+	benefitPeriodStart: z.string(),
+	benefitPeriodEnd: z.string(),
+	consultationsAllowed: z.number().int(),
+	consultationsUsed: z.number().int(),
+	medicationsAllowed: z.number().int(),
+	medicationsUsed: z.number().int(),
+	labAllowed: z.number().int(),
+	labUsed: z.number().int(),
+	status: KonsultaStatusEnum,
+})
+
+export const GetKonsultaBenefitInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid(),
+})
+
+export const RecordKonsultaVisitInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	visitType: z.enum(["consultation", "medication", "laboratory"]),
+})
+
+// ============================================================================
+// Malasakit Center
+// ============================================================================
+
+export const MalasakitSourceEnum = z.enum([
+	"doh_medisure",
+	"hospital_fund",
+	"lgu",
+	"pcso",
+	"dswd",
+	"private_donation",
+	"other",
+])
+
+export const MalasakitStatusEnum = z.enum(["pending", "approved", "disbursed", "denied"])
+
+export const MalasakitAssistanceSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	source: MalasakitSourceEnum,
+	amount: z.number(),
+	purpose: z.string(),
+	status: MalasakitStatusEnum,
+	approvedBy: z.string().uuid().nullable(),
+	approvedAt: dateOrString.nullable(),
+	notes: z.string().nullable(),
+	createdAt: dateOrString,
+})
+
+export const MalasakitSummarySchema = z.object({
+	items: z.array(MalasakitAssistanceSchema),
+	totalRequested: z.number(),
+	totalApproved: z.number(),
+	totalDisbursed: z.number(),
+})
+
+export const GetMalasakitInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+})
+
+export const AddMalasakitInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	source: MalasakitSourceEnum,
+	amount: z.number().positive(),
+	purpose: z.string().min(1),
+	notes: z.string().optional(),
+})
+
+export const UpdateMalasakitStatusInputSchema = z.object({
+	id: z.string().uuid(),
+	status: z.enum(["approved", "disbursed", "denied"]),
+})
+
+// ============================================================================
 // Inferred Types
 // ============================================================================
 
@@ -373,4 +564,11 @@ export type Invoice = z.infer<typeof InvoiceSchema>
 export type InvoiceLineItem = z.infer<typeof InvoiceLineItemSchema>
 export type Payment = z.infer<typeof PaymentSchema>
 export type Cf4Claim = z.infer<typeof Cf4ClaimSchema>
+export type Cf5Assignment = z.infer<typeof Cf5AssignmentSchema>
+export type DrgCode = z.infer<typeof DrgCodeSchema>
 export type EligibilityCheck = z.infer<typeof EligibilityCheckSchema>
+export type StatementOfAccount = z.infer<typeof StatementOfAccountSchema>
+export type SoaLine = z.infer<typeof SoaLineSchema>
+export type KonsultaBenefit = z.infer<typeof KonsultaBenefitSchema>
+export type MalasakitAssistance = z.infer<typeof MalasakitAssistanceSchema>
+export type MalasakitSummary = z.infer<typeof MalasakitSummarySchema>

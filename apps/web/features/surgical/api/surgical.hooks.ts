@@ -1,0 +1,488 @@
+"use client"
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+
+import { env } from "@/env"
+
+const API_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/surgical`
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+	const res = await fetch(url, {
+		credentials: "include",
+		...init,
+		headers: {
+			"Content-Type": "application/json",
+			...init?.headers,
+		},
+	})
+	if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+	return res.json() as Promise<T>
+}
+
+function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
+	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
+	if (entries.length === 0) return ""
+	return "?" + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
+}
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export type SurgeryStatus = "scheduled" | "in_progress" | "completed" | "cancelled" | "postponed"
+export type AsaClass = "ASA I" | "ASA II" | "ASA III" | "ASA IV" | "ASA V" | "ASA VI"
+export type AirwayType = "oral_ett" | "nasal_ett" | "lma" | "awake_fiber_optic" | "tracheostomy"
+export type RvsCodeStatus = "suggested" | "validated" | "finalized"
+
+export interface SurgicalCase {
+	id: string
+	facilityId: string
+	encounterId: string | null
+	patientId: string
+	patientName: string | null
+	procedureName: string
+	orSuite: string | null
+	surgeonName: string | null
+	surgeonStaffId: string | null
+	anesthesiologistName: string | null
+	anesthesiologistStaffId: string | null
+	scheduledDatetime: string | null
+	actualStartDatetime: string | null
+	actualEndDatetime: string | null
+	status: SurgeryStatus
+	surgicalType: string
+	asaClass: AsaClass | null
+	notes: string | null
+	createdAt: string
+	updatedAt: string
+}
+
+export interface OperationRecord {
+	id: string
+	surgicalCaseId: string
+	preOpDiagnosis: string
+	postOpDiagnosis: string | null
+	procedurePerformed: string
+	operativeTechnique: string | null
+	findings: string | null
+	specimens: string | null
+	estimatedBloodLoss: number | null
+	fluidIn: number | null
+	fluidOut: number | null
+	incisionDatetime: string | null
+	closureDatetime: string | null
+	surgeonStaffId: string
+	firstAssistantStaffId: string | null
+	secondAssistantStaffId: string | null
+	scrubNurseStaffId: string | null
+	circulatingNurseStaffId: string | null
+	instrumentCountCorrect: boolean
+	swabCountCorrect: boolean
+	complications: string | null
+	createdAt: string
+	updatedAt: string
+}
+
+export interface AnesthesiaAgent {
+	name: string
+	dose: string
+	route: string
+	time: string
+}
+
+export interface IntraopVital {
+	time: string
+	bp: string
+	hr: number
+	spo2: number
+	etco2?: number
+}
+
+export interface AnesthesiaRecord {
+	id: string
+	surgicalCaseId: string
+	asaClass: AsaClass
+	airwayType: AirwayType
+	intubationAttempts: number
+	agents: AnesthesiaAgent[]
+	intraopVitals: IntraopVital[]
+	reversalAgent: string | null
+	totalAnesthesiaMinutes: number | null
+	emergenceSmooth: boolean
+	complications: string | null
+	postAnesthesiaCareNotes: string | null
+	createdAt: string
+	updatedAt: string
+}
+
+export interface PreOpChecklistItem {
+	key: string
+	label: string
+	checked: boolean
+	checkedAt: string | null
+	checkedByName: string | null
+}
+
+export interface PreOpChecklist {
+	id: string
+	surgicalCaseId: string
+	items: PreOpChecklistItem[]
+	allClear: boolean
+	completedAt: string | null
+	completedByName: string | null
+	createdAt: string
+	updatedAt: string
+}
+
+export interface RvsCode {
+	id: string
+	code: string
+	description: string
+	baseValue: number
+	category: string
+}
+
+export interface RvsAssignment {
+	id: string
+	surgicalCaseId: string
+	rvsCodeId: string
+	code: string
+	description: string
+	status: RvsCodeStatus
+	suggestedByName: string | null
+	validatedByName: string | null
+	finalizedByName: string | null
+	suggestedAt: string | null
+	validatedAt: string | null
+	finalizedAt: string | null
+	modifier: string | null
+	units: number
+	createdAt: string
+}
+
+export interface OrSlot {
+	id: string
+	facilityId: string
+	orSuite: string
+	date: string
+	startTime: string
+	endTime: string
+	surgicalCaseId: string | null
+	procedureName: string | null
+	surgeonName: string | null
+}
+
+interface PaginatedResponse<T> {
+	data: T[]
+	total: number
+	page: number
+	limit: number
+	totalPages: number
+}
+
+// ============================================================================
+// Query Keys
+// ============================================================================
+
+export const surgicalKeys = {
+	all: ["surgical"] as const,
+	cases: (params: object) => [...surgicalKeys.all, "cases", params] as const,
+	case: (id: string) => [...surgicalKeys.all, "case", id] as const,
+	operationRecord: (caseId: string) => [...surgicalKeys.all, "operation-record", caseId] as const,
+	anesthesiaRecord: (caseId: string) => [...surgicalKeys.all, "anesthesia-record", caseId] as const,
+	preOpChecklist: (caseId: string) => [...surgicalKeys.all, "pre-op-checklist", caseId] as const,
+	rvsAssignments: (caseId: string) => [...surgicalKeys.all, "rvs-assignments", caseId] as const,
+	rvsCodes: (search: string) => [...surgicalKeys.all, "rvs-codes", search] as const,
+	orSlots: (facilityId: string, date: string) => [...surgicalKeys.all, "or-slots", facilityId, date] as const,
+}
+
+// ============================================================================
+// Surgical Cases
+// ============================================================================
+
+interface SurgicalCaseListParams {
+	facilityId?: string
+	encounterId?: string
+	status?: SurgeryStatus
+	date?: string
+	page?: number
+	limit?: number
+}
+
+export function useSurgicalCaseListQuery(params: SurgicalCaseListParams) {
+	return useQuery({
+		queryKey: surgicalKeys.cases(params),
+		queryFn: () =>
+			fetchJson<PaginatedResponse<SurgicalCase>>(
+				`${API_BASE}/cases${buildQueryString(params as Record<string, string | number | boolean | undefined>)}`
+			),
+		enabled: !!(params.facilityId || params.encounterId),
+	})
+}
+
+export function useSurgicalCaseDetailQuery(id: string) {
+	return useQuery({
+		queryKey: surgicalKeys.case(id),
+		queryFn: () => fetchJson<SurgicalCase>(`${API_BASE}/cases/${id}`),
+		enabled: !!id,
+	})
+}
+
+interface CreateSurgicalCaseData {
+	facilityId: string
+	encounterId?: string
+	patientId: string
+	procedureName: string
+	orSuite?: string
+	surgeonStaffId?: string
+	anesthesiologistStaffId?: string
+	scheduledDatetime?: string
+	surgicalType: string
+	asaClass?: AsaClass
+	notes?: string
+}
+
+export function useCreateSurgicalCaseMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: CreateSurgicalCaseData) =>
+			fetchJson<SurgicalCase>(`${API_BASE}/cases`, { method: "POST", body: JSON.stringify(data) }),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: surgicalKeys.all }),
+	})
+}
+
+interface UpdateSurgicalCaseData {
+	id: string
+	status?: SurgeryStatus
+	actualStartDatetime?: string
+	actualEndDatetime?: string
+	orSuite?: string
+	notes?: string
+	asaClass?: AsaClass
+}
+
+export function useUpdateSurgicalCaseMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: UpdateSurgicalCaseData) =>
+			fetchJson<SurgicalCase>(`${API_BASE}/cases/${data.id}`, {
+				method: "PUT",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.all })
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.case(variables.id) })
+		},
+	})
+}
+
+// ============================================================================
+// Operation Record
+// ============================================================================
+
+export function useOperationRecordQuery(caseId: string) {
+	return useQuery({
+		queryKey: surgicalKeys.operationRecord(caseId),
+		queryFn: () => fetchJson<OperationRecord | null>(`${API_BASE}/cases/${caseId}/operation-record`),
+		enabled: !!caseId,
+	})
+}
+
+interface SaveOperationRecordData {
+	caseId: string
+	preOpDiagnosis: string
+	postOpDiagnosis?: string
+	procedurePerformed: string
+	operativeTechnique?: string
+	findings?: string
+	specimens?: string
+	estimatedBloodLoss?: number
+	fluidIn?: number
+	fluidOut?: number
+	incisionDatetime?: string
+	closureDatetime?: string
+	surgeonStaffId: string
+	firstAssistantStaffId?: string
+	secondAssistantStaffId?: string
+	scrubNurseStaffId?: string
+	circulatingNurseStaffId?: string
+	instrumentCountCorrect: boolean
+	swabCountCorrect: boolean
+	complications?: string
+}
+
+export function useSaveOperationRecordMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: SaveOperationRecordData) =>
+			fetchJson<OperationRecord>(`${API_BASE}/cases/${data.caseId}/operation-record`, {
+				method: "PUT",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.operationRecord(variables.caseId) })
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.all })
+		},
+	})
+}
+
+// ============================================================================
+// Anesthesia Record
+// ============================================================================
+
+export function useAnesthesiaRecordQuery(caseId: string) {
+	return useQuery({
+		queryKey: surgicalKeys.anesthesiaRecord(caseId),
+		queryFn: () => fetchJson<AnesthesiaRecord | null>(`${API_BASE}/cases/${caseId}/anesthesia-record`),
+		enabled: !!caseId,
+	})
+}
+
+interface SaveAnesthesiaRecordData {
+	caseId: string
+	asaClass: AsaClass
+	airwayType: AirwayType
+	intubationAttempts: number
+	agents: AnesthesiaAgent[]
+	intraopVitals: IntraopVital[]
+	reversalAgent?: string
+	totalAnesthesiaMinutes?: number
+	emergenceSmooth: boolean
+	complications?: string
+	postAnesthesiaCareNotes?: string
+}
+
+export function useSaveAnesthesiaRecordMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: SaveAnesthesiaRecordData) =>
+			fetchJson<AnesthesiaRecord>(`${API_BASE}/cases/${data.caseId}/anesthesia-record`, {
+				method: "PUT",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.anesthesiaRecord(variables.caseId) })
+		},
+	})
+}
+
+// ============================================================================
+// Pre-Op Checklist
+// ============================================================================
+
+export function usePreOpChecklistQuery(caseId: string) {
+	return useQuery({
+		queryKey: surgicalKeys.preOpChecklist(caseId),
+		queryFn: () => fetchJson<PreOpChecklist | null>(`${API_BASE}/cases/${caseId}/pre-op-checklist`),
+		enabled: !!caseId,
+	})
+}
+
+interface SavePreOpChecklistData {
+	caseId: string
+	items: Array<{ key: string; checked: boolean }>
+}
+
+export function useSavePreOpChecklistMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: SavePreOpChecklistData) =>
+			fetchJson<PreOpChecklist>(`${API_BASE}/cases/${data.caseId}/pre-op-checklist`, {
+				method: "PUT",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.preOpChecklist(variables.caseId) })
+		},
+	})
+}
+
+// ============================================================================
+// RVS Codes
+// ============================================================================
+
+export function useRvsCodeSearchQuery(search: string) {
+	return useQuery({
+		queryKey: surgicalKeys.rvsCodes(search),
+		queryFn: () =>
+			fetchJson<PaginatedResponse<RvsCode>>(
+				`${API_BASE}/rvs-codes${buildQueryString({ search, limit: 20 })}`
+			),
+		enabled: search.length >= 2,
+	})
+}
+
+export function useRvsAssignmentsQuery(caseId: string) {
+	return useQuery({
+		queryKey: surgicalKeys.rvsAssignments(caseId),
+		queryFn: () => fetchJson<RvsAssignment[]>(`${API_BASE}/cases/${caseId}/rvs-assignments`),
+		enabled: !!caseId,
+	})
+}
+
+interface SuggestRvsCodeData {
+	caseId: string
+	rvsCodeId: string
+	modifier?: string
+	units?: number
+}
+
+export function useSuggestRvsCodeMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: SuggestRvsCodeData) =>
+			fetchJson<RvsAssignment>(`${API_BASE}/cases/${data.caseId}/rvs-assignments`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.rvsAssignments(variables.caseId) })
+		},
+	})
+}
+
+interface UpdateRvsStatusData {
+	caseId: string
+	assignmentId: string
+	status: RvsCodeStatus
+}
+
+export function useUpdateRvsStatusMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: ({ caseId, assignmentId, ...data }: UpdateRvsStatusData) =>
+			fetchJson<RvsAssignment>(`${API_BASE}/cases/${caseId}/rvs-assignments/${assignmentId}`, {
+				method: "PUT",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.rvsAssignments(variables.caseId) })
+		},
+	})
+}
+
+export function useRemoveRvsAssignmentMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: ({ caseId, assignmentId }: { caseId: string; assignmentId: string }) =>
+			fetchJson<void>(`${API_BASE}/cases/${caseId}/rvs-assignments/${assignmentId}`, {
+				method: "DELETE",
+			}),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.rvsAssignments(variables.caseId) })
+		},
+	})
+}
+
+// ============================================================================
+// OR Slots
+// ============================================================================
+
+export function useOrSlotsQuery(facilityId: string, weekStart: string) {
+	return useQuery({
+		queryKey: surgicalKeys.orSlots(facilityId, weekStart),
+		queryFn: () =>
+			fetchJson<OrSlot[]>(`${API_BASE}/or-slots${buildQueryString({ facilityId, weekStart })}`),
+		enabled: !!facilityId,
+	})
+}

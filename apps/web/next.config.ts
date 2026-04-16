@@ -5,6 +5,8 @@ import path from "node:path"
 
 import "./env"
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000/api"
+
 /** @type {import("next").NextConfig} */
 const config: NextConfig = {
 	typedRoutes: true,
@@ -26,6 +28,16 @@ const config: NextConfig = {
 
 	devIndicators: {
 		position: "bottom-right",
+	},
+
+	// Proxy SSE/streaming endpoints to backend to avoid cross-origin cookie issues
+	async rewrites() {
+		return [
+			{
+				source: "/api/v1/notification/stream",
+				destination: `${BACKEND_URL}/v1/notification/stream`,
+			},
+		]
 	},
 }
 

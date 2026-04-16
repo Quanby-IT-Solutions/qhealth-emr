@@ -11,6 +11,8 @@ export const NotificationTopicEnum = z.enum([
 	"break_glass",
 	"system",
 	"ed_queue",
+	"sla_warning",
+	"sla_exceeded",
 ])
 
 // ============================================================================

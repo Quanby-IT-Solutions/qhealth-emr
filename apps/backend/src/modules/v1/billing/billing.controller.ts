@@ -161,4 +161,104 @@ export class BillingController {
 			return this.billingService.listUnbilledEncounters(input)
 		})
 	}
+
+	// ========================================================================
+	// Statement of Account (SOA)
+	// ========================================================================
+
+	@Implement(v1.billing.getSoa)
+	async getSoa() {
+		return implement(v1.billing.getSoa).handler(async ({ input }) => {
+			return this.billingService.getSoa(input)
+		})
+	}
+
+	@Implement(v1.billing.generateSoa)
+	async generateSoa() {
+		return implement(v1.billing.generateSoa).handler(async ({ input }) => {
+			return this.billingService.generateSoa(input)
+		})
+	}
+
+	@Implement(v1.billing.finalizeSoa)
+	async finalizeSoa() {
+		return implement(v1.billing.finalizeSoa).handler(async ({ input }) => {
+			return this.billingService.finalizeSoa(input)
+		})
+	}
+
+	// ========================================================================
+	// CF5 / DRG Shadow Billing
+	// ========================================================================
+
+	@Implement(v1.billing.getCf5)
+	async getCf5() {
+		return implement(v1.billing.getCf5).handler(async ({ input }) => {
+			return this.billingService.getCf5(input)
+		})
+	}
+
+	@Implement(v1.billing.searchDrgCodes)
+	async searchDrgCodes() {
+		return implement(v1.billing.searchDrgCodes).handler(async ({ input }) => {
+			return this.billingService.searchDrgCodes(input)
+		})
+	}
+
+	@Implement(v1.billing.assignDrg)
+	async assignDrg() {
+		return implement(v1.billing.assignDrg).handler(async ({ input }) => {
+			return this.billingService.assignDrg(input)
+		})
+	}
+
+	@Implement(v1.billing.approveCf5)
+	async approveCf5() {
+		return implement(v1.billing.approveCf5).handler(async ({ input }) => {
+			return this.billingService.approveCf5(input)
+		})
+	}
+
+	// ========================================================================
+	// Konsulta Capitation
+	// ========================================================================
+
+	@Implement(v1.billing.getKonsultaBenefit)
+	async getKonsultaBenefit() {
+		return implement(v1.billing.getKonsultaBenefit).handler(async ({ input }) => {
+			return this.billingService.getKonsultaBenefit(input)
+		})
+	}
+
+	@Implement(v1.billing.recordKonsultaVisit)
+	async recordKonsultaVisit() {
+		return implement(v1.billing.recordKonsultaVisit).handler(async ({ input }) => {
+			return this.billingService.recordKonsultaVisit(input)
+		})
+	}
+
+	// ========================================================================
+	// Malasakit Center
+	// ========================================================================
+
+	@Implement(v1.billing.getMalasakit)
+	async getMalasakit() {
+		return implement(v1.billing.getMalasakit).handler(async ({ input }) => {
+			return this.billingService.getMalasakit(input)
+		})
+	}
+
+	@Implement(v1.billing.addMalasakit)
+	async addMalasakit() {
+		return implement(v1.billing.addMalasakit).handler(async ({ input }) => {
+			return this.billingService.addMalasakit(input)
+		})
+	}
+
+	@Implement(v1.billing.updateMalasakitStatus)
+	async updateMalasakitStatus() {
+		return implement(v1.billing.updateMalasakitStatus).handler(async ({ input }) => {
+			return this.billingService.updateMalasakitStatus(input)
+		})
+	}
 }

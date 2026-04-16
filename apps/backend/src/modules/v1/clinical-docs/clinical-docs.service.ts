@@ -427,12 +427,18 @@ export class ClinicalDocsService {
 		const limit = Number(input.limit ?? 50)
 		const offset = (page - 1) * limit
 
-		const conditions = [eq(consentRecords.encounterId, input.encounterId)]
+		const conditions = []
+		if (input.encounterId) {
+			conditions.push(eq(consentRecords.encounterId, input.encounterId))
+		}
+		if (input.patientId) {
+			conditions.push(eq(consentRecords.patientId, input.patientId))
+		}
 		if (input.consentType) {
 			conditions.push(eq(consentRecords.consentType, input.consentType))
 		}
 
-		const whereClause = and(...conditions)
+		const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 
 		const [totalResult] = await db
 			.select({ count: count() })

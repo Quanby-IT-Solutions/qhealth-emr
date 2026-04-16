@@ -45,11 +45,14 @@ import {
 	useFinalizeInvoiceMutation,
 	usePaymentsQuery,
 	useRecordPaymentMutation,
-	useGenerateCf4Mutation,
-	useFinalizeCf4Mutation,
 	useCheckEligibilityMutation,
 	useBillingStatusQuery,
 } from "@/features/billing/api/billing.hooks"
+import { Cf4Preview } from "@/features/billing/components/cf4-preview"
+import { Cf5Drg } from "@/features/billing/components/cf5-drg"
+import { EsoaPreview } from "@/features/billing/components/esoa-preview"
+import { KonsultaTracker } from "@/features/billing/components/konsulta-tracker"
+import { MalasakitTracker } from "@/features/billing/components/malasakit-tracker"
 
 interface BillingTabProps {
 	encounterId: string
@@ -63,7 +66,11 @@ export function BillingTab({ encounterId, facilityId, patientId }: BillingTabPro
 			<TabsList variant="line">
 				<TabsTrigger value="charges">Charges</TabsTrigger>
 				<TabsTrigger value="invoices">Invoices</TabsTrigger>
+				<TabsTrigger value="esoa">eSOA</TabsTrigger>
 				<TabsTrigger value="cf4">CF4</TabsTrigger>
+				<TabsTrigger value="cf5">CF5 / DRG</TabsTrigger>
+				<TabsTrigger value="konsulta">Konsulta</TabsTrigger>
+				<TabsTrigger value="malasakit">Malasakit</TabsTrigger>
 				<TabsTrigger value="eligibility">Eligibility</TabsTrigger>
 			</TabsList>
 
@@ -75,8 +82,24 @@ export function BillingTab({ encounterId, facilityId, patientId }: BillingTabPro
 				<InvoicesPanel encounterId={encounterId} facilityId={facilityId} patientId={patientId} />
 			</TabsContent>
 
+			<TabsContent value="esoa">
+				<EsoaPreview encounterId={encounterId} facilityId={facilityId} patientId={patientId} />
+			</TabsContent>
+
 			<TabsContent value="cf4">
-				<Cf4Panel encounterId={encounterId} facilityId={facilityId} patientId={patientId} />
+				<Cf4Preview encounterId={encounterId} facilityId={facilityId} patientId={patientId} />
+			</TabsContent>
+
+			<TabsContent value="cf5">
+				<Cf5Drg encounterId={encounterId} facilityId={facilityId} patientId={patientId} />
+			</TabsContent>
+
+			<TabsContent value="konsulta">
+				<KonsultaTracker encounterId={encounterId} facilityId={facilityId} patientId={patientId} />
+			</TabsContent>
+
+			<TabsContent value="malasakit">
+				<MalasakitTracker encounterId={encounterId} facilityId={facilityId} patientId={patientId} />
 			</TabsContent>
 
 			<TabsContent value="eligibility">
@@ -504,140 +527,6 @@ function InvoicesPanel({
 				</DialogContent>
 			</Dialog>
 		</div>
-	)
-}
-
-// ============================================================================
-// CF4 Panel — Flow 9.4
-// ============================================================================
-
-function Cf4Panel({
-	encounterId,
-	facilityId,
-	patientId,
-}: {
-	encounterId: string
-	facilityId: string
-	patientId: string
-}) {
-	const [cf4Preview, setCf4Preview] = useState<{
-		cf4: { id: string; status: string }
-		extractedData: {
-			chiefComplaint: string | null
-			briefHistory: string | null
-			vitalSigns: Record<string, unknown> | null
-			diagnoses: { code: string; displayName: string }[]
-			procedures: { rvsCode: string | null; description: string }[]
-			managementPlan: string | null
-		}
-		missingFields: string[]
-	} | null>(null)
-
-	const generateCf4 = useGenerateCf4Mutation()
-	const finalizeCf4 = useFinalizeCf4Mutation()
-
-	function handleGenerate() {
-		generateCf4.mutate({ facilityId, encounterId, patientId }, {
-			onSuccess: data => setCf4Preview(data),
-		})
-	}
-
-	function handleFinalize() {
-		if (!cf4Preview) return
-		finalizeCf4.mutate({ id: cf4Preview.cf4.id }, {
-			onSuccess: () => {
-				setCf4Preview(null)
-			},
-		})
-	}
-
-	function handleExportEclaims() {
-		// Stubbed — show toast-like message (alert for simplicity)
-		alert("Integration pending — eClaims export is not yet available.")
-	}
-
-	return (
-		<Card>
-			<CardHeader className="flex flex-row items-center justify-between">
-				<CardTitle>PhilHealth CF4</CardTitle>
-				{!cf4Preview && (
-					<Button size="sm" onClick={handleGenerate} disabled={generateCf4.isPending}>
-						{generateCf4.isPending ? "Generating..." : "Generate CF4"}
-					</Button>
-				)}
-			</CardHeader>
-			<CardContent>
-				{!cf4Preview ? (
-					<p className="text-sm text-muted-foreground">Click "Generate CF4" to auto-extract clinical data for the PhilHealth claim form.</p>
-				) : (
-					<div className="space-y-4">
-						{cf4Preview.missingFields.length > 0 && (
-							<div className="rounded-md bg-red-50 border border-red-200 p-3">
-								<p className="text-sm font-medium text-red-800">Missing fields:</p>
-								<ul className="list-disc list-inside text-sm text-red-700 mt-1">
-									{cf4Preview.missingFields.map(f => <li key={f}>{f}</li>)}
-								</ul>
-							</div>
-						)}
-
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-							<div>
-								<Label className={!cf4Preview.extractedData.chiefComplaint ? "text-red-600" : ""}>Chief Complaint</Label>
-								<p className="text-sm mt-1">{cf4Preview.extractedData.chiefComplaint ?? "—"}</p>
-							</div>
-							<div>
-								<Label className={!cf4Preview.extractedData.briefHistory ? "text-red-600" : ""}>Brief History</Label>
-								<p className="text-sm mt-1">{cf4Preview.extractedData.briefHistory ?? "—"}</p>
-							</div>
-							<div>
-								<Label className={!cf4Preview.extractedData.vitalSigns ? "text-red-600" : ""}>Vital Signs</Label>
-								{cf4Preview.extractedData.vitalSigns ? (
-									<div className="text-sm mt-1 space-x-3">
-										{Object.entries(cf4Preview.extractedData.vitalSigns).map(([k, v]) => (
-											<span key={k}><strong>{k}:</strong> {String(v ?? "—")}</span>
-										))}
-									</div>
-								) : <p className="text-sm mt-1">—</p>}
-							</div>
-							<div>
-								<Label className={cf4Preview.extractedData.diagnoses.length === 0 ? "text-red-600" : ""}>Diagnoses (ICD-10)</Label>
-								{cf4Preview.extractedData.diagnoses.length > 0 ? (
-									<ul className="list-disc list-inside text-sm mt-1">
-										{cf4Preview.extractedData.diagnoses.map((d, i) => (
-											<li key={i}>{d.code} — {d.displayName}</li>
-										))}
-									</ul>
-								) : <p className="text-sm mt-1">—</p>}
-							</div>
-							<div>
-								<Label>Procedures</Label>
-								{cf4Preview.extractedData.procedures.length > 0 ? (
-									<ul className="list-disc list-inside text-sm mt-1">
-										{cf4Preview.extractedData.procedures.map((p, i) => (
-											<li key={i}>{p.rvsCode ? `${p.rvsCode} — ` : ""}{p.description}</li>
-										))}
-									</ul>
-								) : <p className="text-sm mt-1">No procedures recorded.</p>}
-							</div>
-							<div>
-								<Label className={!cf4Preview.extractedData.managementPlan ? "text-red-600" : ""}>Management Plan</Label>
-								<p className="text-sm mt-1">{cf4Preview.extractedData.managementPlan ?? "—"}</p>
-							</div>
-						</div>
-
-						<div className="flex gap-2 pt-2">
-							<Button onClick={handleFinalize} disabled={finalizeCf4.isPending}>
-								{finalizeCf4.isPending ? "Finalizing..." : "Finalize CF4"}
-							</Button>
-							<Button variant="outline" onClick={handleExportEclaims}>
-								Export to eClaims
-							</Button>
-							<Button variant="ghost" onClick={() => setCf4Preview(null)}>Cancel</Button>
-						</div>
-					</div>
-				)}
-			</CardContent>
-		</Card>
 	)
 }
 

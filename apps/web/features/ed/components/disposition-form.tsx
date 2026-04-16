@@ -15,6 +15,8 @@ import {
 import { useWardsQuery, useBedListQuery } from "@/features/beds/api/beds.hooks"
 import { useEdDispositionMutation } from "@/features/ed/api/ed.hooks"
 
+import { OecbTagIndicator } from "./oecb-tag-indicator"
+
 interface DispositionFormProps {
 	encounterId: string
 	facilityId: string
@@ -65,9 +67,16 @@ export function DispositionForm({ encounterId, facilityId, onSuccess }: Disposit
 				<Label>Disposition</Label>
 				<Select
 					value={disposition || null}
-					onValueChange={v =>
-						setDisposition((v ?? "") as "admit" | "discharge" | "transfer" | "deceased" | "")
-					}
+					onValueChange={v => {
+						const val = (v ?? "") as "admit" | "discharge" | "transfer" | "deceased" | ""
+						setDisposition(val)
+						// Auto-tag OECB for non-admit dispositions (PhilHealth OECB)
+						if (val === "discharge" || val === "transfer") {
+							setOecbEligible(true)
+						} else {
+							setOecbEligible(false)
+						}
+					}}
 				>
 					<SelectTrigger className="w-full">
 						<SelectValue />
@@ -130,15 +139,20 @@ export function DispositionForm({ encounterId, facilityId, onSuccess }: Disposit
 			)}
 
 			{/* OECB Flag */}
-			{disposition === "discharge" && (
-				<div className="flex items-center gap-2">
-					<Checkbox
-						checked={oecbEligible}
-						onCheckedChange={v => setOecbEligible(v === true)}
-					/>
-					<Label className="text-sm">
-						OECB Eligible (Outpatient Emergency Care Benefit)
-					</Label>
+			{(disposition === "discharge" || disposition === "transfer") && (
+				<div className="space-y-2">
+					<div className="flex items-center gap-2">
+						<Checkbox
+							checked={oecbEligible}
+							onCheckedChange={v => setOecbEligible(v === true)}
+						/>
+						<Label className="text-sm">
+							OECB Eligible (Outpatient Emergency Care Benefit)
+						</Label>
+					</div>
+					{oecbEligible && (
+						<OecbTagIndicator oecbEligible />
+					)}
 				</div>
 			)}
 

@@ -127,7 +127,7 @@ export function AddAllergyDialog({
 							<Select
 								value={severity || undefined}
 								onValueChange={v =>
-									setSeverity((v as "mild" | "moderate" | "severe") ?? "")
+								setSeverity((v as "mild" | "moderate" | "severe") ?? "")
 								}
 							>
 								<SelectTrigger className="w-full">
@@ -137,6 +137,7 @@ export function AddAllergyDialog({
 									<SelectItem value="mild">Mild</SelectItem>
 									<SelectItem value="moderate">Moderate</SelectItem>
 									<SelectItem value="severe">Severe</SelectItem>
+
 								</SelectContent>
 							</Select>
 						</div>

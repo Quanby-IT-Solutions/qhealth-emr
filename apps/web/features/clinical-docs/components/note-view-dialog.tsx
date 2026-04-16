@@ -8,7 +8,6 @@ import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
-	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from "@/core/components/ui/dialog"
@@ -16,12 +15,14 @@ import { Label } from "@/core/components/ui/label"
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
 import {
-	useCreateAddendumMutation,
 	useNoteDetailQuery,
 	useSignAddendumMutation,
-	useSignNoteMutation,
 	useUpdateNoteMutation,
 } from "@/features/clinical-docs/api/clinical-docs.hooks"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+
+import { AmendmentForm } from "./amendment-form"
+import { NoteSigning } from "./note-signing"
 
 function formatDateTime(dateStr: string | null | undefined) {
 	if (!dateStr) return "—"
@@ -61,57 +62,36 @@ export function NoteViewDialog({
 	onOpenChange,
 }: NoteViewDialogProps) {
 	const { data: note, isLoading } = useNoteDetailQuery(noteId)
+	const { data: profile } = useMyProfile()
 
 	const [editContent, setEditContent] = useState<string | null>(null)
 	const [signOpen, setSignOpen] = useState(false)
 	const [addendumOpen, setAddendumOpen] = useState(false)
-	const [addendumContent, setAddendumContent] = useState("")
-	const [addendumReason, setAddendumReason] = useState("")
 
 	const updateNote = useUpdateNoteMutation()
-	const signNote = useSignNoteMutation()
-	const createAddendum = useCreateAddendumMutation()
 	const signAddendum = useSignAddendumMutation()
 
 	const isEditing = editContent !== null
 	const isDraft = note?.status === "draft"
 	const isSigned = note?.status === "signed"
 
+	// Build staff credentials for NoteSigning from the current user's profile
+	const staffProfile = profile?.staffProfiles?.[0]
+	const staffCredentials = {
+		name: staffProfile?.firstName
+			? `${staffProfile.firstName}${staffProfile.middleName ? " " + staffProfile.middleName : ""} ${staffProfile.lastName ?? ""}`.trim()
+			: (note?.authorStaffName ?? "Unknown"),
+		prcLicenseNumber: staffProfile?.prcLicenseNumber ?? null,
+		prcExpiry: staffProfile?.prcExpiry ?? null,
+		ptrNumber: staffProfile?.ptrNumber ?? null,
+		ptrExpiry: staffProfile?.ptrExpiry ?? null,
+	}
+
 	function handleSave() {
 		if (!note || editContent === null) return
 		updateNote.mutate(
 			{ id: note.id, content: editContent },
 			{ onSuccess: () => setEditContent(null) }
-		)
-	}
-
-	function handleSign() {
-		if (!note) return
-		signNote.mutate(
-			{ id: note.id },
-			{
-				onSuccess: () => {
-					setSignOpen(false)
-				},
-			}
-		)
-	}
-
-	function handleCreateAddendum() {
-		if (!note || !addendumContent.trim()) return
-		createAddendum.mutate(
-			{
-				noteId: note.id,
-				content: addendumContent,
-				reason: addendumReason || undefined,
-			},
-			{
-				onSuccess: () => {
-					setAddendumContent("")
-					setAddendumReason("")
-					setAddendumOpen(false)
-				},
-			}
 		)
 	}
 
@@ -132,9 +112,7 @@ export function NoteViewDialog({
 						<DialogHeader>
 							<DialogTitle className="flex items-center gap-2">
 								{noteTypeLabel(note.noteType)}
-								<Badge
-									variant={isSigned ? "default" : "secondary"}
-								>
+								<Badge variant={isSigned ? "default" : "secondary"}>
 									{isSigned ? "Signed" : "Draft"}
 								</Badge>
 							</DialogTitle>
@@ -145,211 +123,158 @@ export function NoteViewDialog({
 							</DialogDescription>
 						</DialogHeader>
 
-						{/* Note Content */}
-						<div className="space-y-4 py-4">
-							{note.templateName && (
-								<div className="text-muted-foreground text-sm">
-									Template: {note.templateName}
-								</div>
-							)}
+						{/* ─── Sign Note Panel ─── */}
+						{signOpen && (
+							<div className="rounded-lg border p-4 bg-muted/20">
+								<h4 className="text-sm font-semibold mb-4">Sign Clinical Note</h4>
+								<NoteSigning
+									noteId={note.id}
+									noteType={note.noteType}
+									staffCredentials={staffCredentials}
+									onSuccess={() => setSignOpen(false)}
+									onCancel={() => setSignOpen(false)}
+								/>
+							</div>
+						)}
 
-							{isEditing ? (
-								<div className="space-y-2">
-									<Label>Content</Label>
-									<Textarea
-										rows={12}
-										value={editContent}
-										onChange={e => setEditContent(e.target.value)}
-									/>
-									<div className="flex gap-2">
-										<Button
-											size="sm"
-											onClick={handleSave}
-											disabled={updateNote.isPending}
-										>
-											{updateNote.isPending ? "Saving…" : "Save Draft"}
-										</Button>
-										<Button
-											size="sm"
-											variant="outline"
-											onClick={() => setEditContent(null)}
-										>
-											Cancel
-										</Button>
+						{/* ─── Amendment / Addendum Panel ─── */}
+						{addendumOpen && (
+							<div className="rounded-lg border p-4 bg-muted/20">
+								<h4 className="text-sm font-semibold mb-4">Add Addendum</h4>
+								<AmendmentForm
+									noteId={note.id}
+									originalContent={note.content}
+									onSuccess={() => setAddendumOpen(false)}
+									onCancel={() => setAddendumOpen(false)}
+								/>
+							</div>
+						)}
+
+						{/* ─── Note Content (hidden while sign/amendment panels are open) ─── */}
+						{!signOpen && !addendumOpen && (
+							<div className="space-y-4 py-4">
+								{note.templateName && (
+									<div className="text-muted-foreground text-sm">
+										Template: {note.templateName}
 									</div>
-								</div>
-							) : (
-								<div className="bg-muted/50 rounded-md border p-4 whitespace-pre-wrap text-sm">
-									{note.content || "No content"}
-								</div>
-							)}
+								)}
 
-							{/* Addenda Section */}
-							{note.addenda && note.addenda.length > 0 && (
-								<>
-									<Separator />
-									<div className="space-y-3">
-										<h4 className="text-sm font-medium">Addenda</h4>
-										{note.addenda.map(addendum => (
-											<div
-												key={addendum.id}
-												className="bg-muted/30 space-y-1 rounded border p-3"
+								{isEditing ? (
+									<div className="space-y-2">
+										<Label>Content</Label>
+										<Textarea
+											rows={12}
+											value={editContent}
+											onChange={e => setEditContent(e.target.value)}
+										/>
+										<div className="flex gap-2">
+											<Button
+												size="sm"
+												onClick={handleSave}
+												disabled={updateNote.isPending}
 											>
-												<div className="flex items-center justify-between text-xs">
-													<span>
-														{addendum.authorStaffName ?? "Unknown"} ·{" "}
-														{formatDateTime(addendum.createdAt)}
-													</span>
-													<Badge
-														variant={
-															addendum.status === "signed"
-																? "default"
-																: "secondary"
-														}
-													>
-														{addendum.status === "signed"
-															? "Signed"
-															: "Draft"}
-													</Badge>
-												</div>
-												{addendum.reason && (
-													<div className="text-muted-foreground text-xs">
-														Reason: {addendum.reason}
-													</div>
-												)}
-												<div className="whitespace-pre-wrap text-sm">
-													{addendum.content}
-												</div>
-												{addendum.status === "draft" && (
-													<Button
-														size="sm"
-														variant="outline"
-														className="mt-1"
-														onClick={() =>
-															handleSignAddendum(addendum.id)
-														}
-														disabled={signAddendum.isPending}
-													>
-														Sign Addendum
-													</Button>
-												)}
-											</div>
-										))}
+												{updateNote.isPending ? "Saving…" : "Save Draft"}
+											</Button>
+											<Button
+												size="sm"
+												variant="outline"
+												onClick={() => setEditContent(null)}
+											>
+												Cancel
+											</Button>
+										</div>
 									</div>
-								</>
-							)}
-						</div>
+								) : (
+									<div className="bg-muted/50 rounded-md border p-4 whitespace-pre-wrap text-sm">
+										{note.content || "No content"}
+									</div>
+								)}
 
-						{/* Actions */}
-						<DialogFooter>
-							{isDraft && !isEditing && (
-								<>
+								{/* Addenda Section */}
+								{note.addenda && note.addenda.length > 0 && (
+									<>
+										<Separator />
+										<div className="space-y-3">
+											<h4 className="text-sm font-medium">Addenda</h4>
+											{note.addenda.map(addendum => (
+												<div
+													key={addendum.id}
+													className="bg-muted/30 space-y-1 rounded border p-3"
+												>
+													<div className="flex items-center justify-between text-xs">
+														<span>
+															{addendum.authorStaffName ?? "Unknown"} ·{" "}
+															{formatDateTime(addendum.createdAt)}
+														</span>
+														<Badge
+															variant={
+																addendum.status === "signed"
+																	? "default"
+																	: "secondary"
+															}
+														>
+															{addendum.status === "signed"
+																? "Signed"
+																: "Draft"}
+														</Badge>
+													</div>
+													{addendum.reason && (
+														<div className="text-muted-foreground text-xs">
+															Reason: {addendum.reason}
+														</div>
+													)}
+													<div className="whitespace-pre-wrap text-sm">
+														{addendum.content}
+													</div>
+													{addendum.status === "draft" && (
+														<Button
+															size="sm"
+															variant="outline"
+															className="mt-1"
+															onClick={() => handleSignAddendum(addendum.id)}
+															disabled={signAddendum.isPending}
+														>
+															Sign Addendum
+														</Button>
+													)}
+												</div>
+											))}
+										</div>
+									</>
+								)}
+							</div>
+						)}
+
+						{/* ─── Footer Actions ─── */}
+						{!signOpen && !addendumOpen && (
+							<div className="flex justify-end gap-2 pt-2">
+								{isDraft && !isEditing && (
+									<>
+										<Button
+											variant="outline"
+											onClick={() => setEditContent(note.content)}
+										>
+											Edit
+										</Button>
+										<Button onClick={() => setSignOpen(true)}>Sign Note</Button>
+									</>
+								)}
+								{isSigned && (
 									<Button
 										variant="outline"
-										onClick={() => setEditContent(note.content)}
+										onClick={() => setAddendumOpen(true)}
 									>
-										Edit
+										Add Addendum
 									</Button>
-									<Button onClick={() => setSignOpen(true)}>Sign Note</Button>
-								</>
-							)}
-							{isSigned && (
-								<Button
-									variant="outline"
-									onClick={() => setAddendumOpen(true)}
-								>
-									Add Addendum
-								</Button>
-							)}
-						</DialogFooter>
+								)}
+							</div>
+						)}
 					</>
 				)}
 			</DialogContent>
-
-			{/* Sign Confirmation Dialog */}
-			<Dialog open={signOpen} onOpenChange={setSignOpen}>
-				<DialogContent className="sm:max-w-md">
-					<DialogHeader>
-						<DialogTitle>Sign Clinical Note</DialogTitle>
-						<DialogDescription>
-							Signing this note makes it part of the permanent medical record. It
-							cannot be edited after signing. Your identity, timestamp, and IP
-							address will be recorded.
-						</DialogDescription>
-					</DialogHeader>
-					<DialogFooter>
-						<Button variant="outline" onClick={() => setSignOpen(false)}>
-							Cancel
-						</Button>
-						<Button
-							onClick={handleSign}
-							disabled={signNote.isPending}
-						>
-							{signNote.isPending ? "Signing…" : "Confirm & Sign"}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-
-			{/* Add Addendum Dialog */}
-			<Dialog
-				open={addendumOpen}
-				onOpenChange={v => {
-					if (!v) {
-						setAddendumContent("")
-						setAddendumReason("")
-					}
-					setAddendumOpen(v)
-				}}
-			>
-				<DialogContent className="sm:max-w-lg">
-					<DialogHeader>
-						<DialogTitle>Add Addendum</DialogTitle>
-						<DialogDescription>
-							Append an addendum to this signed note. The addendum must be
-							separately signed.
-						</DialogDescription>
-					</DialogHeader>
-					<div className="space-y-4 py-4">
-						<div className="space-y-2">
-							<Label>Addendum Content *</Label>
-							<Textarea
-								rows={6}
-								placeholder="Enter additional documentation…"
-								value={addendumContent}
-								onChange={e => setAddendumContent(e.target.value)}
-							/>
-						</div>
-						<div className="space-y-2">
-							<Label>Reason (optional)</Label>
-							<Textarea
-								rows={2}
-								placeholder="Reason for addendum…"
-								value={addendumReason}
-								onChange={e => setAddendumReason(e.target.value)}
-							/>
-						</div>
-					</div>
-					<DialogFooter>
-						<Button
-							variant="outline"
-							onClick={() => {
-								setAddendumContent("")
-								setAddendumReason("")
-								setAddendumOpen(false)
-							}}
-						>
-							Cancel
-						</Button>
-						<Button
-							onClick={handleCreateAddendum}
-							disabled={!addendumContent.trim() || createAddendum.isPending}
-						>
-							{createAddendum.isPending ? "Adding…" : "Add Addendum"}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
 		</Dialog>
 	)
 }
+
+
+

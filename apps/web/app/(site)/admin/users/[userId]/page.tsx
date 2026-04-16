@@ -1,5 +1,3 @@
-"use client"
-
 import { UserDetail } from "@/features/admin/components/user-detail"
 
 interface AdminUserDetailPageProps {

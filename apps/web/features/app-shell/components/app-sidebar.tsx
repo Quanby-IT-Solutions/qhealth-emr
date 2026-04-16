@@ -66,7 +66,7 @@ export function AppSidebar() {
 								const Icon = NAV_ICONS[item.iconName]
 								const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
 								return (
-									<SidebarMenuItem key={item.href}>
+									<SidebarMenuItem key={`primary-${item.href}`}>
 										<SidebarMenuButton isActive={isActive} tooltip={item.title}>
 											<Link href={item.href as never} className="flex items-center gap-2">
 												<HugeiconsIcon icon={Icon} className="size-4" />
@@ -101,7 +101,7 @@ export function AppSidebar() {
 												const Icon = NAV_ICONS[item.iconName]
 												const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
 												return (
-													<SidebarMenuItem key={item.href}>
+													<SidebarMenuItem key={`secondary-${item.href}`}>
 														<SidebarMenuButton isActive={isActive} tooltip={item.title}>
 															<Link href={item.href as never} className="flex items-center gap-2">
 																<HugeiconsIcon icon={Icon} className="size-4" />

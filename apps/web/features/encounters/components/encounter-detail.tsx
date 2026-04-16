@@ -19,6 +19,7 @@ import { ConsentRecordsTab } from "@/features/clinical-docs/components/consent-r
 import { DocumentationTab } from "@/features/clinical-docs/components/documentation-tab"
 import { useEncounterDetailQuery } from "@/features/encounters/api/encounters.hooks"
 import { BillingTab } from "@/features/billing/components/billing-tab"
+import { CewsEligibilityBadge } from "@/features/billing/components/cews-eligibility-badge"
 import { NursingTab } from "@/features/nursing/components/nursing-tab"
 import { OrdersTab } from "@/features/orders/components/orders-tab"
 import { ProblemsAllergiesTab } from "@/features/problems-allergies/components/problems-allergies-tab"
@@ -97,6 +98,7 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 							{encounter.status}
 						</Badge>
 					</div>
+					<CewsEligibilityBadge patientId={patientId} />
 					{encounter.wardName && (
 						<div className="text-sm">
 							<span className="text-muted-foreground">Ward:</span> {encounter.wardName}
@@ -304,6 +306,8 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 							encounterId={encounterId}
 							encounterType={encounter.encounterType}
 							patientId={patientId}
+							patientSex={encounter.patientSex}
+							patientDateOfBirth={encounter.patientDateOfBirth}
 						/>
 					</TabsContent>
 				)}
@@ -311,7 +315,7 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 
 			{/* Back button */}
 			<div className="flex gap-3">
-				<Button variant="outline" render={<Link href={`/patients/${patientId}`} />}>
+				<Button variant="outline" nativeButton={false} render={<Link href={`/patients/${patientId}`} />}>
 					Back to Patient
 				</Button>
 			</div>

@@ -35,7 +35,15 @@ export const MedOrderStatusEnum = z.enum([
 	"cancelled",
 ])
 
-export const LabOrderStatusEnum = z.enum(["ordered", "collected", "resulted", "cancelled"])
+export const LabOrderStatusEnum = z.enum([
+	"pending",
+	"ordered",
+	"collected",
+	"in_progress",
+	"resulted",
+	"completed",
+	"cancelled",
+])
 
 export const ImagingOrderStatusEnum = z.enum([
 	"ordered",
@@ -301,6 +309,10 @@ export const VerifyOrderSchema = z.object({
 
 export const VerificationQueueSchema = PaginationInputSchema.extend({
 	facilityId: z.string().uuid(),
+	status: MedOrderStatusEnum.optional(),
+	priority: OrderPriorityEnum.optional(),
+	search: z.string().optional(),
+	isControlledSubstance: z.coerce.boolean().optional(),
 })
 
 export const VerificationQueueResponseSchema = PaginatedResponseSchema.extend({

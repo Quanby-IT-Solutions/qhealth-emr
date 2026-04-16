@@ -11,28 +11,22 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/core/components/ui/dialog"
-import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/core/components/ui/select"
+import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
-import {
-	useCreateNoteMutation,
-	useNoteTemplatesQuery,
-} from "@/features/clinical-docs/api/clinical-docs.hooks"
+import { useCreateNoteMutation } from "@/features/clinical-docs/api/clinical-docs.hooks"
 
-const NOTE_TYPES = [
-	{ value: "admission", label: "Admission Note" },
-	{ value: "progress", label: "Progress Note" },
-	{ value: "consultation", label: "Consultation" },
-	{ value: "discharge_summary", label: "Discharge Summary" },
-	{ value: "fpe", label: "FPE / Konsulta" },
-] as const
+import {
+	requiresTemplate,
+	TemplateSelector,
+	type NoteTypeValue,
+} from "./template-selector"
+
+interface SelectedTemplate {
+	id: string
+	name: string
+	sections: Array<{ key: string; label: string; defaultContent?: string }>
+}
 
 interface CreateNoteDialogProps {
 	open: boolean
@@ -47,44 +41,44 @@ export function CreateNoteDialog({
 	encounterId,
 	facilityId,
 }: CreateNoteDialogProps) {
-	const [noteType, setNoteType] = useState<string>("")
+	const [noteType, setNoteType] = useState<NoteTypeValue | "">("")
 	const [templateId, setTemplateId] = useState<string>("")
+	const [selectedTemplate, setSelectedTemplate] = useState<SelectedTemplate | null>(null)
 	const [content, setContent] = useState("")
-
-	const { data: templatesData } = useNoteTemplatesQuery({
-		facilityId,
-		category: noteType || undefined,
-		isActive: true,
-	})
-	const templates = templatesData?.data ?? []
 
 	const createNote = useCreateNoteMutation()
 
 	function resetForm() {
 		setNoteType("")
 		setTemplateId("")
+		setSelectedTemplate(null)
 		setContent("")
+	}
+
+	function handleTemplateChange(id: string, tpl: SelectedTemplate | null) {
+		setTemplateId(id)
+		setSelectedTemplate(tpl)
+		// Pre-populate content from template sections
+		if (tpl) {
+			setContent(
+				tpl.sections
+					.map(s => `## ${s.label}\n\n${s.defaultContent ?? ""}`)
+					.join("\n\n")
+			)
+		} else {
+			setContent("")
+		}
 	}
 
 	function handleSubmit() {
 		if (!noteType) return
-
-		const selectedTemplate = templates.find(t => t.id === templateId)
-		const initialContent =
-			content ||
-			(selectedTemplate
-				? selectedTemplate.sections
-						.map(s => `## ${s.label}\n\n${s.defaultContent ?? ""}`)
-						.join("\n\n")
-				: "")
-
 		createNote.mutate(
 			{
 				facilityId,
 				encounterId,
 				templateId: templateId || undefined,
-				noteType: noteType as "admission" | "progress" | "consultation" | "discharge_summary" | "fpe",
-				content: initialContent,
+				noteType: noteType as NoteTypeValue,
+				content,
 			},
 			{
 				onSuccess: () => {
@@ -95,6 +89,11 @@ export function CreateNoteDialog({
 		)
 	}
 
+	const canSubmit =
+		!!noteType &&
+		!requiresTemplate(noteType, templateId) &&
+		!createNote.isPending
+
 	return (
 		<Dialog
 			open={open}
@@ -103,62 +102,47 @@ export function CreateNoteDialog({
 				onOpenChange(v)
 			}}
 		>
-			<DialogContent className="sm:max-w-lg">
+			<DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
 				<DialogHeader>
 					<DialogTitle>Create Clinical Note</DialogTitle>
 					<DialogDescription>
-						Select a note type and optionally choose a template to pre-populate the
-						note.
+						Select a note type and choose a template. Admission Notes, Discharge
+						Summaries, and FPE notes require a template.
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="space-y-4 py-4">
-					<div className="space-y-2">
-						<Label>Note Type *</Label>
-						<Select value={noteType} onValueChange={v => setNoteType(v ?? "")}>
-							<SelectTrigger>
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{NOTE_TYPES.map(t => (
-									<SelectItem key={t.value} value={t.value}>
-										{t.label}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
+				<div className="space-y-5 py-4">
+					<TemplateSelector
+						facilityId={facilityId}
+						noteType={noteType}
+						templateId={templateId}
+						onNoteTypeChange={type => {
+							setNoteType(type)
+							setTemplateId("")
+							setSelectedTemplate(null)
+							setContent("")
+						}}
+						onTemplateChange={handleTemplateChange}
+					/>
 
-					{noteType && templates.length > 0 && (
-						<div className="space-y-2">
-							<Label>Template (optional)</Label>
-							<Select
-								value={templateId}
-								onValueChange={v => setTemplateId(v ?? "")}
-							>
-								<SelectTrigger>
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{templates.map(t => (
-										<SelectItem key={t.id} value={t.id}>
-											{t.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
+					{noteType && (
+						<>
+							<Separator />
+							<div className="space-y-2">
+								<Label>Note Content</Label>
+								<Textarea
+									placeholder={
+										selectedTemplate
+											? "Sections pre-filled from template. Edit as needed…"
+											: "Enter note content…"
+									}
+									rows={8}
+									value={content}
+									onChange={e => setContent(e.target.value)}
+								/>
+							</div>
+						</>
 					)}
-
-					<div className="space-y-2">
-						<Label>Initial Content</Label>
-						<Textarea
-							placeholder="Enter note content or leave blank to use template defaults…"
-							rows={6}
-							value={content}
-							onChange={e => setContent(e.target.value)}
-						/>
-					</div>
 				</div>
 
 				<DialogFooter>
@@ -171,10 +155,7 @@ export function CreateNoteDialog({
 					>
 						Cancel
 					</Button>
-					<Button
-						onClick={handleSubmit}
-						disabled={!noteType || createNote.isPending}
-					>
+					<Button onClick={handleSubmit} disabled={!canSubmit}>
 						{createNote.isPending ? "Creating…" : "Create Draft"}
 					</Button>
 				</DialogFooter>

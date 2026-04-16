@@ -80,6 +80,31 @@ export function useCreateBreakGlassMutation() {
 	return useMutation(orpc.audit.breakGlass.create.mutationOptions())
 }
 
+export function useBreakGlassEventDetailQuery(id: string | null) {
+	return useQuery({
+		...orpc.audit.breakGlass.get.queryOptions({ input: { id: id! } }),
+		enabled: !!id,
+	})
+}
+
+export function usePatientBreakGlassEventsQuery(params: {
+	facilityId: string
+	patientId: string
+	reviewStatus?: string
+}) {
+	return useQuery(
+		orpc.audit.breakGlass.list.queryOptions({
+			input: {
+				facilityId: params.facilityId,
+				patientId: params.patientId,
+				reviewStatus: params.reviewStatus as BreakGlassEvent["reviewStatus"] | undefined,
+				page: 1,
+				limit: 100,
+			},
+		})
+	)
+}
+
 export function useReviewBreakGlassMutation() {
 	const queryClient = useQueryClient()
 
@@ -91,5 +116,37 @@ export function useReviewBreakGlassMutation() {
 				}),
 		})
 	)
+}
+
+/**
+ * Check if the current user has an active break-glass session for a specific patient.
+ * Returns the active event if found (accessExpiresAt > now), null otherwise.
+ */
+export function useMyActiveBreakGlassQuery(params: {
+	facilityId: string | undefined
+	patientId: string | undefined
+	staffId: string | undefined
+}) {
+	const query = useQuery({
+		...orpc.audit.breakGlass.list.queryOptions({
+			input: {
+				facilityId: params.facilityId!,
+				patientId: params.patientId!,
+				clinicianStaffId: params.staffId!,
+				page: 1,
+				limit: 10,
+			},
+		}),
+		enabled: !!params.facilityId && !!params.patientId && !!params.staffId,
+		select: data => {
+			// Find an event that is still active (accessExpiresAt > now)
+			const now = new Date()
+			const activeEvent = data?.data.find(
+				event => new Date(event.accessExpiresAt) > now
+			)
+			return activeEvent ?? null
+		},
+	})
+	return query
 }
 

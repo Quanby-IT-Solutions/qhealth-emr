@@ -5,12 +5,18 @@ import { useState } from "react"
 
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useBedListQuery } from "@/features/beds/api/beds.hooks"
+import { BedSuggestionPanel } from "@/features/beds/components/bed-suggestion-panel"
 import { useCreateEncounterMutation } from "@/features/encounters/api/encounters.hooks"
 
 interface CreateEncounterFormProps {
@@ -18,7 +24,10 @@ interface CreateEncounterFormProps {
 	patientName: string
 }
 
-export function CreateEncounterForm({ patientId, patientName }: CreateEncounterFormProps) {
+export function CreateEncounterForm({
+	patientId,
+	patientName,
+}: CreateEncounterFormProps) {
 	const router = useRouter()
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
@@ -36,11 +45,14 @@ export function CreateEncounterForm({ patientId, patientName }: CreateEncounterF
 	const update = (field: string, value: string) =>
 		setForm(prev => ({ ...prev, [field]: value }))
 
-	const availableBeds = (bedData?.wards ?? []).flatMap(w =>
-		w.beds
-			.filter(b => b.status === "available")
-			.map(b => ({ ...b, wardName: w.name }))
+	const availableBeds = (bedData?.wards ?? []).flatMap(ward =>
+		ward.beds
+			.filter(bed => bed.status === "available")
+			.map(bed => ({ ...bed, wardName: ward.name, wardType: ward.wardType }))
 	)
+
+	const needsBed =
+		form.encounterType === "inpatient" || form.encounterType === "emergency"
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
@@ -64,12 +76,15 @@ export function CreateEncounterForm({ patientId, patientName }: CreateEncounterF
 		<form onSubmit={handleSubmit} className="space-y-6">
 			<Card>
 				<CardHeader>
-					<CardTitle>New Encounter — {patientName}</CardTitle>
+					<CardTitle>New Encounter - {patientName}</CardTitle>
 				</CardHeader>
 				<CardContent className="grid gap-4 sm:grid-cols-2">
 					<div className="space-y-1.5">
 						<Label>Encounter Type *</Label>
-						<Select value={form.encounterType} onValueChange={v => update("encounterType", v ?? "")}>
+						<Select
+							value={form.encounterType}
+							onValueChange={value => update("encounterType", value ?? "")}
+						>
 							<SelectTrigger className="w-full">
 								<SelectValue />
 							</SelectTrigger>
@@ -80,24 +95,6 @@ export function CreateEncounterForm({ patientId, patientName }: CreateEncounterF
 							</SelectContent>
 						</Select>
 					</div>
-
-					{(form.encounterType === "inpatient" || form.encounterType === "emergency") && (
-						<div className="space-y-1.5">
-							<Label>Bed Assignment</Label>
-							<Select value={form.bedId} onValueChange={v => update("bedId", v ?? "")}>
-								<SelectTrigger className="w-full">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{availableBeds.map(bed => (
-										<SelectItem key={bed.id} value={bed.id}>
-											{bed.wardName} — {bed.bedNumber}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
-					)}
 
 					<div className="space-y-1.5 sm:col-span-2">
 						<Label>Chief Complaint</Label>
@@ -110,9 +107,24 @@ export function CreateEncounterForm({ patientId, patientName }: CreateEncounterF
 				</CardContent>
 			</Card>
 
+			{needsBed && (
+				<div className="space-y-1.5">
+					<Label>Bed Assignment</Label>
+					<BedSuggestionPanel
+						encounterType={form.encounterType as "inpatient" | "emergency"}
+						availableBeds={availableBeds}
+						selectedBedId={form.bedId}
+						onSelect={bedId => update("bedId", bedId)}
+					/>
+				</div>
+			)}
+
 			<div className="flex gap-3">
-				<Button type="submit" disabled={!form.encounterType || createEncounter.isPending}>
-					{createEncounter.isPending ? "Creating…" : "Create Encounter"}
+				<Button
+					type="submit"
+					disabled={!form.encounterType || createEncounter.isPending}
+				>
+					{createEncounter.isPending ? "Creating..." : "Create Encounter"}
 				</Button>
 				<Button type="button" variant="outline" onClick={() => router.back()}>
 					Cancel

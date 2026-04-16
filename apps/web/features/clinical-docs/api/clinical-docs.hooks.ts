@@ -26,7 +26,7 @@ function buildQueryString(params: Record<string, string | number | boolean | und
 }
 
 // ============================================================================
-// Types
+// Types (exported for use in feature components)
 // ============================================================================
 
 interface TemplateSection {
@@ -102,7 +102,7 @@ interface ConsentRecord {
 	facilityId: string
 	encounterId: string
 	patientId: string
-	consentType: "general" | "procedure" | "research" | "blood_transfusion" | "surgery"
+	consentType: "general" | "procedure" | "research" | "blood_transfusion" | "surgery" | "dpa"
 	signedByName: string
 	relationship: "self" | "parent" | "guardian" | "spouse" | "other"
 	content: string | null
@@ -111,9 +111,12 @@ interface ConsentRecord {
 	witnessStaffId: string | null
 	witnessStaffName: string | null
 	revokedAt: string | null
+	revokeReason: string | null
 	createdAt: string
 	updatedAt: string
 }
+
+export type { ConsentRecord }
 
 interface ConsentRecordListResponse {
 	data: ConsentRecord[]
@@ -140,6 +143,7 @@ export const clinicalDocsKeys = {
 	note: (id: string) => [...clinicalDocsKeys.all, "note", id] as const,
 	consents: (encounterId: string) => [...clinicalDocsKeys.all, "consents", encounterId] as const,
 	consent: (id: string) => [...clinicalDocsKeys.all, "consent", id] as const,
+	patientConsents: (patientId: string) => [...clinicalDocsKeys.all, "patient-consents", patientId] as const,
 	signedNotes: (encounterId: string) =>
 		[...clinicalDocsKeys.all, "signed-notes", encounterId] as const,
 }
@@ -157,7 +161,7 @@ export function useNoteTemplatesQuery(params: {
 		queryKey: clinicalDocsKeys.templates(params.facilityId),
 		queryFn: () =>
 			fetchJson<NoteTemplateListResponse>(
-				`${API_BASE}/clinical-docs/templates${buildQueryString({
+				`${API_BASE}/templates${buildQueryString({
 					facilityId: params.facilityId,
 					category: params.category,
 					isActive: params.isActive,
@@ -171,7 +175,7 @@ export function useNoteTemplatesQuery(params: {
 export function useNoteTemplateDetailQuery(id: string) {
 	return useQuery({
 		queryKey: clinicalDocsKeys.template(id),
-		queryFn: () => fetchJson<NoteTemplate>(`${API_BASE}/clinical-docs/templates/${id}`),
+		queryFn: () => fetchJson<NoteTemplate>(`${API_BASE}/templates/${id}`),
 		enabled: !!id,
 	})
 }
@@ -186,7 +190,7 @@ export function useCreateTemplateMutation() {
 			category: NoteTemplate["category"]
 			sections: TemplateSection[]
 		}) =>
-			fetchJson<NoteTemplate>(`${API_BASE}/clinical-docs/templates`, {
+			fetchJson<NoteTemplate>(`${API_BASE}/templates`, {
 				method: "POST",
 				body: JSON.stringify(data),
 			}),
@@ -209,7 +213,7 @@ export function useUpdateTemplateMutation() {
 			sections?: TemplateSection[]
 			isActive?: boolean
 		}) =>
-			fetchJson<NoteTemplate>(`${API_BASE}/clinical-docs/templates/${data.id}`, {
+			fetchJson<NoteTemplate>(`${API_BASE}/templates/${data.id}`, {
 				method: "PUT",
 				body: JSON.stringify(data),
 			}),
@@ -235,7 +239,7 @@ export function useNotesQuery(params: {
 		queryKey: clinicalDocsKeys.notes(params.encounterId, params.preEncounterId),
 		queryFn: () =>
 			fetchJson<ClinicalNoteListResponse>(
-				`${API_BASE}/clinical-docs/notes${buildQueryString({
+				`${API_BASE}/notes${buildQueryString({
 					encounterId: params.encounterId,
 					preEncounterId: params.preEncounterId,
 					noteType: params.noteType,
@@ -250,7 +254,7 @@ export function useNotesQuery(params: {
 export function useNoteDetailQuery(id: string) {
 	return useQuery({
 		queryKey: clinicalDocsKeys.note(id),
-		queryFn: () => fetchJson<ClinicalNote>(`${API_BASE}/clinical-docs/notes/${id}`),
+		queryFn: () => fetchJson<ClinicalNote>(`${API_BASE}/notes/${id}`),
 		enabled: !!id,
 	})
 }
@@ -268,7 +272,7 @@ export function useCreateNoteMutation() {
 			content?: string
 			structuredData?: unknown
 		}) =>
-			fetchJson<ClinicalNote>(`${API_BASE}/clinical-docs/notes`, {
+			fetchJson<ClinicalNote>(`${API_BASE}/notes`, {
 				method: "POST",
 				body: JSON.stringify(data),
 			}),
@@ -285,7 +289,7 @@ export function useUpdateNoteMutation() {
 
 	return useMutation({
 		mutationFn: (data: { id: string; content?: string; structuredData?: unknown }) =>
-			fetchJson<ClinicalNote>(`${API_BASE}/clinical-docs/notes/${data.id}`, {
+			fetchJson<ClinicalNote>(`${API_BASE}/notes/${data.id}`, {
 				method: "PUT",
 				body: JSON.stringify(data),
 			}),
@@ -305,7 +309,7 @@ export function useSignNoteMutation() {
 
 	return useMutation({
 		mutationFn: (data: { id: string }) =>
-			fetchJson<ClinicalNote>(`${API_BASE}/clinical-docs/notes/${data.id}/sign`, {
+			fetchJson<ClinicalNote>(`${API_BASE}/notes/${data.id}/sign`, {
 				method: "PUT",
 				body: JSON.stringify(data),
 			}),
@@ -329,7 +333,7 @@ export function useCreateAddendumMutation() {
 
 	return useMutation({
 		mutationFn: (data: { noteId: string; content: string; reason?: string }) =>
-			fetchJson<Addendum>(`${API_BASE}/clinical-docs/addenda`, {
+			fetchJson<Addendum>(`${API_BASE}/addenda`, {
 				method: "POST",
 				body: JSON.stringify(data),
 			}),
@@ -346,7 +350,7 @@ export function useSignAddendumMutation() {
 
 	return useMutation({
 		mutationFn: (data: { id: string; noteId: string }) =>
-			fetchJson<Addendum>(`${API_BASE}/clinical-docs/addenda/${data.id}/sign`, {
+			fetchJson<Addendum>(`${API_BASE}/addenda/${data.id}/sign`, {
 				method: "PUT",
 				body: JSON.stringify(data),
 			}),
@@ -370,7 +374,7 @@ export function useConsentsQuery(params: {
 		queryKey: clinicalDocsKeys.consents(params.encounterId),
 		queryFn: () =>
 			fetchJson<ConsentRecordListResponse>(
-				`${API_BASE}/clinical-docs/consents${buildQueryString({
+				`${API_BASE}/consents${buildQueryString({
 					encounterId: params.encounterId,
 					consentType: params.consentType,
 					limit: 100,
@@ -383,7 +387,7 @@ export function useConsentsQuery(params: {
 export function useConsentDetailQuery(id: string) {
 	return useQuery({
 		queryKey: clinicalDocsKeys.consent(id),
-		queryFn: () => fetchJson<ConsentRecord>(`${API_BASE}/clinical-docs/consents/${id}`),
+		queryFn: () => fetchJson<ConsentRecord>(`${API_BASE}/consents/${id}`),
 		enabled: !!id,
 	})
 }
@@ -402,7 +406,7 @@ export function useCreateConsentMutation() {
 			content?: string
 			signatureData?: unknown
 		}) =>
-			fetchJson<ConsentRecord>(`${API_BASE}/clinical-docs/consents`, {
+			fetchJson<ConsentRecord>(`${API_BASE}/consents`, {
 				method: "POST",
 				body: JSON.stringify(data),
 			}),
@@ -419,7 +423,7 @@ export function useRevokeConsentMutation() {
 
 	return useMutation({
 		mutationFn: (data: { id: string; encounterId: string }) =>
-			fetchJson<ConsentRecord>(`${API_BASE}/clinical-docs/consents/${data.id}/revoke`, {
+			fetchJson<ConsentRecord>(`${API_BASE}/consents/${data.id}/revoke`, {
 				method: "PUT",
 				body: JSON.stringify(data),
 			}),
@@ -428,6 +432,46 @@ export function useRevokeConsentMutation() {
 				queryKey: clinicalDocsKeys.consents(variables.encounterId),
 			})
 		},
+	})
+}
+
+export function useRevokeConsentWithReasonMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation({
+		mutationFn: (data: { id: string; patientId: string; encounterId?: string; reason?: string }) =>
+			fetchJson<ConsentRecord>(`${API_BASE}/consents/${data.id}/revoke`, {
+				method: "PUT",
+				body: JSON.stringify({ reason: data.reason }),
+			}),
+		onSuccess: (_data, variables) => {
+			if (variables.encounterId) {
+				void queryClient.invalidateQueries({
+					queryKey: clinicalDocsKeys.consents(variables.encounterId),
+				})
+			}
+			void queryClient.invalidateQueries({
+				queryKey: clinicalDocsKeys.patientConsents(variables.patientId),
+			})
+		},
+	})
+}
+
+export function usePatientConsentsQuery(params: {
+	patientId: string
+	consentType?: string
+}) {
+	return useQuery({
+		queryKey: clinicalDocsKeys.patientConsents(params.patientId),
+		queryFn: () =>
+			fetchJson<ConsentRecordListResponse>(
+				`${API_BASE}/consents${buildQueryString({
+					patientId: params.patientId,
+					consentType: params.consentType,
+					limit: 200,
+				})}`
+			),
+		enabled: !!params.patientId,
 	})
 }
 
@@ -440,7 +484,7 @@ export function useSignedNotesQuery(encounterId: string) {
 		queryKey: clinicalDocsKeys.signedNotes(encounterId),
 		queryFn: () =>
 			fetchJson<SignedNotesResponse>(
-				`${API_BASE}/clinical-docs/signed-notes${buildQueryString({
+				`${API_BASE}/signed-notes${buildQueryString({
 					encounterId,
 				})}`
 			),

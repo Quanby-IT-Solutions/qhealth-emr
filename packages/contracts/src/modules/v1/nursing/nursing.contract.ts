@@ -49,7 +49,7 @@ export const nursingContract = {
 	listVitals: oc
 		.route({
 			method: "GET",
-			path: "/nursing/vitals",
+			path: "/vitals",
 			summary: "List vital sign entries",
 			tags: ["Nursing — Vitals"],
 		})
@@ -59,7 +59,7 @@ export const nursingContract = {
 	getVital: oc
 		.route({
 			method: "GET",
-			path: "/nursing/vitals/{id}",
+			path: "/vitals/{id}",
 			summary: "Get vital sign entry by ID",
 			tags: ["Nursing — Vitals"],
 		})
@@ -69,7 +69,7 @@ export const nursingContract = {
 	createVital: oc
 		.route({
 			method: "POST",
-			path: "/nursing/vitals",
+			path: "/vitals",
 			summary: "Record vital signs with auto NEWS calculation",
 			tags: ["Nursing — Vitals"],
 		})
@@ -83,7 +83,7 @@ export const nursingContract = {
 	listMarEntries: oc
 		.route({
 			method: "GET",
-			path: "/nursing/mar",
+			path: "/mar",
 			summary: "List MAR entries (time-grid data)",
 			tags: ["Nursing — MAR"],
 		})
@@ -93,7 +93,7 @@ export const nursingContract = {
 	getMarEntry: oc
 		.route({
 			method: "GET",
-			path: "/nursing/mar/{id}",
+			path: "/mar/{id}",
 			summary: "Get MAR entry by ID",
 			tags: ["Nursing — MAR"],
 		})
@@ -103,7 +103,7 @@ export const nursingContract = {
 	administerMar: oc
 		.route({
 			method: "PUT",
-			path: "/nursing/mar/{id}/administer",
+			path: "/mar/{id}/administer",
 			summary: "Administer, hold, or refuse a medication (MAR)",
 			tags: ["Nursing — MAR"],
 		})
@@ -117,7 +117,7 @@ export const nursingContract = {
 	listTarEntries: oc
 		.route({
 			method: "GET",
-			path: "/nursing/tar",
+			path: "/tar",
 			summary: "List TAR entries",
 			tags: ["Nursing — TAR"],
 		})
@@ -127,7 +127,7 @@ export const nursingContract = {
 	getTarEntry: oc
 		.route({
 			method: "GET",
-			path: "/nursing/tar/{id}",
+			path: "/tar/{id}",
 			summary: "Get TAR entry by ID",
 			tags: ["Nursing — TAR"],
 		})
@@ -137,7 +137,7 @@ export const nursingContract = {
 	createTarEntry: oc
 		.route({
 			method: "POST",
-			path: "/nursing/tar",
+			path: "/tar",
 			summary: "Create a TAR entry",
 			tags: ["Nursing — TAR"],
 		})
@@ -147,7 +147,7 @@ export const nursingContract = {
 	administerTar: oc
 		.route({
 			method: "PUT",
-			path: "/nursing/tar/{id}/administer",
+			path: "/tar/{id}/administer",
 			summary: "Complete or mark a treatment (TAR)",
 			tags: ["Nursing — TAR"],
 		})
@@ -161,7 +161,7 @@ export const nursingContract = {
 	listIoEntries: oc
 		.route({
 			method: "GET",
-			path: "/nursing/io",
+			path: "/io",
 			summary: "List intake/output entries",
 			tags: ["Nursing — I/O"],
 		})
@@ -171,7 +171,7 @@ export const nursingContract = {
 	createIoEntry: oc
 		.route({
 			method: "POST",
-			path: "/nursing/io",
+			path: "/io",
 			summary: "Record an intake or output entry",
 			tags: ["Nursing — I/O"],
 		})
@@ -181,7 +181,7 @@ export const nursingContract = {
 	getIoBalance: oc
 		.route({
 			method: "GET",
-			path: "/nursing/io/balance",
+			path: "/io/balance",
 			summary: "Get 24hr I/O fluid balance",
 			tags: ["Nursing — I/O"],
 		})
@@ -195,7 +195,7 @@ export const nursingContract = {
 	listFlowsheetEntries: oc
 		.route({
 			method: "GET",
-			path: "/nursing/flowsheets",
+			path: "/flowsheets",
 			summary: "List flowsheet entries (time-series grid)",
 			tags: ["Nursing — Flowsheets"],
 		})
@@ -209,7 +209,7 @@ export const nursingContract = {
 	listHandoffs: oc
 		.route({
 			method: "GET",
-			path: "/nursing/handoffs",
+			path: "/handoffs",
 			summary: "List shift handoff reports",
 			tags: ["Nursing — Handoff"],
 		})
@@ -219,7 +219,7 @@ export const nursingContract = {
 	getHandoff: oc
 		.route({
 			method: "GET",
-			path: "/nursing/handoffs/{id}",
+			path: "/handoffs/{id}",
 			summary: "Get shift handoff by ID",
 			tags: ["Nursing — Handoff"],
 		})
@@ -229,7 +229,7 @@ export const nursingContract = {
 	generateHandoffSummary: oc
 		.route({
 			method: "POST",
-			path: "/nursing/handoffs/generate",
+			path: "/handoffs/generate",
 			summary: "Auto-generate a shift handoff summary",
 			tags: ["Nursing — Handoff"],
 		})
@@ -239,7 +239,7 @@ export const nursingContract = {
 	createHandoff: oc
 		.route({
 			method: "POST",
-			path: "/nursing/handoffs",
+			path: "/handoffs",
 			summary: "Create a shift handoff report",
 			tags: ["Nursing — Handoff"],
 		})
@@ -249,7 +249,7 @@ export const nursingContract = {
 	finalizeHandoff: oc
 		.route({
 			method: "PUT",
-			path: "/nursing/handoffs/{id}/finalize",
+			path: "/handoffs/{id}/finalize",
 			summary: "Finalize (sign) a shift handoff",
 			tags: ["Nursing — Handoff"],
 		})
@@ -263,7 +263,7 @@ export const nursingContract = {
 	listHaiTags: oc
 		.route({
 			method: "GET",
-			path: "/nursing/hai-tags",
+			path: "/hai-tags",
 			summary: "List HAI tags",
 			tags: ["Nursing — HAI"],
 		})
@@ -273,7 +273,7 @@ export const nursingContract = {
 	getHaiTag: oc
 		.route({
 			method: "GET",
-			path: "/nursing/hai-tags/{id}",
+			path: "/hai-tags/{id}",
 			summary: "Get HAI tag by ID",
 			tags: ["Nursing — HAI"],
 		})
@@ -283,7 +283,7 @@ export const nursingContract = {
 	createHaiTag: oc
 		.route({
 			method: "POST",
-			path: "/nursing/hai-tags",
+			path: "/hai-tags",
 			summary: "Create an HAI tag",
 			tags: ["Nursing — HAI"],
 		})
@@ -293,7 +293,7 @@ export const nursingContract = {
 	updateHaiTag: oc
 		.route({
 			method: "PUT",
-			path: "/nursing/hai-tags/{id}",
+			path: "/hai-tags/{id}",
 			summary: "Update an HAI tag",
 			tags: ["Nursing — HAI"],
 		})

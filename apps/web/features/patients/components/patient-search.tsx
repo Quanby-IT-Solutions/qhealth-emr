@@ -171,7 +171,7 @@ export function PatientSearch() {
 						<p className="text-muted-foreground text-sm">
 							No patients found matching your search criteria.
 						</p>
-						<Button render={<Link href="/patients/register" />}>
+						<Button nativeButton={false} render={<Link href="/patients/register" />}>
 							Register New Patient
 						</Button>
 					</CardContent>

@@ -1,11 +1,12 @@
-import { Controller, Req, Sse } from "@nestjs/common"
+import { Controller, Req, Res, Sse } from "@nestjs/common"
 import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
-import type { Request } from "express"
+import type { Request, Response } from "express"
 import { Observable, map } from "rxjs"
 
 import { v1 } from "@/config/api-versions.config"
+import { env } from "@/config/env.config"
 
 import { NotificationService } from "./notification.service"
 
@@ -25,7 +26,19 @@ export class NotificationController {
 	// ===========================================================================
 
 	@Sse("v1/notification/stream")
-	async stream(@Req() req: Request): Promise<Observable<MessageEvent>> {
+	stream(
+		@Req() req: Request,
+		@Res({ passthrough: true }) res: Response
+	): Observable<MessageEvent> {
+		// Set CORS headers explicitly for SSE streams (NestJS CORS middleware
+		// may not propagate headers to streaming responses)
+		const origin = req.headers.origin
+		const allowedOrigins = env.CORS_ORIGINS.split(",").map(o => o.trim())
+		if (origin && allowedOrigins.includes(origin)) {
+			res.setHeader("Access-Control-Allow-Origin", origin)
+			res.setHeader("Access-Control-Allow-Credentials", "true")
+		}
+
 		// The RbacGuard attaches the full RBAC profile to the request.
 		// Use the active staff profile's UUID so the SSE connection key matches
 		// the recipientStaffId used in send() — enabling real-time delivery.

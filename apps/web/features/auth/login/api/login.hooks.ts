@@ -21,7 +21,10 @@ export function useLoginMutation() {
 			return result
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: sessionKeys.all })
+			// Clear entire cache — switching users invalidates all user-specific data.
+			// invalidateQueries only marks stale; the stale cache is still served until
+			// the background refetch completes, causing the previous user to flash.
+			queryClient.clear()
 			router.push("/")
 			router.refresh()
 		},

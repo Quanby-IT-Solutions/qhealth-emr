@@ -14,6 +14,19 @@ export const RbacModuleEnum = z.enum([
 	"reporting",
 	"audit",
 	"admin",
+	"surgical",
+	"opd",
+	"nutrition",
+	"laboratory",
+	"radiology",
+	"scheduling",
+	"nbs",
+	"consent",
+	"fhir",
+	"msw",
+	"telemedicine",
+	"ed",
+	"death_reporting",
 ])
 
 export const RbacActionEnum = z.enum([
@@ -247,13 +260,28 @@ export const InitiatePasswordResetSchema = z.object({
 })
 
 // ============================================================================
+// Query Helpers
+// ============================================================================
+
+/**
+ * Coerces query string "true"/"false" to boolean for GET params.
+ * Also accepts actual booleans for JSON transport.
+ */
+const queryBoolean = z
+	.union([
+		z.boolean(),
+		z.enum(["true", "false"]).transform((v) => v === "true"),
+	])
+	.optional()
+
+// ============================================================================
 // List Queries
 // ============================================================================
 
 export const ListUsersQuerySchema = z.object({
 	facilityId: z.string().uuid().optional(),
 	search: z.string().optional(),
-	isActive: z.boolean().optional(),
+	isActive: queryBoolean,
 	page: z.coerce.number().int().positive().default(1),
 	limit: z.coerce.number().int().positive().max(100).default(20),
 })

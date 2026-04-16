@@ -2,22 +2,34 @@ import { oc } from "@orpc/contract"
 import { z } from "zod"
 
 import {
+	AddMalasakitInputSchema,
+	ApproveCf5InputSchema,
+	AssignDrgInputSchema,
 	BillingStatusInputSchema,
 	BillingStatusResponseSchema,
 	Cf4PreviewSchema,
 	Cf4ClaimSchema,
+	Cf5AssignmentSchema,
 	ChargeSchema,
 	CheckEligibilityInputSchema,
 	CreateChargeInputSchema,
 	DeleteChargeInputSchema,
+	DrgCodeSchema,
 	EligibilityResponseSchema,
 	FinalizeCf4InputSchema,
 	FinalizeInvoiceInputSchema,
+	FinalizeSoaInputSchema,
 	GenerateCf4InputSchema,
 	GenerateInvoiceInputSchema,
+	GenerateSoaInputSchema,
 	GetCf4InputSchema,
+	GetCf5InputSchema,
 	GetInvoiceInputSchema,
+	GetKonsultaBenefitInputSchema,
+	GetMalasakitInputSchema,
+	GetSoaInputSchema,
 	InvoiceSchema,
+	KonsultaBenefitSchema,
 	ListChargeMasterInputSchema,
 	ListChargeMasterResponseSchema,
 	ListChargesInputSchema,
@@ -26,11 +38,17 @@ import {
 	ListInvoicesResponseSchema,
 	ListPaymentsInputSchema,
 	ListPaymentsResponseSchema,
+	MalasakitAssistanceSchema,
+	MalasakitSummarySchema,
+	RecordKonsultaVisitInputSchema,
 	RecordPaymentInputSchema,
 	PaymentSchema,
+	SearchDrgInputSchema,
+	StatementOfAccountSchema,
 	UnbilledEncountersInputSchema,
 	UnbilledEncountersResponseSchema,
 	UpdateChargeInputSchema,
+	UpdateMalasakitStatusInputSchema,
 } from "./billing.schema.js"
 
 export const billingContract = {
@@ -125,6 +143,30 @@ export const billingContract = {
 		.output(Cf4ClaimSchema),
 
 	// ========================================================================
+	// CF5 / DRG Shadow Billing
+	// ========================================================================
+
+	getCf5: oc
+		.route({ method: "GET", path: "/cf5", summary: "Get CF5 assignment for an encounter", tags: ["Billing"] })
+		.input(GetCf5InputSchema)
+		.output(Cf5AssignmentSchema.nullable()),
+
+	searchDrgCodes: oc
+		.route({ method: "GET", path: "/cf5/drg-codes", summary: "Search DRG codes", tags: ["Billing"] })
+		.input(SearchDrgInputSchema)
+		.output(z.array(DrgCodeSchema)),
+
+	assignDrg: oc
+		.route({ method: "POST", path: "/cf5/assign", summary: "Assign a DRG code to an encounter", tags: ["Billing"] })
+		.input(AssignDrgInputSchema)
+		.output(Cf5AssignmentSchema),
+
+	approveCf5: oc
+		.route({ method: "POST", path: "/cf5/{id}/approve", summary: "Approve a CF5 assignment", tags: ["Billing"] })
+		.input(ApproveCf5InputSchema)
+		.output(Cf5AssignmentSchema),
+
+	// ========================================================================
 	// Eligibility Check (CEWS — stubbed)
 	// ========================================================================
 
@@ -150,4 +192,56 @@ export const billingContract = {
 		.route({ method: "GET", path: "/unbilled", summary: "List encounters with charges but no invoice", tags: ["Billing"] })
 		.input(UnbilledEncountersInputSchema)
 		.output(UnbilledEncountersResponseSchema),
+
+	// ========================================================================
+	// Statement of Account (SOA)
+	// ========================================================================
+
+	getSoa: oc
+		.route({ method: "GET", path: "/soa", summary: "Get SOA for an encounter", tags: ["Billing"] })
+		.input(GetSoaInputSchema)
+		.output(StatementOfAccountSchema.nullable()),
+
+	generateSoa: oc
+		.route({ method: "POST", path: "/soa/generate", summary: "Generate a draft SOA", tags: ["Billing"] })
+		.input(GenerateSoaInputSchema)
+		.output(StatementOfAccountSchema),
+
+	finalizeSoa: oc
+		.route({ method: "POST", path: "/soa/{id}/finalize", summary: "Finalize an SOA", tags: ["Billing"] })
+		.input(FinalizeSoaInputSchema)
+		.output(StatementOfAccountSchema),
+
+	// ========================================================================
+	// Konsulta Capitation
+	// ========================================================================
+
+	getKonsultaBenefit: oc
+		.route({ method: "GET", path: "/konsulta", summary: "Get Konsulta benefit status for a patient", tags: ["Billing"] })
+		.input(GetKonsultaBenefitInputSchema)
+		.output(KonsultaBenefitSchema.nullable()),
+
+	recordKonsultaVisit: oc
+		.route({ method: "POST", path: "/konsulta/record-visit", summary: "Record a Konsulta visit", tags: ["Billing"] })
+		.input(RecordKonsultaVisitInputSchema)
+		.output(KonsultaBenefitSchema),
+
+	// ========================================================================
+	// Malasakit Center
+	// ========================================================================
+
+	getMalasakit: oc
+		.route({ method: "GET", path: "/malasakit", summary: "Get Malasakit assistance for an encounter", tags: ["Billing"] })
+		.input(GetMalasakitInputSchema)
+		.output(MalasakitSummarySchema),
+
+	addMalasakit: oc
+		.route({ method: "POST", path: "/malasakit", summary: "Add Malasakit assistance request", tags: ["Billing"] })
+		.input(AddMalasakitInputSchema)
+		.output(MalasakitAssistanceSchema),
+
+	updateMalasakitStatus: oc
+		.route({ method: "PUT", path: "/malasakit/{id}/status", summary: "Update Malasakit assistance status", tags: ["Billing"] })
+		.input(UpdateMalasakitStatusInputSchema)
+		.output(MalasakitAssistanceSchema),
 }

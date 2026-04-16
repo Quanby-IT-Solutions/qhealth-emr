@@ -2,9 +2,7 @@
 
 import { useState } from "react"
 
-import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import {
 	Dialog,
 	DialogContent,
@@ -15,10 +13,9 @@ import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Separator } from "@/core/components/ui/separator"
 import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
-import {
-	useMergePreEncounterMutation,
-	useMergePreviewQuery,
-} from "@/features/ed/api/ed.hooks"
+import { useMergePreEncounterMutation, useMergePreviewQuery } from "@/features/ed/api/ed.hooks"
+
+import { MergePreview } from "./merge-preview"
 
 interface MergeDialogProps {
 	preEncounterId: string
@@ -142,83 +139,12 @@ export function MergeDialog({
 								</p>
 							) : preview ? (
 								<div className="space-y-4">
-									{/* Patient Info */}
-									<Card>
-										<CardHeader className="pb-2">
-											<CardTitle className="text-sm">Patient</CardTitle>
-										</CardHeader>
-										<CardContent className="text-sm">
-											<p className="font-medium">{preview.patientName}</p>
-											<p className="text-muted-foreground">
-												MRN: {preview.patientMrn}
-											</p>
-										</CardContent>
-									</Card>
-
-									{/* Pre-Encounter Info */}
-									<Card>
-										<CardHeader className="pb-2">
-											<CardTitle className="text-sm">Pre-Encounter</CardTitle>
-										</CardHeader>
-										<CardContent className="space-y-1 text-sm">
-											<p>
-												Trauma Alias:{" "}
-												<Badge variant="outline">
-													{preview.preEncounter.traumaAlias}
-												</Badge>
-											</p>
-											{preview.preEncounter.triageAcuityLevel && (
-												<p>
-													Acuity Level: {preview.preEncounter.triageAcuityLevel}
-													{preview.preEncounter.triageAcuityScale && (
-														<span className="text-muted-foreground ml-1">
-															({preview.preEncounter.triageAcuityScale.toUpperCase()})
-														</span>
-													)}
-												</p>
-											)}
-											{preview.preEncounter.triageStaffName && (
-												<p>Triage Staff: {preview.preEncounter.triageStaffName}</p>
-											)}
-										</CardContent>
-									</Card>
-
-									{/* Clinical Records to Merge */}
-									<Card>
-										<CardHeader className="pb-2">
-											<CardTitle className="text-sm">
-												Clinical Records to Transfer
-											</CardTitle>
-										</CardHeader>
-										<CardContent className="text-sm">
-											<div className="grid grid-cols-2 gap-2">
-												<p>
-													Vital Signs:{" "}
-													<Badge variant="secondary">
-														{preview.clinicalRecordCounts.vitalSigns}
-													</Badge>
-												</p>
-												<p>
-													Clinical Notes:{" "}
-													<Badge variant="secondary">
-														{preview.clinicalRecordCounts.clinicalNotes}
-													</Badge>
-												</p>
-												<p>
-													Medication Orders:{" "}
-													<Badge variant="secondary">
-														{preview.clinicalRecordCounts.medicationOrders}
-													</Badge>
-												</p>
-												<p>
-													MAR Entries:{" "}
-													<Badge variant="secondary">
-														{preview.clinicalRecordCounts.marEntries}
-													</Badge>
-												</p>
-											</div>
-										</CardContent>
-									</Card>
+									<MergePreview
+										patientName={preview.patientName}
+										patientMrn={preview.patientMrn}
+										preEncounter={preview.preEncounter}
+										clinicalRecordCounts={preview.clinicalRecordCounts}
+									/>
 
 									<Separator />
 

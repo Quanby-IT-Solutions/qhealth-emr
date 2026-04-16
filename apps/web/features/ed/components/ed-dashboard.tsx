@@ -32,7 +32,9 @@ import { useNotifications } from "@/services/notifications/notification-provider
 
 import { DispositionForm } from "./disposition-form"
 import { MergeDialog } from "./merge-dialog"
+import { PreEncounterForm } from "./pre-encounter-form"
 import { TrackingBoard } from "./tracking-board"
+import { TraumaAliasBadge } from "./trauma-alias-badge"
 import { TriageForm } from "./triage-form"
 
 function queueStatusLabel(status: string) {
@@ -89,6 +91,7 @@ export function EdDashboard() {
 	}, [onTopic, queryClient])
 
 	const [triageOpen, setTriageOpen] = useState(false)
+	const [preEncounterOpen, setPreEncounterOpen] = useState(false)
 	const [mergeItem, setMergeItem] = useState<{
 		preEncounterId: string
 		traumaAlias: string
@@ -135,19 +138,34 @@ export function EdDashboard() {
 						{summary.total} patient{summary.total !== 1 ? "s" : ""} in ED
 					</p>
 				</div>
-				<Dialog open={triageOpen} onOpenChange={setTriageOpen}>
-					<DialogTrigger render={<Button>New Triage</Button>} />
-					<DialogContent className="max-w-lg">
-						<DialogHeader>
-							<DialogTitle>New Triage Pre-Encounter</DialogTitle>
-						</DialogHeader>
-						<TriageForm
-							facilityId={facilityId}
-							triageStaffId={staffProfileId}
-							onSuccess={() => setTriageOpen(false)}
-						/>
-					</DialogContent>
-				</Dialog>
+				<div className="flex items-center gap-2">
+					<Dialog open={triageOpen} onOpenChange={setTriageOpen}>
+						<DialogTrigger render={<Button variant="outline">New Triage</Button>} />
+						<DialogContent className="max-w-lg">
+							<DialogHeader>
+								<DialogTitle>New Triage Pre-Encounter</DialogTitle>
+							</DialogHeader>
+							<TriageForm
+								facilityId={facilityId}
+								triageStaffId={staffProfileId}
+								onSuccess={() => setTriageOpen(false)}
+							/>
+						</DialogContent>
+					</Dialog>
+					<Dialog open={preEncounterOpen} onOpenChange={setPreEncounterOpen}>
+						<DialogTrigger render={<Button>Fast Track (Pre-Encounter)</Button>} />
+						<DialogContent className="max-w-lg">
+							<DialogHeader>
+								<DialogTitle>Fast Track — Pre-Encounter</DialogTitle>
+							</DialogHeader>
+							<PreEncounterForm
+								facilityId={facilityId}
+								triageStaffId={staffProfileId}
+								onSuccess={() => setPreEncounterOpen(false)}
+							/>
+						</DialogContent>
+					</Dialog>
+				</div>
 			</div>
 
 			{/* Summary Cards */}
@@ -269,9 +287,10 @@ export function EdDashboard() {
 															</p>
 														)}
 														{item.type === "pre_encounter" && (
-															<Badge variant="outline" className="mt-0.5 text-xs">
-																Pre-encounter
-															</Badge>
+															<TraumaAliasBadge
+																alias={item.traumaAlias ?? item.id}
+																acuityLevel={item.acuityLevel}
+															/>
 														)}
 													</div>
 												</TableCell>

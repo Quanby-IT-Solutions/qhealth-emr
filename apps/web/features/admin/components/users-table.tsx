@@ -121,6 +121,7 @@ export function UsersTable() {
 											<Button
 												variant="ghost"
 												size="sm"
+												nativeButton={false}
 												render={<a href={`/admin/users/${user.id}`} />}
 											>
 												View

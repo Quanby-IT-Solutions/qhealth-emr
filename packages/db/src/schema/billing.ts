@@ -196,6 +196,19 @@ export const cf4Claims = createTable(
 			.$type<"draft" | "submitted" | "approved" | "rejected" | "resubmitted">(),
 		submissionData: t.jsonb("submission_data"),
 		responseData: t.jsonb("response_data"),
+		// Auto-extracted clinical data for CF4 auto-population
+		extractedData: t.jsonb("extracted_data").$type<{
+			chiefComplaint?: string
+			historyOfPresentIllness?: string
+			pertinentPastMedicalHistory?: string
+			physicalExamFindings?: string
+			courseInTheWard?: string
+			diagnosisOnAdmission?: string
+			finalDiagnosis?: string
+			operativeProcedures?: string[]
+			vitalSigns?: Array<{ date: string; bp?: string; hr?: number; rr?: number; temp?: number }>
+			labResults?: Array<{ test: string; result: string; date: string }>
+		}>(),
 		submittedAt: t.timestamp("submitted_at"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
@@ -204,6 +217,49 @@ export const cf4Claims = createTable(
 		index("cf4_claims_facility_id_idx").on(t.facilityId),
 		index("cf4_claims_encounter_id_idx").on(t.encounterId),
 		index("cf4_claims_status_idx").on(t.status),
+	]
+)
+
+// DRG Shadow Billing (CF5)
+export const cf5Claims = createTable(
+	"cf5_claims",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		encounterId: t
+			.uuid("encounter_id")
+			.notNull()
+			.references(() => encounters.id, { onDelete: "cascade" }),
+		cf4ClaimId: t
+			.uuid("cf4_claim_id")
+			.references(() => cf4Claims.id, { onDelete: "set null" }),
+		drgCode: t.text("drg_code"),
+		drgDescription: t.text("drg_description"),
+		drgWeight: t.numeric("drg_weight", { precision: 8, scale: 4 }),
+		drgGrouper: t.text("drg_grouper"), // e.g., "PhilHealth DRG v1.0"
+		validatedByStaffId: t
+			.uuid("validated_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		status: t
+			.text("status")
+			.notNull()
+			.default("draft")
+			.$type<"draft" | "validated" | "submitted" | "approved" | "rejected">(),
+		submissionData: t.jsonb("submission_data"),
+		responseData: t.jsonb("response_data"),
+		validatedAt: t.timestamp("validated_at"),
+		submittedAt: t.timestamp("submitted_at"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("cf5_claims_facility_id_idx").on(t.facilityId),
+		index("cf5_claims_encounter_id_idx").on(t.encounterId),
+		index("cf5_claims_cf4_claim_id_idx").on(t.cf4ClaimId),
+		index("cf5_claims_status_idx").on(t.status),
 	]
 )
 

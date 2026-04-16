@@ -20,7 +20,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
-	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
+	const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== "")
 	if (entries.length === 0) return ""
 	return "?" + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
 }
@@ -186,7 +186,7 @@ export const nursingKeys = {
 // ============================================================================
 
 interface VitalSignListParams {
-	facilityId: string
+	facilityId?: string
 	encounterId?: string
 	preEncounterId?: string
 	page?: number
@@ -246,7 +246,7 @@ export function useCreateVitalMutation() {
 // ============================================================================
 
 interface MarEntryListParams {
-	facilityId: string
+	facilityId?: string
 	encounterId?: string
 	preEncounterId?: string
 	status?: string
@@ -303,7 +303,7 @@ export function useAdministerMarMutation() {
 // ============================================================================
 
 interface TarEntryListParams {
-	facilityId: string
+	facilityId?: string
 	encounterId?: string
 	preEncounterId?: string
 	status?: string
@@ -377,7 +377,7 @@ export function useAdministerTarMutation() {
 // ============================================================================
 
 interface IoEntryListParams {
-	facilityId: string
+	facilityId?: string
 	encounterId?: string
 	preEncounterId?: string
 	ioType?: "intake" | "output"
@@ -422,7 +422,7 @@ export function useCreateIoEntryMutation() {
 
 interface IoBalanceParams {
 	encounterId: string
-	facilityId: string
+	facilityId?: string
 }
 
 export function useIoBalanceQuery(params: IoBalanceParams) {
@@ -442,7 +442,7 @@ export function useIoBalanceQuery(params: IoBalanceParams) {
 
 interface FlowsheetListParams {
 	encounterId: string
-	facilityId: string
+	facilityId?: string
 	parameterName?: string
 	dateFrom?: string
 	dateTo?: string
@@ -466,7 +466,7 @@ export function useFlowsheetsQuery(params: FlowsheetListParams) {
 // ============================================================================
 
 interface HandoffListParams {
-	facilityId: string
+	facilityId?: string
 	encounterId?: string
 	outgoingStaffId?: string
 	page?: number
@@ -494,7 +494,7 @@ export function useHandoffQuery(id: string) {
 
 interface GenerateHandoffInput {
 	encounterId: string
-	facilityId: string
+	facilityId?: string
 }
 
 export function useGenerateHandoffMutation() {
@@ -547,7 +547,7 @@ export function useFinalizeHandoffMutation() {
 // ============================================================================
 
 interface HaiTagListParams {
-	facilityId: string
+	facilityId?: string
 	encounterId?: string
 	haiType?: string
 	status?: string
@@ -613,5 +613,149 @@ export function useUpdateHaiTagMutation() {
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
 		},
+	})
+}
+
+// ============================================================================
+// NEWS Score Calculation
+// ============================================================================
+
+interface NewsScoreInput {
+	respiratoryRate: number
+	spo2: number
+	isOnSupplementalOxygen: boolean
+	temperature: number
+	bpSystolic: number
+	heartRate: number
+	consciousnessLevel: "A" | "C" | "V" | "P" | "U" // ACVPU scale
+}
+
+interface NewsScoreResult {
+	totalScore: number
+	riskLevel: "low" | "medium" | "high"
+	clinicalResponse: string
+	componentScores: {
+		respiratoryRate: number
+		spo2: number
+		supplementalOxygen: number
+		temperature: number
+		systolicBp: number
+		heartRate: number
+		consciousness: number
+	}
+	recommendations: string[]
+}
+
+/**
+ * Calculate NEWS (National Early Warning Score) from vital signs.
+ * This is calculated client-side for immediate feedback.
+ */
+export function calculateNewsScore(input: NewsScoreInput): NewsScoreResult {
+	const scores = {
+		respiratoryRate: getRespiratoryRateScore(input.respiratoryRate),
+		spo2: getSpo2Score(input.spo2),
+		supplementalOxygen: input.isOnSupplementalOxygen ? 2 : 0,
+		temperature: getTempScore(input.temperature),
+		systolicBp: getSystolicBpScore(input.bpSystolic),
+		heartRate: getHeartRateScore(input.heartRate),
+		consciousness: input.consciousnessLevel === "A" ? 0 : 3,
+	}
+
+	const totalScore = Object.values(scores).reduce((sum, s) => sum + s, 0)
+
+	let riskLevel: "low" | "medium" | "high" = "low"
+	let clinicalResponse = "Continue routine monitoring"
+	const recommendations: string[] = []
+
+	if (totalScore >= 7 || scores.consciousness === 3) {
+		riskLevel = "high"
+		clinicalResponse = "Emergency response team assessment"
+		recommendations.push("Notify physician immediately")
+		recommendations.push("Continuous monitoring")
+		recommendations.push("Consider ICU transfer")
+	} else if (totalScore >= 5) {
+		riskLevel = "medium"
+		clinicalResponse = "Urgent ward-based response"
+		recommendations.push("Notify senior nurse/physician")
+		recommendations.push("Increase monitoring frequency")
+	} else if (totalScore >= 1) {
+		riskLevel = "low"
+		clinicalResponse = "Ward-based response"
+		recommendations.push("Inform registered nurse")
+	}
+
+	return {
+		totalScore,
+		riskLevel,
+		clinicalResponse,
+		componentScores: scores,
+		recommendations,
+	}
+}
+
+function getRespiratoryRateScore(rr: number): number {
+	if (rr <= 8) return 3
+	if (rr <= 11) return 1
+	if (rr <= 20) return 0
+	if (rr <= 24) return 2
+	return 3
+}
+
+function getSpo2Score(spo2: number): number {
+	if (spo2 <= 91) return 3
+	if (spo2 <= 93) return 2
+	if (spo2 <= 95) return 1
+	return 0
+}
+
+function getTempScore(temp: number): number {
+	if (temp <= 35) return 3
+	if (temp <= 36) return 1
+	if (temp <= 38) return 0
+	if (temp <= 39) return 1
+	return 2
+}
+
+function getSystolicBpScore(sbp: number): number {
+	if (sbp <= 90) return 3
+	if (sbp <= 100) return 2
+	if (sbp <= 110) return 1
+	if (sbp <= 219) return 0
+	return 3
+}
+
+function getHeartRateScore(hr: number): number {
+	if (hr <= 40) return 3
+	if (hr <= 50) return 1
+	if (hr <= 90) return 0
+	if (hr <= 110) return 1
+	if (hr <= 130) return 2
+	return 3
+}
+
+/**
+ * Query for patient NEWS score history
+ */
+export function useNewsScoreHistoryQuery(params: {
+	encounterId: string
+	facilityId: string
+	limit?: number
+}) {
+	return useQuery({
+		queryKey: [...nursingKeys.all, "news-history", params] as const,
+		queryFn: () =>
+			fetchJson<{
+				data: Array<{
+					id: string
+					recordedAt: string
+					newsScore: number
+					riskLevel: "low" | "medium" | "high"
+					vitals: VitalSign
+				}>
+				total: number
+			}>(
+				`${API_BASE}/news/history${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
+			),
+		enabled: !!params.encounterId,
 	})
 }

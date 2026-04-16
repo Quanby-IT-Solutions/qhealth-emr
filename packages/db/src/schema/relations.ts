@@ -2,14 +2,43 @@ import { defineRelations } from "drizzle-orm"
 
 import { accounts, sessions, users, verifications } from "./auth.js"
 import { auditLogs, breakGlassEvents, notifications } from "./audit.js"
-import { charges, chargeMasterItems, cf4Claims, eligibilityChecks, invoiceLineItems, invoices, payments } from "./billing.js"
+import {
+	charges,
+	chargeMasterItems,
+	cf4Claims,
+	cf5Claims,
+	eligibilityChecks,
+	invoiceLineItems,
+	invoices,
+	payments,
+} from "./billing.js"
 import { allergies, clinicalNotes, consentRecords, noteAddenda, noteTemplates, problems } from "./clinical.js"
-import { bedCensusSnapshots, beds, encounters, encounterTransfers, patients, preEncounters, wards } from "./core.js"
+import {
+	bedCensusSnapshots,
+	beds,
+	encounters,
+	encounterStatusEvents,
+	encounterTransfers,
+	patients,
+	preEncounters,
+	wards,
+} from "./core.js"
+import { deathReports } from "./death-reporting.js"
 import { drugBrands, drugGenerics, formularyItems, icd10Codes, loincCodes, rxnormCodes, rvsCodes } from "./formulary.js"
+import { mswEvaluations } from "./msw.js"
+import { nbsLogEntries } from "./nbs.js"
 import { flowsheetEntries, haiTags, ioEntries, marEntries, shiftHandoffs, tarEntries, vitalSigns } from "./nursing.js"
+import { nutritionAssessments } from "./nutrition.js"
 import { imagingOrders, labOrders, medicationOrders, orderVerifications, prescriptions } from "./orders.js"
 import { facilities, rolePermissions, roles, staffProfiles, userRoles } from "./rbac.js"
-import { ahsrSnapshots, pidsrCases, surveillanceFlags } from "./reporting.js"
+import { ahsrSnapshots, fhirExports, pidsrCases, surveillanceFlags } from "./reporting.js"
+import { appointments, clinicTemplates } from "./scheduling.js"
+import {
+	anesthesiaRecords,
+	operationRecords,
+	surgicalChecklists,
+	surgicalRvsAssignments,
+} from "./surgical.js"
 
 // ============================================================================
 // RELATIONS — Single defineRelations() call covering all cross-table relations
@@ -31,6 +60,7 @@ export const relations = defineRelations(
 		// Core
 		patients,
 		encounters,
+		encounterStatusEvents,
 		preEncounters,
 		encounterTransfers,
 		wards,
@@ -72,15 +102,33 @@ export const relations = defineRelations(
 		invoiceLineItems,
 		payments,
 		cf4Claims,
+		cf5Claims,
 		eligibilityChecks,
 		// Reporting
 		pidsrCases,
 		surveillanceFlags,
 		ahsrSnapshots,
+		fhirExports,
 		// Audit
 		auditLogs,
 		breakGlassEvents,
 		notifications,
+		// Surgical
+		operationRecords,
+		anesthesiaRecords,
+		surgicalRvsAssignments,
+		surgicalChecklists,
+		// Scheduling
+		clinicTemplates,
+		appointments,
+		// NBS
+		nbsLogEntries,
+		// Death Reporting
+		deathReports,
+		// Nutrition
+		nutritionAssessments,
+		// MSW
+		mswEvaluations,
 	},
 	r => ({
 		// -----------------------------------------------------------------------
@@ -113,6 +161,7 @@ export const relations = defineRelations(
 			roles: r.many.roles(),
 			patients: r.many.patients(),
 			encounters: r.many.encounters(),
+			encounterStatusEvents: r.many.encounterStatusEvents(),
 			preEncounters: r.many.preEncounters(),
 			wards: r.many.wards(),
 			beds: r.many.beds(),
@@ -140,12 +189,25 @@ export const relations = defineRelations(
 			invoices: r.many.invoices(),
 			payments: r.many.payments(),
 			cf4Claims: r.many.cf4Claims(),
+			cf5Claims: r.many.cf5Claims(),
 			eligibilityChecks: r.many.eligibilityChecks(),
 			pidsrCases: r.many.pidsrCases(),
 			surveillanceFlags: r.many.surveillanceFlags(),
 			ahsrSnapshots: r.many.ahsrSnapshots(),
+			fhirExports: r.many.fhirExports(),
 			auditLogs: r.many.auditLogs(),
 			breakGlassEvents: r.many.breakGlassEvents(),
+			// New table many-relations
+			operationRecords: r.many.operationRecords(),
+			anesthesiaRecords: r.many.anesthesiaRecords(),
+			surgicalRvsAssignments: r.many.surgicalRvsAssignments(),
+			surgicalChecklists: r.many.surgicalChecklists(),
+			clinicTemplates: r.many.clinicTemplates(),
+			appointments: r.many.appointments(),
+			nbsLogEntries: r.many.nbsLogEntries(),
+			deathReports: r.many.deathReports(),
+			nutritionAssessments: r.many.nutritionAssessments(),
+			mswEvaluations: r.many.mswEvaluations(),
 		},
 		staffProfiles: {
 			user: r.one.users({
@@ -201,6 +263,13 @@ export const relations = defineRelations(
 			eligibilityChecks: r.many.eligibilityChecks(),
 			pidsrCases: r.many.pidsrCases(),
 			breakGlassEvents: r.many.breakGlassEvents(),
+			// New table many-relations
+			cf4Claims: r.many.cf4Claims(),
+			appointments: r.many.appointments(),
+			nbsLogEntries: r.many.nbsLogEntries(),
+			deathReports: r.many.deathReports(),
+			nutritionAssessments: r.many.nutritionAssessments(),
+			mswEvaluations: r.many.mswEvaluations(),
 		},
 		encounters: {
 			facility: r.one.facilities({
@@ -228,6 +297,7 @@ export const relations = defineRelations(
 				to: r.preEncounters.id,
 			}),
 			transfers: r.many.encounterTransfers(),
+			statusEvents: r.many.encounterStatusEvents(),
 			clinicalNotes: r.many.clinicalNotes(),
 			consentRecords: r.many.consentRecords(),
 			vitalSigns: r.many.vitalSigns(),
@@ -243,9 +313,16 @@ export const relations = defineRelations(
 			charges: r.many.charges(),
 			invoices: r.many.invoices(),
 			cf4Claims: r.many.cf4Claims(),
+			cf5Claims: r.many.cf5Claims(),
 			prescriptions: r.many.prescriptions(),
 			pidsrCases: r.many.pidsrCases(),
 			surveillanceFlags: r.many.surveillanceFlags(),
+			// New table many-relations
+			operationRecords: r.many.operationRecords(),
+			nbsLogEntries: r.many.nbsLogEntries(),
+			deathReports: r.many.deathReports(),
+			nutritionAssessments: r.many.nutritionAssessments(),
+			mswEvaluations: r.many.mswEvaluations(),
 		},
 		preEncounters: {
 			facility: r.one.facilities({
@@ -875,6 +952,260 @@ export const relations = defineRelations(
 			}),
 			recipientStaff: r.one.staffProfiles({
 				from: r.notifications.recipientStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+
+		// -----------------------------------------------------------------------
+		// Encounter Status Events (SLA tracking)
+		// -----------------------------------------------------------------------
+		encounterStatusEvents: {
+			facility: r.one.facilities({
+				from: r.encounterStatusEvents.facilityId,
+				to: r.facilities.id,
+			}),
+			encounter: r.one.encounters({
+				from: r.encounterStatusEvents.encounterId,
+				to: r.encounters.id,
+			}),
+			staff: r.one.staffProfiles({
+				from: r.encounterStatusEvents.staffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+
+		// -----------------------------------------------------------------------
+		// CF5 Claims (DRG shadow billing)
+		// -----------------------------------------------------------------------
+		cf5Claims: {
+			facility: r.one.facilities({
+				from: r.cf5Claims.facilityId,
+				to: r.facilities.id,
+			}),
+			encounter: r.one.encounters({
+				from: r.cf5Claims.encounterId,
+				to: r.encounters.id,
+			}),
+			cf4Claim: r.one.cf4Claims({
+				from: r.cf5Claims.cf4ClaimId,
+				to: r.cf4Claims.id,
+			}),
+			validatedByStaff: r.one.staffProfiles({
+				from: r.cf5Claims.validatedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+
+		// -----------------------------------------------------------------------
+		// FHIR Exports (NHDR submissions)
+		// -----------------------------------------------------------------------
+		fhirExports: {
+			facility: r.one.facilities({
+				from: r.fhirExports.facilityId,
+				to: r.facilities.id,
+			}),
+			initiatedByStaff: r.one.staffProfiles({
+				from: r.fhirExports.initiatedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+
+		// -----------------------------------------------------------------------
+		// Surgical — Operation Records, Anesthesia, RVS, Checklists
+		// -----------------------------------------------------------------------
+		operationRecords: {
+			facility: r.one.facilities({
+				from: r.operationRecords.facilityId,
+				to: r.facilities.id,
+			}),
+			encounter: r.one.encounters({
+				from: r.operationRecords.encounterId,
+				to: r.encounters.id,
+			}),
+			surgeonStaff: r.one.staffProfiles({
+				from: r.operationRecords.surgeonStaffId,
+				to: r.staffProfiles.id,
+			}),
+			anesthesiologistStaff: r.one.staffProfiles({
+				from: r.operationRecords.anesthesiologistStaffId,
+				to: r.staffProfiles.id,
+			}),
+			anesthesiaRecords: r.many.anesthesiaRecords(),
+			surgicalRvsAssignments: r.many.surgicalRvsAssignments(),
+			surgicalChecklists: r.many.surgicalChecklists(),
+		},
+		anesthesiaRecords: {
+			facility: r.one.facilities({
+				from: r.anesthesiaRecords.facilityId,
+				to: r.facilities.id,
+			}),
+			operationRecord: r.one.operationRecords({
+				from: r.anesthesiaRecords.operationRecordId,
+				to: r.operationRecords.id,
+			}),
+			anesthesiologistStaff: r.one.staffProfiles({
+				from: r.anesthesiaRecords.anesthesiologistStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+		surgicalRvsAssignments: {
+			facility: r.one.facilities({
+				from: r.surgicalRvsAssignments.facilityId,
+				to: r.facilities.id,
+			}),
+			operationRecord: r.one.operationRecords({
+				from: r.surgicalRvsAssignments.operationRecordId,
+				to: r.operationRecords.id,
+			}),
+			rvsCodeRef: r.one.rvsCodes({
+				from: r.surgicalRvsAssignments.rvsCodeId,
+				to: r.rvsCodes.id,
+			}),
+			suggestedByStaff: r.one.staffProfiles({
+				from: r.surgicalRvsAssignments.suggestedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+			validatedByStaff: r.one.staffProfiles({
+				from: r.surgicalRvsAssignments.validatedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+		surgicalChecklists: {
+			facility: r.one.facilities({
+				from: r.surgicalChecklists.facilityId,
+				to: r.facilities.id,
+			}),
+			operationRecord: r.one.operationRecords({
+				from: r.surgicalChecklists.operationRecordId,
+				to: r.operationRecords.id,
+			}),
+			completedByStaff: r.one.staffProfiles({
+				from: r.surgicalChecklists.completedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+
+		// -----------------------------------------------------------------------
+		// Scheduling — Clinic Templates, Appointments
+		// -----------------------------------------------------------------------
+		clinicTemplates: {
+			facility: r.one.facilities({
+				from: r.clinicTemplates.facilityId,
+				to: r.facilities.id,
+			}),
+			clinicianStaff: r.one.staffProfiles({
+				from: r.clinicTemplates.clinicianStaffId,
+				to: r.staffProfiles.id,
+			}),
+			appointments: r.many.appointments(),
+		},
+		appointments: {
+			facility: r.one.facilities({
+				from: r.appointments.facilityId,
+				to: r.facilities.id,
+			}),
+			patient: r.one.patients({
+				from: r.appointments.patientId,
+				to: r.patients.id,
+			}),
+			clinicTemplate: r.one.clinicTemplates({
+				from: r.appointments.clinicTemplateId,
+				to: r.clinicTemplates.id,
+			}),
+			bookedByStaff: r.one.staffProfiles({
+				from: r.appointments.bookedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+
+		// -----------------------------------------------------------------------
+		// NBS Log Entries (Newborn Screening)
+		// -----------------------------------------------------------------------
+		nbsLogEntries: {
+			facility: r.one.facilities({
+				from: r.nbsLogEntries.facilityId,
+				to: r.facilities.id,
+			}),
+			encounter: r.one.encounters({
+				from: r.nbsLogEntries.encounterId,
+				to: r.encounters.id,
+			}),
+			patient: r.one.patients({
+				from: r.nbsLogEntries.patientId,
+				to: r.patients.id,
+			}),
+			screenedByStaff: r.one.staffProfiles({
+				from: r.nbsLogEntries.screenedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+
+		// -----------------------------------------------------------------------
+		// Death Reports (FMDRF/FNDRF)
+		// -----------------------------------------------------------------------
+		deathReports: {
+			facility: r.one.facilities({
+				from: r.deathReports.facilityId,
+				to: r.facilities.id,
+			}),
+			encounter: r.one.encounters({
+				from: r.deathReports.encounterId,
+				to: r.encounters.id,
+			}),
+			patient: r.one.patients({
+				from: r.deathReports.patientId,
+				to: r.patients.id,
+			}),
+			certifyingStaff: r.one.staffProfiles({
+				from: r.deathReports.certifyingStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+
+		// -----------------------------------------------------------------------
+		// Nutrition Assessments
+		// -----------------------------------------------------------------------
+		nutritionAssessments: {
+			facility: r.one.facilities({
+				from: r.nutritionAssessments.facilityId,
+				to: r.facilities.id,
+			}),
+			encounter: r.one.encounters({
+				from: r.nutritionAssessments.encounterId,
+				to: r.encounters.id,
+			}),
+			patient: r.one.patients({
+				from: r.nutritionAssessments.patientId,
+				to: r.patients.id,
+			}),
+			assessedByStaff: r.one.staffProfiles({
+				from: r.nutritionAssessments.assessedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+
+		// -----------------------------------------------------------------------
+		// MSW Evaluations (Medical Social Work)
+		// -----------------------------------------------------------------------
+		mswEvaluations: {
+			facility: r.one.facilities({
+				from: r.mswEvaluations.facilityId,
+				to: r.facilities.id,
+			}),
+			encounter: r.one.encounters({
+				from: r.mswEvaluations.encounterId,
+				to: r.encounters.id,
+			}),
+			patient: r.one.patients({
+				from: r.mswEvaluations.patientId,
+				to: r.patients.id,
+			}),
+			evaluatedByStaff: r.one.staffProfiles({
+				from: r.mswEvaluations.evaluatedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+			approvedByStaff: r.one.staffProfiles({
+				from: r.mswEvaluations.approvedByStaffId,
 				to: r.staffProfiles.id,
 			}),
 		},

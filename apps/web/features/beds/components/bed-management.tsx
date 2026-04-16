@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Progress } from "@/core/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
@@ -19,6 +18,8 @@ import {
 	useCreateWardMutation,
 	useUpdateBedStatusMutation,
 } from "@/features/beds/api/beds.hooks"
+import { BedCensusMetrics } from "@/features/beds/components/bed-census-metrics"
+import { BedStatusLegend } from "@/features/beds/components/bed-status-legend"
 
 function bedStatusColor(status: string) {
 	switch (status) {
@@ -26,6 +27,10 @@ function bedStatusColor(status: string) {
 			return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
 		case "occupied":
 			return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+		case "reserved":
+			return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+		case "cleaning":
+			return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
 		case "out_of_service":
 			return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
 		default:
@@ -39,6 +44,10 @@ function bedStatusLabel(status: string) {
 			return "Available"
 		case "occupied":
 			return "Occupied"
+		case "reserved":
+			return "Reserved"
+		case "cleaning":
+			return "Cleaning"
 		case "out_of_service":
 			return "Out of Service"
 		default:
@@ -80,40 +89,7 @@ export function BedManagement() {
 	return (
 		<div className="space-y-6">
 			{/* Census Summary */}
-			{census && (
-				<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-					<Card>
-						<CardContent className="pt-6">
-							<div className="text-muted-foreground text-sm">Total Beds</div>
-							<div className="text-2xl font-bold">{census.overall.totalBeds}</div>
-						</CardContent>
-					</Card>
-					<Card>
-						<CardContent className="pt-6">
-							<div className="text-muted-foreground text-sm">Occupied</div>
-							<div className="text-2xl font-bold">{census.overall.occupiedBeds}</div>
-						</CardContent>
-					</Card>
-					<Card>
-						<CardContent className="pt-6">
-							<div className="text-muted-foreground text-sm">Available</div>
-							<div className="text-2xl font-bold">
-								{census.overall.totalBeds - census.overall.occupiedBeds}
-							</div>
-						</CardContent>
-					</Card>
-					<Card>
-						<CardContent className="pt-6">
-							<div className="text-muted-foreground text-sm">BOR (Overall)</div>
-							<div className="text-2xl font-bold">{census.overall.borPercentage}%</div>
-							<Progress
-								value={Number(census.overall.borPercentage)}
-								className="mt-2"
-							/>
-						</CardContent>
-					</Card>
-				</div>
-			)}
+			{census && <BedCensusMetrics census={census} />}
 
 			{/* Actions */}
 			<div className="flex flex-wrap gap-2">
@@ -216,6 +192,9 @@ export function BedManagement() {
 				</Dialog>
 			</div>
 
+			{/* Bed Status Legend */}
+			<BedStatusLegend />
+
 			{/* Ward-by-Ward Grid */}
 			{wards.length === 0 ? (
 				<Card>
@@ -299,30 +278,7 @@ export function BedManagement() {
 				))
 			)}
 
-			{/* Per-Ward BOR */}
-			{census && census.byWard.length > 0 && (
-				<Card>
-					<CardHeader>
-						<CardTitle>Ward BOR Summary</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="space-y-3">
-							{census.byWard.map(w => (
-								<div key={w.wardId} className="flex items-center gap-4">
-									<span className="w-40 text-sm font-medium">{w.wardName}</span>
-									<Progress value={Number(w.borPercentage)} className="flex-1" />
-									<span className="text-muted-foreground w-16 text-right text-sm">
-										{w.borPercentage}%
-									</span>
-									<span className="text-muted-foreground text-xs">
-										({w.occupiedBeds}/{w.totalBeds})
-									</span>
-								</div>
-							))}
-						</div>
-					</CardContent>
-				</Card>
-			)}
+
 		</div>
 	)
 }

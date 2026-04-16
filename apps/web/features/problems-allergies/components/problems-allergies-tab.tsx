@@ -31,8 +31,9 @@ function formatDate(dateStr: string | null | undefined) {
 	})
 }
 
-function severityVariant(severity: "mild" | "moderate" | "severe") {
+function severityVariant(severity: "mild" | "moderate" | "severe" | "life-threatening") {
 	switch (severity) {
+		case "life-threatening":
 		case "severe":
 			return "destructive" as const
 		case "moderate":

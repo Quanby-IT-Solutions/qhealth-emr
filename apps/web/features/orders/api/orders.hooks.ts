@@ -556,3 +556,90 @@ export function useActiveOrdersQuery(encounterId: string) {
 		enabled: !!encounterId,
 	})
 }
+
+// ============================================================================
+// PDEA License Validation
+// ============================================================================
+
+interface PdeaLicenseCheckInput {
+	prescriberStaffId: string
+	pdeaSchedule: string // "S2" | "S3" | "S4"
+}
+
+interface PdeaLicenseCheckResponse {
+	isValid: boolean
+	licenseNumber: string | null
+	expiryDate: string | null
+	remainingMonthlyQuota: number | null
+	message: string
+}
+
+export function usePdeaLicenseCheckMutation() {
+	return useMutation({
+		mutationFn: (data: PdeaLicenseCheckInput) =>
+			fetchJson<PdeaLicenseCheckResponse>(`${API_BASE}/pdea/license-check`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+	})
+}
+
+// ============================================================================
+// PDEA Tranching Preview
+// ============================================================================
+
+interface TranchingPreviewInput {
+	genericName: string
+	totalQuantity: number
+	durationDays: number
+	pdeaSchedule: string
+}
+
+interface TranchePreview {
+	trancheNumber: number
+	quantity: number
+	startDay: number
+	endDay: number
+	releaseDate: string
+}
+
+interface TranchingPreviewResponse {
+	totalTranches: number
+	tranches: TranchePreview[]
+	maxTrancheSize: number
+	regulatoryNotes: string | null
+}
+
+export function useTranchingPreviewMutation() {
+	return useMutation({
+		mutationFn: (data: TranchingPreviewInput) =>
+			fetchJson<TranchingPreviewResponse>(`${API_BASE}/pdea/tranching-preview`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+	})
+}
+
+// ============================================================================
+// CDS Alerts Query (for encounter-wide alerts)
+// ============================================================================
+
+interface CdsAlertSummary {
+	totalAlerts: number
+	criticalCount: number
+	warningCount: number
+	infoCount: number
+	alerts: CdsAlert[]
+}
+
+export function useCdsAlertsQuery(encounterId: string) {
+	return useQuery({
+		queryKey: [...orderKeys.all, "cds-alerts", encounterId] as const,
+		queryFn: () =>
+			fetchJson<CdsAlertSummary>(
+				`${API_BASE}/cds/alerts${buildQueryString({ encounterId })}`
+			),
+		enabled: !!encounterId,
+		refetchInterval: 60 * 1000, // Refresh every minute
+	})
+}

@@ -24,7 +24,7 @@ const PaginatedResponseSchema = z.object({
 // Encounter types & status
 // ============================================================================
 
-export const EncounterTypeEnum = z.enum(["inpatient", "outpatient", "emergency"])
+export const EncounterTypeEnum = z.enum(["inpatient", "outpatient", "emergency", "telemedicine"])
 export const EncounterStatusEnum = z.enum(["active", "discharged", "closed", "cancelled"])
 export const DispositionEnum = z.enum(["home", "transfer", "deceased", "ama"])
 

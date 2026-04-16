@@ -10,8 +10,6 @@ import {
 	type ReactNode,
 } from "react"
 
-import { env } from "@/env"
-
 interface SseNotificationEvent {
 	id: string
 	topic: string
@@ -56,6 +54,7 @@ export function NotificationProvider({ children, staffId }: NotificationProvider
 	const [unreadCount, setUnreadCount] = useState(0)
 	const handlersRef = useRef(new Map<string, Set<TopicHandler>>())
 	const eventSourceRef = useRef<EventSource | null>(null)
+	const isClosingRef = useRef(false)
 
 	const onTopic = useCallback((topic: string, handler: TopicHandler) => {
 		if (!handlersRef.current.has(topic)) {
@@ -71,8 +70,11 @@ export function NotificationProvider({ children, staffId }: NotificationProvider
 	useEffect(() => {
 		if (!staffId) return
 
-		const apiBase = env.NEXT_PUBLIC_API_BASE_URL
-		const url = `${apiBase}/v1/notification/stream`
+		isClosingRef.current = false
+
+		// Use proxied path (through Next.js rewrites) to avoid cross-origin cookie issues
+		// The rewrite in next.config.ts proxies this to the backend
+		const url = "/api/v1/notification/stream"
 
 		const eventSource = new EventSource(url, { withCredentials: true })
 		eventSourceRef.current = eventSource
@@ -103,11 +105,22 @@ export function NotificationProvider({ children, staffId }: NotificationProvider
 		}
 
 		eventSource.onerror = () => {
+			// Ignore errors during intentional close (page unload/cleanup)
+			if (isClosingRef.current) return
 			setConnected(false)
 			// EventSource auto-reconnects
 		}
 
+		// Close SSE before page unload to prevent browser "connection interrupted" warnings
+		const handleBeforeUnload = () => {
+			isClosingRef.current = true
+			eventSource.close()
+		}
+		window.addEventListener("beforeunload", handleBeforeUnload)
+
 		return () => {
+			isClosingRef.current = true
+			window.removeEventListener("beforeunload", handleBeforeUnload)
 			eventSource.close()
 			eventSourceRef.current = null
 			setConnected(false)

@@ -1,15 +1,39 @@
 "use client"
 
-import { use } from "react"
+import { use, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
+import { ShieldAlert } from "lucide-react"
+
 import { Badge } from "@/core/components/ui/badge"
+import { Button } from "@/core/components/ui/button"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/core/components/ui/dialog"
 import { Separator } from "@/core/components/ui/separator"
 import { cn } from "@/core/lib/utils"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { useMyActiveBreakGlassQuery } from "@/features/audit/api/audit.hooks"
+import { BreakGlassForm } from "@/features/audit/components/break-glass-form"
 import { useEncounterDetailQuery } from "@/features/encounters/api/encounters.hooks"
 import { ChartContext } from "@/features/encounters/context/chart-context"
 import { usePatientSummaryQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
+
+function usePermissionSet() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+}
+
+function can(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
+}
 
 function calculateAge(dob: string) {
 	const birth = new Date(dob)
@@ -28,31 +52,131 @@ export default function EncounterChartLayout({
 	const { data: encounter, isLoading } = useEncounterDetailQuery(encounterId)
 	const { data: summary } = usePatientSummaryQuery(encounter?.patientId ?? "")
 	const pathname = usePathname()
+	const permSet = usePermissionSet()
+	const { data: profile } = useMyProfile()
+
+	// Break-Glass state
+	const [breakGlassOpen, setBreakGlassOpen] = useState(false)
+	const { data: activeBreakGlass } = useMyActiveBreakGlassQuery({
+		facilityId: encounter?.facilityId,
+		patientId: encounter?.patientId,
+		staffId: profile?.staffProfiles?.[0]?.id,
+	})
+
+	// Clinicians with clinical_docs:sign can invoke break-glass
+	const canInvokeBreakGlass = can(permSet, "clinical_docs", "sign")
 
 	const base = `/patients/${patientId}/encounters/${encounterId}`
 
+	// Each tab declares which permission it needs. Summary is always shown.
+	// Tabs are omitted entirely when the role lacks the required permission —
+	// the backend still enforces access; this is a UX-only filter.
 	const tabs = [
-		{ label: "Summary", href: base },
-		{ label: "Documentation", href: `${base}/documentation` },
-		{ label: "Orders", href: `${base}/orders` },
-		{ label: "Nursing", href: `${base}/nursing` },
-		{ label: "Problems & Allergies", href: `${base}/problems-allergies` },
-		{ label: "Billing", href: `${base}/billing` },
-		{ label: "Consents", href: `${base}/consents` },
-		{ label: "Transfers", href: `${base}/transfers` },
-		{ label: "Audit Trail", href: `${base}/audit-trail` },
-		...(encounter?.status === "active" && encounter.encounterType !== "outpatient"
-			? [{ label: "Transfer Patient", href: `${base}/transfer` }]
+		{ label: "Summary", href: base, show: true },
+		{
+			label: "Problems & Allergies",
+			href: `${base}/problems-allergies`,
+			// Problem list management is for Physicians (orders:edit), not Surgeons, ancillary, or billing staff
+			show:
+				(can(permSet, "clinical_docs", "view") || can(permSet, "orders", "view")) &&
+				!can(permSet, "surgical", "view") &&
+				!can(permSet, "radiology", "view") &&
+				!can(permSet, "laboratory", "view") &&
+				!can(permSet, "billing", "create"), // Exclude Billers - they review CF4, not problem lists
+		},
+		{
+			label: "Documentation",
+			href: `${base}/documentation`,
+			// Documentation is for clinical staff, not ancillary (Lab/Rad) staff
+			show:
+				can(permSet, "clinical_docs", "view") &&
+				!can(permSet, "radiology", "view") &&
+				!can(permSet, "laboratory", "view"),
+		},
+		{
+			label: "Orders",
+			href: `${base}/orders`,
+			// Orders tab is for clinical staff and ancillary staff (Lab/Rad view imaging/lab orders)
+			show:
+				can(permSet, "orders", "view") ||
+				can(permSet, "radiology", "view") ||
+				can(permSet, "laboratory", "view"),
+		},
+		{
+			label: "Surgical",
+			href: `${base}/surgical`,
+			show: can(permSet, "surgical", "view"),
+		},
+		{
+			label: "Nursing",
+			href: `${base}/nursing`,
+			// Nursing tab is for Nurses and Physicians; Surgeons view vitals in Summary
+			show: can(permSet, "nursing", "view") && !can(permSet, "surgical", "view"),
+		},
+		{
+			label: "Nutrition",
+			href: `${base}/nutrition`,
+			show: can(permSet, "nutrition", "view"),
+		},
+		{
+			label: "Billing",
+			href: `${base}/billing`,
+			show: can(permSet, "billing", "view"),
+		},
+		{
+			label: "MSW",
+			href: `${base}/msw`,
+			// MSW tab is for Social Workers only - they have billing:view but NOT billing:create
+			show:
+				can(permSet, "billing", "view") &&
+				!can(permSet, "clinical_docs", "create") &&
+				!can(permSet, "billing", "create"), // Exclude Billers - they manage charges, not CoE/evaluations
+		},
+		{
+			label: "Consents",
+			href: `${base}/consents`,
+			// Consent tracking is for HIM/records staff, not clinical or ancillary staff
+			// HIM has clinical_docs:edit but NOT sign - they review, not author
+			show:
+				(can(permSet, "clinical_docs", "edit") || can(permSet, "adt", "view")) &&
+				!can(permSet, "clinical_docs", "sign") && // Exclude clinicians who sign notes
+				!can(permSet, "radiology", "view") &&
+				!can(permSet, "laboratory", "view") &&
+				!can(permSet, "billing", "create"), // Exclude Billers
+		},
+		{
+			label: "Death Report",
+			href: `${base}/death-report`,
+			// Death Report (FMDRF/FNDRF) is for HIM Coders who complete chart documentation
+			// HIM has clinical_docs:edit for chart completion, not sign (that's clinicians)
+			show:
+				can(permSet, "clinical_docs", "edit") &&
+				!can(permSet, "clinical_docs", "sign"), // Clinicians sign, HIM codes
+		},
+		{
+			label: "Transfers",
+			href: `${base}/transfers`,
+			// Transfer history viewing is administrative - requires adt:edit (not just view)
+			show: can(permSet, "adt", "edit"),
+		},
+		{
+			label: "Audit Trail",
+			href: `${base}/audit-trail`,
+			show: can(permSet, "audit", "view"),
+		},
+		...(encounter?.status === "active" && encounter.encounterType !== "outpatient" && can(permSet, "adt", "edit")
+			? [{ label: "Transfer Patient", href: `${base}/transfer`, show: true }]
 			: []),
-		...(encounter?.status === "active"
+		...(encounter?.status === "active" && (can(permSet, "adt", "edit") || can(permSet, "clinical_docs", "sign"))
 			? [
 					{
 						label: encounter?.encounterType === "outpatient" ? "Close" : "Discharge",
 						href: `${base}/discharge`,
+						show: true,
 					},
 				]
 			: []),
-	]
+	].filter(tab => tab.show)
 
 	return (
 		<ChartContext.Provider
@@ -110,12 +234,52 @@ export default function EncounterChartLayout({
 							{(summary?.activeAllergyCount ?? 0) > 0 && (
 								<Badge
 									variant={summary?.hasSevereAllergies ? "destructive" : "secondary"}
-									className="ml-auto"
+									className={canInvokeBreakGlass ? "" : "ml-auto"}
 								>
 									{summary?.hasSevereAllergies ? "⚠ " : ""}
 									{summary?.activeAllergyCount} Allerg
 									{summary?.activeAllergyCount === 1 ? "y" : "ies"}
 								</Badge>
+							)}
+
+							{/* Break-Glass Button - for clinicians */}
+							{canInvokeBreakGlass && encounter?.facilityId && encounter?.patientId && (
+								<Dialog open={breakGlassOpen} onOpenChange={setBreakGlassOpen}>
+									<DialogTrigger
+										render={
+											<Button
+												variant={activeBreakGlass ? "default" : "outline"}
+												size="sm"
+												className={cn(
+													"ml-auto gap-2",
+													activeBreakGlass
+														? "bg-orange-500 hover:bg-orange-600 text-white"
+														: "border-orange-300 text-orange-700 hover:bg-orange-50"
+												)}
+											>
+												<ShieldAlert className="size-4" />
+												{activeBreakGlass ? "Break-Glass Active" : "Request Break-Glass"}
+											</Button>
+										}
+									/>
+									<DialogContent className="max-w-lg">
+										<DialogHeader>
+											<DialogTitle>Emergency Override Access</DialogTitle>
+											<DialogDescription>
+												Request emergency access to this patient&apos;s chart when you do not have standard authorization.
+											</DialogDescription>
+										</DialogHeader>
+										<BreakGlassForm
+											patientId={encounter.patientId}
+											facilityId={encounter.facilityId}
+											entityType="encounter"
+											entityId={encounterId}
+											activeEvent={activeBreakGlass}
+											onSuccess={() => setBreakGlassOpen(false)}
+											onCancel={() => setBreakGlassOpen(false)}
+										/>
+									</DialogContent>
+								</Dialog>
 							)}
 						</div>
 					) : null}

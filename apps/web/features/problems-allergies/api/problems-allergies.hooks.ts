@@ -60,7 +60,7 @@ interface Allergy {
 	allergenName: string
 	allergenType: "medication" | "food" | "environmental"
 	reactionType: string | null
-	severity: "mild" | "moderate" | "severe"
+	severity: "mild" | "moderate" | "severe" | "life-threatening"
 	onsetDate: string | null
 	isActive: boolean
 	documentingStaffId: string | null
@@ -255,7 +255,7 @@ interface CreateAllergyData {
 	allergenName: string
 	allergenType: "medication" | "food" | "environmental"
 	reactionType?: string
-	severity: "mild" | "moderate" | "severe"
+	severity: "mild" | "moderate" | "severe" | "life-threatening"
 	onsetDate?: string
 }
 
@@ -279,7 +279,7 @@ interface UpdateAllergyData {
 	allergenName?: string
 	allergenType?: "medication" | "food" | "environmental"
 	reactionType?: string
-	severity?: "mild" | "moderate" | "severe"
+	severity?: "mild" | "moderate" | "severe" | "life-threatening"
 	onsetDate?: string
 }
 

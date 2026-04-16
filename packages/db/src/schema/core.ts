@@ -81,7 +81,7 @@ export const beds = createTable(
 			.text("status")
 			.notNull()
 			.default("available")
-			.$type<"available" | "occupied" | "out_of_service">(),
+			.$type<"available" | "occupied" | "reserved" | "cleaning" | "out_of_service">(),
 		currentEncounterId: t
 			.uuid("current_encounter_id")
 			.references((): AnyPgColumn => encounters.id, { onDelete: "set null" }),
@@ -148,7 +148,7 @@ export const encounters = createTable(
 		encounterType: t
 			.text("encounter_type")
 			.notNull()
-			.$type<"inpatient" | "outpatient" | "emergency">(),
+			.$type<"inpatient" | "outpatient" | "emergency" | "telemedicine">(),
 		status: t
 			.text("status")
 			.notNull()
@@ -171,6 +171,14 @@ export const encounters = createTable(
 		mergedFromPreEncounterId: t
 			.uuid("merged_from_pre_encounter_id")
 			.references(() => preEncounters.id, { onDelete: "set null" }),
+		// Telemedicine support: link to parent encounter for follow-ups
+		linkedEncounterId: t
+			.uuid("linked_encounter_id")
+			.references((): AnyPgColumn => encounters.id, { onDelete: "set null" }),
+		// PhilHealth Konsulta and Z-Benefits tagging
+		konsultaTagged: t.boolean("konsulta_tagged").notNull().default(false),
+		// Scheduling: link to appointment that triggered this encounter
+		appointmentId: t.uuid("appointment_id"), // FK added in relations; avoid circular import
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 	}),
@@ -238,5 +246,47 @@ export const bedCensusSnapshots = createTable(
 	}),
 	t => [
 		index("bed_census_snapshots_facility_date_idx").on(t.facilityId, t.snapshotDate),
+	]
+)
+
+// ============================================================================
+// SLA TRACKING — Event-sourced encounter status transitions
+// ============================================================================
+
+export const encounterStatusEvents = createTable(
+	"encounter_status_events",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		encounterId: t
+			.uuid("encounter_id")
+			.notNull()
+			.references(() => encounters.id, { onDelete: "cascade" }),
+		fromStatus: t.text("from_status"),
+		toStatus: t.text("to_status").notNull(),
+		workflowType: t
+			.text("workflow_type")
+			.notNull()
+			.$type<"opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing">(),
+		slaTargetMinutes: t.integer("sla_target_minutes"),
+		actualMinutes: t.integer("actual_minutes"), // Computed on next transition
+		staffId: t
+			.uuid("staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		isEscalated: t.boolean("is_escalated").notNull().default(false),
+		escalatedAt: t.timestamp("escalated_at"),
+		notes: t.text("notes"),
+		occurredAt: t.timestamp("occurred_at").notNull().defaultNow(),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("encounter_status_events_facility_id_idx").on(t.facilityId),
+		index("encounter_status_events_encounter_id_idx").on(t.encounterId),
+		index("encounter_status_events_workflow_type_idx").on(t.workflowType),
+		index("encounter_status_events_occurred_at_idx").on(t.occurredAt),
+		index("encounter_status_events_is_escalated_idx").on(t.isEscalated),
 	]
 )

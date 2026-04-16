@@ -26,7 +26,7 @@ import { db } from "@/common/database/database.client"
 interface ListChargeMasterInput {
 	page: number
 	limit: number
-	facilityId: string
+	facilityId?: string
 	category?: "laboratory" | "imaging" | "medication" | "procedure" | "room" | "other"
 	search?: string
 	isActive?: boolean
@@ -35,7 +35,7 @@ interface ListChargeMasterInput {
 interface ListChargesInput {
 	page: number
 	limit: number
-	facilityId: string
+	facilityId?: string
 	encounterId: string
 	sourceType?: "auto_medication" | "auto_lab" | "auto_imaging" | "manual"
 }
@@ -111,6 +111,74 @@ interface UnbilledEncountersInput {
 	facilityId: string
 }
 
+interface GetSoaInput {
+	encounterId: string
+}
+
+interface GenerateSoaInput {
+	facilityId: string
+	encounterId: string
+	patientId: string
+}
+
+interface FinalizeSoaInput {
+	id: string
+}
+
+interface GetCf5Input {
+	encounterId: string
+}
+
+interface SearchDrgInput {
+	search: string
+}
+
+interface AssignDrgInput {
+	facilityId: string
+	encounterId: string
+	patientId: string
+	drgCode: string
+}
+
+interface ApproveCf5Input {
+	id: string
+}
+
+interface GetKonsultaBenefitInput {
+	facilityId: string
+	patientId: string
+}
+
+interface RecordKonsultaVisitInput {
+	facilityId: string
+	patientId: string
+	encounterId: string
+	visitType: "consultation" | "medication" | "laboratory"
+}
+
+type MalasakitSource = "doh_medisure" | "hospital_fund" | "lgu" | "pcso" | "dswd" | "private_donation" | "other"
+type MalasakitStatus = "pending" | "approved" | "disbursed" | "denied"
+
+interface GetMalasakitInput {
+	facilityId: string
+	encounterId: string
+}
+
+interface AddMalasakitInput {
+	facilityId: string
+	encounterId: string
+	patientId: string
+	source: MalasakitSource
+	amount: number
+	purpose: string
+	notes?: string
+}
+
+interface UpdateMalasakitStatusInput {
+	id: string
+	status: "approved" | "disbursed" | "denied"
+}
+
 @Injectable()
 export class BillingService {
 	private readonly logger = new Logger(BillingService.name)
@@ -137,7 +205,8 @@ export class BillingService {
 		const { page, limit, facilityId, category, search, isActive } = input
 		const offset = (page - 1) * limit
 
-		const conditions = [eq(chargeMasterItems.facilityId, facilityId)]
+		const conditions: ReturnType<typeof eq>[] = []
+		if (facilityId) conditions.push(eq(chargeMasterItems.facilityId, facilityId))
 		if (category) conditions.push(eq(chargeMasterItems.category, category))
 		if (isActive !== undefined) conditions.push(eq(chargeMasterItems.isActive, isActive))
 		if (search) {
@@ -165,10 +234,10 @@ export class BillingService {
 		const { page, limit, facilityId, encounterId, sourceType } = input
 		const offset = (page - 1) * limit
 
-		const conditions = [
-			eq(charges.facilityId, facilityId),
+		const conditions: ReturnType<typeof eq>[] = [
 			eq(charges.encounterId, encounterId),
 		]
+		if (facilityId) conditions.push(eq(charges.facilityId, facilityId))
 		if (sourceType) conditions.push(eq(charges.sourceType, sourceType))
 
 		const where = and(...conditions)
@@ -694,5 +763,324 @@ export class BillingService {
 			.where(eq(invoices.encounterId, encounterId))
 			.limit(1)
 		return !!result
+	}
+
+	// ========================================================================
+	// Statement of Account (SOA)
+	// ========================================================================
+
+	async getSoa(input: GetSoaInput) {
+		const { encounterId } = input
+
+		// Get encounter with patient info
+		const [encounter] = await db
+			.select({
+				id: encounters.id,
+				facilityId: encounters.facilityId,
+				patientId: encounters.patientId,
+				patientName: sql<string>`CONCAT(${patients.firstName}, ' ', ${patients.lastName})`,
+				patientMrn: patients.mrn,
+			})
+			.from(encounters)
+			.innerJoin(patients, eq(patients.id, encounters.patientId))
+			.where(eq(encounters.id, encounterId))
+			.limit(1)
+
+		if (!encounter) return null
+
+		// Get charges grouped by category
+		const chargeRows = await db
+			.select({
+				id: charges.id,
+				description: charges.description,
+				quantity: charges.quantity,
+				unitPrice: charges.unitPrice,
+				totalAmount: charges.totalAmount,
+				sourceType: charges.sourceType,
+			})
+			.from(charges)
+			.where(eq(charges.encounterId, encounterId))
+			.orderBy(charges.sourceType, charges.description)
+
+		const lines = chargeRows.map(c => ({
+			id: c.id,
+			category: c.sourceType === "auto_medication" ? "Medication" :
+				c.sourceType === "auto_lab" ? "Laboratory" :
+				c.sourceType === "auto_imaging" ? "Imaging" : "Other",
+			description: c.description,
+			quantity: Number(c.quantity),
+			unitPrice: Number(c.unitPrice),
+			totalAmount: Number(c.totalAmount),
+		}))
+
+		const subtotal = lines.reduce((sum, l) => sum + l.totalAmount, 0)
+
+		// Get PhilHealth deduction from invoice if exists
+		const [invoice] = await db
+			.select({ philhealthCoverage: invoices.philhealthCoverage })
+			.from(invoices)
+			.where(eq(invoices.encounterId, encounterId))
+			.limit(1)
+
+		const philhealthDeduction = invoice ? Number(invoice.philhealthCoverage) : 0
+		const netAmount = subtotal - philhealthDeduction
+
+		return {
+			id: encounterId, // Using encounterId as SOA id since we don't persist
+			facilityId: encounter.facilityId,
+			encounterId,
+			patientId: encounter.patientId,
+			patientName: encounter.patientName,
+			patientMrn: encounter.patientMrn,
+			soaNumber: `SOA-${encounterId.slice(0, 8).toUpperCase()}`,
+			lines,
+			subtotal,
+			philhealthDeduction,
+			seniorPwdDiscount: 0,
+			malasakitDeduction: 0,
+			otherDeductions: 0,
+			netAmount,
+			status: "draft" as const,
+			generatedAt: new Date(),
+		}
+	}
+
+	async generateSoa(input: GenerateSoaInput) {
+		const soa = await this.getSoa({ encounterId: input.encounterId })
+		if (!soa) {
+			throw new NotFoundException("Encounter not found")
+		}
+		return soa
+	}
+
+	async finalizeSoa(input: FinalizeSoaInput) {
+		// For now, just return the SOA with status changed to final
+		// In a full implementation, this would persist to a database table
+		const soa = await this.getSoa({ encounterId: input.id })
+		if (!soa) {
+			throw new NotFoundException("SOA not found")
+		}
+		return {
+			...soa,
+			status: "final" as const,
+		}
+	}
+
+	// ========================================================================
+	// CF5 / DRG Shadow Billing
+	// ========================================================================
+
+	// Sample DRG codes (in production, load from database or PhilHealth API)
+	private readonly sampleDrgCodes = [
+		{ code: "A01", description: "Craniotomy for trauma", mdrg: "MDC01", weight: 3.5, baseRate: 32000 },
+		{ code: "A02", description: "Spinal procedures", mdrg: "MDC01", weight: 2.8, baseRate: 32000 },
+		{ code: "B01", description: "Lens procedures", mdrg: "MDC02", weight: 1.2, baseRate: 32000 },
+		{ code: "C01", description: "Major chest procedures", mdrg: "MDC04", weight: 2.5, baseRate: 32000 },
+		{ code: "D01", description: "Cardiac valve procedures", mdrg: "MDC05", weight: 4.0, baseRate: 32000 },
+		{ code: "E01", description: "Appendectomy", mdrg: "MDC06", weight: 1.5, baseRate: 32000 },
+		{ code: "F01", description: "Hip replacement", mdrg: "MDC08", weight: 2.2, baseRate: 32000 },
+		{ code: "G01", description: "Normal delivery", mdrg: "MDC14", weight: 0.8, baseRate: 32000 },
+		{ code: "G02", description: "Cesarean section", mdrg: "MDC14", weight: 1.4, baseRate: 32000 },
+		{ code: "H01", description: "Newborn care", mdrg: "MDC15", weight: 0.5, baseRate: 32000 },
+	]
+
+	async getCf5(input: GetCf5Input) {
+		// In production, this would query a cf5_assignments table
+		// For now, return null (no assignment yet)
+		return null
+	}
+
+	async searchDrgCodes(input: SearchDrgInput) {
+		const { search } = input
+		const lower = search.toLowerCase()
+		return this.sampleDrgCodes.filter(
+			d => d.code.toLowerCase().includes(lower) || d.description.toLowerCase().includes(lower)
+		)
+	}
+
+	async assignDrg(input: AssignDrgInput) {
+		const { facilityId, encounterId, patientId, drgCode } = input
+
+		const drg = this.sampleDrgCodes.find(d => d.code === drgCode)
+		if (!drg) {
+			throw new BadRequestException(`Invalid DRG code: ${drgCode}`)
+		}
+
+		const computedRate = drg.weight * drg.baseRate
+
+		// In production, persist to database
+		return {
+			id: encounterId, // Using encounterId as ID since we're not persisting
+			facilityId,
+			encounterId,
+			patientId,
+			drgCode: drg.code,
+			drgDescription: drg.description,
+			mdrg: drg.mdrg,
+			drgWeight: drg.weight,
+			computedRate,
+			status: "draft" as const,
+			approvedBy: null,
+			approvedAt: null,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		}
+	}
+
+	async approveCf5(input: ApproveCf5Input) {
+		// In production, update the database record
+		// For now, return a mock approved assignment
+		return {
+			id: input.id,
+			facilityId: "00000000-0000-0000-0000-000000000000",
+			encounterId: input.id,
+			patientId: "00000000-0000-0000-0000-000000000000",
+			drgCode: "G01",
+			drgDescription: "Normal delivery",
+			mdrg: "MDC14",
+			drgWeight: 0.8,
+			computedRate: 25600,
+			status: "approved" as const,
+			approvedBy: null,
+			approvedAt: new Date(),
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		}
+	}
+
+	// ========================================================================
+	// Konsulta Capitation
+	// ========================================================================
+
+	async getKonsultaBenefit(input: GetKonsultaBenefitInput) {
+		// In production, query from konsulta_benefits table
+		// For now, return a mock benefit if patient has PhilHealth
+		const [patient] = await db
+			.select({ philhealthMemberId: patients.philhealthMemberId })
+			.from(patients)
+			.where(eq(patients.id, input.patientId))
+			.limit(1)
+
+		if (!patient?.philhealthMemberId) {
+			return null
+		}
+
+		const currentYear = new Date().getFullYear()
+		return {
+			id: `konsulta-${input.patientId}-${currentYear}`,
+			facilityId: input.facilityId,
+			patientId: input.patientId,
+			philhealthMemberId: patient.philhealthMemberId,
+			benefitYear: currentYear,
+			benefitPeriodStart: `${currentYear}-01-01`,
+			benefitPeriodEnd: `${currentYear}-12-31`,
+			consultationsAllowed: 4,
+			consultationsUsed: 0,
+			medicationsAllowed: 4,
+			medicationsUsed: 0,
+			labAllowed: 2,
+			labUsed: 0,
+			status: "active" as const,
+		}
+	}
+
+	async recordKonsultaVisit(input: RecordKonsultaVisitInput) {
+		const benefit = await this.getKonsultaBenefit({
+			facilityId: input.facilityId,
+			patientId: input.patientId,
+		})
+
+		if (!benefit) {
+			throw new BadRequestException("Patient does not have Konsulta benefit")
+		}
+
+		// In production, persist to database and increment usage
+		const updated: typeof benefit & { status: "active" | "exhausted" | "inactive" } = { ...benefit }
+		switch (input.visitType) {
+			case "consultation":
+				updated.consultationsUsed += 1
+				break
+			case "medication":
+				updated.medicationsUsed += 1
+				break
+			case "laboratory":
+				updated.labUsed += 1
+				break
+		}
+
+		// Check if exhausted
+		if (
+			updated.consultationsUsed >= updated.consultationsAllowed &&
+			updated.medicationsUsed >= updated.medicationsAllowed &&
+			updated.labUsed >= updated.labAllowed
+		) {
+			updated.status = "exhausted"
+		}
+
+		return updated
+	}
+
+	// ========================================================================
+	// Malasakit Center
+	// ========================================================================
+
+	async getMalasakit(input: GetMalasakitInput) {
+		// In production, query from malasakit_assistance table
+		// For now, return empty summary
+		return {
+			items: [] as Array<{
+				id: string
+				facilityId: string
+				encounterId: string
+				patientId: string
+				source: MalasakitSource
+				amount: number
+				purpose: string
+				status: MalasakitStatus
+				approvedBy: string | null
+				approvedAt: Date | null
+				notes: string | null
+				createdAt: Date
+			}>,
+			totalRequested: 0,
+			totalApproved: 0,
+			totalDisbursed: 0,
+		}
+	}
+
+	async addMalasakit(input: AddMalasakitInput) {
+		// In production, insert into malasakit_assistance table
+		return {
+			id: crypto.randomUUID(),
+			facilityId: input.facilityId,
+			encounterId: input.encounterId,
+			patientId: input.patientId,
+			source: input.source,
+			amount: input.amount,
+			purpose: input.purpose,
+			status: "pending" as const,
+			approvedBy: null,
+			approvedAt: null,
+			notes: input.notes ?? null,
+			createdAt: new Date(),
+		}
+	}
+
+	async updateMalasakitStatus(input: UpdateMalasakitStatusInput) {
+		// In production, update the database record
+		return {
+			id: input.id,
+			facilityId: "00000000-0000-0000-0000-000000000000",
+			encounterId: "00000000-0000-0000-0000-000000000000",
+			patientId: "00000000-0000-0000-0000-000000000000",
+			source: "hospital_fund" as const,
+			amount: 0,
+			purpose: "",
+			status: input.status,
+			approvedBy: input.status === "approved" || input.status === "disbursed" ? "system" : null,
+			approvedAt: input.status === "approved" || input.status === "disbursed" ? new Date() : null,
+			notes: null,
+			createdAt: new Date(),
+		}
 	}
 }

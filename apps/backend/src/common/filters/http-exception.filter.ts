@@ -1,6 +1,9 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger } from "@nestjs/common"
+import type { Request, Response } from "express"
 import { ZodSerializationException } from "nestjs-zod"
 import { ZodError } from "zod"
+
+import { env } from "@/config/env.config"
 
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -8,9 +11,21 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
 	catch(exception: HttpException, host: ArgumentsHost) {
 		const ctx = host.switchToHttp()
-		const response = ctx.getResponse()
+		const request = ctx.getRequest<Request>()
+		const response = ctx.getResponse<Response>()
 		const status = exception.getStatus()
 		const exceptionResponse = exception.getResponse()
+
+		// Ensure CORS headers are present on error responses
+		// (NestJS CORS middleware may not run for exception responses)
+		const origin = request.headers.origin
+		if (origin) {
+			const allowedOrigins = env.CORS_ORIGINS.split(",").map(o => o.trim())
+			if (allowedOrigins.includes(origin)) {
+				response.setHeader("Access-Control-Allow-Origin", origin)
+				response.setHeader("Access-Control-Allow-Credentials", "true")
+			}
+		}
 
 		// Log Zod serialization errors
 		if (exception instanceof ZodSerializationException) {

@@ -42,7 +42,7 @@ export const ordersContract = {
 	evaluateCds: oc
 		.route({
 			method: "POST",
-			path: "/orders/cds/evaluate",
+			path: "/cds/evaluate",
 			summary: "Run CDS evaluation pipeline for a medication order",
 			tags: ["Orders — CDS"],
 		})
@@ -56,7 +56,7 @@ export const ordersContract = {
 	listMedOrders: oc
 		.route({
 			method: "GET",
-			path: "/orders/medications",
+			path: "/medications",
 			summary: "List medication orders",
 			tags: ["Orders — Medications"],
 		})
@@ -66,7 +66,7 @@ export const ordersContract = {
 	getMedOrder: oc
 		.route({
 			method: "GET",
-			path: "/orders/medications/{id}",
+			path: "/medications/{id}",
 			summary: "Get a medication order by ID",
 			tags: ["Orders — Medications"],
 		})
@@ -76,7 +76,7 @@ export const ordersContract = {
 	createMedOrder: oc
 		.route({
 			method: "POST",
-			path: "/orders/medications",
+			path: "/medications",
 			summary: "Create a new medication order",
 			tags: ["Orders — Medications"],
 		})
@@ -86,7 +86,7 @@ export const ordersContract = {
 	updateMedOrder: oc
 		.route({
 			method: "PUT",
-			path: "/orders/medications/{id}",
+			path: "/medications/{id}",
 			summary: "Update a medication order",
 			tags: ["Orders — Medications"],
 		})
@@ -96,7 +96,7 @@ export const ordersContract = {
 	discontinueMedOrder: oc
 		.route({
 			method: "PUT",
-			path: "/orders/medications/{id}/discontinue",
+			path: "/medications/{id}/discontinue",
 			summary: "Discontinue a medication order",
 			tags: ["Orders — Medications"],
 		})
@@ -110,7 +110,7 @@ export const ordersContract = {
 	listLabOrders: oc
 		.route({
 			method: "GET",
-			path: "/orders/labs",
+			path: "/labs",
 			summary: "List lab orders",
 			tags: ["Orders — Labs"],
 		})
@@ -120,7 +120,7 @@ export const ordersContract = {
 	getLabOrder: oc
 		.route({
 			method: "GET",
-			path: "/orders/labs/{id}",
+			path: "/labs/{id}",
 			summary: "Get a lab order by ID",
 			tags: ["Orders — Labs"],
 		})
@@ -130,7 +130,7 @@ export const ordersContract = {
 	createLabOrder: oc
 		.route({
 			method: "POST",
-			path: "/orders/labs",
+			path: "/labs",
 			summary: "Create a new lab order",
 			tags: ["Orders — Labs"],
 		})
@@ -144,7 +144,7 @@ export const ordersContract = {
 	listImagingOrders: oc
 		.route({
 			method: "GET",
-			path: "/orders/imaging",
+			path: "/imaging",
 			summary: "List imaging orders",
 			tags: ["Orders — Imaging"],
 		})
@@ -154,7 +154,7 @@ export const ordersContract = {
 	getImagingOrder: oc
 		.route({
 			method: "GET",
-			path: "/orders/imaging/{id}",
+			path: "/imaging/{id}",
 			summary: "Get an imaging order by ID",
 			tags: ["Orders — Imaging"],
 		})
@@ -164,7 +164,7 @@ export const ordersContract = {
 	createImagingOrder: oc
 		.route({
 			method: "POST",
-			path: "/orders/imaging",
+			path: "/imaging",
 			summary: "Create a new imaging order",
 			tags: ["Orders — Imaging"],
 		})
@@ -178,7 +178,7 @@ export const ordersContract = {
 	getVerificationQueue: oc
 		.route({
 			method: "GET",
-			path: "/orders/pharmacy/queue",
+			path: "/pharmacy/queue",
 			summary: "Get pharmacy verification queue",
 			tags: ["Orders — Pharmacy"],
 		})
@@ -188,7 +188,7 @@ export const ordersContract = {
 	verifyOrder: oc
 		.route({
 			method: "POST",
-			path: "/orders/pharmacy/verify",
+			path: "/pharmacy/verify",
 			summary: "Verify (approve/reject/modify) a medication order",
 			tags: ["Orders — Pharmacy"],
 		})
@@ -202,7 +202,7 @@ export const ordersContract = {
 	listPrescriptions: oc
 		.route({
 			method: "GET",
-			path: "/orders/prescriptions",
+			path: "/prescriptions",
 			summary: "List e-prescriptions",
 			tags: ["Orders — Prescriptions"],
 		})
@@ -212,7 +212,7 @@ export const ordersContract = {
 	getPrescription: oc
 		.route({
 			method: "GET",
-			path: "/orders/prescriptions/{id}",
+			path: "/prescriptions/{id}",
 			summary: "Get a prescription by ID",
 			tags: ["Orders — Prescriptions"],
 		})
@@ -222,7 +222,7 @@ export const ordersContract = {
 	createPrescription: oc
 		.route({
 			method: "POST",
-			path: "/orders/prescriptions",
+			path: "/prescriptions",
 			summary: "Generate an e-prescription from a medication order",
 			tags: ["Orders — Prescriptions"],
 		})
@@ -232,7 +232,7 @@ export const ordersContract = {
 	signPrescription: oc
 		.route({
 			method: "PUT",
-			path: "/orders/prescriptions/{id}/sign",
+			path: "/prescriptions/{id}/sign",
 			summary: "Sign an e-prescription",
 			tags: ["Orders — Prescriptions"],
 		})
@@ -246,7 +246,7 @@ export const ordersContract = {
 	getActiveOrders: oc
 		.route({
 			method: "GET",
-			path: "/orders/active",
+			path: "/active",
 			summary: "Get all active orders for an encounter (used by NursingModule MAR)",
 			tags: ["Orders"],
 		})

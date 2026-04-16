@@ -20,7 +20,7 @@ export const noteTemplates = createTable(
 		category: t
 			.text("category")
 			.notNull()
-			.$type<"admission" | "progress" | "consultation" | "discharge_summary" | "fpe">(),
+			.$type<"admission" | "progress" | "consultation" | "discharge_summary" | "fpe" | "operative" | "anesthesia">(),
 		sections: t.jsonb("sections").notNull().default([]),
 		isActive: t.boolean("is_active").notNull().default(true),
 		createdByStaffId: t
@@ -55,7 +55,7 @@ export const clinicalNotes = createTable(
 		noteType: t
 			.text("note_type")
 			.notNull()
-			.$type<"admission" | "progress" | "consultation" | "discharge_summary" | "fpe">(),
+			.$type<"admission" | "progress" | "consultation" | "discharge_summary" | "fpe" | "operative" | "anesthesia">(),
 		content: t.text("content").notNull().default(""),
 		structuredData: t.jsonb("structured_data"),
 		status: t.text("status").notNull().default("draft").$type<"draft" | "signed">(),
@@ -116,7 +116,7 @@ export const consentRecords = createTable(
 		consentType: t
 			.text("consent_type")
 			.notNull()
-			.$type<"general" | "procedure" | "research" | "blood_transfusion" | "surgery">(),
+			.$type<"general" | "procedure" | "research" | "blood_transfusion" | "surgery" | "dpa" | "nbs">(),
 		signedByName: t.text("signed_by_name").notNull(),
 		relationship: t
 			.text("relationship")
@@ -128,7 +128,9 @@ export const consentRecords = createTable(
 		witnessStaffId: t
 			.uuid("witness_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		isActive: t.boolean("is_active").notNull().default(true),
 		revokedAt: t.timestamp("revoked_at"),
+		revocationReason: t.text("revocation_reason"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 	}),

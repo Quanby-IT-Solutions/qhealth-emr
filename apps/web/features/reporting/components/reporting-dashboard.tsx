@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter, useSearchParams } from "next/navigation"
 import { useState } from "react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -43,6 +44,10 @@ import {
 	useAhsrDrilldownQuery,
 	useExportAhsrMutation,
 } from "@/features/reporting/api/reporting.hooks"
+import { AhsrDashboard } from "@/features/reporting/components/ahsr-dashboard"
+import { HaiReport } from "@/features/reporting/components/hai-report"
+import { PidsrDashboard } from "@/features/reporting/components/pidsr-dashboard"
+import { ReportExport } from "@/features/reporting/components/report-export"
 
 // ============================================================================
 // Helpers
@@ -82,6 +87,20 @@ export function ReportingDashboard() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 
+	const router = useRouter()
+	const searchParams = useSearchParams()
+	const currentTab = searchParams.get("tab") ?? "surveillance"
+
+	function handleTabChange(value: string) {
+		const params = new URLSearchParams(searchParams.toString())
+		if (value === "surveillance") {
+			params.delete("tab")
+		} else {
+			params.set("tab", value)
+		}
+		router.push(`/reporting${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false })
+	}
+
 	if (!facilityId) {
 		return (
 			<div className="text-muted-foreground flex h-48 items-center justify-center">
@@ -95,29 +114,37 @@ export function ReportingDashboard() {
 			<div>
 				<h1 className="text-2xl font-bold">Statutory Reporting</h1>
 				<p className="text-muted-foreground">
-					PIDSR surveillance, case management, weekly reports, and AHSR metrics
+					PIDSR surveillance, case management, weekly reports, AHSR metrics, and HAI reporting
 				</p>
 			</div>
 
-			<Tabs defaultValue="surveillance">
+			<Tabs value={currentTab} onValueChange={handleTabChange}>
 				<TabsList variant="line">
 					<TabsTrigger value="surveillance">Surveillance Flags</TabsTrigger>
-					<TabsTrigger value="pidsr">PIDSR Cases</TabsTrigger>
+					<TabsTrigger value="pidsr">PIDSR</TabsTrigger>
 					<TabsTrigger value="weekly">Weekly Report</TabsTrigger>
 					<TabsTrigger value="ahsr">AHSR Dashboard</TabsTrigger>
+					<TabsTrigger value="hai">HAI Report</TabsTrigger>
+					<TabsTrigger value="export">Export</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="surveillance">
 					<SurveillancePanel facilityId={facilityId} />
 				</TabsContent>
 				<TabsContent value="pidsr">
-					<PidsrCasesPanel facilityId={facilityId} />
+					<PidsrDashboard facilityId={facilityId} />
 				</TabsContent>
 				<TabsContent value="weekly">
 					<WeeklyReportPanel facilityId={facilityId} />
 				</TabsContent>
 				<TabsContent value="ahsr">
-					<AhsrPanel facilityId={facilityId} />
+					<AhsrDashboard facilityId={facilityId} />
+				</TabsContent>
+				<TabsContent value="hai">
+					<HaiReport facilityId={facilityId} />
+				</TabsContent>
+				<TabsContent value="export">
+					<ReportExport facilityId={facilityId} />
 				</TabsContent>
 			</Tabs>
 		</div>

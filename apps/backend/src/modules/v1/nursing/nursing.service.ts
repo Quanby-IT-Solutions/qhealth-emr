@@ -24,7 +24,7 @@ import { db } from "@/common/database/database.client"
 interface VitalSignListInput {
 	page: number
 	limit: number
-	facilityId: string
+	facilityId?: string
 	encounterId?: string
 	preEncounterId?: string
 }
@@ -47,7 +47,7 @@ interface CreateVitalSignInput {
 interface MarEntryListInput {
 	page: number
 	limit: number
-	facilityId: string
+	facilityId?: string
 	encounterId?: string
 	preEncounterId?: string
 	status?: "due" | "given" | "missed" | "held" | "refused"
@@ -67,7 +67,7 @@ interface AdministerMarInput {
 interface TarEntryListInput {
 	page: number
 	limit: number
-	facilityId: string
+	facilityId?: string
 	encounterId?: string
 	preEncounterId?: string
 	status?: "due" | "given" | "missed" | "held" | "refused"
@@ -90,7 +90,7 @@ interface AdministerTarInput {
 interface IoEntryListInput {
 	page: number
 	limit: number
-	facilityId: string
+	facilityId?: string
 	encounterId?: string
 	preEncounterId?: string
 	ioType?: "intake" | "output"
@@ -108,14 +108,14 @@ interface CreateIoEntryInput {
 
 interface IoBalanceInput {
 	encounterId: string
-	facilityId: string
+	facilityId?: string
 }
 
 interface FlowsheetListInput {
 	page: number
 	limit: number
 	encounterId: string
-	facilityId: string
+	facilityId?: string
 	parameterName?: string
 	dateFrom?: string
 	dateTo?: string
@@ -124,14 +124,14 @@ interface FlowsheetListInput {
 interface HandoffListInput {
 	page: number
 	limit: number
-	facilityId: string
+	facilityId?: string
 	encounterId?: string
 	outgoingStaffId?: string
 }
 
 interface GenerateHandoffInput {
 	encounterId: string
-	facilityId: string
+	facilityId?: string
 }
 
 interface CreateHandoffInput {
@@ -148,7 +148,7 @@ interface FinalizeHandoffInput {
 interface HaiTagListInput {
 	page: number
 	limit: number
-	facilityId: string
+	facilityId?: string
 	encounterId?: string
 	haiType?: "clabsi" | "cauti" | "vap" | "ssi" | "cdiff"
 	status?: "suspected" | "confirmed" | "resolved"
@@ -264,7 +264,8 @@ export class NursingService {
 	// ========================================================================
 
 	async findVitals(input: VitalSignListInput) {
-		const conditions = [eq(vitalSigns.facilityId, input.facilityId)]
+		const conditions = []
+		if (input.facilityId) conditions.push(eq(vitalSigns.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(vitalSigns.encounterId, input.encounterId))
 		if (input.preEncounterId) conditions.push(eq(vitalSigns.preEncounterId, input.preEncounterId))
 
@@ -340,7 +341,8 @@ export class NursingService {
 	// ========================================================================
 
 	async findMarEntries(input: MarEntryListInput) {
-		const conditions = [eq(marEntries.facilityId, input.facilityId)]
+		const conditions = []
+		if (input.facilityId) conditions.push(eq(marEntries.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(marEntries.encounterId, input.encounterId))
 		if (input.preEncounterId) conditions.push(eq(marEntries.preEncounterId, input.preEncounterId))
 		if (input.status) conditions.push(eq(marEntries.status, input.status))
@@ -403,7 +405,8 @@ export class NursingService {
 	// ========================================================================
 
 	async findTarEntries(input: TarEntryListInput) {
-		const conditions = [eq(tarEntries.facilityId, input.facilityId)]
+		const conditions = []
+		if (input.facilityId) conditions.push(eq(tarEntries.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(tarEntries.encounterId, input.encounterId))
 		if (input.preEncounterId) conditions.push(eq(tarEntries.preEncounterId, input.preEncounterId))
 		if (input.status) conditions.push(eq(tarEntries.status, input.status))
@@ -481,7 +484,8 @@ export class NursingService {
 	// ========================================================================
 
 	async findIoEntries(input: IoEntryListInput) {
-		const conditions = [eq(ioEntries.facilityId, input.facilityId)]
+		const conditions = []
+		if (input.facilityId) conditions.push(eq(ioEntries.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(ioEntries.encounterId, input.encounterId))
 		if (input.preEncounterId) conditions.push(eq(ioEntries.preEncounterId, input.preEncounterId))
 		if (input.ioType) conditions.push(eq(ioEntries.ioType, input.ioType))
@@ -536,16 +540,16 @@ export class NursingService {
 		const periodEnd = new Date()
 		const periodStart = new Date(periodEnd.getTime() - 24 * 60 * 60 * 1000)
 
+		const conditions = [
+			eq(ioEntries.encounterId, input.encounterId),
+			gte(ioEntries.recordedAt, periodStart),
+		]
+		if (input.facilityId) conditions.push(eq(ioEntries.facilityId, input.facilityId))
+
 		const rows = await db
 			.select()
 			.from(ioEntries)
-			.where(
-				and(
-					eq(ioEntries.encounterId, input.encounterId),
-					eq(ioEntries.facilityId, input.facilityId),
-					gte(ioEntries.recordedAt, periodStart)
-				)
-			)
+			.where(and(...conditions))
 
 		let totalIntake = 0
 		let totalOutput = 0
@@ -571,8 +575,8 @@ export class NursingService {
 	async findFlowsheetEntries(input: FlowsheetListInput) {
 		const conditions = [
 			eq(flowsheetEntries.encounterId, input.encounterId),
-			eq(flowsheetEntries.facilityId, input.facilityId),
 		]
+		if (input.facilityId) conditions.push(eq(flowsheetEntries.facilityId, input.facilityId))
 		if (input.parameterName) conditions.push(eq(flowsheetEntries.parameterName, input.parameterName))
 		if (input.dateFrom) conditions.push(gte(flowsheetEntries.recordedAt, new Date(input.dateFrom)))
 		if (input.dateTo) conditions.push(lte(flowsheetEntries.recordedAt, new Date(input.dateTo)))
@@ -606,7 +610,8 @@ export class NursingService {
 	// ========================================================================
 
 	async findHandoffs(input: HandoffListInput) {
-		const conditions = [eq(shiftHandoffs.facilityId, input.facilityId)]
+		const conditions = []
+		if (input.facilityId) conditions.push(eq(shiftHandoffs.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(shiftHandoffs.encounterId, input.encounterId))
 		if (input.outgoingStaffId) conditions.push(eq(shiftHandoffs.outgoingStaffId, input.outgoingStaffId))
 
@@ -750,7 +755,8 @@ export class NursingService {
 	// ========================================================================
 
 	async findHaiTags(input: HaiTagListInput) {
-		const conditions = [eq(haiTags.facilityId, input.facilityId)]
+		const conditions = []
+		if (input.facilityId) conditions.push(eq(haiTags.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(haiTags.encounterId, input.encounterId))
 		if (input.haiType) conditions.push(eq(haiTags.haiType, input.haiType))
 		if (input.status) conditions.push(eq(haiTags.status, input.status))

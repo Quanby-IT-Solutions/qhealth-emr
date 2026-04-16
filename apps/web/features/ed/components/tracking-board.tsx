@@ -4,6 +4,8 @@ import { Badge } from "@/core/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { acuityColor } from "@/features/ed/lib/acuity-utils"
 
+import { TraumaAliasBadge } from "./trauma-alias-badge"
+
 interface QueueItem {
 	id: string
 	type: "pre_encounter" | "encounter"
@@ -24,6 +26,15 @@ interface QueueItem {
 interface TrackingBoardProps {
 	items: QueueItem[]
 	facilityId: string
+}
+
+function acuityBorderColor(level: number | null) {
+	if (!level) return ""
+	if (level === 1) return "border-l-4 border-l-red-600"
+	if (level === 2) return "border-l-4 border-l-orange-500"
+	if (level === 3) return "border-l-4 border-l-yellow-400"
+	if (level === 4) return "border-l-4 border-l-green-500"
+	return "border-l-4 border-l-blue-500"
 }
 
 const COLUMNS: { key: QueueItem["queueStatus"]; label: string; color: string }[] = [
@@ -59,7 +70,7 @@ export function TrackingBoard({ items }: TrackingBoardProps) {
 								</Card>
 							) : (
 								columnItems.map(item => (
-									<Card key={`${item.type}-${item.id}`} className="hover:shadow-md transition-shadow">
+									<Card key={`${item.type}-${item.id}`} className={`hover:shadow-md transition-shadow ${acuityBorderColor(item.acuityLevel)}`}>
 										<CardContent className="space-y-1 p-3">
 											<div className="flex items-center justify-between">
 												<span className="text-sm font-medium">
@@ -100,9 +111,10 @@ export function TrackingBoard({ items }: TrackingBoardProps) {
 											)}
 
 											{item.type === "pre_encounter" && (
-												<Badge variant="outline" className="text-xs">
-													Pre-encounter
-												</Badge>
+													<TraumaAliasBadge
+														alias={item.traumaAlias ?? item.id}
+														acuityLevel={item.acuityLevel}
+													/>
 											)}
 										</CardContent>
 									</Card>

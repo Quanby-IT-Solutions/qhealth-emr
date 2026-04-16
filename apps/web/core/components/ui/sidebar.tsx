@@ -20,6 +20,7 @@ import {
 import { Skeleton } from "@/core/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
 import { useIsMobile } from "@/core/hooks/use-mobile"
+import { useHasMounted } from "@/core/hooks/use-mounted"
 import { cn } from "@/core/lib/utils"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
@@ -491,6 +492,12 @@ function SidebarMenuButton({
 		tooltip?: string | React.ComponentProps<typeof TooltipContent>
 	} & VariantProps<typeof sidebarMenuButtonVariants>) {
 	const { isMobile, state } = useSidebar()
+	const hasMounted = useHasMounted()
+
+	// Only render TooltipTrigger after mount to avoid hydration mismatch.
+	// Base UI generates non-deterministic IDs that differ between SSR and client.
+	const shouldUseTooltip = tooltip && hasMounted
+
 	const comp = useRender({
 		defaultTagName: "button",
 		props: mergeProps<"button">(
@@ -499,7 +506,7 @@ function SidebarMenuButton({
 			},
 			props
 		),
-		render: !tooltip ? render : render ? <TooltipTrigger render={render} /> : TooltipTrigger,
+		render: !shouldUseTooltip ? render : render ? <TooltipTrigger render={render} /> : TooltipTrigger,
 		state: {
 			slot: "sidebar-menu-button",
 			sidebar: "menu-button",
@@ -508,14 +515,15 @@ function SidebarMenuButton({
 		},
 	})
 
-	if (!tooltip) {
+	if (!shouldUseTooltip) {
 		return comp
 	}
 
+	let tooltipProps: React.ComponentProps<typeof TooltipContent>
 	if (typeof tooltip === "string") {
-		tooltip = {
-			children: tooltip,
-		}
+		tooltipProps = { children: tooltip }
+	} else {
+		tooltipProps = tooltip
 	}
 
 	return (
@@ -525,7 +533,7 @@ function SidebarMenuButton({
 				side="right"
 				align="center"
 				hidden={state !== "collapsed" || isMobile}
-				{...tooltip}
+				{...tooltipProps}
 			/>
 		</Tooltip>
 	)

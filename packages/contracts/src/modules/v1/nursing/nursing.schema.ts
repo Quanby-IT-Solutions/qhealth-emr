@@ -10,7 +10,7 @@ const dateOrString = z
 
 const PaginationInputSchema = z.object({
 	page: z.coerce.number().int().positive().default(1),
-	limit: z.coerce.number().int().positive().max(100).default(50),
+	limit: z.coerce.number().int().positive().max(500).default(50),
 })
 
 const PaginatedResponseSchema = z.object({
@@ -81,7 +81,7 @@ export const CreateVitalSignSchema = z.object({
 export const VitalSignListSchema = PaginationInputSchema.extend({
 	encounterId: z.string().uuid().optional(),
 	preEncounterId: z.string().uuid().optional(),
-	facilityId: z.string().uuid(),
+	facilityId: z.string().uuid().optional(),
 })
 
 export const VitalSignListResponseSchema = PaginatedResponseSchema.extend({
@@ -114,7 +114,7 @@ export const MarEntrySchema = z.object({
 export const MarEntryListSchema = PaginationInputSchema.extend({
 	encounterId: z.string().uuid().optional(),
 	preEncounterId: z.string().uuid().optional(),
-	facilityId: z.string().uuid(),
+	facilityId: z.string().uuid().optional(),
 	status: MarStatusEnum.optional(),
 	scheduledFrom: z.string().optional(),
 	scheduledTo: z.string().optional(),
@@ -156,7 +156,7 @@ export const TarEntrySchema = z.object({
 export const TarEntryListSchema = PaginationInputSchema.extend({
 	encounterId: z.string().uuid().optional(),
 	preEncounterId: z.string().uuid().optional(),
-	facilityId: z.string().uuid(),
+	facilityId: z.string().uuid().optional(),
 	status: TarStatusEnum.optional(),
 })
 
@@ -211,7 +211,7 @@ export const CreateIoEntrySchema = z.object({
 export const IoEntryListSchema = PaginationInputSchema.extend({
 	encounterId: z.string().uuid().optional(),
 	preEncounterId: z.string().uuid().optional(),
-	facilityId: z.string().uuid(),
+	facilityId: z.string().uuid().optional(),
 	ioType: IoTypeEnum.optional(),
 })
 
@@ -221,7 +221,7 @@ export const IoEntryListResponseSchema = PaginatedResponseSchema.extend({
 
 export const IoBalanceSchema = z.object({
 	encounterId: z.string().uuid(),
-	facilityId: z.string().uuid(),
+	facilityId: z.string().uuid().optional(),
 })
 
 export const IoBalanceResponseSchema = z.object({
@@ -250,7 +250,7 @@ export const FlowsheetEntrySchema = z.object({
 
 export const FlowsheetListSchema = PaginationInputSchema.extend({
 	encounterId: z.string().uuid(),
-	facilityId: z.string().uuid(),
+	facilityId: z.string().uuid().optional(),
 	parameterName: z.string().optional(),
 	dateFrom: z.string().optional(),
 	dateTo: z.string().optional(),
@@ -291,7 +291,7 @@ export const FinalizeHandoffSchema = z.object({
 
 export const GenerateHandoffSchema = z.object({
 	encounterId: z.string().uuid(),
-	facilityId: z.string().uuid(),
+	facilityId: z.string().uuid().optional(),
 })
 
 export const GeneratedHandoffResponseSchema = z.object({
@@ -306,7 +306,7 @@ export const GeneratedHandoffResponseSchema = z.object({
 
 export const ShiftHandoffListSchema = PaginationInputSchema.extend({
 	encounterId: z.string().uuid().optional(),
-	facilityId: z.string().uuid(),
+	facilityId: z.string().uuid().optional(),
 	outgoingStaffId: z.string().uuid().optional(),
 })
 
@@ -351,7 +351,7 @@ export const UpdateHaiTagSchema = z.object({
 
 export const HaiTagListSchema = PaginationInputSchema.extend({
 	encounterId: z.string().uuid().optional(),
-	facilityId: z.string().uuid(),
+	facilityId: z.string().uuid().optional(),
 	haiType: HaiTypeEnum.optional(),
 	status: HaiStatusEnum.optional(),
 })

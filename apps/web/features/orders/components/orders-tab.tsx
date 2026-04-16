@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import {
 	Table,
 	TableBody,
-	TableCell,
 	TableHead,
 	TableHeader,
 	TableRow,
@@ -27,6 +26,8 @@ import {
 import { CreateImagingOrderDialog } from "./create-imaging-order-dialog"
 import { CreateLabOrderDialog } from "./create-lab-order-dialog"
 import { CreateMedOrderDialog } from "./create-med-order-dialog"
+import { ImagingDashboard } from "./imaging-dashboard"
+import { OrderGroupRow } from "./order-group-row"
 
 function formatDateTime(dateStr: string | null | undefined) {
 	if (!dateStr) return "—"
@@ -67,6 +68,163 @@ function priorityVariant(priority: string) {
 		default:
 			return "outline" as const
 	}
+}
+
+// ── Status grouping helpers ─────────────────────────────────────────────────
+
+const PENDING_STATUSES = new Set(["pending_verification", "pending"])
+const ACTIVE_STATUSES = new Set(["active", "verified"])
+const COMPLETED_STATUSES = new Set(["discontinued", "completed", "cancelled", "rejected"])
+
+interface MedOrderItem {
+	id: string
+	genericName: string
+	brandName: string | null
+	dose: string
+	doseUnit: string
+	doseForm: string
+	route: string
+	frequency: string
+	durationDays: number | null
+	isPrn: boolean
+	isControlledSubstance: boolean
+	pdeaSchedule: string | null
+	pdeaTrancheNumber: number | null
+	pdeaTrancheTotal: number | null
+	status: string
+	orderingStaffName: string | null
+	createdAt: string
+}
+
+/** Group tranche child orders under their tranche-1 (parent) order.
+ *  Orders without pdeaTrancheTotal or with trancheTotal=1 are standalone.
+ */
+function groupTranches(orders: MedOrderItem[]): Array<{
+	parent: MedOrderItem
+	tranches: MedOrderItem[]
+}> {
+	const trancheParents = orders.filter(
+		(o) => o.pdeaTrancheNumber === 1 && (o.pdeaTrancheTotal ?? 0) > 1,
+	)
+	const trancheChildren = orders.filter(
+		(o) => o.pdeaTrancheNumber != null && o.pdeaTrancheNumber > 1,
+	)
+	const standalone = orders.filter(
+		(o) =>
+			o.pdeaTrancheNumber == null ||
+			(o.pdeaTrancheNumber === 1 && (o.pdeaTrancheTotal ?? 1) <= 1),
+	)
+
+	const grouped = trancheParents.map((parent) => ({
+		parent,
+		tranches: trancheChildren
+			.filter(
+				(c) =>
+					c.genericName === parent.genericName &&
+					c.dose === parent.dose &&
+					c.frequency === parent.frequency,
+			)
+			.sort((a, b) => (a.pdeaTrancheNumber ?? 0) - (b.pdeaTrancheNumber ?? 0)),
+	}))
+
+	const standaloneGrouped = standalone.map((o) => ({ parent: o, tranches: [] as MedOrderItem[] }))
+
+	return [...grouped, ...standaloneGrouped]
+}
+
+interface MedOrdersViewProps {
+	orders: MedOrderItem[]
+	facilityId: string
+	encounterId: string
+	patientId: string
+	onDiscontinue: (id: string) => void
+	onGenerateRx: (id: string) => void
+	discontinuePending: boolean
+	createRxPending: boolean
+}
+
+function MedOrdersView({
+	orders,
+	onDiscontinue,
+	onGenerateRx,
+	discontinuePending,
+	createRxPending,
+}: MedOrdersViewProps) {
+	const [statusTab, setStatusTab] = useState<"pending" | "active" | "completed">("active")
+
+	const filtered = orders.filter((o) => {
+		if (statusTab === "pending") return PENDING_STATUSES.has(o.status)
+		if (statusTab === "active") return ACTIVE_STATUSES.has(o.status)
+		return COMPLETED_STATUSES.has(o.status)
+	})
+
+	const grouped = groupTranches(filtered)
+
+	return (
+		<div>
+			<div className="border-b px-4 pt-3 pb-0">
+				<Tabs value={statusTab} onValueChange={(v) => setStatusTab(v as typeof statusTab)}>
+					<TabsList variant="line">
+						<TabsTrigger value="pending">
+							Pending
+							{orders.filter((o) => PENDING_STATUSES.has(o.status)).length > 0 && (
+								<Badge variant="secondary" className="ml-1.5 text-[10px]">
+									{orders.filter((o) => PENDING_STATUSES.has(o.status)).length}
+								</Badge>
+							)}
+						</TabsTrigger>
+						<TabsTrigger value="active">
+							Active
+							{orders.filter((o) => ACTIVE_STATUSES.has(o.status)).length > 0 && (
+								<Badge variant="default" className="ml-1.5 text-[10px]">
+									{orders.filter((o) => ACTIVE_STATUSES.has(o.status)).length}
+								</Badge>
+							)}
+						</TabsTrigger>
+						<TabsTrigger value="completed">Completed</TabsTrigger>
+					</TabsList>
+				</Tabs>
+			</div>
+
+			{grouped.length === 0 ? (
+				<div className="text-muted-foreground py-8 text-center text-sm">
+					No {statusTab} medication orders.
+				</div>
+			) : (
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead>Drug</TableHead>
+							<TableHead>Dose</TableHead>
+							<TableHead>Route</TableHead>
+							<TableHead>Frequency</TableHead>
+							<TableHead>Duration</TableHead>
+							<TableHead>PRN</TableHead>
+							<TableHead>Status</TableHead>
+							<TableHead>Ordered By</TableHead>
+							<TableHead>Date</TableHead>
+							<TableHead className="text-right">Actions</TableHead>
+						</TableRow>
+					</TableHeader>
+					<tbody>
+						{grouped.map(({ parent, tranches }) => (
+							<OrderGroupRow
+								key={parent.id}
+								parent={parent}
+								tranches={tranches}
+								statusBadge={medStatusVariant}
+								formatDate={formatDateTime}
+								onDiscontinue={onDiscontinue}
+								onGenerateRx={onGenerateRx}
+								discontinuePending={discontinuePending}
+								createRxPending={createRxPending}
+							/>
+						))}
+					</tbody>
+				</Table>
+			)}
+		</div>
+	)
 }
 
 interface OrdersTabProps {
@@ -118,86 +276,23 @@ export function OrdersTab({ encounterId, facilityId, patientId }: OrdersTabProps
 									No medication orders yet.
 								</div>
 							) : (
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>Drug</TableHead>
-											<TableHead>Dose</TableHead>
-											<TableHead>Route</TableHead>
-											<TableHead>Frequency</TableHead>
-											<TableHead>Duration</TableHead>
-											<TableHead>PRN</TableHead>
-											<TableHead>Status</TableHead>
-											<TableHead>Ordered By</TableHead>
-											<TableHead>Date</TableHead>
-											<TableHead className="text-right">Actions</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{medOrders.data.data.map((med) => (
-											<TableRow key={med.id}>
-												<TableCell>
-													<div className="font-medium">{med.genericName}</div>
-													{med.brandName && (
-														<div className="text-muted-foreground text-xs">
-															{med.brandName}
-														</div>
-													)}
-												</TableCell>
-												<TableCell>
-													{med.dose} {med.doseUnit}
-												</TableCell>
-												<TableCell>{med.route}</TableCell>
-												<TableCell>{med.frequency}</TableCell>
-												<TableCell>
-													{med.durationDays ? `${med.durationDays}d` : "—"}
-												</TableCell>
-												<TableCell>{med.isPrn ? "Yes" : "No"}</TableCell>
-												<TableCell>
-													<Badge variant={medStatusVariant(med.status)}>
-														{med.status.replace(/_/g, " ")}
-													</Badge>
-												</TableCell>
-												<TableCell>{med.orderingStaffName ?? "—"}</TableCell>
-												<TableCell>{formatDateTime(med.createdAt)}</TableCell>
-												<TableCell className="text-right">
-													<div className="flex justify-end gap-1">
-														{med.status === "active" && (
-															<Button
-																variant="outline"
-																size="sm"
-																disabled={discontinueMed.isPending}
-																onClick={() =>
-																	discontinueMed.mutate(med.id)
-																}
-															>
-																Discontinue
-															</Button>
-														)}
-														{(med.status === "active" ||
-															med.status === "verified") && (
-															<Button
-																variant="outline"
-																size="sm"
-																disabled={createPrescription.isPending}
-																onClick={() =>
-																	createPrescription.mutate({
-																		facilityId,
-																		encounterId,
-																		medicationOrderId: med.id,
-																		patientId,
-																	})
-																}
-															>
-																Generate Rx
-															</Button>
-														)}
-													</div>
-												</TableCell>
-											</TableRow>
-										))}
-									</TableBody>
-								</Table>
+								<MedOrdersView
+									orders={medOrders.data.data}
+									facilityId={facilityId}
+									encounterId={encounterId}
+									patientId={patientId}
+									onDiscontinue={(id) => discontinueMed.mutate(id)}
+									onGenerateRx={(id) =>
+										createPrescription.mutate({
+											facilityId,
+											encounterId,
+											medicationOrderId: id,
+											patientId,
+										})
+									}
+									discontinuePending={discontinueMed.isPending}
+									createRxPending={createPrescription.isPending}
+								/>
 							)}
 						</CardContent>
 					</Card>
@@ -269,64 +364,11 @@ export function OrdersTab({ encounterId, facilityId, patientId }: OrdersTabProps
 
 				{/* ── Imaging ───────────────────────────────────────── */}
 				<TabsContent value="imaging">
-					<Card>
-						<CardHeader className="flex flex-row items-center justify-between">
-							<CardTitle>Imaging Orders</CardTitle>
-							<Button size="sm" onClick={() => setCreateImagingOpen(true)}>
-								New Imaging Order
-							</Button>
-						</CardHeader>
-						<CardContent className="p-0">
-							{imagingOrders.isLoading ? (
-								<div className="text-muted-foreground py-8 text-center text-sm">
-									Loading…
-								</div>
-							) : !imagingOrders.data?.data?.length ? (
-								<div className="text-muted-foreground py-8 text-center text-sm">
-									No imaging orders yet.
-								</div>
-							) : (
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>Modality</TableHead>
-											<TableHead>Body Part</TableHead>
-											<TableHead>Priority</TableHead>
-											<TableHead>Status</TableHead>
-											<TableHead>Ordered By</TableHead>
-											<TableHead>Date</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{imagingOrders.data.data.map((img) => (
-											<TableRow key={img.id}>
-												<TableCell className="font-medium capitalize">
-													{img.modality}
-												</TableCell>
-												<TableCell>{img.bodyPart}</TableCell>
-												<TableCell>
-													<Badge variant={priorityVariant(img.priority)}>
-														{img.priority}
-													</Badge>
-												</TableCell>
-												<TableCell>
-													<Badge variant={medStatusVariant(img.status)}>
-														{img.status.replace(/_/g, " ")}
-													</Badge>
-												</TableCell>
-												<TableCell>
-													{img.orderingStaffName ?? "—"}
-												</TableCell>
-												<TableCell>
-													{formatDateTime(img.createdAt)}
-												</TableCell>
-											</TableRow>
-										))}
-									</TableBody>
-								</Table>
-							)}
-						</CardContent>
-					</Card>
+					<ImagingDashboard
+						orders={imagingOrders.data?.data ?? []}
+						isLoading={imagingOrders.isLoading}
+						onNewOrder={() => setCreateImagingOpen(true)}
+					/>
 				</TabsContent>
 
 				{/* ── Prescriptions ──────────────────────────────────── */}

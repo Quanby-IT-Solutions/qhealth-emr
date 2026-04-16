@@ -10,7 +10,7 @@ const dateOrString = z
 
 const PaginationInputSchema = z.object({
 	page: z.coerce.number().int().positive().default(1),
-	limit: z.coerce.number().int().positive().max(100).default(50),
+	limit: z.coerce.number().int().positive().max(500).default(50),
 })
 
 const PaginatedResponseSchema = z.object({
@@ -30,6 +30,8 @@ export const NoteTypeEnum = z.enum([
 	"consultation",
 	"discharge_summary",
 	"fpe",
+	"operative",
+	"anesthesia",
 ])
 
 export const NoteStatusEnum = z.enum(["draft", "signed"])
@@ -40,6 +42,8 @@ export const TemplateCategoryEnum = z.enum([
 	"consultation",
 	"discharge_summary",
 	"fpe",
+	"operative",
+	"anesthesia",
 ])
 
 export const ConsentTypeEnum = z.enum([
@@ -48,6 +52,8 @@ export const ConsentTypeEnum = z.enum([
 	"research",
 	"blood_transfusion",
 	"surgery",
+	"nbs",
+	"dpa",
 ])
 
 export const ConsentRelationshipEnum = z.enum([
@@ -256,7 +262,8 @@ export const ConsentRecordIdSchema = z.object({
 })
 
 export const ConsentRecordListSchema = PaginationInputSchema.extend({
-	encounterId: z.string().uuid(),
+	encounterId: z.string().uuid().optional(),
+	patientId: z.string().uuid().optional(),
 	consentType: ConsentTypeEnum.optional(),
 })
 

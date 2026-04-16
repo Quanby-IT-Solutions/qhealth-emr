@@ -88,6 +88,19 @@ export const rolePermissions = createTable(
 				| "reporting"
 				| "audit"
 				| "admin"
+				| "surgical"
+				| "opd"
+				| "nutrition"
+				| "laboratory"
+				| "radiology"
+				| "scheduling"
+				| "nbs"
+				| "consent"
+				| "fhir"
+				| "msw"
+				| "death_reporting"
+				| "ed"
+				| "telemedicine"
 			>(),
 		action: t
 			.text("action")

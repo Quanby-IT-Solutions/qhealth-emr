@@ -1,4 +1,4 @@
-import { index } from "drizzle-orm/pg-core"
+import { type AnyPgColumn, index } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
 import { encounters, patients, preEncounters } from "./core.js"
@@ -42,6 +42,10 @@ export const medicationOrders = createTable(
 		pdeaSchedule: t.text("pdea_schedule"),
 		pdeaTrancheNumber: t.integer("pdea_tranche_number"),
 		pdeaTrancheTotal: t.integer("pdea_tranche_total"),
+		// Self-referencing FK for PDEA tranching: parent-child relationship
+		parentOrderId: t
+			.uuid("parent_order_id")
+			.references((): AnyPgColumn => medicationOrders.id, { onDelete: "set null" }),
 		status: t
 			.text("status")
 			.notNull()
@@ -100,7 +104,7 @@ export const labOrders = createTable(
 			.text("status")
 			.notNull()
 			.default("ordered")
-			.$type<"ordered" | "collected" | "resulted" | "cancelled">(),
+			.$type<"pending" | "ordered" | "collected" | "in_progress" | "resulted" | "completed" | "cancelled">(),
 		specimenType: t.text("specimen_type"),
 		orderingStaffId: t
 			.uuid("ordering_staff_id")

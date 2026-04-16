@@ -61,6 +61,12 @@ type ModuleName =
 	| "reporting"
 	| "audit"
 	| "admin"
+	| "surgical"
+	| "opd"
+	| "nutrition"
+	| "laboratory"
+	| "radiology"
+	| "scheduling"
 
 type ActionName = "view" | "create" | "edit" | "sign" | "delete" | "verify" | "export"
 
@@ -120,13 +126,113 @@ const demoUsers: DemoUser[] = [
 		employeeNumber: "BIL-001",
 	},
 	{
-		email: "surveillance@qhealth.local",
+		email: "pidsr@qhealth.local",
 		name: "Liza Mendoza",
-		roleName: "Surveillance Officer",
+		roleName: "PIDSR Officer",
 		department: "Epidemiology",
 		employeeNumber: "SUR-001",
 		prcLicenseNumber: "PRC-400001",
 		ptrNumber: "PTR-400001",
+	},
+	{
+		email: "registrar@qhealth.local",
+		name: "Maria Garcia",
+		roleName: "Registrar",
+		department: "Admissions",
+		employeeNumber: "REG-001",
+	},
+	{
+		email: "triage@qhealth.local",
+		name: "Jose Cruz",
+		roleName: "Triage Officer",
+		department: "Emergency Department",
+		employeeNumber: "TRG-001",
+		prcLicenseNumber: "PRC-500001",
+		ptrNumber: "PTR-500001",
+	},
+	{
+		email: "surgeon@qhealth.local",
+		name: "Dr. Eduardo Lim",
+		roleName: "Surgeon",
+		department: "Surgery",
+		employeeNumber: "SRG-001",
+		prcLicenseNumber: "PRC-600001",
+		ptrNumber: "PTR-600001",
+		pdeaS2License: "S2-600001",
+	},
+	{
+		email: "anesthesiologist@qhealth.local",
+		name: "Dr. Rosario Tan",
+		roleName: "Anesthesiologist",
+		department: "Anesthesiology",
+		employeeNumber: "ANE-001",
+		prcLicenseNumber: "PRC-700001",
+		ptrNumber: "PTR-700001",
+		pdeaS2License: "S2-700001",
+	},
+	{
+		email: "labtech@qhealth.local",
+		name: "Ramon Bautista",
+		roleName: "Lab Technologist",
+		department: "Laboratory",
+		employeeNumber: "LAB-001",
+		prcLicenseNumber: "PRC-800001",
+		ptrNumber: "PTR-800001",
+	},
+	{
+		email: "radiologist@qhealth.local",
+		name: "Dr. Nilda Gomez",
+		roleName: "Radiologist",
+		department: "Radiology",
+		employeeNumber: "RAD-001",
+		prcLicenseNumber: "PRC-900001",
+		ptrNumber: "PTR-900001",
+	},
+	{
+		email: "bloodbank@qhealth.local",
+		name: "Sofia Ramos",
+		roleName: "Blood Bank Technician",
+		department: "Blood Bank",
+		employeeNumber: "BBK-001",
+		prcLicenseNumber: "PRC-110001",
+		ptrNumber: "PTR-110001",
+	},
+	{
+		email: "him@qhealth.local",
+		name: "Teresa Villanueva",
+		roleName: "HIM Coder",
+		department: "Health Information Management",
+		employeeNumber: "HIM-001",
+	},
+	{
+		email: "msw@qhealth.local",
+		name: "Gloria Aguilar",
+		roleName: "Medical Social Worker",
+		department: "Social Work",
+		employeeNumber: "MSW-001",
+	},
+	{
+		email: "dietitian@qhealth.local",
+		name: "Carla Navarro",
+		roleName: "Clinical Dietitian",
+		department: "Nutrition and Dietetics",
+		employeeNumber: "NDT-001",
+		prcLicenseNumber: "PRC-120001",
+		ptrNumber: "PTR-120001",
+	},
+	{
+		email: "scheduler@qhealth.local",
+		name: "Benigno Aquino",
+		roleName: "Scheduler",
+		department: "Admissions and Scheduling",
+		employeeNumber: "SCH-001",
+	},
+	{
+		email: "auditor@qhealth.local",
+		name: "Ramon Santos",
+		roleName: "Auditor",
+		department: "Compliance and Privacy",
+		employeeNumber: "AUD-001",
 	},
 ]
 
@@ -141,22 +247,26 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["reporting", ["view", "create", "edit", "verify", "export"]],
 		["audit", ["view", "export"]],
 		["admin", ["view", "create", "edit", "delete", "export"]],
+		["opd", ["view"]], // OPD dashboard access
 	],
 	Physician: [
-		["adt", ["view", "create", "edit"]],
+		// Physicians view patients and create encounters, but don't manage scheduling/beds (Registrar's job)
+		["adt", ["view", "create"]],
 		["clinical_docs", ["view", "create", "edit", "sign"]],
 		["orders", ["view", "create", "edit", "sign"]],
 		["nursing", ["view"]],
 		["billing", ["view"]],
 		["formulary", ["view"]],
 		["reporting", ["view", "create"]],
+		["opd", ["view"]], // OPD dashboard access
 	],
 	Nurse: [
-		["adt", ["view"]],
+		["adt", ["view", "edit"]], // edit for bed management access
 		["clinical_docs", ["view", "create", "edit"]],
 		["orders", ["view"]],
 		["nursing", ["view", "create", "edit", "sign"]],
 		["formulary", ["view"]],
+		// NO opd:view — Nurses work in wards/ED, not OPD
 	],
 	Pharmacist: [
 		["orders", ["view", "edit", "verify"]],
@@ -169,10 +279,72 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["clinical_docs", ["view"]],
 		["reporting", ["view", "export"]],
 	],
-	"Surveillance Officer": [
+	"PIDSR Officer": [
 		["clinical_docs", ["view"]],
 		["reporting", ["view", "create", "edit", "verify", "export"]],
 		["audit", ["view", "export"]],
+	],
+	Registrar: [
+		["adt", ["view", "create", "edit"]],
+		["opd", ["view"]], // OPD dashboard access for patient routing
+	],
+	"Triage Officer": [
+		["adt", ["view", "create"]],
+		["nursing", ["view", "create"]],
+	],
+	Surgeon: [
+		["adt", ["view"]],
+		["clinical_docs", ["view", "create", "edit", "sign"]],
+		["orders", ["view", "create", "sign"]],
+		["surgical", ["view"]], // Surgical tab visibility
+		["formulary", ["view"]],
+		["opd", ["view"]], // OPD dashboard access (per TOR)
+	],
+	Anesthesiologist: [
+		["adt", ["view"]],
+		["clinical_docs", ["view", "create", "edit", "sign"]],
+		["orders", ["view", "create"]],
+		["surgical", ["view"]], // Surgical tab visibility
+		["formulary", ["view"]],
+	],
+	"Lab Technologist": [
+		["adt", ["view"]],
+		["orders", ["view", "edit"]],
+		["laboratory", ["view", "edit"]],
+	],
+	Radiologist: [
+		["adt", ["view"]],
+		["radiology", ["view", "edit"]],
+	],
+	"Blood Bank Technician": [
+		["adt", ["view"]],
+		["orders", ["view", "edit"]],
+		["laboratory", ["view"]], // Blood Bank nav access
+	],
+	"HIM Coder": [
+		["adt", ["view"]],
+		["clinical_docs", ["view", "create", "edit"]],
+		["reporting", ["view"]], // HAI tracking and report access
+	],
+	"Medical Social Worker": [
+		["adt", ["view"]],
+		["billing", ["view"]],
+		["clinical_docs", ["view"]],
+	],
+	"Clinical Dietitian": [
+		["adt", ["view"]],
+		// Dietitians use nutrition module, not nursing (avoids unintended nav visibility)
+		["nutrition", ["view", "edit"]],
+		["clinical_docs", ["view"]],
+	],
+	Scheduler: [
+		["adt", ["view", "create"]],
+		["scheduling", ["view", "create", "edit"]],
+	],
+	Auditor: [
+		["adt", ["view"]],
+		["audit", ["view", "export"]],
+		["reporting", ["view"]],
 	],
 }
 
@@ -249,19 +421,42 @@ async function ensureRole(facilityId: string, roleName: string) {
 
 async function ensureRolePermissions(roleId: string, roleName: string) {
 	const bundles = roleBundles[roleName] ?? []
+	
+	// Build set of expected permissions
+	const expectedPerms = new Set<string>()
 	for (const [moduleName, actions] of bundles) {
 		for (const action of actions) {
-			const [existing] = await db
-				.select()
-				.from(rolePermissions)
+			expectedPerms.add(`${moduleName}:${action}`)
+		}
+	}
+	
+	// Get current permissions for this role
+	const currentPerms = await db
+		.select()
+		.from(rolePermissions)
+		.where(eq(rolePermissions.roleId, roleId))
+	
+	// Delete permissions that shouldn't exist
+	for (const perm of currentPerms) {
+		const key = `${perm.module}:${perm.action}`
+		if (!expectedPerms.has(key)) {
+			await db
+				.delete(rolePermissions)
 				.where(
 					and(
 						eq(rolePermissions.roleId, roleId),
-						eq(rolePermissions.module, moduleName),
-						eq(rolePermissions.action, action)
+						eq(rolePermissions.module, perm.module),
+						eq(rolePermissions.action, perm.action)
 					)
 				)
-			if (!existing) {
+		}
+	}
+	
+	// Add missing permissions
+	for (const [moduleName, actions] of bundles) {
+		for (const action of actions) {
+			const exists = currentPerms.some(p => p.module === moduleName && p.action === action)
+			if (!exists) {
 				await db.insert(rolePermissions).values({ roleId, module: moduleName, action })
 			}
 		}

@@ -15,7 +15,20 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { usePatientProfileQuery } from "@/features/patients/api/patients.hooks"
+
+function usePermissionSet() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+}
+
+function can(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
+}
+import { ConsentHistory } from "@/features/clinical-docs/components/consent-history"
+import { DpaStatusBadge } from "@/features/clinical-docs/components/dpa-status-badge"
 import { usePatientSummaryQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
 import { ProblemsAllergiesTab } from "@/features/problems-allergies/components/problems-allergies-tab"
 
@@ -75,6 +88,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 	const router = useRouter()
 	const { data: patient, isLoading, isError, error } = usePatientProfileQuery(patientId)
 	const { data: summary } = usePatientSummaryQuery(patientId)
+	const permSet = usePermissionSet()
 
 	if (isLoading) {
 		return (
@@ -129,6 +143,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 							{summary.activeAllergyCount} Allerg{summary.activeAllergyCount === 1 ? "y" : "ies"}
 						</Badge>
 					)}
+					<DpaStatusBadge patientId={patientId} />
 				</CardContent>
 			</Card>
 
@@ -176,19 +191,24 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 			</Card>
 
 			{/* Problems & Allergies */}
-			<ProblemsAllergiesTab patientId={patientId} facilityId={patient.facilityId} />
+			{(can(permSet, "clinical_docs", "view") || can(permSet, "orders", "view")) && (
+				<ProblemsAllergiesTab patientId={patientId} facilityId={patient.facilityId} />
+			)}
 
 			{/* Encounter History */}
 			<Card>
 				<CardHeader className="flex flex-row items-center justify-between">
 					<CardTitle>Encounter History</CardTitle>
-					<Button
-						size="sm"
-						variant="outline"
-						render={<Link href={`/patients/${patientId}/encounters/new`} />}
-					>
-						New Encounter
-					</Button>
+					{can(permSet, "adt", "create") && (
+						<Button
+							size="sm"
+							variant="outline"
+							nativeButton={false}
+							render={<Link href={`/patients/${patientId}/encounters/new`} />}
+						>
+							New Encounter
+						</Button>
+					)}
 				</CardHeader>
 				<CardContent className="p-0">
 					{patient.encounters.length > 0 ? (
@@ -236,9 +256,14 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 				</CardContent>
 			</Card>
 
+			{/* Consent History */}
+			{can(permSet, "clinical_docs", "view") && (
+				<ConsentHistory patientId={patientId} facilityId={patient.facilityId} />
+			)}
+
 			{/* Actions */}
 			<div className="flex gap-3">
-				<Button variant="outline" render={<Link href="/patients/search" />}>
+				<Button variant="outline" nativeButton={false} render={<Link href="/patients/search" />}>
 					Back to Search
 				</Button>
 			</div>

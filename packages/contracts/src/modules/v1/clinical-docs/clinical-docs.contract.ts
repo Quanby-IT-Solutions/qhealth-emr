@@ -35,7 +35,7 @@ export const clinicalDocsContract = {
 	listTemplates: oc
 		.route({
 			method: "GET",
-			path: "/clinical-docs/templates",
+			path: "/templates",
 			summary: "List note templates for a facility",
 			tags: ["Clinical Documentation"],
 		})
@@ -45,7 +45,7 @@ export const clinicalDocsContract = {
 	getTemplate: oc
 		.route({
 			method: "GET",
-			path: "/clinical-docs/templates/{id}",
+			path: "/templates/{id}",
 			summary: "Get a note template by ID",
 			tags: ["Clinical Documentation"],
 		})
@@ -55,7 +55,7 @@ export const clinicalDocsContract = {
 	createTemplate: oc
 		.route({
 			method: "POST",
-			path: "/clinical-docs/templates",
+			path: "/templates",
 			summary: "Create a new note template",
 			tags: ["Clinical Documentation"],
 		})
@@ -65,7 +65,7 @@ export const clinicalDocsContract = {
 	updateTemplate: oc
 		.route({
 			method: "PUT",
-			path: "/clinical-docs/templates/{id}",
+			path: "/templates/{id}",
 			summary: "Update a note template",
 			tags: ["Clinical Documentation"],
 		})
@@ -79,7 +79,7 @@ export const clinicalDocsContract = {
 	listNotes: oc
 		.route({
 			method: "GET",
-			path: "/clinical-docs/notes",
+			path: "/notes",
 			summary: "List clinical notes for an encounter",
 			tags: ["Clinical Documentation"],
 		})
@@ -89,7 +89,7 @@ export const clinicalDocsContract = {
 	getNote: oc
 		.route({
 			method: "GET",
-			path: "/clinical-docs/notes/{id}",
+			path: "/notes/{id}",
 			summary: "Get a clinical note by ID with addenda",
 			tags: ["Clinical Documentation"],
 		})
@@ -99,7 +99,7 @@ export const clinicalDocsContract = {
 	createNote: oc
 		.route({
 			method: "POST",
-			path: "/clinical-docs/notes",
+			path: "/notes",
 			summary: "Create a new clinical note (draft)",
 			tags: ["Clinical Documentation"],
 		})
@@ -109,7 +109,7 @@ export const clinicalDocsContract = {
 	updateNote: oc
 		.route({
 			method: "PUT",
-			path: "/clinical-docs/notes/{id}",
+			path: "/notes/{id}",
 			summary: "Update a draft clinical note",
 			tags: ["Clinical Documentation"],
 		})
@@ -119,7 +119,7 @@ export const clinicalDocsContract = {
 	signNote: oc
 		.route({
 			method: "PUT",
-			path: "/clinical-docs/notes/{id}/sign",
+			path: "/notes/{id}/sign",
 			summary: "Sign a clinical note (locks it permanently)",
 			tags: ["Clinical Documentation"],
 		})
@@ -133,7 +133,7 @@ export const clinicalDocsContract = {
 	createAddendum: oc
 		.route({
 			method: "POST",
-			path: "/clinical-docs/addenda",
+			path: "/addenda",
 			summary: "Add an addendum to a signed clinical note",
 			tags: ["Clinical Documentation"],
 		})
@@ -143,7 +143,7 @@ export const clinicalDocsContract = {
 	signAddendum: oc
 		.route({
 			method: "PUT",
-			path: "/clinical-docs/addenda/{id}/sign",
+			path: "/addenda/{id}/sign",
 			summary: "Sign an addendum",
 			tags: ["Clinical Documentation"],
 		})
@@ -157,7 +157,7 @@ export const clinicalDocsContract = {
 	listConsents: oc
 		.route({
 			method: "GET",
-			path: "/clinical-docs/consents",
+			path: "/consents",
 			summary: "List consent records for an encounter",
 			tags: ["Clinical Documentation"],
 		})
@@ -167,7 +167,7 @@ export const clinicalDocsContract = {
 	getConsent: oc
 		.route({
 			method: "GET",
-			path: "/clinical-docs/consents/{id}",
+			path: "/consents/{id}",
 			summary: "Get a consent record by ID",
 			tags: ["Clinical Documentation"],
 		})
@@ -177,7 +177,7 @@ export const clinicalDocsContract = {
 	createConsent: oc
 		.route({
 			method: "POST",
-			path: "/clinical-docs/consents",
+			path: "/consents",
 			summary: "Capture a new electronic consent",
 			tags: ["Clinical Documentation"],
 		})
@@ -187,7 +187,7 @@ export const clinicalDocsContract = {
 	revokeConsent: oc
 		.route({
 			method: "PUT",
-			path: "/clinical-docs/consents/{id}/revoke",
+			path: "/consents/{id}/revoke",
 			summary: "Revoke a consent record",
 			tags: ["Clinical Documentation"],
 		})
@@ -201,7 +201,7 @@ export const clinicalDocsContract = {
 	getSignedNotes: oc
 		.route({
 			method: "GET",
-			path: "/clinical-docs/signed-notes",
+			path: "/signed-notes",
 			summary: "Get signed notes for an encounter (used by Billing for CF4)",
 			tags: ["Clinical Documentation"],
 		})

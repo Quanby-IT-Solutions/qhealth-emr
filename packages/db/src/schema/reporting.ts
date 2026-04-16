@@ -26,6 +26,10 @@ export const pidsrCases = createTable(
 			.references(() => patients.id, { onDelete: "restrict" }),
 		diseaseCode: t.text("disease_code").notNull(),
 		diseaseName: t.text("disease_name").notNull(),
+		// PIDSR Category: Category 1 = immediate (within 24 hrs), Category 2 = weekly
+		category: t
+			.text("category")
+			.$type<"category_1" | "category_2">(),
 		caseClassification: t
 			.text("case_classification")
 			.notNull()
@@ -106,5 +110,59 @@ export const ahsrSnapshots = createTable(
 	t => [
 		index("ahsr_snapshots_facility_id_idx").on(t.facilityId),
 		index("ahsr_snapshots_year_month_idx").on(t.reportYear, t.reportMonth),
+	]
+)
+
+// ============================================================================
+// FHIR EXPORT — FHIR/NHDR Export Tracking
+// ============================================================================
+
+export const fhirExports = createTable(
+	"fhir_exports",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		exportDateRange: t.jsonb("export_date_range").$type<{
+			startDate: string
+			endDate: string
+		}>(),
+		resourceTypes: t.jsonb("resource_types").$type<string[]>(), // e.g., ["Patient", "Encounter", "Observation"]
+		totalResources: t.integer("total_resources").notNull().default(0),
+		validResources: t.integer("valid_resources").notNull().default(0),
+		errorCount: t.integer("error_count").notNull().default(0),
+		validationReport: t.jsonb("validation_report").$type<{
+			errors?: Array<{ resourceType: string; resourceId: string; error: string }>
+			warnings?: Array<{ resourceType: string; resourceId: string; warning: string }>
+			summary?: Record<string, { total: number; valid: number; invalid: number }>
+		}>(),
+		exportFormat: t.text("export_format").notNull().default("ndjson").$type<"ndjson" | "json_bundle">(),
+		exportFileUrl: t.text("export_file_url"),
+		submissionStatus: t
+			.text("submission_status")
+			.notNull()
+			.default("pending")
+			.$type<"pending" | "exporting" | "exported" | "submitted" | "accepted" | "rejected">(),
+		nhdrAcknowledgment: t.jsonb("nhdr_acknowledgment").$type<{
+			receiptNumber?: string
+			submissionDate?: string
+			responseCode?: string
+			responseMessage?: string
+		}>(),
+		initiatedByStaffId: t
+			.uuid("initiated_by_staff_id")
+			.notNull()
+			.references(() => staffProfiles.id, { onDelete: "restrict" }),
+		exportedAt: t.timestamp("exported_at"),
+		submittedAt: t.timestamp("submitted_at"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("fhir_exports_facility_id_idx").on(t.facilityId),
+		index("fhir_exports_submission_status_idx").on(t.submissionStatus),
+		index("fhir_exports_created_at_idx").on(t.createdAt),
 	]
 )

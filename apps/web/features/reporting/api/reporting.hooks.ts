@@ -328,3 +328,107 @@ export function useExportAhsrMutation() {
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: reportingKeys.all }),
 	})
 }
+
+// ============================================================================
+// HAI Report Types & Hooks
+// ============================================================================
+
+export interface HaiTrend {
+	period: string
+	count: number
+	rate: number
+}
+
+export interface HaiTypeReport {
+	haiType: string
+	label: string
+	count: number
+	rate: number
+	trend: HaiTrend[]
+}
+
+export interface HaiReportResponse {
+	facilityId: string
+	year: number
+	month: number | null
+	totalHaiCases: number
+	haiRate: number
+	byType: HaiTypeReport[]
+}
+
+export interface HaiCaseDetail {
+	encounterId: string
+	patientName: string
+	patientMrn: string
+	haiType: string
+	onsetDate: string | null
+	diagnosisDate: string
+	disposition: string | null
+}
+
+export interface HaiCaseListResponse {
+	total: number
+	page: number
+	limit: number
+	totalPages: number
+	cases: HaiCaseDetail[]
+}
+
+// Report Export Types
+export interface ExportReportResponse {
+	success: boolean
+	message: string
+	downloadUrl?: string
+	fileName?: string
+}
+
+export function useHaiReportQuery(params: {
+	facilityId: string
+	year: number
+	month?: number
+}) {
+	return useQuery({
+		queryKey: [...reportingKeys.all, "hai", params] as const,
+		queryFn: () =>
+			fetchJson<HaiReportResponse>(
+				`${API_BASE}/hai${buildQueryString(params)}`
+			),
+		enabled: !!params.facilityId,
+	})
+}
+
+export function useHaiCasesQuery(params: {
+	facilityId: string
+	year: number
+	month?: number
+	haiType?: string
+	page?: number
+	limit?: number
+}, enabled = true) {
+	return useQuery({
+		queryKey: [...reportingKeys.all, "hai-cases", params] as const,
+		queryFn: () =>
+			fetchJson<HaiCaseListResponse>(
+				`${API_BASE}/hai/cases${buildQueryString(params)}`
+			),
+		enabled: enabled && !!params.facilityId,
+	})
+}
+
+export function useExportReportMutation() {
+	return useMutation({
+		mutationFn: (data: {
+			facilityId: string
+			reportType: "ahsr" | "pidsr" | "hai"
+			format: "csv" | "pdf" | "xml"
+			year: number
+			month?: number
+			dateFrom?: string
+			dateTo?: string
+		}) =>
+			fetchJson<ExportReportResponse>(`${API_BASE}/export`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+	})
+}

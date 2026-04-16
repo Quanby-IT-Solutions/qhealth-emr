@@ -101,7 +101,7 @@ export const notifications = createTable(
 		topic: t
 			.text("topic")
 			.notNull()
-			.$type<"pidsr" | "news" | "pharmacy" | "break_glass" | "system" | "ed_queue">(),
+			.$type<"pidsr" | "news" | "pharmacy" | "break_glass" | "system" | "ed_queue" | "sla_warning" | "sla_exceeded">(),
 		title: t.text("title").notNull(),
 		body: t.text("body").notNull(),
 		data: t.jsonb("data"),

@@ -20,7 +20,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
-	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
+	const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== "")
 	if (entries.length === 0) return ""
 	return "?" + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
 }
@@ -462,5 +462,301 @@ export function useUnbilledEncountersQuery(params: {
 			fetchJson<PaginatedResponse<UnbilledEncounter>>(
 				`${API_BASE}/unbilled${buildQueryString(params)}`
 			),
+	})
+}
+
+// ============================================================================
+// CF5 / DRG Types & Hooks
+// ============================================================================
+
+export interface DrgCode {
+	code: string
+	description: string
+	mdrg: string
+	weight: number
+	baseRate: number
+}
+
+export interface Cf5Assignment {
+	id: string
+	facilityId: string
+	encounterId: string
+	patientId: string
+	drgCode: string
+	drgDescription: string
+	mdrg: string
+	drgWeight: number
+	computedRate: number
+	status: "draft" | "submitted" | "approved" | "rejected"
+	approvedBy: string | null
+	approvedAt: string | null
+	createdAt: string
+	updatedAt: string
+}
+
+export function useCf5AssignmentQuery(encounterId: string) {
+	return useQuery({
+		queryKey: [...billingKeys.all, "cf5", encounterId] as const,
+		queryFn: () =>
+			fetchJson<Cf5Assignment | null>(`${API_BASE}/cf5${buildQueryString({ encounterId })}`),
+		enabled: !!encounterId,
+	})
+}
+
+export function useDrgSearchQuery(search: string) {
+	return useQuery({
+		queryKey: [...billingKeys.all, "drg-search", search] as const,
+		queryFn: () =>
+			fetchJson<DrgCode[]>(`${API_BASE}/cf5/drg-codes${buildQueryString({ search })}`),
+		enabled: search.length >= 2,
+	})
+}
+
+export function useAssignDrgMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: {
+			facilityId: string
+			encounterId: string
+			patientId: string
+			drgCode: string
+		}) =>
+			fetchJson<Cf5Assignment>(`${API_BASE}/cf5/assign`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: billingKeys.all }),
+	})
+}
+
+export function useApproveCf5Mutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (id: string) =>
+			fetchJson<Cf5Assignment>(`${API_BASE}/cf5/${id}/approve`, {
+				method: "POST",
+				body: JSON.stringify({ id }),
+			}),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: billingKeys.all }),
+	})
+}
+
+// ============================================================================
+// eSOA Types & Hooks
+// ============================================================================
+
+export interface SoaLine {
+	id: string
+	category: string
+	description: string
+	quantity: number
+	unitPrice: number
+	totalAmount: number
+}
+
+export interface StatementOfAccount {
+	id: string
+	facilityId: string
+	encounterId: string
+	patientId: string
+	patientName: string
+	patientMrn: string
+	soaNumber: string
+	lines: SoaLine[]
+	subtotal: number
+	philhealthDeduction: number
+	seniorPwdDiscount: number
+	malasakitDeduction: number
+	otherDeductions: number
+	netAmount: number
+	status: "draft" | "final"
+	generatedAt: string
+}
+
+export function useSoaQuery(encounterId: string) {
+	return useQuery({
+		queryKey: [...billingKeys.all, "soa", encounterId] as const,
+		queryFn: () =>
+			fetchJson<StatementOfAccount | null>(
+				`${API_BASE}/soa${buildQueryString({ encounterId })}`
+			),
+		enabled: !!encounterId,
+	})
+}
+
+export function useGenerateSoaMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: { facilityId: string; encounterId: string; patientId: string }) =>
+			fetchJson<StatementOfAccount>(`${API_BASE}/soa/generate`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: billingKeys.all }),
+	})
+}
+
+export function useFinalizeSoaMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (id: string) =>
+			fetchJson<StatementOfAccount>(`${API_BASE}/soa/${id}/finalize`, {
+				method: "POST",
+				body: JSON.stringify({ id }),
+			}),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: billingKeys.all }),
+	})
+}
+
+// ============================================================================
+// CEWS Eligibility Query Hook
+// ============================================================================
+
+export interface CewsEligibility {
+	patientId: string
+	philhealthMemberId: string | null
+	lastCheckedAt: string | null
+	isEligible: boolean | null
+	benefitType: string | null
+	remainingCoverage: number | null
+	message: string | null
+}
+
+export function useCewsEligibilityQuery(patientId: string) {
+	return useQuery({
+		queryKey: [...billingKeys.all, "cews", patientId] as const,
+		queryFn: () =>
+			fetchJson<CewsEligibility>(`${API_BASE}/eligibility/latest${buildQueryString({ patientId })}`),
+		enabled: !!patientId,
+	})
+}
+
+// ============================================================================
+// Konsulta Types & Hooks
+// ============================================================================
+
+export interface KonsultaBenefit {
+	id: string
+	facilityId: string
+	patientId: string
+	philhealthMemberId: string
+	benefitYear: number
+	benefitPeriodStart: string
+	benefitPeriodEnd: string
+	consultationsAllowed: number
+	consultationsUsed: number
+	medicationsAllowed: number
+	medicationsUsed: number
+	labAllowed: number
+	labUsed: number
+	status: "active" | "exhausted" | "inactive"
+}
+
+export function useKonsultaBenefitQuery(params: { facilityId: string; patientId: string }) {
+	return useQuery({
+		queryKey: [...billingKeys.all, "konsulta", params] as const,
+		queryFn: () =>
+			fetchJson<KonsultaBenefit | null>(
+				`${API_BASE}/konsulta${buildQueryString(params)}`
+			),
+		enabled: !!params.patientId && !!params.facilityId,
+	})
+}
+
+export function useRecordKonsultaVisitMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: {
+			facilityId: string
+			patientId: string
+			encounterId: string
+			visitType: "consultation" | "medication" | "laboratory"
+		}) =>
+			fetchJson<KonsultaBenefit>(`${API_BASE}/konsulta/record-visit`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: billingKeys.all }),
+	})
+}
+
+// ============================================================================
+// Malasakit Types & Hooks
+// ============================================================================
+
+export type MalasakitSource =
+	| "doh_medisure"
+	| "hospital_fund"
+	| "lgu"
+	| "pcso"
+	| "dswd"
+	| "private_donation"
+	| "other"
+
+export interface MalasakitAssistance {
+	id: string
+	facilityId: string
+	encounterId: string
+	patientId: string
+	source: MalasakitSource
+	amount: number
+	purpose: string
+	status: "pending" | "approved" | "disbursed" | "denied"
+	approvedBy: string | null
+	approvedAt: string | null
+	notes: string | null
+	createdAt: string
+}
+
+export interface MalasakitSummary {
+	items: MalasakitAssistance[]
+	totalRequested: number
+	totalApproved: number
+	totalDisbursed: number
+}
+
+export function useMalasakitQuery(params: { facilityId: string; encounterId: string }) {
+	return useQuery({
+		queryKey: [...billingKeys.all, "malasakit", params] as const,
+		queryFn: () =>
+			fetchJson<MalasakitSummary>(
+				`${API_BASE}/malasakit${buildQueryString(params)}`
+			),
+		enabled: !!params.encounterId,
+	})
+}
+
+export function useAddMalasakitMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: {
+			facilityId: string
+			encounterId: string
+			patientId: string
+			source: MalasakitSource
+			amount: number
+			purpose: string
+			notes?: string
+		}) =>
+			fetchJson<MalasakitAssistance>(`${API_BASE}/malasakit`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: billingKeys.all }),
+	})
+}
+
+export function useUpdateMalasakitStatusMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: {
+			id: string
+			status: "approved" | "disbursed" | "denied"
+		}) =>
+			fetchJson<MalasakitAssistance>(`${API_BASE}/malasakit/${data.id}/status`, {
+				method: "PUT",
+				body: JSON.stringify({ status: data.status }),
+			}),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: billingKeys.all }),
 	})
 }

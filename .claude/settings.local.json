@@ -104,7 +104,17 @@
       "Bash(pnpm --filter backend typecheck)",
       "Bash(echo \"{}\")",
       "Bash(pnpm typecheck:*)",
-      "Bash(echo '{}')"
+      "Bash(echo '{}')",
+      "Bash(pnpm --filter @repo/web add lucide-react)",
+      "Bash(pnpm --filter @repo/db seed:dev)",
+      "Bash(pnpm db:push)",
+      "Bash(pnpm --filter @repo/db push)",
+      "Bash(npx drizzle-kit:*)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -n 'module.*type\\\\|$type.*module' D:/PROJECTS/qhealth-emr/packages/db/src/schema/rbac.ts)",
+      "Bash(grep -n 'reserved\\\\|cleaning\\\\|BedStatus\\\\|$type' D:/PROJECTS/qhealth-emr/packages/db/src/schema/core.ts)",
+      "Bash(grep -rn 'module.*$type\\\\|module.*nbs\\\\|module.*msw\\\\|module.*consent' D:/PROJECTS/qhealth-emr/packages/db/src/schema/rbac.ts)",
+      "Bash(grep '$type\\\\|module')"
     ]
   }
 }
