@@ -486,14 +486,18 @@ export function filterNavItems(
 	const isAdmin = permSet.has("admin:view")
 
 	return items.filter(item => {
+		const isExplicitlyExcludedForAdmin = item.excludePermissions?.some(
+			p => p.module === "admin" && permSet.has(`${p.module}:${p.action}`)
+		)
+
+		// Admin bypass - admins see everything unless the item explicitly excludes admin
+		if (isAdmin && item.requiredPermissions.length > 0) {
+			return !isExplicitlyExcludedForAdmin
+		}
+
 		// Check excludes first (takes precedence over includes)
 		if (item.excludePermissions?.some(p => permSet.has(`${p.module}:${p.action}`))) {
 			return false
-		}
-
-		// Admin bypass - admins see everything except items they shouldn't
-		if (isAdmin && item.requiredPermissions.length > 0) {
-			return true
 		}
 
 		if (item.requiredPermissions.length === 0) return true

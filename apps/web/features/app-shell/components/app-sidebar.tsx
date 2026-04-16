@@ -41,10 +41,7 @@ export function AppSidebar() {
 
 	const permissions = profile?.activeRole?.permissions ?? []
 	const primaryItems = filterNavItems(PRIMARY_NAV_ITEMS, permissions)
-	const primaryHrefs = new Set(primaryItems.map(item => item.href))
-	const secondaryItems = filterNavItems(SECONDARY_NAV_ITEMS, permissions).filter(
-		item => !primaryHrefs.has(item.href)
-	)
+	const secondaryItems = filterNavItems(SECONDARY_NAV_ITEMS, permissions)
 
 	return (
 		<Sidebar collapsible="icon" variant="sidebar">
