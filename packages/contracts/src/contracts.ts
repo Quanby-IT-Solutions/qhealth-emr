@@ -165,6 +165,86 @@ export {
 	type BedsideVerifyResult,
 } from "./modules/v1/lab/lab.schema.js"
 
+// ============================================================================
+// NEW MODULES (Ticket BE-02)
+// ============================================================================
+
+// Nutrition schemas — exported for frontend validation
+export {
+	ScreeningToolEnum,
+	MalnutritionRiskEnum,
+	NutritionStatusEnum,
+	DietTypeEnum,
+	NutritionAssessmentSchema,
+	CreateNutritionAssessmentSchema,
+	MealPlanSchema,
+	type NutritionAssessment,
+	type CreateNutritionAssessment,
+	type MealPlan,
+} from "./modules/v1/nutrition/nutrition.schema.js"
+
+// MSW (Medical Social Work) schemas — exported for frontend validation
+export {
+	MswStatusEnum,
+	CoeProgramEnum,
+	FinancialClassEnum,
+	EmploymentStatusEnum,
+	MswEvaluationSchema,
+	CreateMswEvaluationSchema,
+	IssueCoeSchema,
+	type MswEvaluation,
+	type CreateMswEvaluation,
+	type IssueCoe,
+} from "./modules/v1/msw/msw.schema.js"
+
+// Consent schemas — exported for frontend validation
+export {
+	ConsentTypeEnum as ConsentModuleTypeEnum,
+	ConsentStatusEnum,
+	SignerRelationshipEnum,
+	ConsentRecordSchema as ConsentModuleRecordSchema,
+	CreateConsentSchema as CreateConsentModuleRecordSchema,
+	BreakGlassRequestSchema,
+	BreakGlassResponseSchema,
+	type ConsentRecord as ConsentModuleRecord,
+	type CreateConsent as CreateConsentModuleRecordInput,
+	type BreakGlassRequest,
+	type BreakGlassResponse,
+} from "./modules/v1/consent/consent.schema.js"
+
+// PhilHealth schemas — exported for frontend validation
+export {
+	EligibilityStatusEnum,
+	MemberTypeEnum,
+	PatientRelationEnum,
+	Cf5StatusEnum as PhilhealthCf5StatusEnum,
+	KonsultaServiceTypeEnum,
+	CewsEligibilityQuerySchema,
+	CewsEligibilityResultSchema,
+	Cf5ClaimSchema,
+	KonsultaServiceSchema,
+	type CewsEligibilityQuery,
+	type CewsEligibilityResult,
+	type Cf5Claim,
+	type KonsultaService,
+} from "./modules/v1/philhealth/philhealth.schema.js"
+
+// Pharmacy / Dispensing schemas — exported for frontend validation
+export {
+	DispensingStatusEnum,
+	DispensingTypeEnum,
+	PharmacyLocationEnum,
+	DispensingQueueItemSchema,
+	DispensingQueueQuerySchema,
+	DispensingRecordSchema,
+	StartDispensingSchema,
+	CompleteDispensingSchema,
+	type DispensingQueueItem,
+	type DispensingRecord,
+	type StartDispensing,
+	type CompleteDispensing,
+} from "./modules/v1/pharmacy/pharmacy.schema.js"
+
 // Future versions:
 // export { v2Contract, type V2Contract } from "./modules/v2/v2.contract.js"
 // export const v2 = { ... }

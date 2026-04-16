@@ -7,29 +7,36 @@ import {
 	AssignDrgInputSchema,
 	BillingStatusInputSchema,
 	BillingStatusResponseSchema,
+	CewsCheckInputSchema,
+	CewsResponseSchema,
 	Cf4PreviewSchema,
 	Cf4ClaimSchema,
 	Cf5AssignmentSchema,
+	Cf5WithBillingSchema,
 	ChargeSchema,
 	CheckEligibilityInputSchema,
 	CreateChargeInputSchema,
 	DeleteChargeInputSchema,
 	DrgCodeSchema,
 	EligibilityResponseSchema,
+	EsoaResponseSchema,
 	FinalizeCf4InputSchema,
 	FinalizeInvoiceInputSchema,
 	FinalizeSoaInputSchema,
 	GenerateCf4InputSchema,
+	GenerateEsoaInputSchema,
 	GenerateInvoiceInputSchema,
 	GenerateSoaInputSchema,
 	GetCf4InputSchema,
 	GetCf5InputSchema,
+	GetCf5WithBillingInputSchema,
 	GetInvoiceInputSchema,
 	GetKonsultaBenefitInputSchema,
 	GetMalasakitInputSchema,
 	GetSoaInputSchema,
 	InvoiceSchema,
 	KonsultaBenefitSchema,
+	LinkChargeToIcdInputSchema,
 	ListChargeMasterInputSchema,
 	ListChargeMasterResponseSchema,
 	ListChargesInputSchema,
@@ -244,4 +251,36 @@ export const billingContract = {
 		.route({ method: "PUT", path: "/malasakit/{id}/status", summary: "Update Malasakit assistance status", tags: ["Billing"] })
 		.input(UpdateMalasakitStatusInputSchema)
 		.output(MalasakitAssistanceSchema),
+
+	// ========================================================================
+	// eSOA (Electronic Statement of Account)
+	// ========================================================================
+
+	generateEsoa: oc
+		.route({ method: "POST", path: "/esoa/generate", summary: "Generate eSOA in PDF/XML/JSON format", tags: ["Billing"] })
+		.input(GenerateEsoaInputSchema)
+		.output(EsoaResponseSchema),
+
+	// ========================================================================
+	// CF5 with Billing Items
+	// ========================================================================
+
+	getCf5WithBilling: oc
+		.route({ method: "GET", path: "/cf5/billing", summary: "Get CF5 with linked billing items", tags: ["Billing"] })
+		.input(GetCf5WithBillingInputSchema)
+		.output(Cf5WithBillingSchema.nullable()),
+
+	linkChargeToIcd: oc
+		.route({ method: "POST", path: "/charges/link-icd", summary: "Link a charge to an ICD code for CF5", tags: ["Billing"] })
+		.input(LinkChargeToIcdInputSchema)
+		.output(z.object({ success: z.boolean() })),
+
+	// ========================================================================
+	// CEWS Real-Time Check
+	// ========================================================================
+
+	checkCews: oc
+		.route({ method: "POST", path: "/cews/check", summary: "Real-time CEWS (indigency/Listahanan) check", tags: ["Billing"] })
+		.input(CewsCheckInputSchema)
+		.output(CewsResponseSchema),
 }

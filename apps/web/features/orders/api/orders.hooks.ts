@@ -1,49 +1,52 @@
 "use client"
 
+import type { InferContractRouterInputs, InferContractRouterOutputs } from "@orpc/contract"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { type v1Contract } from "@repo/contracts"
+
 import { env } from "@/env"
+import { orpc } from "@/services/orpc/client"
 
-const API_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/orders`
+type V1Inputs = InferContractRouterInputs<typeof v1Contract>
+type V1Outputs = InferContractRouterOutputs<typeof v1Contract>
 
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-	const res = await fetch(url, {
-		credentials: "include",
-		...init,
-		headers: {
-			"Content-Type": "application/json",
-			...init?.headers,
-		},
-	})
-	if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-	return res.json() as Promise<T>
+type RawCdsEvaluateResponse = V1Outputs["orders"]["evaluateCds"]
+type RawMedOrder = V1Outputs["orders"]["getMedOrder"]
+type RawLabOrder = V1Outputs["orders"]["getLabOrder"]
+type RawImagingOrder = V1Outputs["orders"]["getImagingOrder"]
+type RawVerification = V1Outputs["orders"]["verifyOrder"]
+type RawPrescription = V1Outputs["orders"]["getPrescription"]
+type RawMedOrderListResponse = V1Outputs["orders"]["listMedOrders"]
+type RawLabOrderListResponse = V1Outputs["orders"]["listLabOrders"]
+type RawImagingOrderListResponse = V1Outputs["orders"]["listImagingOrders"]
+type RawPrescriptionListResponse = V1Outputs["orders"]["listPrescriptions"]
+type RawActiveOrdersResponse = V1Outputs["orders"]["getActiveOrders"]
+
+function serializeDate(value: Date | string | null | undefined): string | null {
+	if (!value) return null
+	return value instanceof Date ? value.toISOString() : value
 }
 
-function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
-	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
-	if (entries.length === 0) return ""
-	return "?" + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
+function serializeRequiredDate(value: Date | string): string {
+	return value instanceof Date ? value.toISOString() : value
 }
 
-// ============================================================================
-// Types
-// ============================================================================
-
-interface CdsAlert {
+export interface CdsAlert {
 	type: string
 	severity: string
 	message: string
 	details?: Record<string, unknown>
 }
 
-interface CdsEvaluateResponse {
+export interface CdsEvaluateResponse {
 	alerts: CdsAlert[]
 	canProceed: boolean
 	requiresOverride: boolean
 	requiresDoubleVerification: boolean
 }
 
-interface MedOrder {
+export interface MedOrder {
 	id: string
 	facilityId: string
 	encounterId: string | null
@@ -65,16 +68,38 @@ interface MedOrder {
 	pdeaSchedule: string | null
 	pdeaTrancheNumber: number | null
 	pdeaTrancheTotal: number | null
+	parentOrderId: string | null
+	isTranche: boolean
 	status: string
 	orderingStaffId: string
 	orderingStaffName: string | null
+	patientId?: string | null
+	patientName?: string | null
+	patientMrn?: string | null
+	patientDateOfBirth?: string | null
+	patientWeight?: number | null
+	patientCreatinine?: number | null
+	priority?: string
+	alertCount?: number
+	criticalAlertCount?: number
+	receivedAt?: string
+	safetyChecks?: Array<{
+		id: string
+		type: string
+		severity: string
+		title: string
+		message: string
+		details?: Record<string, unknown>
+		isHardBlock: boolean
+		requiresOverride: boolean
+	}>
 	cdsAlerts: unknown
 	cdsOverrides: unknown
 	createdAt: string
 	updatedAt: string
 }
 
-interface LabOrder {
+export interface LabOrder {
 	id: string
 	facilityId: string
 	encounterId: string | null
@@ -96,7 +121,7 @@ interface LabOrder {
 	updatedAt: string
 }
 
-interface ImagingOrder {
+export interface ImagingOrder {
 	id: string
 	facilityId: string
 	encounterId: string | null
@@ -117,7 +142,7 @@ interface ImagingOrder {
 	updatedAt: string
 }
 
-interface Verification {
+export interface Verification {
 	id: string
 	medicationOrderId: string
 	action: string
@@ -129,7 +154,7 @@ interface Verification {
 	createdAt: string
 }
 
-interface Prescription {
+export interface Prescription {
 	id: string
 	facilityId: string
 	encounterId: string
@@ -146,7 +171,7 @@ interface Prescription {
 	createdAt: string
 }
 
-interface PaginatedResponse<T> {
+export interface PaginatedResponse<T> {
 	data: T[]
 	total: number
 	page: number
@@ -154,15 +179,85 @@ interface PaginatedResponse<T> {
 	totalPages: number
 }
 
-interface ActiveOrdersResponse {
+export interface ActiveOrdersResponse {
 	medicationOrders: MedOrder[]
 	labOrders: LabOrder[]
 	imagingOrders: ImagingOrder[]
 }
 
-// ============================================================================
-// Query Keys
-// ============================================================================
+function mapMedOrder(order: RawMedOrder): MedOrder {
+	return {
+		...order,
+		patientDateOfBirth: serializeDate(order.patientDateOfBirth),
+		receivedAt: order.receivedAt ? serializeRequiredDate(order.receivedAt) : undefined,
+		createdAt: serializeRequiredDate(order.createdAt),
+		updatedAt: serializeRequiredDate(order.updatedAt),
+	}
+}
+
+function mapLabOrder(order: RawLabOrder): LabOrder {
+	return {
+		...order,
+		collectionDatetime: serializeDate(order.collectionDatetime),
+		resultedDatetime: serializeDate(order.resultedDatetime),
+		createdAt: serializeRequiredDate(order.createdAt),
+		updatedAt: serializeRequiredDate(order.updatedAt),
+	}
+}
+
+function mapImagingOrder(order: RawImagingOrder): ImagingOrder {
+	return {
+		...order,
+		scheduledDatetime: serializeDate(order.scheduledDatetime),
+		completedDatetime: serializeDate(order.completedDatetime),
+		createdAt: serializeRequiredDate(order.createdAt),
+		updatedAt: serializeRequiredDate(order.updatedAt),
+	}
+}
+
+function mapVerification(verification: RawVerification): Verification {
+	return {
+		...verification,
+		verifiedAt: serializeRequiredDate(verification.verifiedAt),
+		createdAt: serializeRequiredDate(verification.createdAt),
+	}
+}
+
+function mapPrescription(prescription: RawPrescription): Prescription {
+	return {
+		...prescription,
+		signedAt: serializeDate(prescription.signedAt),
+		createdAt: serializeRequiredDate(prescription.createdAt),
+	}
+}
+
+function mapPaginatedMedOrders(response: RawMedOrderListResponse): PaginatedResponse<MedOrder> {
+	return { ...response, data: response.data.map(mapMedOrder) }
+}
+
+function mapPaginatedLabOrders(response: RawLabOrderListResponse): PaginatedResponse<LabOrder> {
+	return { ...response, data: response.data.map(mapLabOrder) }
+}
+
+function mapPaginatedImagingOrders(
+	response: RawImagingOrderListResponse
+): PaginatedResponse<ImagingOrder> {
+	return { ...response, data: response.data.map(mapImagingOrder) }
+}
+
+function mapPaginatedPrescriptions(
+	response: RawPrescriptionListResponse
+): PaginatedResponse<Prescription> {
+	return { ...response, data: response.data.map(mapPrescription) }
+}
+
+function mapActiveOrders(response: RawActiveOrdersResponse): ActiveOrdersResponse {
+	return {
+		medicationOrders: response.medicationOrders.map(mapMedOrder),
+		labOrders: response.labOrders.map(mapLabOrder),
+		imagingOrders: response.imagingOrders.map(mapImagingOrder),
+	}
+}
 
 export const orderKeys = {
 	all: ["orders"] as const,
@@ -178,32 +273,20 @@ export const orderKeys = {
 	active: (encounterId: string) => [...orderKeys.all, "active", encounterId] as const,
 }
 
-// ============================================================================
-// CDS Evaluation
-// ============================================================================
-
-interface CdsEvaluateInput {
-	patientId: string
-	genericName: string
-	formularyItemId?: string
-	isControlledSubstance?: boolean
-	orderingStaffId: string
-	facilityId: string
-}
+type CdsEvaluateInput = V1Inputs["orders"]["evaluateCds"]
 
 export function useEvaluateCdsMutation() {
-	return useMutation({
-		mutationFn: (data: CdsEvaluateInput) =>
-			fetchJson<CdsEvaluateResponse>(`${API_BASE}/cds/evaluate`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
+	return useMutation<
+		CdsEvaluateResponse,
+		Error,
+		CdsEvaluateInput
+	>({
+		mutationFn: async data => {
+			const result = await orpc.orders.evaluateCds.call(data)
+			return result as CdsEvaluateResponse
+		},
 	})
 }
-
-// ============================================================================
-// Medication Orders
-// ============================================================================
 
 interface MedOrderListParams {
 	encounterId?: string
@@ -214,112 +297,73 @@ interface MedOrderListParams {
 }
 
 export function useMedOrderListQuery(params: MedOrderListParams) {
-	return useQuery({
-		queryKey: orderKeys.medOrders(params),
-		queryFn: () =>
-			fetchJson<PaginatedResponse<MedOrder>>(
-				`${API_BASE}/medications${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
-			),
-		enabled: !!(params.encounterId || params.preEncounterId),
-	})
+	return useQuery(
+		orpc.orders.listMedOrders.queryOptions({
+			input: {
+				encounterId: params.encounterId,
+				preEncounterId: params.preEncounterId,
+				status: params.status as V1Inputs["orders"]["listMedOrders"]["status"],
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			enabled: !!(params.encounterId || params.preEncounterId),
+			select: mapPaginatedMedOrders,
+		})
+	)
 }
 
 export function useMedOrderDetailQuery(id: string) {
-	return useQuery({
-		queryKey: orderKeys.medOrder(id),
-		queryFn: () => fetchJson<MedOrder>(`${API_BASE}/medications/${id}`),
-		enabled: !!id,
-	})
+	return useQuery(
+		orpc.orders.getMedOrder.queryOptions({
+			input: { id },
+			enabled: !!id,
+			select: mapMedOrder,
+		})
+	)
 }
 
-interface CreateMedOrderData {
-	facilityId: string
-	encounterId?: string
-	preEncounterId?: string
-	formularyItemId?: string
-	genericName: string
-	brandName?: string
-	rxnormCode?: string
-	dose: string
-	doseUnit: string
-	doseForm: string
-	route: string
-	frequency: string
-	durationDays?: number
-	specialInstructions?: string
-	isPrn?: boolean
-	prnReason?: string
-	isControlledSubstance?: boolean
-	pdeaSchedule?: string
-	pdeaTrancheNumber?: number
-	pdeaTrancheTotal?: number
-	cdsAlerts?: unknown
-	cdsOverrides?: unknown
-}
+type CreateMedOrderData = V1Inputs["orders"]["createMedOrder"]
 
 export function useCreateMedOrderMutation() {
 	const queryClient = useQueryClient()
 
-	return useMutation({
-		mutationFn: (data: CreateMedOrderData) =>
-			fetchJson<MedOrder>(`${API_BASE}/medications`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: orderKeys.all })
-		},
-	})
+	return useMutation(
+		orpc.orders.createMedOrder.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
+			},
+		})
+	)
 }
 
-interface UpdateMedOrderData {
-	id: string
-	dose?: string
-	doseUnit?: string
-	doseForm?: string
-	route?: string
-	frequency?: string
-	durationDays?: number
-	specialInstructions?: string
-	isPrn?: boolean
-	prnReason?: string
-	status?: string
-}
+type UpdateMedOrderData = V1Inputs["orders"]["updateMedOrder"]
 
 export function useUpdateMedOrderMutation() {
 	const queryClient = useQueryClient()
 
-	return useMutation({
-		mutationFn: (data: UpdateMedOrderData) =>
-			fetchJson<MedOrder>(`${API_BASE}/medications/${data.id}`, {
-				method: "PUT",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: (_data, variables) => {
-			queryClient.invalidateQueries({ queryKey: orderKeys.all })
-			queryClient.invalidateQueries({ queryKey: orderKeys.medOrder(variables.id) })
-		},
-	})
+	return useMutation(
+		orpc.orders.updateMedOrder.mutationOptions({
+			onSuccess: (_data, variables) => {
+				queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
+				queryClient.invalidateQueries({ queryKey: orderKeys.medOrder(variables.id) })
+			},
+		})
+	)
 }
 
 export function useDiscontinueMedOrderMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
-		mutationFn: (id: string) =>
-			fetchJson<MedOrder>(`${API_BASE}/medications/${id}/discontinue`, {
-				method: "PUT",
-				body: JSON.stringify({ id }),
-			}),
+		mutationFn: async (id: string) => {
+			const result = await orpc.orders.discontinueMedOrder.call({ id })
+			return mapMedOrder(result)
+		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: orderKeys.all })
+			queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
 		},
 	})
 }
-
-// ============================================================================
-// Lab Orders
-// ============================================================================
 
 interface LabOrderListParams {
 	encounterId?: string
@@ -330,55 +374,44 @@ interface LabOrderListParams {
 }
 
 export function useLabOrderListQuery(params: LabOrderListParams) {
-	return useQuery({
-		queryKey: orderKeys.labOrders(params),
-		queryFn: () =>
-			fetchJson<PaginatedResponse<LabOrder>>(
-				`${API_BASE}/labs${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
-			),
-		enabled: !!(params.encounterId || params.preEncounterId),
-	})
+	return useQuery(
+		orpc.orders.listLabOrders.queryOptions({
+			input: {
+				encounterId: params.encounterId,
+				preEncounterId: params.preEncounterId,
+				status: params.status as V1Inputs["orders"]["listLabOrders"]["status"],
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			enabled: !!(params.encounterId || params.preEncounterId),
+			select: mapPaginatedLabOrders,
+		})
+	)
 }
 
 export function useLabOrderDetailQuery(id: string) {
-	return useQuery({
-		queryKey: orderKeys.labOrder(id),
-		queryFn: () => fetchJson<LabOrder>(`${API_BASE}/labs/${id}`),
-		enabled: !!id,
-	})
+	return useQuery(
+		orpc.orders.getLabOrder.queryOptions({
+			input: { id },
+			enabled: !!id,
+			select: mapLabOrder,
+		})
+	)
 }
 
-interface CreateLabOrderData {
-	facilityId: string
-	encounterId?: string
-	preEncounterId?: string
-	loincCode?: string
-	panelCode?: string
-	testName: string
-	panelName?: string
-	priority?: string
-	specimenType?: string
-	clinicalIndication?: string
-}
+type CreateLabOrderData = V1Inputs["orders"]["createLabOrder"]
 
 export function useCreateLabOrderMutation() {
 	const queryClient = useQueryClient()
 
-	return useMutation({
-		mutationFn: (data: CreateLabOrderData) =>
-			fetchJson<LabOrder>(`${API_BASE}/labs`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: orderKeys.all })
-		},
-	})
+	return useMutation(
+		orpc.orders.createLabOrder.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
+			},
+		})
+	)
 }
-
-// ============================================================================
-// Imaging Orders
-// ============================================================================
 
 interface ImagingOrderListParams {
 	encounterId?: string
@@ -389,52 +422,44 @@ interface ImagingOrderListParams {
 }
 
 export function useImagingOrderListQuery(params: ImagingOrderListParams) {
-	return useQuery({
-		queryKey: orderKeys.imagingOrders(params),
-		queryFn: () =>
-			fetchJson<PaginatedResponse<ImagingOrder>>(
-				`${API_BASE}/imaging${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
-			),
-		enabled: !!(params.encounterId || params.preEncounterId),
-	})
+	return useQuery(
+		orpc.orders.listImagingOrders.queryOptions({
+			input: {
+				encounterId: params.encounterId,
+				preEncounterId: params.preEncounterId,
+				status: params.status as V1Inputs["orders"]["listImagingOrders"]["status"],
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			enabled: !!(params.encounterId || params.preEncounterId),
+			select: mapPaginatedImagingOrders,
+		})
+	)
 }
 
 export function useImagingOrderDetailQuery(id: string) {
-	return useQuery({
-		queryKey: orderKeys.imagingOrder(id),
-		queryFn: () => fetchJson<ImagingOrder>(`${API_BASE}/imaging/${id}`),
-		enabled: !!id,
-	})
+	return useQuery(
+		orpc.orders.getImagingOrder.queryOptions({
+			input: { id },
+			enabled: !!id,
+			select: mapImagingOrder,
+		})
+	)
 }
 
-interface CreateImagingOrderData {
-	facilityId: string
-	encounterId?: string
-	preEncounterId?: string
-	modality: string
-	bodyPart: string
-	clinicalIndication?: string
-	priority?: string
-}
+type CreateImagingOrderData = V1Inputs["orders"]["createImagingOrder"]
 
 export function useCreateImagingOrderMutation() {
 	const queryClient = useQueryClient()
 
-	return useMutation({
-		mutationFn: (data: CreateImagingOrderData) =>
-			fetchJson<ImagingOrder>(`${API_BASE}/imaging`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: orderKeys.all })
-		},
-	})
+	return useMutation(
+		orpc.orders.createImagingOrder.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
+			},
+		})
+	)
 }
-
-// ============================================================================
-// Pharmacy Verification
-// ============================================================================
 
 interface VerificationQueueParams {
 	facilityId: string
@@ -443,14 +468,17 @@ interface VerificationQueueParams {
 }
 
 export function useVerificationQueueQuery(params: VerificationQueueParams) {
-	return useQuery({
-		queryKey: orderKeys.verificationQueue(params),
-		queryFn: () =>
-			fetchJson<PaginatedResponse<MedOrder>>(
-				`${API_BASE}/pharmacy/queue${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
-			),
-		enabled: !!params.facilityId,
-	})
+	return useQuery(
+		orpc.orders.getVerificationQueue.queryOptions({
+			input: {
+				facilityId: params.facilityId,
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			enabled: !!params.facilityId,
+			select: mapPaginatedMedOrders,
+		})
+	)
 }
 
 interface VerifyOrderData {
@@ -464,20 +492,15 @@ export function useVerifyOrderMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
-		mutationFn: (data: VerifyOrderData) =>
-			fetchJson<Verification>(`${API_BASE}/pharmacy/verify`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
+		mutationFn: async (data: VerifyOrderData) => {
+			const result = await orpc.orders.verifyOrder.call(data)
+			return mapVerification(result)
+		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: orderKeys.all })
+			queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
 		},
 	})
 }
-
-// ============================================================================
-// Prescriptions
-// ============================================================================
 
 interface PrescriptionListParams {
 	encounterId?: string
@@ -487,83 +510,72 @@ interface PrescriptionListParams {
 }
 
 export function usePrescriptionListQuery(params: PrescriptionListParams) {
-	return useQuery({
-		queryKey: orderKeys.prescriptions(params),
-		queryFn: () =>
-			fetchJson<PaginatedResponse<Prescription>>(
-				`${API_BASE}/prescriptions${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
-			),
-		enabled: !!(params.encounterId || params.patientId),
-	})
+	return useQuery(
+		orpc.orders.listPrescriptions.queryOptions({
+			input: {
+				encounterId: params.encounterId,
+				patientId: params.patientId,
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			enabled: !!(params.encounterId || params.patientId),
+			select: mapPaginatedPrescriptions,
+		})
+	)
 }
 
 export function usePrescriptionDetailQuery(id: string) {
-	return useQuery({
-		queryKey: orderKeys.prescription(id),
-		queryFn: () => fetchJson<Prescription>(`${API_BASE}/prescriptions/${id}`),
-		enabled: !!id,
-	})
+	return useQuery(
+		orpc.orders.getPrescription.queryOptions({
+			input: { id },
+			enabled: !!id,
+			select: mapPrescription,
+		})
+	)
 }
 
-interface CreatePrescriptionData {
-	facilityId: string
-	encounterId: string
-	medicationOrderId: string
-	patientId: string
-}
+type CreatePrescriptionData = V1Inputs["orders"]["createPrescription"]
 
 export function useCreatePrescriptionMutation() {
 	const queryClient = useQueryClient()
 
-	return useMutation({
-		mutationFn: (data: CreatePrescriptionData) =>
-			fetchJson<Prescription>(`${API_BASE}/prescriptions`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: orderKeys.all })
-		},
-	})
+	return useMutation(
+		orpc.orders.createPrescription.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
+			},
+		})
+	)
 }
 
 export function useSignPrescriptionMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
-		mutationFn: (id: string) =>
-			fetchJson<Prescription>(`${API_BASE}/prescriptions/${id}/sign`, {
-				method: "PUT",
-				body: JSON.stringify({ id }),
-			}),
+		mutationFn: async (id: string) => {
+			const result = await orpc.orders.signPrescription.call({ id })
+			return mapPrescription(result)
+		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: orderKeys.all })
+			queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
 		},
 	})
 }
 
-// ============================================================================
-// Active Orders (cross-module)
-// ============================================================================
-
 export function useActiveOrdersQuery(encounterId: string) {
-	return useQuery({
-		queryKey: orderKeys.active(encounterId),
-		queryFn: () =>
-			fetchJson<ActiveOrdersResponse>(
-				`${API_BASE}/active${buildQueryString({ encounterId })}`
-			),
-		enabled: !!encounterId,
-	})
+	return useQuery(
+		orpc.orders.getActiveOrders.queryOptions({
+			input: { encounterId },
+			enabled: !!encounterId,
+			select: mapActiveOrders,
+		})
+	)
 }
-
-// ============================================================================
-// PDEA License Validation
-// ============================================================================
 
 interface PdeaLicenseCheckInput {
 	prescriberStaffId: string
-	pdeaSchedule: string // "S2" | "S3" | "S4"
+	pdeaSchedule: string
+	facilityId?: string
 }
 
 interface PdeaLicenseCheckResponse {
@@ -575,24 +587,42 @@ interface PdeaLicenseCheckResponse {
 }
 
 export function usePdeaLicenseCheckMutation() {
-	return useMutation({
-		mutationFn: (data: PdeaLicenseCheckInput) =>
-			fetchJson<PdeaLicenseCheckResponse>(`${API_BASE}/pdea/license-check`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
+	const queryClient = useQueryClient()
+
+	return useMutation<PdeaLicenseCheckResponse, Error, PdeaLicenseCheckInput>({
+		mutationFn: async data => {
+			if (!data.facilityId) {
+				throw new Error("facilityId is required for PDEA license checks")
+			}
+
+			const result = await queryClient.fetchQuery(
+				orpc.orders.checkPdeaLicense.queryOptions({
+					input: {
+						staffId: data.prescriberStaffId,
+						facilityId: data.facilityId,
+					},
+				})
+			)
+
+			return {
+				isValid: result.canPrescribeControlled,
+				licenseNumber: result.licenseNumber,
+				expiryDate: result.expiryDate,
+				remainingMonthlyQuota: null,
+				message: result.errorMessage ?? (result.canPrescribeControlled ? "License valid" : "License invalid"),
+			}
+		},
 	})
 }
 
-// ============================================================================
-// PDEA Tranching Preview
-// ============================================================================
-
 interface TranchingPreviewInput {
+	facilityId: string
 	genericName: string
-	totalQuantity: number
+	dose: string
+	frequency: string
 	durationDays: number
 	pdeaSchedule: string
+	startDate?: string
 }
 
 interface TranchePreview {
@@ -604,42 +634,45 @@ interface TranchePreview {
 }
 
 interface TranchingPreviewResponse {
+	requiresTranching: boolean
+	reason: string | null
+	totalDays: number
 	totalTranches: number
 	tranches: TranchePreview[]
 	maxTrancheSize: number
-	regulatoryNotes: string | null
 }
 
 export function useTranchingPreviewMutation() {
-	return useMutation({
-		mutationFn: (data: TranchingPreviewInput) =>
-			fetchJson<TranchingPreviewResponse>(`${API_BASE}/pdea/tranching-preview`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-	})
-}
+	return useMutation<
+		TranchingPreviewResponse,
+		Error,
+		TranchingPreviewInput
+	>({
+		mutationFn: async data => {
+			const result = await orpc.orders.previewTranches.call({
+				facilityId: data.facilityId,
+				genericName: data.genericName,
+				dose: data.dose,
+				frequency: data.frequency,
+				durationDays: data.durationDays,
+				pdeaSchedule: data.pdeaSchedule,
+				startDate: data.startDate,
+			})
 
-// ============================================================================
-// CDS Alerts Query (for encounter-wide alerts)
-// ============================================================================
-
-interface CdsAlertSummary {
-	totalAlerts: number
-	criticalCount: number
-	warningCount: number
-	infoCount: number
-	alerts: CdsAlert[]
-}
-
-export function useCdsAlertsQuery(encounterId: string) {
-	return useQuery({
-		queryKey: [...orderKeys.all, "cds-alerts", encounterId] as const,
-		queryFn: () =>
-			fetchJson<CdsAlertSummary>(
-				`${API_BASE}/cds/alerts${buildQueryString({ encounterId })}`
-			),
-		enabled: !!encounterId,
-		refetchInterval: 60 * 1000, // Refresh every minute
+			return {
+				requiresTranching: result.requiresTranching,
+				reason: result.reason,
+				totalDays: result.totalDays,
+				totalTranches: result.tranches.length,
+				tranches: result.tranches.map(tranche => ({
+					trancheNumber: tranche.trancheNumber,
+					quantity: tranche.quantityPerTranche ?? 0,
+					startDay: Number(tranche.startDate.split("-")[2] ?? 1),
+					endDay: Number(tranche.endDate.split("-")[2] ?? tranche.durationDays),
+					releaseDate: tranche.startDate,
+				})),
+				maxTrancheSize: result.maxDaysPerTranche,
+			}
+		},
 	})
 }

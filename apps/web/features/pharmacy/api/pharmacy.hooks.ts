@@ -1,12 +1,20 @@
 "use client"
 
+import type { InferContractRouterOutputs } from "@orpc/contract"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { type v1Contract } from "@repo/contracts"
+
 import { env } from "@/env"
+import { orpc } from "@/services/orpc/client"
 
 // Pharmacy endpoints are under /orders/pharmacy in the backend
 const ORDERS_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/orders`
 const PHARMACY_BASE = `${ORDERS_BASE}/pharmacy`
+
+type V1Outputs = InferContractRouterOutputs<typeof v1Contract>
+type RawMedOrder = V1Outputs["orders"]["getMedOrder"]
+type RawVerificationQueueResponse = V1Outputs["orders"]["getVerificationQueue"]
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 	const res = await fetch(url, {
@@ -181,6 +189,137 @@ export interface OpdDispenseRecord {
 	dispensedAt: string
 }
 
+function serializeDate(value: Date | string | null | undefined): string | null {
+	if (!value) return null
+	return value instanceof Date ? value.toISOString() : value
+}
+
+function serializeRequiredDate(value: Date | string): string {
+	return value instanceof Date ? value.toISOString() : value
+}
+
+function normalizeQueueStatus(status: string): QueueStatus {
+	switch (status) {
+		case "active":
+		case "verified":
+			return "verified"
+		case "modified":
+			return "on_hold"
+		case "rejected":
+			return "rejected"
+		default:
+			return "pending_verification"
+	}
+}
+
+function mapPharmacyQueueItem(order: RawMedOrder): PharmacyQueueItem {
+	return {
+		id: order.id,
+		facilityId: order.facilityId,
+		encounterId: order.encounterId,
+		patientId: order.patientId ?? "",
+		patientName: order.patientName ?? "Unknown patient",
+		patientMrn: order.patientMrn ?? "-",
+		patientWeight: order.patientWeight ?? null,
+		patientDateOfBirth: serializeDate(order.patientDateOfBirth),
+		patientCreatinine: order.patientCreatinine ?? null,
+		genericName: order.genericName,
+		brandName: order.brandName,
+		dose: order.dose,
+		doseUnit: order.doseUnit,
+		doseForm: order.doseForm,
+		route: order.route,
+		frequency: order.frequency,
+		durationDays: order.durationDays,
+		specialInstructions: order.specialInstructions,
+		isPrn: order.isPrn,
+		prnReason: order.prnReason,
+		isControlledSubstance: order.isControlledSubstance,
+		pdeaSchedule: order.pdeaSchedule,
+		priority: (order.priority ?? "routine") as OrderPriority,
+		status: normalizeQueueStatus(order.status),
+		orderingStaffId: order.orderingStaffId,
+		orderingStaffName: order.orderingStaffName,
+		alertCount: order.alertCount ?? 0,
+		criticalAlertCount: order.criticalAlertCount ?? 0,
+		receivedAt: serializeRequiredDate(order.receivedAt ?? order.createdAt),
+	}
+	}
+
+function mapSafetyChecks(order: RawMedOrder): SafetyCheck[] {
+	return (order.safetyChecks ?? []).map(check => ({
+		id: check.id,
+		type: check.type,
+		severity: check.severity,
+		title: check.title,
+		message: check.message,
+		details: check.details,
+		isHardBlock: check.isHardBlock,
+		requiresOverride: check.requiresOverride,
+	}))
+}
+
+function mapPharmacyOrderDetail(order: RawMedOrder): PharmacyOrderDetail {
+	return {
+		...mapPharmacyQueueItem(order),
+		safetyChecks: mapSafetyChecks(order),
+		rxnormCode: order.rxnormCode,
+		formularyItemId: order.formularyItemId,
+		cdsAlerts: order.cdsAlerts,
+		cdsOverrides: order.cdsOverrides,
+	}
+}
+
+function filterQueueResponse(
+	response: RawVerificationQueueResponse,
+	params: PharmacyQueueParams
+): PaginatedResponse<PharmacyQueueItem> {
+	const searchTerm = params.search?.trim().toLowerCase()
+
+	const data = response.data
+		.map(mapPharmacyQueueItem)
+		.filter(item => {
+			if (params.status && params.status !== "all" && item.status !== params.status) {
+				return false
+			}
+
+			if (params.priority && item.priority !== params.priority) {
+				return false
+			}
+
+			if (
+				params.isControlledSubstance !== undefined &&
+				item.isControlledSubstance !== params.isControlledSubstance
+			) {
+				return false
+			}
+
+			if (!searchTerm) {
+				return true
+			}
+
+			const haystack = [
+				item.patientName,
+				item.patientMrn,
+				item.genericName,
+				item.brandName,
+			]
+				.filter(Boolean)
+				.join(" ")
+				.toLowerCase()
+
+			return haystack.includes(searchTerm)
+		})
+
+	return {
+		data,
+		total: data.length,
+		page: params.page ?? response.page,
+		limit: params.limit ?? response.limit,
+		totalPages: Math.max(1, Math.ceil(data.length / (params.limit ?? response.limit))),
+	}
+}
+
 // ============================================================================
 // Query Keys
 // ============================================================================
@@ -221,23 +360,28 @@ interface PaginatedResponse<T> {
 
 export function usePharmacyQueueQuery(params: PharmacyQueueParams) {
 	return useQuery({
+		...orpc.orders.getVerificationQueue.queryOptions({
+			input: {
+				facilityId: params.facilityId,
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			enabled: !!params.facilityId,
+			select: response => filterQueueResponse(response, params),
+		}),
 		queryKey: pharmacyKeys.queue(params),
-		queryFn: () =>
-			fetchJson<PaginatedResponse<PharmacyQueueItem>>(
-				`${PHARMACY_BASE}/queue${buildQueryString(
-					params as unknown as Record<string, string | number | boolean | undefined>
-				)}`
-			),
-		enabled: !!params.facilityId,
-		refetchInterval: 30 * 1000, // auto-refresh every 30 s
+		refetchInterval: 30 * 1000,
 	})
 }
 
 export function usePharmacyOrderDetailQuery(id: string | null) {
 	return useQuery({
+		...orpc.orders.getMedOrder.queryOptions({
+			input: id ? { id } : undefined,
+			enabled: !!id,
+			select: mapPharmacyOrderDetail,
+		}),
 		queryKey: pharmacyKeys.order(id ?? ""),
-		queryFn: () => fetchJson<PharmacyOrderDetail>(`${ORDERS_BASE}/medications/${id}`),
-		enabled: !!id,
 	})
 }
 
@@ -256,13 +400,20 @@ interface VerifyOrderInput {
 export function useVerifyPharmacyOrderMutation() {
 	const queryClient = useQueryClient()
 	return useMutation({
-		mutationFn: (data: VerifyOrderInput) =>
-			fetchJson<{ success: boolean }>(`${PHARMACY_BASE}/verify`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
+		mutationFn: async (data: VerifyOrderInput) => {
+			await orpc.orders.verifyOrder.call({
+				medicationOrderId: data.medicationOrderId,
+				action: data.action === "on_hold" ? "modified" : data.action,
+				rejectionReason: data.rejectionReason,
+				modificationNotes:
+					data.modificationNotes ?? data.overrideNotes,
+			})
+
+			return { success: true }
+		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: pharmacyKeys.all })
+			queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
 		},
 	})
 }

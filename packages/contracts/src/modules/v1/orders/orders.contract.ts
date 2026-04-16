@@ -1,4 +1,5 @@
 import { oc } from "@orpc/contract"
+import { z } from "zod"
 
 import {
 	ActiveOrdersResponseSchema,
@@ -9,6 +10,7 @@ import {
 	CreateLabOrderSchema,
 	CreateMedOrderSchema,
 	CreatePrescriptionSchema,
+	CreateTranchedOrdersSchema,
 	DiscontinueMedOrderSchema,
 	ImagingOrderIdSchema,
 	ImagingOrderListResponseSchema,
@@ -22,11 +24,17 @@ import {
 	MedOrderListResponseSchema,
 	MedOrderListSchema,
 	MedOrderSchema,
+	ParentOrderIdSchema,
+	PdeaLicenseCheckSchema,
+	PdeaLicenseStatusSchema,
 	PrescriptionIdSchema,
 	PrescriptionListResponseSchema,
 	PrescriptionListSchema,
 	PrescriptionSchema,
 	SignPrescriptionSchema,
+	TranchedOrdersResponseSchema,
+	TranchePreviewInputSchema,
+	TranchePreviewResponseSchema,
 	UpdateMedOrderSchema,
 	VerificationQueueResponseSchema,
 	VerificationQueueSchema,
@@ -252,4 +260,52 @@ export const ordersContract = {
 		})
 		.input(ActiveOrdersSchema)
 		.output(ActiveOrdersResponseSchema),
+
+	// ========================================================================
+	// PDEA License Check
+	// ========================================================================
+
+	checkPdeaLicense: oc
+		.route({
+			method: "GET",
+			path: "/pdea/check-license",
+			summary: "Check if staff has valid PDEA S-2 license for controlled substances",
+			tags: ["Orders — PDEA"],
+		})
+		.input(PdeaLicenseCheckSchema)
+		.output(PdeaLicenseStatusSchema),
+
+	// ========================================================================
+	// PDEA Tranching (for controlled substances > 90 days)
+	// ========================================================================
+
+	previewTranches: oc
+		.route({
+			method: "POST",
+			path: "/pdea/preview-tranches",
+			summary: "Preview how an order will be split into tranches (controlled substances > 90 days)",
+			tags: ["Orders — PDEA"],
+		})
+		.input(TranchePreviewInputSchema)
+		.output(TranchePreviewResponseSchema),
+
+	createTranchedOrders: oc
+		.route({
+			method: "POST",
+			path: "/pdea/create-tranched",
+			summary: "Create parent order with child tranche orders",
+			tags: ["Orders — PDEA"],
+		})
+		.input(CreateTranchedOrdersSchema)
+		.output(TranchedOrdersResponseSchema),
+
+	getChildOrders: oc
+		.route({
+			method: "GET",
+			path: "/medications/{parentOrderId}/tranches",
+			summary: "Get child tranche orders for a parent order",
+			tags: ["Orders — PDEA"],
+		})
+		.input(ParentOrderIdSchema)
+		.output(z.array(MedOrderSchema)),
 }

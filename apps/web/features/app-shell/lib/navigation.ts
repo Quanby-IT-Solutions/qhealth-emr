@@ -391,6 +391,9 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 			{ module: "radiology", action: "view" },
 			{ module: "orders", action: "verify" },
 		],
+		excludePermissions: [
+			{ module: "admin", action: "view" },
+		],
 		isSecondary: true,
 	},
 	{
@@ -483,14 +486,14 @@ export function filterNavItems(
 	const isAdmin = permSet.has("admin:view")
 
 	return items.filter(item => {
-		// Admin bypass - admins see everything except items they shouldn't
-		if (isAdmin && item.requiredPermissions.length > 0) {
-			return true
-		}
-
 		// Check excludes first (takes precedence over includes)
 		if (item.excludePermissions?.some(p => permSet.has(`${p.module}:${p.action}`))) {
 			return false
+		}
+
+		// Admin bypass - admins see everything except items they shouldn't
+		if (isAdmin && item.requiredPermissions.length > 0) {
+			return true
 		}
 
 		if (item.requiredPermissions.length === 0) return true

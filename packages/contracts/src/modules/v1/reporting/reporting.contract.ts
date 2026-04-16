@@ -5,10 +5,15 @@ import {
 	AhsrDrilldownResponseSchema,
 	AhsrMetricsInputSchema,
 	AhsrMetricsResponseSchema,
+	AhsrRealTimeQuerySchema,
+	AhsrRealTimeMetricsSchema,
+	AutoDetectionResultSchema,
 	ExportAhsrInputSchema,
 	ExportAhsrResponseSchema,
 	GenerateWeeklyReportInputSchema,
 	GetPidsrCaseInputSchema,
+	ListDetectionRulesQuerySchema,
+	ListDetectionRulesResponseSchema,
 	ListPidsrCasesInputSchema,
 	ListPidsrCasesResponseSchema,
 	ListSurveillanceFlagsInputSchema,
@@ -16,6 +21,7 @@ import {
 	PidsrCaseDetailSchema,
 	ReviewFlagInputSchema,
 	ReviewFlagResponseSchema,
+	RunAutoDetectionInputSchema,
 	ScanEncounterInputSchema,
 	ScanEncounterResponseSchema,
 	SubmitPidsrCaseInputSchema,
@@ -72,6 +78,20 @@ export const reportingContract = {
 		.output(WeeklyReportSummarySchema),
 
 	// ========================================================================
+	// PIDSR Auto-Detection
+	// ========================================================================
+
+	listDetectionRules: oc
+		.route({ method: "GET", path: "/pidsr/detection-rules", summary: "List disease detection rules", tags: ["Reporting"] })
+		.input(ListDetectionRulesQuerySchema)
+		.output(ListDetectionRulesResponseSchema),
+
+	runAutoDetection: oc
+		.route({ method: "POST", path: "/pidsr/auto-detect", summary: "Run auto-detection on an encounter", tags: ["Reporting"] })
+		.input(RunAutoDetectionInputSchema)
+		.output(AutoDetectionResultSchema),
+
+	// ========================================================================
 	// AHSR Metrics
 	// ========================================================================
 
@@ -79,6 +99,11 @@ export const reportingContract = {
 		.route({ method: "GET", path: "/ahsr", summary: "Get AHSR metrics dashboard data", tags: ["Reporting"] })
 		.input(AhsrMetricsInputSchema)
 		.output(AhsrMetricsResponseSchema),
+
+	getAhsrRealTime: oc
+		.route({ method: "GET", path: "/ahsr/realtime", summary: "Get real-time AHSR dashboard metrics", tags: ["Reporting"] })
+		.input(AhsrRealTimeQuerySchema)
+		.output(AhsrRealTimeMetricsSchema),
 
 	drilldownAhsr: oc
 		.route({ method: "GET", path: "/ahsr/drilldown", summary: "Drill down into AHSR metric", tags: ["Reporting"] })

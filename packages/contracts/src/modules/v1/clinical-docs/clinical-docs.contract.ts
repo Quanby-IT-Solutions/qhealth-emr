@@ -2,6 +2,7 @@ import { oc } from "@orpc/contract"
 
 import {
 	AddendumSchema,
+	Cf4ExtractionResultSchema,
 	ClinicalNoteIdSchema,
 	ClinicalNoteListResponseSchema,
 	ClinicalNoteListSchema,
@@ -14,6 +15,7 @@ import {
 	CreateClinicalNoteSchema,
 	CreateConsentRecordSchema,
 	CreateNoteTemplateSchema,
+	ExtractCf4DataInputSchema,
 	NoteTemplateIdSchema,
 	NoteTemplateListResponseSchema,
 	NoteTemplateListSchema,
@@ -207,4 +209,14 @@ export const clinicalDocsContract = {
 		})
 		.input(SignedNotesSchema)
 		.output(SignedNotesResponseSchema),
+
+	extractCf4Data: oc
+		.route({
+			method: "GET",
+			path: "/cf4-extract",
+			summary: "Extract structured data from clinical notes for CF4 auto-population",
+			tags: ["Clinical Documentation"],
+		})
+		.input(ExtractCf4DataInputSchema)
+		.output(Cf4ExtractionResultSchema),
 }

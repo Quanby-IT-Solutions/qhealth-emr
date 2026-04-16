@@ -146,4 +146,11 @@ export class ClinicalDocsController {
 			return this.service.getSignedNotes(input)
 		})
 	}
+
+	@Implement(v1.clinicalDocs.extractCf4Data)
+	async extractCf4Data() {
+		return implement(v1.clinicalDocs.extractCf4Data).handler(async ({ input }) => {
+			return this.service.extractCf4Data(input)
+		})
+	}
 }

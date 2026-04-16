@@ -7,6 +7,10 @@ import {
 	BedListResponseSchema,
 	BedListSchema,
 	BedSchema,
+	BedSuggestionQuerySchema,
+	BedSuggestionResponseSchema,
+	CensusDashboardQuerySchema,
+	CensusDashboardResponseSchema,
 	CreateBedSchema,
 	CreateWardSchema,
 	UpdateBedStatusSchema,
@@ -65,6 +69,16 @@ export const bedContract = {
 		.input(UpdateBedStatusSchema)
 		.output(BedSchema),
 
+	suggestBeds: oc
+		.route({
+			method: "POST",
+			path: "/beds/suggest",
+			summary: "Get ranked bed suggestions based on patient criteria",
+			tags: ["Beds"],
+		})
+		.input(BedSuggestionQuerySchema)
+		.output(BedSuggestionResponseSchema),
+
 	census: oc
 		.route({
 			method: "GET",
@@ -74,4 +88,14 @@ export const bedContract = {
 		})
 		.input(BedCensusQuerySchema)
 		.output(BedCensusResponseSchema),
+
+	dashboard: oc
+		.route({
+			method: "GET",
+			path: "/beds/dashboard",
+			summary: "Real-time census dashboard with activity metrics",
+			tags: ["Beds"],
+		})
+		.input(CensusDashboardQuerySchema)
+		.output(CensusDashboardResponseSchema),
 }

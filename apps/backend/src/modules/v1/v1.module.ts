@@ -12,11 +12,13 @@ import { FormularyModule } from "./formulary/formulary.module"
 import { HealthModule } from "./health/health.module"
 import { LabModule } from "./lab/lab.module"
 import { NbsModule } from "./nbs/nbs.module"
+import { NutritionModule } from "./nutrition/nutrition.module"
 import { NotificationModule } from "./notifications/notification.module"
 import { NursingModule } from "./nursing/nursing.module"
 import { OrdersModule } from "./orders/orders.module"
 import { PatientsModule } from "./patients/patients.module"
 import { ReportingModule } from "./reporting/reporting.module"
+import { MswModule } from "./msw/msw.module"
 import { ProblemsAllergiesModule } from "./problems-allergies/problems-allergies.module"
 import { RbacModule } from "./rbac/rbac.module"
 import { SchedulingModule } from "./scheduling/scheduling.module"
@@ -32,6 +34,7 @@ import { TelemedicineModule } from "./telemedicine/telemedicine.module"
 		FormularyModule,
 		LabModule,
 		NbsModule,
+		NutritionModule,
 		PatientsModule,
 		RbacModule,
 		EncountersModule,
@@ -44,6 +47,7 @@ import { TelemedicineModule } from "./telemedicine/telemedicine.module"
 		NursingModule,
 		BillingModule,
 		DeathReportingModule,
+		MswModule,
 		ReportingModule,
 		SchedulingModule,
 		SlaModule,

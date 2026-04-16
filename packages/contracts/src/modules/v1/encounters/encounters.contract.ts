@@ -10,6 +10,7 @@ import {
 	EncounterListResponseSchema,
 	EncounterListSchema,
 	EncounterSchema,
+	LinkedEncounterListSchema,
 	TransferEncounterSchema,
 } from "./encounters.schema.js"
 
@@ -33,6 +34,16 @@ export const encounterContract = {
 		})
 		.input(EncounterIdSchema)
 		.output(EncounterDetailSchema),
+
+	getLinked: oc
+		.route({
+			method: "GET",
+			path: "/encounters/{id}/linked",
+			summary: "Get linked encounters (telemedicine follow-ups referencing this encounter)",
+			tags: ["Encounters"],
+		})
+		.input(EncounterIdSchema)
+		.output(LinkedEncounterListSchema),
 
 	create: oc
 		.route({

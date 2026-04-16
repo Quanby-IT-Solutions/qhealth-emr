@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm"
 
-import { auditLogs, breakGlassEvents } from "@repo/db/schema"
+import { auditLogs, breakGlassEvents, patients, staffProfiles } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
@@ -28,6 +28,20 @@ interface LogAuditEntry {
 @Injectable()
 export class AuditService {
 	private readonly logger = new Logger(AuditService.name)
+
+	async resolveStaffProfileId(userId: string) {
+		const [row] = await db
+			.select({ id: staffProfiles.id })
+			.from(staffProfiles)
+			.where(eq(staffProfiles.userId, userId))
+			.limit(1)
+
+		if (!row) {
+			throw new NotFoundException("Staff profile not found")
+		}
+
+		return row.id
+	}
 
 	/**
 	 * Write an audit log entry. Called by @Audited() decorator and directly by services.
@@ -61,13 +75,7 @@ export class AuditService {
 	 * Query audit logs with filtering and pagination.
 	 */
 	async findAll(filter: AuditLogFilterInput) {
-		const { facilityId, startDate, endDate, userId, action, entityType } = filter
-		// TODO: patientMrn filter is defined in AuditLogFilterSchema and surfaced in the frontend filter UI,
-		// but audit_logs does not directly store patient MRN. Implementing this filter would require:
-		//   (a) Joining through break_glass_events.patient_id → patients.mrn when entity_type = 'break_glass_event', OR
-		//   (b) Querying JSONB metadata if patient info is stored there, OR
-		//   (c) Adding a denormalized patient_mrn column to audit_logs for indexed lookups.
-		// Until implemented, patientMrn is intentionally not applied to the query.
+		const { facilityId, startDate, endDate, userId, action, entityType, patientMrn } = filter
 		const page = Number(filter.page) || 1
 		const limit = Number(filter.limit) || 50
 
@@ -87,6 +95,16 @@ export class AuditService {
 		}
 		if (entityType) {
 			conditions.push(eq(auditLogs.entityType, entityType))
+		}
+		if (patientMrn) {
+			conditions.push(sql`exists (
+				select 1
+				from ${breakGlassEvents}
+				inner join ${patients} on ${patients.id} = ${breakGlassEvents.patientId}
+				where ${breakGlassEvents.id} = ${auditLogs.entityId}
+				and ${auditLogs.entityType} = 'break_glass_event'
+				and ${patients.mrn} = ${patientMrn}
+			)`)
 		}
 
 		const whereClause = and(...conditions)
@@ -134,7 +152,7 @@ export class AuditService {
 	 * Export audit logs (no pagination, respects filters).
 	 */
 	async exportLogs(filter: Omit<AuditLogFilterInput, "page" | "limit">) {
-		const { facilityId, startDate, endDate, userId, action, entityType } = filter
+		const { facilityId, startDate, endDate, userId, action, entityType, patientMrn } = filter
 
 		const conditions = [eq(auditLogs.facilityId, facilityId)]
 
@@ -152,6 +170,16 @@ export class AuditService {
 		}
 		if (entityType) {
 			conditions.push(eq(auditLogs.entityType, entityType))
+		}
+		if (patientMrn) {
+			conditions.push(sql`exists (
+				select 1
+				from ${breakGlassEvents}
+				inner join ${patients} on ${patients.id} = ${breakGlassEvents.patientId}
+				where ${breakGlassEvents.id} = ${auditLogs.entityId}
+				and ${auditLogs.entityType} = 'break_glass_event'
+				and ${patients.mrn} = ${patientMrn}
+			)`)
 		}
 
 		const data = await db

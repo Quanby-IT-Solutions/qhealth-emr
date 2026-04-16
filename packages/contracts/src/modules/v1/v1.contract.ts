@@ -4,6 +4,7 @@ import { v1Audit } from "./audit/v1.audit.js"
 import { v1Bed } from "./beds/v1.bed.js"
 import { v1Billing } from "./billing/v1.billing.js"
 import { v1ClinicalDocs } from "./clinical-docs/v1.clinical-docs.js"
+import { v1Consent } from "./consent/v1.consent.js"
 import { v1DeathReporting } from "./death-reporting/v1.death-reporting.js"
 import { v1Ed } from "./ed/v1.ed.js"
 import { v1Encounter } from "./encounters/v1.encounter.js"
@@ -11,11 +12,15 @@ import { v1Fhir } from "./fhir/v1.fhir.js"
 import { v1Formulary } from "./formulary/v1.formulary.js"
 import { healthContract } from "./health/health.contract.js"
 import { v1Lab } from "./lab/v1.lab.js"
+import { v1Msw } from "./msw/v1.msw.js"
 import { v1Nbs } from "./nbs/v1.nbs.js"
 import { v1Notification } from "./notifications/v1.notification.js"
 import { v1Nursing } from "./nursing/v1.nursing.js"
+import { v1Nutrition } from "./nutrition/v1.nutrition.js"
 import { v1Orders } from "./orders/v1.orders.js"
 import { v1Patient } from "./patients/v1.patient.js"
+import { v1Pharmacy } from "./pharmacy/v1.pharmacy.js"
+import { v1Philhealth } from "./philhealth/v1.philhealth.js"
 import { v1ProblemsAllergies } from "./problems-allergies/v1.problems-allergies.js"
 import { v1Rbac } from "./rbac/v1.rbac.js"
 import { v1Reporting } from "./reporting/v1.reporting.js"
@@ -53,6 +58,12 @@ export const v1Contract = oc.prefix("/v1").router(
 		sla: v1Sla,
 		surgical: v1Surgical,
 		telemedicine: v1Telemedicine,
+		// New modules for ticket BE-02
+		consent: v1Consent,
+		msw: v1Msw,
+		nutrition: v1Nutrition,
+		pharmacy: v1Pharmacy,
+		philhealth: v1Philhealth,
 	})
 )
 

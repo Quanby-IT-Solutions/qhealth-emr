@@ -64,19 +64,17 @@ export class AuditController {
 		session: UserSession
 	) {
 		return implement(v1.audit.breakGlass.create).handler(async ({ input }) => {
-			// TODO: Resolve clinicianStaffId from session.user.id + facilityId
-			// For now use the userId as a placeholder that will be resolved by the RBAC layer
+			const staffProfileId = await this.auditService.resolveStaffProfileId(session.user.id)
+
 			const event = await this.auditService.createBreakGlass({
 				...input,
-				clinicianStaffId: session.user.id,
+				clinicianStaffId: staffProfileId,
 				userId: session.user.id,
 			})
 
-			// TODO: Resolve privacy officer staff IDs from RBAC
-			// For now, send a system notification that can be caught by the notification stream
 			await this.notificationService.send({
 				facilityId: input.facilityId,
-				recipientStaffId: session.user.id, // placeholder — should be privacy officer
+				recipientStaffId: staffProfileId,
 				topic: "break_glass",
 				title: "Break-Glass Access Requested",
 				body: `Emergency access requested for patient. Reason: ${input.reasonCategory}`,
@@ -97,9 +95,10 @@ export class AuditController {
 		session: UserSession
 	) {
 		return implement(v1.audit.breakGlass.review).handler(async ({ input }) => {
+			const reviewerStaffId = await this.auditService.resolveStaffProfileId(session.user.id)
 			return this.auditService.reviewBreakGlass({
 				...input,
-				reviewerStaffId: session.user.id, // TODO: resolve from RBAC
+				reviewerStaffId,
 			})
 		})
 	}

@@ -269,3 +269,122 @@ export const ScanEncounterResponseSchema = z.object({
 		})
 	),
 })
+
+// ============================================================================
+// AHSR Real-Time Dashboard
+// ============================================================================
+
+export const AhsrRealTimeQuerySchema = z.object({
+	facilityId: z.string().uuid(),
+})
+
+export const AhsrRealTimeMetricsSchema = z.object({
+	facilityId: z.string().uuid(),
+	timestamp: z.string(),
+
+	// Current census
+	currentCensus: z.object({
+		totalBeds: z.number(),
+		occupiedBeds: z.number(),
+		availableBeds: z.number(),
+		borPercentage: z.number(),
+	}),
+
+	// Today's activity
+	todayActivity: z.object({
+		admissions: z.number(),
+		discharges: z.number(),
+		deaths: z.number(),
+		transfers: z.number(),
+	}),
+
+	// Last 7 days trend
+	weeklyTrend: z.array(
+		z.object({
+			date: z.string(),
+			admissions: z.number(),
+			discharges: z.number(),
+			deaths: z.number(),
+		})
+	),
+
+	// Active encounters by type
+	encountersByType: z.array(
+		z.object({
+			encounterType: z.string(),
+			activeCount: z.number(),
+		})
+	),
+
+	// Emergency department metrics
+	edMetrics: z.object({
+		currentWaiting: z.number(),
+		averageWaitMinutes: z.number().nullable(),
+		bedsTurnover24h: z.number(),
+	}).nullable(),
+
+	// Alert counts (surveillance flags pending review)
+	pendingAlerts: z.number(),
+})
+
+// ============================================================================
+// PIDSR Auto-Detection Configuration
+// ============================================================================
+
+export const DiseaseDetectionRuleSchema = z.object({
+	id: z.string().uuid(),
+	diseaseCode: z.string(),
+	diseaseName: z.string(),
+	category: PidsrCategoryEnum,
+	// ICD-10 codes that trigger detection
+	icdCodes: z.array(z.string()),
+	// Keywords in chief complaint or notes
+	keywords: z.array(z.string()),
+	// Lab test codes for confirmatory
+	labTestCodes: z.array(z.string()),
+	isActive: z.boolean(),
+})
+
+export const ListDetectionRulesQuerySchema = z.object({
+	facilityId: z.string().uuid(),
+	category: PidsrCategoryEnum.optional(),
+	isActive: z.coerce.boolean().optional(),
+})
+
+export const ListDetectionRulesResponseSchema = z.object({
+	rules: z.array(DiseaseDetectionRuleSchema),
+})
+
+// Auto-detection result when scanning clinical data
+export const AutoDetectionResultSchema = z.object({
+	encounterId: z.string().uuid(),
+	detectedDiseases: z.array(
+		z.object({
+			diseaseCode: z.string(),
+			diseaseName: z.string(),
+			category: PidsrCategoryEnum,
+			confidence: z.enum(["high", "medium", "low"]),
+			matchedOn: z.array(
+				z.object({
+					type: z.enum(["icd_code", "keyword", "lab_result"]),
+					value: z.string(),
+					source: z.string(),
+				})
+			),
+		})
+	),
+	flagsCreated: z.number(),
+})
+
+export const RunAutoDetectionInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+})
+
+// ============================================================================
+// Type exports for new schemas
+// ============================================================================
+
+export type AhsrRealTimeMetrics = z.infer<typeof AhsrRealTimeMetricsSchema>
+export type DiseaseDetectionRule = z.infer<typeof DiseaseDetectionRuleSchema>
+export type AutoDetectionResult = z.infer<typeof AutoDetectionResultSchema>

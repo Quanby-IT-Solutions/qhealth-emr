@@ -49,10 +49,24 @@ export class BedsController {
 		})
 	}
 
+	@Implement(v1.bed.suggestBeds)
+	async suggestBeds() {
+		return implement(v1.bed.suggestBeds).handler(async ({ input }) => {
+			return this.bedsService.suggestBeds(input)
+		})
+	}
+
 	@Implement(v1.bed.census)
 	async census() {
 		return implement(v1.bed.census).handler(async ({ input }) => {
 			return this.bedsService.getCensus(input)
+		})
+	}
+
+	@Implement(v1.bed.dashboard)
+	async dashboard() {
+		return implement(v1.bed.dashboard).handler(async ({ input }) => {
+			return this.bedsService.getDashboard(input)
 		})
 	}
 }

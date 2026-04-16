@@ -8,6 +8,8 @@ import { and, count, desc, eq } from "drizzle-orm"
 
 import {
 	beds,
+	deathReports,
+	encounterStatusEvents,
 	encounters,
 	encounterTransfers,
 	patients,
@@ -19,16 +21,50 @@ import {
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 
+type WorkflowType = "opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing"
+
 type EncounterListInput = V1Inputs["encounter"]["list"]
 type CreateEncounterInput = V1Inputs["encounter"]["create"]
 type TransferEncounterInput = V1Inputs["encounter"]["transfer"]
 type DischargeEncounterInput = V1Inputs["encounter"]["discharge"]
 type CloseEncounterInput = V1Inputs["encounter"]["close"]
 type EncounterIdInput = V1Inputs["encounter"]["get"]
+type LinkedEncountersInput = V1Inputs["encounter"]["getLinked"]
 
 @Injectable()
 export class EncountersService {
 	private readonly logger = new Logger(EncountersService.name)
+
+	// ========================================================================
+	// Private: SLA Event Logging
+	// ========================================================================
+
+	/**
+	 * Logs a status transition event for SLA tracking.
+	 * Records the workflow type (opd/ed/admission/discharge) and optional target SLA.
+	 */
+	private async logSlaEvent(params: {
+		facilityId: string
+		encounterId: string
+		fromStatus?: string | null
+		toStatus: string
+		workflowType: WorkflowType
+		staffId?: string | null
+		slaTargetMinutes?: number | null
+		notes?: string | null
+	}) {
+		await db.insert(encounterStatusEvents).values({
+			facilityId: params.facilityId,
+			encounterId: params.encounterId,
+			fromStatus: params.fromStatus ?? null,
+			toStatus: params.toStatus,
+			workflowType: params.workflowType,
+			staffId: params.staffId ?? null,
+			slaTargetMinutes: params.slaTargetMinutes ?? null,
+			notes: params.notes ?? null,
+			occurredAt: new Date(),
+		})
+	}
 
 	// ========================================================================
 	// List encounters for a patient
@@ -134,6 +170,9 @@ export class EncountersService {
 				disposition: encounters.disposition,
 				oecbEligible: encounters.oecbEligible,
 				mergedFromPreEncounterId: encounters.mergedFromPreEncounterId,
+				linkedEncounterId: encounters.linkedEncounterId,
+				konsultaTagged: encounters.konsultaTagged,
+				appointmentId: encounters.appointmentId,
 				createdAt: encounters.createdAt,
 				updatedAt: encounters.updatedAt,
 				patientFirstName: patients.firstName,
@@ -216,7 +255,60 @@ export class EncountersService {
 			attendingStaffName: row.attendingStaffName ?? null,
 			wardName: row.wardName ?? null,
 			bedNumber: row.bedNumber ?? null,
+			// SLA tracking (computed) - will be populated by separate SLA query
+			slaStatus: null,
+			slaElapsedMinutes: null,
+			slaTargetMinutes: null,
 			transfers: enrichedTransfers,
+		}
+	}
+
+	// ========================================================================
+	// Get linked encounters (telemedicine follow-ups)
+	// ========================================================================
+
+	async getLinked(input: LinkedEncountersInput) {
+		// Verify source encounter exists
+		const [sourceEncounter] = await db
+			.select({ id: encounters.id })
+			.from(encounters)
+			.where(eq(encounters.id, input.id))
+
+		if (!sourceEncounter) {
+			throw new NotFoundException(`Encounter ${input.id} not found`)
+		}
+
+		// Find all encounters that reference this encounter as their linked parent
+		const attendingStaffSq = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("attending_staff")
+
+		const linkedRows = await db
+			.select({
+				id: encounters.id,
+				encounterType: encounters.encounterType,
+				status: encounters.status,
+				admissionDatetime: encounters.admissionDatetime,
+				dischargeDatetime: encounters.dischargeDatetime,
+				attendingStaffName: attendingStaffSq.name,
+			})
+			.from(encounters)
+			.leftJoin(attendingStaffSq, eq(encounters.attendingStaffId, attendingStaffSq.id))
+			.where(eq(encounters.linkedEncounterId, input.id))
+			.orderBy(desc(encounters.admissionDatetime))
+
+		return {
+			sourceEncounterId: input.id,
+			linkedEncounters: linkedRows.map(row => ({
+				id: row.id,
+				encounterType: row.encounterType,
+				status: row.status,
+				admissionDatetime: row.admissionDatetime,
+				dischargeDatetime: row.dischargeDatetime,
+				attendingStaffName: row.attendingStaffName ?? null,
+			})),
 		}
 	}
 
@@ -289,11 +381,35 @@ export class EncountersService {
 			return enc!
 		})
 
+		// Log SLA event for new encounter creation
+		const workflowType: WorkflowType =
+			input.encounterType === "outpatient"
+				? "opd"
+				: input.encounterType === "emergency"
+					? "ed"
+					: "admission"
+
+		await this.logSlaEvent({
+			facilityId: input.facilityId,
+			encounterId: created.id,
+			fromStatus: null,
+			toStatus: "active",
+			workflowType,
+			staffId: input.admittingStaffId,
+			notes: `Created ${input.encounterType} encounter`,
+		})
+
 		this.logger.log(
 			`Created ${input.encounterType} encounter ${created.id} for patient ${input.patientId}`
 		)
 
-		return created
+		// Return with default SLA tracking fields (newly created = no elapsed time yet)
+		return {
+			...created,
+			slaStatus: null,
+			slaElapsedMinutes: null,
+			slaTargetMinutes: null,
+		}
 	}
 
 	// ========================================================================
@@ -373,9 +489,26 @@ export class EncountersService {
 			return enc!
 		})
 
+		// Log SLA event for transfer (use 'admission' workflow for inpatient transitions)
+		await this.logSlaEvent({
+			facilityId: encounter.facilityId,
+			encounterId: encounter.id,
+			fromStatus: "active",
+			toStatus: "active",
+			workflowType: "admission",
+			staffId: input.orderingStaffId,
+			notes: `Transferred to bed ${input.toBedId}`,
+		})
+
 		this.logger.log(`Transferred encounter ${input.encounterId} to bed ${input.toBedId}`)
 
-		return updated
+		// Return with SLA tracking fields (computed based on last event)
+		return {
+			...updated,
+			slaStatus: null,
+			slaElapsedMinutes: null,
+			slaTargetMinutes: null,
+		}
 	}
 
 	// ========================================================================
@@ -421,11 +554,53 @@ export class EncountersService {
 			.where(eq(encounters.id, input.encounterId))
 			.returning()
 
+		// Log SLA event for discharge
+		await this.logSlaEvent({
+			facilityId: encounter.facilityId,
+			encounterId: encounter.id,
+			fromStatus: "active",
+			toStatus: "discharged",
+			workflowType: "discharge",
+			staffId: null,
+			notes: `Disposition: ${input.disposition}`,
+		})
+
+		// Trigger draft death report creation if disposition is deceased
+		if (input.disposition === "deceased") {
+			try {
+				await db.insert(deathReports).values({
+					facilityId: encounter.facilityId,
+					encounterId: encounter.id,
+					patientId: encounter.patientId,
+					reportType: "fmdrf", // Default to FMDRF, can be changed during review
+					deathDatetime: input.dischargeDatetime
+						? new Date(input.dischargeDatetime)
+						: new Date(),
+					causeOfDeath: "Pending determination", // Placeholder
+					status: "draft",
+				})
+				this.logger.log(
+					`Created draft death report for deceased patient on encounter ${encounter.id}`
+				)
+			} catch (error) {
+				// Log but don't fail discharge — death report can be created manually
+				this.logger.error(
+					`Failed to create draft death report for encounter ${encounter.id}: ${error}`
+				)
+			}
+		}
+
 		this.logger.log(
 			`Discharged encounter ${input.encounterId} with disposition: ${input.disposition}`
 		)
 
-		return updated!
+		// Return with SLA tracking fields
+		return {
+			...updated!,
+			slaStatus: null,
+			slaElapsedMinutes: null,
+			slaTargetMinutes: null,
+		}
 	}
 
 	// ========================================================================
@@ -456,9 +631,26 @@ export class EncountersService {
 			.where(eq(encounters.id, input.encounterId))
 			.returning()
 
+		// Log SLA event for outpatient close
+		await this.logSlaEvent({
+			facilityId: encounter.facilityId,
+			encounterId: encounter.id,
+			fromStatus: "active",
+			toStatus: "closed",
+			workflowType: "opd",
+			staffId: null,
+			notes: "Outpatient visit closed",
+		})
+
 		this.logger.log(`Closed outpatient encounter ${input.encounterId}`)
 
-		return updated!
+		// Return with SLA tracking fields
+		return {
+			...updated!,
+			slaStatus: null,
+			slaElapsedMinutes: null,
+			slaTargetMinutes: null,
+		}
 	}
 
 	// ========================================================================

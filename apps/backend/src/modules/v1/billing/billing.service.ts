@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, isNull, sql } from "drizzle-orm"
 
 import {
@@ -18,6 +18,14 @@ import {
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
+import {
+	PHILHEALTH_ADAPTER,
+	type PhilHealthAdapter,
+} from "@/common/philhealth/philhealth.adapter"
+
+import { env } from "@/config/env.config"
+
+import { AuditService } from "../audit/audit.service"
 
 // ============================================================================
 // Input Types (explicit — avoids TypeScript depth limit with InferContractRouterInputs)
@@ -183,6 +191,11 @@ interface UpdateMalasakitStatusInput {
 export class BillingService {
 	private readonly logger = new Logger(BillingService.name)
 
+	constructor(
+		@Inject(PHILHEALTH_ADAPTER) private readonly philHealthAdapter: PhilHealthAdapter,
+		private readonly auditService: AuditService
+	) {}
+
 	// ========================================================================
 	// Helpers
 	// ========================================================================
@@ -195,6 +208,14 @@ export class BillingService {
 			.limit(1)
 		if (!profile) throw new NotFoundException("Staff profile not found")
 		return profile.id
+	}
+
+	private async getOptionalStaffProfileId(userId: string): Promise<string | null> {
+		try {
+			return await this.auditService.resolveStaffProfileId(userId)
+		} catch {
+			return null
+		}
 	}
 
 	// ========================================================================
@@ -482,6 +503,7 @@ export class BillingService {
 		if (!cf4) throw new NotFoundException("CF4 claim not found")
 		return {
 			...cf4,
+			extractedData: cf4.extractedData as Record<string, unknown> | null,
 			submissionData: cf4.submissionData as Record<string, unknown> | null,
 			responseData: cf4.responseData as Record<string, unknown> | null,
 		}
@@ -558,7 +580,38 @@ export class BillingService {
 		if (diagnoses.length === 0) missingFields.push("diagnoses")
 		if (!managementPlan) missingFields.push("managementPlan")
 
+		const dbExtractedData = {
+			chiefComplaint: chiefComplaint ?? undefined,
+			historyOfPresentIllness: briefHistory ?? undefined,
+			courseInTheWard: managementPlan ?? undefined,
+			operativeProcedures: procedures.map(procedure => procedure.description),
+			vitalSigns: latestVitals
+				? [{
+					date: latestVitals.recordedAt.toISOString(),
+					bp:
+						latestVitals.bpSystolic !== null && latestVitals.bpDiastolic !== null
+							? `${latestVitals.bpSystolic}/${latestVitals.bpDiastolic}`
+							: undefined,
+					hr: latestVitals.heartRate ?? undefined,
+					rr: latestVitals.respiratoryRate ?? undefined,
+					temp:
+						typeof latestVitals.temperature === "string"
+							? Number(latestVitals.temperature)
+							: latestVitals.temperature ?? undefined,
+				}]
+				: undefined,
+		} satisfies typeof cf4Claims.$inferInsert.extractedData
+
 		// Create CF4 draft
+		const extractedData = {
+			chiefComplaint,
+			briefHistory,
+			vitalSigns: vitalData,
+			diagnoses,
+			procedures,
+			managementPlan,
+		}
+
 		const [cf4] = await db
 			.insert(cf4Claims)
 			.values({
@@ -566,14 +619,7 @@ export class BillingService {
 				encounterId: input.encounterId,
 				patientId: input.patientId,
 				status: "draft",
-				submissionData: {
-					chiefComplaint,
-					briefHistory,
-					vitalSigns: vitalData,
-					diagnoses,
-					procedures,
-					managementPlan,
-				},
+				extractedData: dbExtractedData,
 			})
 			.returning()
 
@@ -581,20 +627,14 @@ export class BillingService {
 
 		const cf4WithCast = {
 			...cf4,
+			extractedData: cf4.extractedData as Record<string, unknown> | null,
 			submissionData: cf4.submissionData as Record<string, unknown> | null,
 			responseData: cf4.responseData as Record<string, unknown> | null,
 		}
 
 		return {
 			cf4: cf4WithCast,
-			extractedData: {
-				chiefComplaint,
-				briefHistory,
-				vitalSigns: vitalData,
-				diagnoses,
-				procedures,
-				managementPlan,
-			},
+			extractedData,
 			missingFields,
 		}
 	}
@@ -617,6 +657,7 @@ export class BillingService {
 		if (!updated) throw new NotFoundException("CF4 not found after update")
 		return {
 			...updated,
+			extractedData: updated.extractedData as Record<string, unknown> | null,
 			submissionData: updated.submissionData as Record<string, unknown> | null,
 			responseData: updated.responseData as Record<string, unknown> | null,
 		}
@@ -626,27 +667,53 @@ export class BillingService {
 	// Eligibility Check (CEWS — stubbed)
 	// ========================================================================
 
-	async checkEligibility(input: CheckEligibilityInput) {
-		// Stubbed: returns mock eligibility data
+	async checkEligibility(input: CheckEligibilityInput, userId: string) {
+		const result = await this.philHealthAdapter.checkEligibility({
+			philhealthId: input.philhealthMemberId,
+			facilityId: input.facilityId,
+			patientId: input.patientId,
+		})
+
 		const [check] = await db
 			.insert(eligibilityChecks)
 			.values({
 				facilityId: input.facilityId,
 				patientId: input.patientId,
 				philhealthMemberId: input.philhealthMemberId,
-				checkStatus: "eligible",
-				checkResponse: {
-					isEligible: true,
-					benefitType: "All Case Rate",
-					remainingCoverage: 45000,
-					memberType: "Member",
-					effectiveDate: "2025-01-01",
-					expiryDate: "2026-12-31",
-				},
+				checkStatus: result.status,
+				checkResponse: result,
 			})
 			.returning()
 
 		if (!check) throw new NotFoundException("Failed to create eligibility check")
+
+		await this.auditService.log({
+			facilityId: input.facilityId,
+			userId,
+			staffProfileId: await this.getOptionalStaffProfileId(userId),
+			action: "verify",
+			entityType: "philhealth_eligibility",
+			entityId: check.id,
+			beforeState: null,
+			afterState: {
+				checkStatus: check.checkStatus,
+				result,
+			},
+			ipAddress: null,
+			userAgent: null,
+			metadata: {
+				provider: this.philHealthAdapter.providerName,
+				mode: env.PHILHEALTH_MODE,
+			},
+		})
+
+		const message =
+			result.errorMessage ??
+			(result.isEligible
+				? "Member is eligible for PhilHealth benefits."
+				: result.status === "pending"
+					? "PhilHealth eligibility check is pending."
+					: "Member is not eligible for PhilHealth benefits.")
 
 		return {
 			eligibilityCheck: {
@@ -654,10 +721,10 @@ export class BillingService {
 				checkResponse: check.checkResponse as Record<string, unknown> | null,
 			},
 			result: {
-				isEligible: true,
-				benefitType: "All Case Rate",
-				remainingCoverage: 45000,
-				message: "Member is eligible for PhilHealth benefits. (Stubbed response)",
+				isEligible: result.isEligible,
+				benefitType: result.isEligible ? "PhilHealth CEWS" : null,
+				remainingCoverage: result.remainingBenefit,
+				message,
 			},
 		}
 	}
@@ -995,7 +1062,10 @@ export class BillingService {
 		}
 
 		// In production, persist to database and increment usage
-		const updated: typeof benefit & { status: "active" | "exhausted" | "inactive" } = { ...benefit }
+		const updated = {
+			...benefit,
+			status: benefit.status as "active" | "exhausted" | "inactive",
+		}
 		switch (input.visitType) {
 			case "consultation":
 				updated.consultationsUsed += 1

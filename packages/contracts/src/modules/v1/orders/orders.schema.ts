@@ -96,6 +96,46 @@ export const CdsEvaluateResponseSchema = z.object({
 	requiresDoubleVerification: z.boolean(),
 })
 
+export const MedOrderSafetyTypeEnum = z.enum([
+	"drug_interaction",
+	"dose_range",
+	"weight_based",
+	"renal_adjustment",
+	"hepatic_adjustment",
+	"allergy_cross_reactivity",
+	"black_box_warning",
+	"duplicate_therapy",
+	"pregnancy_category",
+])
+
+export const MedOrderSafetySeverityEnum = z.enum([
+	"critical",
+	"major",
+	"moderate",
+	"minor",
+	"info",
+])
+
+export const MedOrderSafetyCheckSchema = z.object({
+	id: z.string(),
+	type: MedOrderSafetyTypeEnum,
+	severity: MedOrderSafetySeverityEnum,
+	title: z.string(),
+	message: z.string(),
+	details: z
+		.object({
+			interactingDrug: z.string().optional(),
+			recommendedDose: z.string().optional(),
+			actualDose: z.string().optional(),
+			adjustedDose: z.string().optional(),
+			allergen: z.string().optional(),
+			category: z.string().optional(),
+		})
+		.optional(),
+	isHardBlock: z.boolean(),
+	requiresOverride: z.boolean(),
+})
+
 // ============================================================================
 // Medication Order Schemas
 // ============================================================================
@@ -122,9 +162,22 @@ export const MedOrderSchema = z.object({
 	pdeaSchedule: z.string().nullable(),
 	pdeaTrancheNumber: z.number().nullable(),
 	pdeaTrancheTotal: z.number().nullable(),
+	parentOrderId: z.string().uuid().nullable(), // For PDEA tranching parent-child relationship
+	isTranche: z.boolean(),
 	status: MedOrderStatusEnum,
 	orderingStaffId: z.string().uuid(),
 	orderingStaffName: z.string().nullable(),
+	patientId: z.string().uuid().nullable().optional(),
+	patientName: z.string().nullable().optional(),
+	patientMrn: z.string().nullable().optional(),
+	patientDateOfBirth: dateOrString.nullable().optional(),
+	patientWeight: z.number().nullable().optional(),
+	patientCreatinine: z.number().nullable().optional(),
+	priority: OrderPriorityEnum.optional(),
+	alertCount: z.number().int().nonnegative().optional(),
+	criticalAlertCount: z.number().int().nonnegative().optional(),
+	receivedAt: dateOrString.optional(),
+	safetyChecks: z.array(MedOrderSafetyCheckSchema).optional(),
 	cdsAlerts: z.unknown(),
 	cdsOverrides: z.unknown(),
 	createdAt: dateOrString,
@@ -375,3 +428,112 @@ export const ActiveOrdersResponseSchema = z.object({
 	labOrders: z.array(LabOrderSchema),
 	imagingOrders: z.array(ImagingOrderSchema),
 })
+
+// ============================================================================
+// PDEA License Check
+// ============================================================================
+
+export const PdeaLicenseCheckSchema = z.object({
+	staffId: z.string().uuid(),
+	facilityId: z.string().uuid(),
+})
+
+export type PdeaLicenseCheck = z.infer<typeof PdeaLicenseCheckSchema>
+
+export const PdeaLicenseStatusSchema = z.object({
+	staffId: z.string().uuid(),
+	staffName: z.string(),
+	hasLicense: z.boolean(),
+	licenseNumber: z.string().nullable(),
+	expiryDate: z.string().nullable(),
+	isExpired: z.boolean(),
+	daysUntilExpiry: z.number().nullable(),
+	canPrescribeControlled: z.boolean(),
+	errorMessage: z.string().nullable(),
+})
+
+export type PdeaLicenseStatus = z.infer<typeof PdeaLicenseStatusSchema>
+
+// ============================================================================
+// Tranching Preview (for controlled substances > 90 days)
+// ============================================================================
+
+export const TranchePreviewItemSchema = z.object({
+	trancheNumber: z.number().int().positive(),
+	startDate: z.string(),
+	endDate: z.string(),
+	durationDays: z.number().int().positive(),
+	quantityPerTranche: z.number().int().positive().nullable(),
+	noRefill: z.boolean(),
+})
+
+export type TranchePreviewItem = z.infer<typeof TranchePreviewItemSchema>
+
+export const TranchePreviewInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	genericName: z.string(),
+	dose: z.string(),
+	frequency: z.string(),
+	durationDays: z.number().int().positive(),
+	pdeaSchedule: z.string(),
+	startDate: z.string().optional(), // Defaults to today
+})
+
+export type TranchePreviewInput = z.infer<typeof TranchePreviewInputSchema>
+
+export const TranchePreviewResponseSchema = z.object({
+	requiresTranching: z.boolean(),
+	reason: z.string().nullable(),
+	totalDays: z.number().int().positive(),
+	maxDaysPerTranche: z.number().int().positive(),
+	tranches: z.array(TranchePreviewItemSchema),
+})
+
+export type TranchePreviewResponse = z.infer<typeof TranchePreviewResponseSchema>
+
+// ============================================================================
+// Create Tranched Orders (after preview confirmation)
+// ============================================================================
+
+export const CreateTranchedOrdersSchema = z.object({
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid().optional(),
+	preEncounterId: z.string().uuid().optional(),
+	formularyItemId: z.string().uuid().optional(),
+	genericName: z.string().min(1),
+	brandName: z.string().optional(),
+	rxnormCode: z.string().optional(),
+	dose: z.string().min(1),
+	doseUnit: z.string().min(1),
+	doseForm: z.string().min(1),
+	route: z.string().min(1),
+	frequency: z.string().min(1),
+	durationDays: z.number().int().positive(),
+	specialInstructions: z.string().optional(),
+	isPrn: z.boolean().optional(),
+	prnReason: z.string().optional(),
+	pdeaSchedule: z.string(),
+	startDate: z.string().optional(),
+	cdsAlerts: z.unknown().optional(),
+	cdsOverrides: z.unknown().optional(),
+})
+
+export type CreateTranchedOrders = z.infer<typeof CreateTranchedOrdersSchema>
+
+export const TranchedOrdersResponseSchema = z.object({
+	parentOrder: MedOrderSchema,
+	childOrders: z.array(MedOrderSchema),
+	totalTranches: z.number().int().positive(),
+})
+
+export type TranchedOrdersResponse = z.infer<typeof TranchedOrdersResponseSchema>
+
+// ============================================================================
+// Get Child Orders (for a parent order)
+// ============================================================================
+
+export const ParentOrderIdSchema = z.object({
+	parentOrderId: z.string().uuid(),
+})
+
+export type ParentOrderId = z.infer<typeof ParentOrderIdSchema>

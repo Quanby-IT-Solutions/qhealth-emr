@@ -29,6 +29,13 @@ export const EncounterStatusEnum = z.enum(["active", "discharged", "closed", "ca
 export const DispositionEnum = z.enum(["home", "transfer", "deceased", "ama"])
 
 // ============================================================================
+// SLA Status Enum
+// ============================================================================
+
+export const EncounterSlaStatusEnum = z.enum(["on_time", "approaching", "exceeded"])
+export type EncounterSlaStatus = z.infer<typeof EncounterSlaStatusEnum>
+
+// ============================================================================
 // Encounter Schema — full encounter resource
 // ============================================================================
 
@@ -47,6 +54,21 @@ export const EncounterSchema = z.object({
 	disposition: DispositionEnum.nullable(),
 	oecbEligible: z.boolean(),
 	mergedFromPreEncounterId: z.string().uuid().nullable(),
+
+	// Linked encounter (for telemedicine follow-ups)
+	linkedEncounterId: z.string().uuid().nullable(),
+
+	// Scheduling integration
+	appointmentId: z.string().uuid().nullable(),
+
+	// PhilHealth tagging
+	konsultaTagged: z.boolean(),
+
+	// SLA tracking (computed from encounterStatusEvents)
+	slaStatus: EncounterSlaStatusEnum.nullable(),
+	slaElapsedMinutes: z.number().int().nonnegative().nullable(),
+	slaTargetMinutes: z.number().int().positive().nullable(),
+
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 })
@@ -100,6 +122,12 @@ export const CreateEncounterSchema = z.object({
 	attendingStaffId: z.string().uuid().optional(),
 	bedId: z.string().uuid().optional(),
 	admissionDatetime: z.string().optional(),
+
+	// Link to parent encounter (telemedicine follow-up)
+	linkedEncounterId: z.string().uuid().optional(),
+
+	// Link to scheduling appointment
+	appointmentId: z.string().uuid().optional(),
 })
 
 export type CreateEncounterInput = z.infer<typeof CreateEncounterSchema>
@@ -192,3 +220,21 @@ export const DischargeChecklistSchema = z.object({
 })
 
 export type DischargeChecklist = z.infer<typeof DischargeChecklistSchema>
+
+// ============================================================================
+// Linked Encounters (telemedicine follow-ups)
+// ============================================================================
+
+export const LinkedEncounterItemSchema = z.object({
+	id: z.string().uuid(),
+	encounterType: EncounterTypeEnum,
+	status: EncounterStatusEnum,
+	admissionDatetime: dateOrString,
+	dischargeDatetime: dateOrString.nullable(),
+	attendingStaffName: z.string().nullable(),
+})
+
+export const LinkedEncounterListSchema = z.object({
+	sourceEncounterId: z.string().uuid(),
+	linkedEncounters: z.array(LinkedEncounterItemSchema),
+})

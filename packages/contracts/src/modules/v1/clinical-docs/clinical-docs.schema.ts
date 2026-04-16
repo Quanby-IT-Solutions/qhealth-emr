@@ -282,3 +282,157 @@ export const SignedNotesSchema = z.object({
 export const SignedNotesResponseSchema = z.object({
 	notes: z.array(ClinicalNoteSchema),
 })
+
+// ============================================================================
+// CF4 Auto-Extraction (link clinical notes to CF4 claim fields)
+// ============================================================================
+
+export const Cf4FieldSourceSchema = z.object({
+	field: z.string(),
+	value: z.string(),
+	sourceNoteId: z.string().uuid(),
+	sourceNoteType: NoteTypeEnum,
+	extractedAt: dateOrString,
+	confidence: z.enum(["high", "medium", "low"]),
+})
+
+export const Cf4ExtractionResultSchema = z.object({
+	encounterId: z.string().uuid(),
+
+	// Chief complaint from admission note
+	chiefComplaint: Cf4FieldSourceSchema.nullable(),
+
+	// History of present illness
+	historyOfPresentIllness: Cf4FieldSourceSchema.nullable(),
+
+	// Physical examination findings
+	physicalExamination: Cf4FieldSourceSchema.nullable(),
+
+	// Course in the ward (from progress notes)
+	courseInWard: Cf4FieldSourceSchema.nullable(),
+
+	// Vital signs on admission
+	vitalSigns: z.object({
+		bloodPressure: z.string().nullable(),
+		heartRate: z.string().nullable(),
+		respiratoryRate: z.string().nullable(),
+		temperature: z.string().nullable(),
+		oxygenSaturation: z.string().nullable(),
+		sourceNoteId: z.string().uuid().nullable(),
+	}).nullable(),
+
+	// Procedures performed (from operative notes)
+	procedures: z.array(
+		z.object({
+			procedure: z.string(),
+			rvsCode: z.string().nullable(),
+			laterality: z.string().nullable(),
+			sourceNoteId: z.string().uuid(),
+		})
+	),
+
+	// Final diagnoses (from discharge summary)
+	finalDiagnoses: z.array(
+		z.object({
+			diagnosis: z.string(),
+			icdCode: z.string().nullable(),
+			isPrimary: z.boolean(),
+			sourceNoteId: z.string().uuid(),
+		})
+	),
+
+	// Missing required fields for CF4 submission
+	missingFields: z.array(z.string()),
+
+	// Overall extraction status
+	status: z.enum(["complete", "partial", "insufficient"]),
+})
+
+export const ExtractCf4DataInputSchema = z.object({
+	encounterId: z.string().uuid(),
+})
+
+// ============================================================================
+// Operative Note Structured Data
+// ============================================================================
+
+export const OperativeNoteDataSchema = z.object({
+	// Pre-operative
+	preOpDiagnosis: z.string(),
+	postOpDiagnosis: z.string(),
+	procedureName: z.string(),
+	procedureRvsCode: z.string().nullable(),
+
+	// Surgical team
+	surgeonId: z.string().uuid(),
+	assistants: z.array(z.string().uuid()),
+	anesthesiologistId: z.string().uuid().nullable(),
+	anesthesiaType: z.string().nullable(),
+
+	// Timing
+	operationStartTime: z.string(),
+	operationEndTime: z.string(),
+
+	// Findings
+	findings: z.string(),
+	complications: z.string().nullable(),
+	bloodLoss: z.string().nullable(),
+	specimenSent: z.boolean(),
+	specimenDescription: z.string().nullable(),
+
+	// Post-op
+	postOpInstructions: z.string(),
+})
+
+// ============================================================================
+// Anesthesia Note Structured Data
+// ============================================================================
+
+export const AnesthesiaNoteDataSchema = z.object({
+	// Pre-anesthesia
+	asaClass: z.enum(["I", "II", "III", "IV", "V", "VI"]),
+	mallampatiScore: z.enum(["I", "II", "III", "IV"]).nullable(),
+	npoStatus: z.boolean(),
+	npoHours: z.number().nullable(),
+
+	// Anesthesia details
+	anesthesiaType: z.enum(["general", "regional", "local", "sedation", "combined"]),
+	airwayManagement: z.string().nullable(),
+	agents: z.array(
+		z.object({
+			name: z.string(),
+			dose: z.string(),
+			route: z.string(),
+			time: z.string(),
+		})
+	),
+
+	// Monitoring
+	monitors: z.array(z.string()),
+	fluidsGiven: z.string().nullable(),
+	bloodProducts: z.string().nullable(),
+
+	// Vitals during procedure
+	intraOpVitals: z.array(
+		z.object({
+			time: z.string(),
+			bp: z.string().nullable(),
+			hr: z.number().nullable(),
+			spo2: z.number().nullable(),
+			etco2: z.number().nullable(),
+		})
+	).nullable(),
+
+	// Recovery
+	pacuArrivalTime: z.string().nullable(),
+	aldrete: z.number().nullable(),
+	complications: z.string().nullable(),
+})
+
+// ============================================================================
+// Type exports for new schemas
+// ============================================================================
+
+export type Cf4ExtractionResult = z.infer<typeof Cf4ExtractionResultSchema>
+export type OperativeNoteData = z.infer<typeof OperativeNoteDataSchema>
+export type AnesthesiaNoteData = z.infer<typeof AnesthesiaNoteDataSchema>

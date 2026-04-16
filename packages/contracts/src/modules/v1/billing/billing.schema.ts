@@ -555,6 +555,104 @@ export const UpdateMalasakitStatusInputSchema = z.object({
 })
 
 // ============================================================================
+// eSOA (Electronic Statement of Account) - PDF/XML export
+// ============================================================================
+
+export const EsoaFormatEnum = z.enum(["pdf", "xml", "json"])
+export type EsoaFormat = z.infer<typeof EsoaFormatEnum>
+
+export const GenerateEsoaInputSchema = z.object({
+	encounterId: z.string().uuid(),
+	format: EsoaFormatEnum.default("pdf"),
+	includeItemizedBreakdown: z.boolean().default(true),
+	includePhilhealthDetails: z.boolean().default(true),
+})
+
+export const EsoaResponseSchema = z.object({
+	format: EsoaFormatEnum,
+	fileName: z.string(),
+	contentType: z.string(),
+	// Base64-encoded file content (for PDF/XML) or raw JSON
+	data: z.string(),
+	generatedAt: dateOrString,
+	// Metadata for verification
+	soaNumber: z.string(),
+	encounterId: z.string().uuid(),
+	netAmount: z.number(),
+})
+
+// ============================================================================
+// CF5 with Billing Items - link billing charges to CF5 claim lines
+// ============================================================================
+
+export const Cf5BillingItemSchema = z.object({
+	chargeId: z.string().uuid(),
+	description: z.string(),
+	quantity: z.number(),
+	unitPrice: z.number(),
+	totalAmount: z.number(),
+	rvsCode: z.string().nullable(),
+	icdCode: z.string().nullable(),
+	isPhilhealthCovered: z.boolean(),
+})
+
+export const Cf5WithBillingSchema = z.object({
+	cf5: Cf5AssignmentSchema,
+	billingItems: z.array(Cf5BillingItemSchema),
+	totalCharges: z.number(),
+	philhealthCoverage: z.number(),
+	patientResponsibility: z.number(),
+	approvalRequired: z.boolean(),
+})
+
+export const GetCf5WithBillingInputSchema = z.object({
+	encounterId: z.string().uuid(),
+})
+
+export const LinkChargeToIcdInputSchema = z.object({
+	chargeId: z.string().uuid(),
+	icdCode: z.string(),
+})
+
+// ============================================================================
+// CEWS Real-Time Check (Community Employment and Welfare System)
+// ============================================================================
+
+export const CewsCheckInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	// Alternative lookup by ID
+	philhealthMemberId: z.string().optional(),
+	nationalId: z.string().optional(),
+})
+
+export const CewsStatusEnum = z.enum(["active", "inactive", "pending", "not_found"])
+export type CewsStatus = z.infer<typeof CewsStatusEnum>
+
+export const CewsBenefitSchema = z.object({
+	benefitType: z.string(),
+	benefitAmount: z.number().nullable(),
+	startDate: z.string().nullable(),
+	endDate: z.string().nullable(),
+	status: z.string(),
+})
+
+export const CewsResponseSchema = z.object({
+	status: CewsStatusEnum,
+	// Whether patient qualifies for indigency benefits
+	isIndigent: z.boolean(),
+	// Listahanan score (poverty database)
+	listahananStatus: z.string().nullable(),
+	listahananScore: z.number().nullable(),
+	// Active benefits from various sources
+	activeBenefits: z.array(CewsBenefitSchema),
+	// When the check was performed
+	checkedAt: dateOrString,
+	// Message/notes from the CEWS system
+	message: z.string().nullable(),
+})
+
+// ============================================================================
 // Inferred Types
 // ============================================================================
 
@@ -565,6 +663,7 @@ export type InvoiceLineItem = z.infer<typeof InvoiceLineItemSchema>
 export type Payment = z.infer<typeof PaymentSchema>
 export type Cf4Claim = z.infer<typeof Cf4ClaimSchema>
 export type Cf5Assignment = z.infer<typeof Cf5AssignmentSchema>
+export type Cf5BillingItem = z.infer<typeof Cf5BillingItemSchema>
 export type DrgCode = z.infer<typeof DrgCodeSchema>
 export type EligibilityCheck = z.infer<typeof EligibilityCheckSchema>
 export type StatementOfAccount = z.infer<typeof StatementOfAccountSchema>
@@ -572,3 +671,5 @@ export type SoaLine = z.infer<typeof SoaLineSchema>
 export type KonsultaBenefit = z.infer<typeof KonsultaBenefitSchema>
 export type MalasakitAssistance = z.infer<typeof MalasakitAssistanceSchema>
 export type MalasakitSummary = z.infer<typeof MalasakitSummarySchema>
+export type CewsResponse = z.infer<typeof CewsResponseSchema>
+export type EsoaResponse = z.infer<typeof EsoaResponseSchema>

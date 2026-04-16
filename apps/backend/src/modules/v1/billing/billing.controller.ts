@@ -134,9 +134,9 @@ export class BillingController {
 	// ========================================================================
 
 	@Implement(v1.billing.checkEligibility)
-	async checkEligibility() {
+	async checkEligibility(@Session() session: UserSession) {
 		return implement(v1.billing.checkEligibility).handler(async ({ input }) => {
-			return this.billingService.checkEligibility(input)
+			return this.billingService.checkEligibility(input, session.user.id)
 		})
 	}
 

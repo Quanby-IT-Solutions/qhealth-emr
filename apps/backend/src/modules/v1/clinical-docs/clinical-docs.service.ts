@@ -31,6 +31,7 @@ type ListConsentsInput = V1Inputs["clinicalDocs"]["listConsents"]
 type CreateConsentInput = V1Inputs["clinicalDocs"]["createConsent"]
 type RevokeConsentInput = V1Inputs["clinicalDocs"]["revokeConsent"]
 type SignedNotesInput = V1Inputs["clinicalDocs"]["getSignedNotes"]
+type ExtractCf4DataInput = V1Inputs["clinicalDocs"]["extractCf4Data"]
 
 interface TemplateSection {
 	key: string
@@ -42,6 +43,20 @@ interface TemplateSection {
 @Injectable()
 export class ClinicalDocsService {
 	private readonly logger = new Logger(ClinicalDocsService.name)
+
+	private async getStaffProfileId(userId: string): Promise<string> {
+		const [row] = await db
+			.select({ id: staffProfiles.id })
+			.from(staffProfiles)
+			.where(eq(staffProfiles.userId, userId))
+			.limit(1)
+
+		if (!row) {
+			throw new NotFoundException("Staff profile not found")
+		}
+
+		return row.id
+	}
 
 	// ========================================================================
 	// Note Templates
@@ -124,6 +139,7 @@ export class ClinicalDocsService {
 	}
 
 	async createTemplate(input: CreateTemplateInput, staffProfileId: string) {
+		const resolvedStaffProfileId = await this.getStaffProfileId(staffProfileId)
 		const [row] = await db
 			.insert(noteTemplates)
 			.values({
@@ -131,7 +147,7 @@ export class ClinicalDocsService {
 				name: input.name,
 				category: input.category,
 				sections: input.sections,
-				createdByStaffId: staffProfileId,
+				createdByStaffId: resolvedStaffProfileId,
 			})
 			.returning()
 
@@ -278,6 +294,7 @@ export class ClinicalDocsService {
 	}
 
 	async createNote(input: CreateNoteInput, authorStaffId: string) {
+		const resolvedAuthorStaffId = await this.getStaffProfileId(authorStaffId)
 		const [row] = await db
 			.insert(clinicalNotes)
 			.values({
@@ -288,7 +305,7 @@ export class ClinicalDocsService {
 				noteType: input.noteType,
 				content: input.content ?? "",
 				structuredData: input.structuredData ?? null,
-				authorStaffId,
+				authorStaffId: resolvedAuthorStaffId,
 			})
 			.returning()
 
@@ -351,6 +368,7 @@ export class ClinicalDocsService {
 	// ========================================================================
 
 	async createAddendum(input: CreateAddendumInput, authorStaffId: string) {
+		const resolvedAuthorStaffId = await this.getStaffProfileId(authorStaffId)
 		// Verify the parent note is signed
 		const [note] = await db
 			.select({ status: clinicalNotes.status })
@@ -368,7 +386,7 @@ export class ClinicalDocsService {
 				noteId: input.noteId,
 				content: input.content,
 				reason: input.reason ?? null,
-				authorStaffId,
+				authorStaffId: resolvedAuthorStaffId,
 			})
 			.returning()
 
@@ -511,6 +529,7 @@ export class ClinicalDocsService {
 	}
 
 	async createConsent(input: CreateConsentInput, witnessStaffId: string) {
+		const resolvedWitnessStaffId = await this.getStaffProfileId(witnessStaffId)
 		const [row] = await db
 			.insert(consentRecords)
 			.values({
@@ -523,7 +542,7 @@ export class ClinicalDocsService {
 				content: input.content ?? null,
 				signatureData: input.signatureData ?? null,
 				signedAt: new Date(),
-				witnessStaffId,
+				witnessStaffId: resolvedWitnessStaffId,
 			})
 			.returning()
 
@@ -588,5 +607,183 @@ export class ClinicalDocsService {
 			.orderBy(desc(clinicalNotes.signedAt))
 
 		return { notes: rows }
+	}
+
+	async extractCf4Data(input: ExtractCf4DataInput) {
+		const { notes } = await this.getSignedNotes({ encounterId: input.encounterId })
+		const extractedAt = new Date().toISOString()
+
+		const pickField = (
+			field: string,
+			noteTypes: string[],
+			structuredKeys: string[],
+			fallbackPatterns: RegExp[]
+		) => {
+			for (const note of notes) {
+				if (!noteTypes.includes(note.noteType)) continue
+
+				const structured = (note.structuredData ?? {}) as Record<string, unknown>
+				for (const key of structuredKeys) {
+					const value = structured[key]
+					if (typeof value === "string" && value.trim().length > 0) {
+						return {
+							field,
+							value,
+							sourceNoteId: note.id,
+							sourceNoteType: note.noteType,
+							extractedAt,
+							confidence: "high" as const,
+						}
+					}
+				}
+
+				const content = note.content ?? ""
+				for (const pattern of fallbackPatterns) {
+					const match = content.match(pattern)
+					if (match?.[1]?.trim()) {
+						return {
+							field,
+							value: match[1].trim(),
+							sourceNoteId: note.id,
+							sourceNoteType: note.noteType,
+							extractedAt,
+							confidence: "medium" as const,
+						}
+					}
+				}
+			}
+
+			return null
+		}
+
+		const chiefComplaint = pickField(
+			"chiefComplaint",
+			["admission", "consultation"],
+			["chiefComplaint", "chief_complaint"],
+			[/chief complaint[:\s]+([^\n]+)/i]
+		)
+		const historyOfPresentIllness = pickField(
+			"historyOfPresentIllness",
+			["admission", "consultation", "progress"],
+			["historyOfPresentIllness", "hpi", "history_present_illness"],
+			[/history of present illness[:\s]+([\s\S]{1,400})/i, /hpi[:\s]+([\s\S]{1,400})/i]
+		)
+		const physicalExamination = pickField(
+			"physicalExamination",
+			["fpe", "admission", "progress"],
+			["physicalExamination", "physical_exam", "findings"],
+			[/physical examination[:\s]+([\s\S]{1,400})/i, /physical exam[:\s]+([\s\S]{1,400})/i]
+		)
+		const courseInWard = pickField(
+			"courseInWard",
+			["progress", "discharge_summary"],
+			["courseInWard", "course_in_ward", "hospitalCourse"],
+			[/course in ward[:\s]+([\s\S]{1,400})/i, /hospital course[:\s]+([\s\S]{1,400})/i]
+		)
+
+		let vitalSigns: {
+			bloodPressure: string | null
+			heartRate: string | null
+			respiratoryRate: string | null
+			temperature: string | null
+			oxygenSaturation: string | null
+			sourceNoteId: string | null
+		} | null = null
+
+		for (const note of notes) {
+			const structured = (note.structuredData ?? {}) as Record<string, unknown>
+			const sourceNoteId = note.id
+			const bloodPressure = typeof structured.bloodPressure === "string" ? structured.bloodPressure : null
+			const heartRate = typeof structured.heartRate === "string" ? structured.heartRate : null
+			const respiratoryRate = typeof structured.respiratoryRate === "string" ? structured.respiratoryRate : null
+			const temperature = typeof structured.temperature === "string" ? structured.temperature : null
+			const oxygenSaturation = typeof structured.oxygenSaturation === "string" ? structured.oxygenSaturation : null
+
+			if (bloodPressure || heartRate || respiratoryRate || temperature || oxygenSaturation) {
+				vitalSigns = {
+					bloodPressure,
+					heartRate,
+					respiratoryRate,
+					temperature,
+					oxygenSaturation,
+					sourceNoteId,
+				}
+				break
+			}
+		}
+
+		const procedures = notes
+			.filter(note => note.noteType === "operative")
+			.flatMap(note => {
+				const structured = (note.structuredData ?? {}) as Record<string, unknown>
+				const procedure = typeof structured.procedureName === "string"
+					? structured.procedureName
+					: (note.content?.match(/procedure(?: name)?[:\s]+([^\n]+)/i)?.[1] ?? "").trim()
+				if (!procedure) return []
+				return [{
+					procedure,
+					rvsCode: typeof structured.procedureRvsCode === "string" ? structured.procedureRvsCode : null,
+					laterality: typeof structured.laterality === "string" ? structured.laterality : null,
+					sourceNoteId: note.id,
+				}]
+			})
+
+		const finalDiagnoses = notes
+			.filter(note => note.noteType === "discharge_summary" || note.noteType === "admission")
+			.flatMap(note => {
+				const structured = (note.structuredData ?? {}) as Record<string, unknown>
+				const diagnoses = Array.isArray(structured.finalDiagnoses)
+					? structured.finalDiagnoses
+					: Array.isArray(structured.diagnoses)
+						? structured.diagnoses
+						: []
+
+				if (diagnoses.length > 0) {
+					return diagnoses
+						.filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+						.map((item, index) => ({
+							diagnosis: typeof item.diagnosis === "string" ? item.diagnosis : String(item.name ?? ""),
+							icdCode: typeof item.icdCode === "string" ? item.icdCode : null,
+							isPrimary: index === 0,
+							sourceNoteId: note.id,
+						}))
+						.filter(item => item.diagnosis)
+				}
+
+				const fallback = note.content?.match(/final diagnos(?:is|es)[:\s]+([^\n]+)/i)?.[1]?.trim()
+				return fallback
+					? [{ diagnosis: fallback, icdCode: null, isPrimary: true, sourceNoteId: note.id }]
+					: []
+			})
+
+		const missingFields = [
+			!chiefComplaint ? "chiefComplaint" : null,
+			!historyOfPresentIllness ? "historyOfPresentIllness" : null,
+			!physicalExamination ? "physicalExamination" : null,
+			!courseInWard ? "courseInWard" : null,
+			!vitalSigns ? "vitalSigns" : null,
+			procedures.length === 0 ? "procedures" : null,
+			finalDiagnoses.length === 0 ? "finalDiagnoses" : null,
+		].filter((value): value is string => value !== null)
+
+		const populatedFields = 7 - missingFields.length
+		const status: "complete" | "partial" | "insufficient" = missingFields.length === 0
+			? "complete"
+			: populatedFields > 0
+				? "partial"
+				: "insufficient"
+
+		return {
+			encounterId: input.encounterId,
+			chiefComplaint,
+			historyOfPresentIllness,
+			physicalExamination,
+			courseInWard,
+			vitalSigns,
+			procedures,
+			finalDiagnoses,
+			missingFields,
+			status,
+		}
 	}
 }

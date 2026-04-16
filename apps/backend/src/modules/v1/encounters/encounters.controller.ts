@@ -25,6 +25,13 @@ export class EncountersController {
 		})
 	}
 
+	@Implement(v1.encounter.getLinked)
+	async getLinked() {
+		return implement(v1.encounter.getLinked).handler(async ({ input }) => {
+			return this.encountersService.getLinked(input)
+		})
+	}
+
 	@Implement(v1.encounter.create)
 	async create(@Session() session: UserSession) {
 		return implement(v1.encounter.create).handler(async ({ input }) => {

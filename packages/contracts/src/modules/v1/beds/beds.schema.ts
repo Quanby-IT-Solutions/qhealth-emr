@@ -168,3 +168,92 @@ export const BedListSchema = z.object({
 export const BedListResponseSchema = z.object({
 	wards: z.array(WardWithBedsSchema),
 })
+
+// ============================================================================
+// Bed Suggestion (ranked available beds based on criteria)
+// ============================================================================
+
+export const BedIsolationTypeEnum = z.enum(["none", "contact", "droplet", "airborne"])
+export type BedIsolationType = z.infer<typeof BedIsolationTypeEnum>
+
+export const GenderPreferenceEnum = z.enum(["any", "male_only", "female_only"])
+export type GenderPreference = z.infer<typeof GenderPreferenceEnum>
+
+export const BedSuggestionQuerySchema = z.object({
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	preferredWardType: WardTypeEnum.optional(),
+	isolationRequired: BedIsolationTypeEnum.optional(),
+	genderPreference: GenderPreferenceEnum.optional(),
+	// e.g., "near_nursing_station", "private_room"
+	specialRequirements: z.array(z.string()).optional(),
+})
+
+export type BedSuggestionQuery = z.infer<typeof BedSuggestionQuerySchema>
+
+export const SuggestedBedSchema = z.object({
+	bedId: z.string().uuid(),
+	wardId: z.string().uuid(),
+	wardName: z.string(),
+	wardType: WardTypeEnum,
+	bedNumber: z.string(),
+	// Higher score = better match
+	matchScore: z.number(),
+	// Why this bed was suggested
+	matchReasons: z.array(z.string()),
+	// Warnings (e.g., "gender mix in ward")
+	warnings: z.array(z.string()),
+})
+
+export const BedSuggestionResponseSchema = z.object({
+	suggestedBeds: z.array(SuggestedBedSchema),
+	totalAvailable: z.number(),
+})
+
+// ============================================================================
+// Real-time Census Dashboard
+// ============================================================================
+
+export const CensusDashboardQuerySchema = z.object({
+	facilityId: z.string().uuid(),
+})
+
+export const CensusDashboardResponseSchema = z.object({
+	facilityId: z.string().uuid(),
+	timestamp: dateOrString,
+	overall: z.object({
+		totalBeds: z.number(),
+		occupiedBeds: z.number(),
+		availableBeds: z.number(),
+		reservedBeds: z.number(),
+		cleaningBeds: z.number(),
+		outOfServiceBeds: z.number(),
+		borPercentage: z.number(),
+	}),
+	byWardType: z.array(
+		z.object({
+			wardType: WardTypeEnum,
+			totalBeds: z.number(),
+			occupiedBeds: z.number(),
+			availableBeds: z.number(),
+			borPercentage: z.number(),
+		})
+	),
+	byWard: z.array(
+		z.object({
+			wardId: z.string().uuid(),
+			wardName: z.string(),
+			wardType: WardTypeEnum,
+			totalBeds: z.number(),
+			occupiedBeds: z.number(),
+			availableBeds: z.number(),
+			borPercentage: z.number(),
+		})
+	),
+	// Active admissions/discharges in last 24h
+	recentActivity: z.object({
+		admissionsLast24h: z.number(),
+		dischargesLast24h: z.number(),
+		transfersLast24h: z.number(),
+	}),
+})

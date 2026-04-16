@@ -1,8 +1,11 @@
+import { createHash } from "node:crypto"
+
 import { Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, avg, count, desc, eq, gte, ilike, isNotNull, lte, or, sql } from "drizzle-orm"
 
 import {
 	ahsrSnapshots,
+	beds,
 	bedCensusSnapshots,
 	clinicalNotes,
 	encounters,
@@ -87,6 +90,21 @@ interface ExportAhsrInput {
 	month?: number
 }
 
+interface ListDetectionRulesInput {
+	facilityId: string
+	category?: "category_1" | "category_2"
+	isActive?: boolean
+}
+
+interface RunAutoDetectionInput {
+	facilityId: string
+	encounterId: string
+}
+
+interface AhsrRealTimeInput {
+	facilityId: string
+}
+
 // ============================================================================
 // PIDSR Category 1 notifiable diseases (ICD-10 codes + keywords)
 // ============================================================================
@@ -139,6 +157,118 @@ export class ReportingService {
 			.limit(1)
 		if (!row) throw new NotFoundException("Staff profile not found")
 		return row.id
+	}
+
+	private getDetectionRuleId(diseaseCode: string): string {
+		const hex = createHash("md5").update(diseaseCode).digest("hex")
+		return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+	}
+
+	private async collectDetectionMatches(input: RunAutoDetectionInput) {
+		const [enc] = await db
+			.select({ patientId: encounters.patientId })
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+			.limit(1)
+
+		if (!enc) throw new NotFoundException("Encounter not found")
+
+		const patientProblems = await db
+			.select({ icd10Code: problems.icd10Code, description: problems.description })
+			.from(problems)
+			.where(and(eq(problems.patientId, enc.patientId), eq(problems.status, "active")))
+
+		const notes = await db
+			.select({ id: clinicalNotes.id, content: clinicalNotes.content })
+			.from(clinicalNotes)
+			.where(and(eq(clinicalNotes.encounterId, input.encounterId), eq(clinicalNotes.status, "signed")))
+
+		const diseaseMatches = new Map<string, {
+			diseaseCode: string
+			diseaseName: string
+			category: "category_1" | "category_2"
+			confidence: "high" | "medium" | "low"
+			matchedOn: Array<{ type: "icd_code" | "keyword" | "lab_result"; value: string; source: string }>
+		}>()
+
+		for (const problem of patientProblems) {
+			if (!problem.icd10Code) continue
+			const matched = ALL_NOTIFIABLE.find(d => problem.icd10Code!.toUpperCase().startsWith(d.code))
+			if (!matched) continue
+
+			const category = CATEGORY_1_DISEASES.some(d => d.code === matched.code) ? "category_1" : "category_2"
+			const existing = diseaseMatches.get(matched.code) ?? {
+				diseaseCode: matched.code,
+				diseaseName: matched.name,
+				category,
+				confidence: "medium" as const,
+				matchedOn: [],
+			}
+			existing.confidence = "high"
+			existing.matchedOn.push({
+				type: "icd_code",
+				value: problem.icd10Code,
+				source: problem.description ?? "problem_list",
+			})
+			diseaseMatches.set(matched.code, existing)
+		}
+
+		for (const note of notes) {
+			const content = (note.content ?? "").toLowerCase()
+			for (const disease of ALL_NOTIFIABLE) {
+				const keyword = disease.keywords.find(value => content.includes(value.toLowerCase()))
+				if (!keyword) continue
+
+				const category = CATEGORY_1_DISEASES.some(d => d.code === disease.code) ? "category_1" : "category_2"
+				const existing = diseaseMatches.get(disease.code) ?? {
+					diseaseCode: disease.code,
+					diseaseName: disease.name,
+					category,
+					confidence: "low" as const,
+					matchedOn: [],
+				}
+				if (existing.confidence !== "high") {
+					existing.confidence = existing.matchedOn.length > 0 ? "medium" : "low"
+				}
+				existing.matchedOn.push({
+					type: "keyword",
+					value: keyword,
+					source: note.id,
+				})
+				diseaseMatches.set(disease.code, existing)
+			}
+		}
+
+		return Array.from(diseaseMatches.values())
+	}
+
+	private async persistDetectionFlags(input: RunAutoDetectionInput, matches: Awaited<ReturnType<ReportingService["collectDetectionMatches"]>>) {
+		const existingFlags = await db
+			.select({ triggerValue: surveillanceFlags.triggerValue })
+			.from(surveillanceFlags)
+			.where(eq(surveillanceFlags.encounterId, input.encounterId))
+
+		const existingValues = new Set(existingFlags.map(flag => flag.triggerValue))
+		let flagsCreated = 0
+
+		for (const match of matches) {
+			if (existingValues.has(match.diseaseCode)) continue
+
+			const [row] = await db.insert(surveillanceFlags).values({
+				facilityId: input.facilityId,
+				encounterId: input.encounterId,
+				noteId: match.matchedOn.find(item => item.type === "keyword")?.source ?? null,
+				flagType: match.matchedOn.some(item => item.type === "icd_code") ? "icd10_match" : "syndromic_keyword",
+				triggeredBy: match.matchedOn.map(item => `${item.type}:${item.value}`).join(", "),
+				triggerValue: match.diseaseCode,
+			}).returning({ id: surveillanceFlags.id })
+
+			if (row) {
+				flagsCreated += 1
+			}
+		}
+
+		return flagsCreated
 	}
 
 	// ========================================================================
@@ -276,124 +406,72 @@ export class ReportingService {
 	}
 
 	async scanEncounter(input: ScanEncounterInput) {
-		// Gather ICD-10 codes from the encounter's patient problems
-		const [enc] = await db
-			.select({ patientId: encounters.patientId })
-			.from(encounters)
-			.where(eq(encounters.id, input.encounterId))
-			.limit(1)
+		const matches = await this.collectDetectionMatches(input)
+		const flagsCreated = await this.persistDetectionFlags(input, matches)
 
-		if (!enc) throw new NotFoundException("Encounter not found")
+		const flags = matches.map(match => ({
+			id: this.getDetectionRuleId(`${input.encounterId}:${match.diseaseCode}`),
+			flagType: match.matchedOn.some(item => item.type === "icd_code") ? "icd10_match" : "syndromic_keyword",
+			triggeredBy: match.matchedOn.map(item => `${item.type}:${item.value}`).join(", "),
+			triggerValue: match.diseaseCode,
+		}))
 
-		const patientProblems = await db
-			.select({ icd10Code: problems.icd10Code, description: problems.description })
-			.from(problems)
-			.where(and(eq(problems.patientId, enc.patientId), eq(problems.status, "active")))
+		if (flagsCreated > 0) {
+			const reportingStaff = await db
+				.select({ id: staffProfiles.id })
+				.from(staffProfiles)
+				.where(eq(staffProfiles.facilityId, input.facilityId))
 
-		// Gather signed clinical notes
-		const notes = await db
-			.select({ id: clinicalNotes.id, content: clinicalNotes.content })
-			.from(clinicalNotes)
-			.where(
-				and(
-					eq(clinicalNotes.encounterId, input.encounterId),
-					eq(clinicalNotes.status, "signed")
-				)
-			)
-
-		const flagsToCreate: {
-			facilityId: string
-			encounterId: string
-			noteId: string | null
-			flagType: string
-			triggeredBy: string
-			triggerValue: string
-		}[] = []
-
-		// Check ICD-10 matches
-		for (const prob of patientProblems) {
-			if (!prob.icd10Code) continue
-			const code = prob.icd10Code.toUpperCase()
-			const matched = ALL_NOTIFIABLE.find(d => code.startsWith(d.code))
-			if (matched) {
-				flagsToCreate.push({
-					facilityId: input.facilityId,
-					encounterId: input.encounterId,
-					noteId: null,
-					flagType: "icd10_match",
-					triggeredBy: `ICD-10: ${prob.icd10Code}`,
-					triggerValue: matched.code,
-				})
-			}
-		}
-
-		// Check syndromic keywords in notes
-		for (const note of notes) {
-			const lower = (note.content ?? "").toLowerCase()
-			for (const disease of ALL_NOTIFIABLE) {
-				for (const kw of disease.keywords) {
-					if (lower.includes(kw.toLowerCase())) {
-						flagsToCreate.push({
-							facilityId: input.facilityId,
-							encounterId: input.encounterId,
-							noteId: note.id,
-							flagType: "syndromic_keyword",
-							triggeredBy: `Keyword: "${kw}"`,
-							triggerValue: disease.code,
-						})
-						break // one flag per disease per note
-					}
+			for (const match of matches.filter(item => item.category === "category_1")) {
+				for (const staff of reportingStaff) {
+					await db.insert(notifications).values({
+						facilityId: input.facilityId,
+						recipientStaffId: staff.id,
+						topic: "pidsr",
+						title: `Category 1 Alert: ${match.diseaseName}`,
+						body: "A Category 1 notifiable disease has been detected. Please review.",
+						data: { encounterId: input.encounterId, diseaseCode: match.diseaseCode },
+					})
 				}
 			}
 		}
 
-		// De-duplicate by triggerValue (one flag per disease per encounter)
-		const existingFlags = await db
-			.select({ triggerValue: surveillanceFlags.triggerValue })
-			.from(surveillanceFlags)
-			.where(eq(surveillanceFlags.encounterId, input.encounterId))
+		return { flagsCreated, flags }
+	}
 
-		const existingValues = new Set(existingFlags.map(f => f.triggerValue))
-		const uniqueFlags = flagsToCreate.filter(f => !existingValues.has(f.triggerValue))
-
-		const inserted: { id: string; flagType: string; triggeredBy: string; triggerValue: string }[] = []
-
-		for (const flag of uniqueFlags) {
-			const [row] = await db.insert(surveillanceFlags).values(flag).returning({
-				id: surveillanceFlags.id,
-				flagType: surveillanceFlags.flagType,
-				triggeredBy: surveillanceFlags.triggeredBy,
-				triggerValue: surveillanceFlags.triggerValue,
+	async listDetectionRules(input: ListDetectionRulesInput) {
+		void input.facilityId
+		const rules = ALL_NOTIFIABLE
+			.map(disease => {
+				const category: "category_1" | "category_2" = CATEGORY_1_DISEASES.some(item => item.code === disease.code)
+					? "category_1"
+					: "category_2"
+				return {
+					id: this.getDetectionRuleId(disease.code),
+					diseaseCode: disease.code,
+					diseaseName: disease.name,
+					category,
+					icdCodes: [disease.code],
+					keywords: disease.keywords,
+					labTestCodes: [],
+					isActive: true,
+				}
 			})
+			.filter(rule => (input.category ? rule.category === input.category : true))
+			.filter(rule => (input.isActive !== undefined ? rule.isActive === input.isActive : true))
 
-			if (row) {
-				inserted.push(row)
+		return { rules }
+	}
 
-				// Create real-time notification for Category 1 diseases
-				const isCategory1 = CATEGORY_1_DISEASES.some(d => d.code === flag.triggerValue)
-				if (isCategory1) {
-					const matched = CATEGORY_1_DISEASES.find(d => d.code === flag.triggerValue)
-					// Send to all staff with reporting role at this facility
-					const reportingStaff = await db
-						.select({ id: staffProfiles.id })
-						.from(staffProfiles)
-						.where(eq(staffProfiles.facilityId, input.facilityId))
+	async runAutoDetection(input: RunAutoDetectionInput) {
+		const detectedDiseases = await this.collectDetectionMatches(input)
+		const flagsCreated = await this.persistDetectionFlags(input, detectedDiseases)
 
-					for (const staff of reportingStaff) {
-						await db.insert(notifications).values({
-							facilityId: input.facilityId,
-							recipientStaffId: staff.id,
-							topic: "pidsr",
-							title: `Category 1 Alert: ${matched?.name ?? flag.triggerValue}`,
-							body: `A Category 1 notifiable disease has been detected. Please review.`,
-							data: { flagId: row.id, encounterId: input.encounterId },
-						})
-					}
-				}
-			}
+		return {
+			encounterId: input.encounterId,
+			detectedDiseases,
+			flagsCreated,
 		}
-
-		return { flagsCreated: inserted.length, flags: inserted }
 	}
 
 	// ========================================================================
@@ -930,6 +1008,78 @@ export class ReportingService {
 			page: input.page,
 			limit: input.limit,
 			totalPages: Math.ceil(total / input.limit),
+		}
+	}
+
+	async getAhsrRealTime(input: AhsrRealTimeInput) {
+		const todayStart = new Date()
+		todayStart.setHours(0, 0, 0, 0)
+
+		const [bedCounts, admissionsToday, dischargesToday, deathsToday, pendingAlerts, activeEncounterRows] = await Promise.all([
+			db
+				.select({
+					totalBeds: count(),
+					occupiedBeds: sql<number>`count(*) filter (where ${beds.status} = 'occupied')`,
+					availableBeds: sql<number>`count(*) filter (where ${beds.status} = 'available')`,
+				})
+				.from(beds)
+				.where(eq(beds.facilityId, input.facilityId)),
+			db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), gte(encounters.admissionDatetime, todayStart))),
+			db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), isNotNull(encounters.dischargeDatetime), gte(encounters.dischargeDatetime, todayStart))),
+			db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), eq(encounters.disposition, "deceased"), isNotNull(encounters.dischargeDatetime), gte(encounters.dischargeDatetime, todayStart))),
+			db.select({ count: count() }).from(surveillanceFlags).where(and(eq(surveillanceFlags.facilityId, input.facilityId), eq(surveillanceFlags.isReviewed, false))),
+			db
+				.select({ encounterType: encounters.encounterType, activeCount: count() })
+				.from(encounters)
+				.where(and(eq(encounters.facilityId, input.facilityId), eq(encounters.status, "active")))
+				.groupBy(encounters.encounterType),
+		])
+
+		const weeklyTrend: Array<{ date: string; admissions: number; discharges: number; deaths: number }> = []
+		for (let index = 6; index >= 0; index -= 1) {
+			const dayStart = new Date(todayStart)
+			dayStart.setDate(todayStart.getDate() - index)
+			const dayEnd = new Date(dayStart)
+			dayEnd.setDate(dayStart.getDate() + 1)
+
+			const [admissions, discharges, deaths] = await Promise.all([
+				db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), gte(encounters.admissionDatetime, dayStart), lte(encounters.admissionDatetime, dayEnd))),
+				db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), isNotNull(encounters.dischargeDatetime), gte(encounters.dischargeDatetime, dayStart), lte(encounters.dischargeDatetime, dayEnd))),
+				db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), eq(encounters.disposition, "deceased"), isNotNull(encounters.dischargeDatetime), gte(encounters.dischargeDatetime, dayStart), lte(encounters.dischargeDatetime, dayEnd))),
+			])
+
+			weeklyTrend.push({
+				date: dayStart.toISOString().split("T")[0]!,
+				admissions: admissions[0]?.count ?? 0,
+				discharges: discharges[0]?.count ?? 0,
+				deaths: deaths[0]?.count ?? 0,
+			})
+		}
+
+		const census = bedCounts[0] ?? { totalBeds: 0, occupiedBeds: 0, availableBeds: 0 }
+
+		return {
+			facilityId: input.facilityId,
+			timestamp: new Date().toISOString(),
+			currentCensus: {
+				totalBeds: census.totalBeds ?? 0,
+				occupiedBeds: Number(census.occupiedBeds ?? 0),
+				availableBeds: Number(census.availableBeds ?? 0),
+				borPercentage: (census.totalBeds ?? 0) > 0 ? Number(((Number(census.occupiedBeds ?? 0) / Number(census.totalBeds ?? 0)) * 100).toFixed(2)) : 0,
+			},
+			todayActivity: {
+				admissions: admissionsToday[0]?.count ?? 0,
+				discharges: dischargesToday[0]?.count ?? 0,
+				deaths: deathsToday[0]?.count ?? 0,
+				transfers: 0,
+			},
+			weeklyTrend,
+			encountersByType: activeEncounterRows.map(row => ({
+				encounterType: row.encounterType,
+				activeCount: row.activeCount,
+			})),
+			edMetrics: null,
+			pendingAlerts: pendingAlerts[0]?.count ?? 0,
 		}
 	}
 

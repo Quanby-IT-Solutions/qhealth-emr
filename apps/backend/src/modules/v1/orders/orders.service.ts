@@ -2,11 +2,13 @@ import { Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm"
 
 import {
+	encounters,
 	formularyItems,
 	imagingOrders,
 	labOrders,
 	medicationOrders,
 	orderVerifications,
+	patients,
 	prescriptions,
 	staffProfiles,
 	users,
@@ -134,6 +136,81 @@ export class OrdersService {
 		}
 	}
 
+	private mapSafetyChecks(cdsAlerts: unknown) {
+		if (!Array.isArray(cdsAlerts)) {
+			return []
+		}
+
+		return cdsAlerts.flatMap((alert, index) => {
+			if (!alert || typeof alert !== "object") {
+				return []
+			}
+
+			const candidate = alert as {
+				type?: string
+				severity?: string
+				message?: string
+				details?: Record<string, unknown>
+			}
+
+			const typeMap = {
+				allergy_hard_block: "allergy_cross_reactivity",
+				allergy_soft_block: "allergy_cross_reactivity",
+				formulary_warning: "duplicate_therapy",
+				high_alert: "black_box_warning",
+				s2_license_block: "pregnancy_category",
+			} as const
+
+			const severityMap = {
+				hard_block: "critical",
+				soft_block: "major",
+				warning: "moderate",
+				info: "info",
+			} as const
+
+			const titleMap = {
+				allergy_hard_block: "Severe allergy conflict",
+				allergy_soft_block: "Allergy override required",
+				formulary_warning: "Formulary warning",
+				high_alert: "High-alert medication",
+				s2_license_block: "PDEA S-2 validation",
+			} as const
+
+			const mappedType =
+				candidate.type && candidate.type in typeMap
+					? typeMap[candidate.type as keyof typeof typeMap]
+					: "duplicate_therapy"
+			const mappedSeverity =
+				candidate.severity && candidate.severity in severityMap
+					? severityMap[candidate.severity as keyof typeof severityMap]
+					: "info"
+			const mappedTitle =
+				candidate.type && candidate.type in titleMap
+					? titleMap[candidate.type as keyof typeof titleMap]
+					: "Clinical safety check"
+
+			return [{
+				id: `${candidate.type ?? "alert"}-${index}`,
+				type: mappedType,
+				severity: mappedSeverity,
+				title: mappedTitle,
+				message: candidate.message ?? "Clinical safety check triggered.",
+				details: candidate.details,
+				isHardBlock: candidate.severity === "hard_block",
+				requiresOverride: candidate.severity === "soft_block",
+			}]
+		})
+	}
+
+	private getAlertCounts(cdsAlerts: unknown) {
+		const safetyChecks = this.mapSafetyChecks(cdsAlerts)
+		return {
+			alertCount: safetyChecks.length,
+			criticalAlertCount: safetyChecks.filter(check => check.isHardBlock).length,
+			safetyChecks,
+		}
+	}
+
 	// ========================================================================
 	// Medication Orders
 	// ========================================================================
@@ -175,15 +252,23 @@ export class OrdersService {
 					pdeaSchedule: medicationOrders.pdeaSchedule,
 					pdeaTrancheNumber: medicationOrders.pdeaTrancheNumber,
 					pdeaTrancheTotal: medicationOrders.pdeaTrancheTotal,
+					parentOrderId: medicationOrders.parentOrderId,
 					status: medicationOrders.status,
 					orderingStaffId: medicationOrders.orderingStaffId,
 					orderingStaffName: users.name,
+					patientId: patients.id,
+					patientFirstName: patients.firstName,
+					patientLastName: patients.lastName,
+					patientMrn: patients.mrn,
+					patientDateOfBirth: patients.dateOfBirth,
 					cdsAlerts: medicationOrders.cdsAlerts,
 					cdsOverrides: medicationOrders.cdsOverrides,
 					createdAt: medicationOrders.createdAt,
 					updatedAt: medicationOrders.updatedAt,
 				})
 				.from(medicationOrders)
+				.leftJoin(encounters, eq(medicationOrders.encounterId, encounters.id))
+				.leftJoin(patients, eq(encounters.patientId, patients.id))
 				.leftJoin(staffProfiles, eq(medicationOrders.orderingStaffId, staffProfiles.id))
 				.leftJoin(users, eq(staffProfiles.userId, users.id))
 				.where(whereClause)
@@ -195,7 +280,16 @@ export class OrdersService {
 		const total = totalResult?.count ?? 0
 
 		return {
-			data: rows,
+			data: rows.map(row => ({
+				...row,
+				isTranche: row.parentOrderId !== null,
+				patientName:
+					row.patientLastName && row.patientFirstName
+						? `${row.patientLastName}, ${row.patientFirstName}`
+						: null,
+				priority: "routine" as const,
+				receivedAt: row.createdAt,
+			})),
 			total,
 			page,
 			limit,
@@ -227,21 +321,44 @@ export class OrdersService {
 				pdeaSchedule: medicationOrders.pdeaSchedule,
 				pdeaTrancheNumber: medicationOrders.pdeaTrancheNumber,
 				pdeaTrancheTotal: medicationOrders.pdeaTrancheTotal,
+				parentOrderId: medicationOrders.parentOrderId,
 				status: medicationOrders.status,
 				orderingStaffId: medicationOrders.orderingStaffId,
 				orderingStaffName: users.name,
+				patientId: patients.id,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+				patientMrn: patients.mrn,
+				patientDateOfBirth: patients.dateOfBirth,
 				cdsAlerts: medicationOrders.cdsAlerts,
 				cdsOverrides: medicationOrders.cdsOverrides,
 				createdAt: medicationOrders.createdAt,
 				updatedAt: medicationOrders.updatedAt,
 			})
 			.from(medicationOrders)
+			.leftJoin(encounters, eq(medicationOrders.encounterId, encounters.id))
+			.leftJoin(patients, eq(encounters.patientId, patients.id))
 			.leftJoin(staffProfiles, eq(medicationOrders.orderingStaffId, staffProfiles.id))
 			.leftJoin(users, eq(staffProfiles.userId, users.id))
 			.where(eq(medicationOrders.id, id))
 
 		if (!row) throw new NotFoundException(`Medication order ${id} not found`)
-		return row
+		const { alertCount, criticalAlertCount, safetyChecks } = this.getAlertCounts(row.cdsAlerts)
+		return {
+			...row,
+			isTranche: row.parentOrderId !== null,
+			patientName:
+				row.patientLastName && row.patientFirstName
+					? `${row.patientLastName}, ${row.patientFirstName}`
+					: null,
+			patientWeight: null,
+			patientCreatinine: null,
+			priority: "routine" as const,
+			alertCount,
+			criticalAlertCount,
+			receivedAt: row.createdAt,
+			safetyChecks,
+		}
 	}
 
 	async createMedOrder(input: CreateMedOrderInput, userId: string) {
@@ -585,15 +702,23 @@ export class OrdersService {
 					pdeaSchedule: medicationOrders.pdeaSchedule,
 					pdeaTrancheNumber: medicationOrders.pdeaTrancheNumber,
 					pdeaTrancheTotal: medicationOrders.pdeaTrancheTotal,
+					parentOrderId: medicationOrders.parentOrderId,
 					status: medicationOrders.status,
 					orderingStaffId: medicationOrders.orderingStaffId,
 					orderingStaffName: users.name,
+					patientId: patients.id,
+					patientFirstName: patients.firstName,
+					patientLastName: patients.lastName,
+					patientMrn: patients.mrn,
+					patientDateOfBirth: patients.dateOfBirth,
 					cdsAlerts: medicationOrders.cdsAlerts,
 					cdsOverrides: medicationOrders.cdsOverrides,
 					createdAt: medicationOrders.createdAt,
 					updatedAt: medicationOrders.updatedAt,
 				})
 				.from(medicationOrders)
+				.leftJoin(encounters, eq(medicationOrders.encounterId, encounters.id))
+				.leftJoin(patients, eq(encounters.patientId, patients.id))
 				.leftJoin(staffProfiles, eq(medicationOrders.orderingStaffId, staffProfiles.id))
 				.leftJoin(users, eq(staffProfiles.userId, users.id))
 				.where(whereClause)
@@ -611,7 +736,24 @@ export class OrdersService {
 		const total = totalResult?.count ?? 0
 
 		return {
-			data: rows,
+			data: rows.map(row => {
+				const { alertCount, criticalAlertCount } = this.getAlertCounts(row.cdsAlerts)
+
+				return {
+				...row,
+				isTranche: row.parentOrderId !== null,
+				patientName:
+					row.patientLastName && row.patientFirstName
+						? `${row.patientLastName}, ${row.patientFirstName}`
+						: null,
+				patientWeight: null,
+				patientCreatinine: null,
+				priority: "routine" as const,
+				alertCount,
+				criticalAlertCount,
+				receivedAt: row.createdAt,
+				}
+			}),
 			total,
 			page,
 			limit,
@@ -847,6 +989,7 @@ export class OrdersService {
 					pdeaSchedule: medicationOrders.pdeaSchedule,
 					pdeaTrancheNumber: medicationOrders.pdeaTrancheNumber,
 					pdeaTrancheTotal: medicationOrders.pdeaTrancheTotal,
+					parentOrderId: medicationOrders.parentOrderId,
 					status: medicationOrders.status,
 					orderingStaffId: medicationOrders.orderingStaffId,
 					orderingStaffName: users.name,
@@ -931,7 +1074,10 @@ export class OrdersService {
 		])
 
 		return {
-			medicationOrders: activeMedOrders,
+			medicationOrders: activeMedOrders.map(order => ({
+				...order,
+				isTranche: order.parentOrderId !== null,
+			})),
 			labOrders: activeLabOrders,
 			imagingOrders: activeImagingOrders,
 		}

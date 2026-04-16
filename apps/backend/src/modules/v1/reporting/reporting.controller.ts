@@ -36,6 +36,20 @@ export class ReportingController {
 		})
 	}
 
+	@Implement(v1.reporting.listDetectionRules)
+	async listDetectionRules() {
+		return implement(v1.reporting.listDetectionRules).handler(async ({ input }) => {
+			return this.reportingService.listDetectionRules(input)
+		})
+	}
+
+	@Implement(v1.reporting.runAutoDetection)
+	async runAutoDetection() {
+		return implement(v1.reporting.runAutoDetection).handler(async ({ input }) => {
+			return this.reportingService.runAutoDetection(input)
+		})
+	}
+
 	// ========================================================================
 	// PIDSR Cases
 	// ========================================================================
@@ -80,6 +94,13 @@ export class ReportingController {
 	async getAhsrMetrics() {
 		return implement(v1.reporting.getAhsrMetrics).handler(async ({ input }) => {
 			return this.reportingService.getAhsrMetrics(input)
+		})
+	}
+
+	@Implement(v1.reporting.getAhsrRealTime)
+	async getAhsrRealTime() {
+		return implement(v1.reporting.getAhsrRealTime).handler(async ({ input }) => {
+			return this.reportingService.getAhsrRealTime(input)
 		})
 	}
 
