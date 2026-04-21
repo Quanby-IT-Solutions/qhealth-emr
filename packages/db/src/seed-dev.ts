@@ -1041,7 +1041,7 @@ async function main() {
 		formularyItemId: refs.formulary.id,
 		chargeItemId: refs.chargeItem.id,
 		billingStaffId: staffMap.get("billing@qhealth.local")!,
-		reportingStaffId: staffMap.get("surveillance@qhealth.local")!,
+		reportingStaffId: staffMap.get("pidsr@qhealth.local")!,
 	})
 
 	await db.update(beds).set({ status: "occupied", currentEncounterId: erEncounter.id, updatedAt: new Date() }).where(eq(beds.id, erBed1.id))
