@@ -16,6 +16,10 @@ import { db } from "@/common/database/database.client"
 
 import { RbacService } from "./rbac.service"
 
+jest.mock("@thallesp/nestjs-better-auth", () => ({
+	AuthService: class MockAuthService {},
+}))
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
