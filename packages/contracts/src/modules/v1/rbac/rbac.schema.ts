@@ -27,6 +27,10 @@ export const RbacModuleEnum = z.enum([
 	"telemedicine",
 	"ed",
 	"death_reporting",
+	"feature_flags",
+	"system_settings",
+	"facility_profile",
+	"integration_registry",
 ])
 
 export const RbacActionEnum = z.enum([
@@ -257,6 +261,81 @@ export const LicenseStatusSchema = z.object({
 
 export const InitiatePasswordResetSchema = z.object({
 	userId: z.string(),
+})
+
+// ============================================================================
+// Access Governance — Multi-facility user creation
+// ============================================================================
+
+const FacilityMembershipInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	roleIds: z.array(z.string().uuid()).min(1, "At least one role required"),
+	isPrimary: z.boolean(),
+})
+
+export const CreateUserWithFacilitiesSchema = z
+	.object({
+		name: z.string().min(1).max(255),
+		email: z.string().email(),
+		employeeNumber: z.string().optional(),
+		password: z.string().min(8),
+		facilities: z.array(FacilityMembershipInputSchema).min(1, "At least one facility required"),
+		prcLicenseNumber: z.string().optional(),
+		prcExpiry: z.string().date().optional(),
+		ptrNumber: z.string().optional(),
+		ptrExpiry: z.string().date().optional(),
+		pdeaS2License: z.string().optional(),
+		pdeaS2Expiry: z.string().date().optional(),
+	})
+	.refine(
+		data => data.facilities.filter(f => f.isPrimary).length === 1,
+		{ message: "Exactly one facility must be marked as primary", path: ["facilities"] }
+	)
+	.refine(
+		data => new Set(data.facilities.map(f => f.facilityId)).size === data.facilities.length,
+		{ message: "Duplicate facilityId values are not allowed", path: ["facilities"] }
+	)
+
+export const CreateUserWithFacilitiesResponseSchema = z.object({
+	userId: z.string(),
+	staffProfileIds: z.array(z.string().uuid()),
+})
+
+// ============================================================================
+// Access Governance — Re-enable user
+// ============================================================================
+
+export const ReEnableUserSchema = z.object({
+	staffProfileId: z.string().uuid(),
+})
+
+// ============================================================================
+// Access Governance — Facility membership
+// ============================================================================
+
+export const AddFacilityMembershipSchema = z.object({
+	userId: z.string(),
+	facilityId: z.string().uuid(),
+	roleIds: z.array(z.string().uuid()).min(1),
+	isPrimary: z.boolean().default(false),
+})
+
+export const RemoveFacilityMembershipSchema = z.object({
+	staffProfileId: z.string().uuid(),
+})
+
+// ============================================================================
+// Access Governance — Role assignment
+// ============================================================================
+
+export const AddRoleAssignmentSchema = z.object({
+	staffProfileId: z.string().uuid(),
+	roleId: z.string().uuid(),
+})
+
+export const RemoveRoleAssignmentSchema = z.object({
+	staffProfileId: z.string().uuid(),
+	roleId: z.string().uuid(),
 })
 
 // ============================================================================

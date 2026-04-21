@@ -6,6 +6,24 @@ import { env } from "@/config/env.config"
 const logger = new Logger("AppConfig")
 
 /**
+ * Whitelist of environment variable names that integrations may reference as
+ * credential stores. Only the variable *name* is exposed via the
+ * `listCredentialRefs` endpoint — values are never transmitted.
+ *
+ * Add new entries here when onboarding a new integration type.
+ */
+export const INTEGRATION_CREDENTIAL_ENV_VARS = [
+	"FHIR_API_KEY",
+	"NHDR_FHIR_API_KEY",
+	"CIVIL_REGISTRY_API_KEY",
+	"HAI_API_KEY",
+	"PHILHEALTH_CEWS_API_KEY",
+	"CUSTOM_INTEGRATION_API_KEY",
+] as const satisfies readonly string[]
+
+export type IntegrationCredentialRef = (typeof INTEGRATION_CREDENTIAL_ENV_VARS)[number]
+
+/**
  * Configure body parser middleware for non-auth routes
  * Note: bodyParser is disabled in bootstrap.ts to allow Better Auth to handle its own body parsing.
  * We need to manually add JSON parsing for all other routes.

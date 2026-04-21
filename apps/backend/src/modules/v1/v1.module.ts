@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common"
 
+import { AdminDashboardModule } from "./admin-dashboard/admin-dashboard.module"
 import { AuditModule } from "./audit/audit.module"
 import { BedsModule } from "./beds/beds.module"
 import { BillingModule } from "./billing/billing.module"
@@ -25,9 +26,14 @@ import { SchedulingModule } from "./scheduling/scheduling.module"
 import { SlaModule } from "./sla/sla.module"
 import { SurgicalModule } from "./surgical/surgical.module"
 import { TelemedicineModule } from "./telemedicine/telemedicine.module"
+import { FeatureFlagsModule } from "./feature-flags/feature-flags.module"
+import { SystemSettingsModule } from "./system-settings/system-settings.module"
+import { FacilityProfileModule } from "./facility-profile/facility-profile.module"
+import { IntegrationRegistryModule } from "./integration-registry/integration-registry.module"
 
 @Module({
 	imports: [
+		AdminDashboardModule,
 		HealthModule,
 		AuditModule,
 		NotificationModule,
@@ -53,6 +59,10 @@ import { TelemedicineModule } from "./telemedicine/telemedicine.module"
 		SlaModule,
 		SurgicalModule,
 		TelemedicineModule,
+		FeatureFlagsModule,
+		SystemSettingsModule,
+		FacilityProfileModule,
+		IntegrationRegistryModule,
 	],
 })
 export class V1Module {}

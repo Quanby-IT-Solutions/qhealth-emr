@@ -1,12 +1,33 @@
-import { Controller } from "@nestjs/common"
+import { Controller, Req } from "@nestjs/common"
 import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
+import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
 
 import { RbacService } from "./rbac.service"
 import { RequirePermission } from "./rbac.guard"
+
+type RbacProfile = {
+	staffProfiles: Array<{ id: string; facilityId: string; roles: Array<{ id: string }> }>
+	activeRole: { id: string } | null
+}
+
+function extractActor(session: UserSession, req: Request) {
+	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
+	const activeProfile =
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
+
+	return {
+		userId: session.user.id,
+		facilityId: activeProfile?.facilityId ?? "",
+		staffProfileId: activeProfile?.id ?? null,
+		ipAddress: (req.headers["x-forwarded-for"] as string | undefined) ?? req.ip ?? null,
+		userAgent: (req.headers["user-agent"] as string | undefined) ?? null,
+	}
+}
 
 @Controller()
 export class RbacController {
@@ -128,6 +149,68 @@ export class RbacController {
 	async resetPassword() {
 		return implement(v1.rbac.resetPassword).handler(async ({ input }) => {
 			return this.rbacService.resetPassword(input)
+		})
+	}
+
+	// ── Access Governance — Multi-facility user creation ─────────────────
+
+	@RequirePermission("admin", "create")
+	@Implement(v1.rbac.createUser)
+	async createUser(@Session() session: UserSession, @Req() req: Request) {
+		return implement(v1.rbac.createUser).handler(async ({ input }) => {
+			const actor = extractActor(session, req)
+			return this.rbacService.createUser(input, actor)
+		})
+	}
+
+	// ── Access Governance — Re-enable user ───────────────────────────────
+
+	@RequirePermission("admin", "edit")
+	@Implement(v1.rbac.reEnableUser)
+	async reEnableUser(@Session() session: UserSession, @Req() req: Request) {
+		return implement(v1.rbac.reEnableUser).handler(async ({ input }) => {
+			const actor = extractActor(session, req)
+			return this.rbacService.reEnableUser(input, actor)
+		})
+	}
+
+	// ── Access Governance — Facility membership ──────────────────────────
+
+	@RequirePermission("admin", "edit")
+	@Implement(v1.rbac.addStaffFacility)
+	async addStaffFacility(@Session() session: UserSession, @Req() req: Request) {
+		return implement(v1.rbac.addStaffFacility).handler(async ({ input }) => {
+			const actor = extractActor(session, req)
+			return this.rbacService.addStaffFacility(input, actor)
+		})
+	}
+
+	@RequirePermission("admin", "edit")
+	@Implement(v1.rbac.removeStaffFacility)
+	async removeStaffFacility(@Session() session: UserSession, @Req() req: Request) {
+		return implement(v1.rbac.removeStaffFacility).handler(async ({ input }) => {
+			const actor = extractActor(session, req)
+			return this.rbacService.removeStaffFacility(input, actor)
+		})
+	}
+
+	// ── Access Governance — Role assignment ─────────────────────────────
+
+	@RequirePermission("admin", "edit")
+	@Implement(v1.rbac.addUserRole)
+	async addUserRole(@Session() session: UserSession, @Req() req: Request) {
+		return implement(v1.rbac.addUserRole).handler(async ({ input }) => {
+			const actor = extractActor(session, req)
+			return this.rbacService.addUserRole(input, actor)
+		})
+	}
+
+	@RequirePermission("admin", "edit")
+	@Implement(v1.rbac.removeUserRole)
+	async removeUserRole(@Session() session: UserSession, @Req() req: Request) {
+		return implement(v1.rbac.removeUserRole).handler(async ({ input }) => {
+			const actor = extractActor(session, req)
+			return this.rbacService.removeUserRole(input, actor)
 		})
 	}
 }

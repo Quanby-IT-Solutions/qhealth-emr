@@ -11,6 +11,13 @@ type BreakGlassFilterInput = V1Inputs["audit"]["breakGlass"]["list"]
 type CreateBreakGlassInput = V1Inputs["audit"]["breakGlass"]["create"]
 type ReviewBreakGlassInput = V1Inputs["audit"]["breakGlass"]["review"]
 
+/**
+ * Transaction handle type derived from the Drizzle client. Pass a transaction
+ * handle here to make the audit insert participate in the caller's transaction
+ * (so the audit row rolls back if the outer transaction rolls back).
+ */
+export type DBTransaction = Parameters<Parameters<typeof db["transaction"]>[0]>[0]
+
 interface LogAuditEntry {
 	facilityId: string
 	userId: string
@@ -45,10 +52,18 @@ export class AuditService {
 
 	/**
 	 * Write an audit log entry. Called by @Audited() decorator and directly by services.
+	 *
+	 * @param entry   The audit entry to write.
+	 * @param options Optional options object.
+	 * @param options.tx When supplied the insert runs inside this Drizzle transaction
+	 *                   so the audit row participates in the caller's transaction and
+	 *                   rolls back together with the data change on failure. When
+	 *                   omitted the singleton `db` client is used (existing behaviour).
 	 */
-	async log(entry: LogAuditEntry) {
+	async log(entry: LogAuditEntry, options?: { tx?: DBTransaction }) {
+		const client = options?.tx ?? db
 		try {
-			const [created] = await db
+			const [created] = await client
 				.insert(auditLogs)
 				.values({
 					facilityId: entry.facilityId,

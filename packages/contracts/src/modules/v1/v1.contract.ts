@@ -1,6 +1,7 @@
 import { oc } from "@orpc/contract"
 
 import { v1Audit } from "./audit/v1.audit.js"
+import { v1AdminDashboard } from "./admin-dashboard/v1.admin-dashboard.js"
 import { v1Bed } from "./beds/v1.bed.js"
 import { v1Billing } from "./billing/v1.billing.js"
 import { v1ClinicalDocs } from "./clinical-docs/v1.clinical-docs.js"
@@ -28,6 +29,10 @@ import { v1Scheduling } from "./scheduling/v1.scheduling.js"
 import { v1Sla } from "./sla/v1.sla.js"
 import { v1Surgical } from "./surgical/v1.surgical.js"
 import { v1Telemedicine } from "./telemedicine/v1.telemedicine.js"
+import { v1FeatureFlags } from "./feature-flags/v1.feature-flags.js"
+import { v1SystemSettings } from "./system-settings/v1.system-settings.js"
+import { v1FacilityProfile } from "./facility-profile/v1.facility-profile.js"
+import { v1IntegrationRegistry } from "./integration-registry/v1.integration-registry.js"
 
 /**
  * V1 contract router
@@ -37,6 +42,7 @@ export const v1Contract = oc.prefix("/v1").router(
 	oc.router({
 		health: healthContract,
 		audit: v1Audit,
+		adminDashboard: v1AdminDashboard,
 		notification: v1Notification,
 		formulary: v1Formulary,
 		lab: v1Lab,
@@ -64,6 +70,10 @@ export const v1Contract = oc.prefix("/v1").router(
 		nutrition: v1Nutrition,
 		pharmacy: v1Pharmacy,
 		philhealth: v1Philhealth,
+		featureFlags: v1FeatureFlags,
+		systemSettings: v1SystemSettings,
+		facilityProfile: v1FacilityProfile,
+		integrationRegistry: v1IntegrationRegistry,
 	})
 )
 

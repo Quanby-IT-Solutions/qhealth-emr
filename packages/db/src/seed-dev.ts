@@ -6,16 +6,22 @@ import { createDBClient } from "./client.js"
 import {
 	allergies,
 	ahsrSnapshots,
+	auditLogs,
 	beds,
+	breakGlassEvents,
 	chargeMasterItems,
 	charges,
 	clinicalNotes,
 	drugBrands,
 	drugGenerics,
 	encounters,
+	facilityProfiles,
 	facilities,
+	featureFlags,
+	featureFlagTargets,
 	formularyItems,
 	imagingOrders,
+	integrations,
 	invoiceLineItems,
 	invoices,
 	ioEntries,
@@ -32,6 +38,7 @@ import {
 	roles,
 	staffProfiles,
 	surveillanceFlags,
+	systemSettings,
 	tarEntries,
 	userRoles,
 	users,
@@ -67,6 +74,10 @@ type ModuleName =
 	| "laboratory"
 	| "radiology"
 	| "scheduling"
+	| "feature_flags"
+	| "system_settings"
+	| "facility_profile"
+	| "integration_registry"
 
 type ActionName = "view" | "create" | "edit" | "sign" | "delete" | "verify" | "export"
 
@@ -237,17 +248,19 @@ const demoUsers: DemoUser[] = [
 ]
 
 const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
+	// TOR: System Admin manages configuration, users, roles, and feature flags.
+	// Has NO clinical write access (no create/edit/sign/verify/delete on clinical modules).
 	Administrator: [
-		["adt", ["view", "create", "edit", "delete", "export"]],
-		["clinical_docs", ["view", "create", "edit", "sign", "delete", "export"]],
-		["orders", ["view", "create", "edit", "sign", "verify", "delete"]],
-		["nursing", ["view", "create", "edit", "sign"]],
-		["billing", ["view", "create", "edit", "delete", "export"]],
-		["formulary", ["view", "create", "edit", "delete"]],
-		["reporting", ["view", "create", "edit", "verify", "export"]],
-		["audit", ["view", "export"]],
-		["admin", ["view", "create", "edit", "delete", "export"]],
-		["opd", ["view"]], // OPD dashboard access
+		["admin", ["view", "create", "edit", "delete", "export"]], // User/role management
+		["feature_flags", ["view", "create", "edit", "delete"]], // Feature flag management
+		["system_settings", ["view", "create", "edit"]], // System configuration
+		["facility_profile", ["view", "create", "edit"]], // Facility profile management
+		["integration_registry", ["view", "create", "edit", "delete"]], // Integration oversight
+		["audit", ["view", "export"]], // Audit trail visibility
+		["reporting", ["view", "export"]], // Reporting access (view only)
+		["adt", ["view"]], // Census visibility (no clinical write)
+		["billing", ["view"]], // Billing visibility (no create/edit)
+		["formulary", ["view"]], // Formulary visibility (no create/edit)
 	],
 	Physician: [
 		// Physicians view patients and create encounters, but don't manage scheduling/beds (Registrar's job)
@@ -983,6 +996,198 @@ async function ensureNursingAndOrders(params: {
 	}
 }
 
+async function seedAdminScenarios(params: {
+	facilityId: string
+	adminUserId: string
+	adminStaffId: string
+	doctorStaffId: string
+	patientId: string
+}) {
+	const { facilityId, adminUserId, adminStaffId, doctorStaffId, patientId } = params
+
+	// ── Facility Profile (partially complete to trigger dashboard alert) ───────
+	const [existingProfile] = await db
+		.select()
+		.from(facilityProfiles)
+		.where(eq(facilityProfiles.facilityId, facilityId))
+	if (!existingProfile) {
+		await db.insert(facilityProfiles).values({
+			facilityId,
+			facilityCode: "QH-MAIN",
+			governingAuthority: "DOH Region NCR",
+			addressLine1: "123 Mabini Street",
+			city: "Quezon City",
+			province: "Metro Manila",
+			// Intentionally omitting zipCode, telephone, email, adminContactName,
+			// adminContactEmail to keep profile ~60% complete for demo
+		})
+	}
+
+	// ── System Settings ───────────────────────────────────────────────────────
+	const [existingSettings] = await db
+		.select()
+		.from(systemSettings)
+		.where(eq(systemSettings.facilityId, facilityId))
+	if (!existingSettings) {
+		await db.insert(systemSettings).values({
+			facilityId,
+			timezone: "Asia/Manila",
+			chartRetentionYears: 10,
+			// supportMailbox and serviceDeskHotline intentionally omitted
+			// to trigger "missing critical settings" dashboard alert
+			breakGlassRequiresReason: true,
+			autoFreezeChargesOnDischarge: true,
+			requireDpaConsentBeforeExport: true,
+			enableOfflineSummaryCache: false,
+			policySections: {
+				artaSla: { targetMinutes: 30, enableBanner: true },
+				exportDefaults: { defaultFormat: "ndjson" },
+			},
+			updatedAt: new Date(),
+		})
+	}
+
+	// ── Feature Flags (include one high-risk enabled flag) ────────────────────
+	const flagDefs = [
+		{
+			key: "break-glass-auto-expire",
+			name: "Break-Glass Auto Expiry",
+			description: "Automatically expire emergency access sessions after 4 hours.",
+			group: "compliance" as const,
+			riskLevel: "low" as const,
+			defaultEnabled: true,
+		},
+		{
+			key: "fhir-r4-export",
+			name: "FHIR R4 Export",
+			description: "Enable FHIR R4-compatible patient data export for NHDR submission.",
+			group: "integration" as const,
+			riskLevel: "moderate" as const,
+			defaultEnabled: false,
+		},
+		{
+			key: "offline-summary-cache",
+			name: "Offline Summary Cache",
+			description: "Cache active patient summaries for offline access in low-connectivity areas.",
+			group: "platform-control" as const,
+			riskLevel: "high" as const,
+			defaultEnabled: true, // High-risk + enabled → triggers dashboard alert
+		},
+	]
+	for (const def of flagDefs) {
+		const [existing] = await db
+			.select()
+			.from(featureFlags)
+			.where(eq(featureFlags.key, def.key))
+		if (!existing) {
+			await db.insert(featureFlags).values(def)
+		}
+	}
+
+	// ── Integrations (include one failed and one with missing credentials) ────
+	const integrationDefs = [
+		{
+			kind: "fhir" as const,
+			name: "NHDR FHIR R4",
+			endpointUrl: "https://nhdr.doh.gov.ph/fhir/r4",
+			credentialsRef: "NHDR_API_KEY",
+			enabled: true,
+			lastSyncAt: new Date(Date.now() - 36 * 60 * 60 * 1000), // 36h ago → stale
+			lastSyncStatus: "error" as const,
+		},
+		{
+			kind: "philhealth" as const,
+			name: "PhilHealth eClaims",
+			endpointUrl: "https://eclaims.philhealth.gov.ph/api",
+			credentialsRef: null, // No credentials → triggers alert
+			enabled: true,
+			lastSyncAt: null,
+			lastSyncStatus: null,
+		},
+		{
+			kind: "civil_registry" as const,
+			name: "PSA Civil Registry",
+			endpointUrl: "https://api.psa.gov.ph/civil-registry",
+			credentialsRef: "PSA_API_KEY",
+			enabled: false, // Disabled
+			lastSyncAt: null,
+			lastSyncStatus: null,
+		},
+	]
+	for (const def of integrationDefs) {
+		const [existing] = await db
+			.select()
+			.from(integrations)
+			.where(
+				and(
+					eq(integrations.facilityId, facilityId),
+					eq(integrations.kind, def.kind),
+					eq(integrations.name, def.name)
+				)
+			)
+		if (!existing) {
+			await db.insert(integrations).values({ facilityId, ...def })
+		}
+	}
+
+	// ── Audit Logs (privileged changes for dashboard visibility) ──────────────
+	const auditEntries = [
+		{
+			entityType: "feature_flag",
+			action: "update" as const,
+			description: "Enabled offline-summary-cache flag",
+		},
+		{
+			entityType: "role_permission",
+			action: "create" as const,
+			description: "Added admin:export to Administrator role",
+		},
+		{
+			entityType: "integration",
+			action: "create" as const,
+			description: "Added NHDR FHIR R4 integration",
+		},
+	]
+	for (const entry of auditEntries) {
+		await db.insert(auditLogs).values({
+			facilityId,
+			userId: adminUserId,
+			staffProfileId: adminStaffId,
+			action: entry.action,
+			entityType: entry.entityType,
+			entityId: crypto.randomUUID(),
+			metadata: { description: entry.description },
+			createdAt: new Date(Date.now() - Math.random() * 5 * 24 * 60 * 60 * 1000),
+		})
+	}
+
+	// ── Break-Glass Event (for dashboard audit widget) ────────────────────────
+	const [existingBg] = await db
+		.select()
+		.from(breakGlassEvents)
+		.where(
+			and(
+				eq(breakGlassEvents.facilityId, facilityId),
+				eq(breakGlassEvents.clinicianStaffId, doctorStaffId)
+			)
+		)
+	if (!existingBg) {
+		const expiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000)
+		await db.insert(breakGlassEvents).values({
+			facilityId,
+			clinicianStaffId: doctorStaffId,
+			patientId,
+			reasonCategory: "emergency",
+			justification: "Patient unconscious, no prior consent; emergency clinical access required.",
+			accessGrantedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+			accessExpiresAt: expiresAt,
+			reviewStatus: "pending",
+		})
+	}
+
+	console.log("  ✓ Admin dashboard seed scenarios complete")
+}
+
 async function main() {
 	console.log("Seeding qhealth-emr development data...")
 	const facility = await ensureFacility()
@@ -1046,6 +1251,14 @@ async function main() {
 
 	await db.update(beds).set({ status: "occupied", currentEncounterId: erEncounter.id, updatedAt: new Date() }).where(eq(beds.id, erBed1.id))
 	await db.update(beds).set({ status: "occupied", currentEncounterId: inpatientEncounter.id, updatedAt: new Date() }).where(eq(beds.id, medBed1.id))
+
+	await seedAdminScenarios({
+		facilityId: facility.id,
+		adminUserId: authUsers.get("admin@qhealth.local")!,
+		adminStaffId: staffMap.get("admin@qhealth.local")!,
+		doctorStaffId: staffMap.get("doctor@qhealth.local")!,
+		patientId: patient1.id,
+	})
 
 	console.log("Seed complete.")
 	console.log("Login credentials:")

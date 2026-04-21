@@ -341,6 +341,42 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		isSecondary: true,
 	},
 	{
+		title: "Feature Flags",
+		href: "/admin/feature-flags",
+		iconName: "settings",
+		requiredPermissions: [
+			{ module: "admin", action: "view" },
+		],
+		isSecondary: true,
+	},
+	{
+		title: "System Settings",
+		href: "/admin/settings",
+		iconName: "settings",
+		requiredPermissions: [
+			{ module: "admin", action: "view" },
+		],
+		isSecondary: true,
+	},
+	{
+		title: "Facility Profile",
+		href: "/admin/facility-profile",
+		iconName: "settings",
+		requiredPermissions: [
+			{ module: "admin", action: "view" },
+		],
+		isSecondary: true,
+	},
+	{
+		title: "Integration Registry",
+		href: "/admin/integration-registry",
+		iconName: "settings",
+		requiredPermissions: [
+			{ module: "integration_registry", action: "view" },
+		],
+		isSecondary: true,
+	},
+	{
 		title: "Social Work (MSW)",
 		href: "/msw",
 		iconName: "social-work",
@@ -507,10 +543,17 @@ export function filterNavItems(
 
 /**
  * Default widget configurations per role name.
- * Keys are role names (lowercase). Widgets are placeholder IDs populated by later tickets.
+ * Keys are role names (lowercase). Widgets are IDs resolved by DashboardWidgets.
  */
 export const ROLE_DASHBOARD_WIDGETS: Record<string, string[]> = {
-	"system admin": ["quick-stats", "alerts", "system-health"],
+	// TOR: System Admin — governance, config, audit, integration, ARTA/SLA visibility
+	administrator: [
+		"admin-access-governance",
+		"admin-platform-control",
+		"admin-integrations",
+		"admin-audit",
+		"admin-arta-sla",
+	],
 	registrar: ["my-patient-list", "quick-stats", "alerts"],
 	clinician: ["my-patient-list", "pending-orders", "unsigned-notes", "alerts"],
 	nurse: ["my-patient-list", "pending-orders", "alerts", "quick-stats"],
@@ -521,4 +564,11 @@ export const ROLE_DASHBOARD_WIDGETS: Record<string, string[]> = {
 export function getDashboardWidgets(roleName: string): string[] {
 	const key = roleName.toLowerCase()
 	return ROLE_DASHBOARD_WIDGETS[key] ?? ["quick-stats", "alerts"]
+}
+
+/**
+ * Returns true if the given role name resolves to the Administrator widget set.
+ */
+export function isAdminRole(roleName: string): boolean {
+	return roleName.toLowerCase() === "administrator"
 }

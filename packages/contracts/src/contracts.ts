@@ -7,6 +7,19 @@
 export { v1Contract } from "./modules/v1/v1.contract.js"
 export type { V1Contract } from "./modules/v1/v1.contract.js"
 
+// Admin dashboard schemas — exported for frontend and backend consumption
+export type {
+	AdminDashboardSummary,
+	AdminDashboardAlert,
+	AdminSummaryCard,
+	RecentChange,
+	AccessGovernanceSection,
+	PlatformControlSection,
+	IntegrationHealthSection,
+	AuditSummarySection,
+	ArtaSlaSection,
+} from "./modules/v1/admin-dashboard/admin-dashboard.schema.js"
+
 // Patient schemas — exported for frontend validation (e.g. CreatePatientSchema.safeParse)
 export {
 	CreatePatientSchema,

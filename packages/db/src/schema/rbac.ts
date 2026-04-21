@@ -101,6 +101,10 @@ export const rolePermissions = createTable(
 				| "death_reporting"
 				| "ed"
 				| "telemedicine"
+				| "feature_flags"
+				| "system_settings"
+				| "facility_profile"
+				| "integration_registry"
 			>(),
 		action: t
 			.text("action")

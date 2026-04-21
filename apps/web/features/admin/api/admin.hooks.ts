@@ -132,3 +132,65 @@ export function useUpdateRolePermissionsMutation() {
 		})
 	)
 }
+
+// ── Access Governance ────────────────────────────────────────────────────────
+
+export function useCreateUserMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.rbac.createUser.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+		})
+	)
+}
+
+export function useReEnableUserMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.rbac.reEnableUser.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+		})
+	)
+}
+
+export function useAddStaffFacilityMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.rbac.addStaffFacility.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+		})
+	)
+}
+
+export function useRemoveStaffFacilityMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.rbac.removeStaffFacility.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+		})
+	)
+}
+
+export function useAddUserRoleMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.rbac.addUserRole.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+		})
+	)
+}
+
+export function useRemoveUserRoleMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.rbac.removeUserRole.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+		})
+	)
+}

@@ -1,0 +1,83 @@
+import { z } from "zod"
+
+// ============================================================================
+// Policy section sub-schemas
+// ============================================================================
+
+export const ArtaSlaSchema = z.object({
+	targetMinutes: z.number().int().positive().optional(),
+	enableBanner: z.boolean().optional(),
+})
+
+export const ExportDefaultsSchema = z.object({
+	scheduleWindow: z.string().optional(),
+	defaultFormat: z.enum(["ndjson", "json_bundle", "csv"]).optional(),
+})
+
+export const OfflineModeSchema = z.object({
+	cacheActivePatients: z.boolean().optional(),
+	maxOfflineDays: z.number().int().min(1).max(30).optional(),
+})
+
+export const PrivacyConsentSchema = z.object({
+	consentVersion: z.string().optional(),
+	enforceOnLogin: z.boolean().optional(),
+})
+
+/**
+ * The discriminated-by-key policy sections object.
+ * Update endpoint rejects unknown top-level keys.
+ */
+export const PolicySectionsSchema = z
+	.object({
+		artaSla: ArtaSlaSchema.optional(),
+		exportDefaults: ExportDefaultsSchema.optional(),
+		offlineMode: OfflineModeSchema.optional(),
+		privacyConsent: PrivacyConsentSchema.optional(),
+	})
+	.strict() // Zod .strict() rejects unknown keys
+
+export type PolicySections = z.infer<typeof PolicySectionsSchema>
+
+// ============================================================================
+// System settings (full response shape)
+// ============================================================================
+
+export const SystemSettingsSchema = z.object({
+	facilityId: z.string().uuid(),
+	timezone: z.string().min(1),
+	chartRetentionYears: z.number().int().positive(),
+	supportMailbox: z.string().email().nullable(),
+	serviceDeskHotline: z.string().nullable(),
+	breakGlassRequiresReason: z.boolean(),
+	autoFreezeChargesOnDischarge: z.boolean(),
+	requireDpaConsentBeforeExport: z.boolean(),
+	enableOfflineSummaryCache: z.boolean(),
+	policySections: PolicySectionsSchema,
+	updatedAt: z
+		.union([z.date(), z.string()])
+		.transform(v => (typeof v === "string" ? new Date(v) : v))
+		.nullable(),
+})
+
+export type SystemSettings = z.infer<typeof SystemSettingsSchema>
+
+// ============================================================================
+// Update input schema
+// ============================================================================
+
+export const UpdateSystemSettingsSchema = z.object({
+	// Typed columns (all optional for partial updates)
+	timezone: z.string().min(1).optional(),
+	chartRetentionYears: z.number().int().positive().optional(),
+	supportMailbox: z.string().email().nullable().optional(),
+	serviceDeskHotline: z.string().nullable().optional(),
+	breakGlassRequiresReason: z.boolean().optional(),
+	autoFreezeChargesOnDischarge: z.boolean().optional(),
+	requireDpaConsentBeforeExport: z.boolean().optional(),
+	enableOfflineSummaryCache: z.boolean().optional(),
+	// JSONB policy sections — strict schema rejects unknown keys
+	policySections: PolicySectionsSchema.optional(),
+})
+
+export type UpdateSystemSettingsInput = z.infer<typeof UpdateSystemSettingsSchema>
