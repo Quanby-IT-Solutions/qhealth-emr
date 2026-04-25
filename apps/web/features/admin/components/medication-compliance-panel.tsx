@@ -4,7 +4,7 @@ import Link from "next/link"
 import {
 	AlertCircleFreeIcons,
 	ArrowLeft01FreeIcons,
-	Medication01FreeIcons,
+	Medicine01FreeIcons,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 
@@ -112,7 +112,7 @@ export function MedicationCompliancePanel() {
 			</div>
 
 			<div className="flex items-center gap-3">
-				<HugeiconsIcon icon={Medication01FreeIcons} className="size-6 text-muted-foreground" />
+				<HugeiconsIcon icon={Medicine01FreeIcons} className="size-6 text-muted-foreground" />
 				<div>
 					<h1 className="text-xl font-semibold">Medication Compliance Oversight</h1>
 					<p className="text-sm text-muted-foreground">

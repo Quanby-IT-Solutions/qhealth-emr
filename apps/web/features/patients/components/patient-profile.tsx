@@ -192,7 +192,8 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 			{/* Problems & Allergies */}
 			{(can(permSet, "clinical_docs", "view") || can(permSet, "orders", "view")) && (
-			<ProblemsAllergiesTab patientId={patientId} facilityId={patient.facilityId} canWrite={can(permSet, "clinical_docs", "sign")} />
+				<ProblemsAllergiesTab patientId={patientId} facilityId={patient.facilityId} canWrite={can(permSet, "clinical_docs", "sign")} />
+			)}
 
 			{/* Encounter History */}
 			<Card>

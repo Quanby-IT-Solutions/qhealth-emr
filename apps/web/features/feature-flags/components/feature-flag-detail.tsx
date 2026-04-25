@@ -344,7 +344,7 @@ export function FeatureFlagDetail({ flagId, canEdit }: FeatureFlagDetailProps) {
 							<CardTitle className="text-base">No targeting overrides</CardTitle>
 							<CardDescription>
 								This flag resolves to its default ({flag.defaultEnabled ? "enabled" : "disabled"}) for all contexts.
-								{canEdit && " Use "Add row" to create overrides."}
+								{canEdit && ' Use "Add row" to create overrides.'}
 							</CardDescription>
 						</CardHeader>
 					</Card>

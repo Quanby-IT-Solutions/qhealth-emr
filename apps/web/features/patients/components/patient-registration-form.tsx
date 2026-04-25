@@ -67,10 +67,6 @@ export function PatientRegistrationForm() {
 	const { data: cliniciansData } = useListCliniciansQuery(facilityId ?? undefined)
 
 	const clinicianOptions = cliniciansData?.data ?? []
-				name: user.name as string,
-				department: sp.department as string | undefined,
-			}))
-	)
 
 	const update = (field: string, value: string) =>
 		setForm(prev => ({ ...prev, [field]: value }))
