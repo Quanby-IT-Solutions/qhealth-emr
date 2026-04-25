@@ -30,11 +30,36 @@ const mockDb = {
 	update: mockUpdate,
 }
 
-jest.mock("@/common/database/database.client", () => ({ db: mockDb }))
+// Bypass the @repo/contracts barrel (which transitively loads @orpc/contract
+// as ESM) — these tests don't use any contract objects at runtime.
+jest.mock("@repo/contracts", () => ({
+	SLA_STEP_DEFAULT_TARGETS: {},
+}))
+
+jest.mock("@/common/database/database.client", () => ({
+	db: {
+		select: (...args: unknown[]) => mockSelect(...args),
+		update: (...args: unknown[]) => mockUpdate(...args),
+	},
+}))
 
 // ProblemsAllergiesService mock (required constructor dep)
 jest.mock("../problems-allergies/problems-allergies.service")
 const { ProblemsAllergiesService } = jest.requireMock("../problems-allergies/problems-allergies.service")
+
+// Builds a chainable Drizzle select mock: any of from/leftJoin/where/orderBy
+// return the same chain; .limit() resolves the provided rows.
+function buildSelectChain(rows: unknown[]) {
+	const chain: Record<string, unknown> = {}
+	chain.from = jest.fn(() => chain)
+	chain.leftJoin = jest.fn(() => chain)
+	chain.innerJoin = jest.fn(() => chain)
+	chain.where = jest.fn(() => chain)
+	chain.orderBy = jest.fn(() => chain)
+	chain.limit = jest.fn().mockResolvedValue(rows)
+	chain.then = (resolve: (value: unknown) => unknown) => Promise.resolve(rows).then(resolve)
+	return chain
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -128,18 +153,7 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 			const order = buildLabOrder({ status: "pending", specimenReceivedAt: null })
 
 			// findLabOrder calls select; second call is the post-update fetch
-			let selectCallCount = 0
-			mockSelect.mockImplementation(() => {
-				selectCallCount++
-				return {
-					from: jest.fn().mockReturnValue({
-						leftJoin: jest.fn().mockReturnValue({
-							where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([order]) }),
-						}),
-						where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([order]) }),
-					}),
-				}
-			})
+			mockSelect.mockImplementation(() => buildSelectChain([order]))
 			mockReturning.mockResolvedValue([order])
 
 			let capturedSet: Record<string, unknown> = {}
@@ -158,14 +172,7 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 			const existingTimestamp = new Date("2024-06-01T10:00:00Z")
 			const order = buildLabOrder({ status: "collected", specimenReceivedAt: existingTimestamp })
 
-			mockSelect.mockImplementation(() => ({
-				from: jest.fn().mockReturnValue({
-					leftJoin: jest.fn().mockReturnValue({
-						where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([order]) }),
-					}),
-					where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([order]) }),
-				}),
-			}))
+			mockSelect.mockImplementation(() => buildSelectChain([order]))
 
 			let capturedSet: Record<string, unknown> = {}
 			mockSet.mockImplementation((data: Record<string, unknown>) => {
@@ -183,14 +190,7 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 			const order = buildLabOrder({ status: "resulted" })
 			const billingTs = new Date("2024-06-01T12:00:00Z")
 
-			mockSelect.mockImplementation(() => ({
-				from: jest.fn().mockReturnValue({
-					leftJoin: jest.fn().mockReturnValue({
-						where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([order]) }),
-					}),
-					where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([order]) }),
-				}),
-			}))
+			mockSelect.mockImplementation(() => buildSelectChain([order]))
 
 			let capturedSet: Record<string, unknown> = {}
 			mockSet.mockImplementation((data: Record<string, unknown>) => {
@@ -204,13 +204,7 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 		})
 
 		it("throws NotFoundException when lab order does not exist", async () => {
-			mockSelect.mockImplementation(() => ({
-				from: jest.fn().mockReturnValue({
-					leftJoin: jest.fn().mockReturnValue({
-						where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }),
-					}),
-				}),
-			}))
+			mockSelect.mockImplementation(() => buildSelectChain([]))
 
 			await expect(service.updateLabOrder({ id: "non-existent", status: "collected" })).rejects.toThrow(
 				NotFoundException
@@ -226,14 +220,7 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 		it("auto-sets studyStartedAt when status transitions to 'in_progress' and no existing value", async () => {
 			const order = buildImagingOrder({ status: "scheduled", studyStartedAt: null })
 
-			mockSelect.mockImplementation(() => ({
-				from: jest.fn().mockReturnValue({
-					leftJoin: jest.fn().mockReturnValue({
-						where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([order]) }),
-					}),
-					where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([order]) }),
-				}),
-			}))
+			mockSelect.mockImplementation(() => buildSelectChain([order]))
 
 			let capturedSet: Record<string, unknown> = {}
 			mockSet.mockImplementation((data: Record<string, unknown>) => {
@@ -251,14 +238,7 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 			const existingTimestamp = new Date("2024-06-01T09:30:00Z")
 			const order = buildImagingOrder({ status: "in_progress", studyStartedAt: existingTimestamp })
 
-			mockSelect.mockImplementation(() => ({
-				from: jest.fn().mockReturnValue({
-					leftJoin: jest.fn().mockReturnValue({
-						where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([order]) }),
-					}),
-					where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([order]) }),
-				}),
-			}))
+			mockSelect.mockImplementation(() => buildSelectChain([order]))
 
 			let capturedSet: Record<string, unknown> = {}
 			mockSet.mockImplementation((data: Record<string, unknown>) => {
@@ -275,14 +255,7 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 			const order = buildImagingOrder({ status: "completed" })
 			const billingTs = new Date("2024-06-01T12:30:00Z")
 
-			mockSelect.mockImplementation(() => ({
-				from: jest.fn().mockReturnValue({
-					leftJoin: jest.fn().mockReturnValue({
-						where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([order]) }),
-					}),
-					where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([order]) }),
-				}),
-			}))
+			mockSelect.mockImplementation(() => buildSelectChain([order]))
 
 			let capturedSet: Record<string, unknown> = {}
 			mockSet.mockImplementation((data: Record<string, unknown>) => {
@@ -296,13 +269,7 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 		})
 
 		it("throws NotFoundException when imaging order does not exist", async () => {
-			mockSelect.mockImplementation(() => ({
-				from: jest.fn().mockReturnValue({
-					leftJoin: jest.fn().mockReturnValue({
-						where: jest.fn().mockReturnValue({ limit: jest.fn().mockResolvedValue([]) }),
-					}),
-				}),
-			}))
+			mockSelect.mockImplementation(() => buildSelectChain([]))
 
 			await expect(service.updateImagingOrder({ id: "non-existent", status: "in_progress" })).rejects.toThrow(
 				NotFoundException
