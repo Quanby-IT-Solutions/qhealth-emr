@@ -68,7 +68,7 @@ describe("PolicySectionsSchema (strict — rejects unknown top-level keys)", () 
 		const input = {
 			artaSla: { targetMinutes: 30 },
 			exportDefaults: { scheduleWindow: "weekly", defaultFormat: "ndjson" },
-			offlineMode: { cacheActivePatients: false },
+			offlineMode: { cacheActivePatients: true },
 			privacyConsent: { enforceOnLogin: true },
 		}
 		expect(PolicySectionsSchema.parse(input)).toEqual(input)
@@ -101,9 +101,9 @@ describe("UpdateSystemSettingsSchema", () => {
 			supportMailbox: "support@hospital.local",
 			serviceDeskHotline: "+63 2 8123 4567",
 			breakGlassRequiresReason: true,
-			autoFreezeChargesOnDischarge: false,
+			autoFreezeChargesOnDischarge: true,
 			requireDpaConsentBeforeExport: true,
-			enableOfflineSummaryCache: false,
+			enableOfflineSummaryCache: true,
 			policySections: {
 				artaSla: { targetMinutes: 15 },
 			},

@@ -41,6 +41,8 @@ const EXPECTED_MODULES = [
 	"system_settings",
 	"facility_profile",
 	"integration_registry",
+	"civil_registry",
+	"medical_records",
 	"patients",
 ] as const
 
@@ -82,6 +84,8 @@ describe("RbacModuleEnum", () => {
 			  "system_settings",
 			  "facility_profile",
 			  "integration_registry",
+			  "civil_registry",
+			  "medical_records",
 			  "patients",
 			]
 		`)
