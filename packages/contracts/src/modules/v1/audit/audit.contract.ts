@@ -9,6 +9,10 @@ import {
 	BreakGlassFilterSchema,
 	BreakGlassIdSchema,
 	BreakGlassListResponseSchema,
+	BreakGlassPatternsFilterSchema,
+	BreakGlassPatternsSchema,
+	ConfigHistoryFilterSchema,
+	ConfigHistoryListResponseSchema,
 	CreateBreakGlassSchema,
 	ReviewBreakGlassSchema,
 } from "./audit.schema.js"
@@ -46,6 +50,16 @@ export const auditLogContract = {
 			// Returns CSV string - frontend handles download
 			AuditLogListResponseSchema
 		),
+
+	configHistory: oc
+		.route({
+			method: "GET",
+			path: "/audit-logs/config-history",
+			summary: "List configuration change history for governance forensics",
+			tags: ["Audit", "Config History"],
+		})
+		.input(ConfigHistoryFilterSchema)
+		.output(ConfigHistoryListResponseSchema),
 }
 
 export const breakGlassContract = {
@@ -88,4 +102,14 @@ export const breakGlassContract = {
 		})
 		.input(ReviewBreakGlassSchema)
 		.output(BreakGlassEventSchema),
+
+	patterns: oc
+		.route({
+			method: "GET",
+			path: "/break-glass/patterns",
+			summary: "Get break-glass pattern analysis for privacy officer investigation",
+			tags: ["Audit", "Break Glass"],
+		})
+		.input(BreakGlassPatternsFilterSchema)
+		.output(BreakGlassPatternsSchema),
 }

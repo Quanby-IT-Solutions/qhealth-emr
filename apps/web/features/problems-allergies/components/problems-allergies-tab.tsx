@@ -57,9 +57,10 @@ function allergenTypeLabel(type: "medication" | "food" | "environmental") {
 interface ProblemsAllergiesTabProps {
 	patientId: string
 	facilityId: string
+	canWrite?: boolean
 }
 
-export function ProblemsAllergiesTab({ patientId, facilityId }: ProblemsAllergiesTabProps) {
+export function ProblemsAllergiesTab({ patientId, facilityId, canWrite = false }: ProblemsAllergiesTabProps) {
 	const [problemStatusFilter, setProblemStatusFilter] = useState<"active" | "resolved" | undefined>(
 		"active",
 	)
@@ -112,9 +113,11 @@ export function ProblemsAllergiesTab({ patientId, facilityId }: ProblemsAllergie
 								All
 							</Button>
 						</div>
-						<Button size="sm" onClick={() => setShowAddProblem(true)}>
-							Add Problem
-						</Button>
+						{canWrite && (
+							<Button size="sm" onClick={() => setShowAddProblem(true)}>
+								Add Problem
+							</Button>
+						)}
 					</div>
 				</CardHeader>
 				<CardContent className="p-0">
@@ -165,7 +168,7 @@ export function ProblemsAllergiesTab({ patientId, facilityId }: ProblemsAllergie
 											{problem.documentingStaffName ?? "—"}
 										</TableCell>
 										<TableCell>
-											{problem.status === "active" && (
+											{problem.status === "active" && canWrite && (
 												<Button
 													size="sm"
 													variant="outline"
@@ -196,9 +199,11 @@ export function ProblemsAllergiesTab({ patientId, facilityId }: ProblemsAllergie
 							{allergiesData?.total ?? 0} active
 						</p>
 					</div>
-					<Button size="sm" onClick={() => setShowAddAllergy(true)}>
-						Add Allergy
-					</Button>
+					{canWrite && (
+						<Button size="sm" onClick={() => setShowAddAllergy(true)}>
+							Add Allergy
+						</Button>
+					)}
 				</CardHeader>
 				<CardContent className="p-0">
 					{allergiesLoading ? (

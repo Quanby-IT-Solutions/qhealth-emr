@@ -1,13 +1,29 @@
-import type { Metadata } from "next"
+"use client"
 
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { FacilityProfilePanel } from "@/features/facility-profile/components/facility-profile-panel"
 
-export const metadata: Metadata = {
-	title: "Facility Profile | Admin",
-	description: "Official identity used in reports, exports, and external submissions.",
+function usePermissionSet() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+}
+
+function can(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
 }
 
 export default function FacilityProfilePage() {
+	const permSet = usePermissionSet()
+
+	if (!can(permSet, "admin", "view")) {
+		return (
+			<div className="flex items-center justify-center p-8 text-muted-foreground">
+				You do not have permission to access facility profile settings.
+			</div>
+		)
+	}
+
 	return (
 		<div className="space-y-6">
 			<div className="space-y-1">

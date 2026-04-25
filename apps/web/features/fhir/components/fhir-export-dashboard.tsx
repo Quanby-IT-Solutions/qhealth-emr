@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import {
+	AlertTriangle,
 	CheckCircle2,
 	Clock,
 	Download,
@@ -29,7 +30,9 @@ import {
 	type FhirExportStatus,
 	formatExportStatusLabel,
 	getExportStatusColor,
+	downloadBundleAsync,
 	useExportListQuery,
+	useNhdrSystemStatusQuery,
 } from "@/features/fhir/api/fhir.hooks"
 import { ExportConfigForm } from "@/features/fhir/components/export-config-form"
 import { SubmissionTracker } from "@/features/fhir/components/submission-tracker"
@@ -57,6 +60,9 @@ function ExportStatusBadge({ status }: { status: FhirExportStatus }) {
 	if (status === "failed" || status === "rejected") {
 		return <Badge variant="destructive">{label}</Badge>
 	}
+	if (status === "invalid") {
+		return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">{label}</Badge>
+	}
 	return <Badge className={colorClass}>{label}</Badge>
 }
 
@@ -69,6 +75,8 @@ function ExportStatusIcon({ status }: { status: FhirExportStatus }) {
 		case "completed":
 		case "accepted":
 			return <CheckCircle2 className="size-3.5 text-green-500" />
+		case "invalid":
+			return <AlertTriangle className="size-3.5 text-amber-500" />
 		case "submitted":
 			return <FileJson className="size-3.5 text-purple-500" />
 		case "failed":
@@ -84,7 +92,7 @@ function ExportStatusIcon({ status }: { status: FhirExportStatus }) {
 function StatsRow({ exports }: { exports: FhirExport[] }) {
 	const total = exports.length
 	const completed = exports.filter(e => e.status === "completed" || e.status === "accepted" || e.status === "submitted").length
-	const failed = exports.filter(e => e.status === "failed" || e.status === "rejected").length
+	const failed = exports.filter(e => e.status === "failed" || e.status === "rejected" || e.status === "invalid").length
 	const pending = exports.filter(e => e.status === "pending" || e.status === "processing").length
 
 	return (
@@ -130,6 +138,9 @@ interface ExportHistoryTableProps {
 	page: number
 	totalPages: number
 	onPageChange: (p: number) => void
+	downloadingId: string | null
+	onDownload: (id: string) => void
+	canDownload: boolean
 }
 
 function ExportHistoryTable({
@@ -141,6 +152,9 @@ function ExportHistoryTable({
 	page,
 	totalPages,
 	onPageChange,
+	downloadingId,
+	onDownload,
+	canDownload,
 }: ExportHistoryTableProps) {
 	return (
 		<Card>
@@ -214,10 +228,14 @@ function ExportHistoryTable({
 											: "—"}
 								</TableCell>
 								<TableCell>
-									{exp.validateOnExport ? (
-										<Badge variant="outline" className="text-xs">Yes</Badge>
-									) : (
-										<span className="text-xs text-muted-foreground">No</span>
+									{(exp.status === "completed" || exp.status === "submitted" || exp.status === "accepted") && (
+										<Badge variant="outline" className="text-xs">Passed</Badge>
+									)}
+									{exp.status === "invalid" && (
+										<Badge className="bg-amber-100 text-amber-800 text-xs dark:bg-amber-900/30 dark:text-amber-300">Errors</Badge>
+									)}
+									{(exp.status === "pending" || exp.status === "processing" || exp.status === "failed" || exp.status === "rejected") && (
+										<span className="text-xs text-muted-foreground">—</span>
 									)}
 								</TableCell>
 								<TableCell>
@@ -229,7 +247,7 @@ function ExportHistoryTable({
 								<TableCell className="text-xs">{formatDate(exp.createdAt)}</TableCell>
 								<TableCell>
 									<div className="flex items-center gap-1">
-										{exp.validateOnExport && (exp.status === "completed" || exp.status === "submitted" || exp.status === "accepted") && (
+										{(exp.status === "completed" || exp.status === "invalid" || exp.status === "submitted" || exp.status === "accepted") && (
 											<Button
 												variant="ghost"
 												size="sm"
@@ -241,15 +259,17 @@ function ExportHistoryTable({
 												{selectedExportId === exp.id ? "Hide Report" : "Validation"}
 											</Button>
 										)}
-										{exp.exportUrl && (
+									{exp.exportUrl && canDownload && (
 											<Button
 												variant="ghost"
 												size="sm"
-											className="h-7 text-xs"
-											nativeButton={false}
-											render={<a href={exp.exportUrl} target="_blank" rel="noreferrer" />}
+												className="h-7 text-xs"
+												disabled={downloadingId === exp.id}
+												onClick={() => onDownload(exp.id)}
 											>
-												<Download className="size-3.5" />
+												{downloadingId === exp.id
+													? <Loader2 className="size-3.5 animate-spin" />
+													: <Download className="size-3.5" />}
 											</Button>
 										)}
 									</div>
@@ -290,16 +310,74 @@ function ExportHistoryTable({
 }
 
 // ============================================================================
+// NHDR Status Panel (FHIR-003)
+// ============================================================================
+
+function NhdrStatusPanel() {
+	const { data, isLoading } = useNhdrSystemStatusQuery()
+
+	if (isLoading || !data) return null
+
+	const isLive = data.nhdrMode === "real"
+	const isReady = isLive && data.nhdrConfigured
+
+	return (
+		<Card>
+			<CardHeader className="pb-3">
+				<CardTitle className="text-base">NHDR Integration Status</CardTitle>
+			</CardHeader>
+			<CardContent className="space-y-3">
+				<div className="flex flex-wrap items-center gap-3">
+					<div className="flex items-center gap-2">
+						<span className="text-sm text-muted-foreground">Mode:</span>
+						<Badge
+							className={isLive ? "bg-blue-100 text-blue-800" : "bg-yellow-100 text-yellow-800"}
+						>
+							{isLive ? "Live" : "Mock"}
+						</Badge>
+					</div>
+					<div className="flex items-center gap-2">
+						<span className="text-sm text-muted-foreground">Configuration:</span>
+						{isReady ? (
+							<span className="flex items-center gap-1 text-sm text-green-700">
+								<CheckCircle2 className="size-4" /> Configured
+							</span>
+						) : (
+							<span className="flex items-center gap-1 text-sm text-yellow-700">
+								<AlertTriangle className="size-4" />
+								{isLive ? "Incomplete" : "Mock only"}
+							</span>
+						)}
+					</div>
+				</div>
+				<p className="text-sm text-muted-foreground">{data.nhdrEndpointNote}</p>
+				{data.nhdrBaseUrl && (
+					<p className="font-mono text-xs text-muted-foreground">
+						Endpoint: {data.nhdrBaseUrl}
+					</p>
+				)}
+			</CardContent>
+		</Card>
+	)
+}
+
+// ============================================================================
 // Main Dashboard
 // ============================================================================
 
-export function FhirExportDashboard() {
+interface FhirExportDashboardProps {
+	/** Whether the current user has admin:edit permission (required for mutations). */
+	canEdit: boolean
+}
+
+export function FhirExportDashboard({ canEdit }: FhirExportDashboardProps) {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles[0]?.facilityId ?? ""
 
 	const [page, setPage] = useState(1)
 	const [configOpen, setConfigOpen] = useState(false)
 	const [selectedExportId, setSelectedExportId] = useState<string | null>(null)
+	const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
 	const { data, isLoading, error } = useExportListQuery(facilityId, page)
 	const exports = data?.data ?? []
@@ -309,6 +387,19 @@ export function FhirExportDashboard() {
 	const pendingSubmissionExport = exports.find(
 		e => e.status === "completed" && !e.nhdrSubmissionId,
 	) ?? null
+
+	void selectedExport
+
+	async function handleDownload(exportId: string) {
+		setDownloadingId(exportId)
+		try {
+			await downloadBundleAsync(exportId)
+		} catch (err) {
+			console.error("[FHIR] Bundle download failed:", err)
+		} finally {
+			setDownloadingId(null)
+		}
+	}
 
 	return (
 		<div className="space-y-6">
@@ -320,11 +411,16 @@ export function FhirExportDashboard() {
 						Export clinical data in FHIR R4 format for NHDR submission and interoperability
 					</p>
 				</div>
-				<Button onClick={() => setConfigOpen(true)}>
-					<Plus className="mr-2 size-4" />
-					New Export
-				</Button>
+				{canEdit && (
+					<Button onClick={() => setConfigOpen(true)}>
+						<Plus className="mr-2 size-4" />
+						New Export
+					</Button>
+				)}
 			</div>
+
+			{/* NHDR System Status (FHIR-003) */}
+			<NhdrStatusPanel />
 
 			{/* Stats */}
 			{!isLoading && <StatsRow exports={exports} />}
@@ -339,6 +435,9 @@ export function FhirExportDashboard() {
 				page={page}
 				totalPages={data?.totalPages ?? 1}
 				onPageChange={setPage}
+				downloadingId={downloadingId}
+				onDownload={exportId => { void handleDownload(exportId) }}
+				canDownload={canEdit}
 			/>
 
 			{/* Validation Report Panel (shown below table when export is selected) */}
@@ -353,7 +452,7 @@ export function FhirExportDashboard() {
 			)}
 
 			{/* NHDR Submission Tracker */}
-			<SubmissionTracker facilityId={facilityId} pendingExport={pendingSubmissionExport} />
+			<SubmissionTracker facilityId={facilityId} pendingExport={pendingSubmissionExport} canEdit={canEdit} />
 
 			{/* Export Config Dialog */}
 			<ExportConfigForm

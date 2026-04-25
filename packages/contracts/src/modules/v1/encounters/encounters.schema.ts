@@ -64,6 +64,15 @@ export const EncounterSchema = z.object({
 	// PhilHealth tagging
 	konsultaTagged: z.boolean(),
 
+	// OPD queue number (outpatient encounters only, auto-generated per clinic per day)
+	queueNumber: z.number().int().positive().nullable(),
+
+	// PS-002: Clinic that this OPD encounter belongs to (for per-clinic queue numbering)
+	clinicianStaffId: z.string().uuid().nullable(),
+
+	// PS-003: Walk-in OPD queue position on the clinic queue board
+	queueStatus: z.enum(["waiting", "in_progress", "completed"]).nullable(),
+
 	// SLA tracking (computed from encounterStatusEvents)
 	slaStatus: EncounterSlaStatusEnum.nullable(),
 	slaElapsedMinutes: z.number().int().nonnegative().nullable(),
@@ -128,6 +137,30 @@ export const CreateEncounterSchema = z.object({
 
 	// Link to scheduling appointment
 	appointmentId: z.string().uuid().optional(),
+
+	// PS-002: Clinic for OPD queue scoping
+	clinicianStaffId: z.string().uuid().optional(),
+
+	// PS-001: Link to triage intake record (pre-registration vitals)
+	triageIntakeId: z.string().uuid().optional(),
+}).superRefine((data, ctx) => {
+	// PS-036: clinicianStaffId required for outpatient encounters to ensure clinic-scoped queue assignment
+	if (data.encounterType === "outpatient" && !data.clinicianStaffId) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: "clinicianStaffId is required for outpatient encounter registration",
+			path: ["clinicianStaffId"],
+		})
+	}
+	// PS-044: triageIntakeId required for outpatient encounters (TOR Flow 1 Step 1 mandatory)
+	if (data.encounterType === "outpatient" && !data.triageIntakeId) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message:
+				"triageIntakeId is required for outpatient encounter registration (TOR Flow 1 Step 1)",
+			path: ["triageIntakeId"],
+		})
+	}
 })
 
 export type CreateEncounterInput = z.infer<typeof CreateEncounterSchema>
@@ -152,6 +185,7 @@ export const EncounterListItemSchema = z.object({
 	attendingStaffName: z.string().nullable(),
 	wardName: z.string().nullable(),
 	bedNumber: z.string().nullable(),
+	queueNumber: z.number().int().positive().nullable(),
 })
 
 export const EncounterListResponseSchema = PaginatedResponseSchema.extend({

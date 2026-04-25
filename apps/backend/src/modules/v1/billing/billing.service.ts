@@ -7,6 +7,7 @@ import {
 	cf4Claims,
 	clinicalNotes,
 	eligibilityChecks,
+	encounterStatusEvents,
 	encounters,
 	invoiceLineItems,
 	invoices,
@@ -26,6 +27,8 @@ import {
 import { env } from "@/config/env.config"
 
 import { AuditService } from "../audit/audit.service"
+import { closeOpenSlaStep } from "@/utils/sla-events"
+import { resolveStepTarget } from "@/utils/sla-step-target"
 
 // ============================================================================
 // Input Types (explicit — avoids TypeScript depth limit with InferContractRouterInputs)
@@ -416,6 +419,20 @@ export class BillingService {
 
 		const lines = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, invoice.id))
 
+		// SLA-004/SLA-005: Write billing event when the invoice is first created (draft status)
+		const draftSlaMins = await resolveStepTarget(invoice.facilityId, "billing", "draft")
+		await db.insert(encounterStatusEvents).values({
+			facilityId: invoice.facilityId,
+			encounterId: invoice.encounterId,
+			fromStatus: null,
+			toStatus: "draft",
+			workflowType: "billing" as const,
+			staffId: staffProfileId,
+			slaTargetMinutes: draftSlaMins,
+			notes: `Invoice ${invoice.invoiceNumber} created (draft)`,
+			occurredAt: new Date(),
+		})
+
 		return { ...invoice, lineItems: lines }
 	}
 
@@ -431,6 +448,24 @@ export class BillingService {
 			.returning()
 
 		if (!updated) throw new NotFoundException("Invoice not found after update")
+
+		// SLA-001/SLA-004: Close open billing step then write the finalized transition event
+		await closeOpenSlaStep(db, invoice.encounterId, "billing")
+
+		// Write durable SLA billing transition event
+		const finalizedSlaMins = await resolveStepTarget(invoice.facilityId, "billing", "finalized")
+		await db.insert(encounterStatusEvents).values({
+			facilityId: invoice.facilityId,
+			encounterId: invoice.encounterId,
+			fromStatus: invoice.status,
+			toStatus: "finalized",
+			workflowType: "billing" as const,
+			staffId: null,
+			slaTargetMinutes: finalizedSlaMins,
+			notes: `Invoice ${invoice.invoiceNumber}: draft → finalized`,
+			occurredAt: new Date(),
+		})
+
 		return updated
 	}
 
@@ -490,6 +525,23 @@ export class BillingService {
 
 		const newStatus = totalPaid >= invoiceTotal ? "paid" : "partially_paid"
 		await db.update(invoices).set({ status: newStatus }).where(eq(invoices.id, input.invoiceId))
+
+		// SLA-001/SLA-004: Close open billing step then write payment transition event
+		await closeOpenSlaStep(db, invoice.encounterId, "billing")
+
+		// Write durable SLA billing transition event
+		const paymentSlaMins = await resolveStepTarget(invoice.facilityId, "billing", newStatus)
+		await db.insert(encounterStatusEvents).values({
+			facilityId: invoice.facilityId,
+			encounterId: invoice.encounterId,
+			fromStatus: invoice.status,
+			toStatus: newStatus,
+			workflowType: "billing" as const,
+			staffId: null,
+			slaTargetMinutes: paymentSlaMins,
+			notes: `Invoice ${invoice.invoiceNumber}: ${invoice.status} → ${newStatus}`,
+			occurredAt: new Date(),
+		})
 
 		return payment
 	}
@@ -927,6 +979,23 @@ export class BillingService {
 		if (!soa) {
 			throw new NotFoundException("SOA not found")
 		}
+
+		// SLA-004/SLA-005: Write a billing event so the SOA finalization is tracked in SLA monitoring
+		if (soa.encounterId) {
+			const soaSlaMins = await resolveStepTarget(soa.facilityId, "billing", "soa_finalized")
+			await db.insert(encounterStatusEvents).values({
+				facilityId: soa.facilityId,
+				encounterId: soa.encounterId,
+				fromStatus: "draft",
+				toStatus: "soa_finalized",
+				workflowType: "billing" as const,
+				staffId: null,
+				slaTargetMinutes: soaSlaMins,
+				notes: `SOA for encounter ${soa.encounterId} finalized`,
+				occurredAt: new Date(),
+			})
+		}
+
 		return {
 			...soa,
 			status: "final" as const,

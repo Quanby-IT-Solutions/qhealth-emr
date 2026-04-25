@@ -1,0 +1,201 @@
+/**
+ * Admin Dashboard — FHIR telemetry permission boundary tests (FHIR-009)
+ *
+ * Verifies that:
+ *   1. getSummary() with canViewFhir:false strips fhirFailures from the
+ *      returned integrations object (returns 0).
+ *   2. getSummary() with canViewFhir:false omits the fhir-failure-no-consent
+ *      anomaly alert even when FHIR failures exist and consent is not enforced.
+ *   3. getSummary() with canViewFhir:true returns the real fhirFailures count
+ *      and emits the FHIR alert when the condition is met.
+ *   4. getSummary() with no options (default) leaves FHIR data intact.
+ *
+ * The service is tested directly (unit style) with all DB calls mocked via
+ * jest.spyOn on the private methods, so we never touch a real database.
+ *
+ * All ESM-only and transitive-contract-importing packages are stubbed via
+ * jest.mock() at the module level.
+ */
+
+// ── ESM / transitive dependency stubs ────────────────────────────────────────
+
+jest.mock("@/common/database/database.client", () => ({ db: {} }))
+jest.mock("@repo/db/schema", () => ({}))
+// SlaService transitively imports @repo/contracts (value import) which has
+// .js extension re-exports that break Jest's CJS transformer. Stub the whole
+// service to avoid the chain.
+jest.mock("../sla/sla.service", () => ({
+	SlaService: class SlaService {},
+}))
+jest.mock("../reporting/reporting.service", () => ({
+	ReportingService: class ReportingService {},
+}))
+
+import { SlaService } from "../sla/sla.service"
+import { ReportingService } from "../reporting/reporting.service"
+import { AdminDashboardService } from "./admin-dashboard.service"
+
+// ── Minimal typed stubs returned by private fetcher methods ───────────────────
+
+const EMPTY_GOVERNANCE = {
+	totalAdmins: 0,
+	recentRoleChanges: [],
+	inactiveAdmins: 0,
+	multiFacilityUsers: 0,
+	usersWithoutRole: 0,
+}
+
+const EMPTY_PLATFORM = {
+	totalFeatureFlags: 0,
+	activeFlags: 0,
+	recentFlagChanges: [],
+	highRiskFlagsEnabled: 0,
+	missingCriticalSettings: [],
+	facilityProfileCompleteness: 100,
+}
+
+const EMPTY_AUDIT_BASE = {
+	breakGlassEventCount: 0,
+	recentPrivilegedChanges: [],
+	privilegedChangeCount: 0,
+	pendingAuditItems: 0,
+	pendingBreakGlassReviews: 0,
+	flaggedBreakGlassEvents: 0,
+	privilegedChangeCount7d: 0,
+}
+
+const EMPTY_ARTA = {
+	slaBreachCount: 0,
+	pendingRequests: 0,
+	avgProcessingDays: 0,
+}
+
+const EMPTY_OFFLINE = {
+	facilitiesWithoutOfflineSupport: 0,
+	totalFacilities: 0,
+	status: "ok" as const,
+	lastFailureMessage: null,
+}
+
+const EMPTY_STATUTORY_READINESS = {
+	facilitiesWithoutStatutoryReporting: 0,
+	totalFacilities: 0,
+}
+
+const EMPTY_STATUTORY_OPS = {
+	pidsr: { blockedOrRejected: false, draftCount: 0 },
+	hai: { pendingCount: 0 },
+	ahsr: { currentMonthReady: true },
+}
+
+const EMPTY_DATA_QUALITY = {
+	incompleteRecordsCount: 0,
+	duplicateRecordsCount: 0,
+	missingIcd10Count: 0,
+	missingRvsCount: 0,
+	cf4DraftCount: 0,
+}
+
+function makeIntegrationHealth(fhirFailures: number) {
+	return {
+		failedCount: fhirFailures,
+		disabledCount: 0,
+		missingCredentialsCount: 0,
+		staleCount: 0,
+		fhirFailures,
+	}
+}
+
+function stubService(fhirFailures: number, consentEnforced = false) {
+	const slaService = new SlaService() as jest.Mocked<SlaService>
+	const reportingService = new ReportingService() as jest.Mocked<ReportingService>
+	const service = new AdminDashboardService(slaService, reportingService)
+
+	// Stub all private async fetchers via spyOn
+	jest.spyOn(service as never, "getAccessGovernance").mockResolvedValue(EMPTY_GOVERNANCE as never)
+	jest.spyOn(service as never, "getPlatformControl").mockResolvedValue(EMPTY_PLATFORM as never)
+	jest.spyOn(service as never, "getIntegrationHealth").mockResolvedValue(
+		makeIntegrationHealth(fhirFailures) as never
+	)
+	jest.spyOn(service as never, "getAuditSummary").mockResolvedValue({
+		...EMPTY_AUDIT_BASE,
+		consentEnforced,
+	} as never)
+	jest.spyOn(service as never, "withMissingSchemaFallback").mockImplementation(
+		async (_section: unknown, _fid: unknown, fn: () => Promise<unknown>) => fn()
+	)
+	jest.spyOn(service as never, "getArtaSla").mockResolvedValue(EMPTY_ARTA as never)
+	jest.spyOn(service as never, "getOfflineReadiness").mockResolvedValue(EMPTY_OFFLINE as never)
+	jest.spyOn(service as never, "getStatutoryReadiness").mockResolvedValue(EMPTY_STATUTORY_READINESS as never)
+	jest.spyOn(service as never, "getStatutoryOps").mockResolvedValue(EMPTY_STATUTORY_OPS as never)
+	jest.spyOn(service as never, "getDataQuality").mockResolvedValue(EMPTY_DATA_QUALITY as never)
+
+	return service
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe("AdminDashboardService.getSummary — FHIR telemetry permission boundary (FHIR-009)", () => {
+	afterEach(() => jest.restoreAllMocks())
+
+	describe("caller WITHOUT fhir:view (canViewFhir: false)", () => {
+		it("returns fhirFailures as 0 even when real failures exist", async () => {
+			const service = stubService(3)
+			const result = await service.getSummary("facility-1", { canViewFhir: false })
+			expect(result.integrations.fhirFailures).toBe(0)
+		})
+
+		it("does NOT emit fhir-failure-no-consent alert when failures exist and consent not enforced", async () => {
+			const service = stubService(2, false /* consentEnforced */)
+			const result = await service.getSummary("facility-1", { canViewFhir: false })
+			const alertIds = result.alerts.map((a: { id: string }) => a.id)
+			expect(alertIds).not.toContain("fhir-failure-no-consent")
+		})
+
+		it("still returns non-FHIR integration health fields accurately", async () => {
+			const service = stubService(3)
+			const result = await service.getSummary("facility-1", { canViewFhir: false })
+			expect(result.integrations.fhirFailures).toBe(0)
+			expect(result.integrations.disabledCount).toBe(0)
+			expect(result.integrations.missingCredentialsCount).toBe(0)
+		})
+	})
+
+	describe("caller WITH fhir:view (canViewFhir: true)", () => {
+		it("returns the real fhirFailures count", async () => {
+			const service = stubService(5)
+			const result = await service.getSummary("facility-1", { canViewFhir: true })
+			expect(result.integrations.fhirFailures).toBe(5)
+		})
+
+		it("emits fhir-failure-no-consent alert when failures exist and consent not enforced", async () => {
+			const service = stubService(2, false)
+			const result = await service.getSummary("facility-1", { canViewFhir: true })
+			const alertIds = result.alerts.map((a: { id: string }) => a.id)
+			expect(alertIds).toContain("fhir-failure-no-consent")
+		})
+
+		it("does NOT emit fhir-failure-no-consent alert when consent is enforced", async () => {
+			const service = stubService(2, true /* consentEnforced */)
+			const result = await service.getSummary("facility-1", { canViewFhir: true })
+			const alertIds = result.alerts.map((a: { id: string }) => a.id)
+			expect(alertIds).not.toContain("fhir-failure-no-consent")
+		})
+
+		it("does NOT emit fhir-failure-no-consent alert when there are no failures", async () => {
+			const service = stubService(0, false)
+			const result = await service.getSummary("facility-1", { canViewFhir: true })
+			const alertIds = result.alerts.map((a: { id: string }) => a.id)
+			expect(alertIds).not.toContain("fhir-failure-no-consent")
+		})
+	})
+
+	describe("default behaviour (no options — backward compat)", () => {
+		it("defaults to canViewFhir:true and returns real fhirFailures", async () => {
+			const service = stubService(4)
+			const result = await service.getSummary("facility-1")
+			expect(result.integrations.fhirFailures).toBe(4)
+		})
+	})
+})
+

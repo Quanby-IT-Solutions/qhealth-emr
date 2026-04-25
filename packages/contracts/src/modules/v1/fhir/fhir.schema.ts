@@ -36,6 +36,7 @@ export const FhirResourceTypeEnum = z.enum([
 	"Observation",
 	"DiagnosticReport",
 	"MedicationRequest",
+	"NutritionOrder",
 	"Procedure",
 	"Condition",
 	"Immunization",
@@ -51,6 +52,7 @@ export const FhirExportStatusEnum = z.enum([
 	"pending",
 	"processing",
 	"completed",
+	"invalid",
 	"failed",
 	"submitted",
 	"accepted",
@@ -191,3 +193,16 @@ export type CreateFhirExport = z.infer<typeof CreateFhirExportSchema>
 export const SubmitToNhdrParamsSchema = z.object({
 	exportId: z.string().uuid(),
 })
+
+// ============================================================================
+// FHIR System Status
+// ============================================================================
+
+export const FhirSystemStatusSchema = z.object({
+	nhdrMode: z.enum(["mock", "real"]),
+	nhdrConfigured: z.boolean(),
+	nhdrBaseUrl: z.string().url().nullable(),
+	nhdrEndpointNote: z.string(),
+})
+
+export type FhirSystemStatus = z.infer<typeof FhirSystemStatusSchema>

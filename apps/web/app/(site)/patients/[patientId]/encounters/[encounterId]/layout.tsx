@@ -49,7 +49,7 @@ export default function EncounterChartLayout({
 	params: Promise<{ patientId: string; encounterId: string }>
 }) {
 	const { patientId, encounterId } = use(params)
-	const { data: encounter, isLoading } = useEncounterDetailQuery(encounterId)
+	const { data: encounter, isLoading, isError } = useEncounterDetailQuery(encounterId)
 	const { data: summary } = usePatientSummaryQuery(encounter?.patientId ?? "")
 	const pathname = usePathname()
 	const permSet = usePermissionSet()
@@ -63,8 +63,8 @@ export default function EncounterChartLayout({
 		staffId: profile?.staffProfiles?.[0]?.id,
 	})
 
-	// Clinicians with clinical_docs:sign can invoke break-glass
-	const canInvokeBreakGlass = can(permSet, "clinical_docs", "sign")
+	// Clinicians with audit:create can invoke break-glass
+	const canInvokeBreakGlass = can(permSet, "audit", "create")
 
 	const base = `/patients/${patientId}/encounters/${encounterId}`
 
@@ -76,10 +76,10 @@ export default function EncounterChartLayout({
 		{
 			label: "Problems & Allergies",
 			href: `${base}/problems-allergies`,
-			// Problem list management is for Physicians (orders:edit), not Surgeons, ancillary, or billing staff
+			// Problem list and allergy management is for all clinicians who author clinical documentation
+			// (Physicians, Nurses, Surgeons, Anesthesiologists). Ancillary and billing staff are excluded.
 			show:
 				(can(permSet, "clinical_docs", "view") || can(permSet, "orders", "view")) &&
-				!can(permSet, "surgical", "view") &&
 				!can(permSet, "radiology", "view") &&
 				!can(permSet, "laboratory", "view") &&
 				!can(permSet, "billing", "create"), // Exclude Billers - they review CF4, not problem lists
@@ -126,11 +126,7 @@ export default function EncounterChartLayout({
 		{
 			label: "MSW",
 			href: `${base}/msw`,
-			// MSW tab is for Social Workers only - they have billing:view but NOT billing:create
-			show:
-				can(permSet, "billing", "view") &&
-				!can(permSet, "clinical_docs", "create") &&
-				!can(permSet, "billing", "create"), // Exclude Billers - they manage charges, not CoE/evaluations
+			show: can(permSet, "msw", "view"),
 		},
 		{
 			label: "Consents",
@@ -147,11 +143,9 @@ export default function EncounterChartLayout({
 		{
 			label: "Death Report",
 			href: `${base}/death-report`,
-			// Death Report (FMDRF/FNDRF) is for HIM Coders who complete chart documentation
-			// HIM has clinical_docs:edit for chart completion, not sign (that's clinicians)
-			show:
-				can(permSet, "clinical_docs", "edit") &&
-				!can(permSet, "clinical_docs", "sign"), // Clinicians sign, HIM codes
+			// Death Report (FMDRF/FNDRF) is visible to anyone with explicit death_reporting:view
+			// This includes Physicians/Surgeons (authors) and Registrars (certificate issuance)
+			show: can(permSet, "death_reporting", "view"),
 		},
 		{
 			label: "Transfers",
@@ -195,6 +189,8 @@ export default function EncounterChartLayout({
 				<div className="border-b bg-background px-6 py-4">
 					{isLoading ? (
 						<div className="h-12 animate-pulse rounded bg-muted" />
+					) : isError ? (
+						<p className="text-sm text-destructive">You do not have permission to view this encounter.</p>
 					) : encounter ? (
 						<div className="flex flex-wrap items-center gap-x-6 gap-y-2">
 							<div>

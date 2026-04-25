@@ -1,48 +1,198 @@
 import { Injectable, Logger } from "@nestjs/common"
-import { and, count, eq, gte, isNull, lt, or } from "drizzle-orm"
+import { and, count, countDistinct, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm"
 
 import {
+	ahsrSnapshots,
 	auditLogs,
+	birthRegistrations,
 	breakGlassEvents,
+	cf4Claims,
+	clinicalNotes,
+	dataExports,
+	deathReports,
+	encounterStatusEvents,
+	encounters,
 	facilityProfiles,
 	featureFlags,
 	featureFlagTargets,
+	formularyItems,
 	integrations,
+	medicalRecordsRequests,
+	medicationOrders,
+	nbsLogEntries,
+	offlineCacheJobs,
+	operationRecords,
+	pidsrCases,
+	prescriptions,
+	problems,
 	rolePermissions,
+	slaConfigs,
 	staffProfiles,
+	surgicalRvsAssignments,
+	surveillanceFlags,
 	systemSettings,
 	userRoles,
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
+import { ReportingService } from "../reporting/reporting.service"
+import { SlaService } from "../sla/sla.service"
 
 import type {
-	AdminDashboardSummary,
 	AdminDashboardAlert,
+	AdminDashboardSummary,
 	AdminSummaryCard,
-	RecentChange,
-	AccessGovernanceSection,
-	PlatformControlSection,
-	IntegrationHealthSection,
-	AuditSummarySection,
 	ArtaSlaSection,
+	AccessGovernanceSection,
+	AuditSummarySection,
+	CivilRegistryOpsSection,
+	DataQualitySection,
+	ExportComplianceList,
+	ExportComplianceQuery,
+	HimOpsSection,
+	IntegrationHealthSection,
+	MedicationComplianceSection,
+	OfflineReadinessSection,
+	PlatformControlSection,
+	RecentChange,
+	StatutoryOpsSection,
+	StatutoryReadinessSection,
 } from "@repo/contracts"
+
+function isMissingDatabaseObjectError(error: unknown): boolean {
+	if (!error || typeof error !== "object") return false
+
+	const maybeError = error as { code?: string; cause?: unknown }
+	if (maybeError.code === "42P01" || maybeError.code === "42703") return true
+
+	if (!maybeError.cause || typeof maybeError.cause !== "object") return false
+
+	const cause = maybeError.cause as { code?: string }
+	return cause.code === "42P01" || cause.code === "42703"
+}
+
+const EMPTY_ARTA_SLA: ArtaSlaSection = {
+	activeBreaches: 0,
+	overdueQueues: 0,
+	topBreachedWorkflows: [],
+	queueBreakdown: [],
+	dataAvailable: false,
+}
+
+const EMPTY_OFFLINE_READINESS: OfflineReadinessSection = {
+	enabled: false,
+	status: "disabled",
+	lastCachePreparedAt: null,
+	activePatientsCount: 0,
+	maxOfflineDays: null,
+	recentJobs: [],
+	lastFailedAt: null,
+	lastFailureMessage: null,
+}
+
+const EMPTY_STATUTORY_READINESS: StatutoryReadinessSection = {
+	fhirNhdr: { name: "FHIR / NHDR", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
+	philhealth: { name: "PhilHealth / CF4", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
+	hai: { name: "HAI Reporting", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
+	pidsr: { name: "PIDSR", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
+	civilRegistry: { name: "Civil Registry", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
+}
+
+const EMPTY_STATUTORY_OPS: StatutoryOpsSection = {
+	pidsr: {
+		category1Count: 0,
+		category2Count: 0,
+		draftCount: 0,
+		submittedCount: 0,
+		rejectedCount: 0,
+		blockedCount: 0,
+		lastSubmittedAt: null,
+		blockedOrRejected: false,
+	},
+	hai: {
+		openSurveillanceCount: 0,
+		reviewedCount: 0,
+		pendingCount: 0,
+		byType: [],
+	},
+	ahsr: {
+		snapshotCount: 0,
+		lastSnapshotMonth: null,
+		currentMonthReady: false,
+		currentYearBor: null,
+		currentYearGrossDeathRate: null,
+		currentYearNetDeathRate: null,
+		topMorbidities: [],
+		topMortalities: [],
+	},
+}
+
+const EMPTY_DATA_QUALITY: DataQualitySection = {
+	cf4DraftCount: 0,
+	cf4SubmittedThisMonth: 0,
+	missingIcd10Count: 0,
+	missingRvsCount: 0,
+	ahsrLastSnapshotMonth: null,
+	ahsrCurrentMonthReady: false,
+	cf4WithExtractedData: 0,
+	cf4MissingExtractedData: 0,
+	cf4ExtractionCompletePct: 100,
+	cf4SectionCompleteness: [],
+}
 
 @Injectable()
 export class AdminDashboardService {
 	private readonly logger = new Logger(AdminDashboardService.name)
 
-	async getSummary(facilityId: string): Promise<AdminDashboardSummary> {
-		const [governance, platform, integrationHealth, audit, artaSla] = await Promise.all([
+	constructor(
+		private readonly slaService: SlaService,
+		private readonly reportingService: ReportingService,
+	) {}
+
+	private async withMissingSchemaFallback<T>(
+		sectionName: string,
+		facilityId: string,
+		action: () => Promise<T>,
+		fallback: T,
+	): Promise<T> {
+		try {
+			return await action()
+		} catch (error) {
+			if (isMissingDatabaseObjectError(error)) {
+				this.logger.warn(`${sectionName} data unavailable for facility ${facilityId}: database schema is behind the current code`)
+				return fallback
+			}
+
+			throw error
+		}
+	}
+
+	async getSummary(
+		facilityId: string,
+		options: { canViewFhir: boolean } = { canViewFhir: true }
+	): Promise<AdminDashboardSummary> {
+		const [governance, platform, integrationHealth, audit] = await Promise.all([
 			this.getAccessGovernance(facilityId),
 			this.getPlatformControl(facilityId),
 			this.getIntegrationHealth(facilityId),
 			this.getAuditSummary(facilityId),
-			this.getArtaSla(),
 		])
 
-		const alerts = this.buildAlerts(governance, platform, integrationHealth, audit, artaSla)
-		const summaryCards = this.buildSummaryCards(governance, integrationHealth, audit, artaSla)
+		const [artaSla, offlineReadiness, statutoryReadiness, statutoryOps, dataQuality] = await Promise.all([
+			this.withMissingSchemaFallback("ARTA/SLA", facilityId, () => this.getArtaSla(facilityId), EMPTY_ARTA_SLA),
+			this.withMissingSchemaFallback("offline readiness", facilityId, () => this.getOfflineReadiness(facilityId), EMPTY_OFFLINE_READINESS),
+			this.withMissingSchemaFallback("statutory readiness", facilityId, () => this.getStatutoryReadiness(facilityId), EMPTY_STATUTORY_READINESS),
+			this.withMissingSchemaFallback("statutory operations", facilityId, () => this.getStatutoryOps(facilityId), EMPTY_STATUTORY_OPS),
+			this.withMissingSchemaFallback("data quality", facilityId, () => this.getDataQuality(facilityId), EMPTY_DATA_QUALITY),
+		])
+
+		// Strip FHIR-specific telemetry when the caller lacks fhir:view — TOR §4.2 least-privilege
+		const effectiveIntegrationHealth = options.canViewFhir
+			? integrationHealth
+			: { ...integrationHealth, fhirFailures: 0 }
+
+		const alerts = this.buildAlerts(governance, platform, effectiveIntegrationHealth, audit, artaSla, offlineReadiness, statutoryOps, dataQuality)
+		const summaryCards = this.buildSummaryCards(governance, effectiveIntegrationHealth, audit, artaSla)
 		const recentChanges = [
 			...governance.recentRoleChanges,
 			...platform.recentFlagChanges,
@@ -57,9 +207,13 @@ export class AdminDashboardService {
 			recentChanges,
 			accessGovernance: governance,
 			platformControl: platform,
-			integrations: integrationHealth,
+			integrations: effectiveIntegrationHealth,
 			audit,
 			artaSla,
+			offlineReadiness,
+			statutoryReadiness,
+			statutoryOps,
+			dataQuality,
 		}
 	}
 
@@ -96,6 +250,19 @@ export class AdminDashboardService {
 		const assignedSet = new Set(assignedStaffIds.map(r => r.staffProfileId))
 		const usersWithoutRole = allStaffIds.filter(s => !assignedSet.has(s.id)).length
 
+		// Users with staff profiles in more than one facility (multi-facility members)
+		// Sub-query: count distinct facilityId per userId, then count users with > 1
+		const multiFacilityCounts = await db
+			.select({
+				userId: staffProfiles.userId,
+				facilityCount: countDistinct(staffProfiles.facilityId).as("facility_count"),
+			})
+			.from(staffProfiles)
+			.where(eq(staffProfiles.isActive, true))
+			.groupBy(staffProfiles.userId)
+
+		const multiFacilityUsers = multiFacilityCounts.filter(r => (r.facilityCount ?? 0) > 1).length
+
 		// Recent audit entries for role/permission changes (last 30 days)
 		const recentRoleAuditLogs = await db
 			.select()
@@ -126,7 +293,7 @@ export class AdminDashboardService {
 			activeUsers: activeCount,
 			inactiveUsers: inactiveCount,
 			usersWithoutRole,
-			multiFacilityUsers: 0, // Multi-facility feature not yet instrumented
+			multiFacilityUsers,
 			recentRoleChanges,
 		}
 	}
@@ -302,6 +469,31 @@ export class AdminDashboardService {
 			)
 		const breakGlassCount = bgRow?.breakGlassCount ?? 0
 
+		// Pending break-glass reviews (all-time unreviewed)
+		const [pendingBgRow] = await db
+			.select({ pendingCount: count() })
+			.from(breakGlassEvents)
+			.where(
+				and(
+					eq(breakGlassEvents.facilityId, facilityId),
+					eq(breakGlassEvents.reviewStatus, "pending")
+				)
+			)
+		const pendingBreakGlassReviews = pendingBgRow?.pendingCount ?? 0
+
+		// Flagged break-glass events (last 7 days)
+		const [flaggedBgRow] = await db
+			.select({ flaggedCount: count() })
+			.from(breakGlassEvents)
+			.where(
+				and(
+					eq(breakGlassEvents.facilityId, facilityId),
+					eq(breakGlassEvents.reviewStatus, "flagged"),
+					gte(breakGlassEvents.accessGrantedAt, sevenDaysAgo)
+				)
+			)
+		const flaggedBreakGlassEvents = flaggedBgRow?.flaggedCount ?? 0
+
 		// Total audit events (last 7 days) as a proxy for "high severity"
 		const [eventsRow] = await db
 			.select({ totalRecentEvents: count() })
@@ -313,23 +505,159 @@ export class AdminDashboardService {
 				)
 			)
 
+		// Total count of all privileged changes in last 7d (for anomaly detection, AD-006)
+		const [privilegedCountRow] = await db
+			.select({ n: count() })
+			.from(auditLogs)
+			.where(
+				and(
+					eq(auditLogs.facilityId, facilityId),
+					gte(auditLogs.createdAt, sevenDaysAgo),
+					or(
+						eq(auditLogs.entityType, "feature_flag"),
+						eq(auditLogs.entityType, "system_settings"),
+						eq(auditLogs.entityType, "role_permission"),
+						eq(auditLogs.entityType, "user_role"),
+						eq(auditLogs.entityType, "integration")
+					)
+				)
+			)
+
+		// DPA consent enforcement setting
+		const [settingsRow] = await db
+			.select({ requireDpaConsentBeforeExport: systemSettings.requireDpaConsentBeforeExport })
+			.from(systemSettings)
+			.where(eq(systemSettings.facilityId, facilityId))
+			.limit(1)
+		const consentEnforced = settingsRow?.requireDpaConsentBeforeExport ?? true
+
 		return {
 			recentPrivilegedChanges,
 			breakGlassEventCount: breakGlassCount,
 			highSeverityEventCount: eventsRow?.totalRecentEvents ?? 0,
+			pendingBreakGlassReviews,
+			flaggedBreakGlassEvents,
+			consentEnforced,
+			privilegedChangeCount7d: privilegedCountRow?.n ?? 0,
 		}
 	}
 
 	// ── ARTA / SLA ─────────────────────────────────────────────────────────────
 
-	private async getArtaSla(): Promise<ArtaSlaSection> {
-		// SLA event instrumentation is not yet fully implemented.
-		// Return explicit "data unavailable" state so the UI can show a clear message.
-		return {
-			activeBreaches: 0,
-			overdueQueues: 0,
-			topBreachedWorkflows: [],
-			dataAvailable: false,
+	private async getArtaSla(facilityId: string): Promise<ArtaSlaSection> {
+		try {
+			// Check if any SLA configs exist for this facility
+			const activeConfigs = await db
+				.select()
+				.from(slaConfigs)
+				.where(and(eq(slaConfigs.facilityId, facilityId), eq(slaConfigs.isActive, true)))
+
+			if (activeConfigs.length === 0) {
+				// No SLA targets configured yet — keep the "data unavailable" state
+				return { activeBreaches: 0, overdueQueues: 0, topBreachedWorkflows: [], queueBreakdown: [], dataAvailable: false }
+			}
+
+			// Use full status breakdown (AD-004: populate real onTime/approaching counts)
+			const result = await this.slaService.getActiveSlaStatusBreakdown(facilityId)
+
+			// AD-014: Query open steps (encounters in-flight, actualMinutes IS NULL) and
+			// recent activity (last 30 days) grouped by workflowType + toStatus.
+			const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+			// Open steps: transitions that have started (occurredAt set) but no completion time yet
+			const openStepRows = await db
+				.select({
+					workflowType: encounterStatusEvents.workflowType,
+					toStatus: encounterStatusEvents.toStatus,
+					n: count(),
+				})
+				.from(encounterStatusEvents)
+				.where(
+					and(
+						eq(encounterStatusEvents.facilityId, facilityId),
+						isNull(encounterStatusEvents.actualMinutes)
+					)
+				)
+				.groupBy(encounterStatusEvents.workflowType, encounterStatusEvents.toStatus)
+
+			// Recent activity: at least one event in the last 30 days per workflow — signals pipeline is wired
+			const recentActivityRows = await db
+				.select({
+					workflowType: encounterStatusEvents.workflowType,
+					n: count(),
+				})
+				.from(encounterStatusEvents)
+				.where(
+					and(
+						eq(encounterStatusEvents.facilityId, facilityId),
+						gte(encounterStatusEvents.occurredAt, thirtyDaysAgo)
+					)
+				)
+				.groupBy(encounterStatusEvents.workflowType)
+
+			const recentActivitySet = new Set<string>(recentActivityRows.map(r => r.workflowType))
+
+			// Build a map: workflowType → open steps array
+			const openStepsByWorkflow = new Map<string, Array<{ step: string; count: number }>>()
+			for (const row of openStepRows) {
+				if (!openStepsByWorkflow.has(row.workflowType)) {
+					openStepsByWorkflow.set(row.workflowType, [])
+				}
+				openStepsByWorkflow.get(row.workflowType)!.push({ step: row.toStatus, count: Number(row.n) })
+			}
+
+			// AD-001 + AD-014: Build per-queue breakdown for ALL configured workflows.
+			// A workflow is instrumented if active items exist OR recent event history exists.
+			const queueBreakdown = activeConfigs.map(cfg => {
+				const breakdown = result.workflowBreakdown.find(b => b.workflow === cfg.workflowType)
+				const openSteps = openStepsByWorkflow.get(cfg.workflowType) ?? []
+				const hasRecentActivity = recentActivitySet.has(cfg.workflowType)
+
+				if (breakdown) {
+					return {
+						workflow: breakdown.workflow,
+						label: cfg.description || breakdown.workflow.replaceAll("_", " "),
+						onTime: breakdown.onTime,
+						approaching: breakdown.approaching,
+						exceeded: breakdown.exceeded,
+						targetMinutes: breakdown.targetMinutes,
+						instrumented: breakdown.instrumented || hasRecentActivity,
+						openSteps,
+					}
+				}
+
+				return {
+					workflow: cfg.workflowType,
+					label: cfg.description || cfg.workflowType.replaceAll("_", " "),
+					onTime: 0,
+					approaching: 0,
+					exceeded: 0,
+					targetMinutes: cfg.targetMinutes,
+					instrumented: hasRecentActivity,
+					openSteps,
+				}
+			})
+
+			return {
+				activeBreaches: result.activeBreaches,
+				overdueQueues: result.overdueQueues,
+				topBreachedWorkflows: result.topBreachedWorkflows,
+				queueBreakdown,
+				dataAvailable: true,
+			}
+		} catch (error) {
+			if (isMissingDatabaseObjectError(error)) {
+				this.logger.warn(`SLA dashboard data unavailable for facility ${facilityId}: database schema is behind the current code`)
+				return {
+					activeBreaches: 0,
+					overdueQueues: 0,
+					topBreachedWorkflows: [],
+					queueBreakdown: [],
+					dataAvailable: false,
+				}
+			}
+
+			throw error
 		}
 	}
 
@@ -340,7 +668,10 @@ export class AdminDashboardService {
 		platform: PlatformControlSection,
 		integrationHealth: IntegrationHealthSection,
 		audit: AuditSummarySection,
-		artaSla: ArtaSlaSection
+		artaSla: ArtaSlaSection,
+		offlineReadiness: OfflineReadinessSection,
+		statutoryOps: StatutoryOpsSection,
+		dataQuality: DataQualitySection
 	): AdminDashboardAlert[] {
 		const alerts: AdminDashboardAlert[] = []
 
@@ -421,10 +752,333 @@ export class AdminDashboardService {
 			})
 		}
 
+		if (audit.pendingBreakGlassReviews > 0) {
+			alerts.push({
+				id: "pending-break-glass-reviews",
+				severity: "warning",
+				category: "audit",
+				title: `${audit.pendingBreakGlassReviews} break-glass event(s) pending review`,
+				description: "Unreviewed emergency access events require privacy officer action.",
+				link: "/audit/break-glass",
+			})
+		}
+
+		if (audit.flaggedBreakGlassEvents > 0) {
+			alerts.push({
+				id: "flagged-break-glass-events",
+				severity: "critical",
+				category: "audit",
+				title: `${audit.flaggedBreakGlassEvents} break-glass event(s) flagged in the last 7 days`,
+				description: "Flagged emergency access may indicate a policy violation. Immediate review required.",
+				link: "/audit/break-glass",
+			})
+		}
+
+		if (!audit.consentEnforced) {
+			alerts.push({
+				id: "consent-not-enforced",
+				severity: "warning",
+				category: "audit",
+				title: "DPA consent enforcement is disabled",
+				description: "Patient data exports are not gated by consent. Review your privacy policy settings.",
+				link: "/admin/settings",
+			})
+		}
+
+		if (offlineReadiness.status === "disabled") {
+			alerts.push({
+				id: "offline-disabled",
+				severity: "warning",
+				category: "platform",
+				title: "Offline continuity mode is disabled",
+				description: "Patients cannot be served without network connectivity. Enable offline summary cache in System Settings.",
+				link: "/admin/offline",
+			})
+		}
+
+		if (offlineReadiness.status === "stale") {
+			alerts.push({
+				id: "offline-stale",
+				severity: "warning",
+				category: "platform",
+				title: "Offline summary cache is stale",
+				description: "The offline readiness cache has not been refreshed recently. Continuity may be impaired.",
+				link: "/admin/offline",
+			})
+		}
+
+		if (offlineReadiness.status === "degraded") {
+			alerts.push({
+				id: "offline-degraded",
+				severity: "critical",
+				category: "platform",
+				title: "Offline cache preparation has failed",
+				description: offlineReadiness.lastFailureMessage
+					? `Last failure: ${offlineReadiness.lastFailureMessage}`
+					: "Cache preparation failed. Offline continuity is not available.",
+				link: "/admin/offline",
+			})
+		}
+
+		// ── Statutory Ops (AD-001) ─────────────────────────────────────────────
+
+		if (statutoryOps.pidsr.blockedOrRejected) {
+			alerts.push({
+				id: "pidsr-blocked",
+				severity: "critical",
+				category: "statutory",
+				title: "PIDSR submission blocked or rejected",
+				description: "One or more PIDSR case reports are blocked or rejected by DOH. Immediate action required.",
+				link: "/reporting/pidsr",
+			})
+		}
+
+		if (statutoryOps.pidsr.draftCount > 5) {
+			alerts.push({
+				id: "pidsr-draft-backlog",
+				severity: "warning",
+				category: "statutory",
+				title: `${statutoryOps.pidsr.draftCount} PIDSR draft reports pending submission`,
+				description: "A large number of PIDSR reports remain in draft. Review and submit to DOH.",
+				link: "/reporting/pidsr",
+			})
+		}
+
+		if (statutoryOps.hai.pendingCount > 0) {
+			alerts.push({
+				id: "hai-pending",
+				severity: "warning",
+				category: "statutory",
+				title: `${statutoryOps.hai.pendingCount} HAI surveillance case(s) need review`,
+				description: "Healthcare-associated infection cases are awaiting infection control review.",
+				link: "/reporting/hai",
+			})
+		}
+
+		if (!statutoryOps.ahsr.currentMonthReady) {
+			alerts.push({
+				id: "ahsr-not-ready",
+				severity: "info",
+				category: "statutory",
+				title: "Annual Hospital Statistical Report not yet ready for current month",
+				description: "AHSR snapshot for this month has not been generated. Ensure monthly close activities are complete.",
+				link: "/reporting",
+			})
+		}
+
+		// ── Data Quality (AD-003) ─────────────────────────────────────────────
+
+		if (dataQuality.missingIcd10Count > 0) {
+			alerts.push({
+				id: "missing-icd10",
+				severity: "warning",
+				category: "data_quality",
+				title: `${dataQuality.missingIcd10Count} resolved problem(s) missing ICD-10 code`,
+				description: "Resolved diagnoses without ICD-10 codes affect PhilHealth billing and statutory reports.",
+				link: "/admin/data-quality",
+			})
+		}
+
+		if (dataQuality.missingRvsCount > 0) {
+			alerts.push({
+				id: "missing-rvs",
+				severity: "warning",
+				category: "data_quality",
+				title: `${dataQuality.missingRvsCount} surgical procedure(s) missing RVS code`,
+				description: "Surgical procedures without RVS codes cannot be billed correctly.",
+				link: "/admin/data-quality",
+			})
+		}
+
+		if (dataQuality.cf4DraftCount > 10) {
+			alerts.push({
+				id: "cf4-draft-backlog",
+				severity: "warning",
+				category: "data_quality",
+				title: `${dataQuality.cf4DraftCount} CF4 claims in draft`,
+				description: "High CF4 draft count may indicate billing workflow bottlenecks.",
+				link: "/billing",
+			})
+		}
+
+		// ── Governance anomaly detection (AD-006) ─────────────────────────────
+
+		if (audit.privilegedChangeCount7d > 20) {
+			alerts.push({
+				id: "privileged-change-spike",
+				severity: "warning",
+				category: "anomaly",
+				title: `Unusual privileged change volume: ${audit.privilegedChangeCount7d} changes in 7 days`,
+				description: "A high number of role, flag, settings, or integration changes were made this week. Review for unauthorized activity.",
+				link: "/audit",
+			})
+		}
+
+		if (audit.breakGlassEventCount > 10) {
+			alerts.push({
+				id: "break-glass-spike",
+				severity: "critical",
+				category: "anomaly",
+				title: `Break-glass volume spike: ${audit.breakGlassEventCount} events in 7 days`,
+				description: "Unusually high emergency access volume may indicate a privacy or security incident. Immediate review required.",
+				link: "/audit/break-glass",
+			})
+		}
+
+		if (integrationHealth.fhirFailures > 0 && !audit.consentEnforced) {
+			alerts.push({
+				id: "fhir-failure-no-consent",
+				severity: "critical",
+				category: "anomaly",
+				title: "FHIR export failures with consent enforcement disabled",
+				description: "Export failures are occurring while DPA consent is not enforced. Data governance risk is elevated.",
+				link: "/admin/fhir",
+			})
+		}
+
+		if (governance.multiFacilityUsers > 5) {
+			alerts.push({
+				id: "multi-facility-anomaly",
+				severity: "warning",
+				category: "anomaly",
+				title: `${governance.multiFacilityUsers} users have cross-facility access`,
+				description: "A large number of users are active across multiple facilities. Verify these assignments are intentional.",
+				link: "/admin/users",
+			})
+		}
+
 		return alerts.sort((a, b) => {
 			const order = { critical: 0, warning: 1, info: 2 }
 			return order[a.severity] - order[b.severity]
 		})
+	}
+
+	// ── Offline Readiness ─────────────────────────────────────────────────────
+
+	private async getOfflineReadiness(facilityId: string): Promise<OfflineReadinessSection> {
+		const [settingsRow] = await db
+			.select({
+				enableOfflineSummaryCache: systemSettings.enableOfflineSummaryCache,
+				policySections: systemSettings.policySections,
+			})
+			.from(systemSettings)
+			.where(eq(systemSettings.facilityId, facilityId))
+			.limit(1)
+
+		const enabled = settingsRow?.enableOfflineSummaryCache ?? false
+		const offlineMode = settingsRow?.policySections?.offlineMode
+		const maxOfflineDays = offlineMode?.maxOfflineDays ?? null
+
+		// Read from the offline_cache_jobs table for real runtime telemetry
+		const [lastJob] = await db
+			.select()
+			.from(offlineCacheJobs)
+			.where(
+				and(
+					eq(offlineCacheJobs.facilityId, facilityId),
+					or(
+						eq(offlineCacheJobs.status, "completed"),
+						eq(offlineCacheJobs.status, "failed")
+					)
+				)
+			)
+			.orderBy(desc(offlineCacheJobs.startedAt))
+			.limit(1)
+
+		const lastCachePreparedAt = lastJob?.status === "completed" ? (lastJob.completedAt ?? lastJob.startedAt) : null
+		const activePatientsCount = lastJob?.status === "completed" ? (lastJob.cachedPatientCount ?? 0) : 0
+
+		let status: OfflineReadinessSection["status"]
+		if (!enabled) {
+			status = "disabled"
+		} else if (!lastJob || lastJob.status === "failed") {
+			status = lastCachePreparedAt === null ? "degraded" : "stale"
+		} else {
+			// Check if last successful job was within 24 hours
+			const staleCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000)
+			status = lastCachePreparedAt && lastCachePreparedAt > staleCutoff ? "healthy" : "stale"
+		}
+
+		// AD-005: Retrieve recent job history for the offline operations detail page
+		const recentJobRows = await db
+			.select()
+			.from(offlineCacheJobs)
+			.where(eq(offlineCacheJobs.facilityId, facilityId))
+			.orderBy(desc(offlineCacheJobs.startedAt))
+			.limit(10)
+
+		const recentJobs = recentJobRows.map(j => ({
+			id: j.id,
+			status: j.status,
+			startedAt: j.startedAt,
+			completedAt: j.completedAt ?? null,
+			cachedPatientCount: j.cachedPatientCount ?? null,
+			errorMessage: j.errorMessage ?? null,
+			triggeredBy: j.triggeredBy,
+		}))
+
+		const lastFailedJob = recentJobRows.find(j => j.status === "failed") ?? null
+
+		return {
+			enabled,
+			status,
+			lastCachePreparedAt,
+			activePatientsCount,
+			maxOfflineDays,
+			recentJobs,
+			lastFailedAt: lastFailedJob?.startedAt ?? null,
+			lastFailureMessage: lastFailedJob?.errorMessage ?? null,
+		}
+	}
+
+	// ── Statutory Reporting Readiness ─────────────────────────────────────────
+
+	private async getStatutoryReadiness(facilityId: string): Promise<StatutoryReadinessSection> {
+		const integrationRows = await db
+			.select({
+				kind: integrations.kind,
+				name: integrations.name,
+				enabled: integrations.enabled,
+				lastSyncAt: integrations.lastSyncAt,
+				lastSyncStatus: integrations.lastSyncStatus,
+				credentialsRef: integrations.credentialsRef,
+			})
+			.from(integrations)
+			.where(eq(integrations.facilityId, facilityId))
+
+		const byKind = new Map(integrationRows.map(r => [r.kind, r]))
+
+		type DomainStatus = "ready" | "warning" | "blocked" | "degraded" | "not_configured"
+
+		function computeDomainStatus(
+			integration: (typeof integrationRows)[0] | undefined
+		): { status: DomainStatus; detail: string | null } {
+			if (!integration) return { status: "not_configured", detail: "No integration configured" }
+			if (!integration.enabled) return { status: "blocked", detail: "Integration is disabled" }
+			if (!integration.credentialsRef) return { status: "warning", detail: "Missing credential reference" }
+			if (integration.lastSyncStatus === "error") return { status: "degraded", detail: "Last sync failed" }
+			if (!integration.lastSyncAt) return { status: "warning", detail: "Never synced — verify endpoint is reachable" }
+			return { status: "ready", detail: null }
+		}
+
+		const fhir = computeDomainStatus(byKind.get("fhir"))
+		const philhealth = computeDomainStatus(byKind.get("philhealth"))
+		const hai = computeDomainStatus(byKind.get("hai"))
+		// PIDSR is modeled through a dedicated custom integration entry when configured.
+		// Fall back to civil_registry to preserve existing facilities that still share the endpoint.
+		const pidsrIntegration = integrationRows.find(
+			integration => integration.kind === "custom" && integration.name.toLowerCase().includes("pidsr")
+		)
+		const pidsr = computeDomainStatus(pidsrIntegration ?? byKind.get("civil_registry"))
+		const civilRegistry = computeDomainStatus(byKind.get("civil_registry"))
+
+		return {
+			fhirNhdr: { name: "FHIR / NHDR", ...fhir, link: "/admin/integration-registry" },
+			philhealth: { name: "PhilHealth / CF4", ...philhealth, link: "/admin/integration-registry" },
+			hai: { name: "HAI Reporting", ...hai, link: "/admin/integration-registry" },
+			pidsr: { name: "PIDSR", ...pidsr, link: "/admin/integration-registry" },
+			civilRegistry: { name: "Civil Registry", ...civilRegistry, link: "/admin/integration-registry" },
+		}
 	}
 
 	// ── Summary cards ──────────────────────────────────────────────────────────
@@ -462,8 +1116,756 @@ export class AdminDashboardService {
 				label: "Active SLA Breaches",
 				value: artaSla.activeBreaches,
 				severity: artaSla.activeBreaches > 0 ? "critical" : "ok",
-				link: "/sla",
+				link: "/admin/sla",
 			},
 		]
+	}
+
+	// ── Statutory Operations (AD-001) ──────────────────────────────────────────
+
+	private async getStatutoryOps(facilityId: string): Promise<StatutoryOpsSection> {
+		const now = new Date()
+		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+		// ── PIDSR ─────────────────────────────────────────────────────────────
+		const pidsrRows = await db
+			.select({
+				category: pidsrCases.category,
+				reportStatus: pidsrCases.reportStatus,
+				updatedAt: pidsrCases.updatedAt,
+			})
+			.from(pidsrCases)
+			.where(and(eq(pidsrCases.facilityId, facilityId), gte(pidsrCases.updatedAt, startOfMonth)))
+
+		const category1Count = pidsrRows.filter(r => r.category === "category_1").length
+		const category2Count = pidsrRows.filter(r => r.category === "category_2").length
+		const draftCount = pidsrRows.filter(r => r.reportStatus === "draft").length
+		const submittedCount = pidsrRows.filter(r => r.reportStatus === "submitted").length
+		// AD-004: derive blocked/rejected from real schema states
+		const rejectedCount = pidsrRows.filter(r => r.reportStatus === "rejected").length
+		const blockedCount = pidsrRows.filter(r => r.reportStatus === "blocked").length
+		const blockedOrRejected = rejectedCount > 0 || blockedCount > 0
+
+		// Last submitted timestamp (across all time)
+		const [lastSubmittedRow] = await db
+			.select({ submittedAt: pidsrCases.updatedAt })
+			.from(pidsrCases)
+			.where(and(eq(pidsrCases.facilityId, facilityId), eq(pidsrCases.reportStatus, "submitted")))
+			.orderBy(desc(pidsrCases.updatedAt))
+			.limit(1)
+
+		// ── HAI Surveillance ──────────────────────────────────────────────────
+		const surveillanceRows = await db
+			.select({
+				isReviewed: surveillanceFlags.isReviewed,
+				flagType: surveillanceFlags.flagType,
+			})
+			.from(surveillanceFlags)
+			.where(and(eq(surveillanceFlags.facilityId, facilityId), gte(surveillanceFlags.createdAt, startOfMonth)))
+
+		const openSurveillanceCount = surveillanceRows.length
+		const reviewedCount = surveillanceRows.filter(r => r.isReviewed).length
+		const pendingCount = surveillanceRows.filter(r => !r.isReviewed).length
+
+		// Group by flagType
+		const byTypeMap = new Map<string, number>()
+		for (const row of surveillanceRows) {
+			const key = row.flagType ?? "unknown"
+			byTypeMap.set(key, (byTypeMap.get(key) ?? 0) + 1)
+		}
+		const byType = Array.from(byTypeMap.entries()).map(([type, count]) => ({ type, count }))
+
+		// ── AHSR Snapshot ─────────────────────────────────────────────────────
+		const currentYear = now.getFullYear()
+		const currentMonth = now.getMonth() + 1
+
+		const [ahsrSnapshotCountRow] = await db
+			.select({ n: count() })
+			.from(ahsrSnapshots)
+			.where(eq(ahsrSnapshots.facilityId, facilityId))
+
+		const [latestAhsr] = await db
+			.select({ reportYear: ahsrSnapshots.reportYear, reportMonth: ahsrSnapshots.reportMonth })
+			.from(ahsrSnapshots)
+			.where(eq(ahsrSnapshots.facilityId, facilityId))
+			.orderBy(desc(ahsrSnapshots.reportYear), desc(ahsrSnapshots.reportMonth))
+			.limit(1)
+
+		const ahsrLastSnapshotMonth = latestAhsr
+			? `${latestAhsr.reportYear}-${String(latestAhsr.reportMonth).padStart(2, "0")}`
+			: null
+		const ahsrCurrentMonthReady =
+			latestAhsr?.reportYear === currentYear && latestAhsr?.reportMonth === currentMonth
+
+		// Fetch current-year AHSR metrics for admin oversight (AD-003)
+		let ahsrMetrics: Awaited<ReturnType<typeof this.reportingService.getAhsrMetrics>> | null = null
+		try {
+			ahsrMetrics = await this.reportingService.getAhsrMetrics({ facilityId, year: currentYear })
+		} catch {
+			// Non-fatal: AHSR metrics may not be available if no clinical data exists yet
+		}
+
+		return {
+			pidsr: {
+				category1Count,
+				category2Count,
+				draftCount,
+				submittedCount,
+				rejectedCount,
+				blockedCount,
+				lastSubmittedAt: lastSubmittedRow?.submittedAt ?? null,
+				blockedOrRejected,
+			},
+			hai: {
+				openSurveillanceCount,
+				reviewedCount,
+				pendingCount,
+				byType,
+			},
+			ahsr: {
+				snapshotCount: ahsrSnapshotCountRow?.n ?? 0,
+				lastSnapshotMonth: ahsrLastSnapshotMonth,
+				currentMonthReady: ahsrCurrentMonthReady,
+				currentYearBor: ahsrMetrics?.bedOccupancyRate ?? null,
+				currentYearGrossDeathRate: ahsrMetrics?.grossDeathRate ?? null,
+				currentYearNetDeathRate: ahsrMetrics?.netDeathRate ?? null,
+				topMorbidities: ahsrMetrics?.topMorbidities ?? [],
+				topMortalities: ahsrMetrics?.topMortalities ?? [],
+			},
+		}
+	}
+
+	// ── Data Quality (AD-002) ──────────────────────────────────────────────────
+
+	private async getDataQuality(facilityId: string): Promise<DataQualitySection> {
+		const now = new Date()
+		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+		// ── CF4 claims ────────────────────────────────────────────────────────
+		const [cf4DraftRow] = await db
+			.select({ n: count() })
+			.from(cf4Claims)
+			.where(and(eq(cf4Claims.facilityId, facilityId), eq(cf4Claims.status, "draft")))
+
+		const [cf4SubmittedRow] = await db
+			.select({ n: count() })
+			.from(cf4Claims)
+			.where(
+				and(
+					eq(cf4Claims.facilityId, facilityId),
+					eq(cf4Claims.status, "submitted"),
+					gte(cf4Claims.submittedAt, startOfMonth)
+				)
+			)
+
+		// ── Missing ICD-10 codes ───────────────────────────────────────────────
+		// Count RESOLVED problems with no icd10Code: these are encounters that
+		// have closed but coding was never completed (AD-003: more accurate completeness metric)
+		const [missingIcd10Row] = await db
+			.select({ n: count() })
+			.from(problems)
+			.where(
+				and(
+					eq(problems.facilityId, facilityId),
+					isNull(problems.icd10Code),
+					eq(problems.status, "resolved")
+				)
+			)
+
+		// ── Missing RVS codes ─────────────────────────────────────────────────
+		const [missingRvsRow] = await db
+			.select({ n: count() })
+			.from(surgicalRvsAssignments)
+			.innerJoin(operationRecords, eq(surgicalRvsAssignments.operationRecordId, operationRecords.id))
+			.where(
+				and(
+					eq(operationRecords.facilityId, facilityId),
+					isNull(surgicalRvsAssignments.rvsCode)
+				)
+			)
+
+		// ── AHSR snapshot ─────────────────────────────────────────────────────
+		const currentYear = now.getFullYear()
+		const currentMonth = now.getMonth() + 1
+
+		const [latestSnapshot] = await db
+			.select({ reportYear: ahsrSnapshots.reportYear, reportMonth: ahsrSnapshots.reportMonth })
+			.from(ahsrSnapshots)
+			.where(eq(ahsrSnapshots.facilityId, facilityId))
+			.orderBy(desc(ahsrSnapshots.reportYear), desc(ahsrSnapshots.reportMonth))
+			.limit(1)
+
+		const ahsrLastSnapshotMonth = latestSnapshot
+			? `${latestSnapshot.reportYear}-${String(latestSnapshot.reportMonth).padStart(2, "0")}`
+			: null
+		const ahsrCurrentMonthReady =
+			latestSnapshot?.reportYear === currentYear && latestSnapshot?.reportMonth === currentMonth
+
+		// ── AD-016: CF4 extraction completeness ───────────────────────────────
+		// For non-draft claims, assess whether the auto-extracted clinical payload
+		// is complete enough for compliant PhilHealth CF4 submission.
+		const nonDraftClaims = await db
+			.select({ extractedData: cf4Claims.extractedData })
+			.from(cf4Claims)
+			.where(
+				and(
+					eq(cf4Claims.facilityId, facilityId),
+					sql`${cf4Claims.status} != 'draft'`
+				)
+			)
+
+		const CF4_REQUIRED_SECTIONS = [
+			"chiefComplaint",
+			"historyOfPresentIllness",
+			"physicalExamFindings",
+			"finalDiagnosis",
+		] as const
+
+		const CF4_SECTION_LABELS: Record<string, string> = {
+			chiefComplaint: "Chief Complaint",
+			historyOfPresentIllness: "History of Present Illness",
+			physicalExamFindings: "Physical Exam Findings",
+			finalDiagnosis: "Final Diagnosis",
+		}
+
+		const nonDraftTotal = nonDraftClaims.length
+		const sectionMissingCounts = new Map<string, number>(
+			CF4_REQUIRED_SECTIONS.map(s => [s, 0])
+		)
+
+		let extractedDataPresentCount = 0
+		for (const claim of nonDraftClaims) {
+			const data = claim.extractedData as Record<string, unknown> | null
+			if (!data) continue
+			extractedDataPresentCount++
+			for (const section of CF4_REQUIRED_SECTIONS) {
+				const val = data[section]
+				if (!val || (typeof val === "string" && val.trim() === "")) {
+					sectionMissingCounts.set(section, (sectionMissingCounts.get(section) ?? 0) + 1)
+				}
+			}
+		}
+
+		const cf4MissingExtractedData = nonDraftTotal - extractedDataPresentCount
+		const cf4WithExtractedData = extractedDataPresentCount
+		const cf4ExtractionCompletePct =
+			nonDraftTotal > 0 ? Math.round((cf4WithExtractedData / nonDraftTotal) * 100) : 100
+
+		const cf4SectionCompleteness = CF4_REQUIRED_SECTIONS.map(section => ({
+			section: CF4_SECTION_LABELS[section] ?? section,
+			missingCount: sectionMissingCounts.get(section) ?? 0,
+		}))
+
+		return {
+			cf4DraftCount: cf4DraftRow?.n ?? 0,
+			cf4SubmittedThisMonth: cf4SubmittedRow?.n ?? 0,
+			missingIcd10Count: missingIcd10Row?.n ?? 0,
+			missingRvsCount: missingRvsRow?.n ?? 0,
+			ahsrLastSnapshotMonth,
+			ahsrCurrentMonthReady,
+			cf4WithExtractedData,
+			cf4MissingExtractedData,
+			cf4ExtractionCompletePct,
+			cf4SectionCompleteness,
+		}
+	}
+
+	// ── HIM Operations (AD-004) ────────────────────────────────────────────────
+
+	async getHimOps(facilityId: string): Promise<HimOpsSection> {
+		// Discharge summaries still in draft for already-discharged encounters
+		const [pendingDsRow] = await db
+			.select({ n: count() })
+			.from(clinicalNotes)
+			.innerJoin(encounters, eq(clinicalNotes.encounterId, encounters.id))
+			.where(
+				and(
+					eq(clinicalNotes.facilityId, facilityId),
+					eq(clinicalNotes.noteType, "discharge_summary"),
+					eq(clinicalNotes.status, "draft"),
+					isNotNull(encounters.dischargeDatetime)
+				)
+			)
+
+		// AD-007: count distinct encounters (not problem rows) — one encounter may have many uncoded diagnoses
+		const [pendingCodingRow] = await db
+			.select({ n: countDistinct(problems.encounterId) })
+			.from(problems)
+			.innerJoin(encounters, eq(problems.encounterId, encounters.id))
+			.where(
+				and(
+					eq(problems.facilityId, facilityId),
+					eq(problems.status, "resolved"),
+					isNull(problems.icd10Code),
+					isNotNull(encounters.dischargeDatetime)
+				)
+			)
+
+		// Pending medical records release requests (chart release + copies)
+		const [pendingReleaseRow] = await db
+			.select({ n: count() })
+			.from(medicalRecordsRequests)
+			.where(
+				and(
+					eq(medicalRecordsRequests.facilityId, facilityId),
+					eq(medicalRecordsRequests.status, "pending"),
+					or(
+						eq(medicalRecordsRequests.requestType, "chart_release"),
+						eq(medicalRecordsRequests.requestType, "discharge_summary_copy"),
+						eq(medicalRecordsRequests.requestType, "laboratory_results")
+					)
+				)
+			)
+
+		// Pending medical certificate requests
+		const [pendingMedCertRow] = await db
+			.select({ n: count() })
+			.from(medicalRecordsRequests)
+			.where(
+				and(
+					eq(medicalRecordsRequests.facilityId, facilityId),
+					eq(medicalRecordsRequests.status, "pending"),
+					eq(medicalRecordsRequests.requestType, "medical_certificate")
+				)
+			)
+
+		return {
+			pendingDischargeSummaryCount: pendingDsRow?.n ?? 0,
+			pendingCodingCount: pendingCodingRow?.n ?? 0,
+			pendingRecordsReleaseCount: pendingReleaseRow?.n ?? 0,
+			pendingMedCertCount: pendingMedCertRow?.n ?? 0,
+		}
+	}
+
+	// ── Export Compliance (AD-002) ─────────────────────────────────────────────
+
+	async getExportCompliance(facilityId: string, query: ExportComplianceQuery): Promise<ExportComplianceList> {
+		const page = query.page ?? 1
+		const limit = query.limit ?? 50
+		const offset = (page - 1) * limit
+
+		const [totalRow] = await db
+			.select({ n: count() })
+			.from(dataExports)
+			.where(eq(dataExports.facilityId, facilityId))
+
+		const rows = await db
+			.select()
+			.from(dataExports)
+			.where(eq(dataExports.facilityId, facilityId))
+			.orderBy(desc(dataExports.exportedAt))
+			.limit(limit)
+			.offset(offset)
+
+		const items = rows.map(r => ({
+			id: r.id,
+			exportedAt: r.exportedAt,
+			entityType: r.entityType,
+			actor: r.actorUserId,
+			actorStaffId: r.actorStaffId ?? null,
+			entityId: r.entityId ?? null,
+			ipAddress: r.ipAddress ?? null,
+			consentGated: r.consentGated,
+			consentOutcome: r.consentOutcome ?? null,
+			destination: r.destination ?? null,
+			transmissionScope: r.transmissionScope ?? null,
+			status: r.status,
+			rejectionReason: r.rejectionReason ?? null,
+		}))
+
+		const total = totalRow?.n ?? 0
+		return {
+			items,
+			total,
+			page,
+			limit,
+		}
+	}
+
+	// ── Civil Registry Operations (AD-003) ────────────────────────────────────
+
+	async getCivilRegistryOps(facilityId: string): Promise<CivilRegistryOpsSection> {
+		const rows = await db
+			.select({ reportType: deathReports.reportType, status: deathReports.status, submittedAt: deathReports.submittedAt })
+			.from(deathReports)
+			.where(eq(deathReports.facilityId, facilityId))
+
+		const fmdrfRows = rows.filter(r => r.reportType === "fmdrf")
+		const fndrfRows = rows.filter(r => r.reportType === "fndrf")
+
+		const pendingCertificateCount = rows.filter(r => r.status === "draft").length
+		const completedNotSubmittedCount = rows.filter(r => r.status === "completed").length
+		const submittedCount = rows.filter(r => r.status === "submitted").length
+
+		const submittedDates = rows
+			.filter(r => r.status === "submitted" && r.submittedAt)
+			.map(r => r.submittedAt!)
+			.sort((a, b) => b.getTime() - a.getTime())
+		const lastSubmittedAt = submittedDates[0] ?? null
+
+		// AD-005: Birth certificate tracking from civil registry registration records.
+		// birthRegistrations is the authoritative source for birth certificate status.
+		const birthCertRows = await db
+			.select({ status: birthRegistrations.status, submittedAt: birthRegistrations.submittedAt })
+			.from(birthRegistrations)
+			.where(eq(birthRegistrations.facilityId, facilityId))
+
+		const bcDraftCount = birthCertRows.filter(r => r.status === "draft").length
+		const bcCompletedCount = birthCertRows.filter(r => r.status === "completed").length
+		const bcSubmittedCount = birthCertRows.filter(r => r.status === "submitted").length
+		const bcLastSubmittedAt =
+			birthCertRows
+				.filter(r => r.status === "submitted" && r.submittedAt)
+				.map(r => r.submittedAt!)
+				.sort((a, b) => b.getTime() - a.getTime())[0] ?? null
+
+		// AD-005 / AD-012: NBS data is retained separately as newborn screening metrics only.
+		// It is NOT used as a proxy for birth certificate status.
+		const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000)
+
+		const nbsRows = await db
+			.select({
+				status: nbsLogEntries.status,
+				birthDatetime: nbsLogEntries.birthDatetime,
+				hoursElapsed: nbsLogEntries.hoursElapsed,
+				consentStatus: nbsLogEntries.consentStatus,
+				referralStatus: nbsLogEntries.referralStatus,
+				screeningResult: nbsLogEntries.screeningResult,
+			})
+			.from(nbsLogEntries)
+			.where(eq(nbsLogEntries.facilityId, facilityId))
+
+		const totalLiveBirths = nbsRows.length
+		const pendingScreeningCount = nbsRows.filter(r => r.status === "pending").length
+		const screenedCount = nbsRows.filter(r => r.status !== "pending").length
+		const lastScreeningAt =
+			nbsRows
+				.map(r => r.birthDatetime)
+				.sort((a, b) => b.getTime() - a.getTime())[0] ?? null
+
+		// AD-012: Timing-window compliance — RA 9288 mandates screening within 24–48h post-birth.
+		const screenedRows = nbsRows.filter(r => r.status !== "pending" && r.hoursElapsed !== null)
+		const onTimeCount = screenedRows.filter(r => r.hoursElapsed! >= 24 && r.hoursElapsed! <= 48).length
+		const earlyCount = screenedRows.filter(r => r.hoursElapsed! < 24).length
+		const lateScreenedCount = screenedRows.filter(r => r.hoursElapsed! > 48).length
+		const overdueCount = nbsRows.filter(
+			r => r.status === "pending" && r.birthDatetime < fortyEightHoursAgo
+		).length
+
+		// AD-012: Consent / waiver breakdown.
+		const consentedCount = nbsRows.filter(r => r.consentStatus === "consented").length
+		const waivedCount = nbsRows.filter(r => r.consentStatus === "waived").length
+		const pendingConsentCount = nbsRows.filter(r => r.consentStatus === "pending").length
+
+		// AD-012: Positive / abnormal result count and referral follow-through.
+		const positiveOrBorderlineCount = nbsRows.filter(r => {
+			const result = r.screeningResult
+			if (!result || !result.conditions) return false
+			return result.conditions.some(c => c.result === "abnormal")
+		}).length
+		const referralPendingCount = nbsRows.filter(r => r.referralStatus === "referred").length
+		const referralCompletedCount = nbsRows.filter(r => r.referralStatus === "completed").length
+
+		return {
+			fmdrf: {
+				draft: fmdrfRows.filter(r => r.status === "draft").length,
+				completed: fmdrfRows.filter(r => r.status === "completed").length,
+				submitted: fmdrfRows.filter(r => r.status === "submitted").length,
+			},
+			fndrf: {
+				draft: fndrfRows.filter(r => r.status === "draft").length,
+				completed: fndrfRows.filter(r => r.status === "completed").length,
+				submitted: fndrfRows.filter(r => r.status === "submitted").length,
+			},
+			pendingCertificateCount,
+			completedNotSubmittedCount,
+			submittedCount,
+			lastSubmittedAt,
+			birthCertificate: {
+				draftCount: bcDraftCount,
+				completedCount: bcCompletedCount,
+				submittedCount: bcSubmittedCount,
+				lastSubmittedAt: bcLastSubmittedAt,
+			},
+			nbsScreening: {
+				totalLiveBirths,
+				pendingScreeningCount,
+				screenedCount,
+				lastScreeningAt,
+				onTimeCount,
+				earlyCount,
+				lateScreenedCount,
+				overdueCount,
+				consentedCount,
+				waivedCount,
+				pendingConsentCount,
+				positiveOrBorderlineCount,
+				referralPendingCount,
+				referralCompletedCount,
+			},
+		}
+	}
+
+	// ── Medication Compliance (AD-005) ─────────────────────────────────────────
+
+	async getMedicationCompliance(facilityId: string): Promise<MedicationComplianceSection> {
+		const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+		const orders = await db
+			.select({
+				brandName: medicationOrders.brandName,
+				isControlledSubstance: medicationOrders.isControlledSubstance,
+				pdeaSchedule: medicationOrders.pdeaSchedule,
+				pdeaTrancheNumber: medicationOrders.pdeaTrancheNumber,
+				pdeaTrancheTotal: medicationOrders.pdeaTrancheTotal,
+				noRefillInscribed: medicationOrders.noRefillInscribed,
+				durationDays: medicationOrders.durationDays,
+				specialInstructions: medicationOrders.specialInstructions,
+				cdsAlerts: medicationOrders.cdsAlerts,
+				status: medicationOrders.status,
+			})
+			.from(medicationOrders)
+			.where(
+				and(
+					eq(medicationOrders.facilityId, facilityId),
+					gte(medicationOrders.createdAt, thirtyDaysAgo)
+				)
+			)
+
+		const total = orders.length
+
+		// Generics Act compliance: orders prescribed without a brand name (generic-only)
+		const genericsPrescribedCount = orders.filter(o => !o.brandName).length
+		const brandsPrescribedCount = orders.filter(o => !!o.brandName).length
+		const genericsPrescribedPct = total > 0 ? Math.round((genericsPrescribedCount / total) * 100) : 100
+
+		// PDEA S-2 (controlled substance) tranche compliance
+		const controlledSubstancesCount = orders.filter(o => o.isControlledSubstance).length
+		const pdeaS2Count = orders.filter(o => o.pdeaSchedule === "S-2").length
+		const pdeaS2WithTrancheCount = orders.filter(
+			o => o.pdeaSchedule === "S-2" && o.pdeaTrancheNumber !== null && o.pdeaTrancheTotal !== null
+		).length
+		const pdeaS2TrancheCompliancePct =
+			pdeaS2Count > 0 ? Math.round((pdeaS2WithTrancheCount / pdeaS2Count) * 100) : 100
+
+		// CDS alert verification rate
+		const ordersWithCdsAlerts = orders.filter(
+			o => o.cdsAlerts !== null && Array.isArray(o.cdsAlerts) && (o.cdsAlerts as unknown[]).length > 0
+		).length
+		const cdsAlertsVerifiedCount = orders.filter(
+			o =>
+				o.cdsAlerts !== null &&
+				Array.isArray(o.cdsAlerts) &&
+				(o.cdsAlerts as unknown[]).length > 0 &&
+				o.status === "verified"
+		).length
+		const cdsVerificationPct =
+			ordersWithCdsAlerts > 0
+				? Math.round((cdsAlertsVerifiedCount / ordersWithCdsAlerts) * 100)
+				: 100
+
+		// AD-003: PRC/PTR prescribing credential compliance.
+		// Prescriptions must carry both prcLicenseNumber and ptrNumber per TOR requirements.
+		const prescriptionRows = await db
+			.select({
+				prcLicenseNumber: prescriptions.prcLicenseNumber,
+				ptrNumber: prescriptions.ptrNumber,
+			})
+			.from(prescriptions)
+			.where(
+				and(
+					eq(prescriptions.facilityId, facilityId),
+					gte(prescriptions.createdAt, thirtyDaysAgo)
+				)
+			)
+
+		const prescriptionsLast30d = prescriptionRows.length
+		const prescriptionsWithPrcAndPtr = prescriptionRows.filter(
+			p => p.prcLicenseNumber?.trim() && p.ptrNumber?.trim()
+		).length
+		const prcPtrCompliancePct =
+			prescriptionsLast30d > 0
+				? Math.round((prescriptionsWithPrcAndPtr / prescriptionsLast30d) * 100)
+				: 100
+
+		// AD-003: PDEA S-2 license validation.
+		// S-2 prescriptions must record the prescriber's PDEA S-2 license number.
+		const s2PrescriptionRows = await db
+			.select({ pdeaS2License: prescriptions.pdeaS2License })
+			.from(prescriptions)
+			.innerJoin(medicationOrders, eq(prescriptions.medicationOrderId, medicationOrders.id))
+			.where(
+				and(
+					eq(prescriptions.facilityId, facilityId),
+					gte(prescriptions.createdAt, thirtyDaysAgo),
+					eq(medicationOrders.pdeaSchedule, "S-2")
+				)
+			)
+
+		const pdeaS2OrdersWithLicense = s2PrescriptionRows.filter(r => !!r.pdeaS2License?.trim()).length
+		const pdeaS2LicensePct =
+			s2PrescriptionRows.length > 0
+				? Math.round((pdeaS2OrdersWithLicense / s2PrescriptionRows.length) * 100)
+				: 100
+
+		// AD-015: Active-validity credential checks.
+		// Join prescriptions with the prescriber's staff profile to compare expiry dates
+		// against the prescription creation timestamp. A credential is "active" if either
+		// the expiry date is null (no expiry recorded — conservative assumption: present)
+		// or the expiry date is after the prescription was created (signed).
+		const validityRows = await db
+			.select({
+				createdAt: prescriptions.createdAt,
+				prcExpiry: staffProfiles.prcExpiry,
+				ptrExpiry: staffProfiles.ptrExpiry,
+				pdeaS2Expiry: staffProfiles.pdeaS2Expiry,
+				pdeaS2License: prescriptions.pdeaS2License,
+				medicationOrderId: prescriptions.medicationOrderId,
+			})
+			.from(prescriptions)
+			.innerJoin(staffProfiles, eq(prescriptions.prescriberStaffId, staffProfiles.id))
+			.where(
+				and(
+					eq(prescriptions.facilityId, facilityId),
+					gte(prescriptions.createdAt, thirtyDaysAgo)
+				)
+			)
+
+		// Helper: check if a date string (or null) represents an active credential at given time
+		const isActive = (expiry: string | null, atTime: Date): boolean => {
+			if (!expiry) return true // no expiry recorded: assume valid (conservative)
+			return new Date(expiry) > atTime
+		}
+
+		const prescriptionsWithActivePrc = validityRows.filter(r =>
+			isActive(r.prcExpiry, r.createdAt)
+		).length
+
+		const prescriptionsWithActivePtr = validityRows.filter(r =>
+			isActive(r.ptrExpiry, r.createdAt)
+		).length
+
+		const validityTotal = validityRows.length
+
+		const prcActiveValidityPct =
+			validityTotal > 0 ? Math.round((prescriptionsWithActivePrc / validityTotal) * 100) : 100
+
+		const ptrActiveValidityPct =
+			validityTotal > 0 ? Math.round((prescriptionsWithActivePtr / validityTotal) * 100) : 100
+
+		// S-2 active license at time of signing: only rows that have a pdeaS2License recorded
+		// and the prescriber's pdeaS2Expiry was not past at signing time.
+		const s2ValidityRows = validityRows.filter(r => !!r.pdeaS2License?.trim())
+		const pdeaS2OrdersWithActiveS2 = s2ValidityRows.filter(r =>
+			isActive(r.pdeaS2Expiry, r.createdAt)
+		).length
+		const pdeaS2ActiveLicensePct =
+			s2ValidityRows.length > 0
+				? Math.round((pdeaS2OrdersWithActiveS2 / s2ValidityRows.length) * 100)
+				: 100
+
+		// Count prescriptions where any credential was expired at time of signing
+		const expiredCredentialPrescriptionCount = validityRows.filter(r =>
+			!isActive(r.prcExpiry, r.createdAt) ||
+			!isActive(r.ptrExpiry, r.createdAt) ||
+			(!!r.pdeaS2License?.trim() && !isActive(r.pdeaS2Expiry, r.createdAt))
+		).length
+
+		// AD-003: High-alert medication safeguards.
+		// Orders for formulary items flagged as high-alert must be explicitly verified by a pharmacist.
+		const highAlertRows = await db
+			.select({ status: medicationOrders.status })
+			.from(medicationOrders)
+			.innerJoin(formularyItems, eq(medicationOrders.formularyItemId, formularyItems.id))
+			.where(
+				and(
+					eq(medicationOrders.facilityId, facilityId),
+					gte(medicationOrders.createdAt, thirtyDaysAgo),
+					eq(formularyItems.isHighAlert, true)
+				)
+			)
+
+		const highAlertOrderCount = highAlertRows.length
+		const highAlertVerifiedCount = highAlertRows.filter(r => r.status === "verified").length
+		const highAlertVerificationPct =
+			highAlertOrderCount > 0
+				? Math.round((highAlertVerifiedCount / highAlertOrderCount) * 100)
+				: 100
+
+		// AD-016: 90-day supply cap compliance for Schedule IV dangerous drugs.
+		// PDEA rules cap Schedule IV prescriptions at 90 days per issuance.
+		const scheduleIvOrders = orders.filter(o => o.pdeaSchedule === "S-4")
+		const scheduleIv90DayCompliantCount = scheduleIvOrders.filter(
+			o => o.durationDays === null || o.durationDays <= 90
+		).length
+		const scheduleIv90DayLimitCompliancePct =
+			scheduleIvOrders.length > 0
+				? Math.round((scheduleIv90DayCompliantCount / scheduleIvOrders.length) * 100)
+				: 100
+
+		// AD-016: 30-day tranche-splitting compliance for Schedule II (S-2) dangerous drugs.
+		// PDEA rules prohibit dispensing more than 30 days of S-2 supply per prescription.
+		const s2Orders = orders.filter(o => o.pdeaSchedule === "S-2")
+		const scheduleIv30DayTrancheSplitCompliantCount = s2Orders.filter(
+			o => o.durationDays === null || o.durationDays <= 30
+		).length
+		const scheduleIv30DayTrancheSplitCompliancePct =
+			s2Orders.length > 0
+				? Math.round((scheduleIv30DayTrancheSplitCompliantCount / s2Orders.length) * 100)
+				: 100
+
+		// AD-016: Temporal dispensing instruction coverage for dangerous drug orders.
+		// TOR requires temporally-scoped dispensing instructions on all dangerous-drug prescriptions.
+		const dangerousDrugOrders = orders.filter(
+			o => o.pdeaSchedule === "S-2" || o.pdeaSchedule === "S-4"
+		)
+		const temporalInstructionCount = dangerousDrugOrders.filter(
+			o => o.specialInstructions !== null && o.specialInstructions.trim().length > 0
+		).length
+		const temporalDispensingInstructionPct =
+			dangerousDrugOrders.length > 0
+				? Math.round((temporalInstructionCount / dangerousDrugOrders.length) * 100)
+				: 100
+
+		// AD-016: "No Refill" inscription coverage for S-2 and S-4 dangerous-drug orders.
+		// PDEA requires the "No Refill" notation on all dangerous-drug prescriptions.
+		const noRefillCompliantCount = dangerousDrugOrders.filter(o => o.noRefillInscribed).length
+		const noRefillInscriptionPct =
+			dangerousDrugOrders.length > 0
+				? Math.round((noRefillCompliantCount / dangerousDrugOrders.length) * 100)
+				: 100
+
+		return {
+			totalOrdersLast30d: total,
+			genericsPrescribedCount,
+			brandsPrescribedCount,
+			genericsPrescribedPct,
+			controlledSubstancesCount,
+			pdeaS2Count,
+			pdeaS2WithTrancheCount,
+			pdeaS2TrancheCompliancePct,
+			ordersWithCdsAlerts,
+			cdsAlertsVerifiedCount,
+			cdsVerificationPct,
+			prescriptionsLast30d,
+			prescriptionsWithPrcAndPtr,
+			prcPtrCompliancePct,
+			pdeaS2OrdersWithLicense,
+			pdeaS2LicensePct,
+			highAlertOrderCount,
+			highAlertVerifiedCount,
+			highAlertVerificationPct,
+			scheduleIv90DayLimitCompliancePct,
+			scheduleIv30DayTrancheSplitCompliancePct,
+			temporalDispensingInstructionPct,
+			noRefillInscriptionPct,
+			prescriptionsWithActivePrc,
+			prescriptionsWithActivePtr,
+			prcActiveValidityPct,
+			ptrActiveValidityPct,
+			pdeaS2OrdersWithActiveS2,
+			pdeaS2ActiveLicensePct,
+			expiredCredentialPrescriptionCount,
+		}
 	}
 }

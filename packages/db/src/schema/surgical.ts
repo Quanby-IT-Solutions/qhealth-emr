@@ -46,6 +46,8 @@ export const operationRecords = createTable(
 		signedByStaffId: t
 			.uuid("signed_by_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		// SLA-005: authoritative checkpoint — set when the surgery is formally requested/scheduled
+		schedulingRequestedAt: t.timestamp("scheduling_requested_at"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 	}),

@@ -6,6 +6,7 @@ import { z } from "zod"
 
 export const AuditActionEnum = z.enum([
 	"create",
+	"read",
 	"update",
 	"delete",
 	"sign",
@@ -122,12 +123,86 @@ export const BreakGlassFilterSchema = z.object({
 	reviewStatus: BreakGlassReviewStatusEnum.optional(),
 	clinicianStaffId: z.string().uuid().optional(),
 	patientId: z.string().uuid().optional(),
+	dateFrom: z.string().datetime().optional(),
+	dateTo: z.string().datetime().optional(),
 	page: z.coerce.number().int().positive().default(1),
 	limit: z.coerce.number().int().positive().max(100).default(50),
 })
 
 export const BreakGlassListResponseSchema = z.object({
 	data: z.array(BreakGlassEventSchema),
+	total: z.number(),
+	page: z.number(),
+	limit: z.number(),
+	totalPages: z.number(),
+})
+
+// ============================================================================
+// Break Glass — Pattern Detection (AD-005)
+// ============================================================================
+
+export const BreakGlassPatternsFilterSchema = z.object({
+	facilityId: z.string().uuid(),
+	days: z.coerce.number().int().positive().max(90).default(30),
+	topN: z.coerce.number().int().positive().max(20).default(10),
+})
+
+export const BreakGlassRepeatRequesterSchema = z.object({
+	clinicianStaffId: z.string().uuid(),
+	eventCount: z.number(),
+	pendingReviewCount: z.number(),
+	flaggedCount: z.number(),
+	distinctPatients: z.number(),
+})
+
+export const BreakGlassRepeatPatientSchema = z.object({
+	patientId: z.string().uuid(),
+	eventCount: z.number(),
+	distinctClinicians: z.number(),
+	flaggedCount: z.number(),
+})
+
+export const BreakGlassPatternsSchema = z.object({
+	totalEventsInWindow: z.number(),
+	pendingReviewCount: z.number(),
+	flaggedCount: z.number(),
+	topRepeatRequesters: z.array(BreakGlassRepeatRequesterSchema),
+	topRepeatPatients: z.array(BreakGlassRepeatPatientSchema),
+	daysAnalyzed: z.number(),
+})
+
+export type BreakGlassPatterns = z.infer<typeof BreakGlassPatternsSchema>
+
+// ============================================================================
+// Config History (AD-006)
+// ============================================================================
+
+export const ConfigHistoryFilterSchema = z.object({
+	facilityId: z.string().uuid(),
+	entityType: z.string().optional(),
+	dateFrom: z.string().datetime().optional(),
+	dateTo: z.string().datetime().optional(),
+	page: z.coerce.number().int().positive().default(1),
+	limit: z.coerce.number().int().positive().max(100).default(50),
+})
+
+export const ConfigHistoryEntrySchema = z.object({
+	id: z.string().uuid(),
+	entityType: z.string(),
+	action: z.string(),
+	description: z.string(),
+	actor: z.string(),
+	beforeState: z.unknown().nullable(),
+	afterState: z.unknown().nullable(),
+	at: z
+		.union([z.date(), z.string()])
+		.transform(v => (typeof v === "string" ? new Date(v) : v)),
+})
+
+export type ConfigHistoryEntry = z.infer<typeof ConfigHistoryEntrySchema>
+
+export const ConfigHistoryListResponseSchema = z.object({
+	data: z.array(ConfigHistoryEntrySchema),
 	total: z.number(),
 	page: z.number(),
 	limit: z.number(),

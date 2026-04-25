@@ -52,6 +52,7 @@ interface NoteViewDialogProps {
 	patientId: string
 	open: boolean
 	onOpenChange: (open: boolean) => void
+	canWrite?: boolean
 }
 
 export function NoteViewDialog({
@@ -60,6 +61,7 @@ export function NoteViewDialog({
 	patientId,
 	open,
 	onOpenChange,
+	canWrite,
 }: NoteViewDialogProps) {
 	const { data: note, isLoading } = useNoteDetailQuery(noteId)
 	const { data: profile } = useMyProfile()
@@ -248,7 +250,7 @@ export function NoteViewDialog({
 						{/* ─── Footer Actions ─── */}
 						{!signOpen && !addendumOpen && (
 							<div className="flex justify-end gap-2 pt-2">
-								{isDraft && !isEditing && (
+								{isDraft && !isEditing && canWrite && (
 									<>
 										<Button
 											variant="outline"
@@ -259,7 +261,7 @@ export function NoteViewDialog({
 										<Button onClick={() => setSignOpen(true)}>Sign Note</Button>
 									</>
 								)}
-								{isSigned && (
+								{isSigned && canWrite && (
 									<Button
 										variant="outline"
 										onClick={() => setAddendumOpen(true)}

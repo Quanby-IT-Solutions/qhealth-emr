@@ -4,6 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
+import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { EncountersService } from "./encounters.service"
 
@@ -11,6 +12,7 @@ import { EncountersService } from "./encounters.service"
 export class EncountersController {
 	constructor(private readonly encountersService: EncountersService) {}
 
+	@RequirePermission("patients", "view")
 	@Implement(v1.encounter.list)
 	async list() {
 		return implement(v1.encounter.list).handler(async ({ input }) => {
@@ -18,6 +20,7 @@ export class EncountersController {
 		})
 	}
 
+	@RequirePermission("patients", "view")
 	@Implement(v1.encounter.get)
 	async get() {
 		return implement(v1.encounter.get).handler(async ({ input }) => {
@@ -25,6 +28,7 @@ export class EncountersController {
 		})
 	}
 
+	@RequirePermission("adt", "view")
 	@Implement(v1.encounter.getLinked)
 	async getLinked() {
 		return implement(v1.encounter.getLinked).handler(async ({ input }) => {
@@ -32,14 +36,15 @@ export class EncountersController {
 		})
 	}
 
+	@RequirePermission("adt", "create")
 	@Implement(v1.encounter.create)
 	async create(@Session() session: UserSession) {
 		return implement(v1.encounter.create).handler(async ({ input }) => {
-			void session
-			return this.encountersService.create(input)
+			return this.encountersService.create(input, session.user.id)
 		})
 	}
 
+	@RequirePermission("adt", "edit")
 	@Implement(v1.encounter.transfer)
 	async transfer(@Session() session: UserSession) {
 		return implement(v1.encounter.transfer).handler(async ({ input }) => {
@@ -48,6 +53,7 @@ export class EncountersController {
 		})
 	}
 
+	@RequirePermission("adt", "edit")
 	@Implement(v1.encounter.discharge)
 	async discharge(@Session() session: UserSession) {
 		return implement(v1.encounter.discharge).handler(async ({ input }) => {
@@ -56,6 +62,7 @@ export class EncountersController {
 		})
 	}
 
+	@RequirePermission("adt", "edit")
 	@Implement(v1.encounter.close)
 	async close(@Session() session: UserSession) {
 		return implement(v1.encounter.close).handler(async ({ input }) => {
@@ -64,6 +71,7 @@ export class EncountersController {
 		})
 	}
 
+	@RequirePermission("adt", "view")
 	@Implement(v1.encounter.checklist)
 	async checklist() {
 		return implement(v1.encounter.checklist).handler(async ({ input }) => {

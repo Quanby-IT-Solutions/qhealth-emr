@@ -21,6 +21,7 @@ const EXPECTED_MODULES = [
 	"billing",
 	"formulary",
 	"reporting",
+	"notifications",
 	"audit",
 	"admin",
 	"surgical",
@@ -40,6 +41,7 @@ const EXPECTED_MODULES = [
 	"system_settings",
 	"facility_profile",
 	"integration_registry",
+	"patients",
 ] as const
 
 describe("RbacModuleEnum", () => {
@@ -60,6 +62,7 @@ describe("RbacModuleEnum", () => {
 			  "billing",
 			  "formulary",
 			  "reporting",
+			  "notifications",
 			  "audit",
 			  "admin",
 			  "surgical",
@@ -79,6 +82,7 @@ describe("RbacModuleEnum", () => {
 			  "system_settings",
 			  "facility_profile",
 			  "integration_registry",
+			  "patients",
 			]
 		`)
 	})

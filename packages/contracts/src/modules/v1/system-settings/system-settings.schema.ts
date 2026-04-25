@@ -15,7 +15,13 @@ export const ExportDefaultsSchema = z.object({
 })
 
 export const OfflineModeSchema = z.object({
-	cacheActivePatients: z.boolean().optional(),
+	// TOR §2 mandates offline capability — caching cannot be disabled
+	cacheActivePatients: z
+		.boolean()
+		.refine(v => v !== false, {
+			message: "TOR §2: Offline patient caching is mandatory and cannot be disabled.",
+		})
+		.optional(),
 	maxOfflineDays: z.number().int().min(1).max(30).optional(),
 })
 
@@ -72,10 +78,34 @@ export const UpdateSystemSettingsSchema = z.object({
 	chartRetentionYears: z.number().int().positive().optional(),
 	supportMailbox: z.string().email().nullable().optional(),
 	serviceDeskHotline: z.string().nullable().optional(),
-	breakGlassRequiresReason: z.boolean().optional(),
-	autoFreezeChargesOnDischarge: z.boolean().optional(),
-	requireDpaConsentBeforeExport: z.boolean().optional(),
-	enableOfflineSummaryCache: z.boolean().optional(),
+	// TOR §4.3: break-glass reason enforcement is mandatory — reject false
+	breakGlassRequiresReason: z
+		.boolean()
+		.refine(v => v !== false, {
+			message: "TOR §4.3: Break-glass reason enforcement is mandatory and cannot be disabled.",
+		})
+		.optional(),
+	// TOR Flow 5: charge freeze on discharge is mandatory — reject false
+	autoFreezeChargesOnDischarge: z
+		.boolean()
+		.refine(v => v !== false, {
+			message: "TOR Flow 5: Automatic charge freeze on discharge is mandatory and cannot be disabled.",
+		})
+		.optional(),
+	// TOR §6: DPA consent before export is mandatory — reject false
+	requireDpaConsentBeforeExport: z
+		.boolean()
+		.refine(v => v !== false, {
+			message: "TOR §6: DPA consent enforcement before export is mandatory and cannot be disabled.",
+		})
+		.optional(),
+	// TOR §2: offline summary cache is mandatory — reject false
+	enableOfflineSummaryCache: z
+		.boolean()
+		.refine(v => v !== false, {
+			message: "TOR §2: Offline summary cache is mandatory and cannot be disabled.",
+		})
+		.optional(),
 	// JSONB policy sections — strict schema rejects unknown keys
 	policySections: PolicySectionsSchema.optional(),
 })

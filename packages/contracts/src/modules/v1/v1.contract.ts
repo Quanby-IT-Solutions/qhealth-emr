@@ -33,6 +33,9 @@ import { v1FeatureFlags } from "./feature-flags/v1.feature-flags.js"
 import { v1SystemSettings } from "./system-settings/v1.system-settings.js"
 import { v1FacilityProfile } from "./facility-profile/v1.facility-profile.js"
 import { v1IntegrationRegistry } from "./integration-registry/v1.integration-registry.js"
+import { v1OpdTriage } from "./opd-triage/v1.opd-triage.js"
+import { v1CivilRegistry } from "./civil-registry/v1.civil-registry.js"
+import { v1MedicalRecords } from "./medical-records/v1.medical-records.js"
 
 /**
  * V1 contract router
@@ -74,7 +77,10 @@ export const v1Contract = oc.prefix("/v1").router(
 		systemSettings: v1SystemSettings,
 		facilityProfile: v1FacilityProfile,
 		integrationRegistry: v1IntegrationRegistry,
+		opdTriage: v1OpdTriage,
+		// SLA-017: civil registry (birth certificate requests + payment)
+		civilRegistry: v1CivilRegistry,
+		// SLA-017: medical records requests + payment
+		medicalRecords: v1MedicalRecords,
 	})
 )
-
-export type V1Contract = typeof v1Contract

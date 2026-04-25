@@ -478,7 +478,7 @@ export class RbacService {
 		const roleRows = await db
 			.select()
 			.from(roles)
-			.where(eq(roles.facilityId, input.facilityId))
+			.where(and(eq(roles.facilityId, input.facilityId), eq(roles.isArchived, false)))
 
 		if (roleRows.length === 0) return []
 
@@ -576,6 +576,39 @@ export class RbacService {
 		})
 
 		return { ...role, permissions: newPerms }
+	}
+
+	async archiveRole(id: string) {
+		const [role] = await db.select().from(roles).where(eq(roles.id, id))
+		if (!role) throw new NotFoundException("Role not found")
+
+		if (role.isSystemDefault) {
+			throw new ForbiddenException("System default roles cannot be archived")
+		}
+
+		if (role.isArchived) {
+			throw new BadRequestException("Role is already archived")
+		}
+
+		// Count active users currently assigned this role
+		const [assignmentRow] = await db
+			.select({ assignedCount: count() })
+			.from(userRoles)
+			.where(eq(userRoles.roleId, id))
+
+		const assignedUserCount = assignmentRow?.assignedCount ?? 0
+
+		if (assignedUserCount > 0) {
+			// Return conflict instead of throwing so the UI can guide remediation
+			return { success: false, conflict: { assignedUserCount } }
+		}
+
+		await db
+			.update(roles)
+			.set({ isArchived: true, archivedAt: new Date() })
+			.where(eq(roles.id, id))
+
+		return { success: true }
 	}
 
 	// ── User-Role Assignment ─────────────────────────────────────────────────

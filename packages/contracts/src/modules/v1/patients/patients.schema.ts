@@ -119,6 +119,66 @@ export const CreatePatientSchema = z.object({
 export type CreatePatientInput = z.infer<typeof CreatePatientSchema>
 
 // ============================================================================
+// Register Patient With OPD Encounter (PS-034 — atomic, single DB transaction)
+// ============================================================================
+
+export const RegisterPatientWithOpdEncounterInputSchema = CreatePatientSchema.extend({
+	admittingStaffId: z.string().uuid().optional(),
+	// PS-036: required — OPD registration must always produce a clinic-scoped queue number
+	clinicianStaffId: z.string().uuid(),
+	/** Present when reconciling a walk-in triage intake — the intake is linked atomically */
+	pendingTriageId: z.string().uuid().optional(),
+}).superRefine((data, ctx) => {
+	// PS-044: OPD registration always requires prior triage (TOR Flow 1 Step 1)
+	if (!data.pendingTriageId) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message:
+				"Outpatient registration requires a pending triage intake (TOR Flow 1 Step 1)",
+			path: ["pendingTriageId"],
+		})
+	}
+})
+
+export type RegisterPatientWithOpdEncounterInput = z.infer<
+	typeof RegisterPatientWithOpdEncounterInputSchema
+>
+
+export const RegisterPatientWithOpdEncounterResponseSchema = z.object({
+	patientId: z.string().uuid(),
+	mrn: z.string(),
+	encounterId: z.string().uuid(),
+	queueNumber: z.number().int().positive().nullable(),
+	clinicianStaffId: z.string().uuid().nullable(),
+})
+
+// ============================================================================
+// Update Patient Input
+// ============================================================================
+
+// ============================================================================
+// List Clinicians Input — registrar-accessible, replaces admin-only listStaff
+// ============================================================================
+
+export const ListCliniciansInputSchema = z.object({
+	facilityId: z.string().uuid(),
+})
+
+export type ListCliniciansInput = z.infer<typeof ListCliniciansInputSchema>
+
+export const ClinicianOptionSchema = z.object({
+	staffProfileId: z.string().uuid(),
+	name: z.string(),
+	department: z.string().nullable(),
+})
+
+export const ClinicianListResponseSchema = z.object({
+	data: z.array(ClinicianOptionSchema),
+})
+
+export type ClinicianOption = z.infer<typeof ClinicianOptionSchema>
+
+// ============================================================================
 // Update Patient Input
 // ============================================================================
 

@@ -42,6 +42,7 @@ export const medicationOrders = createTable(
 		pdeaSchedule: t.text("pdea_schedule"),
 		pdeaTrancheNumber: t.integer("pdea_tranche_number"),
 		pdeaTrancheTotal: t.integer("pdea_tranche_total"),
+		noRefillInscribed: t.boolean("no_refill_inscribed").notNull().default(false),
 		// Self-referencing FK for PDEA tranching: parent-child relationship
 		parentOrderId: t
 			.uuid("parent_order_id")
@@ -111,6 +112,10 @@ export const labOrders = createTable(
 			.notNull()
 			.references(() => staffProfiles.id, { onDelete: "restrict" }),
 		collectionDatetime: t.timestamp("collection_datetime"),
+		// SLA-005: authoritative checkpoint — set when the lab acknowledges specimen receipt
+		specimenReceivedAt: t.timestamp("specimen_received_at"),
+		// SLA-014: authoritative checkpoint — set when billing clears the payment for the lab order
+		billingClearedAt: t.timestamp("billing_cleared_at"),
 		resultedDatetime: t.timestamp("resulted_datetime"),
 		results: t.jsonb("results"),
 		cdsAlerts: t.jsonb("cds_alerts"),
@@ -159,6 +164,12 @@ export const imagingOrders = createTable(
 			.notNull()
 			.references(() => staffProfiles.id, { onDelete: "restrict" }),
 		scheduledDatetime: t.timestamp("scheduled_datetime"),
+		// SLA-005: authoritative checkpoint — set when the radiology dept starts the study
+		studyStartedAt: t.timestamp("study_started_at"),
+		// SLA-019: authoritative checkpoint — set when radiology acknowledges receipt of the imaging order (Flow 3 Step 1)
+		imagingOrderReceivedAt: t.timestamp("imaging_order_received_at"),
+		// SLA-014: authoritative checkpoint — set when billing clears the payment for the imaging order
+		billingClearedAt: t.timestamp("billing_cleared_at"),
 		completedDatetime: t.timestamp("completed_datetime"),
 		report: t.text("report"),
 		structuredResults: t.jsonb("structured_results"),

@@ -4,6 +4,7 @@ import { z } from "zod"
 import {
 	AddFacilityMembershipSchema,
 	AddRoleAssignmentSchema,
+	ArchiveRoleResponseSchema,
 	AssignUserRolesSchema,
 	CreateRoleSchema,
 	CreateStaffProfileSchema,
@@ -178,6 +179,16 @@ export const rbacContract = {
 		})
 		.input(RoleIdSchema.extend(SetRolePermissionsSchema.shape))
 		.output(RoleWithPermissionsSchema),
+
+	archiveRole: oc
+		.route({
+			method: "DELETE",
+			path: "/roles/{id}",
+			summary: "Archive a role (admin only). System default roles cannot be archived.",
+			tags: ["RBAC"],
+		})
+		.input(RoleIdSchema)
+		.output(ArchiveRoleResponseSchema),
 
 	// ── User-Role Assignment ────────────────────────────────────────────
 

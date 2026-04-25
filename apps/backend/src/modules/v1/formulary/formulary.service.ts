@@ -9,6 +9,7 @@ import {
 	loincCodes,
 	rvsCodes,
 	rxnormCodes,
+	snomedCtCodes,
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
@@ -30,6 +31,7 @@ type Icd10SearchInput = V1Inputs["formulary"]["icd10"]["search"]
 type LoincSearchInput = V1Inputs["formulary"]["loinc"]["search"]
 type RxnormSearchInput = V1Inputs["formulary"]["rxnorm"]["search"]
 type RvsSearchInput = V1Inputs["formulary"]["rvs"]["search"]
+type SnomedCtSearchInput = V1Inputs["formulary"]["snomedCt"]["search"]
 
 @Injectable()
 export class FormularyService {
@@ -489,6 +491,52 @@ export class FormularyService {
 				.limit(limit)
 				.offset(offset),
 			db.select({ count: count() }).from(rvsCodes).where(whereClause),
+		])
+
+		const total = totalResult[0]?.count ?? 0
+
+		return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
+	}
+
+	// ========================================================================
+	// SNOMED CT Codes
+	// ========================================================================
+
+	async searchSnomedCt(filter: SnomedCtSearchInput) {
+		const page = Number(filter.page) || 1
+		const limit = Number(filter.limit) || 50
+		const offset = (page - 1) * limit
+
+		const conditions = []
+
+		if (filter.search) {
+			const escaped = this.escapeLikePattern(filter.search)
+			conditions.push(
+				or(
+					ilike(snomedCtCodes.conceptId, `%${escaped}%`),
+					ilike(snomedCtCodes.preferredTerm, `%${escaped}%`),
+					ilike(snomedCtCodes.fsn, `%${escaped}%`)
+				)
+			)
+		}
+
+		if (filter.semanticTag) {
+			conditions.push(eq(snomedCtCodes.semanticTag, filter.semanticTag))
+		}
+
+		conditions.push(eq(snomedCtCodes.isActive, true))
+
+		const whereClause = and(...conditions)
+
+		const [data, totalResult] = await Promise.all([
+			db
+				.select()
+				.from(snomedCtCodes)
+				.where(whereClause)
+				.orderBy(snomedCtCodes.preferredTerm)
+				.limit(limit)
+				.offset(offset),
+			db.select({ count: count() }).from(snomedCtCodes).where(whereClause),
 		])
 
 		const total = totalResult[0]?.count ?? 0

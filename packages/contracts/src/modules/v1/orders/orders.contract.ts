@@ -35,6 +35,8 @@ import {
 	TranchedOrdersResponseSchema,
 	TranchePreviewInputSchema,
 	TranchePreviewResponseSchema,
+	UpdateImagingOrderSchema,
+	UpdateLabOrderSchema,
 	UpdateMedOrderSchema,
 	VerificationQueueResponseSchema,
 	VerificationQueueSchema,
@@ -145,6 +147,17 @@ export const ordersContract = {
 		.input(CreateLabOrderSchema)
 		.output(LabOrderSchema),
 
+	// SLA-016: update lab order status and persist authoritative checkpoints
+	updateLabOrder: oc
+		.route({
+			method: "PUT",
+			path: "/labs/{id}",
+			summary: "Update a lab order (status transitions persist SLA-016 checkpoints)",
+			tags: ["Orders — Labs"],
+		})
+		.input(UpdateLabOrderSchema)
+		.output(LabOrderSchema),
+
 	// ========================================================================
 	// Imaging Orders
 	// ========================================================================
@@ -177,6 +190,17 @@ export const ordersContract = {
 			tags: ["Orders — Imaging"],
 		})
 		.input(CreateImagingOrderSchema)
+		.output(ImagingOrderSchema),
+
+	// SLA-016: update imaging order status and persist authoritative checkpoints
+	updateImagingOrder: oc
+		.route({
+			method: "PUT",
+			path: "/imaging/{id}",
+			summary: "Update an imaging order (status transitions persist SLA-016 checkpoints)",
+			tags: ["Orders — Imaging"],
+		})
+		.input(UpdateImagingOrderSchema)
 		.output(ImagingOrderSchema),
 
 	// ========================================================================

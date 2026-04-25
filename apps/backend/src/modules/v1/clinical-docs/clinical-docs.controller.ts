@@ -4,6 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
+import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { ClinicalDocsService } from "./clinical-docs.service"
 
@@ -15,6 +16,7 @@ export class ClinicalDocsController {
 	// Note Templates
 	// ========================================================================
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.listTemplates)
 	async listTemplates() {
 		return implement(v1.clinicalDocs.listTemplates).handler(async ({ input }) => {
@@ -22,6 +24,7 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.getTemplate)
 	async getTemplate() {
 		return implement(v1.clinicalDocs.getTemplate).handler(async ({ input }) => {
@@ -29,6 +32,7 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.clinicalDocs.createTemplate)
 	async createTemplate(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.createTemplate).handler(async ({ input }) => {
@@ -37,6 +41,7 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.clinicalDocs.updateTemplate)
 	async updateTemplate(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.updateTemplate).handler(async ({ input }) => {
@@ -48,6 +53,7 @@ export class ClinicalDocsController {
 	// Clinical Notes
 	// ========================================================================
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.listNotes)
 	async listNotes() {
 		return implement(v1.clinicalDocs.listNotes).handler(async ({ input }) => {
@@ -55,6 +61,7 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.getNote)
 	async getNote() {
 		return implement(v1.clinicalDocs.getNote).handler(async ({ input }) => {
@@ -62,6 +69,7 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.clinicalDocs.createNote)
 	async createNote(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.createNote).handler(async ({ input }) => {
@@ -70,6 +78,7 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.clinicalDocs.updateNote)
 	async updateNote(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.updateNote).handler(async ({ input }) => {
@@ -77,6 +86,7 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.clinicalDocs.signNote)
 	async signNote(@Session() session: UserSession, @Ip() ip: string) {
 		return implement(v1.clinicalDocs.signNote).handler(async ({ input }) => {
@@ -88,6 +98,7 @@ export class ClinicalDocsController {
 	// Note Addenda
 	// ========================================================================
 
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.clinicalDocs.createAddendum)
 	async createAddendum(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.createAddendum).handler(async ({ input }) => {
@@ -96,6 +107,7 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.clinicalDocs.signAddendum)
 	async signAddendum(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.signAddendum).handler(async ({ input }) => {
@@ -107,6 +119,7 @@ export class ClinicalDocsController {
 	// Consent Records
 	// ========================================================================
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.listConsents)
 	async listConsents() {
 		return implement(v1.clinicalDocs.listConsents).handler(async ({ input }) => {
@@ -114,6 +127,7 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.getConsent)
 	async getConsent() {
 		return implement(v1.clinicalDocs.getConsent).handler(async ({ input }) => {
@@ -121,6 +135,7 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "create")
 	@Implement(v1.clinicalDocs.createConsent)
 	async createConsent(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.createConsent).handler(async ({ input }) => {
@@ -129,6 +144,7 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "edit")
 	@Implement(v1.clinicalDocs.revokeConsent)
 	async revokeConsent(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.revokeConsent).handler(async ({ input }) => {
@@ -140,6 +156,7 @@ export class ClinicalDocsController {
 	// Cross-module: Signed Notes for CF4
 	// ========================================================================
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.getSignedNotes)
 	async getSignedNotes() {
 		return implement(v1.clinicalDocs.getSignedNotes).handler(async ({ input }) => {
@@ -147,6 +164,7 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.extractCf4Data)
 	async extractCf4Data() {
 		return implement(v1.clinicalDocs.extractCf4Data).handler(async ({ input }) => {

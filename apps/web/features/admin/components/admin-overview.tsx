@@ -1,7 +1,10 @@
+"use client"
+
 import Link from "next/link"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 const ADMIN_AREAS = [
 	{
@@ -61,7 +64,7 @@ const ADMIN_AREAS = [
 			},
 			{
 				title: "Code Sets",
-				description: "Review ICD-10, LOINC, RxNorm, and RVS reference code sets.",
+				description: "Review ICD-10, SNOMED CT, LOINC, RxNorm, and RVS reference code sets.",
 				href: "/admin/formulary/code-sets",
 			},
 		],
@@ -82,9 +85,33 @@ const ADMIN_AREAS = [
 			},
 		],
 	},
+	{
+		title: "Clinical Information Management",
+		description: "HIM operations oversight — discharge documentation, ICD-10 coding backlogs, and records release.",
+		pages: [
+			{
+				title: "HIM Operations",
+				description: "Monitor pending discharge summaries, ICD-10 coding backlogs, and medical records release requests.",
+				href: "/admin/him-ops",
+				status: "New",
+			},
+		],
+	},
 ] as const
 
 export function AdminOverview() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	const permSet = new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+
+	const areas = ADMIN_AREAS.map(area => ({
+		...area,
+		pages: area.pages.filter(page => {
+			if (page.href === "/admin/fhir") return permSet.has("fhir:view")
+			return true
+		}),
+	})).filter(area => area.pages.length > 0)
+
 	return (
 		<div className="space-y-6">
 			<div className="space-y-2">
@@ -97,7 +124,7 @@ export function AdminOverview() {
 			</div>
 
 			<div className="grid gap-4 lg:grid-cols-2">
-				{ADMIN_AREAS.map(area => (
+			{areas.map(area => (
 					<Card key={area.title} className="h-full border-border/70">
 						<CardHeader className="space-y-2">
 							<div className="flex items-center justify-between gap-3">

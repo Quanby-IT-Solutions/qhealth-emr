@@ -87,8 +87,8 @@ interface PatientProfileProps {
 export function PatientProfile({ patientId }: PatientProfileProps) {
 	const router = useRouter()
 	const { data: patient, isLoading, isError, error } = usePatientProfileQuery(patientId)
-	const { data: summary } = usePatientSummaryQuery(patientId)
 	const permSet = usePermissionSet()
+	const { data: summary } = usePatientSummaryQuery(can(permSet, "patients", "view") ? patientId : "")
 
 	if (isLoading) {
 		return (
@@ -192,8 +192,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 			{/* Problems & Allergies */}
 			{(can(permSet, "clinical_docs", "view") || can(permSet, "orders", "view")) && (
-				<ProblemsAllergiesTab patientId={patientId} facilityId={patient.facilityId} />
-			)}
+			<ProblemsAllergiesTab patientId={patientId} facilityId={patient.facilityId} canWrite={can(permSet, "clinical_docs", "sign")} />
 
 			{/* Encounter History */}
 			<Card>
@@ -258,7 +257,11 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 			{/* Consent History */}
 			{can(permSet, "clinical_docs", "view") && (
-				<ConsentHistory patientId={patientId} facilityId={patient.facilityId} />
+				<ConsentHistory
+					patientId={patientId}
+					facilityId={patient.facilityId}
+					canManageConsents={can(permSet, "clinical_docs", "edit")}
+				/>
 			)}
 
 			{/* Actions */}

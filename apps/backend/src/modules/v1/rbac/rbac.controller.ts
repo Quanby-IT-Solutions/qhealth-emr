@@ -123,6 +123,14 @@ export class RbacController {
 		})
 	}
 
+	@RequirePermission("admin", "delete")
+	@Implement(v1.rbac.archiveRole)
+	async archiveRole() {
+		return implement(v1.rbac.archiveRole).handler(async ({ input }) => {
+			return this.rbacService.archiveRole(input.id)
+		})
+	}
+
 	// ── User-Role Assignment ────────────────────────────────────────────
 
 	@RequirePermission("admin", "edit")
@@ -135,6 +143,7 @@ export class RbacController {
 
 	// ── License Status ─────────────────────────────────────────────────
 
+	@RequirePermission("admin", "view")
 	@Implement(v1.rbac.getLicenseStatus)
 	async getLicenseStatus() {
 		return implement(v1.rbac.getLicenseStatus).handler(async ({ input }) => {

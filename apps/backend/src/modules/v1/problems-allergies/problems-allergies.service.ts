@@ -49,6 +49,8 @@ export class ProblemsAllergiesService {
 				patientId: problems.patientId,
 				icd10Code: problems.icd10Code,
 				icd10Display: problems.icd10Display,
+				snomedCode: problems.snomedCode,
+				snomedDisplay: problems.snomedDisplay,
 				description: problems.description,
 				onsetDate: problems.onsetDate,
 				resolutionDate: problems.resolutionDate,
@@ -85,6 +87,8 @@ export class ProblemsAllergiesService {
 				patientId: problems.patientId,
 				icd10Code: problems.icd10Code,
 				icd10Display: problems.icd10Display,
+				snomedCode: problems.snomedCode,
+				snomedDisplay: problems.snomedDisplay,
 				description: problems.description,
 				onsetDate: problems.onsetDate,
 				resolutionDate: problems.resolutionDate,
@@ -111,6 +115,8 @@ export class ProblemsAllergiesService {
 				patientId: input.patientId,
 				icd10Code: input.icd10Code ?? null,
 				icd10Display: input.icd10Display ?? null,
+				snomedCode: input.snomedCode ?? null,
+				snomedDisplay: input.snomedDisplay ?? null,
 				description: input.description,
 				onsetDate: input.onsetDate ?? null,
 				status: "active",
@@ -130,6 +136,8 @@ export class ProblemsAllergiesService {
 		if (input.description !== undefined) updateValues.description = input.description
 		if (input.icd10Code !== undefined) updateValues.icd10Code = input.icd10Code
 		if (input.icd10Display !== undefined) updateValues.icd10Display = input.icd10Display
+		if (input.snomedCode !== undefined) updateValues.snomedCode = input.snomedCode
+		if (input.snomedDisplay !== undefined) updateValues.snomedDisplay = input.snomedDisplay
 		if (input.onsetDate !== undefined) updateValues.onsetDate = input.onsetDate
 
 		await db.update(problems).set(updateValues).where(eq(problems.id, existing.id))
@@ -345,6 +353,8 @@ export class ProblemsAllergiesService {
 				patientId: problems.patientId,
 				icd10Code: problems.icd10Code,
 				icd10Display: problems.icd10Display,
+				snomedCode: problems.snomedCode,
+				snomedDisplay: problems.snomedDisplay,
 				description: problems.description,
 				onsetDate: problems.onsetDate,
 				resolutionDate: problems.resolutionDate,

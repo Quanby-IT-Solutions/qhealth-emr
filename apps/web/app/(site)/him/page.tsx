@@ -1,27 +1,28 @@
 "use client"
 
-import { FolderOpen } from "lucide-react"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { HimOpsPanel } from "@/features/admin/components/him-ops-panel"
 
-import { Card, CardContent } from "@/core/components/ui/card"
+function usePermissionSet() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+}
+
+function can(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
+}
 
 export default function HIMPage() {
-	return (
-		<div className="space-y-6">
-			<div>
-				<h1 className="text-2xl font-semibold">Medical Records</h1>
-				<p className="text-muted-foreground text-sm">
-					Health information management, ICD-10 coding, and chart release
-				</p>
+	const permSet = usePermissionSet()
+
+	if (!can(permSet, "medical_records", "view")) {
+		return (
+			<div className="flex items-center justify-center p-8 text-muted-foreground">
+				You do not have permission to access HIM operations.
 			</div>
-			<Card>
-				<CardContent className="flex flex-col items-center justify-center py-20 text-center">
-					<FolderOpen className="text-muted-foreground mb-4 size-12" />
-					<p className="font-medium">Health Information Management</p>
-					<p className="text-muted-foreground mt-1 max-w-sm text-sm">
-						Discharge summary coding, ICD-10 assignment, medical certificate requests, and chart release management will be available here.
-					</p>
-				</CardContent>
-			</Card>
-		</div>
-	)
+		)
+	}
+
+	return <HimOpsPanel />
 }

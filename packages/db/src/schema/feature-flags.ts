@@ -1,8 +1,7 @@
 import { index, uniqueIndex } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
-import { facilities } from "./rbac.js"
-import { roles } from "./rbac.js"
+import { facilities, roles } from "./rbac.js"
 
 // ============================================================================
 // Feature Flags — definitions and per-dimension targeting overrides

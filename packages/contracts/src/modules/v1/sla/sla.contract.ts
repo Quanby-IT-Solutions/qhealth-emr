@@ -3,7 +3,9 @@ import { z } from "zod"
 
 import {
 	CreateSlaConfigSchema,
+	CreateSlaStepConfigSchema,
 	DeleteSlaConfigParamsSchema,
+	DeleteSlaStepConfigParamsSchema,
 	SlaComplianceQuerySchema,
 	SlaComplianceReportSchema,
 	SlaConfigSchema,
@@ -13,8 +15,13 @@ import {
 	SlaEventSchema,
 	SlaEventsQuerySchema,
 	SlaEventsResponseSchema,
+	SlaStepConfigSchema,
+	SlaStepConfigsQuerySchema,
+	SlaStepConfigsResponseSchema,
 	UpdateSlaConfigParamsSchema,
 	UpdateSlaConfigSchema,
+	UpdateSlaStepConfigParamsSchema,
+	UpdateSlaStepConfigSchema,
 } from "./sla.schema.js"
 
 export const slaContract = {
@@ -99,4 +106,48 @@ export const slaContract = {
 		})
 		.input(SlaComplianceQuerySchema)
 		.output(SlaComplianceReportSchema),
+
+	// ========================================================================
+	// SLA Step Configs
+	// ========================================================================
+
+	listStepConfigs: oc
+		.route({
+			method: "GET",
+			path: "/step-configs",
+			summary: "List step-level SLA target overrides for a facility",
+			tags: ["SLA"],
+		})
+		.input(SlaStepConfigsQuerySchema)
+		.output(SlaStepConfigsResponseSchema),
+
+	createStepConfig: oc
+		.route({
+			method: "POST",
+			path: "/step-configs",
+			summary: "Create a step-level SLA target override",
+			tags: ["SLA"],
+		})
+		.input(CreateSlaStepConfigSchema)
+		.output(SlaStepConfigSchema),
+
+	updateStepConfig: oc
+		.route({
+			method: "PATCH",
+			path: "/step-configs/{id}",
+			summary: "Update a step-level SLA target override",
+			tags: ["SLA"],
+		})
+		.input(UpdateSlaStepConfigSchema)
+		.output(SlaStepConfigSchema),
+
+	deleteStepConfig: oc
+		.route({
+			method: "DELETE",
+			path: "/step-configs/{id}",
+			summary: "Delete a step-level SLA target override",
+			tags: ["SLA"],
+		})
+		.input(DeleteSlaStepConfigParamsSchema)
+		.output(z.object({ success: z.boolean() })),
 }

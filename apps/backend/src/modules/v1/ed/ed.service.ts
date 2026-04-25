@@ -5,11 +5,12 @@ import {
 	Logger,
 	NotFoundException,
 } from "@nestjs/common"
-import { and, count, desc, eq, like } from "drizzle-orm"
+import { and, count, desc, eq, isNull, like } from "drizzle-orm"
 
 import {
 	beds,
 	clinicalNotes,
+	encounterStatusEvents,
 	encounters,
 	imagingOrders,
 	ioEntries,
@@ -27,6 +28,8 @@ import {
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
+import { closeOpenSlaStep } from "@/utils/sla-events"
+import { resolveStepTarget } from "@/utils/sla-step-target"
 import { NotificationService } from "../notifications/notification.service"
 
 type CreatePreEncounterInput = V1Inputs["ed"]["createPreEncounter"]
@@ -368,6 +371,9 @@ export class EdService {
 			throw new NotFoundException(`Patient ${input.patientId} not found`)
 		}
 
+		// SLA-004: Resolve ED registration step target before the transaction (read-only)
+		const edRegisteredSlaMins = await resolveStepTarget(preEnc.facilityId, "ed", "ed_registered")
+
 		// Execute merge in transaction
 		const result = await db.transaction(async tx => {
 			// 1. Create a real encounter linked to the patient
@@ -483,6 +489,20 @@ export class EdService {
 					})
 					.where(eq(beds.id, input.bedId))
 			}
+
+			// 5. SLA-002/SLA-004: Write initial ED event backdated to triage datetime so that
+			// the SLA clock starts when the patient first arrived, not when charts merged.
+			await tx.insert(encounterStatusEvents).values({
+				facilityId: preEnc.facilityId,
+				encounterId,
+				fromStatus: null,
+				toStatus: "ed_registered",
+				workflowType: "ed" as const,
+				staffId: preEnc.triageStaffId ?? null,
+				slaTargetMinutes: edRegisteredSlaMins,
+				notes: `Pre-encounter ${preEnc.traumaAlias} merged — triage clock preserved`,
+				occurredAt: preEnc.triageDatetime ?? new Date(),
+			})
 
 			return {
 				encounterId,
@@ -654,10 +674,53 @@ export class EdService {
 	}
 
 	async updateQueueStatus(input: UpdateQueueStatusInput) {
-		// In the current implementation, queue status is primarily derived from
-		// encounter/pre-encounter state. For tracking board drag-and-drop, we
-		// store a transient status. For now, return the input as acknowledgment.
-		// Future: add a queue_status column or use Redis for transient ED state.
+		// Pre-encounters have no permanent encounter ID; event writes are deferred
+		// until the pre-encounter is merged into a full encounter (see ed.merge).
+		if (input.type !== "encounter") {
+			return input
+		}
+
+		// Fetch current encounter to capture facilityId and previous queue status
+		const [current] = await db
+			.select({ queueStatus: encounters.queueStatus, facilityId: encounters.facilityId })
+			.from(encounters)
+			.where(eq(encounters.id, input.id))
+
+		if (!current) {
+			throw new NotFoundException(`Encounter ${input.id} not found`)
+		}
+
+		const fromStatus = current.queueStatus ?? null
+
+		// Persist the ED queue status on the encounter row. The queueStatus column
+		// is plain text in the DB; the $type<> constraint is TypeScript-only, so
+		// ED status values (waiting/triage/being_seen/disposition) are stored safely.
+		await db
+			.update(encounters)
+			.set({
+				queueStatus: input.queueStatus as unknown as "waiting" | "in_progress" | "completed",
+				updatedAt: new Date(),
+			})
+			.where(eq(encounters.id, input.id))
+
+		// SLA-001/SLA-004: Close the previous open ED step before starting a new one
+		await closeOpenSlaStep(db, input.id, "ed")
+
+		// Write durable SLA transition event for emergency-triage workflow tracking
+		const queueStatusSlaMins = await resolveStepTarget(current.facilityId, "ed", input.queueStatus)
+		await db.insert(encounterStatusEvents).values({
+			facilityId: current.facilityId,
+			encounterId: input.id,
+			fromStatus,
+			toStatus: input.queueStatus,
+			workflowType: "ed" as const,
+			staffId: null,
+			slaTargetMinutes: queueStatusSlaMins,
+			notes: `ED queue: ${fromStatus ?? "none"} → ${input.queueStatus}`,
+			occurredAt: new Date(),
+		})
+
+		this.logger.log(`Updated ED encounter ${input.id} queue status to ${input.queueStatus}`)
 		return input
 	}
 
@@ -678,6 +741,12 @@ export class EdService {
 		if (encounter.status !== "active") {
 			throw new BadRequestException("Can only set disposition on active encounters")
 		}
+
+		// SLA-004: Resolve step targets before the transaction (read-only operations)
+		const [dispositionSlaMins, admittedSlaMins] = await Promise.all([
+			resolveStepTarget(encounter.facilityId, "discharge", input.disposition),
+			resolveStepTarget(encounter.facilityId, "admission", "admitted"),
+		])
 
 		const result = await db.transaction(async tx => {
 			let inpatientEncounterId: string | null = null
@@ -722,6 +791,7 @@ export class EdService {
 			}
 
 			// Update the ED encounter — final status is always "discharged" regardless of disposition subtype
+			const dispositionNow = new Date()
 			await tx
 				.update(encounters)
 				.set({
@@ -736,10 +806,63 @@ export class EdService {
 									: "deceased",
 					oecbEligible:
 						input.disposition === "discharge" ? (input.oecbEligible ?? false) : false,
-					dischargeDatetime: new Date(),
-					updatedAt: new Date(),
+					dischargeDatetime: dispositionNow,
+					updatedAt: dispositionNow,
 				})
 				.where(eq(encounters.id, input.encounterId))
+
+			// SLA-002: Close last open ED step then write disposition SLA events.
+			const [openEdStep] = await tx
+				.select({ id: encounterStatusEvents.id, occurredAt: encounterStatusEvents.occurredAt })
+				.from(encounterStatusEvents)
+				.where(
+					and(
+						eq(encounterStatusEvents.encounterId, input.encounterId),
+						eq(encounterStatusEvents.workflowType, "ed" as const),
+						isNull(encounterStatusEvents.actualMinutes),
+					),
+				)
+				.orderBy(desc(encounterStatusEvents.occurredAt))
+				.limit(1)
+
+			if (openEdStep) {
+				const mins = Math.max(
+					1,
+					Math.ceil((dispositionNow.getTime() - openEdStep.occurredAt.getTime()) / 60_000),
+				)
+				await tx
+					.update(encounterStatusEvents)
+					.set({ actualMinutes: mins })
+					.where(eq(encounterStatusEvents.id, openEdStep.id))
+			}
+
+			// Write the disposition event for the ED encounter
+			await tx.insert(encounterStatusEvents).values({
+				facilityId: encounter.facilityId,
+				encounterId: input.encounterId,
+				fromStatus: "ed_active",
+				toStatus: input.disposition,
+				workflowType: "discharge" as const,
+				staffId: null,
+				slaTargetMinutes: dispositionSlaMins,
+				notes: `ED disposition: ${input.disposition}`,
+				occurredAt: dispositionNow,
+			})
+
+			// For admit: write the opening admission event on the new inpatient encounter
+			if (inpatientEncounterId) {
+				await tx.insert(encounterStatusEvents).values({
+					facilityId: encounter.facilityId,
+					encounterId: inpatientEncounterId,
+					fromStatus: null,
+					toStatus: "admitted",
+					workflowType: "admission" as const,
+					staffId: null,
+					slaTargetMinutes: admittedSlaMins,
+					notes: `Admitted from ED encounter ${input.encounterId}`,
+					occurredAt: dispositionNow,
+				})
+			}
 
 			return {
 				encounterId: input.encounterId,

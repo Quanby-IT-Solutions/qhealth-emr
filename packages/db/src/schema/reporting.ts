@@ -44,7 +44,7 @@ export const pidsrCases = createTable(
 			.text("report_status")
 			.notNull()
 			.default("draft")
-			.$type<"draft" | "submitted">(),
+			.$type<"draft" | "submitted" | "rejected" | "blocked">(),
 		submissionData: t.jsonb("submission_data"),
 		submittedAt: t.timestamp("submitted_at"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
@@ -140,6 +140,8 @@ export const fhirExports = createTable(
 		}>(),
 		exportFormat: t.text("export_format").notNull().default("ndjson").$type<"ndjson" | "json_bundle">(),
 		exportFileUrl: t.text("export_file_url"),
+		/** NDJSON or JSON bundle content stored in-database pending file-storage migration. */
+		bundleData: t.text("bundle_data"),
 		submissionStatus: t
 			.text("submission_status")
 			.notNull()

@@ -61,6 +61,10 @@ export function useAuditLogExportMutation() {
 export function useBreakGlassEventsQuery(filter: {
 	facilityId: string
 	reviewStatus?: string
+	clinicianStaffId?: string
+	patientId?: string
+	dateFrom?: string
+	dateTo?: string
 	page?: number
 	limit?: number
 }) {
@@ -69,6 +73,10 @@ export function useBreakGlassEventsQuery(filter: {
 			input: {
 				facilityId: filter.facilityId,
 				reviewStatus: filter.reviewStatus as BreakGlassEvent["reviewStatus"] | undefined,
+				clinicianStaffId: filter.clinicianStaffId,
+				patientId: filter.patientId,
+				dateFrom: filter.dateFrom,
+				dateTo: filter.dateTo,
 				page: filter.page ?? 1,
 				limit: filter.limit ?? 50,
 			},
@@ -114,6 +122,44 @@ export function useReviewBreakGlassMutation() {
 				queryClient.invalidateQueries({
 					queryKey: orpc.audit.breakGlass.list.key(),
 				}),
+		})
+	)
+}
+
+export function useBreakGlassPatternsQuery(params: {
+	facilityId: string
+	days?: number
+	topN?: number
+}) {
+	return useQuery(
+		orpc.audit.breakGlass.patterns.queryOptions({
+			input: {
+				facilityId: params.facilityId,
+				days: params.days ?? 30,
+				topN: params.topN ?? 10,
+			},
+		})
+	)
+}
+
+export function useConfigHistoryQuery(filter: {
+	facilityId: string
+	entityType?: string
+	dateFrom?: string
+	dateTo?: string
+	page?: number
+	limit?: number
+}) {
+	return useQuery(
+		orpc.audit.log.configHistory.queryOptions({
+			input: {
+				facilityId: filter.facilityId,
+				entityType: filter.entityType,
+				dateFrom: filter.dateFrom,
+				dateTo: filter.dateTo,
+				page: filter.page ?? 1,
+				limit: filter.limit ?? 50,
+			},
 		})
 	)
 }

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import Link from "next/link"
+import { useState, useCallback } from "react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -39,6 +40,35 @@ function formatMinutes(minutes: number): string {
 	const h = Math.floor(minutes / 60)
 	const m = Math.round(minutes % 60)
 	return m > 0 ? `${h}h ${m}m` : `${h}h`
+}
+
+// SLA-007/SLA-008: Map TOR step codes to concise labels for the monitoring table
+const MONITORING_STEP_LABELS: Record<string, string> = {
+	records_request: "Request",
+	records_payment: "Payment",
+	records_processing_release: "Processing & Release",
+	// Encounter steps (condensed)
+	triaged: "Triage",
+	registered: "Registration",
+	vitals_recorded: "Vitals",
+	in_consultation: "Consultation",
+	in_progress: "In Progress",
+	completed: "Completed",
+	discharged: "Discharged",
+	admitted: "Admitted",
+	may_go_home: "May Go Home",
+	chart_completed: "Chart Done",
+	cleared: "Cleared",
+	billed: "Billed",
+	gate_pass_issued: "Gate Pass",
+	rx_verified: "Rx Verified",
+	cleared_for_dispensing: "Cleared",
+	dispensed: "Dispensed",
+}
+
+function formatCurrentStep(step: string | null | undefined): string {
+	if (!step) return "—"
+	return MONITORING_STEP_LABELS[step] ?? step.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
 }
 
 function formatDateTime(val: string | null | undefined): string {
@@ -154,13 +184,6 @@ export function SlaDashboard() {
 	const [statusFilter, setStatusFilter] = useState<SlaStatus | "all">("all")
 	const [workflowFilter, setWorkflowFilter] = useState<SlaWorkflowType | "all">("all")
 	const [page, setPage] = useState(1)
-	const [tick, setTick] = useState(0)
-
-	// Live refresh every 30 seconds
-	useEffect(() => {
-		const id = setInterval(() => setTick(t => t + 1), 30_000)
-		return () => clearInterval(id)
-	}, [])
 
 	const { data, isLoading, error } = useSlaEventsQuery({
 		facilityId,
@@ -188,12 +211,17 @@ export function SlaDashboard() {
 				<div>
 					<h1 className="text-2xl font-bold">SLA Tracking Dashboard</h1>
 					<p className="text-sm text-muted-foreground">
-						Real-time turnaround time monitoring — Citizen's Charter compliance
+						Active work items across all workflows — auto-refreshes every 30s
 					</p>
 				</div>
-				<div className="flex items-center gap-2 text-xs text-muted-foreground">
-					<span className="inline-block size-2 animate-pulse rounded-full bg-green-500" />
-					Live (last updated {new Date().toLocaleTimeString("en-PH")})
+				<div className="flex items-center gap-3">
+					<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+						<span className="inline-block size-2 animate-pulse rounded-full bg-green-500" />
+						Live
+					</div>
+					<Button asChild size="sm" variant="outline">
+						<Link href="/reporting/sla">Compliance Report</Link>
+					</Button>
 				</div>
 			</div>
 
@@ -220,11 +248,12 @@ export function SlaDashboard() {
 					</SelectTrigger>
 					<SelectContent>
 						<SelectItem value="all">All Workflows</SelectItem>
-						{(Object.keys(WORKFLOW_LABELS) as SlaWorkflowType[]).map(wt => (
-							<SelectItem key={wt} value={wt}>
-								{WORKFLOW_LABELS[wt]}
-							</SelectItem>
-						))}
+						{(Object.keys(WORKFLOW_LABELS) as SlaWorkflowType[])
+							.map(wt => (
+								<SelectItem key={wt} value={wt}>
+									{WORKFLOW_LABELS[wt]}
+								</SelectItem>
+							))}
 					</SelectContent>
 				</Select>
 			</div>
@@ -244,8 +273,8 @@ export function SlaDashboard() {
 						<Table>
 							<TableHeader>
 								<TableRow>
-									<TableHead>Patient</TableHead>
-									<TableHead>Workflow</TableHead>
+								<TableHead>Workflow</TableHead>
+								<TableHead>Current Step</TableHead>
 									<TableHead>Started</TableHead>
 									<TableHead>Elapsed</TableHead>
 									<TableHead>Target</TableHead>
@@ -257,15 +286,15 @@ export function SlaDashboard() {
 							<TableBody>
 								{isLoading && (
 									<TableRow>
-										<TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-											Loading…
-										</TableCell>
-									</TableRow>
-								)}
+								<TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+									Loading…
+								</TableCell>
+							</TableRow>
+							)}
 
-								{!isLoading && events.length === 0 && (
-									<TableRow>
-										<TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+							{!isLoading && events.length === 0 && (
+								<TableRow>
+									<TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
 											No SLA events found for the selected filters.
 										</TableCell>
 									</TableRow>
@@ -276,9 +305,17 @@ export function SlaDashboard() {
 										key={event.id}
 										className={event.status === "exceeded" ? "bg-red-50/50 dark:bg-red-900/10" : ""}
 									>
-										<TableCell className="font-medium text-sm">{event.patientName}</TableCell>
+
+										<TableCell className="text-xs">
+											<div className="font-medium text-foreground">{WORKFLOW_LABELS[event.workflowType]}</div>
+											{event.notes && (
+												<div className="mt-0.5 max-w-48 truncate text-muted-foreground" title={event.notes}>
+													{event.notes}
+												</div>
+											)}
+										</TableCell>
 										<TableCell className="text-xs text-muted-foreground">
-											{WORKFLOW_LABELS[event.workflowType]}
+											{formatCurrentStep(event.currentStep)}
 										</TableCell>
 										<TableCell className="text-xs">{formatDateTime(event.startedAt)}</TableCell>
 										<TableCell className="text-sm font-medium">

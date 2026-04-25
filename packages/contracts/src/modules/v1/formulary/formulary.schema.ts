@@ -278,3 +278,28 @@ export const RvsSearchSchema = PaginationInputSchema.extend({
 export const RvsListResponseSchema = PaginatedResponseSchema.extend({
 	data: z.array(RvsCodeSchema),
 })
+
+// ============================================================================
+// SNOMED CT Codes
+// ============================================================================
+
+export const SnomedCtCodeSchema = z.object({
+	id: z.string().uuid(),
+	conceptId: z.string(),
+	fsn: z.string(),
+	preferredTerm: z.string(),
+	semanticTag: z.string().nullable(),
+	isActive: z.boolean(),
+	createdAt: dateOrString,
+})
+
+export type SnomedCtCode = z.infer<typeof SnomedCtCodeSchema>
+
+export const SnomedCtSearchSchema = PaginationInputSchema.extend({
+	search: z.string().optional(),
+	semanticTag: z.string().optional(),
+})
+
+export const SnomedCtListResponseSchema = PaginatedResponseSchema.extend({
+	data: z.array(SnomedCtCodeSchema),
+})

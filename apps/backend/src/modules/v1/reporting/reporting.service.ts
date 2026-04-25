@@ -48,7 +48,7 @@ interface ListPidsrCasesInput {
 	page: number
 	limit: number
 	facilityId: string
-	reportStatus?: "draft" | "submitted"
+	reportStatus?: "draft" | "submitted" | "rejected" | "blocked"
 	category?: string
 	dateFrom?: string
 	dateTo?: string
@@ -781,7 +781,9 @@ export class ReportingService {
 			)
 		const bedOccupancyRate = borRow?.avgBor ? Number(borRow.avgBor) : null
 
-		// Top 10 Morbidities — ICD-10 codes from problems for admitted patients in period
+		// Top 10 Morbidities — ICD-10 codes from problems scoped to admitted encounters in period
+		// AD-009: join via problems.encounterId (encounter-scoped) so each diagnosis is counted
+		// only once per the specific admission encounter, not for every encounter the patient had.
 		const morbidityRows = await db
 			.select({
 				icdCode: problems.icd10Code,
@@ -790,7 +792,7 @@ export class ReportingService {
 			})
 			.from(problems)
 			.innerJoin(encounters, and(
-				eq(problems.patientId, encounters.patientId),
+				eq(problems.encounterId, encounters.id),
 				eq(encounters.facilityId, input.facilityId),
 				gte(encounters.admissionDatetime, new Date(dateStart)),
 				input.month
@@ -811,7 +813,9 @@ export class ReportingService {
 			percentage: totalMorbidityCount > 0 ? (r.count / totalMorbidityCount) * 100 : 0,
 		}))
 
-		// Top 10 Mortalities — ICD-10 codes from problems for deceased encounters
+		// Top 10 Mortalities — ICD-10 codes from problems scoped to deceased encounters in period
+		// AD-009: join via problems.encounterId (encounter-scoped) so each diagnosis is counted
+		// only once per the specific death encounter, not for every encounter the patient had.
 		const mortalityRows = await db
 			.select({
 				icdCode: problems.icd10Code,
@@ -820,7 +824,7 @@ export class ReportingService {
 			})
 			.from(problems)
 			.innerJoin(encounters, and(
-				eq(problems.patientId, encounters.patientId),
+				eq(problems.encounterId, encounters.id),
 				eq(encounters.facilityId, input.facilityId),
 				eq(encounters.disposition, "deceased"),
 				isNotNull(encounters.dischargeDatetime),

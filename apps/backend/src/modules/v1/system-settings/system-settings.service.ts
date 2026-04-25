@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common"
-import { eq, sql } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 
 import { systemSettings } from "@repo/db/schema"
 
@@ -80,7 +80,18 @@ export class SystemSettingsService {
 
 	/**
 	 * Get system settings for a facility.
-	 * Auto-provisions the row on first access via ON CONFLICT DO NOTHING.
+	 * Auto-provisions the row on first access via ON CONFLICT DO NOTHING, then
+	 * returns the persisted row unchanged.
+	 *
+	 * TOR-mandatory boolean enforcement:
+	 * - All *new* rows are compliant because the DB column defaults were corrected
+	 *   to TRUE in migration 0006.
+	 * - Any *legacy* rows with FALSE values are corrected by migration
+	 *   0006_tor_mandatory_settings_backfill.sql, which runs at deploy time and
+	 *   serves as the auditable record of that one-time correction.
+	 * - This method is intentionally side-effect-free on reads.  Any future
+	 *   configuration change must go through update(), which writes a proper
+	 *   human-actor audit log entry.
 	 */
 	async get(facilityId: string): Promise<SystemSettingsRow> {
 		// Auto-provision — idempotent, no triggers needed
@@ -115,7 +126,7 @@ export class SystemSettingsService {
 			enableOfflineSummaryCache?: boolean
 			policySections?: Record<string, unknown>
 		},
-		actor: { userId: string; facilityId: string; staffProfileId: string | null }
+		actor: { userId: string; facilityId: string; staffProfileId: string | null; ipAddress: string | null; userAgent: string | null }
 	): Promise<SystemSettingsRow> {
 		return db.transaction(async (tx: DBTransaction) => {
 			// 1. Auto-provision if missing, then fetch current state
@@ -146,6 +157,28 @@ export class SystemSettingsService {
 			// 3. Build update payload
 			const updatePayload: Partial<SystemSettingsRow> = {
 				updatedAt: new Date(),
+			}
+
+			// Defense-in-depth: TOR-mandatory booleans must always be true.
+			// The Zod schema already rejects false, but we enforce again here
+			// in case a future bypass (e.g. seeding, migration script) reaches
+			// this method directly without going through the controller.
+			const mandatoryTrueFields = [
+				"breakGlassRequiresReason",
+				"requireDpaConsentBeforeExport",
+				"autoFreezeChargesOnDischarge",
+				"enableOfflineSummaryCache",
+			] as const
+			for (const field of mandatoryTrueFields) {
+				if (field in input) {
+					;(input as Record<string, unknown>)[field] = true
+				}
+			}
+
+			// Also enforce offline caching inside policySections
+			if (input.policySections?.offlineMode) {
+				const offlineMode = input.policySections.offlineMode as Record<string, unknown>
+				offlineMode.cacheActivePatients = true
 			}
 
 			const TYPED_COL_KEYS = [
@@ -191,8 +224,8 @@ export class SystemSettingsService {
 						entityId: facilityId,
 						beforeState: currentRow as unknown as Record<string, unknown>,
 						afterState: updated as unknown as Record<string, unknown>,
-						ipAddress: null,
-						userAgent: null,
+						ipAddress: actor.ipAddress,
+						userAgent: actor.userAgent,
 						metadata: { changes },
 					},
 					{ tx }

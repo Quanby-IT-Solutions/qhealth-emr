@@ -3,6 +3,7 @@ import { and, count, desc, eq, inArray, sql } from "drizzle-orm"
 
 import {
 	encounters,
+	encounterStatusEvents,
 	formularyItems,
 	imagingOrders,
 	labOrders,
@@ -16,6 +17,8 @@ import {
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
+import { closeOpenSlaStep } from "@/utils/sla-events"
+import { resolveStepTarget } from "@/utils/sla-step-target"
 
 import { ProblemsAllergiesService } from "../problems-allergies/problems-allergies.service"
 
@@ -25,13 +28,18 @@ type CreateMedOrderInput = V1Inputs["orders"]["createMedOrder"]
 type UpdateMedOrderInput = V1Inputs["orders"]["updateMedOrder"]
 type LabOrderListInput = V1Inputs["orders"]["listLabOrders"]
 type CreateLabOrderInput = V1Inputs["orders"]["createLabOrder"]
+type UpdateLabOrderInput = V1Inputs["orders"]["updateLabOrder"]
 type ImagingOrderListInput = V1Inputs["orders"]["listImagingOrders"]
 type CreateImagingOrderInput = V1Inputs["orders"]["createImagingOrder"]
+type UpdateImagingOrderInput = V1Inputs["orders"]["updateImagingOrder"]
 type VerificationQueueInput = V1Inputs["orders"]["getVerificationQueue"]
 type VerifyOrderInput = V1Inputs["orders"]["verifyOrder"]
 type PrescriptionListInput = V1Inputs["orders"]["listPrescriptions"]
 type CreatePrescriptionInput = V1Inputs["orders"]["createPrescription"]
 type ActiveOrdersInput = V1Inputs["orders"]["getActiveOrders"]
+type PdeaLicenseCheckInput = V1Inputs["orders"]["checkPdeaLicense"]
+type TranchePreviewInput = V1Inputs["orders"]["previewTranches"]
+type CreateTranchedOrdersInput = V1Inputs["orders"]["createTranchedOrders"]
 
 @Injectable()
 export class OrdersService {
@@ -421,12 +429,29 @@ export class OrdersService {
 	}
 
 	async discontinueMedOrder(id: string) {
-		await this.findMedOrder(id)
+		const order = await this.findMedOrder(id)
 
 		await db
 			.update(medicationOrders)
 			.set({ status: "discontinued", updatedAt: new Date() })
 			.where(eq(medicationOrders.id, id))
+
+		// SLA-004: Track pharmacy lifecycle — close any open step then write discontinue event
+		if (order.encounterId) {
+			const slaMins = await resolveStepTarget(order.facilityId, "pharmacy", "discontinued")
+			await closeOpenSlaStep(db, order.encounterId, "pharmacy")
+			await db.insert(encounterStatusEvents).values({
+				facilityId: order.facilityId,
+				encounterId: order.encounterId,
+				fromStatus: order.status,
+				toStatus: "discontinued",
+				workflowType: "pharmacy" as const,
+				staffId: null,
+				slaTargetMinutes: slaMins,
+				notes: `Medication order ${id} discontinued`,
+				occurredAt: new Date(),
+			})
+		}
 
 		return this.findMedOrder(id)
 	}
@@ -511,6 +536,8 @@ export class OrdersService {
 				resultedDatetime: labOrders.resultedDatetime,
 				results: labOrders.results,
 				cdsAlerts: labOrders.cdsAlerts,
+				specimenReceivedAt: labOrders.specimenReceivedAt,
+				billingClearedAt: labOrders.billingClearedAt,
 				createdAt: labOrders.createdAt,
 				updatedAt: labOrders.updatedAt,
 			})
@@ -546,7 +573,52 @@ export class OrdersService {
 
 		this.logger.log(`Created lab order ${created!.id}`)
 
+		// SLA-003/SLA-004: Track ancillary work from the moment the order is placed.
+		// Only encounter-linked orders carry an SLA clock.
+		if (input.encounterId) {
+			const slaMins = await resolveStepTarget(input.facilityId, "ancillary", "lab_ordered")
+			await db.insert(encounterStatusEvents).values({
+				facilityId: input.facilityId,
+				encounterId: input.encounterId,
+				fromStatus: null,
+				toStatus: "lab_ordered",
+				workflowType: "ancillary" as const,
+				staffId: staff.id,
+				slaTargetMinutes: slaMins,
+				notes: `Lab order: ${input.testName ?? input.panelName ?? "Unknown"}`,
+				occurredAt: new Date(),
+			})
+		}
+
 		return this.findLabOrder(created!.id)
+	}
+
+	/**
+	 * SLA-016: Update a lab order.
+	 * - When status transitions to "collected", auto-sets specimenReceivedAt if not already set.
+	 * - billingClearedAt is accepted explicitly from billing staff (Flow 3 Step 2).
+	 */
+	async updateLabOrder(input: UpdateLabOrderInput) {
+		const existing = await this.findLabOrder(input.id)
+
+		const updateData: Record<string, unknown> = { updatedAt: new Date() }
+
+		if (input.status !== undefined) {
+			updateData.status = input.status
+			// Auto-set specimenReceivedAt when lab acknowledges specimen receipt (SLA-016 Step 1)
+			if (input.status === "collected" && !existing.specimenReceivedAt) {
+				updateData.specimenReceivedAt = new Date()
+			}
+		}
+		if (input.collectionDatetime !== undefined) updateData.collectionDatetime = input.collectionDatetime
+		if (input.resultedDatetime !== undefined) updateData.resultedDatetime = input.resultedDatetime
+		if (input.results !== undefined) updateData.results = input.results
+		// SLA-016 Step 2: billing clearance timestamp persisted explicitly
+		if (input.billingClearedAt !== undefined) updateData.billingClearedAt = input.billingClearedAt
+
+		await db.update(labOrders).set(updateData).where(eq(labOrders.id, input.id))
+
+		return this.findLabOrder(input.id)
 	}
 
 	// ========================================================================
@@ -627,6 +699,9 @@ export class OrdersService {
 				report: imagingOrders.report,
 				structuredResults: imagingOrders.structuredResults,
 				cdsAlerts: imagingOrders.cdsAlerts,
+			studyStartedAt: imagingOrders.studyStartedAt,
+			imagingOrderReceivedAt: imagingOrders.imagingOrderReceivedAt,
+			billingClearedAt: imagingOrders.billingClearedAt,
 				createdAt: imagingOrders.createdAt,
 				updatedAt: imagingOrders.updatedAt,
 			})
@@ -660,7 +735,80 @@ export class OrdersService {
 
 		this.logger.log(`Created imaging order ${created!.id}`)
 
+		// SLA-003/SLA-004: Track ancillary work from the moment the imaging order is placed.
+		if (input.encounterId) {
+			const slaMins = await resolveStepTarget(input.facilityId, "ancillary", "imaging_ordered")
+			await db.insert(encounterStatusEvents).values({
+				facilityId: input.facilityId,
+				encounterId: input.encounterId,
+				fromStatus: null,
+				toStatus: "imaging_ordered",
+				workflowType: "ancillary" as const,
+				staffId: staff.id,
+				slaTargetMinutes: slaMins,
+				notes: `Imaging order: ${input.modality} — ${input.bodyPart}`,
+				occurredAt: new Date(),
+			})
+		}
+
 		return this.findImagingOrder(created!.id)
+	}
+
+	/**
+	 * SLA-016/SLA-019: Update an imaging order.
+	 * - When status transitions to "in_progress", auto-sets studyStartedAt if not already set.
+	 * - When status transitions to "scheduled", auto-sets imagingOrderReceivedAt if not already set (SLA-019 Step 1).
+	 * - imagingOrderReceivedAt can also be provided explicitly by radiology staff.
+	 * - billingClearedAt is accepted explicitly from billing staff (Flow 3 Step 2).
+	 */
+	async updateImagingOrder(input: UpdateImagingOrderInput) {
+		// Check order exists (throws NotFoundException if not)
+		await this.findImagingOrder(input.id)
+
+		const updateData: Record<string, unknown> = { updatedAt: new Date() }
+
+		if (input.status !== undefined) {
+			updateData.status = input.status
+			// Auto-set studyStartedAt when radiology begins the study (SLA-016 Step 3)
+			if (input.status === "in_progress") {
+				// Fetch current to avoid overwriting an existing timestamp
+				const [current] = await db
+					.select({ studyStartedAt: imagingOrders.studyStartedAt, imagingOrderReceivedAt: imagingOrders.imagingOrderReceivedAt })
+					.from(imagingOrders)
+					.where(eq(imagingOrders.id, input.id))
+					.limit(1)
+				if (!current?.studyStartedAt) {
+					updateData.studyStartedAt = new Date()
+				}
+				// SLA-019: also auto-set imagingOrderReceivedAt on in_progress if not yet captured
+				if (!current?.imagingOrderReceivedAt && input.imagingOrderReceivedAt === undefined) {
+					updateData.imagingOrderReceivedAt = new Date()
+				}
+			}
+			// SLA-019: auto-set imagingOrderReceivedAt when order is acknowledged as scheduled
+			if (input.status === "scheduled") {
+				const [current] = await db
+					.select({ imagingOrderReceivedAt: imagingOrders.imagingOrderReceivedAt })
+					.from(imagingOrders)
+					.where(eq(imagingOrders.id, input.id))
+					.limit(1)
+				if (!current?.imagingOrderReceivedAt && input.imagingOrderReceivedAt === undefined) {
+					updateData.imagingOrderReceivedAt = new Date()
+				}
+			}
+		}
+		if (input.scheduledDatetime !== undefined) updateData.scheduledDatetime = input.scheduledDatetime
+		if (input.completedDatetime !== undefined) updateData.completedDatetime = input.completedDatetime
+		if (input.report !== undefined) updateData.report = input.report
+		if (input.structuredResults !== undefined) updateData.structuredResults = input.structuredResults
+		// SLA-019: explicit receipt timestamp from radiology staff (overrides auto-set)
+		if (input.imagingOrderReceivedAt !== undefined) updateData.imagingOrderReceivedAt = input.imagingOrderReceivedAt
+		// SLA-016 Step 2: billing clearance timestamp persisted explicitly
+		if (input.billingClearedAt !== undefined) updateData.billingClearedAt = input.billingClearedAt
+
+		await db.update(imagingOrders).set(updateData).where(eq(imagingOrders.id, input.id))
+
+		return this.findImagingOrder(input.id)
 	}
 
 	// ========================================================================
@@ -765,8 +913,8 @@ export class OrdersService {
 		const [pharmacist] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId))
 		if (!pharmacist) throw new NotFoundException("Pharmacist staff profile not found for user")
 
-		// Ensure medication order exists
-		await this.findMedOrder(input.medicationOrderId)
+		// Capture the order before status update so we have facilityId/encounterId/fromStatus
+		const medOrder = await this.findMedOrder(input.medicationOrderId)
 
 		// Insert verification record
 		const [verification] = await db
@@ -794,6 +942,25 @@ export class OrdersService {
 			.where(eq(medicationOrders.id, input.medicationOrderId))
 
 		this.logger.log(`Order ${input.medicationOrderId} ${input.action} by pharmacist ${pharmacist.id}`)
+
+		// SLA-004: Write durable pharmacy SLA event for all verification outcomes.
+		// Only encounter-linked orders are tracked; pre-encounter orders have no encounter ID.
+		if (medOrder.encounterId) {
+			const toStatus = statusMap[input.action]
+			const slaMins = await resolveStepTarget(medOrder.facilityId, "pharmacy", toStatus)
+			await closeOpenSlaStep(db, medOrder.encounterId, "pharmacy")
+			await db.insert(encounterStatusEvents).values({
+				facilityId: medOrder.facilityId,
+				encounterId: medOrder.encounterId,
+				fromStatus: medOrder.status,
+				toStatus,
+				workflowType: "pharmacy" as const,
+				staffId: pharmacist.id,
+				slaTargetMinutes: slaMins,
+				notes: `Medication order ${input.medicationOrderId} ${input.action}`,
+				occurredAt: new Date(),
+			})
+		}
 
 		// Return verification with pharmacist name
 		const [result] = await db
@@ -1081,5 +1248,297 @@ export class OrdersService {
 			labOrders: activeLabOrders,
 			imagingOrders: activeImagingOrders,
 		}
+	}
+
+	// ========================================================================
+	// PDEA License Check (AD-010)
+	// ========================================================================
+
+	async checkPdeaLicense(input: PdeaLicenseCheckInput) {
+		const [staff] = await db
+			.select({
+				id: staffProfiles.id,
+				pdeaS2License: staffProfiles.pdeaS2License,
+				pdeaS2Expiry: staffProfiles.pdeaS2Expiry,
+				userId: staffProfiles.userId,
+			})
+			.from(staffProfiles)
+			.where(and(eq(staffProfiles.id, input.staffId), eq(staffProfiles.facilityId, input.facilityId)))
+			.limit(1)
+
+		if (!staff) {
+			return {
+				staffId: input.staffId,
+				staffName: "Unknown",
+				hasLicense: false,
+				licenseNumber: null,
+				expiryDate: null,
+				isExpired: false,
+				daysUntilExpiry: null,
+				canPrescribeControlled: false,
+				errorMessage: "Staff profile not found in this facility",
+			}
+		}
+
+		const [userRow] = await db
+			.select({ name: users.name })
+			.from(users)
+			.where(eq(users.id, staff.userId))
+			.limit(1)
+
+		const hasLicense = !!staff.pdeaS2License
+		let isExpired = false
+		let daysUntilExpiry: number | null = null
+
+		if (hasLicense && staff.pdeaS2Expiry) {
+			const expiryDate = new Date(staff.pdeaS2Expiry)
+			const today = new Date()
+			today.setHours(0, 0, 0, 0)
+			isExpired = expiryDate < today
+			daysUntilExpiry = Math.floor((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+		}
+
+		return {
+			staffId: staff.id,
+			staffName: userRow?.name ?? "Unknown",
+			hasLicense,
+			licenseNumber: staff.pdeaS2License ?? null,
+			expiryDate: staff.pdeaS2Expiry ?? null,
+			isExpired,
+			daysUntilExpiry,
+			canPrescribeControlled: hasLicense && !isExpired,
+			errorMessage: isExpired ? `PDEA S-2 license expired on ${staff.pdeaS2Expiry}` : null,
+		}
+	}
+
+	// ========================================================================
+	// PDEA Tranche Preview (AD-010)
+	// ========================================================================
+
+	async previewTranches(input: TranchePreviewInput) {
+		// PDEA regulations: S-2 controlled substances are limited to 30 days per prescription
+		const MAX_DAYS_PER_TRANCHE = 30
+		const requiresTranching = input.durationDays > MAX_DAYS_PER_TRANCHE
+
+		if (!requiresTranching) {
+			const startDate = input.startDate ? new Date(input.startDate) : new Date()
+			const endDate = new Date(startDate)
+			endDate.setDate(endDate.getDate() + input.durationDays - 1)
+
+			return {
+				requiresTranching: false,
+				reason: null,
+				totalDays: input.durationDays,
+				maxDaysPerTranche: MAX_DAYS_PER_TRANCHE,
+				tranches: [{
+					trancheNumber: 1,
+					startDate: startDate.toISOString().split("T")[0]!,
+					endDate: endDate.toISOString().split("T")[0]!,
+					durationDays: input.durationDays,
+					quantityPerTranche: null,
+					noRefill: true,
+				}],
+			}
+		}
+
+		const totalTranches = Math.ceil(input.durationDays / MAX_DAYS_PER_TRANCHE)
+		const startDate = input.startDate ? new Date(input.startDate) : new Date()
+		const tranches = []
+		let remainingDays = input.durationDays
+		let currentStart = new Date(startDate)
+
+		for (let i = 1; i <= totalTranches; i++) {
+			const trancheDays = Math.min(remainingDays, MAX_DAYS_PER_TRANCHE)
+			const trancheEnd = new Date(currentStart)
+			trancheEnd.setDate(trancheEnd.getDate() + trancheDays - 1)
+
+			tranches.push({
+				trancheNumber: i,
+				startDate: currentStart.toISOString().split("T")[0]!,
+				endDate: trancheEnd.toISOString().split("T")[0]!,
+				durationDays: trancheDays,
+				quantityPerTranche: null,
+				noRefill: true,
+			})
+
+			currentStart = new Date(trancheEnd)
+			currentStart.setDate(currentStart.getDate() + 1)
+			remainingDays -= trancheDays
+		}
+
+		return {
+			requiresTranching: true,
+			reason: `PDEA ${input.pdeaSchedule} controlled substances may only be prescribed in ${MAX_DAYS_PER_TRANCHE}-day supply increments. This ${input.durationDays}-day order requires ${totalTranches} separate prescriptions.`,
+			totalDays: input.durationDays,
+			maxDaysPerTranche: MAX_DAYS_PER_TRANCHE,
+			tranches,
+		}
+	}
+
+	// ========================================================================
+	// Create Tranched Orders (AD-010)
+	// ========================================================================
+
+	async createTranchedOrders(input: CreateTranchedOrdersInput, userId: string) {
+		const [staff] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId))
+		if (!staff) throw new NotFoundException("Staff profile not found for user")
+
+		const preview = await this.previewTranches({
+			facilityId: input.facilityId,
+			genericName: input.genericName,
+			dose: input.dose,
+			frequency: input.frequency,
+			durationDays: input.durationDays,
+			pdeaSchedule: input.pdeaSchedule,
+			startDate: input.startDate,
+		})
+
+		const totalTranches = preview.tranches.length
+
+		// Create parent order (represents the full course; not dispensed directly)
+		const [parentRow] = await db
+			.insert(medicationOrders)
+			.values({
+				facilityId: input.facilityId,
+				encounterId: input.encounterId ?? null,
+				preEncounterId: input.preEncounterId ?? null,
+				formularyItemId: input.formularyItemId ?? null,
+				genericName: input.genericName,
+				brandName: input.brandName ?? null,
+				rxnormCode: input.rxnormCode ?? null,
+				dose: input.dose,
+				doseUnit: input.doseUnit,
+				doseForm: input.doseForm,
+				route: input.route,
+				frequency: input.frequency,
+				durationDays: input.durationDays,
+				specialInstructions: input.specialInstructions ?? null,
+				isPrn: input.isPrn ?? false,
+				prnReason: input.prnReason ?? null,
+				isControlledSubstance: true,
+				pdeaSchedule: input.pdeaSchedule,
+				pdeaTrancheNumber: null,
+				pdeaTrancheTotal: totalTranches,
+				parentOrderId: null,
+				status: "pending_verification",
+				orderingStaffId: staff.id,
+				cdsAlerts: input.cdsAlerts ?? null,
+				cdsOverrides: input.cdsOverrides ?? null,
+			})
+			.returning()
+
+		if (!parentRow) throw new NotFoundException("Failed to create parent order")
+
+		// Create one child order per tranche
+		const childIds: string[] = []
+		for (const tranche of preview.tranches) {
+			const [childRow] = await db
+				.insert(medicationOrders)
+				.values({
+					facilityId: input.facilityId,
+					encounterId: input.encounterId ?? null,
+					preEncounterId: input.preEncounterId ?? null,
+					formularyItemId: input.formularyItemId ?? null,
+					genericName: input.genericName,
+					brandName: input.brandName ?? null,
+					rxnormCode: input.rxnormCode ?? null,
+					dose: input.dose,
+					doseUnit: input.doseUnit,
+					doseForm: input.doseForm,
+					route: input.route,
+					frequency: input.frequency,
+					durationDays: tranche.durationDays,
+					specialInstructions: input.specialInstructions ?? null,
+					isPrn: input.isPrn ?? false,
+					prnReason: input.prnReason ?? null,
+					isControlledSubstance: true,
+					pdeaSchedule: input.pdeaSchedule,
+					pdeaTrancheNumber: tranche.trancheNumber,
+					pdeaTrancheTotal: totalTranches,
+					parentOrderId: parentRow.id,
+					status: "pending_verification",
+					orderingStaffId: staff.id,
+					cdsAlerts: input.cdsAlerts ?? null,
+					cdsOverrides: input.cdsOverrides ?? null,
+				})
+				.returning()
+
+			if (childRow) childIds.push(childRow.id)
+		}
+
+		const [parentOrder, ...childOrders] = await Promise.all([
+			this.findMedOrder(parentRow.id),
+			...childIds.map(id => this.findMedOrder(id)),
+		])
+
+		this.logger.log(`Created PDEA tranched order: parent=${parentRow.id}, tranches=${totalTranches}`)
+
+		return {
+			parentOrder: parentOrder!,
+			childOrders,
+			totalTranches,
+		}
+	}
+
+	// ========================================================================
+	// Get Child Tranche Orders (AD-010)
+	// ========================================================================
+
+	async getChildOrders(parentOrderId: string) {
+		const rows = await db
+			.select({
+				id: medicationOrders.id,
+				facilityId: medicationOrders.facilityId,
+				encounterId: medicationOrders.encounterId,
+				preEncounterId: medicationOrders.preEncounterId,
+				formularyItemId: medicationOrders.formularyItemId,
+				genericName: medicationOrders.genericName,
+				brandName: medicationOrders.brandName,
+				rxnormCode: medicationOrders.rxnormCode,
+				dose: medicationOrders.dose,
+				doseUnit: medicationOrders.doseUnit,
+				doseForm: medicationOrders.doseForm,
+				route: medicationOrders.route,
+				frequency: medicationOrders.frequency,
+				durationDays: medicationOrders.durationDays,
+				specialInstructions: medicationOrders.specialInstructions,
+				isPrn: medicationOrders.isPrn,
+				prnReason: medicationOrders.prnReason,
+				isControlledSubstance: medicationOrders.isControlledSubstance,
+				pdeaSchedule: medicationOrders.pdeaSchedule,
+				pdeaTrancheNumber: medicationOrders.pdeaTrancheNumber,
+				pdeaTrancheTotal: medicationOrders.pdeaTrancheTotal,
+				parentOrderId: medicationOrders.parentOrderId,
+				status: medicationOrders.status,
+				orderingStaffId: medicationOrders.orderingStaffId,
+				orderingStaffName: users.name,
+				patientId: patients.id,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+				patientMrn: patients.mrn,
+				patientDateOfBirth: patients.dateOfBirth,
+				cdsAlerts: medicationOrders.cdsAlerts,
+				cdsOverrides: medicationOrders.cdsOverrides,
+				createdAt: medicationOrders.createdAt,
+				updatedAt: medicationOrders.updatedAt,
+			})
+			.from(medicationOrders)
+			.leftJoin(encounters, eq(medicationOrders.encounterId, encounters.id))
+			.leftJoin(patients, eq(encounters.patientId, patients.id))
+			.leftJoin(staffProfiles, eq(medicationOrders.orderingStaffId, staffProfiles.id))
+			.leftJoin(users, eq(staffProfiles.userId, users.id))
+			.where(eq(medicationOrders.parentOrderId, parentOrderId))
+			.orderBy(medicationOrders.pdeaTrancheNumber)
+
+		return rows.map(row => ({
+			...row,
+			isTranche: true,
+			patientName:
+				row.patientLastName && row.patientFirstName
+					? `${row.patientLastName}, ${row.patientFirstName}`
+					: null,
+			priority: "routine" as const,
+			receivedAt: row.createdAt,
+		}))
 	}
 }

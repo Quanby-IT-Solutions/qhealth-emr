@@ -22,6 +22,8 @@ import {
 	RxnormSearchSchema,
 	RvsListResponseSchema,
 	RvsSearchSchema,
+	SnomedCtListResponseSchema,
+	SnomedCtSearchSchema,
 	UpdateDrugBrandSchema,
 	UpdateDrugGenericSchema,
 	UpdateFormularyItemSchema,
@@ -205,4 +207,16 @@ export const rvsContract = {
 		})
 		.input(RvsSearchSchema)
 		.output(RvsListResponseSchema),
+}
+
+export const snomedCtContract = {
+	search: oc
+		.route({
+			method: "GET",
+			path: "/code-sets/snomed-ct",
+			summary: "Search SNOMED CT concepts",
+			tags: ["Code Sets"],
+		})
+		.input(SnomedCtSearchSchema)
+		.output(SnomedCtListResponseSchema),
 }

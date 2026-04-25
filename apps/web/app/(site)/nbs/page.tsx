@@ -6,6 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { NbsLogbook } from "@/features/nbs/components/nbs-logbook"
 
+function usePermissionSet() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+}
+
+function can(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
+}
+
 const FEATURES = [
 	{
 		icon: Baby,
@@ -36,6 +46,15 @@ const FEATURES = [
 export default function NbsPage() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles[0]?.facilityId ?? ""
+	const permSet = usePermissionSet()
+
+	if (!can(permSet, "nbs", "view")) {
+		return (
+			<div className="flex items-center justify-center p-8 text-muted-foreground">
+				You do not have permission to access the newborn screening module.
+			</div>
+		)
+	}
 
 	return (
 		<div className="space-y-6">

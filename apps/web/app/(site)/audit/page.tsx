@@ -1,13 +1,34 @@
-import { Suspense } from "react"
+"use client"
+
 import Link from "next/link"
 
 import { Button } from "@/core/components/ui/button"
+import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { AuditLogTable } from "@/features/audit/components/audit-log-table"
 
-// TODO: Replace with actual facility context from session/RBAC
-const PLACEHOLDER_FACILITY_ID = "00000000-0000-0000-0000-000000000000"
+function usePermissionSet() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+}
+
+function can(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
+}
 
 export default function AuditPage() {
+	const facilityId = useActiveFacilityId()
+	const permSet = usePermissionSet()
+
+	if (!can(permSet, "audit", "view")) {
+		return (
+			<div className="flex items-center justify-center p-8 text-muted-foreground">
+				You do not have permission to access the audit trail.
+			</div>
+		)
+	}
+
 	return (
 		<div className="w-full max-w-7xl space-y-6 p-4">
 			<div className="flex items-center justify-between">
@@ -22,9 +43,11 @@ export default function AuditPage() {
 				</Button>
 			</div>
 
-			<Suspense fallback={<p>Loading audit logs...</p>}>
-				<AuditLogTable facilityId={PLACEHOLDER_FACILITY_ID} />
-			</Suspense>
+			{facilityId ? (
+				<AuditLogTable facilityId={facilityId} />
+			) : (
+				<p className="text-muted-foreground">Loading facility context...</p>
+			)}
 		</div>
 	)
 }

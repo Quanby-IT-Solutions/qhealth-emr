@@ -251,3 +251,28 @@ export function useRvsSearchQuery(
 		})
 	)
 }
+
+// ============================================================================
+// SNOMED CT Codes
+// ============================================================================
+
+export function useSnomedCtSearchQuery(
+	params: {
+		search?: string
+		semanticTag?: string
+		page?: number
+		limit?: number
+	} = {}
+) {
+	return useQuery(
+		orpc.formulary.snomedCt.search.queryOptions({
+			input: {
+				search: params.search,
+				semanticTag: params.semanticTag,
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			staleTime: 5 * 60 * 1000,
+		})
+	)
+}

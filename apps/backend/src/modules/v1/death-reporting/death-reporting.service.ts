@@ -187,8 +187,13 @@ export class DeathReportingService {
 					certificationDate: input.certificationDate,
 					signatureData: input.physicianSignatureDataUrl,
 				},
-				status: "completed" as const,
-				completedAt: new Date(),
+				// SLA-023: create as draft so the certificate has a genuine open SLA window,
+				// consistent with the FNDRF path. Completion and release are recorded via
+				// markDeathReportReleased() which sets releasedAt + releasedByStaffId and
+				// closes the Flow 7 lifecycle.
+				status: "draft" as const,
+				// SLA-017: record the moment the death certificate request was formally submitted
+				requestedAt: new Date(),
 			})
 			.returning()
 
@@ -297,8 +302,12 @@ export class DeathReportingService {
 					certificationDate: input.certificationDate,
 					signatureData: input.physicianSignatureDataUrl,
 				},
-				status: "completed" as const,
-				completedAt: new Date(),
+				// SLA-021: create as draft so the certificate has a genuine open SLA window.
+				// Completion and release are recorded via markDeathReportReleased() which sets
+				// releasedAt + releasedByStaffId and closes the Flow 7 lifecycle.
+				status: "draft" as const,
+				// SLA-017: record the moment the death certificate request was formally submitted
+				requestedAt: new Date(),
 			})
 			.returning()
 
@@ -395,6 +404,63 @@ export class DeathReportingService {
 			certificationDate: cert.certificationDate ?? "",
 			createdAt: report.createdAt.toISOString(),
 			updatedAt: report.updatedAt.toISOString(),
+		}
+	}
+
+	// ============================================================================
+	// SLA-017: Payment checkpoints
+	// ============================================================================
+
+	/**
+	 * Mark a death report (FMDRF or FNDRF) as paid.
+	 * Sets paidAt to record the moment payment was received for the death certificate (Flow 7 Step 2).
+	 */
+	async markDeathReportPaid(input: { id: string; paidAt?: Date }) {
+		const paidAt = input.paidAt ?? new Date()
+
+		const [report] = await db
+			.update(deathReports)
+			.set({ paidAt, updatedAt: new Date() })
+			.where(eq(deathReports.id, input.id))
+			.returning()
+
+		if (!report) {
+			throw new NotFoundException(`Death report ${input.id} not found`)
+		}
+
+		return { id: report.id, paidAt: report.paidAt?.toISOString() ?? null }
+	}
+
+	/**
+	 * SLA-021: Mark a death report as released to the family.
+	 * Sets releasedByStaffId, releasedAt, completedAt, and status="completed" to provide
+	 * an authoritative Flow 7 Step 3 evidence trail and close the SLA window.
+	 */
+	async markDeathReportReleased(input: { id: string; releasedByStaffId: string; releasedAt?: Date }) {
+		const releasedAt = input.releasedAt ?? new Date()
+
+		const [report] = await db
+			.update(deathReports)
+			.set({
+				releasedByStaffId: input.releasedByStaffId,
+				releasedAt,
+				completedAt: releasedAt,
+				status: "completed" as const,
+				updatedAt: new Date(),
+			})
+			.where(eq(deathReports.id, input.id))
+			.returning()
+
+		if (!report) {
+			throw new NotFoundException(`Death report ${input.id} not found`)
+		}
+
+		return {
+			id: report.id,
+			releasedByStaffId: report.releasedByStaffId ?? null,
+			releasedAt: report.releasedAt?.toISOString() ?? null,
+			status: report.status,
+			completedAt: report.completedAt?.toISOString() ?? null,
 		}
 	}
 

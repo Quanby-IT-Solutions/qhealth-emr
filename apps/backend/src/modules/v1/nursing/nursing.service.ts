@@ -333,6 +333,39 @@ export class NursingService {
 			.returning()
 
 		if (!row) throw new NotFoundException("Failed to create vital sign")
+
+		// PS-021: materialize vitals into flowsheet entries so the flowsheet read model is populated
+		if (input.encounterId) {
+			const recordedAt = row.recordedAt
+			const vitalsMap: Array<{ name: string; value: number | null | undefined; unit: string }> = [
+				{ name: "Temperature", value: input.temperature, unit: "°C" },
+				{ name: "BP Systolic", value: input.bpSystolic, unit: "mmHg" },
+				{ name: "BP Diastolic", value: input.bpDiastolic, unit: "mmHg" },
+				{ name: "Heart Rate", value: input.heartRate, unit: "bpm" },
+				{ name: "Respiratory Rate", value: input.respiratoryRate, unit: "breaths/min" },
+				{ name: "SpO2", value: input.spo2, unit: "%" },
+				{ name: "Pain Score", value: input.painScore, unit: "/10" },
+				{ name: "Weight", value: input.weight, unit: "kg" },
+				{ name: "Height", value: input.height, unit: "cm" },
+			]
+
+			const entriesToInsert = vitalsMap
+				.filter(v => v.value != null)
+				.map(v => ({
+					facilityId: input.facilityId,
+					encounterId: input.encounterId!,
+					parameterName: v.name,
+					parameterValue: String(v.value),
+					unit: v.unit,
+					recordedByStaffId: staffProfileId,
+					recordedAt,
+				}))
+
+			if (entriesToInsert.length > 0) {
+				await db.insert(flowsheetEntries).values(entriesToInsert)
+			}
+		}
+
 		return row
 	}
 

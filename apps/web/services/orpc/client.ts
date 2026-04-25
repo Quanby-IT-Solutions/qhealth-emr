@@ -3,7 +3,9 @@ import type { ContractRouterClient } from "@orpc/contract"
 import { OpenAPILink } from "@orpc/openapi-client/fetch"
 import { createTanstackQueryUtils } from "@orpc/tanstack-query"
 
-import { v1Contract, type V1Contract } from "@repo/contracts"
+import { v1Contract } from "@repo/contracts"
+
+type V1Contract = typeof v1Contract
 
 import { env } from "@/env"
 

@@ -232,28 +232,51 @@ export const ClinicQueueQuerySchema = z.object({
 	date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format"),
 })
 
-export const QueueItemSchema = z.object({
+// Unified queue status — maps appointment statuses + encounter walk-in statuses
+export const QueueEntryStatusEnum = z.enum(["waiting", "in_progress", "completed"])
+
+// A single entry in the unified clinic queue — can be either a booked appointment
+// (checked in) or a walk-in OPD encounter (created from /patients/search).
+export const UnifiedQueueEntrySchema = z.object({
+	entryType: z.enum(["appointment", "walk_in"]),
+	// `appointmentId` for appointment entries, `encounterId` for walk-in entries
 	id: z.string().uuid(),
+	appointmentId: z.string().uuid().nullable(),
+	encounterId: z.string().uuid().nullable(),
 	queueNumber: z.number().int().nullable(),
-	appointmentTime: z.string(),
-	status: AppointmentStatusEnum,
-	checkedInAt: dateOrString.nullable(),
+	// HH:mm — appointment scheduled time (null for walk-ins)
+	slotTime: z.string().nullable(),
+	checkInTime: z.string().nullable(),
+	status: QueueEntryStatusEnum,
 	patientId: z.string().uuid(),
 	patientName: z.string().optional(),
 	patientMrn: z.string().optional(),
-	clinicianStaffId: z.string().uuid(),
+	clinicianStaffId: z.string().uuid().nullable(),
 	clinicianName: z.string().optional(),
 })
 
+export type UnifiedQueueEntry = z.infer<typeof UnifiedQueueEntrySchema>
+
 export const ClinicQueueResponseSchema = z.object({
-	queue: z.array(QueueItemSchema),
+	entries: z.array(UnifiedQueueEntrySchema),
+	clinicName: z.string().nullable(),
 	stats: z.object({
-		booked: z.number(),
-		checkedIn: z.number(),
+		waiting: z.number(),
 		inProgress: z.number(),
 		completed: z.number(),
 		total: z.number(),
 	}),
+})
+
+// PS-003: Update walk-in encounter queue status
+export const UpdateEncounterQueueStatusSchema = z.object({
+	id: z.string().uuid(),
+	status: z.enum(["in_progress", "completed"]),
+})
+
+export const UpdateEncounterQueueStatusResponseSchema = z.object({
+	id: z.string().uuid(),
+	queueStatus: z.enum(["waiting", "in_progress", "completed"]),
 })
 
 // ============================================================================
@@ -266,3 +289,4 @@ export type CheckInAppointmentInput = z.infer<typeof CheckInAppointmentSchema>
 export type UpdateAppointmentStatusInput = z.infer<typeof UpdateAppointmentStatusSchema>
 export type AvailableSlotsQuery = z.infer<typeof AvailableSlotsQuerySchema>
 export type ClinicQueueQuery = z.infer<typeof ClinicQueueQuerySchema>
+export type UpdateEncounterQueueStatusInput = z.infer<typeof UpdateEncounterQueueStatusSchema>

@@ -201,6 +201,7 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 					<ProblemsAllergiesTab
 						patientId={patientId}
 						facilityId={encounter.facilityId}
+						canWrite={false}
 					/>
 				</TabsContent>
 
@@ -246,6 +247,7 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 						encounterId={encounterId}
 						facilityId={encounter.facilityId}
 						patientId={patientId}
+						canManageConsents={false}
 					/>
 				</TabsContent>
 

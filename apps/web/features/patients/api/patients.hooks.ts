@@ -86,5 +86,33 @@ export function useUpdatePatientMutation() {
 	)
 }
 
+// ============================================================================
+// Register with OPD Encounter (PS-034 — atomic patient + encounter creation)
+// ============================================================================
 
+export function useRegisterPatientWithOpdEncounterMutation() {
+	const queryClient = useQueryClient()
 
+	return useMutation(
+		orpc.patient.registerWithOpdEncounter.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({
+					queryKey: orpc.patient.key(),
+				}),
+		})
+	)
+}
+
+// ============================================================================
+// List Clinicians — registrar-accessible (PS-047), replaces admin-only listStaff
+// ============================================================================
+
+export function useListCliniciansQuery(facilityId: string | undefined) {
+	return useQuery(
+		orpc.patient.listClinicians.queryOptions({
+			input: { facilityId: facilityId ?? "" },
+			enabled: !!facilityId,
+			staleTime: 60 * 1000,
+		})
+	)
+}

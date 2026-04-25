@@ -116,9 +116,10 @@ function ChecklistGroup({ category, items, checks, onChange, serverItems }: Chec
 interface PreOpChecklistProps {
 	caseId: string
 	existing: PreOpChecklistData | null | undefined
+	canEdit?: boolean
 }
 
-export function PreOpChecklist({ caseId, existing }: PreOpChecklistProps) {
+export function PreOpChecklist({ caseId, existing, canEdit = true }: PreOpChecklistProps) {
 	const [checks, setChecks] = useState<CheckMap>(() => buildCheckMap(existing))
 	const save = useSavePreOpChecklistMutation()
 
@@ -224,7 +225,7 @@ export function PreOpChecklist({ caseId, existing }: PreOpChecklistProps) {
 			<Separator />
 
 			<div className="flex justify-end">
-				<Button onClick={handleSave} disabled={save.isPending}>
+				<Button onClick={handleSave} disabled={save.isPending || !canEdit}>
 					{save.isPending ? "Saving…" : "Save Checklist"}
 				</Button>
 			</div>

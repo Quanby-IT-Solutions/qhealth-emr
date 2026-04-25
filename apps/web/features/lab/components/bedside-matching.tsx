@@ -11,6 +11,7 @@ import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { cn } from "@/core/lib/utils"
 import { type BedsideVerifyResult, useBedsideVerifyMutation } from "@/features/lab/api/lab.hooks"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 // ============================================================================
 // Barcode Input Field (simulates barcode scanner)
@@ -123,6 +124,11 @@ interface BedsideMatchingProps {
 }
 
 export function BedsideMatching({ crossMatchId: initialCrossMatchId }: BedsideMatchingProps) {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	const hasLabEditPerm = permissions.some(
+		(p: { module: string; action: string }) => p.module === "laboratory" && p.action === "edit",
+	)
 	const [crossMatchId, setCrossMatchId] = useState(initialCrossMatchId ?? "")
 	const [unitBarcode, setUnitBarcode] = useState("")
 	const [patientWristband, setPatientWristband] = useState("")
@@ -153,6 +159,7 @@ export function BedsideMatching({ crossMatchId: initialCrossMatchId }: BedsideMa
 	}
 
 	const canVerify =
+		hasLabEditPerm &&
 		crossMatchId.trim() &&
 		unitBarcode.trim() &&
 		patientWristband.trim() &&

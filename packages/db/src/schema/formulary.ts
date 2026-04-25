@@ -145,3 +145,21 @@ export const rvsCodes = createTable(
 		index("rvs_codes_procedure_name_idx").on(t.procedureName),
 	]
 )
+
+export const snomedCtCodes = createTable(
+	"snomed_ct_codes",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		conceptId: t.text("concept_id").notNull().unique(),   // SNOMED concept identifier (e.g. "73211009")
+		fsn: t.text("fsn").notNull(),                         // Fully Specified Name
+		preferredTerm: t.text("preferred_term").notNull(),    // Preferred display term
+		semanticTag: t.text("semantic_tag"),                  // Semantic type extracted from FSN brackets (e.g. "disorder", "finding")
+		isActive: t.boolean("is_active").notNull().default(true),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("snomed_ct_codes_concept_id_idx").on(t.conceptId),
+		index("snomed_ct_codes_preferred_term_idx").on(t.preferredTerm),
+		index("snomed_ct_codes_semantic_tag_idx").on(t.semanticTag),
+	]
+)

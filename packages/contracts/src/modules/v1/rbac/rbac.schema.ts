@@ -12,6 +12,7 @@ export const RbacModuleEnum = z.enum([
 	"billing",
 	"formulary",
 	"reporting",
+	"notifications",
 	"audit",
 	"admin",
 	"surgical",
@@ -31,6 +32,9 @@ export const RbacModuleEnum = z.enum([
 	"system_settings",
 	"facility_profile",
 	"integration_registry",
+	"civil_registry",
+	"medical_records",
+	"patients",
 ])
 
 export const RbacActionEnum = z.enum([
@@ -131,6 +135,11 @@ export const RoleSchema = z.object({
 	name: z.string(),
 	description: z.string().nullable(),
 	isSystemDefault: z.boolean(),
+	isArchived: z.boolean(),
+	archivedAt: z
+		.union([z.date(), z.string()])
+		.transform(v => (typeof v === "string" ? new Date(v) : v))
+		.nullable(),
 	createdAt: z
 		.union([z.date(), z.string()])
 		.transform(v => (typeof v === "string" ? new Date(v) : v)),
@@ -148,6 +157,15 @@ export const UpdateRoleSchema = z.object({
 })
 
 export const RoleIdSchema = z.object({ id: z.string().uuid() })
+
+export const ArchiveRoleResponseSchema = z.object({
+	success: z.boolean(),
+	conflict: z
+		.object({
+			assignedUserCount: z.number().int(),
+		})
+		.optional(),
+})
 
 // ============================================================================
 // Role Permissions
@@ -388,6 +406,7 @@ export type UpdateStaffProfileInput = z.infer<typeof UpdateStaffProfileSchema>
 export type Role = z.infer<typeof RoleSchema>
 export type CreateRoleInput = z.infer<typeof CreateRoleSchema>
 export type UpdateRoleInput = z.infer<typeof UpdateRoleSchema>
+export type ArchiveRoleResponse = z.infer<typeof ArchiveRoleResponseSchema>
 export type RoleWithPermissions = z.infer<typeof RoleWithPermissionsSchema>
 export type SetRolePermissionsInput = z.infer<typeof SetRolePermissionsSchema>
 export type AssignUserRolesInput = z.infer<typeof AssignUserRolesSchema>

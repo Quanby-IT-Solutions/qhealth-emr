@@ -4,6 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
+import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { ProblemsAllergiesService } from "./problems-allergies.service"
 
@@ -15,6 +16,7 @@ export class ProblemsAllergiesController {
 	// Problems
 	// ========================================================================
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.problemsAllergies.listProblems)
 	async listProblems() {
 		return implement(v1.problemsAllergies.listProblems).handler(async ({ input }) => {
@@ -22,6 +24,7 @@ export class ProblemsAllergiesController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.problemsAllergies.getProblem)
 	async getProblem() {
 		return implement(v1.problemsAllergies.getProblem).handler(async ({ input }) => {
@@ -29,6 +32,7 @@ export class ProblemsAllergiesController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.createProblem)
 	async createProblem(@Session() session: UserSession) {
 		return implement(v1.problemsAllergies.createProblem).handler(async ({ input }) => {
@@ -37,6 +41,7 @@ export class ProblemsAllergiesController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.updateProblem)
 	async updateProblem(@Session() session: UserSession) {
 		return implement(v1.problemsAllergies.updateProblem).handler(async ({ input }) => {
@@ -44,6 +49,7 @@ export class ProblemsAllergiesController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.resolveProblem)
 	async resolveProblem(@Session() session: UserSession) {
 		return implement(v1.problemsAllergies.resolveProblem).handler(async ({ input }) => {
@@ -55,6 +61,7 @@ export class ProblemsAllergiesController {
 	// Allergies
 	// ========================================================================
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.problemsAllergies.listAllergies)
 	async listAllergies() {
 		return implement(v1.problemsAllergies.listAllergies).handler(async ({ input }) => {
@@ -62,6 +69,7 @@ export class ProblemsAllergiesController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.problemsAllergies.getAllergy)
 	async getAllergy() {
 		return implement(v1.problemsAllergies.getAllergy).handler(async ({ input }) => {
@@ -69,6 +77,7 @@ export class ProblemsAllergiesController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.createAllergy)
 	async createAllergy(@Session() session: UserSession) {
 		return implement(v1.problemsAllergies.createAllergy).handler(async ({ input }) => {
@@ -77,6 +86,7 @@ export class ProblemsAllergiesController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.updateAllergy)
 	async updateAllergy(@Session() session: UserSession) {
 		return implement(v1.problemsAllergies.updateAllergy).handler(async ({ input }) => {
@@ -84,6 +94,7 @@ export class ProblemsAllergiesController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.deactivateAllergy)
 	async deactivateAllergy(@Session() session: UserSession) {
 		return implement(v1.problemsAllergies.deactivateAllergy).handler(async ({ input }) => {
@@ -95,6 +106,7 @@ export class ProblemsAllergiesController {
 	// CDS / Cross-module
 	// ========================================================================
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.problemsAllergies.getActiveAllergies)
 	async getActiveAllergies() {
 		return implement(v1.problemsAllergies.getActiveAllergies).handler(async ({ input }) => {
@@ -102,6 +114,7 @@ export class ProblemsAllergiesController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.problemsAllergies.getPatientSummary)
 	async getPatientSummary() {
 		return implement(v1.problemsAllergies.getPatientSummary).handler(async ({ input }) => {

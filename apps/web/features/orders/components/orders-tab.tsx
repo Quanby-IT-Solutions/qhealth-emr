@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 
+import { Printer } from "lucide-react"
+
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
@@ -28,6 +30,8 @@ import { CreateLabOrderDialog } from "./create-lab-order-dialog"
 import { CreateMedOrderDialog } from "./create-med-order-dialog"
 import { ImagingDashboard } from "./imaging-dashboard"
 import { OrderGroupRow } from "./order-group-row"
+import { PrescriptionPrintDialog } from "./prescription-print-dialog"
+import { PrescriptionPrintDialog } from "./prescription-print-dialog"
 
 function formatDateTime(dateStr: string | null | undefined) {
 	if (!dateStr) return "—"
@@ -237,6 +241,7 @@ export function OrdersTab({ encounterId, facilityId, patientId }: OrdersTabProps
 	const [createMedOpen, setCreateMedOpen] = useState(false)
 	const [createLabOpen, setCreateLabOpen] = useState(false)
 	const [createImagingOpen, setCreateImagingOpen] = useState(false)
+	const [rxPrintOpen, setRxPrintOpen] = useState(false)
 
 	const medOrders = useMedOrderListQuery({ encounterId })
 	const labOrders = useLabOrderListQuery({ encounterId })
@@ -443,6 +448,16 @@ export function OrdersTab({ encounterId, facilityId, patientId }: OrdersTabProps
 																Sign
 															</Button>
 														)}
+														{rx.status === "signed" && (
+															<Button
+																variant="outline"
+																size="sm"
+																onClick={() => setRxPrintOpen(true)}
+															>
+																<Printer className="mr-1 size-3.5" />
+																Print
+															</Button>
+														)}
 													</TableCell>
 												</TableRow>
 											)
@@ -475,6 +490,18 @@ export function OrdersTab({ encounterId, facilityId, patientId }: OrdersTabProps
 				onOpenChange={setCreateImagingOpen}
 				encounterId={encounterId}
 				facilityId={facilityId}
+			/>
+			<PrescriptionPrintDialog
+				open={rxPrintOpen}
+				onOpenChange={setRxPrintOpen}
+				encounterId={encounterId}
+				patientId={patientId}
+			/>
+			<PrescriptionPrintDialog
+				open={rxPrintOpen}
+				onOpenChange={setRxPrintOpen}
+				encounterId={encounterId}
+				patientId={patientId}
 			/>
 		</>
 	)

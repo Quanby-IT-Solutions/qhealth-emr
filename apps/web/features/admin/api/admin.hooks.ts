@@ -133,6 +133,16 @@ export function useUpdateRolePermissionsMutation() {
 	)
 }
 
+export function useArchiveRoleMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.rbac.archiveRole.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.rbac.listRoles.key() }),
+		})
+	)
+}
+
 // ── Access Governance ────────────────────────────────────────────────────────
 
 export function useCreateUserMutation() {

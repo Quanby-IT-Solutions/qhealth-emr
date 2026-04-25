@@ -43,6 +43,7 @@ export default function SurgicalPage() {
 	)
 
 	const permSet = usePermissionSet()
+	const canEditSurgical = can(permSet, "surgical", "edit")
 	const canValidateRvs = can(permSet, "billing", "edit")
 	const canFinalizeRvs = can(permSet, "billing", "sign")
 
@@ -98,7 +99,7 @@ export default function SurgicalPage() {
 					{checklistLoading ? (
 						<Loader2 className="size-4 animate-spin" />
 					) : (
-						<PreOpChecklist caseId={caseId} existing={preOpChecklist} />
+						<PreOpChecklist caseId={caseId} existing={preOpChecklist} canEdit={canEditSurgical} />
 					)}
 				</TabsContent>
 
@@ -110,6 +111,7 @@ export default function SurgicalPage() {
 							caseId={caseId}
 							surgeonStaffId={surgicalCase.surgeonStaffId ?? staffId}
 							existing={opRecord}
+							canEdit={canEditSurgical}
 						/>
 					)}
 				</TabsContent>
@@ -118,13 +120,14 @@ export default function SurgicalPage() {
 					{anesthesiaLoading ? (
 						<Loader2 className="size-4 animate-spin" />
 					) : (
-						<AnesthesiaRecordForm caseId={caseId} existing={anesthesiaRecord} />
+						<AnesthesiaRecordForm caseId={caseId} existing={anesthesiaRecord} canEdit={canEditSurgical} />
 					)}
 				</TabsContent>
 
 				<TabsContent value="rvs" className="mt-6">
 					<RvsCodeSelector
 						caseId={caseId}
+						canEdit={canEditSurgical}
 						canValidate={canValidateRvs}
 						canFinalize={canFinalizeRvs}
 					/>

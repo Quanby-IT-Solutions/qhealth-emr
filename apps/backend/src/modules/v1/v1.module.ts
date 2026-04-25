@@ -30,6 +30,9 @@ import { FeatureFlagsModule } from "./feature-flags/feature-flags.module"
 import { SystemSettingsModule } from "./system-settings/system-settings.module"
 import { FacilityProfileModule } from "./facility-profile/facility-profile.module"
 import { IntegrationRegistryModule } from "./integration-registry/integration-registry.module"
+import { OpdTriageModule } from "./opd-triage/opd-triage.module"
+import { CivilRegistryModule } from "./civil-registry/civil-registry.module"
+import { MedicalRecordsModule } from "./medical-records/medical-records.module"
 
 @Module({
 	imports: [
@@ -63,6 +66,11 @@ import { IntegrationRegistryModule } from "./integration-registry/integration-re
 		SystemSettingsModule,
 		FacilityProfileModule,
 		IntegrationRegistryModule,
+		OpdTriageModule,
+		// SLA-017: civil registry (birth certificate requests + payment)
+		CivilRegistryModule,
+		// SLA-017: medical records requests + payment
+		MedicalRecordsModule,
 	],
 })
 export class V1Module {}

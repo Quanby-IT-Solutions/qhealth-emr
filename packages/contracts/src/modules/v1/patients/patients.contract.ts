@@ -1,12 +1,16 @@
 import { oc } from "@orpc/contract"
 
 import {
+	ClinicianListResponseSchema,
 	CreatePatientSchema,
+	ListCliniciansInputSchema,
 	PatientIdSchema,
 	PatientProfileResponseSchema,
 	PatientSchema,
 	PatientSearchResponseSchema,
 	PatientSearchSchema,
+	RegisterPatientWithOpdEncounterInputSchema,
+	RegisterPatientWithOpdEncounterResponseSchema,
 	UpdatePatientSchema,
 } from "./patients.schema.js"
 
@@ -53,4 +57,26 @@ export const patientContract = {
 		// No schema separation is needed — oRPC handles the path/body merge.
 		.input(UpdatePatientSchema)
 		.output(PatientSchema),
+
+	registerWithOpdEncounter: oc
+		.route({
+			method: "POST",
+			path: "/patients/register-with-opd-encounter",
+			summary:
+				"Atomically register a new patient and create an OPD encounter (TOR Flow 1 Step 2)",
+			tags: ["Patients"],
+		})
+		.input(RegisterPatientWithOpdEncounterInputSchema)
+		.output(RegisterPatientWithOpdEncounterResponseSchema),
+
+	listClinicians: oc
+		.route({
+			method: "GET",
+			path: "/patients/clinicians",
+			summary:
+				"List active clinicians for a facility — accessible to registrar (opd:view), no admin permission required",
+			tags: ["Patients"],
+		})
+		.input(ListCliniciansInputSchema)
+		.output(ClinicianListResponseSchema),
 }

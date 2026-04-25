@@ -1,11 +1,33 @@
+"use client"
+
+import { useParams } from "next/navigation"
+
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { UserDetail } from "@/features/admin/components/user-detail"
 
-interface AdminUserDetailPageProps {
-	params: Promise<{ userId: string }>
+function usePermissionSet() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
 }
 
-export default async function AdminUserDetailPage({ params }: AdminUserDetailPageProps) {
-	const { userId } = await params
+function can(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
+}
+
+export default function AdminUserDetailPage() {
+	const params = useParams<{ userId: string }>()
+	const userId = params.userId
+	const permSet = usePermissionSet()
+
+	if (!can(permSet, "admin", "view")) {
+		return (
+			<div className="flex items-center justify-center p-8 text-muted-foreground">
+				You do not have permission to access user management.
+			</div>
+		)
+	}
+
 	return (
 		<div className="space-y-6">
 			<div>

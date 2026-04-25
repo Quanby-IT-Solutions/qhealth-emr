@@ -7,15 +7,17 @@ import {
 	useLoincSearchQuery,
 	useRxnormSearchQuery,
 	useRvsSearchQuery,
+	useSnomedCtSearchQuery,
 } from "@/features/formulary/api/formulary.hooks"
 
-type CodeSetType = "icd10" | "loinc" | "rxnorm" | "rvs"
+type CodeSetType = "icd10" | "loinc" | "rxnorm" | "rvs" | "snomedCt"
 
 const CODE_SET_LABELS: Record<CodeSetType, string> = {
 	icd10: "ICD-10",
 	loinc: "LOINC",
 	rxnorm: "RxNorm",
 	rvs: "RVS",
+	snomedCt: "SNOMED CT",
 }
 
 export function CodeSetBrowser() {
@@ -67,6 +69,9 @@ export function CodeSetBrowser() {
 			)}
 			{activeTab === "rvs" && (
 				<RvsTable search={search} page={page} onPageChange={setPage} />
+			)}
+			{activeTab === "snomedCt" && (
+				<SnomedCtTable search={search} page={page} onPageChange={setPage} />
 			)}
 		</div>
 	)
@@ -308,6 +313,69 @@ function RvsTable({
 								<td className="p-3">{code.procedureName}</td>
 								<td className="p-3 text-muted-foreground">{code.category ?? "—"}</td>
 								<td className="p-3">{code.rvsValue ?? "—"}</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			<Pagination page={page} totalPages={result.totalPages} onPageChange={onPageChange} />
+		</>
+	)
+}
+
+// ---------------------------------------------------------------------------
+// SNOMED CT Table
+// ---------------------------------------------------------------------------
+
+function SnomedCtTable({
+	search,
+	page,
+	onPageChange,
+}: {
+	search: string
+	page: number
+	onPageChange: (p: number) => void
+}) {
+	const { data, isLoading } = useSnomedCtSearchQuery({
+		search: search || undefined,
+		page,
+		limit: 20,
+	})
+
+	const result = data as {
+		data: {
+			id: string
+			conceptId: string
+			fsn: string
+			preferredTerm: string
+			semanticTag: string | null
+		}[]
+		totalPages: number
+	} | undefined
+
+	if (isLoading) return <p className="text-muted-foreground">Loading...</p>
+	if (!result?.data.length)
+		return <p className="text-muted-foreground">No SNOMED CT concepts found.</p>
+
+	return (
+		<>
+			<div className="rounded-md border">
+				<table className="w-full text-sm">
+					<thead>
+						<tr className="border-b">
+							<th className="p-3 text-left font-medium">Concept ID</th>
+							<th className="p-3 text-left font-medium">Preferred Term</th>
+							<th className="p-3 text-left font-medium">Semantic Tag</th>
+							<th className="p-3 text-left font-medium">Fully Specified Name</th>
+						</tr>
+					</thead>
+					<tbody>
+						{result.data.map(code => (
+							<tr key={code.id} className="border-b">
+								<td className="p-3 font-mono">{code.conceptId}</td>
+								<td className="p-3">{code.preferredTerm}</td>
+								<td className="p-3 text-muted-foreground">{code.semanticTag ?? "—"}</td>
+								<td className="p-3 text-muted-foreground">{code.fsn}</td>
 							</tr>
 						))}
 					</tbody>

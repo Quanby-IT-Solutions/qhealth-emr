@@ -4,13 +4,17 @@ import {
 	Logger,
 	NotFoundException,
 } from "@nestjs/common"
-import { and, count, desc, eq, sql, type SQL } from "drizzle-orm"
+import { and, count, desc, eq, gte, isNotNull, lt, or, sql, type SQL } from "drizzle-orm"
 import type { UserSession } from "@thallesp/nestjs-better-auth"
 
-import { appointments, clinicTemplates, patients, staffProfiles, users } from "@repo/db/schema"
+import { appointments, clinicTemplates, encounterStatusEvents, encounters, patients, staffProfiles, users } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
+import { closeOpenSlaStep } from "@/utils/sla-events"
+import { resolveStepTarget } from "@/utils/sla-step-target"
+
+type WorkflowType = "opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing"
 
 type ClinicTemplateListInput = V1Inputs["scheduling"]["listClinicTemplates"]
 type CreateClinicTemplateInput = V1Inputs["scheduling"]["createClinicTemplate"]
@@ -21,6 +25,7 @@ type CheckInAppointmentInput = V1Inputs["scheduling"]["checkInAppointment"]
 type UpdateAppointmentStatusInput = V1Inputs["scheduling"]["updateAppointmentStatus"]
 type AvailableSlotsInput = V1Inputs["scheduling"]["getAvailableSlots"]
 type ClinicQueueInput = V1Inputs["scheduling"]["getClinicQueue"]
+type UpdateEncounterQueueStatusInput = V1Inputs["scheduling"]["updateEncounterQueueStatus"]
 
 @Injectable()
 export class SchedulingService {
@@ -363,6 +368,9 @@ export class SchedulingService {
 			.where(eq(appointments.id, input.id))
 			.returning()
 
+		// SLA-006: SLA events cannot be written here — encounterStatusEvents.encounterId is NOT NULL,
+		// and appointments are not yet linked to an encounter at check-in time.  Full OPD arrival
+		// SLA tracking requires creating an encounter at check-in (requires a schema change).
 		this.logger.log(`Checked in appointment ${input.id}, queue number: ${queueNumber}`)
 
 		return {
@@ -399,6 +407,9 @@ export class SchedulingService {
 			.where(eq(appointments.id, input.id))
 			.returning()
 
+		// SLA-006: Same constraint — cancellations cannot be logged to encounterStatusEvents
+		// without a real encounterId.  If an encounter was already created for this appointment,
+		// the ed/opd queue status update will track the SLA event instead.
 		this.logger.log(`Updated appointment ${input.id} status to ${input.status}`)
 		return updated!
 	}
@@ -471,47 +482,112 @@ export class SchedulingService {
 	}
 
 	async getClinicQueue(input: ClinicQueueInput) {
-		const conditions: SQL[] = [
-			eq(appointments.appointmentDate, input.date),
-		]
-
-		// Support either facilityId or clinicId
+		// PS-003: Unified clinic queue — appointments (checked_in/in_progress/completed) +
+		// outpatient encounters with a queueStatus (walk-ins)
 		const theFacilityId = input.facilityId ?? input.clinicId
+
+		const apptConditions: SQL[] = [
+			eq(appointments.appointmentDate, input.date),
+			sql`${appointments.status} IN ('checked_in', 'in_progress', 'completed')`,
+		]
 		if (theFacilityId) {
-			conditions.push(eq(appointments.facilityId, theFacilityId))
+			apptConditions.push(eq(appointments.facilityId, theFacilityId))
 		}
-
 		if (input.clinicianStaffId) {
-			conditions.push(eq(appointments.clinicianStaffId, input.clinicianStaffId))
+			apptConditions.push(eq(appointments.clinicianStaffId, input.clinicianStaffId))
 		}
 
-		const rows = await db
+		const clinicianStaffSq = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("clinician_staff")
+
+		const apptRows = await db
 			.select({
 				id: appointments.id,
+				appointmentId: appointments.id,
+				encounterId: appointments.id, // placeholder — appointments don't have encounterId
 				queueNumber: appointments.queueNumber,
-				appointmentTime: appointments.appointmentTime,
-				status: appointments.status,
+				slotTime: appointments.appointmentTime,
 				checkedInAt: appointments.checkedInAt,
+				status: appointments.status,
 				patientId: appointments.patientId,
 				patientFirstName: patients.firstName,
 				patientLastName: patients.lastName,
 				patientMrn: patients.mrn,
 				clinicianStaffId: appointments.clinicianStaffId,
-				clinicianName: users.name,
+				clinicianName: clinicianStaffSq.name,
+				clinicName: clinicTemplates.clinicName,
 			})
 			.from(appointments)
 			.leftJoin(patients, eq(appointments.patientId, patients.id))
-			.leftJoin(staffProfiles, eq(appointments.clinicianStaffId, staffProfiles.id))
-			.leftJoin(users, eq(staffProfiles.userId, users.id))
-			.where(and(...conditions))
+			.leftJoin(clinicianStaffSq, eq(appointments.clinicianStaffId, clinicianStaffSq.id))
+			.leftJoin(clinicTemplates, eq(appointments.clinicTemplateId, clinicTemplates.id))
+			.where(and(...apptConditions))
 			.orderBy(appointments.queueNumber, appointments.appointmentTime)
 
-		const queue = rows.map(row => ({
+		const todayStart = new Date()
+		todayStart.setUTCHours(0, 0, 0, 0)
+		const tomorrowStart = new Date(todayStart)
+		tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1)
+
+		const walkInConditions: SQL[] = [
+			eq(encounters.encounterType, sql`'outpatient'`),
+			isNotNull(encounters.queueStatus),
+			gte(encounters.admissionDatetime, todayStart),
+			lt(encounters.admissionDatetime, tomorrowStart),
+		]
+		if (theFacilityId) {
+			walkInConditions.push(eq(encounters.facilityId, theFacilityId))
+		}
+		if (input.clinicianStaffId) {
+			walkInConditions.push(eq(encounters.clinicianStaffId, input.clinicianStaffId))
+		}
+
+		const walkInClinStaff = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("walk_in_clin_staff")
+
+		const walkInRows = await db
+			.select({
+				id: encounters.id,
+				encounterId: encounters.id,
+				queueNumber: encounters.queueNumber,
+				slotTime: sql<string | null>`null`,
+				checkedInAt: encounters.admissionDatetime,
+				queueStatus: encounters.queueStatus,
+				patientId: encounters.patientId,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+				patientMrn: patients.mrn,
+				clinicianStaffId: encounters.clinicianStaffId,
+				clinicianName: walkInClinStaff.name,
+			})
+			.from(encounters)
+			.innerJoin(patients, eq(encounters.patientId, patients.id))
+			.leftJoin(walkInClinStaff, eq(encounters.clinicianStaffId, walkInClinStaff.id))
+			.where(and(...walkInConditions))
+			.orderBy(encounters.queueNumber)
+
+		// Map appointment statuses to unified statuses
+		const mapApptStatus = (s: string): "waiting" | "in_progress" | "completed" => {
+			if (s === "checked_in") return "waiting"
+			if (s === "in_progress") return "in_progress"
+			return "completed"
+		}
+
+		const apptEntries = apptRows.map(row => ({
+			entryType: "appointment" as const,
 			id: row.id,
+			appointmentId: row.appointmentId,
+			encounterId: null as string | null,
 			queueNumber: row.queueNumber,
-			appointmentTime: row.appointmentTime,
-			status: row.status,
-			checkedInAt: row.checkedInAt,
+			slotTime: row.slotTime,
+			checkInTime: row.checkedInAt ? String(row.checkedInAt) : null,
+			status: mapApptStatus(row.status),
 			patientId: row.patientId,
 			patientName: row.patientFirstName
 				? `${row.patientLastName}, ${row.patientFirstName}`
@@ -521,22 +597,84 @@ export class SchedulingService {
 			clinicianName: row.clinicianName ?? undefined,
 		}))
 
-		// Calculate stats
-		const booked = queue.filter(q => q.status === "booked").length
-		const checkedIn = queue.filter(q => q.status === "checked_in").length
-		const inProgress = queue.filter(q => q.status === "in_progress").length
-		const completed = queue.filter(q => q.status === "completed").length
+		const walkInEntries = walkInRows.map(row => ({
+			entryType: "walk_in" as const,
+			id: row.id,
+			appointmentId: null as string | null,
+			encounterId: row.encounterId,
+			queueNumber: row.queueNumber,
+			slotTime: null as string | null,
+			checkInTime: row.checkedInAt ? String(row.checkedInAt) : null,
+			status: (row.queueStatus ?? "waiting") as "waiting" | "in_progress" | "completed",
+			patientId: row.patientId,
+			patientName: row.patientFirstName
+				? `${row.patientLastName}, ${row.patientFirstName}`
+				: undefined,
+			patientMrn: row.patientMrn ?? undefined,
+			clinicianStaffId: row.clinicianStaffId,
+			clinicianName: row.clinicianName ?? undefined,
+		}))
+
+		const entries = [...apptEntries, ...walkInEntries].sort(
+			(a, b) => (a.queueNumber ?? 9999) - (b.queueNumber ?? 9999)
+		)
+
+		// Derive clinic name from first appointment row that has one
+		const clinicName = apptRows.find(r => r.clinicName)?.clinicName ?? null
+
+		const waiting = entries.filter(e => e.status === "waiting").length
+		const inProgress = entries.filter(e => e.status === "in_progress").length
+		const completed = entries.filter(e => e.status === "completed").length
 
 		return {
-			queue,
-			stats: {
-				booked,
-				checkedIn,
-				inProgress,
-				completed,
-				total: queue.length,
-			},
+			entries,
+			clinicName,
+			stats: { waiting, inProgress, completed, total: entries.length },
 		}
+	}
+
+	async updateEncounterQueueStatus(input: UpdateEncounterQueueStatusInput) {
+		// Fetch current encounter to capture fromStatus and facilityId for the SLA event (PS-005)
+		const [current] = await db
+			.select({ queueStatus: encounters.queueStatus, facilityId: encounters.facilityId })
+			.from(encounters)
+			.where(eq(encounters.id, input.id))
+
+		if (!current) {
+			throw new NotFoundException(`Encounter ${input.id} not found`)
+		}
+
+		const fromStatus = current.queueStatus ?? null
+
+		const [enc] = await db
+			.update(encounters)
+			.set({ queueStatus: input.status, updatedAt: new Date() })
+			.where(eq(encounters.id, input.id))
+			.returning()
+
+		if (!enc) {
+			throw new NotFoundException(`Encounter ${input.id} not found`)
+		}
+
+		// SLA-001/SLA-004: Close the previous open OPD step before writing the new transition
+		await closeOpenSlaStep(db, enc.id, "opd")
+
+		// Log durable workflow-status event for SLA / audit tracking (PS-005)
+		const queueSlaMins = await resolveStepTarget(current.facilityId, "opd", input.status)
+		await db.insert(encounterStatusEvents).values({
+			facilityId: current.facilityId,
+			encounterId: enc.id,
+			fromStatus,
+			toStatus: input.status,
+			workflowType: "opd" as WorkflowType,
+			staffId: null,
+			slaTargetMinutes: queueSlaMins,
+			notes: `OPD queue: ${fromStatus ?? "none"} → ${input.status}`,
+			occurredAt: new Date(),
+		})
+
+		this.logger.log(`Updated encounter ${input.id} queue status to ${input.status}`)
+		return { id: enc.id, queueStatus: enc.queueStatus! }
 	}
 
 	// ========================================================================

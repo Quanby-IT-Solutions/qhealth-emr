@@ -36,6 +36,19 @@ export const RequirePermission = (
 	SetMetadata(RBAC_PERMISSION_KEY, { module, action })
 
 // ============================================================================
+// Decorator: RequirePermissions (multiple — AND logic)
+// ============================================================================
+
+/** Metadata key used by RequirePermissions decorator. */
+export const RBAC_PERMISSIONS_KEY = "rbac_all"
+
+/** Require ALL listed permissions on a controller or handler (AND logic). */
+export const RequirePermissions = (
+	permissions: Array<{ module: PermissionEntry["module"]; action: PermissionEntry["action"] }>
+) =>
+	SetMetadata(RBAC_PERMISSIONS_KEY, permissions)
+
+// ============================================================================
 // Guard
 // ============================================================================
 
@@ -117,31 +130,56 @@ export class RbacGuard implements CanActivate {
 			}
 		}
 
-		// Check route-level permission metadata
+		// Check route-level permission metadata (single, legacy)
 		const required = this.reflector.getAllAndOverride<
 			{ module: PermissionEntry["module"]; action: PermissionEntry["action"] } | undefined
 		>(RBAC_PERMISSION_KEY, [context.getHandler(), context.getClass()])
 
+		// Check multi-permission AND-logic metadata
+		const requiredAll = this.reflector.getAllAndOverride<
+			Array<{ module: PermissionEntry["module"]; action: PermissionEntry["action"] }> | undefined
+		>(RBAC_PERMISSIONS_KEY, [context.getHandler(), context.getClass()])
+
 		// Reject deactivated accounts on permission-protected routes
-		if (required && profile.staffProfiles.length === 0) {
+		if ((required || requiredAll) && profile.staffProfiles.length === 0) {
 			throw new ForbiddenException("Account is deactivated")
 		}
 
-		if (!required) {
+		if (!required && !requiredAll) {
 			// No permission metadata — authenticated access is sufficient
 			return true
 		}
 
-		const hasPermission =
-			profile.activeRole?.permissions.some(
-				p => p.module === required.module && p.action === required.action
-			) ?? false
+		// Check single permission (existing behaviour)
+		if (required) {
+			const hasPermission =
+				profile.activeRole?.permissions.some(
+					p => p.module === required.module && p.action === required.action
+				) ?? false
 
-		if (!hasPermission) {
-			this.logger.warn(
-				`User ${userId} missing permission ${required.module}:${required.action}`
-			)
-			throw new ForbiddenException("Insufficient permissions")
+			if (!hasPermission) {
+				this.logger.warn(
+					`User ${userId} missing permission ${required.module}:${required.action}`
+				)
+				throw new ForbiddenException("Insufficient permissions")
+			}
+		}
+
+		// Check all permissions (AND logic)
+		if (requiredAll) {
+			for (const req of requiredAll) {
+				const hasPermission =
+					profile.activeRole?.permissions.some(
+						p => p.module === req.module && p.action === req.action
+					) ?? false
+
+				if (!hasPermission) {
+					this.logger.warn(
+						`User ${userId} missing permission ${req.module}:${req.action}`
+					)
+					throw new ForbiddenException("Insufficient permissions")
+				}
+			}
 		}
 
 		return true

@@ -261,11 +261,27 @@ export const LabOrderSchema = z.object({
 	resultedDatetime: dateOrString.nullable(),
 	results: z.unknown(),
 	cdsAlerts: z.unknown(),
+	/** SLA-016: set when lab acknowledges specimen receipt */
+	specimenReceivedAt: dateOrString.nullable().optional(),
+	/** SLA-016: set when billing clears payment for the lab order */
+	billingClearedAt: dateOrString.nullable().optional(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 })
 
 export const LabOrderIdSchema = z.object({ id: z.string().uuid() })
+
+// SLA-016: update lab order — status transitions auto-set specimenReceivedAt;
+// billingClearedAt is provided explicitly when billing clears the order.
+export const UpdateLabOrderSchema = z.object({
+	id: z.string().uuid(),
+	status: LabOrderStatusEnum.optional(),
+	collectionDatetime: dateOrString.optional(),
+	resultedDatetime: dateOrString.optional(),
+	results: z.unknown().optional(),
+	/** Explicit billing-clearance timestamp (Flow 3 Step 2). Set by billing staff when payment clears. */
+	billingClearedAt: dateOrString.optional(),
+})
 
 export const CreateLabOrderSchema = z.object({
 	facilityId: z.string().uuid(),
@@ -311,11 +327,33 @@ export const ImagingOrderSchema = z.object({
 	report: z.string().nullable(),
 	structuredResults: z.unknown(),
 	cdsAlerts: z.unknown(),
+	/** SLA-016: set when radiology begins the study */
+	studyStartedAt: dateOrString.nullable().optional(),
+	/** SLA-019: set when radiology acknowledges receipt of the imaging order (Flow 3 Step 1 authoritative checkpoint) */
+	imagingOrderReceivedAt: dateOrString.nullable().optional(),
+	/** SLA-016: set when billing clears payment for the imaging order */
+	billingClearedAt: dateOrString.nullable().optional(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 })
 
 export const ImagingOrderIdSchema = z.object({ id: z.string().uuid() })
+
+// SLA-016/SLA-019: update imaging order — status transition to "in_progress" auto-sets studyStartedAt;
+// imagingOrderReceivedAt is provided explicitly when radiology acknowledges receipt (Flow 3 Step 1);
+// billingClearedAt is provided explicitly when billing clears the order (Flow 3 Step 2).
+export const UpdateImagingOrderSchema = z.object({
+	id: z.string().uuid(),
+	status: ImagingOrderStatusEnum.optional(),
+	scheduledDatetime: dateOrString.optional(),
+	completedDatetime: dateOrString.optional(),
+	report: z.string().optional(),
+	structuredResults: z.unknown().optional(),
+	/** SLA-019: explicit receipt timestamp — set when radiology acknowledges order receipt (Flow 3 Step 1). */
+	imagingOrderReceivedAt: dateOrString.optional(),
+	/** Explicit billing-clearance timestamp (Flow 3 Step 2). Set by billing staff when payment clears. */
+	billingClearedAt: dateOrString.optional(),
+})
 
 export const CreateImagingOrderSchema = z.object({
 	facilityId: z.string().uuid(),

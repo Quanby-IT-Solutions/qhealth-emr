@@ -1,3 +1,5 @@
+import { index } from "drizzle-orm/pg-core"
+
 import { createTable } from "../utils/table.js"
 import { facilities } from "./rbac.js"
 
@@ -15,7 +17,8 @@ export const systemSettings = createTable("system_settings", t => ({
 	breakGlassRequiresReason: t.boolean("break_glass_requires_reason").notNull().default(true),
 	autoFreezeChargesOnDischarge: t.boolean("auto_freeze_charges_on_discharge").notNull().default(true),
 	requireDpaConsentBeforeExport: t.boolean("require_dpa_consent_before_export").notNull().default(true),
-	enableOfflineSummaryCache: t.boolean("enable_offline_summary_cache").notNull().default(false),
+	// TOR §4.2: offline capability is mandatory — default must be true so new rows are provisioned compliantly
+	enableOfflineSummaryCache: t.boolean("enable_offline_summary_cache").notNull().default(true),
 
 	// ── JSONB policy sections ─────────────────────────────────────────────────
 	// Shape: { artaSla: {...}, exportDefaults: {...}, offlineMode: {...}, privacyConsent: {...} }
@@ -58,3 +61,35 @@ export interface PolicySections {
 }
 
 export type SystemSettingsRow = typeof systemSettings.$inferSelect
+
+// ============================================================================
+// OFFLINE CACHE JOBS — Tracks background cache preparation for offline mode
+// ============================================================================
+
+export const offlineCacheJobs = createTable(
+	"offline_cache_jobs",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "cascade" }),
+		status: t
+			.text("status")
+			.notNull()
+			.$type<"running" | "completed" | "failed">(),
+		startedAt: t.timestamp("started_at").notNull().defaultNow(),
+		completedAt: t.timestamp("completed_at"),
+		cachedPatientCount: t.integer("cached_patient_count"),
+		errorMessage: t.text("error_message"),
+		triggeredBy: t.text("triggered_by").notNull().default("scheduler"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("offline_cache_jobs_facility_id_idx").on(t.facilityId),
+		index("offline_cache_jobs_status_idx").on(t.status),
+		index("offline_cache_jobs_started_at_idx").on(t.startedAt),
+	]
+)
+
+export type OfflineCacheJobRow = typeof offlineCacheJobs.$inferSelect

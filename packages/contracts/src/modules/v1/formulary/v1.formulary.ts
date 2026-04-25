@@ -8,6 +8,7 @@ import {
 	loincContract,
 	rvsContract,
 	rxnormContract,
+	snomedCtContract,
 } from "./formulary.contract.js"
 
 export const v1Formulary = oc.prefix("/formulary").router(
@@ -19,5 +20,6 @@ export const v1Formulary = oc.prefix("/formulary").router(
 		loinc: loincContract,
 		rxnorm: rxnormContract,
 		rvs: rvsContract,
+		snomedCt: snomedCtContract,
 	})
 )

@@ -23,7 +23,7 @@ export const featureFlagsContract = {
 	list: oc
 		.route({
 			method: "GET",
-			path: "/feature-flags",
+			path: "/",
 			summary: "List all feature flags with their targeting configuration",
 			tags: ["Feature Flags"],
 		})
@@ -32,7 +32,7 @@ export const featureFlagsContract = {
 	get: oc
 		.route({
 			method: "GET",
-			path: "/feature-flags/{id}",
+			path: "/{id}",
 			summary: "Get a feature flag detail including targets",
 			tags: ["Feature Flags"],
 		})
@@ -42,7 +42,7 @@ export const featureFlagsContract = {
 	create: oc
 		.route({
 			method: "POST",
-			path: "/feature-flags",
+			path: "/",
 			summary: "Create a new feature flag definition",
 			tags: ["Feature Flags"],
 		})
@@ -52,7 +52,7 @@ export const featureFlagsContract = {
 	update: oc
 		.route({
 			method: "PATCH",
-			path: "/feature-flags/{id}",
+			path: "/{id}",
 			summary: "Update a feature flag definition",
 			tags: ["Feature Flags"],
 		})
@@ -62,7 +62,7 @@ export const featureFlagsContract = {
 	delete: oc
 		.route({
 			method: "DELETE",
-			path: "/feature-flags/{id}",
+			path: "/{id}",
 			summary: "Delete a feature flag and all its targets",
 			tags: ["Feature Flags"],
 		})
@@ -72,7 +72,7 @@ export const featureFlagsContract = {
 	updateTargeting: oc
 		.route({
 			method: "PUT",
-			path: "/feature-flags/{flagId}/targets",
+			path: "/{flagId}/targets",
 			summary: "Replace targeting configuration for a flag (full replace, audited diff)",
 			tags: ["Feature Flags"],
 		})
@@ -86,7 +86,7 @@ export const featureFlagsContract = {
 	resolveForSession: oc
 		.route({
 			method: "GET",
-			path: "/feature-flags/resolve",
+			path: "/resolve",
 			summary: "Resolve all feature flags for the current session context",
 			tags: ["Feature Flags"],
 		})
@@ -99,7 +99,7 @@ export const featureFlagsContract = {
 	evaluate: oc
 		.route({
 			method: "GET",
-			path: "/feature-flags/evaluate/{key}",
+			path: "/evaluate/{key}",
 			summary: "Evaluate a single feature flag by key for the current session",
 			tags: ["Feature Flags"],
 		})

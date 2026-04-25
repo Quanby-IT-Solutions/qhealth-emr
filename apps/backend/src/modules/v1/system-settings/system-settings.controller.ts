@@ -5,7 +5,7 @@ import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequirePermission, RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
 
 import { SystemSettingsService } from "./system-settings.service"
 
@@ -39,10 +39,11 @@ function getActiveFacilityId(req: Request): string {
 }
 
 @Controller()
+@RequirePermission("admin", "view")
 export class SystemSettingsController {
 	constructor(private readonly systemSettingsService: SystemSettingsService) {}
 
-	@RequirePermission("system_settings", "view")
+	@RequirePermissions([{ module: "system_settings", action: "view" }])
 	@Implement(v1.systemSettings.get)
 	async get(@Session() _session: UserSession, @Req() req: Request) {
 		const facilityId = getActiveFacilityId(req)
@@ -51,10 +52,14 @@ export class SystemSettingsController {
 		})
 	}
 
-	@RequirePermission("system_settings", "edit")
+	@RequirePermissions([{ module: "system_settings", action: "edit" }])
 	@Implement(v1.systemSettings.update)
 	async update(@Session() session: UserSession, @Req() req: Request) {
-		const actor = extractActor(session, req)
+		const actor = {
+			...extractActor(session, req),
+			ipAddress: (req.ip ?? null) as string | null,
+			userAgent: (req.get("user-agent") ?? null) as string | null,
+		}
 		const facilityId = actor.facilityId
 		return implement(v1.systemSettings.update).handler(async ({ input }) => {
 			return this.systemSettingsService.update(facilityId, input, actor)

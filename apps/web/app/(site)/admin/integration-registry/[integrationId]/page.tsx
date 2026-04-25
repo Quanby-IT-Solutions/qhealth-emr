@@ -1,11 +1,33 @@
+"use client"
+
+import { useParams } from "next/navigation"
+
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { IntegrationDetail } from "@/features/integration-registry/components/integration-detail"
 
-interface IntegrationDetailPageProps {
-	params: Promise<{ integrationId: string }>
+function usePermissionSet() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
 }
 
-export default async function IntegrationDetailPage({ params }: IntegrationDetailPageProps) {
-	const { integrationId } = await params
+function can(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
+}
+
+export default function IntegrationDetailPage() {
+	const params = useParams<{ integrationId: string }>()
+	const { integrationId } = params
+	const permSet = usePermissionSet()
+
+	if (!can(permSet, "admin", "view")) {
+		return (
+			<div className="flex items-center justify-center p-8 text-muted-foreground">
+				You do not have permission to access integration registry management.
+			</div>
+		)
+	}
+
 	return (
 		<div className="space-y-6">
 			<div>

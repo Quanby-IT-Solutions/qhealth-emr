@@ -14,9 +14,10 @@ interface DocumentationTabProps {
 	encounterId: string
 	facilityId: string
 	patientId: string
+	canWrite?: boolean
 }
 
-export function DocumentationTab({ encounterId, facilityId, patientId }: DocumentationTabProps) {
+export function DocumentationTab({ encounterId, facilityId, patientId, canWrite }: DocumentationTabProps) {
 	const { data, isLoading } = useNotesQuery({ encounterId })
 	const [createOpen, setCreateOpen] = useState(false)
 	const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
@@ -28,9 +29,11 @@ export function DocumentationTab({ encounterId, facilityId, patientId }: Documen
 			<Card>
 				<CardHeader className="flex flex-row items-center justify-between">
 					<CardTitle>Clinical Notes</CardTitle>
-					<Button size="sm" onClick={() => setCreateOpen(true)}>
-						New Note
-					</Button>
+					{canWrite && (
+						<Button size="sm" onClick={() => setCreateOpen(true)}>
+							New Note
+						</Button>
+					)}
 				</CardHeader>
 				<CardContent className="p-0">
 					<NoteTimeline
@@ -57,6 +60,7 @@ export function DocumentationTab({ encounterId, facilityId, patientId }: Documen
 					onOpenChange={open => {
 						if (!open) setSelectedNoteId(null)
 					}}
+					canWrite={canWrite}
 				/>
 			)}
 		</div>

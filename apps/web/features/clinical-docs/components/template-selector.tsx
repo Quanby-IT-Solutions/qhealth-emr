@@ -16,13 +16,13 @@ import {
 import { useNoteTemplatesQuery } from "@/features/clinical-docs/api/clinical-docs.hooks"
 
 /** Note types that REQUIRE a template to be chosen before creation. */
-const TEMPLATE_REQUIRED_TYPES = new Set(["admission", "discharge_summary", "fpe"])
+const TEMPLATE_REQUIRED_TYPES = new Set(["admission", "discharge_summary", "fpe", "consultation"])
 
 /** Human-readable note type labels. */
 export const NOTE_TYPE_LABELS: Record<string, string> = {
 	admission: "Admission Note (H&P)",
 	progress: "Progress Note",
-	consultation: "Consultation",
+	consultation: "Consultation (SOAP)",
 	discharge_summary: "Discharge Summary",
 	fpe: "FPE / Konsulta",
 }

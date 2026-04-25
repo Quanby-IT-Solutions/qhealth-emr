@@ -173,6 +173,35 @@ export const FndrfIdInputSchema = z.object({
 	id: z.string().uuid(),
 })
 
+// SLA-021: mark a death report as released (Flow 7 Step 3 authoritative evidence)
+export const MarkDeathReportReleasedInputSchema = z.object({
+	id: z.string().uuid(),
+	/** UUID of the staff member who physically released the certificate */
+	releasedByStaffId: z.string().uuid(),
+	/** ISO datetime of release; defaults to now if omitted */
+	releasedAt: z.string().datetime().optional(),
+})
+
+export const MarkDeathReportReleasedResponseSchema = z.object({
+	id: z.string().uuid(),
+	releasedByStaffId: z.string().nullable(),
+	releasedAt: z.string().nullable(),
+	status: z.string(),
+	completedAt: z.string().nullable(),
+})
+
+// SLA-017: mark a death report as paid
+export const MarkDeathReportPaidInputSchema = z.object({
+	id: z.string().uuid(),
+	/** ISO datetime of payment; defaults to now if omitted */
+	paidAt: z.string().datetime().optional(),
+})
+
+export const MarkDeathReportPaidResponseSchema = z.object({
+	id: z.string().uuid(),
+	paidAt: z.string().nullable(),
+})
+
 // ============================================================================
 // Inferred Types
 // ============================================================================

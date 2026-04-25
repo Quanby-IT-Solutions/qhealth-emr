@@ -78,6 +78,16 @@ type ModuleName =
 	| "system_settings"
 	| "facility_profile"
 	| "integration_registry"
+	| "patients"
+	| "telemedicine"
+	| "ed"
+	| "nbs"
+	| "msw"
+	| "death_reporting"
+	| "fhir"
+	| "civil_registry"
+	| "medical_records"
+	| "notifications"
 
 type ActionName = "view" | "create" | "edit" | "sign" | "delete" | "verify" | "export"
 
@@ -256,15 +266,16 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["system_settings", ["view", "create", "edit"]], // System configuration
 		["facility_profile", ["view", "create", "edit"]], // Facility profile management
 		["integration_registry", ["view", "create", "edit", "delete"]], // Integration oversight
-		["audit", ["view", "export"]], // Audit trail visibility
 		["reporting", ["view", "export"]], // Reporting access (view only)
 		["adt", ["view"]], // Census visibility (no clinical write)
-		["billing", ["view"]], // Billing visibility (no create/edit)
 		["formulary", ["view"]], // Formulary visibility (no create/edit)
+		["fhir", ["view", "export"]], // FHIR export management
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Physician: [
 		// Physicians view patients and create encounters, but don't manage scheduling/beds (Registrar's job)
 		["adt", ["view", "create"]],
+		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
 		["orders", ["view", "create", "edit", "sign"]],
 		["nursing", ["view"]],
@@ -272,92 +283,159 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["formulary", ["view"]],
 		["reporting", ["view", "create"]],
 		["opd", ["view"]], // OPD dashboard access
+		["telemedicine", ["view", "create", "edit"]], // Virtual consultation access
+		["ed", ["view"]], // Emergency department patient viewing
+		["death_reporting", ["view", "create", "edit"]], // Physician authors FMDRF/FNDRF forms
+		["audit", ["create"]], // Break-glass emergency access invocation
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Nurse: [
 		["adt", ["view", "edit"]], // edit for bed management access
-		["clinical_docs", ["view", "create", "edit"]],
+		["patients", ["view"]], // Patient record access (search, profile)
+		["clinical_docs", ["view"]],
 		["orders", ["view"]],
 		["nursing", ["view", "create", "edit", "sign"]],
 		["formulary", ["view"]],
-		// NO opd:view — Nurses work in wards/ED, not OPD
+		["ed", ["view"]], // Emergency department access
+		["nbs", ["view", "create", "edit"]], // Newborn screening workflows
+		["opd", ["view"]], // TOR: Nurses participate in OPD triage and vital-sign capture
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Pharmacist: [
 		["orders", ["view", "edit", "verify"]],
 		["formulary", ["view", "create", "edit"]],
 		["clinical_docs", ["view"]],
+		["patients", ["view"]], // Patient record access for dispensing verification
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Billing Officer": [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access for billing reconciliation
 		["billing", ["view", "create", "edit", "export"]],
 		["clinical_docs", ["view"]],
 		["reporting", ["view", "export"]],
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"PIDSR Officer": [
+		["patients", ["view"]], // Patient record access for disease surveillance
 		["clinical_docs", ["view"]],
 		["reporting", ["view", "create", "edit", "verify", "export"]],
-		["audit", ["view", "export"]],
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Registrar: [
 		["adt", ["view", "create", "edit"]],
+		["patients", ["view", "create", "edit"]], // TOR: Registrar views, creates and updates patient records
 		["opd", ["view"]], // OPD dashboard access for patient routing
+		["death_reporting", ["view"]], // TOR: Registrar issues and tracks death certificates (FMDRF/FNDRF)
+		["civil_registry", ["view", "create", "edit"]], // TOR: Registrar registers births/deaths via civil registry forms
+		["medical_records", ["view"]], // TOR: Registrar processes medical certificate requests
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Triage Officer": [
 		["adt", ["view", "create"]],
+		["patients", ["view"]], // Patient record access for triage intake lookup
+		["clinical_docs", ["view"]], // TOR: Triage needs allergy/problem history for patient safety
 		["nursing", ["view", "create"]],
+		["ed", ["view", "create"]], // Emergency department triage workflows
+		["opd", ["view"]], // TOR: Triage Officers staff the OPD triage desk
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Surgeon: [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
 		["orders", ["view", "create", "sign"]],
-		["surgical", ["view"]], // Surgical tab visibility
+		["surgical", ["view", "create", "edit"]], // Surgical tab visibility + create/save operation/anesthesia records
 		["formulary", ["view"]],
 		["opd", ["view"]], // OPD dashboard access (per TOR)
+		["death_reporting", ["view", "create", "edit"]], // Surgeon may author FMDRF/FNDRF for surgical cases
+		["audit", ["create"]], // Break-glass emergency access invocation
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Anesthesiologist: [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
 		["orders", ["view", "create"]],
-		["surgical", ["view"]], // Surgical tab visibility
+		["surgical", ["view", "edit"]], // Surgical tab visibility + save anesthesia records
 		["formulary", ["view"]],
+		["audit", ["create"]], // Break-glass emergency access invocation
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Lab Technologist": [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access for order lookup
 		["orders", ["view", "edit"]],
 		["laboratory", ["view", "edit"]],
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Radiologist: [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access for imaging lookup
 		["radiology", ["view", "edit"]],
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Blood Bank Technician": [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access for blood bank orders
 		["orders", ["view", "edit"]],
-		["laboratory", ["view"]], // Blood Bank nav access
+		["laboratory", ["view", "create", "edit"]], // Blood Bank nav + submit cross-match + approve/bedside verify
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"HIM Coder": [
 		["adt", ["view"]],
-		["clinical_docs", ["view", "create", "edit"]],
+		["patients", ["view"]], // Patient record access for coding and HIM
+		["clinical_docs", ["view", "edit"]],
 		["reporting", ["view"]], // HAI tracking and report access
+		["medical_records", ["view", "create", "edit"]], // TOR: HIM manages medical records release and chart completion
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Medical Social Worker": [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access for social work assessment
 		["billing", ["view"]],
 		["clinical_docs", ["view"]],
+		["msw", ["view", "create", "edit"]], // MSW assessment and COE workflows
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Clinical Dietitian": [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access for dietary assessment
 		// Dietitians use nutrition module, not nursing (avoids unintended nav visibility)
 		["nutrition", ["view", "edit"]],
 		["clinical_docs", ["view"]],
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Scheduler: [
 		["adt", ["view", "create"]],
+		["patients", ["view"]], // Patient record access for appointment scheduling
 		["scheduling", ["view", "create", "edit"]],
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Auditor: [
 		["adt", ["view"]],
+		["patients", ["view"]], // TOR: Auditor/Privacy Officer has read-all access
+		["clinical_docs", ["view"]], // TOR: clinical documentation audit
+		["nursing", ["view"]], // TOR: nursing records audit
+		["orders", ["view"]], // TOR: medication order audit trail
+		["billing", ["view"]], // TOR: billing and charge audit
+		["formulary", ["view"]], // TOR: formulary compliance audit
+		["laboratory", ["view"]], // TOR: lab result audit
+		["radiology", ["view"]], // TOR: imaging order audit
 		["audit", ["view", "export"]],
 		["reporting", ["view"]],
+		["telemedicine", ["view"]], // TOR: telemedicine encounter audit
+		["msw", ["view"]], // TOR: social work assessment audit
+		["nutrition", ["view"]], // TOR: nutrition assessment audit
+		["nbs", ["view"]], // TOR: newborn screening audit
+		["surgical", ["view"]], // TOR: surgical record audit
+		["ed", ["view"]], // TOR: emergency department audit
+		["death_reporting", ["view"]], // TOR: death certificate audit
+		["scheduling", ["view"]], // TOR: scheduling audit
+		["civil_registry", ["view"]], // TOR: civil registry audit
+		["medical_records", ["view"]], // TOR: medical records release audit
+		["opd", ["view"]], // TOR: OPD encounter audit
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 }
 
@@ -689,6 +767,24 @@ async function ensureClinicalData(params: {
 				createdByStaffId: params.staffId,
 			})
 			.returning()
+	}
+
+	// PS-003: Seed a dedicated OPD Consultation SOAP template so consultation notes are structured
+	const [consultTemplate] = await db
+		.select()
+		.from(noteTemplates)
+		.where(and(eq(noteTemplates.facilityId, params.facilityId), eq(noteTemplates.name, "Outpatient Consultation (SOAP)")))
+	if (!consultTemplate) {
+		await db
+			.insert(noteTemplates)
+			.values({
+				facilityId: params.facilityId,
+				name: "Outpatient Consultation (SOAP)",
+				category: "consultation",
+				sections: ["Subjective", "Objective", "Assessment", "Plan"],
+				isActive: true,
+				createdByStaffId: params.staffId,
+			})
 	}
 
 	const [note] = await db

@@ -1,10 +1,32 @@
+"use client"
+
+import { useParams } from "next/navigation"
+
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { FeatureFlagDetail } from "@/features/feature-flags/components/feature-flag-detail"
 
-interface FeatureFlagDetailPageProps {
-	params: Promise<{ flagId: string }>
+function usePermissionSet() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
 }
 
-export default async function FeatureFlagDetailPage({ params }: FeatureFlagDetailPageProps) {
-	const { flagId } = await params
-	return <FeatureFlagDetail flagId={flagId} />
+function can(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
+}
+
+export default function FeatureFlagDetailPage() {
+	const params = useParams<{ flagId: string }>()
+	const { flagId } = params
+	const permSet = usePermissionSet()
+
+	if (!can(permSet, "admin", "view") || !can(permSet, "feature_flags", "view")) {
+		return (
+			<div className="flex items-center justify-center p-8 text-muted-foreground">
+				You do not have permission to access feature flag management.
+			</div>
+		)
+	}
+
+	return <FeatureFlagDetail flagId={flagId} canEdit={can(permSet, "feature_flags", "edit")} />
 }

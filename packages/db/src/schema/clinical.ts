@@ -152,8 +152,13 @@ export const problems = createTable(
 			.uuid("patient_id")
 			.notNull()
 			.references(() => patients.id, { onDelete: "cascade" }),
+		encounterId: t
+			.uuid("encounter_id")
+			.references(() => encounters.id, { onDelete: "set null" }),
 		icd10Code: t.text("icd10_code"),
 		icd10Display: t.text("icd10_display"),
+		snomedCode: t.text("snomed_code"),
+		snomedDisplay: t.text("snomed_display"),
 		description: t.text("description").notNull(),
 		onsetDate: t.date("onset_date"),
 		resolutionDate: t.date("resolution_date"),
@@ -168,6 +173,7 @@ export const problems = createTable(
 		index("problems_patient_id_idx").on(t.patientId),
 		index("problems_facility_id_idx").on(t.facilityId),
 		index("problems_status_idx").on(t.status),
+		index("problems_encounter_id_idx").on(t.encounterId),
 	]
 )
 
@@ -205,5 +211,65 @@ export const allergies = createTable(
 		index("allergies_patient_id_idx").on(t.patientId),
 		index("allergies_facility_id_idx").on(t.facilityId),
 		index("allergies_allergen_type_idx").on(t.allergenType),
+	]
+)
+
+// ── Medical Records Requests — HIM chart release & med cert tracking (AD-004) ─
+
+export const medicalRecordsRequests = createTable(
+	"medical_records_requests",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		patientId: t
+			.uuid("patient_id")
+			.notNull()
+			.references(() => patients.id, { onDelete: "restrict" }),
+		encounterId: t
+			.uuid("encounter_id")
+			.references(() => encounters.id, { onDelete: "set null" }),
+		requestType: t
+			.text("request_type")
+			.notNull()
+			.$type<"chart_release" | "medical_certificate" | "discharge_summary_copy" | "laboratory_results">(),
+		requestedByName: t.text("requested_by_name").notNull(),
+		requestedByRelationship: t
+			.text("requested_by_relationship")
+			.$type<"self" | "parent" | "guardian" | "legal_representative" | "other">(),
+		purpose: t.text("purpose"),
+		status: t
+			.text("status")
+			.notNull()
+			.default("pending")
+			.$type<"pending" | "processing" | "completed" | "rejected">(),
+		processedByStaffId: t
+			.uuid("processed_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		completedAt: t.timestamp("completed_at"),
+		// SLA-012: Flow 7 Step 2 — captures when payment was received for this request.
+		// Drives the records_payment step metric in the SLA compliance report.
+		paidAt: t.timestamp("paid_at"),
+		// SLA-020: Flow 7 Step 1 evidence — identity verified at point of request receipt.
+		identityVerified: t.boolean("identity_verified").notNull().default(false),
+		// SLA-020: Flow 7 Step 1 evidence — DPA consent was captured at receipt.
+		dpaConsentObtained: t.boolean("dpa_consent_obtained").notNull().default(false),
+		// SLA-020: Flow 7 Step 3 evidence — staff member who physically released the records.
+		releasedByStaffId: t
+			.uuid("released_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		// SLA-020: Flow 7 Step 3 evidence — timestamp when records were released to requestor.
+		releasedAt: t.timestamp("released_at"),
+		rejectionReason: t.text("rejection_reason"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("medical_records_requests_facility_id_idx").on(t.facilityId),
+		index("medical_records_requests_patient_id_idx").on(t.patientId),
+		index("medical_records_requests_status_idx").on(t.status),
+		index("medical_records_requests_request_type_idx").on(t.requestType),
 	]
 )

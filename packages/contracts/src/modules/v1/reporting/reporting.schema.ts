@@ -24,7 +24,7 @@ export const PidsrCategoryEnum = z.enum(["category_1", "category_2"])
 
 export const CaseClassificationEnum = z.enum(["suspected", "probable", "confirmed"])
 
-export const PidsrReportStatusEnum = z.enum(["draft", "submitted"])
+export const PidsrReportStatusEnum = z.enum(["draft", "submitted", "rejected", "blocked"])
 
 export const SurveillanceFlagTypeEnum = z.enum(["icd10_match", "syndromic_keyword"])
 
