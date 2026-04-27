@@ -6,8 +6,8 @@ import { useChartContext } from "@/features/encounters/context/chart-context"
 
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
-	const perms: string[] = profile?.activeRole?.permissions ?? []
-	return new Set(perms)
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
 }
 
 function can(permSet: Set<string>, module: string, action: string) {

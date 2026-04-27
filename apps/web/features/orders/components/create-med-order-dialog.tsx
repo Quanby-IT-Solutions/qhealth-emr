@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { AlertCircle, Eye } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -18,24 +17,20 @@ import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { useActiveAllergiesQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
 import {
 	useCreateMedOrderMutation,
 	useEvaluateCdsMutation,
+	type CdsEvaluateResponse,
 } from "@/features/orders/api/orders.hooks"
+import { useActiveAllergiesQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
 
-import { type CdsAlertItem, CdsAlertBanner } from "./cds-alert-banner"
-import { type AllergyAlertItem, AllergyAlertBanner } from "./allergy-alert-banner"
-import { type TrancheRow, TranchingPreviewModal } from "./tranching-preview-modal"
+import { AllergyAlertBanner, type AllergyAlertItem } from "./allergy-alert-banner"
+import { CdsAlertBanner, type CdsAlertItem } from "./cds-alert-banner"
+import { TranchingPreviewModal, type TrancheRow } from "./tranching-preview-modal"
 
 const TRANCHE_THRESHOLD_DAYS = 90
 
-interface CdsResult {
-	alerts: CdsAlertItem[]
-	canProceed: boolean
-	requiresOverride: boolean
-	requiresDoubleVerification: boolean
-}
+type CdsResult = CdsEvaluateResponse
 
 interface CreateMedOrderDialogProps {
 	open: boolean
@@ -88,11 +83,13 @@ export function CreateMedOrderDialog({
 	const createMedOrder = useCreateMedOrderMutation()
 
 	// ── PDEA validation ──────────────────────────────────────────────────────
-	const staffProfile = profile?.staffProfiles?.[0]
+	const staffProfile =
+		profile?.staffProfiles?.find(p => p.id === orderingStaffId) ??
+		profile?.staffProfiles?.find(p => p.facilityId === facilityId) ??
+		profile?.staffProfiles?.[0]
 	const pdeaLicense = staffProfile?.pdeaS2License ?? null
 	const pdeaExpiry = staffProfile?.pdeaS2Expiry ?? null
-	const pdeaExpired =
-		pdeaExpiry != null ? new Date(pdeaExpiry) < new Date() : false
+	const pdeaExpired = pdeaExpiry != null ? new Date(pdeaExpiry) < new Date() : false
 	const pdeaValid = pdeaLicense != null && !pdeaExpired
 
 	function handleControlledSubstanceChange(checked: boolean) {
@@ -108,29 +105,26 @@ export function CreateMedOrderDialog({
 			message: a.message,
 		})) ?? []
 
-	const hasHardBlock = normalizedAlerts.some((a) => a.severity === "hard_block")
+	const hasHardBlock = normalizedAlerts.some(a => a.severity === "hard_block")
 	const unoverriddenSoftBlocks = normalizedAlerts.filter(
-		(a) => a.severity === "soft_block" && !overriddenAlerts.has(a.id),
+		a => a.severity === "soft_block" && !overriddenAlerts.has(a.id)
 	)
 	const allSoftBlocksOverridden = unoverriddenSoftBlocks.length === 0
 
 	// ── Allergy helpers ──────────────────────────────────────────────────────
 	const normalizedAllergyAlerts: AllergyAlertItem[] = (activeAllergies?.allergies ?? [])
-		.filter((a) => a.allergenType === "medication")
+		.filter(a => a.allergenType === "medication")
 		.map((a, i) => ({
 			id: `allergy-${i}`,
-			blockType:
-				a.severity === "severe" || a.severity === "life-threatening"
-					? "hard_block"
-					: "soft_block",
+			blockType: a.severity === "severe" ? "hard_block" : "soft_block",
 			allergenName: a.allergenName,
 			severity: a.severity,
 			reactionType: a.reactionType,
 		}))
 
-	const hasAllergyHardBlock = normalizedAllergyAlerts.some((a) => a.blockType === "hard_block")
+	const hasAllergyHardBlock = normalizedAllergyAlerts.some(a => a.blockType === "hard_block")
 	const unoverriddenAllergySoftBlocks = normalizedAllergyAlerts.filter(
-		(a) => a.blockType === "soft_block" && !allergyOverriddenAlerts.has(a.id),
+		a => a.blockType === "soft_block" && !allergyOverriddenAlerts.has(a.id)
 	)
 	const allergyAllSoftBlocksOverridden = unoverriddenAllergySoftBlocks.length === 0
 
@@ -180,7 +174,7 @@ export function CreateMedOrderDialog({
 	}
 
 	function handleCheckCds() {
-		if (!genericName.trim()) return
+		if (!genericName.trim() || !orderingStaffId) return
 		evaluateCds.mutate(
 			{
 				patientId,
@@ -189,25 +183,25 @@ export function CreateMedOrderDialog({
 				orderingStaffId,
 				facilityId,
 			},
-			{ onSuccess: (data) => setCdsResult(data) },
+			{ onSuccess: data => setCdsResult(data) }
 		)
 	}
 
 	function handleOverride(alertId: string, reason: string) {
-		setOverriddenAlerts((prev) => new Set([...prev, alertId]))
-		setOverrideReasons((prev) => ({ ...prev, [alertId]: reason }))
+		setOverriddenAlerts(prev => new Set([...prev, alertId]))
+		setOverrideReasons(prev => ({ ...prev, [alertId]: reason }))
 	}
 
 	function handleAllergyOverride(alertId: string, reason: string) {
-		setAllergyOverriddenAlerts((prev) => new Set([...prev, alertId]))
-		setAllergyOverrideReasons((prev) => ({ ...prev, [alertId]: reason }))
+		setAllergyOverriddenAlerts(prev => new Set([...prev, alertId]))
+		setAllergyOverrideReasons(prev => ({ ...prev, [alertId]: reason }))
 	}
 
 	function doSubmit(trancheNumber?: number, trancheTotal?: number, trancheDays?: number) {
 		const cdsOverrides =
 			overriddenAlerts.size > 0
 				? {
-						overrides: [...overriddenAlerts].map((id) => ({
+						overrides: [...overriddenAlerts].map(id => ({
 							alertId: id,
 							reason: overrideReasons[id] ?? "",
 							overriddenAt: new Date().toISOString(),
@@ -237,7 +231,7 @@ export function CreateMedOrderDialog({
 				cdsAlerts: cdsResult?.alerts ?? undefined,
 				cdsOverrides,
 			},
-			{ onSuccess: () => handleOpenChange(false) },
+			{ onSuccess: () => handleOpenChange(false) }
 		)
 	}
 
@@ -263,8 +257,8 @@ export function CreateMedOrderDialog({
 					<DialogHeader>
 						<DialogTitle>New Medication Order</DialogTitle>
 						<DialogDescription>
-							Generic drug name is required first. Brand name is optional and
-							appears after entering the generic name.
+							Generic drug name is required first. Brand name is optional and appears after entering
+							the generic name.
 						</DialogDescription>
 					</DialogHeader>
 
@@ -272,13 +266,12 @@ export function CreateMedOrderDialog({
 						{/* ── Generic Name (primary / required) ─────────── */}
 						<div className="space-y-2">
 							<Label htmlFor="genericName">
-								Generic Name{" "}
-								<span className="text-destructive">*</span>
+								Generic Name <span className="text-destructive">*</span>
 							</Label>
 							<Input
 								id="genericName"
 								value={genericName}
-								onChange={(e) => {
+								onChange={e => {
 									setGenericName(e.target.value)
 									// Reset brand + CDS when generic changes
 									setBrandName("")
@@ -289,7 +282,7 @@ export function CreateMedOrderDialog({
 								placeholder="e.g., Amoxicillin (generic name required)"
 								autoFocus
 							/>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								Per RA 6675 (Generics Act), orders must specify the generic name.
 							</p>
 						</div>
@@ -301,7 +294,7 @@ export function CreateMedOrderDialog({
 								<Input
 									id="brandName"
 									value={brandName}
-									onChange={(e) => setBrandName(e.target.value)}
+									onChange={e => setBrandName(e.target.value)}
 									placeholder="e.g., Amoxil — leave blank to dispense any generic"
 								/>
 							</div>
@@ -313,13 +306,13 @@ export function CreateMedOrderDialog({
 								type="button"
 								variant="secondary"
 								size="sm"
-								disabled={!genericName.trim() || evaluateCds.isPending}
+								disabled={!genericName.trim() || !orderingStaffId || evaluateCds.isPending}
 								onClick={handleCheckCds}
 							>
 								{evaluateCds.isPending ? "Checking…" : "Check Drug Safety"}
 							</Button>
 							{cdsResult && (
-								<span className="text-xs text-muted-foreground">
+								<span className="text-muted-foreground text-xs">
 									{cdsResult.alerts.length === 0
 										? "✓ No alerts"
 										: `${cdsResult.alerts.length} alert(s) found`}
@@ -333,7 +326,7 @@ export function CreateMedOrderDialog({
 								alerts={normalizedAlerts}
 								overrideReasons={overrideReasons}
 								onOverrideReasonChange={(id, reason) =>
-									setOverrideReasons((prev) => ({ ...prev, [id]: reason }))
+									setOverrideReasons(prev => ({ ...prev, [id]: reason }))
 								}
 								onOverride={handleOverride}
 							/>
@@ -345,7 +338,7 @@ export function CreateMedOrderDialog({
 								alerts={normalizedAllergyAlerts}
 								overrideReasons={allergyOverrideReasons}
 								onOverrideReasonChange={(id, reason) =>
-									setAllergyOverrideReasons((prev) => ({ ...prev, [id]: reason }))
+									setAllergyOverrideReasons(prev => ({ ...prev, [id]: reason }))
 								}
 								onOverride={handleAllergyOverride}
 							/>
@@ -360,7 +353,7 @@ export function CreateMedOrderDialog({
 								<Input
 									id="dose"
 									value={dose}
-									onChange={(e) => setDose(e.target.value)}
+									onChange={e => setDose(e.target.value)}
 									placeholder="e.g., 500"
 								/>
 							</div>
@@ -371,7 +364,7 @@ export function CreateMedOrderDialog({
 								<Input
 									id="doseUnit"
 									value={doseUnit}
-									onChange={(e) => setDoseUnit(e.target.value)}
+									onChange={e => setDoseUnit(e.target.value)}
 									placeholder="e.g., mg"
 								/>
 							</div>
@@ -382,7 +375,7 @@ export function CreateMedOrderDialog({
 								<Input
 									id="doseForm"
 									value={doseForm}
-									onChange={(e) => setDoseForm(e.target.value)}
+									onChange={e => setDoseForm(e.target.value)}
 									placeholder="e.g., tablet"
 								/>
 							</div>
@@ -397,7 +390,7 @@ export function CreateMedOrderDialog({
 								<Input
 									id="route"
 									value={route}
-									onChange={(e) => setRoute(e.target.value)}
+									onChange={e => setRoute(e.target.value)}
 									placeholder="e.g., oral"
 								/>
 							</div>
@@ -408,7 +401,7 @@ export function CreateMedOrderDialog({
 								<Input
 									id="frequency"
 									value={frequency}
-									onChange={(e) => setFrequency(e.target.value)}
+									onChange={e => setFrequency(e.target.value)}
 									placeholder="e.g., q8h"
 								/>
 							</div>
@@ -419,7 +412,7 @@ export function CreateMedOrderDialog({
 									type="number"
 									min={1}
 									value={durationDays}
-									onChange={(e) => setDurationDays(e.target.value)}
+									onChange={e => setDurationDays(e.target.value)}
 									placeholder="Optional"
 								/>
 							</div>
@@ -430,9 +423,8 @@ export function CreateMedOrderDialog({
 							<div className="flex items-center gap-2 rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-200">
 								<Eye className="size-4 shrink-0" />
 								<span>
-									This order spans more than 90 days. PDEA regulations require
-									dispensing in 30-day tranches. Click{" "}
-									<strong>Preview Tranches</strong> to review before submitting.
+									This order spans more than 90 days. PDEA regulations require dispensing in 30-day
+									tranches. Click <strong>Preview Tranches</strong> to review before submitting.
 								</span>
 							</div>
 						)}
@@ -443,7 +435,7 @@ export function CreateMedOrderDialog({
 							<Textarea
 								id="specialInstructions"
 								value={specialInstructions}
-								onChange={(e) => setSpecialInstructions(e.target.value)}
+								onChange={e => setSpecialInstructions(e.target.value)}
 								rows={2}
 								placeholder="Optional"
 							/>
@@ -455,7 +447,7 @@ export function CreateMedOrderDialog({
 								<input
 									type="checkbox"
 									checked={isPrn}
-									onChange={(e) => setIsPrn(e.target.checked)}
+									onChange={e => setIsPrn(e.target.checked)}
 									className="size-4 rounded border"
 								/>
 								PRN (as needed)
@@ -466,7 +458,7 @@ export function CreateMedOrderDialog({
 									<Input
 										id="prnReason"
 										value={prnReason}
-										onChange={(e) => setPrnReason(e.target.value)}
+										onChange={e => setPrnReason(e.target.value)}
 										placeholder="e.g., for pain"
 									/>
 								</div>
@@ -479,9 +471,7 @@ export function CreateMedOrderDialog({
 								<input
 									type="checkbox"
 									checked={isControlledSubstance}
-									onChange={(e) =>
-										handleControlledSubstanceChange(e.target.checked)
-									}
+									onChange={e => handleControlledSubstanceChange(e.target.checked)}
 									disabled={!pdeaValid && !isControlledSubstance}
 									className="size-4 rounded border"
 								/>
@@ -490,21 +480,21 @@ export function CreateMedOrderDialog({
 
 							{/* PDEA license status */}
 							{!pdeaLicense && (
-								<div className="flex items-center gap-2 rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
+								<div className="border-destructive bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
 									<AlertCircle className="size-4 shrink-0" />
-									No PDEA S-2 license on file. Contact administration to add
-									your license before ordering controlled substances.
+									No PDEA S-2 license on file. Contact administration to add your license before
+									ordering controlled substances.
 								</div>
 							)}
 							{pdeaLicense != null && pdeaExpired && (
-								<div className="flex items-center gap-2 rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
+								<div className="border-destructive bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
 									<AlertCircle className="size-4 shrink-0" />
-									PDEA S-2 license expired ({pdeaExpiry}). Renew your license
-									before ordering controlled substances.
+									PDEA S-2 license expired ({pdeaExpiry}). Renew your license before ordering
+									controlled substances.
 								</div>
 							)}
 							{pdeaValid && (
-								<div className="flex items-center gap-2 pl-1 text-xs text-muted-foreground">
+								<div className="text-muted-foreground flex items-center gap-2 pl-1 text-xs">
 									<Badge variant="outline" className="text-[10px]">
 										PDEA S-2
 									</Badge>
@@ -519,7 +509,7 @@ export function CreateMedOrderDialog({
 									<Input
 										id="pdeaSchedule"
 										value={pdeaSchedule}
-										onChange={(e) => setPdeaSchedule(e.target.value)}
+										onChange={e => setPdeaSchedule(e.target.value)}
 										placeholder="e.g., S2, S3"
 									/>
 								</div>
@@ -540,10 +530,7 @@ export function CreateMedOrderDialog({
 								Preview Tranches
 							</Button>
 						) : (
-							<Button
-								disabled={!canSubmit || createMedOrder.isPending}
-								onClick={handleSubmit}
-							>
+							<Button disabled={!canSubmit || createMedOrder.isPending} onClick={handleSubmit}>
 								{createMedOrder.isPending ? "Creating…" : "Create Order"}
 							</Button>
 						)}

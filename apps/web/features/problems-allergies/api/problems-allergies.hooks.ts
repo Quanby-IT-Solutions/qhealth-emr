@@ -20,32 +20,39 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
-	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
+	const entries = Object.entries(params).filter(([, value]) => value !== undefined && value !== "")
 	if (entries.length === 0) return ""
-	return "?" + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
+	return (
+		"?" +
+		entries
+			.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+			.join("&")
+	)
 }
 
-// ============================================================================
-// Types
-// ============================================================================
+export type ProblemStatus = "active" | "resolved"
+export type AllergenType = "medication" | "food" | "environmental"
+export type AllergySeverity = "mild" | "moderate" | "severe"
 
-interface Problem {
+export interface Problem {
 	id: string
 	facilityId: string
 	patientId: string
 	icd10Code: string | null
 	icd10Display: string | null
+	snomedCode: string | null
+	snomedDisplay: string | null
 	description: string
 	onsetDate: string | null
 	resolutionDate: string | null
-	status: "active" | "resolved"
+	status: ProblemStatus
 	documentingStaffId: string | null
 	documentingStaffName: string | null
 	createdAt: string
 	updatedAt: string
 }
 
-interface ProblemListResponse {
+export interface ProblemListResponse {
 	data: Problem[]
 	total: number
 	page: number
@@ -53,14 +60,14 @@ interface ProblemListResponse {
 	totalPages: number
 }
 
-interface Allergy {
+export interface Allergy {
 	id: string
 	facilityId: string
 	patientId: string
 	allergenName: string
-	allergenType: "medication" | "food" | "environmental"
+	allergenType: AllergenType
 	reactionType: string | null
-	severity: "mild" | "moderate" | "severe" | "life-threatening"
+	severity: AllergySeverity
 	onsetDate: string | null
 	isActive: boolean
 	documentingStaffId: string | null
@@ -69,7 +76,7 @@ interface Allergy {
 	updatedAt: string
 }
 
-interface AllergyListResponse {
+export interface AllergyListResponse {
 	data: Allergy[]
 	total: number
 	page: number
@@ -91,9 +98,38 @@ interface PatientSummaryResponse {
 	hasSevereAllergies: boolean
 }
 
-// ============================================================================
-// Query Keys
-// ============================================================================
+export interface Icd10SearchResult {
+	id: string
+	code: string
+	description: string
+	category: string | null
+	isActive: boolean
+	createdAt: string
+}
+
+export interface SnomedCtSearchResult {
+	id: string
+	conceptId: string
+	fsn: string
+	preferredTerm: string
+	semanticTag: string | null
+	isActive: boolean
+	createdAt: string
+}
+
+export interface AllergenSearchResult {
+	allergenName: string
+	allergenType: AllergenType
+	source: "allergy_history" | "drug_generic"
+}
+
+interface ListResponse<T> {
+	data: T[]
+	total: number
+	page: number
+	limit: number
+	totalPages: number
+}
 
 export const problemsAllergiesKeys = {
 	all: ["problems-allergies"] as const,
@@ -105,17 +141,18 @@ export const problemsAllergiesKeys = {
 	allergy: (id: string) => [...problemsAllergiesKeys.all, "allergy", id] as const,
 	activeAllergies: (patientId: string) =>
 		[...problemsAllergiesKeys.all, "active-allergies", patientId] as const,
-	summary: (patientId: string) =>
-		[...problemsAllergiesKeys.all, "summary", patientId] as const,
+	summary: (patientId: string) => [...problemsAllergiesKeys.all, "summary", patientId] as const,
+	icd10Search: (search?: string, page?: number, limit?: number) =>
+		[...problemsAllergiesKeys.all, "icd10-search", search, page, limit] as const,
+	snomedCtSearch: (search?: string, semanticTag?: string, page?: number, limit?: number) =>
+		[...problemsAllergiesKeys.all, "snomed-ct-search", search, semanticTag, page, limit] as const,
+	allergenSearch: (search?: string, facilityId?: string, allergenType?: string) =>
+		[...problemsAllergiesKeys.all, "allergen-search", search, facilityId, allergenType] as const,
 }
-
-// ============================================================================
-// Problem Queries
-// ============================================================================
 
 interface ProblemListParams {
 	patientId: string
-	status?: "active" | "resolved"
+	status?: ProblemStatus
 	page?: number
 	limit?: number
 }
@@ -125,7 +162,7 @@ export function useProblemsQuery(params: ProblemListParams) {
 		queryKey: problemsAllergiesKeys.problems(params.patientId, params.status),
 		queryFn: () =>
 			fetchJson<ProblemListResponse>(
-				`${API_BASE}/problems${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`,
+				`${API_BASE}/problems${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
 			),
 		enabled: !!params.patientId,
 	})
@@ -139,17 +176,17 @@ export function useProblemDetailQuery(id: string) {
 	})
 }
 
-// ============================================================================
-// Problem Mutations
-// ============================================================================
-
 interface CreateProblemData {
 	facilityId: string
 	patientId: string
 	icd10Code?: string
 	icd10Display?: string
+	snomedCode?: string
+	snomedDisplay?: string
 	description: string
 	onsetDate?: string
+	resolutionDate?: string
+	status?: ProblemStatus
 	notes?: string
 }
 
@@ -162,7 +199,7 @@ export function useCreateProblemMutation() {
 				method: "POST",
 				body: JSON.stringify(data),
 			}),
-		onSuccess: (_data, variables) => {
+		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: problemsAllergiesKeys.all })
 		},
 	})
@@ -172,8 +209,12 @@ interface UpdateProblemData {
 	id: string
 	icd10Code?: string
 	icd10Display?: string
+	snomedCode?: string
+	snomedDisplay?: string
 	description?: string
 	onsetDate?: string
+	resolutionDate?: string | null
+	status?: ProblemStatus
 }
 
 export function useUpdateProblemMutation() {
@@ -185,7 +226,7 @@ export function useUpdateProblemMutation() {
 				method: "PUT",
 				body: JSON.stringify(data),
 			}),
-		onSuccess: (_data, variables) => {
+		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: problemsAllergiesKeys.all })
 		},
 	})
@@ -211,14 +252,24 @@ export function useResolveProblemMutation() {
 	})
 }
 
-// ============================================================================
-// Allergy Queries
-// ============================================================================
+export function useDeleteProblemMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation({
+		mutationFn: (id: string) =>
+			fetchJson<Problem>(`${API_BASE}/problems/${id}`, {
+				method: "DELETE",
+			}),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: problemsAllergiesKeys.all })
+		},
+	})
+}
 
 interface AllergyListParams {
 	patientId: string
 	isActive?: boolean
-	allergenType?: "medication" | "food" | "environmental"
+	allergenType?: AllergenType
 	page?: number
 	limit?: number
 }
@@ -231,7 +282,7 @@ export function useAllergiesQuery(params: AllergyListParams) {
 		}),
 		queryFn: () =>
 			fetchJson<AllergyListResponse>(
-				`${API_BASE}/allergies${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`,
+				`${API_BASE}/allergies${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
 			),
 		enabled: !!params.patientId,
 	})
@@ -245,17 +296,13 @@ export function useAllergyDetailQuery(id: string) {
 	})
 }
 
-// ============================================================================
-// Allergy Mutations
-// ============================================================================
-
 interface CreateAllergyData {
 	facilityId: string
 	patientId: string
 	allergenName: string
-	allergenType: "medication" | "food" | "environmental"
+	allergenType: AllergenType
 	reactionType?: string
-	severity: "mild" | "moderate" | "severe" | "life-threatening"
+	severity: AllergySeverity
 	onsetDate?: string
 }
 
@@ -277,9 +324,9 @@ export function useCreateAllergyMutation() {
 interface UpdateAllergyData {
 	id: string
 	allergenName?: string
-	allergenType?: "medication" | "food" | "environmental"
+	allergenType?: AllergenType
 	reactionType?: string
-	severity?: "mild" | "moderate" | "severe" | "life-threatening"
+	severity?: AllergySeverity
 	onsetDate?: string
 }
 
@@ -313,16 +360,87 @@ export function useDeactivateAllergyMutation() {
 	})
 }
 
-// ============================================================================
-// CDS / Cross-module
-// ============================================================================
+export function useIcd10ProblemSearchQuery(params: {
+	search?: string
+	page?: number
+	limit?: number
+}) {
+	return useQuery({
+		queryKey: problemsAllergiesKeys.icd10Search(params.search, params.page, params.limit),
+		queryFn: () =>
+			fetchJson<ListResponse<Icd10SearchResult>>(
+				`${API_BASE}/terminology/icd10${buildQueryString({
+					search: params.search,
+					page: params.page ?? 1,
+					limit: params.limit ?? 10,
+				})}`
+			),
+		enabled: !!params.search && params.search.trim().length >= 2,
+		staleTime: 5 * 60 * 1000,
+	})
+}
+
+export function useSnomedCtProblemSearchQuery(params: {
+	search?: string
+	semanticTag?: string
+	page?: number
+	limit?: number
+}) {
+	return useQuery({
+		queryKey: problemsAllergiesKeys.snomedCtSearch(
+			params.search,
+			params.semanticTag,
+			params.page,
+			params.limit
+		),
+		queryFn: () =>
+			fetchJson<ListResponse<SnomedCtSearchResult>>(
+				`${API_BASE}/terminology/snomed-ct${buildQueryString({
+					search: params.search,
+					semanticTag: params.semanticTag,
+					page: params.page ?? 1,
+					limit: params.limit ?? 10,
+				})}`
+			),
+		enabled: !!params.search && params.search.trim().length >= 2,
+		staleTime: 5 * 60 * 1000,
+	})
+}
+
+export function useAllergenSearchQuery(params: {
+	search?: string
+	facilityId?: string
+	allergenType?: AllergenType
+	page?: number
+	limit?: number
+}) {
+	return useQuery({
+		queryKey: problemsAllergiesKeys.allergenSearch(
+			params.search,
+			params.facilityId,
+			params.allergenType
+		),
+		queryFn: () =>
+			fetchJson<ListResponse<AllergenSearchResult>>(
+				`${API_BASE}/allergens/search${buildQueryString({
+					search: params.search,
+					facilityId: params.facilityId,
+					allergenType: params.allergenType,
+					page: params.page ?? 1,
+					limit: params.limit ?? 10,
+				})}`
+			),
+		enabled: !!params.search && params.search.trim().length >= 2,
+		staleTime: 5 * 60 * 1000,
+	})
+}
 
 export function useActiveAllergiesQuery(patientId: string) {
 	return useQuery({
 		queryKey: problemsAllergiesKeys.activeAllergies(patientId),
 		queryFn: () =>
 			fetchJson<ActiveAllergiesResponse>(
-				`${API_BASE}/active-allergies${buildQueryString({ patientId })}`,
+				`${API_BASE}/active-allergies${buildQueryString({ patientId })}`
 			),
 		enabled: !!patientId,
 	})
@@ -332,9 +450,7 @@ export function usePatientSummaryQuery(patientId: string) {
 	return useQuery({
 		queryKey: problemsAllergiesKeys.summary(patientId),
 		queryFn: () =>
-			fetchJson<PatientSummaryResponse>(
-				`${API_BASE}/summary${buildQueryString({ patientId })}`,
-			),
+			fetchJson<PatientSummaryResponse>(`${API_BASE}/summary${buildQueryString({ patientId })}`),
 		enabled: !!patientId,
 	})
 }
