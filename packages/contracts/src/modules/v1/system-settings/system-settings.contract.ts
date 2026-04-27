@@ -2,6 +2,7 @@ import { oc } from "@orpc/contract"
 
 import {
 	SystemSettingsSchema,
+	TriggerOfflineCacheJobResultSchema,
 	UpdateSystemSettingsSchema,
 } from "./system-settings.schema.js"
 
@@ -32,4 +33,17 @@ export const systemSettingsContract = {
 		})
 		.input(UpdateSystemSettingsSchema)
 		.output(SystemSettingsSchema),
+
+	/**
+	 * Manually trigger an offline cache preparation job for the active facility.
+	 * Counts active patients and records the result in offline_cache_jobs.
+	 */
+	triggerCacheJob: oc
+		.route({
+			method: "POST",
+			path: "/offline-cache/trigger",
+			summary: "Manually trigger an offline cache preparation job for the active facility",
+			tags: ["System Settings"],
+		})
+		.output(TriggerOfflineCacheJobResultSchema),
 }

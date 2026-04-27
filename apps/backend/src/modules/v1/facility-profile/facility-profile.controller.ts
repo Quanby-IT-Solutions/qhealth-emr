@@ -25,6 +25,8 @@ function extractActor(session: UserSession, req: Request) {
 		userId: session.user.id,
 		facilityId: activeProfile?.facilityId ?? "",
 		staffProfileId: activeProfile?.id ?? null,
+		ipAddress: (req.ip ?? null) as string | null,
+		userAgent: (req.get("user-agent") ?? null) as string | null,
 	}
 }
 

@@ -7,6 +7,7 @@ import type { Request } from "express"
 import { v1 } from "@/config/api-versions.config"
 import { RequirePermission, RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
 
+import { OfflineCacheService } from "./offline-cache.service"
 import { SystemSettingsService } from "./system-settings.service"
 
 type RbacProfile = {
@@ -41,7 +42,10 @@ function getActiveFacilityId(req: Request): string {
 @Controller()
 @RequirePermission("admin", "view")
 export class SystemSettingsController {
-	constructor(private readonly systemSettingsService: SystemSettingsService) {}
+	constructor(
+		private readonly systemSettingsService: SystemSettingsService,
+		private readonly offlineCacheService: OfflineCacheService,
+	) {}
 
 	@RequirePermissions([{ module: "system_settings", action: "view" }])
 	@Implement(v1.systemSettings.get)
@@ -63,6 +67,16 @@ export class SystemSettingsController {
 		const facilityId = actor.facilityId
 		return implement(v1.systemSettings.update).handler(async ({ input }) => {
 			return this.systemSettingsService.update(facilityId, input, actor)
+		})
+	}
+
+	@RequirePermissions([{ module: "system_settings", action: "edit" }])
+	@Implement(v1.systemSettings.triggerCacheJob)
+	async triggerCacheJob(@Session() session: UserSession, @Req() req: Request) {
+		const facilityId = getActiveFacilityId(req)
+		const userId = session.user.id
+		return implement(v1.systemSettings.triggerCacheJob).handler(async () => {
+			return this.offlineCacheService.runJobForFacility(facilityId, `user:${userId}`)
 		})
 	}
 }

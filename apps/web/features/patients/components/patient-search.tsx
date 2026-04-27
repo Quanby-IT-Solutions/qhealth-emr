@@ -1,11 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 
+import { WifiOffFreeIcons } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
+
 import { Activity } from "lucide-react"
 
+import { Alert, AlertDescription, AlertTitle } from "@/core/components/ui/alert"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
@@ -28,6 +32,7 @@ import {
 } from "@/core/components/ui/table"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useCreateEncounterMutation } from "@/features/encounters/api/encounters.hooks"
+import { useOfflinePatients } from "@/features/offline-cache/lib/use-offline-patients"
 import { LinkTriageBanner } from "@/features/opd-triage/components/link-triage-banner"
 import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
@@ -89,9 +94,13 @@ export function PatientSearch() {
 		limit: number
 	} | null>(null)
 
+	// Offline continuity — SS-001: load facility cache before the server query so
+	// isOnline can gate the enabled flag below.
+	const { isOnline, offlinePatients, cachedAt } = useOfflinePatients()
+
 	const { data, isLoading, isFetching } = usePatientSearchQuery(
 		committedParams ?? { facilityId, page: 1, limit: 50 },
-		{ enabled: !!committedParams && !!facilityId },
+		{ enabled: isOnline && !!committedParams && !!facilityId },
 	)
 
 	const handleSearch = (e: React.FormEvent) => {
@@ -108,6 +117,19 @@ export function PatientSearch() {
 
 	const results = data?.data ?? []
 	const hasSearched = !!committedParams
+
+	// Offline: filter facility-scoped localStorage cache client-side — SS-001
+	const filteredOfflinePatients = useMemo(() => {
+		if (isOnline || !committedParams) return []
+		const term = (committedParams.search ?? "").toLowerCase()
+		const mrn = (committedParams.mrn ?? "").toLowerCase()
+		return offlinePatients.filter(p => {
+			const fullName = `${p.firstName} ${p.lastName}`.toLowerCase()
+			const mrnMatch = !mrn || p.mrn.toLowerCase().includes(mrn)
+			const nameMatch = !term || fullName.includes(term) || p.mrn.toLowerCase().includes(term)
+			return mrnMatch && nameMatch && p.isActive
+		})
+	}, [isOnline, offlinePatients, committedParams])
 	const showEmpty = hasSearched && !isLoading && results.length === 0
 
 	// PS-038: triage-first — column only shown for triage staff or when reconciling a pending intake
@@ -153,6 +175,20 @@ export function PatientSearch() {
 					}}
 				/>
 			)}
+
+			{/* SS-001: offline continuity banner */}
+			{!isOnline && (
+				<Alert className="border-amber-200 bg-amber-50 dark:border-amber-800/40 dark:bg-amber-950/20">
+					<HugeiconsIcon icon={WifiOffFreeIcons} className="size-4 text-amber-600 dark:text-amber-400" />
+					<AlertTitle className="text-amber-800 dark:text-amber-300">Working Offline</AlertTitle>
+					<AlertDescription className="text-amber-700 dark:text-amber-400">
+						{offlinePatients.length > 0
+							? `Patient search is using the offline cache (${offlinePatients.length.toLocaleString()} patients${cachedAt ? `, last updated ${new Date(cachedAt).toLocaleString("en-PH")}` : ""}).`
+							: "No offline cache is available for this facility. Connect to the network to search patients."}
+					</AlertDescription>
+				</Alert>
+			)}
+
 			<Card>
 				<CardHeader>
 					<CardTitle>Search Patients</CardTitle>
@@ -307,6 +343,65 @@ export function PatientSearch() {
 					)}
 				</CardContent>
 			</Card>
+		)}
+
+		{/* SS-001: offline cache results — shown when offline and no live TQ results available */}
+		{!isOnline && hasSearched && results.length === 0 && !isLoading && (
+			<>
+				{filteredOfflinePatients.length > 0 ? (
+					<Card>
+						<CardHeader className="pb-2">
+							<CardTitle className="flex items-center gap-2 text-sm font-medium">
+								<HugeiconsIcon icon={WifiOffFreeIcons} className="size-4 text-amber-500" />
+								Cached Patients
+								<Badge variant="outline" className="ml-1 text-[10px]">
+									{filteredOfflinePatients.length} result{filteredOfflinePatients.length !== 1 ? "s" : ""}
+								</Badge>
+							</CardTitle>
+						</CardHeader>
+						<CardContent className="p-0">
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>MRN</TableHead>
+										<TableHead>Name</TableHead>
+										<TableHead>Date of Birth</TableHead>
+										<TableHead>Sex</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{filteredOfflinePatients.map(patient => (
+										<TableRow key={patient.id} className="cursor-pointer">
+											<TableCell>
+												<Link href={`/patients/${patient.id}`} className="text-primary hover:underline">
+													{patient.mrn}
+												</Link>
+											</TableCell>
+											<TableCell>
+												<Link href={`/patients/${patient.id}`}>
+													{patient.lastName}, {patient.firstName}
+												</Link>
+											</TableCell>
+											<TableCell>{formatDate(patient.dateOfBirth)}</TableCell>
+											<TableCell>{formatSex(patient.sex)}</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</CardContent>
+					</Card>
+				) : (
+					<Card>
+						<CardContent className="flex flex-col items-center gap-4 py-12">
+							<p className="text-muted-foreground text-sm">
+								{offlinePatients.length > 0
+									? "No cached patients match your search criteria."
+									: "No offline cache is available for this facility."}
+							</p>
+						</CardContent>
+					</Card>
+				)}
+			</>
 		)}
 
 		{/* Triage reconciliation queue confirmation — PS-035 */}

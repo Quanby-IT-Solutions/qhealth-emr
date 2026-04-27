@@ -439,9 +439,7 @@ export class AdminDashboardService {
 					gte(auditLogs.createdAt, sevenDaysAgo),
 					or(
 						eq(auditLogs.entityType, "feature_flag"),
-						eq(auditLogs.entityType, "system_settings"),
-						eq(auditLogs.entityType, "role_permission"),
-						eq(auditLogs.entityType, "user_role"),
+					eq(auditLogs.entityType, "system_setting"),
 						eq(auditLogs.entityType, "integration")
 					)
 				)
@@ -515,7 +513,7 @@ export class AdminDashboardService {
 					gte(auditLogs.createdAt, sevenDaysAgo),
 					or(
 						eq(auditLogs.entityType, "feature_flag"),
-						eq(auditLogs.entityType, "system_settings"),
+						eq(auditLogs.entityType, "system_setting"),
 						eq(auditLogs.entityType, "role_permission"),
 						eq(auditLogs.entityType, "user_role"),
 						eq(auditLogs.entityType, "integration")

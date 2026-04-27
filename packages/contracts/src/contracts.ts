@@ -304,3 +304,9 @@ export {
 // export { v2Contract, type V2Contract } from "./modules/v2/v2.contract.js"
 // export const v2 = { ... }
 // export type { Todo as V2Todo, ... } from "./modules/v2/..."
+
+// System settings schemas — exported for frontend consumption
+export type {
+	SystemSettings,
+	TriggerOfflineCacheJobResult,
+} from "./modules/v1/system-settings/system-settings.schema.js"

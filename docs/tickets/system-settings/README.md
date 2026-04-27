@@ -1,22 +1,27 @@
 # System Settings Tickets
 
-Status: Resolved
-Scope: Admin role surface at `/admin/settings`
+Status: Closed
+Scope: Admin-role system configuration surface at `/admin/settings`
 TOR Reference: `docs/MASTER_EMR_TERMS_OF_REFERENCE.md`
+Last Reviewed: 2026-04-26
 
 ## Current Verdict
 
-Fresh review of the current implementation on 2026-04-25 found one remaining material TOR gap for `/admin/settings`.
+Fresh repo-backed re-audit of the current `/admin/settings` implementation finds no remaining material TOR gaps.
 
-Resolved from the previous round:
+What is aligned now:
 
-- permission boundaries are aligned across navigation, page gating, and backend enforcement;
-- audit provenance captures `ipAddress` and `userAgent` for human settings updates;
-- the update path rejects or overrides attempts to disable mandatory TOR controls;
-- the default and read paths now enforce TOR-mandatory offline settings.
-
-All tickets resolved. No open gaps remain.
+- the page is permission-gated for `admin:view` plus `system_settings:view`;
+- edits are restricted to `system_settings:edit` in both the page flow and the backend controller;
+- TOR-mandatory controls remain locked on in the UI, rejected by the contract if disabled, and re-enforced in the backend update path;
+- system settings audit visibility aligns with the writer and the governance readers again;
+- offline continuity is now wired into a clinician-facing patient search workflow with reconnect refresh behavior;
+- the settings surface remains administrative and does not expose clinical write actions.
 
 ## Ticket Index
 
-- `SS-001-audit-automatic-normalization-of-tor-mandatory-settings.md`
+No open tickets.
+
+## Conclusion
+
+`/admin/settings` is currently TOR-aligned for the reviewed admin-role scope. No new system-settings tickets are required from this re-audit.

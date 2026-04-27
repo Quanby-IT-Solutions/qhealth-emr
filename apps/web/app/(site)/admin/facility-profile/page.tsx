@@ -16,13 +16,15 @@ function can(permSet: Set<string>, module: string, action: string) {
 export default function FacilityProfilePage() {
 	const permSet = usePermissionSet()
 
-	if (!can(permSet, "admin", "view")) {
+	if (!can(permSet, "facility_profile", "view")) {
 		return (
 			<div className="flex items-center justify-center p-8 text-muted-foreground">
 				You do not have permission to access facility profile settings.
 			</div>
 		)
 	}
+
+	const canEdit = can(permSet, "facility_profile", "edit")
 
 	return (
 		<div className="space-y-6">
@@ -32,7 +34,7 @@ export default function FacilityProfilePage() {
 					Official identity used in reports, exports, and external submissions.
 				</p>
 			</div>
-			<FacilityProfilePanel />
+			<FacilityProfilePanel canEdit={canEdit} />
 		</div>
 	)
 }

@@ -132,7 +132,7 @@ describe("SystemSettingsService", () => {
 	// ── Update — per-field diff for typed columns ─────────────────────────────
 
 	describe("update()", () => {
-		const actor = { userId: "user-1", facilityId: "fac-1", staffProfileId: "staff-1" }
+		const actor = { userId: "user-1", facilityId: "fac-1", staffProfileId: "staff-1", ipAddress: null, userAgent: null }
 
 		function setupTransaction(currentRow: ReturnType<typeof makeRow>, updatedRow: ReturnType<typeof makeRow>) {
 			;(db.transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {

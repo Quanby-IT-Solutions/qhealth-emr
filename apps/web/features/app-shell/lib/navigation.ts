@@ -8,6 +8,9 @@ type RbacModule =
 	| "reporting"
 	| "audit"
 	| "admin"
+	| "feature_flags" // Admin governance — feature flag management
+	| "system_settings" // Admin governance — system configuration
+	| "facility_profile" // Admin governance — canonical facility identity
 	| "surgical" // Seeded for Surgeon/Anesthesiologist roles
 	| "opd" // Seeded for roles that access OPD (not Anesthesiologist)
 	| "patients" // Explicit patient-record access (search, profile) — NOT granted to Administrator
@@ -369,6 +372,11 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "settings",
 		requiredPermissions: [
 			{ module: "admin", action: "view" },
+		],
+		// Also require facility_profile:view — the page and API enforce this permission,
+		// so the nav link must only appear when the user can actually access it.
+		requireAllPermissions: [
+			{ module: "facility_profile", action: "view" },
 		],
 		isSecondary: true,
 	},

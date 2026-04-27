@@ -8,11 +8,26 @@ import { z } from "zod"
 const facilityCodeRegex = /^[A-Z0-9][A-Z0-9-]{1,18}[A-Z0-9]$/
 
 // ============================================================================
+// Canonical facility type enum
+// ============================================================================
+
+export const FacilityTypeEnum = z.enum(["community", "district", "tertiary"])
+export type FacilityType = z.infer<typeof FacilityTypeEnum>
+
+// ============================================================================
 // Full response schema (what the API returns)
+// Includes canonical fields from the facilities table plus auxiliary fields
+// from the facility_profiles table.
 // ============================================================================
 
 export const FacilityProfileSchema = z.object({
 	facilityId: z.string().uuid(),
+	// Canonical identity (from facilities table)
+	name: z.string(),
+	facilityType: FacilityTypeEnum,
+	dohLicenseNumber: z.string().nullable(),
+	philhealthAccreditationId: z.string().nullable(),
+	// Auxiliary operational fields (from facility_profiles table)
 	facilityCode: z.string().nullable(),
 	governingAuthority: z.string().nullable(),
 	addressLine1: z.string().nullable(),
@@ -39,6 +54,12 @@ export type FacilityProfile = z.infer<typeof FacilityProfileSchema>
 // ============================================================================
 
 export const UpdateFacilityProfileSchema = z.object({
+	// Canonical identity fields (written to facilities table)
+	name: z.string().min(1, "Facility name is required").optional(),
+	facilityType: FacilityTypeEnum.optional(),
+	dohLicenseNumber: z.string().nullable().optional(),
+	philhealthAccreditationId: z.string().nullable().optional(),
+	// Auxiliary operational fields (written to facility_profiles table)
 	facilityCode: z
 		.string()
 		.regex(facilityCodeRegex, "Facility code must be 3–20 uppercase alphanumeric characters with hyphens (e.g. QH-MAIN)")

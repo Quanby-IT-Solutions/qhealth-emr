@@ -4,6 +4,7 @@ import Link from "next/link"
 import {
 	AlertCircleFreeIcons,
 	ArrowLeft01FreeIcons,
+	ArrowReloadHorizontalFreeIcons,
 	WifiOffFreeIcons,
 	CheckmarkCircle01FreeIcons,
 	CancelCircleFreeIcons,
@@ -13,13 +14,16 @@ import { HugeiconsIcon } from "@hugeicons/react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/core/components/ui/alert"
 import { Badge } from "@/core/components/ui/badge"
-import { buttonVariants } from "@/core/components/ui/button"
+import { Button, buttonVariants } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Skeleton } from "@/core/components/ui/skeleton"
 import { cn } from "@/core/lib/utils"
 
 import { useAdminDashboardSummaryQuery } from "@/features/admin/api/admin-dashboard.hooks"
-import type { OfflineCacheJob, OfflineReadinessSection } from "@repo/contracts"
+import { useTriggerOfflineCacheJobMutation } from "@/features/system-settings/api/system-settings.hooks"
+import type { OfflineReadinessSection } from "@repo/contracts"
+
+type OfflineCacheJob = OfflineReadinessSection["recentJobs"][number]
 
 // ── Status badge helpers ──────────────────────────────────────────────────────
 
@@ -71,6 +75,7 @@ function JobStatusBadge({ status }: { status: OfflineCacheJob["status"] }) {
 export function OfflineOpsPanel() {
 	const { data, isLoading, isError } = useAdminDashboardSummaryQuery()
 	const offline = data?.offlineReadiness
+	const triggerMutation = useTriggerOfflineCacheJobMutation()
 
 	return (
 		<div className="space-y-6">
@@ -118,7 +123,24 @@ export function OfflineOpsPanel() {
 						<CardHeader className="pb-2">
 							<div className="flex items-center justify-between">
 								<CardTitle className="text-sm font-medium">Current Readiness</CardTitle>
-								<StatusBadge status={offline.status} />
+								<div className="flex items-center gap-2">
+									<StatusBadge status={offline.status} />
+									{offline.enabled && (
+										<Button
+											variant="outline"
+											size="sm"
+											className="h-7 gap-1.5 text-xs"
+											disabled={triggerMutation.isPending}
+											onClick={() => triggerMutation.mutate(undefined)}
+										>
+											<HugeiconsIcon
+											icon={ArrowReloadHorizontalFreeIcons}
+												className={cn("size-3", triggerMutation.isPending && "animate-spin")}
+											/>
+											{triggerMutation.isPending ? "Running…" : "Trigger Now"}
+										</Button>
+									)}
+								</div>
 							</div>
 						</CardHeader>
 						<CardContent>
@@ -227,11 +249,11 @@ export function OfflineOpsPanel() {
 					<Card className="border-dashed">
 						<CardContent className="pt-4">
 							<p className="text-xs text-muted-foreground">
-								<strong>This is a read-only oversight view.</strong> Cache jobs are triggered
-								automatically by the system scheduler or manually from System Settings. If jobs are
-								failing consistently, check server disk space, database connectivity, and the system logs
-								for root cause analysis. A stale cache (no job in &gt;24h) means patients seen offline
-								may not have their latest records pre-loaded.
+								Cache jobs run automatically every hour for all facilities with offline mode enabled.
+								You can also trigger a manual run using the <strong>Trigger Now</strong> button above.
+								If jobs are failing consistently, check server disk space, database connectivity, and
+								the system logs for root cause analysis. A stale cache (no job in &gt;24h) means
+								patients seen offline may not have their latest records pre-loaded.
 							</p>
 						</CardContent>
 					</Card>

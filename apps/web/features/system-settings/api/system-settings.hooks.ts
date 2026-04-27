@@ -24,3 +24,21 @@ export function useUpdateSystemSettingsMutation() {
 		})
 	)
 }
+
+/**
+ * Manually trigger an offline cache preparation job for the active facility.
+ * On success, invalidates the admin dashboard query so the offline readiness
+ * section reflects the new job record immediately.
+ */
+export function useTriggerOfflineCacheJobMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.systemSettings.triggerCacheJob.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({
+					queryKey: orpc.adminDashboard.key(),
+				}),
+		})
+	)
+}

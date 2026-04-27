@@ -2,7 +2,10 @@
 -- Permission Backfill — Access Governance Slice 5
 --
 -- Grants view, create, edit, delete on the four new admin modules to every
--- roles row where isSystemDefault = true AND name = 'Admin'.
+-- system-default admin role row.
+--
+-- Handles both historical 'Admin' naming and the current 'Administrator' naming
+-- so this migration is safe for both clean installs and legacy environments.
 --
 -- Idempotent: uses ON CONFLICT DO NOTHING against the
 -- role_permissions_role_module_action_unique index.
@@ -31,5 +34,5 @@ CROSS JOIN (
         ('delete')
 ) AS a(action)
 WHERE r.is_system_default = true
-  AND r.name = 'Admin'
+  AND r.name IN ('Admin', 'Administrator')
 ON CONFLICT DO NOTHING;

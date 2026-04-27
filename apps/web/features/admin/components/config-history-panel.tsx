@@ -16,7 +16,7 @@ import { useConfigHistoryQuery } from "@/features/audit/api/audit.hooks"
 const ENTITY_TYPES = [
 	"feature_flag",
 	"feature_flag_target",
-	"system_settings",
+	"system_setting",
 	"sla_config",
 	"integration",
 	"role_permission",

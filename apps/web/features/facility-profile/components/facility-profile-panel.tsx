@@ -8,13 +8,28 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Skeleton } from "@/core/components/ui/skeleton"
 import {
 	useFacilityProfileQuery,
 	useUpdateFacilityProfileMutation,
 } from "@/features/facility-profile/api/facility-profile.hooks"
 
+type FacilityType = "community" | "district" | "tertiary"
+
 interface DraftState {
+	// Canonical identity (facilities table)
+	name: string
+	facilityType: FacilityType | ""
+	dohLicenseNumber: string
+	philhealthAccreditationId: string
+	// Auxiliary operational fields (facility_profiles table)
 	facilityCode: string
 	governingAuthority: string
 	addressLine1: string
@@ -30,6 +45,10 @@ interface DraftState {
 
 type FacilityProfileData = {
 	facilityId: string
+	name: string
+	facilityType: FacilityType
+	dohLicenseNumber: string | null
+	philhealthAccreditationId: string | null
 	facilityCode: string | null
 	governingAuthority: string | null
 	addressLine1: string | null
@@ -46,6 +65,10 @@ type FacilityProfileData = {
 
 function toDraft(p: FacilityProfileData): DraftState {
 	return {
+		name: p.name ?? "",
+		facilityType: p.facilityType ?? "",
+		dohLicenseNumber: p.dohLicenseNumber ?? "",
+		philhealthAccreditationId: p.philhealthAccreditationId ?? "",
 		facilityCode: p.facilityCode ?? "",
 		governingAuthority: p.governingAuthority ?? "",
 		addressLine1: p.addressLine1 ?? "",
@@ -60,7 +83,11 @@ function toDraft(p: FacilityProfileData): DraftState {
 	}
 }
 
-export function FacilityProfilePanel() {
+interface FacilityProfilePanelProps {
+	canEdit: boolean
+}
+
+export function FacilityProfilePanel({ canEdit }: FacilityProfilePanelProps) {
 	const { data: profile, isLoading, error } = useFacilityProfileQuery()
 	const updateMutation = useUpdateFacilityProfileMutation()
 
@@ -70,7 +97,7 @@ export function FacilityProfilePanel() {
 	// Sync draft from server data on first load
 	useEffect(() => {
 		if (profile && !isDirty) {
-			setDraft(toDraft(profile))
+			setDraft(toDraft(profile as FacilityProfileData))
 		}
 	}, [profile, isDirty])
 
@@ -125,7 +152,7 @@ export function FacilityProfilePanel() {
 	return (
 		<div className="space-y-4">
 			{/* Unsaved changes banner */}
-			{hasChanges && (
+			{hasChanges && canEdit && (
 				<div className="flex items-center justify-between rounded-md border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm dark:border-amber-700 dark:bg-amber-950">
 					<span className="text-amber-800 dark:text-amber-200">
 						{changedFields.length} unsaved{" "}
@@ -158,12 +185,60 @@ export function FacilityProfilePanel() {
 						</CardHeader>
 						<CardContent className="space-y-4">
 							<div className="space-y-1.5">
+								<Label htmlFor="name">Facility name</Label>
+								<Input
+									id="name"
+									value={draft.name}
+									onChange={e => patch("name", e.target.value)}
+									placeholder="e.g. QHealth General Hospital"
+									disabled={!canEdit}
+								/>
+							</div>
+							<div className="space-y-1.5">
+								<Label htmlFor="facilityType">Facility type</Label>
+								<Select
+									value={draft.facilityType || undefined}
+									onValueChange={val => patch("facilityType", val ?? "")}
+									disabled={!canEdit}
+								>
+									<SelectTrigger id="facilityType">
+										<SelectValue>{draft.facilityType || <span className="text-muted-foreground">Select type…</span>}</SelectValue>
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="community">Community</SelectItem>
+										<SelectItem value="district">District</SelectItem>
+										<SelectItem value="tertiary">Tertiary</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+							<div className="space-y-1.5">
+								<Label htmlFor="dohLicenseNumber">DOH license number</Label>
+								<Input
+									id="dohLicenseNumber"
+									value={draft.dohLicenseNumber}
+									onChange={e => patch("dohLicenseNumber", e.target.value)}
+									placeholder="e.g. LIC-HOSP-0001-2024"
+									disabled={!canEdit}
+								/>
+							</div>
+							<div className="space-y-1.5">
+								<Label htmlFor="philhealthAccreditationId">PhilHealth accreditation ID</Label>
+								<Input
+									id="philhealthAccreditationId"
+									value={draft.philhealthAccreditationId}
+									onChange={e => patch("philhealthAccreditationId", e.target.value)}
+									placeholder="e.g. PH-ACC-00001"
+									disabled={!canEdit}
+								/>
+							</div>
+							<div className="space-y-1.5">
 								<Label htmlFor="facilityCode">Facility code</Label>
 								<Input
 									id="facilityCode"
 									value={draft.facilityCode}
 									onChange={e => patch("facilityCode", e.target.value)}
 									placeholder="e.g. QH-MAIN"
+									disabled={!canEdit}
 								/>
 							</div>
 							<div className="space-y-1.5">
@@ -173,6 +248,7 @@ export function FacilityProfilePanel() {
 									value={draft.governingAuthority}
 									onChange={e => patch("governingAuthority", e.target.value)}
 									placeholder="e.g. DOH Region IV-A"
+									disabled={!canEdit}
 								/>
 							</div>
 						</CardContent>
@@ -191,6 +267,7 @@ export function FacilityProfilePanel() {
 									value={draft.adminContactName}
 									onChange={e => patch("adminContactName", e.target.value)}
 									placeholder="e.g. A. Cruz"
+									disabled={!canEdit}
 								/>
 							</div>
 							<div className="space-y-1.5">
@@ -201,6 +278,7 @@ export function FacilityProfilePanel() {
 									value={draft.adminContactEmail}
 									onChange={e => patch("adminContactEmail", e.target.value)}
 									placeholder="admin@facility.local"
+									disabled={!canEdit}
 								/>
 							</div>
 							<div className="space-y-1.5">
@@ -211,6 +289,7 @@ export function FacilityProfilePanel() {
 									value={draft.email}
 									onChange={e => patch("email", e.target.value)}
 									placeholder="info@facility.local"
+									disabled={!canEdit}
 								/>
 							</div>
 						</CardContent>
@@ -232,6 +311,7 @@ export function FacilityProfilePanel() {
 									value={draft.addressLine1}
 									onChange={e => patch("addressLine1", e.target.value)}
 									placeholder="Street address"
+									disabled={!canEdit}
 								/>
 							</div>
 							<div className="space-y-1.5">
@@ -241,6 +321,7 @@ export function FacilityProfilePanel() {
 									value={draft.addressLine2}
 									onChange={e => patch("addressLine2", e.target.value)}
 									placeholder="Barangay, district (optional)"
+									disabled={!canEdit}
 								/>
 							</div>
 							<div className="grid grid-cols-2 gap-3">
@@ -251,6 +332,7 @@ export function FacilityProfilePanel() {
 										value={draft.city}
 										onChange={e => patch("city", e.target.value)}
 										placeholder="e.g. Makati"
+										disabled={!canEdit}
 									/>
 								</div>
 								<div className="space-y-1.5">
@@ -260,6 +342,7 @@ export function FacilityProfilePanel() {
 										value={draft.province}
 										onChange={e => patch("province", e.target.value)}
 										placeholder="e.g. Metro Manila"
+										disabled={!canEdit}
 									/>
 								</div>
 							</div>
@@ -271,6 +354,7 @@ export function FacilityProfilePanel() {
 									onChange={e => patch("zipCode", e.target.value)}
 									placeholder="e.g. 1234"
 									className="max-w-32"
+									disabled={!canEdit}
 								/>
 							</div>
 							<div className="space-y-1.5">
@@ -280,6 +364,7 @@ export function FacilityProfilePanel() {
 									value={draft.telephone}
 									onChange={e => patch("telephone", e.target.value)}
 									placeholder="+63 2 8123 0000"
+									disabled={!canEdit}
 								/>
 							</div>
 						</CardContent>

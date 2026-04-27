@@ -111,3 +111,16 @@ export const UpdateSystemSettingsSchema = z.object({
 })
 
 export type UpdateSystemSettingsInput = z.infer<typeof UpdateSystemSettingsSchema>
+
+// ============================================================================
+// Offline cache job trigger result
+// ============================================================================
+
+export const TriggerOfflineCacheJobResultSchema = z.object({
+	jobId: z.string().uuid(),
+	status: z.enum(["running", "completed", "failed"]),
+	cachedPatientCount: z.number().int().nullable(),
+	errorMessage: z.string().nullable(),
+})
+
+export type TriggerOfflineCacheJobResult = z.infer<typeof TriggerOfflineCacheJobResultSchema>
