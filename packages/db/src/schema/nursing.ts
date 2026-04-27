@@ -9,7 +9,7 @@ import { facilities, staffProfiles } from "./rbac.js"
 // CONSENT RECORDS — Electronic consent captured by nursing staff
 // ============================================================================
 
-export const consentRecords = createTable(
+export const nursingConsentRecords = createTable(
 	"consent_records",
 	t => ({
 		id: t.uuid("id").primaryKey().defaultRandom(),

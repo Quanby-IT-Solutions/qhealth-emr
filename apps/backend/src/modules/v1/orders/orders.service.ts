@@ -1609,13 +1609,15 @@ export class OrdersService {
 	}
 
 	async findDispenseLogs(input: DispenseLogListInput) {
+		const page = Number(input.page) || 1
+		const limit = Number(input.limit) || 50
 		const conditions = []
 		if (input.facilityId) conditions.push(eq(dispenseLogs.facilityId, input.facilityId))
 		if (input.medicationOrderId) conditions.push(eq(dispenseLogs.medicationOrderId, input.medicationOrderId))
 		if (input.patientId) conditions.push(eq(dispenseLogs.patientId, input.patientId))
 
 		const where = and(...conditions)
-		const offset = (input.page - 1) * input.limit
+		const offset = (page - 1) * limit
 
 		const [rows, [totalRow]] = await Promise.all([
 			db
@@ -1623,7 +1625,7 @@ export class OrdersService {
 				.from(dispenseLogs)
 				.where(where)
 				.orderBy(desc(dispenseLogs.dispensedAt))
-				.limit(input.limit)
+				.limit(limit)
 				.offset(offset),
 			db.select({ count: count() }).from(dispenseLogs).where(where),
 		])
@@ -1632,9 +1634,9 @@ export class OrdersService {
 		return {
 			data: rows,
 			total,
-			page: input.page,
-			limit: input.limit,
-			totalPages: Math.ceil(total / input.limit),
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit),
 		}
 	}
 
@@ -1820,10 +1822,12 @@ export class OrdersService {
 	}
 
 	async listOpdDispenseHistory(input: OpdDispenseHistoryInput) {
+		const page = Number(input.page) || 1
+		const limit = Number(input.limit) || 50
 		const conditions = [eq(dispenseLogs.facilityId, input.facilityId)]
 
 		const where = and(...conditions)
-		const offset = (input.page - 1) * input.limit
+		const offset = (page - 1) * limit
 
 		const [rows, [totalRow]] = await Promise.all([
 			db
@@ -1831,7 +1835,7 @@ export class OrdersService {
 				.from(dispenseLogs)
 				.where(where)
 				.orderBy(desc(dispenseLogs.dispensedAt))
-				.limit(input.limit)
+				.limit(limit)
 				.offset(offset),
 			db.select({ count: count() }).from(dispenseLogs).where(where),
 		])
@@ -1858,9 +1862,9 @@ export class OrdersService {
 				dispensedAt: log.dispensedAt,
 			})),
 			total,
-			page: input.page,
-			limit: input.limit,
-			totalPages: Math.ceil(total / input.limit),
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit),
 		}
 	}
 
@@ -1886,17 +1890,22 @@ export class OrdersService {
 			.returning()
 
 		if (!row) throw new NotFoundException("Failed to save counseling log")
-		return row
+		return {
+			...row,
+			checklistItems: (row.checklistItems as Array<{ item: string; checked: boolean }>) ?? [],
+		}
 	}
 
 	async findCounselingLogs(input: CounselingLogListInput) {
+		const page = Number(input.page) || 1
+		const limit = Number(input.limit) || 50
 		const conditions = []
 		if (input.facilityId) conditions.push(eq(counselingLogs.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(counselingLogs.encounterId, input.encounterId))
 		if (input.patientId) conditions.push(eq(counselingLogs.patientId, input.patientId))
 
 		const where = and(...conditions)
-		const offset = (input.page - 1) * input.limit
+		const offset = (page - 1) * limit
 
 		const [rows, [totalRow]] = await Promise.all([
 			db
@@ -1904,7 +1913,7 @@ export class OrdersService {
 				.from(counselingLogs)
 				.where(where)
 				.orderBy(desc(counselingLogs.counseledAt))
-				.limit(input.limit)
+				.limit(limit)
 				.offset(offset),
 			db.select({ count: count() }).from(counselingLogs).where(where),
 		])
@@ -1916,9 +1925,9 @@ export class OrdersService {
 				checklistItems: (row.checklistItems as Array<{ item: string; checked: boolean }>) ?? [],
 			})),
 			total,
-			page: input.page,
-			limit: input.limit,
-			totalPages: Math.ceil(total / input.limit),
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit),
 		}
 	}
 }

@@ -2,13 +2,13 @@ import { Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm"
 
 import {
-	consentRecords,
 	encounters,
 	flowsheetEntries,
 	haiTags,
 	ioEntries,
 	marEntries,
 	medicationOrders,
+	nursingConsentRecords,
 	problems,
 	shiftHandoffs,
 	staffProfiles,
@@ -890,10 +890,10 @@ export class NursingService {
 
 	async findConsentRecords(input: ConsentRecordListInput) {
 		const conditions = []
-		if (input.facilityId) conditions.push(eq(consentRecords.facilityId, input.facilityId))
-		if (input.encounterId) conditions.push(eq(consentRecords.encounterId, input.encounterId))
-		if (input.preEncounterId) conditions.push(eq(consentRecords.preEncounterId, input.preEncounterId))
-		if (input.consentType) conditions.push(eq(consentRecords.consentType, input.consentType))
+		if (input.facilityId) conditions.push(eq(nursingConsentRecords.facilityId, input.facilityId))
+		if (input.encounterId) conditions.push(eq(nursingConsentRecords.encounterId, input.encounterId))
+		if (input.preEncounterId) conditions.push(eq(nursingConsentRecords.preEncounterId, input.preEncounterId))
+		if (input.consentType) conditions.push(eq(nursingConsentRecords.consentType, input.consentType))
 
 		const where = and(...conditions)
 		const offset = (input.page - 1) * input.limit
@@ -901,12 +901,12 @@ export class NursingService {
 		const [rows, [totalRow]] = await Promise.all([
 			db
 				.select()
-				.from(consentRecords)
+				.from(nursingConsentRecords)
 				.where(where)
-				.orderBy(desc(consentRecords.signedAt))
+				.orderBy(desc(nursingConsentRecords.signedAt))
 				.limit(input.limit)
 				.offset(offset),
-			db.select({ count: count() }).from(consentRecords).where(where),
+			db.select({ count: count() }).from(nursingConsentRecords).where(where),
 		])
 
 		const total = totalRow?.count ?? 0
@@ -920,7 +920,7 @@ export class NursingService {
 	}
 
 	async findConsentRecord(id: string) {
-		const [row] = await db.select().from(consentRecords).where(eq(consentRecords.id, id)).limit(1)
+		const [row] = await db.select().from(nursingConsentRecords).where(eq(nursingConsentRecords.id, id)).limit(1)
 		if (!row) throw new NotFoundException("Consent record not found")
 		return row
 	}
@@ -929,7 +929,7 @@ export class NursingService {
 		const staffProfileId = await this.getStaffProfileId(userId)
 
 		const [row] = await db
-			.insert(consentRecords)
+			.insert(nursingConsentRecords)
 			.values({
 				facilityId: input.facilityId,
 				encounterId: input.encounterId,
