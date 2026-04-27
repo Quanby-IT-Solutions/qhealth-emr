@@ -1,7 +1,9 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, count, desc, eq, inArray, sql } from "drizzle-orm"
+import { and, count, desc, eq, inArray, ilike, or, sql } from "drizzle-orm"
 
 import {
+	counselingLogs,
+	dispenseLogs,
 	encounters,
 	encounterStatusEvents,
 	formularyItems,
@@ -40,6 +42,13 @@ type ActiveOrdersInput = V1Inputs["orders"]["getActiveOrders"]
 type PdeaLicenseCheckInput = V1Inputs["orders"]["checkPdeaLicense"]
 type TranchePreviewInput = V1Inputs["orders"]["previewTranches"]
 type CreateTranchedOrdersInput = V1Inputs["orders"]["createTranchedOrders"]
+type DispenseOrderInput = V1Inputs["orders"]["dispenseOrder"]
+type DispenseLogListInput = V1Inputs["orders"]["listDispenseLogs"]
+type OpdPrescriptionSearchInput = V1Inputs["orders"]["searchOpdPrescription"]
+type OpdDispenseInput = V1Inputs["orders"]["opdDispense"]
+type OpdDispenseHistoryInput = V1Inputs["orders"]["listOpdDispenseHistory"]
+type SaveCounselingLogInput = V1Inputs["orders"]["saveCounselingLog"]
+type CounselingLogListInput = V1Inputs["orders"]["listCounselingLogs"]
 
 @Injectable()
 export class OrdersService {
@@ -1540,5 +1549,376 @@ export class OrdersService {
 			priority: "routine" as const,
 			receivedAt: row.createdAt,
 		}))
+	}
+
+	// ========================================================================
+	// Dispense Logs (Inpatient)
+	// ========================================================================
+
+	private async getPharmacistStaffId(userId: string): Promise<string> {
+		const [profile] = await db
+			.select({ id: staffProfiles.id })
+			.from(staffProfiles)
+			.where(eq(staffProfiles.userId, userId))
+			.limit(1)
+		if (!profile) throw new NotFoundException("Staff profile not found for user")
+		return profile.id
+	}
+
+	async dispenseOrder(input: DispenseOrderInput, userId: string) {
+		const pharmacistStaffId = await this.getPharmacistStaffId(userId)
+
+		// Get medication order to retrieve patient info
+		const [order] = await db
+			.select({ encounterId: medicationOrders.encounterId, facilityId: medicationOrders.facilityId })
+			.from(medicationOrders)
+			.where(eq(medicationOrders.id, input.medicationOrderId))
+			.limit(1)
+		if (!order) throw new NotFoundException("Medication order not found")
+
+		// Resolve patientId from encounter
+		let patientId: string | null = null
+		if (order.encounterId) {
+			const [enc] = await db
+				.select({ patientId: encounters.patientId })
+				.from(encounters)
+				.where(eq(encounters.id, order.encounterId))
+				.limit(1)
+			patientId = enc?.patientId ?? null
+		}
+
+		const [row] = await db
+			.insert(dispenseLogs)
+			.values({
+				facilityId: order.facilityId,
+				medicationOrderId: input.medicationOrderId,
+				patientId,
+				dispensedQuantity: String(input.dispensedQuantity),
+				quantityUnit: input.quantityUnit,
+				lotNumber: input.lotNumber,
+				expiryDate: input.expiryDate,
+				counselingNotes: input.counselingNotes,
+				patientEducation: input.patientEducation ?? [],
+				pharmacistStaffId,
+				dispensedAt: new Date(),
+			})
+			.returning()
+
+		if (!row) throw new NotFoundException("Failed to create dispense log")
+		return row
+	}
+
+	async findDispenseLogs(input: DispenseLogListInput) {
+		const conditions = []
+		if (input.facilityId) conditions.push(eq(dispenseLogs.facilityId, input.facilityId))
+		if (input.medicationOrderId) conditions.push(eq(dispenseLogs.medicationOrderId, input.medicationOrderId))
+		if (input.patientId) conditions.push(eq(dispenseLogs.patientId, input.patientId))
+
+		const where = and(...conditions)
+		const offset = (input.page - 1) * input.limit
+
+		const [rows, [totalRow]] = await Promise.all([
+			db
+				.select()
+				.from(dispenseLogs)
+				.where(where)
+				.orderBy(desc(dispenseLogs.dispensedAt))
+				.limit(input.limit)
+				.offset(offset),
+			db.select({ count: count() }).from(dispenseLogs).where(where),
+		])
+
+		const total = totalRow?.count ?? 0
+		return {
+			data: rows,
+			total,
+			page: input.page,
+			limit: input.limit,
+			totalPages: Math.ceil(total / input.limit),
+		}
+	}
+
+	async findDispenseLog(id: string) {
+		const [row] = await db.select().from(dispenseLogs).where(eq(dispenseLogs.id, id)).limit(1)
+		if (!row) throw new NotFoundException("Dispense log not found")
+		return row
+	}
+
+	// ========================================================================
+	// OPD Dispensing
+	// ========================================================================
+
+	async searchOpdPrescription(input: OpdPrescriptionSearchInput) {
+		const search = input.q.trim().toLowerCase()
+
+		// Find signed/issued prescriptions where patient MRN or name matches
+		const [prescription] = await db
+			.select({
+				id: prescriptions.id,
+				facilityId: prescriptions.facilityId,
+				encounterId: prescriptions.encounterId,
+				patientId: prescriptions.patientId,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+				patientMrn: patients.mrn,
+				patientDateOfBirth: patients.dateOfBirth,
+				prescriberName: users.name,
+				prcLicenseNumber: prescriptions.prcLicenseNumber,
+				prescribedAt: prescriptions.createdAt,
+				status: prescriptions.status,
+				medicationOrderId: prescriptions.medicationOrderId,
+			})
+			.from(prescriptions)
+			.leftJoin(patients, eq(prescriptions.patientId, patients.id))
+			.leftJoin(staffProfiles, eq(prescriptions.prescriberStaffId, staffProfiles.id))
+			.leftJoin(users, eq(staffProfiles.userId, users.id))
+			.where(
+				and(
+					input.facilityId ? eq(prescriptions.facilityId, input.facilityId) : undefined,
+					or(
+						ilike(patients.mrn, `%${search}%`),
+						ilike(patients.firstName, `%${search}%`),
+						ilike(patients.lastName, `%${search}%`)
+					)
+				)
+			)
+			.orderBy(desc(prescriptions.createdAt))
+			.limit(1)
+
+		if (!prescription) throw new NotFoundException("No prescription found for the search query")
+
+		// Get related medication order for the prescription item
+		const [medOrder] = await db
+			.select()
+			.from(medicationOrders)
+			.where(eq(medicationOrders.id, prescription.medicationOrderId))
+			.limit(1)
+
+		const patientName =
+			prescription.patientLastName && prescription.patientFirstName
+				? `${prescription.patientLastName}, ${prescription.patientFirstName}`
+				: null
+
+		return {
+			id: prescription.id,
+			facilityId: prescription.facilityId,
+			encounterId: prescription.encounterId,
+			patientId: prescription.patientId,
+			patientName: patientName ?? "Unknown",
+			patientMrn: prescription.patientMrn ?? "-",
+			patientDateOfBirth: prescription.patientDateOfBirth
+				? String(prescription.patientDateOfBirth)
+				: null,
+			prescriberName: prescription.prescriberName,
+			prescriberPrc: prescription.prcLicenseNumber,
+			prescribedAt: prescription.prescribedAt,
+			status: prescription.status,
+			items: medOrder
+				? [
+						{
+							id: medOrder.id,
+							genericName: medOrder.genericName,
+							brandName: medOrder.brandName,
+							dose: medOrder.dose,
+							doseUnit: medOrder.doseUnit,
+							doseForm: medOrder.doseForm,
+							route: medOrder.route,
+							frequency: medOrder.frequency,
+							durationDays: medOrder.durationDays,
+							isControlledSubstance: medOrder.isControlledSubstance,
+							pdeaSchedule: medOrder.pdeaSchedule,
+							status: medOrder.status,
+						},
+					]
+				: [],
+		}
+	}
+
+	async opdDispense(input: OpdDispenseInput, userId: string) {
+		const pharmacistStaffId = await this.getPharmacistStaffId(userId)
+
+		// Resolve patient from prescription
+		const [prescription] = await db
+			.select({ patientId: prescriptions.patientId, facilityId: prescriptions.facilityId })
+			.from(prescriptions)
+			.where(eq(prescriptions.id, input.prescriptionId))
+			.limit(1)
+
+		const patientId = prescription?.patientId ?? null
+
+		// Get patient name
+		let patientName: string | null = null
+		if (patientId) {
+			const [patient] = await db
+				.select({ firstName: patients.firstName, lastName: patients.lastName })
+				.from(patients)
+				.where(eq(patients.id, patientId))
+				.limit(1)
+			if (patient) {
+				patientName =
+					patient.lastName && patient.firstName
+						? `${patient.lastName}, ${patient.firstName}`
+						: null
+			}
+		}
+
+		// Create a dispense log per item
+		const createdItems: Array<{
+			medicationOrderId: string
+			genericName: string
+			dispensedQuantity: string
+			lotNumber: string | null
+		}> = []
+
+		for (const item of input.items) {
+			const [order] = await db
+				.select({ genericName: medicationOrders.genericName, facilityId: medicationOrders.facilityId })
+				.from(medicationOrders)
+				.where(eq(medicationOrders.id, item.medicationOrderId))
+				.limit(1)
+
+			if (!order) continue
+
+			const [log] = await db
+				.insert(dispenseLogs)
+				.values({
+					facilityId: input.facilityId,
+					medicationOrderId: item.medicationOrderId,
+					patientId,
+					dispensedQuantity: String(item.dispensedQuantity),
+					quantityUnit: "tablet",
+					lotNumber: item.lotNumber,
+					expiryDate: undefined,
+					counselingNotes: input.counselingNotes,
+					patientEducation: input.patientEducation ?? [],
+					pharmacistStaffId,
+					dispensedAt: new Date(),
+				})
+				.returning()
+
+			if (log) {
+				createdItems.push({
+					medicationOrderId: item.medicationOrderId,
+					genericName: order.genericName,
+					dispensedQuantity: String(item.dispensedQuantity),
+					lotNumber: item.lotNumber ?? null,
+				})
+			}
+		}
+
+		return {
+			id: crypto.randomUUID(),
+			prescriptionId: input.prescriptionId,
+			facilityId: input.facilityId,
+			patientId,
+			patientName,
+			items: createdItems,
+			counselingNotes: input.counselingNotes ?? null,
+			pharmacistStaffId,
+			dispensedAt: new Date(),
+		}
+	}
+
+	async listOpdDispenseHistory(input: OpdDispenseHistoryInput) {
+		const conditions = [eq(dispenseLogs.facilityId, input.facilityId)]
+
+		const where = and(...conditions)
+		const offset = (input.page - 1) * input.limit
+
+		const [rows, [totalRow]] = await Promise.all([
+			db
+				.select()
+				.from(dispenseLogs)
+				.where(where)
+				.orderBy(desc(dispenseLogs.dispensedAt))
+				.limit(input.limit)
+				.offset(offset),
+			db.select({ count: count() }).from(dispenseLogs).where(where),
+		])
+
+		// Group dispense logs into OPD-style records
+		const total = totalRow?.count ?? 0
+		return {
+			data: rows.map(log => ({
+				id: log.id,
+				prescriptionId: log.medicationOrderId,
+				facilityId: log.facilityId,
+				patientId: log.patientId,
+				patientName: null,
+				items: [
+					{
+						medicationOrderId: log.medicationOrderId,
+						genericName: "",
+						dispensedQuantity: log.dispensedQuantity,
+						lotNumber: log.lotNumber,
+					},
+				],
+				counselingNotes: log.counselingNotes,
+				pharmacistStaffId: log.pharmacistStaffId,
+				dispensedAt: log.dispensedAt,
+			})),
+			total,
+			page: input.page,
+			limit: input.limit,
+			totalPages: Math.ceil(total / input.limit),
+		}
+	}
+
+	// ========================================================================
+	// Patient Counseling Logs
+	// ========================================================================
+
+	async saveCounselingLog(input: SaveCounselingLogInput, userId: string) {
+		const pharmacistStaffId = await this.getPharmacistStaffId(userId)
+
+		const [row] = await db
+			.insert(counselingLogs)
+			.values({
+				facilityId: input.facilityId,
+				encounterId: input.encounterId,
+				patientId: input.patientId,
+				medicationOrderId: input.medicationOrderId,
+				checklistItems: input.checklistItems,
+				patientSignature: input.patientSignature,
+				pharmacistStaffId,
+				counseledAt: new Date(),
+			})
+			.returning()
+
+		if (!row) throw new NotFoundException("Failed to save counseling log")
+		return row
+	}
+
+	async findCounselingLogs(input: CounselingLogListInput) {
+		const conditions = []
+		if (input.facilityId) conditions.push(eq(counselingLogs.facilityId, input.facilityId))
+		if (input.encounterId) conditions.push(eq(counselingLogs.encounterId, input.encounterId))
+		if (input.patientId) conditions.push(eq(counselingLogs.patientId, input.patientId))
+
+		const where = and(...conditions)
+		const offset = (input.page - 1) * input.limit
+
+		const [rows, [totalRow]] = await Promise.all([
+			db
+				.select()
+				.from(counselingLogs)
+				.where(where)
+				.orderBy(desc(counselingLogs.counseledAt))
+				.limit(input.limit)
+				.offset(offset),
+			db.select({ count: count() }).from(counselingLogs).where(where),
+		])
+
+		const total = totalRow?.count ?? 0
+		return {
+			data: rows.map(row => ({
+				...row,
+				checklistItems: (row.checklistItems as Array<{ item: string; checked: boolean }>) ?? [],
+			})),
+			total,
+			page: input.page,
+			limit: input.limit,
+			totalPages: Math.ceil(total / input.limit),
+		}
 	}
 }

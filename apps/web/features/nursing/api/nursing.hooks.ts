@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { env } from "@/env"
+import { orpc } from "@/services/orpc/client"
 
 const API_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/nursing`
 
@@ -757,5 +758,95 @@ export function useNewsScoreHistoryQuery(params: {
 				`${API_BASE}/news/history${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
 			),
 		enabled: !!params.encounterId,
+	})
+}
+
+// ============================================================================
+// Consent Records
+// ============================================================================
+
+export const ConsentTypeLabels: Record<string, string> = {
+	general: "General Consent",
+	dpa: "Data Privacy Act (DPA) Consent",
+	nbs: "Newborn Screening Consent",
+	transfusion: "Blood Transfusion Consent",
+	surgery: "Surgical Consent",
+	anesthesia: "Anesthesia Consent",
+	philhealth: "PhilHealth Authorization",
+	do_not_resuscitate: "Do Not Resuscitate (DNR) Order",
+	hiv_testing: "HIV Testing Consent",
+	organ_donation: "Organ Donation Consent",
+	research: "Research Participation Consent",
+	telemedicine: "Telemedicine Consent",
+}
+
+export interface ConsentRecord {
+	id: string
+	facilityId: string
+	encounterId: string | null
+	preEncounterId: string | null
+	consentType: string
+	consentText: string
+	patientSignature: string | null
+	guardianSignature: string | null
+	witnessSignature: string | null
+	capturedByStaffId: string
+	signedAt: string
+	createdAt: string
+}
+
+export interface CreateConsentInput {
+	facilityId: string
+	encounterId?: string
+	preEncounterId?: string
+	consentType: string
+	consentText?: string
+	patientSignature?: string
+	guardianSignature?: string
+	witnessSignature?: string
+}
+
+export function useConsentsQuery(params: {
+	facilityId?: string
+	encounterId?: string
+	preEncounterId?: string
+	consentType?: string
+	page?: number
+	limit?: number
+}) {
+	return useQuery({
+		...orpc.nursing.listConsents.queryOptions({
+			input: {
+				facilityId: params.facilityId,
+				encounterId: params.encounterId,
+				preEncounterId: params.preEncounterId,
+				consentType: params.consentType,
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			enabled: !!(params.encounterId || params.preEncounterId || params.facilityId),
+		}),
+		queryKey: [...nursingKeys.all, "consents", params] as const,
+	})
+}
+
+export function useConsentQuery(id: string | null) {
+	return useQuery({
+		...orpc.nursing.getConsent.queryOptions({
+			input: id ? { id } : undefined,
+			enabled: !!id,
+		}),
+		queryKey: [...nursingKeys.all, "consent", id ?? ""] as const,
+	})
+}
+
+export function useCreateConsentMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: CreateConsentInput) =>
+			orpc.nursing.createConsent.call(data),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
+		},
 	})
 }
