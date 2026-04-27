@@ -197,7 +197,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		],
 	},
 	{
-		title: "Laboratory",
+		title: "Lab Result Entry & Validation",
 		href: "/laboratory",
 		iconName: "laboratory",
 		// Laboratory module is seeded for Lab Technologist role
@@ -207,13 +207,46 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		],
 	},
 	{
-		title: "Radiology",
+		title: "Critical Results",
+		href: "/laboratory/critical-results",
+		iconName: "laboratory",
+		requiredPermissions: [
+			{ module: "laboratory", action: "view" },
+		],
+	},
+	{
+		title: "Blood Bank",
+		href: "/laboratory/blood-bank",
+		iconName: "blood-bank",
+		requiredPermissions: [
+			{ module: "laboratory", action: "view" },
+		],
+	},
+	{
+		title: "Transfusion Verification",
+		href: "/transfusion",
+		iconName: "blood-bank",
+		requiredPermissions: [
+			{ module: "laboratory", action: "view" },
+		],
+	},
+	{
+		title: "Procedure Barcode Logging",
+		href: "/procedure-logging",
+		iconName: "laboratory",
+		requiredPermissions: [
+			{ module: "laboratory", action: "view" },
+		],
+	},
+	{
+		title: "Radiology Report Attachment",
 		href: "/radiology",
 		iconName: "radiology",
-		// Radiology module is seeded for Radiologist role
-		// Admin does not have radiology access per TOR
+		// Radiology module is seeded for Radiologist role.
+		// Also allow Lab Technologists (laboratory:view) to access this nav
 		requiredPermissions: [
 			{ module: "radiology", action: "view" },
+			{ module: "laboratory", action: "view" },
 		],
 	},
 	{

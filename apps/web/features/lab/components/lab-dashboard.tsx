@@ -2,18 +2,11 @@
 
 import { useState } from "react"
 
-import { AlertCircle, FlaskConical } from "lucide-react"
+import { ArrowRight, Clock3, FlaskConical, ShieldCheck, TriangleAlert } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/core/components/ui/select"
 import {
 	Table,
 	TableBody,
@@ -22,7 +15,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
+import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { type LabOrder, useLabDashboardQuery } from "@/features/lab/api/lab.hooks"
 
@@ -35,33 +28,34 @@ import { LabResultDetail } from "./lab-result-detail"
 function formatDateTime(d: string | null | undefined) {
 	if (!d) return "—"
 	return new Date(d).toLocaleString("en-PH", {
-		year: "numeric",
-		month: "short",
-		day: "numeric",
 		hour: "2-digit",
 		minute: "2-digit",
 	})
 }
 
-function priorityBadge(priority: string) {
+function formatAccession(orderId: string) {
+	return `L-${orderId.slice(0, 4).toUpperCase()}-${orderId.slice(4, 8).toUpperCase()}`
+}
+
+function priorityBadge(priority: LabOrder["priority"]) {
 	switch (priority) {
 		case "stat":
 			return <Badge variant="destructive">STAT</Badge>
 		case "urgent":
-			return <Badge variant="secondary">Urgent</Badge>
+			return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Urgent</Badge>
 		default:
 			return <Badge variant="outline">Routine</Badge>
 	}
 }
 
-function statusBadge(status: string) {
+function statusBadge(status: LabOrder["status"]) {
 	switch (status) {
 		case "pending":
 			return <Badge variant="outline">Pending</Badge>
 		case "in_progress":
-			return <Badge variant="secondary">In Progress</Badge>
+			return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">In Progress</Badge>
 		case "completed":
-			return <Badge variant="default">Completed</Badge>
+			return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Awaiting Validation</Badge>
 		case "cancelled":
 			return (
 				<Badge variant="outline" className="text-muted-foreground">
@@ -79,44 +73,32 @@ function statusBadge(status: string) {
 
 function LabOrderRow({
 	order,
-	onViewResult,
+	onEnter,
 }: {
 	order: LabOrder
-	onViewResult: (order: LabOrder) => void
+	onEnter: (order: LabOrder) => void
 }) {
 	return (
 		<TableRow>
 			<TableCell>
-				<div className="flex items-center gap-1">
-					{order.hasCriticalValues && (
-						<AlertCircle className="size-4 shrink-0 text-destructive" />
-					)}
-					<span className="font-medium">{order.patientName ?? "—"}</span>
-				</div>
+				<span className="font-mono text-xs">{formatAccession(order.id)}</span>
 			</TableCell>
 			<TableCell>
 				<div>
-					<p className="font-medium">{order.panelName ?? order.testName}</p>
-					{order.panelName && (
-						<p className="text-xs text-muted-foreground">{order.testName}</p>
-					)}
+					<p className="font-medium">{order.patientName ?? "—"}</p>
+					<p className="text-xs text-muted-foreground">MRN {order.patientId?.slice(0, 10) ?? "N/A"}</p>
 				</div>
 			</TableCell>
-			<TableCell>{order.specimenType ?? "—"}</TableCell>
+			<TableCell>{order.encounterId ? `ENC-${order.encounterId.slice(0, 4).toUpperCase()}` : "—"}</TableCell>
+			<TableCell>{order.panelName ?? order.testName}</TableCell>
 			<TableCell>{priorityBadge(order.priority)}</TableCell>
-			<TableCell>{formatDateTime(order.createdAt)}</TableCell>
-			<TableCell>{formatDateTime(order.collectionDatetime)}</TableCell>
 			<TableCell>{statusBadge(order.status)}</TableCell>
-			<TableCell>
-				{order.status === "completed" && (
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => onViewResult(order)}
-					>
-						View Results
-					</Button>
-				)}
+			<TableCell>{formatDateTime(order.collectionDatetime ?? order.createdAt)}</TableCell>
+			<TableCell className="text-right">
+				<Button variant="ghost" size="sm" onClick={() => onEnter(order)}>
+					Enter
+					<ArrowRight className="ml-1 size-4" />
+				</Button>
 			</TableCell>
 		</TableRow>
 	)
@@ -129,11 +111,11 @@ function LabOrderRow({
 function LabOrdersTable({
 	orders,
 	isLoading,
-	onViewResult,
+	onEnter,
 }: {
 	orders: LabOrder[]
 	isLoading: boolean
-	onViewResult: (order: LabOrder) => void
+	onEnter: (order: LabOrder) => void
 }) {
 	if (isLoading) {
 		return (
@@ -156,19 +138,19 @@ function LabOrdersTable({
 		<Table>
 			<TableHeader>
 				<TableRow>
+					<TableHead>Accession</TableHead>
 					<TableHead>Patient</TableHead>
-					<TableHead>Test / Panel</TableHead>
-					<TableHead>Specimen</TableHead>
+					<TableHead>Ward</TableHead>
+					<TableHead>Panel</TableHead>
 					<TableHead>Priority</TableHead>
-					<TableHead>Ordered</TableHead>
-					<TableHead>Collection</TableHead>
 					<TableHead>Status</TableHead>
-					<TableHead />
+					<TableHead>Collected</TableHead>
+					<TableHead className="text-right" />
 				</TableRow>
 			</TableHeader>
 			<TableBody>
 				{orders.map((order) => (
-					<LabOrderRow key={order.id} order={order} onViewResult={onViewResult} />
+					<LabOrderRow key={order.id} order={order} onEnter={onEnter} />
 				))}
 			</TableBody>
 		</Table>
@@ -198,118 +180,122 @@ export function LabDashboard() {
 	const inProgressQuery = useLabDashboardQuery(buildParams("in_progress"))
 	const completedQuery = useLabDashboardQuery(buildParams("completed"))
 
-	function handleViewResult(order: LabOrder) {
+	function handleEnter(order: LabOrder) {
 		setSelectedOrder(order)
 		setDetailOpen(true)
 	}
 
-	const criticalCount =
-		(completedQuery.data?.data.filter((o) => o.hasCriticalValues).length ?? 0) +
-		(inProgressQuery.data?.data.filter((o) => o.hasCriticalValues).length ?? 0)
+	const allOrders = [
+		...(pendingQuery.data?.data ?? []),
+		...(inProgressQuery.data?.data ?? []),
+		...(completedQuery.data?.data ?? []),
+	].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+
+	const releasedTodayCount = (completedQuery.data?.data ?? []).filter((order) => {
+		if (!order.resultedDatetime) return false
+		const today = new Date()
+		const date = new Date(order.resultedDatetime)
+		return (
+			date.getFullYear() === today.getFullYear() &&
+			date.getMonth() === today.getMonth() &&
+			date.getDate() === today.getDate()
+		)
+	}).length
+
+	const filterOptions: Array<{ value: string; label: string }> = [
+		{ value: "all", label: "All" },
+		{ value: "stat", label: "STAT" },
+		{ value: "urgent", label: "Urgent" },
+		{ value: "routine", label: "Routine" },
+	]
 
 	return (
-		<div className="space-y-4">
-			{/* Header */}
-			<div className="flex items-center justify-between">
+		<div className="space-y-5">
+			<div className="flex items-start justify-between gap-3">
 				<div>
-					<h1 className="text-2xl font-semibold">Laboratory Orders</h1>
+					<h1 className="text-2xl font-semibold">Lab Result Entry & Validation</h1>
 					<p className="text-sm text-muted-foreground">
-						Facility-wide lab order tracking and results
+						Pending and in-progress orders requiring manual entry and validation
 					</p>
 				</div>
 
 				<div className="flex items-center gap-2">
-					{criticalCount > 0 && (
-						<div className="flex items-center gap-1 rounded-md border border-destructive bg-destructive/10 px-3 py-1.5 text-sm font-medium text-destructive">
-							<AlertCircle className="size-4" />
-							{criticalCount} critical value{criticalCount > 1 ? "s" : ""}
-						</div>
-					)}
-					<Select value={priorityFilter} onValueChange={setPriorityFilter}>
-						<SelectTrigger className="w-36">
-							<SelectValue placeholder="All priorities" />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All priorities</SelectItem>
-							<SelectItem value="stat">STAT only</SelectItem>
-							<SelectItem value="urgent">Urgent only</SelectItem>
-							<SelectItem value="routine">Routine only</SelectItem>
-						</SelectContent>
-					</Select>
+					<Button variant="outline" size="sm">
+						Filters
+					</Button>
+					<Button size="sm">New manual entry</Button>
 				</div>
 			</div>
 
-			{/* Tabs */}
+			<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+				<Card>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Pending</CardTitle>
+					</CardHeader>
+					<CardContent className="flex items-end justify-between">
+						<p className="text-3xl font-semibold text-rose-600">{pendingQuery.data?.total ?? 0}</p>
+						<Clock3 className="size-4 text-rose-500" />
+					</CardContent>
+				</Card>
+				<Card>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">In Progress</CardTitle>
+					</CardHeader>
+					<CardContent className="flex items-end justify-between">
+						<p className="text-3xl font-semibold text-blue-600">{inProgressQuery.data?.total ?? 0}</p>
+						<FlaskConical className="size-4 text-blue-500" />
+					</CardContent>
+				</Card>
+				<Card>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Awaiting Validation</CardTitle>
+					</CardHeader>
+					<CardContent className="flex items-end justify-between">
+						<p className="text-3xl font-semibold">{completedQuery.data?.total ?? 0}</p>
+						<TriangleAlert className="size-4 text-muted-foreground" />
+					</CardContent>
+				</Card>
+				<Card>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Released Today</CardTitle>
+					</CardHeader>
+					<CardContent className="flex items-end justify-between">
+						<p className="text-3xl font-semibold text-emerald-600">{releasedTodayCount}</p>
+						<ShieldCheck className="size-4 text-emerald-500" />
+					</CardContent>
+				</Card>
+			</div>
+
 			<Card>
-				<CardHeader className="pb-0">
-					<CardTitle className="text-base">Lab Orders</CardTitle>
-				</CardHeader>
-				<CardContent className="pt-0">
-					<Tabs defaultValue="pending">
-						<TabsList className="mb-4 mt-2">
-							<TabsTrigger value="pending">
-								Pending
-								{(pendingQuery.data?.total ?? 0) > 0 && (
-									<Badge
-										variant="secondary"
-										className="ml-1.5 text-[10px]"
-									>
-										{pendingQuery.data?.total}
-									</Badge>
-								)}
-							</TabsTrigger>
-							<TabsTrigger value="in_progress">
-								In Progress
-								{(inProgressQuery.data?.total ?? 0) > 0 && (
-									<Badge
-										variant="secondary"
-										className="ml-1.5 text-[10px]"
-									>
-										{inProgressQuery.data?.total}
-									</Badge>
-								)}
-							</TabsTrigger>
-							<TabsTrigger value="completed">
-								Completed
-								{(completedQuery.data?.total ?? 0) > 0 && (
-									<Badge
-										variant="outline"
-										className="ml-1.5 text-[10px]"
-									>
-										{completedQuery.data?.total}
-									</Badge>
-								)}
-							</TabsTrigger>
-						</TabsList>
-
-						<TabsContent value="pending">
-							<LabOrdersTable
-								orders={pendingQuery.data?.data ?? []}
-								isLoading={pendingQuery.isLoading}
-								onViewResult={handleViewResult}
-							/>
-						</TabsContent>
-
-						<TabsContent value="in_progress">
-							<LabOrdersTable
-								orders={inProgressQuery.data?.data ?? []}
-								isLoading={inProgressQuery.isLoading}
-								onViewResult={handleViewResult}
-							/>
-						</TabsContent>
-
-						<TabsContent value="completed">
-							<LabOrdersTable
-								orders={completedQuery.data?.data ?? []}
-								isLoading={completedQuery.isLoading}
-								onViewResult={handleViewResult}
-							/>
-						</TabsContent>
-					</Tabs>
+				<CardContent className="space-y-3 pt-4">
+					<div className="flex items-center justify-between gap-2">
+						<div className="inline-flex rounded-md border bg-muted/40 p-1">
+							{filterOptions.map((filter) => (
+								<button
+									key={filter.value}
+									type="button"
+									onClick={() => setPriorityFilter(filter.value)}
+									className={cn(
+										"rounded px-3 py-1 text-xs font-medium transition",
+										priorityFilter === filter.value
+											? "bg-background text-foreground shadow-sm"
+											: "text-muted-foreground hover:text-foreground",
+									)}
+								>
+									{filter.label}
+								</button>
+							))}
+						</div>
+						<p className="text-xs text-muted-foreground">Updated just now</p>
+					</div>
+					<LabOrdersTable
+						orders={allOrders}
+						isLoading={pendingQuery.isLoading || inProgressQuery.isLoading || completedQuery.isLoading}
+						onEnter={handleEnter}
+					/>
 				</CardContent>
 			</Card>
 
-			{/* Result Detail Modal */}
 			<LabResultDetail
 				order={selectedOrder}
 				open={detailOpen}
