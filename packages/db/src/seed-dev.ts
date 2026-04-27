@@ -1,6 +1,6 @@
 import "dotenv/config"
 
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 
 import { createDBClient } from "./client.js"
 import {
@@ -57,6 +57,11 @@ if (!DATABASE_URL) {
 }
 
 const db = createDBClient(DATABASE_URL)
+
+async function ensureProblemsTerminologyColumns() {
+	await db.execute(sql`ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "snomed_code" text`)
+	await db.execute(sql`ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "snomed_display" text`)
+}
 
 type ModuleName =
 	| "adt"
@@ -1286,6 +1291,7 @@ async function seedAdminScenarios(params: {
 
 async function main() {
 	console.log("Seeding qhealth-emr development data...")
+	await ensureProblemsTerminologyColumns()
 	const facility = await ensureFacility()
 
 	const roleMap = new Map<string, string>()
