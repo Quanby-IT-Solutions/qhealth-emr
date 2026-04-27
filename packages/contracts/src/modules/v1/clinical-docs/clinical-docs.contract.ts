@@ -16,6 +16,8 @@ import {
 	CreateConsentRecordSchema,
 	CreateNoteTemplateSchema,
 	ExtractCf4DataInputSchema,
+	NoteContextInputSchema,
+	NoteContextSchema,
 	NoteTemplateIdSchema,
 	NoteTemplateListResponseSchema,
 	NoteTemplateListSchema,
@@ -127,6 +129,16 @@ export const clinicalDocsContract = {
 		})
 		.input(SignClinicalNoteSchema)
 		.output(ClinicalNoteSchema),
+
+	getNoteContext: oc
+		.route({
+			method: "GET",
+			path: "/context",
+			summary: "Get chart context snippets for clinical note authoring",
+			tags: ["Clinical Documentation"],
+		})
+		.input(NoteContextInputSchema)
+		.output(NoteContextSchema),
 
 	// ========================================================================
 	// Note Addenda

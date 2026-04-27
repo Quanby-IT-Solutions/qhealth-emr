@@ -36,7 +36,6 @@ export class ProblemsAllergiesController {
 	@Implement(v1.problemsAllergies.createProblem)
 	async createProblem(@Session() session: UserSession) {
 		return implement(v1.problemsAllergies.createProblem).handler(async ({ input }) => {
-			// TODO: Resolve staffProfileId from session.user.id + facilityId via RBAC
 			return this.service.createProblem(input, session.user.id)
 		})
 	}
@@ -45,7 +44,7 @@ export class ProblemsAllergiesController {
 	@Implement(v1.problemsAllergies.updateProblem)
 	async updateProblem(@Session() session: UserSession) {
 		return implement(v1.problemsAllergies.updateProblem).handler(async ({ input }) => {
-			return this.service.updateProblem(input)
+			return this.service.updateProblem(input, session.user.id)
 		})
 	}
 
@@ -53,7 +52,15 @@ export class ProblemsAllergiesController {
 	@Implement(v1.problemsAllergies.resolveProblem)
 	async resolveProblem(@Session() session: UserSession) {
 		return implement(v1.problemsAllergies.resolveProblem).handler(async ({ input }) => {
-			return this.service.resolveProblem(input)
+			return this.service.resolveProblem(input, session.user.id)
+		})
+	}
+
+	@RequirePermission("clinical_docs", "sign")
+	@Implement(v1.problemsAllergies.deleteProblem)
+	async deleteProblem(@Session() session: UserSession) {
+		return implement(v1.problemsAllergies.deleteProblem).handler(async ({ input }) => {
+			return this.service.deleteProblem(input.id, session.user.id)
 		})
 	}
 
@@ -81,7 +88,6 @@ export class ProblemsAllergiesController {
 	@Implement(v1.problemsAllergies.createAllergy)
 	async createAllergy(@Session() session: UserSession) {
 		return implement(v1.problemsAllergies.createAllergy).handler(async ({ input }) => {
-			// TODO: Resolve staffProfileId from session.user.id + facilityId via RBAC
 			return this.service.createAllergy(input, session.user.id)
 		})
 	}
@@ -90,7 +96,7 @@ export class ProblemsAllergiesController {
 	@Implement(v1.problemsAllergies.updateAllergy)
 	async updateAllergy(@Session() session: UserSession) {
 		return implement(v1.problemsAllergies.updateAllergy).handler(async ({ input }) => {
-			return this.service.updateAllergy(input)
+			return this.service.updateAllergy(input, session.user.id)
 		})
 	}
 
@@ -98,7 +104,35 @@ export class ProblemsAllergiesController {
 	@Implement(v1.problemsAllergies.deactivateAllergy)
 	async deactivateAllergy(@Session() session: UserSession) {
 		return implement(v1.problemsAllergies.deactivateAllergy).handler(async ({ input }) => {
-			return this.service.deactivateAllergy(input.id)
+			return this.service.deactivateAllergy(input.id, session.user.id)
+		})
+	}
+
+	// ========================================================================
+	// Terminology / Search
+	// ========================================================================
+
+	@RequirePermission("clinical_docs", "view")
+	@Implement(v1.problemsAllergies.searchIcd10)
+	async searchIcd10() {
+		return implement(v1.problemsAllergies.searchIcd10).handler(async ({ input }) => {
+			return this.service.searchIcd10(input)
+		})
+	}
+
+	@RequirePermission("clinical_docs", "view")
+	@Implement(v1.problemsAllergies.searchSnomedCt)
+	async searchSnomedCt() {
+		return implement(v1.problemsAllergies.searchSnomedCt).handler(async ({ input }) => {
+			return this.service.searchSnomedCt(input)
+		})
+	}
+
+	@RequirePermission("clinical_docs", "view")
+	@Implement(v1.problemsAllergies.searchAllergens)
+	async searchAllergens() {
+		return implement(v1.problemsAllergies.searchAllergens).handler(async ({ input }) => {
+			return this.service.searchAllergens(input)
 		})
 	}
 

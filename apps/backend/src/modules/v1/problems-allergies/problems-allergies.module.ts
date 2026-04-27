@@ -1,9 +1,11 @@
 import { Module } from "@nestjs/common"
 
+import { AuditModule } from "../audit/audit.module"
 import { ProblemsAllergiesController } from "./problems-allergies.controller"
 import { ProblemsAllergiesService } from "./problems-allergies.service"
 
 @Module({
+	imports: [AuditModule],
 	controllers: [ProblemsAllergiesController],
 	providers: [ProblemsAllergiesService],
 	exports: [ProblemsAllergiesService],

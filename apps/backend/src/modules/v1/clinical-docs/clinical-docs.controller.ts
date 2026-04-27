@@ -94,6 +94,14 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "view")
+	@Implement(v1.clinicalDocs.getNoteContext)
+	async getNoteContext() {
+		return implement(v1.clinicalDocs.getNoteContext).handler(async ({ input }) => {
+			return this.service.getNoteContext(input)
+		})
+	}
+
 	// ========================================================================
 	// Note Addenda
 	// ========================================================================
