@@ -157,6 +157,19 @@ export const nutritionKeys = {
 		[...nutritionKeys.all, "meal-plan", encounterId] as const,
 	dietOrders: (encounterId: string) =>
 		[...nutritionKeys.all, "diet-orders", encounterId] as const,
+	worklist: (facilityId: string) =>
+		[...nutritionKeys.all, "worklist", facilityId] as const,
+}
+
+// ============================================================================
+// Facility-level worklist type (superset of NutritionAssessment)
+// ============================================================================
+
+export interface WorklistAssessment extends NutritionAssessment {
+	patientName?: string
+	patientMrn?: string
+	ward?: string
+	mealPlanStatus?: "none" | "draft" | "active"
 }
 
 // ============================================================================
@@ -249,6 +262,40 @@ export function useDietOrdersQuery(encounterId: string) {
 	})
 }
 
+// ============================================================================
+// Facility Worklist (dietitian landing page)
+// ============================================================================
+
+export interface WorklistResponse {
+	total: number
+	page: number
+	limit: number
+	totalPages: number
+	assessments: WorklistAssessment[]
+}
+
+export function useNutritionWorklistQuery(
+	facilityId: string,
+	params?: {
+		page?: number
+		limit?: number
+		malnutritionRisk?: "low" | "moderate" | "high"
+		status?: string
+	}
+) {
+	return useQuery({
+		queryKey: [...nutritionKeys.worklist(facilityId), params],
+		queryFn: () =>
+			fetchJson<WorklistResponse>(
+				`${API_BASE}/assessments${buildQueryString({
+					facilityId,
+					...params,
+				})}`
+			),
+		enabled: !!facilityId,
+	})
+}
+
 export function useCreateDietOrderMutation() {
 	const qc = useQueryClient()
 	return useMutation({
@@ -278,5 +325,32 @@ export function useDiscontinueDietOrderMutation() {
 				queryKey: nutritionKeys.dietOrders(data.encounterId),
 			})
 		},
+	})
+}
+
+// ============================================================================
+// Screening Tool Scoring
+// ============================================================================
+
+export interface ScreeningScoreResult {
+	tool: "nrs_2002" | "sga" | "must"
+	score: number
+	risk: "low" | "moderate" | "high"
+	interpretation: string
+	recommendation: string
+}
+
+export type ScreeningScoreInput =
+	| { tool: "nrs_2002"; nutritionalImpairmentScore: number; severityOfDiseaseScore: number; age: number }
+	| { tool: "must"; bmiScore: number; weightLossScore: number; acuteDiseaseEffect: number }
+	| { tool: "sga"; rating: "A" | "B" | "C" }
+
+export function useScoreScreeningMutation() {
+	return useMutation({
+		mutationFn: (input: ScreeningScoreInput) =>
+			fetchJson<ScreeningScoreResult>(`${API_BASE}/screening/score`, {
+				method: "POST",
+				body: JSON.stringify(input),
+			}),
 	})
 }

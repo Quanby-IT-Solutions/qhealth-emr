@@ -225,6 +225,45 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		],
 	},
 	{
+		title: "OPD Dispensing",
+		href: "/pharmacy/opd",
+		iconName: "pill",
+		// Primary sidebar for Pharmacist — hidden from admins and physicians
+		requiredPermissions: [
+			{ module: "orders", action: "verify" },
+		],
+		excludePermissions: [
+			{ module: "admin", action: "view" },
+			{ module: "clinical_docs", action: "sign" },
+		],
+	},
+	{
+		title: "Formulary",
+		href: "/admin/formulary",
+		iconName: "formulary",
+		// Primary sidebar for Pharmacist
+		requiredPermissions: [
+			{ module: "orders", action: "verify" },
+		],
+	},
+	{
+		title: "Nursing",
+		href: "/nursing",
+		iconName: "nursing",
+		requiredPermissions: [
+			{ module: "nursing", action: "view" },
+		],
+	},
+	{
+		title: "Nutrition",
+		href: "/nutrition",
+		iconName: "nutrition",
+		// Primary nav for Dietitian
+		requiredPermissions: [
+			{ module: "nutrition", action: "view" },
+		],
+	},
+	{
 		title: "Telemedicine",
 		href: "/telemedicine",
 		iconName: "video",
