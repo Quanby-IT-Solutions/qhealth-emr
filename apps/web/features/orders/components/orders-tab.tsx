@@ -10,11 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import {
 	Table,
 	TableBody,
+	TableCell,
 	TableHead,
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
 	useDiscontinueMedOrderMutation,
 	useCreatePrescriptionMutation,
@@ -242,6 +244,7 @@ export function OrdersTab({ encounterId, facilityId, patientId }: OrdersTabProps
 	const [createImagingOpen, setCreateImagingOpen] = useState(false)
 	const [rxPrintOpen, setRxPrintOpen] = useState(false)
 
+	const { data: profile } = useMyProfile()
 	const medOrders = useMedOrderListQuery({ encounterId })
 	const labOrders = useLabOrderListQuery({ encounterId })
 	const imagingOrders = useImagingOrderListQuery({ encounterId })
@@ -250,6 +253,10 @@ export function OrdersTab({ encounterId, facilityId, patientId }: OrdersTabProps
 	const discontinueMed = useDiscontinueMedOrderMutation()
 	const createPrescription = useCreatePrescriptionMutation()
 	const signPrescription = useSignPrescriptionMutation()
+	const orderingStaffProfile =
+		profile?.staffProfiles?.find((staffProfile) => staffProfile.facilityId === facilityId) ??
+		profile?.staffProfiles?.[0]
+	const orderingStaffId = orderingStaffProfile?.id ?? ""
 
 	return (
 		<>
@@ -476,7 +483,7 @@ export function OrdersTab({ encounterId, facilityId, patientId }: OrdersTabProps
 				encounterId={encounterId}
 				facilityId={facilityId}
 				patientId={patientId}
-				orderingStaffId=""
+				orderingStaffId={orderingStaffId}
 			/>
 			<CreateLabOrderDialog
 				open={createLabOpen}
@@ -489,12 +496,6 @@ export function OrdersTab({ encounterId, facilityId, patientId }: OrdersTabProps
 				onOpenChange={setCreateImagingOpen}
 				encounterId={encounterId}
 				facilityId={facilityId}
-			/>
-			<PrescriptionPrintDialog
-				open={rxPrintOpen}
-				onOpenChange={setRxPrintOpen}
-				encounterId={encounterId}
-				patientId={patientId}
 			/>
 			<PrescriptionPrintDialog
 				open={rxPrintOpen}

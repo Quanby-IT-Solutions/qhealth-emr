@@ -21,14 +21,8 @@ interface ResolveProblemDialogProps {
 	problemId: string
 }
 
-export function ResolveProblemDialog({
-	open,
-	onOpenChange,
-	problemId,
-}: ResolveProblemDialogProps) {
-	const [resolutionDate, setResolutionDate] = useState(
-		new Date().toISOString().split("T")[0] ?? "",
-	)
+export function ResolveProblemDialog({ open, onOpenChange, problemId }: ResolveProblemDialogProps) {
+	const [resolutionDate, setResolutionDate] = useState(new Date().toISOString().split("T")[0] ?? "")
 
 	const resolveProblem = useResolveProblemMutation()
 
@@ -42,7 +36,7 @@ export function ResolveProblemDialog({
 				onSuccess: () => {
 					onOpenChange(false)
 				},
-			},
+			}
 		)
 	}
 
@@ -66,11 +60,8 @@ export function ResolveProblemDialog({
 				</div>
 
 				<DialogFooter>
-					<Button
-						onClick={handleResolve}
-						disabled={resolveProblem.isPending}
-					>
-						{resolveProblem.isPending ? "Resolving…" : "Mark Resolved"}
+					<Button onClick={handleResolve} disabled={resolveProblem.isPending}>
+						{resolveProblem.isPending ? "Resolving..." : "Mark Resolved"}
 					</Button>
 				</DialogFooter>
 			</DialogContent>
