@@ -61,4 +61,12 @@ export class NutritionController {
 			return this.nutritionService.saveMealPlan(input)
 		})
 	}
+
+	@RequirePermission("nutrition", "view")
+	@Implement(v1.nutrition.scoreScreening)
+	async scoreScreening() {
+		return implement(v1.nutrition.scoreScreening).handler(async ({ input }) => {
+			return this.nutritionService.scoreScreening(input)
+		})
+	}
 }

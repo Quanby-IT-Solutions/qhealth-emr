@@ -233,9 +233,19 @@ export {
 	NutritionAssessmentSchema,
 	CreateNutritionAssessmentSchema,
 	MealPlanSchema,
+	ScreeningScoreInputSchema,
+	ScreeningScoreResultSchema,
+	Nrs2002InputSchema,
+	MustInputSchema,
+	SgaInputSchema,
 	type NutritionAssessment,
 	type CreateNutritionAssessment,
 	type MealPlan,
+	type ScreeningScoreInput,
+	type ScreeningScoreResult,
+	type Nrs2002Input,
+	type MustInput,
+	type SgaInput,
 } from "./modules/v1/nutrition/nutrition.schema.js"
 
 // MSW (Medical Social Work) schemas — exported for frontend validation

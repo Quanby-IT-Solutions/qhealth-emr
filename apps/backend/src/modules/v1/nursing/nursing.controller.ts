@@ -223,4 +223,32 @@ export class NursingController {
 			return this.nursingService.updateHaiTag(input)
 		})
 	}
+
+	// ========================================================================
+	// Consent Records
+	// ========================================================================
+
+	@RequirePermission("nursing", "view")
+	@Implement(v1.nursing.listConsents)
+	async listConsents() {
+		return implement(v1.nursing.listConsents).handler(async ({ input }) => {
+			return this.nursingService.findConsentRecords(input)
+		})
+	}
+
+	@RequirePermission("nursing", "view")
+	@Implement(v1.nursing.getConsent)
+	async getConsent() {
+		return implement(v1.nursing.getConsent).handler(async ({ input }) => {
+			return this.nursingService.findConsentRecord(input.id)
+		})
+	}
+
+	@RequirePermission("nursing", "create")
+	@Implement(v1.nursing.createConsent)
+	async createConsent(@Session() session: UserSession) {
+		return implement(v1.nursing.createConsent).handler(async ({ input }) => {
+			return this.nursingService.createConsentRecord(input, session.user.id)
+		})
+	}
 }

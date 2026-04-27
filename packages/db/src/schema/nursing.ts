@@ -6,6 +6,43 @@ import { medicationOrders } from "./orders.js"
 import { facilities, staffProfiles } from "./rbac.js"
 
 // ============================================================================
+// CONSENT RECORDS — Electronic consent captured by nursing staff
+// ============================================================================
+
+export const consentRecords = createTable(
+	"consent_records",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		encounterId: t
+			.uuid("encounter_id")
+			.references(() => encounters.id, { onDelete: "cascade" }),
+		preEncounterId: t
+			.uuid("pre_encounter_id")
+			.references(() => preEncounters.id, { onDelete: "set null" }),
+		consentType: t.text("consent_type").notNull(),
+		consentText: t.text("consent_text").notNull().default(""),
+		patientSignature: t.text("patient_signature"),
+		guardianSignature: t.text("guardian_signature"),
+		witnessSignature: t.text("witness_signature"),
+		capturedByStaffId: t
+			.uuid("captured_by_staff_id")
+			.notNull()
+			.references(() => staffProfiles.id, { onDelete: "restrict" }),
+		signedAt: t.timestamp("signed_at").notNull().defaultNow(),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("consent_records_facility_id_idx").on(t.facilityId),
+		index("consent_records_encounter_id_idx").on(t.encounterId),
+		index("consent_records_consent_type_idx").on(t.consentType),
+	]
+)
+
+// ============================================================================
 // NURSING — Vitals, Flowsheets, MAR/TAR, I/O, Handoffs, HAI
 // ============================================================================
 

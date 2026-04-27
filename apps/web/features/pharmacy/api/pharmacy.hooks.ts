@@ -436,9 +436,14 @@ export function useDispenseOrderMutation() {
 	const queryClient = useQueryClient()
 	return useMutation({
 		mutationFn: (data: DispenseOrderInput) =>
-			fetchJson<DispenseRecord>(`${PHARMACY_BASE}/dispense`, {
-				method: "POST",
-				body: JSON.stringify(data),
+			orpc.orders.dispenseOrder.call({
+				medicationOrderId: data.medicationOrderId,
+				dispensedQuantity: data.dispensedQuantity,
+				quantityUnit: data.quantityUnit,
+				lotNumber: data.lotNumber,
+				expiryDate: data.expiryDate,
+				counselingNotes: data.counselingNotes,
+				patientEducation: data.patientEducation,
 			}),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: pharmacyKeys.all })
@@ -452,12 +457,11 @@ export function useDispenseOrderMutation() {
 
 export function useOpdPrescriptionSearchQuery(search: string) {
 	return useQuery({
+		...orpc.orders.searchOpdPrescription.queryOptions({
+			input: { q: search },
+			enabled: search.trim().length >= 3,
+		}),
 		queryKey: pharmacyKeys.opdPrescription(search),
-		queryFn: () =>
-			fetchJson<OpdPrescription>(
-				`${PHARMACY_BASE}/opd/prescription${buildQueryString({ q: search })}`
-			),
-		enabled: search.trim().length >= 3,
 		retry: false,
 	})
 }
@@ -478,9 +482,16 @@ export function useOpdDispenseMutation() {
 	const queryClient = useQueryClient()
 	return useMutation({
 		mutationFn: (data: OpdDispenseInput) =>
-			fetchJson<OpdDispenseRecord>(`${PHARMACY_BASE}/opd/dispense`, {
-				method: "POST",
-				body: JSON.stringify(data),
+			orpc.orders.opdDispense.call({
+				prescriptionId: data.prescriptionId,
+				facilityId: data.facilityId,
+				items: data.items.map(item => ({
+					medicationOrderId: item.prescriptionItemId,
+					dispensedQuantity: item.dispensedQuantity,
+					lotNumber: item.lotNumber,
+				})),
+				counselingNotes: data.counselingNotes,
+				patientEducation: data.patientEducation,
 			}),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: pharmacyKeys.all })
@@ -497,13 +508,63 @@ export interface OpdDispenseHistoryParams {
 
 export function useOpdDispenseHistoryQuery(params: OpdDispenseHistoryParams) {
 	return useQuery({
+		...orpc.orders.listOpdDispenseHistory.queryOptions({
+			input: {
+				facilityId: params.facilityId,
+				date: params.date,
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			enabled: !!params.facilityId,
+		}),
 		queryKey: pharmacyKeys.opdDispenseHistory(params),
-		queryFn: () =>
-			fetchJson<PaginatedResponse<OpdDispenseRecord>>(
-				`${PHARMACY_BASE}/opd/history${buildQueryString(
-					params as unknown as Record<string, string | number | boolean | undefined>
-				)}`
-			),
-		enabled: !!params.facilityId,
+	})
+}
+
+// ============================================================================
+// Patient Counseling Log
+// ============================================================================
+
+export interface SaveCounselingLogInput {
+	facilityId: string
+	encounterId?: string
+	patientId?: string
+	medicationOrderId?: string
+	checklistItems: Array<{ label: string; checked: boolean }>
+	patientSignature?: string
+}
+
+export interface CounselingLogListParams {
+	facilityId: string
+	encounterId?: string
+	patientId?: string
+	page?: number
+	limit?: number
+}
+
+export function useSaveCounselingLogMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: SaveCounselingLogInput) =>
+			orpc.orders.saveCounselingLog.call(data),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: pharmacyKeys.all })
+		},
+	})
+}
+
+export function useListCounselingLogsQuery(params: CounselingLogListParams) {
+	return useQuery({
+		...orpc.orders.listCounselingLogs.queryOptions({
+			input: {
+				facilityId: params.facilityId,
+				encounterId: params.encounterId,
+				patientId: params.patientId,
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			enabled: !!params.facilityId,
+		}),
+		queryKey: [...pharmacyKeys.all, "counseling", params] as const,
 	})
 }

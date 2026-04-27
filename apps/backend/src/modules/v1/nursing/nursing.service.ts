@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm"
 
 import {
+	consentRecords,
 	encounters,
 	flowsheetEntries,
 	haiTags,
@@ -166,6 +167,26 @@ interface UpdateHaiTagInput {
 	id: string
 	status?: "suspected" | "confirmed" | "resolved"
 	notes?: string
+}
+
+interface ConsentRecordListInput {
+	page: number
+	limit: number
+	facilityId?: string
+	encounterId?: string
+	preEncounterId?: string
+	consentType?: string
+}
+
+interface CreateConsentRecordInput {
+	facilityId: string
+	encounterId?: string
+	preEncounterId?: string
+	consentType: string
+	consentText?: string
+	patientSignature?: string
+	guardianSignature?: string
+	witnessSignature?: string
 }
 
 @Injectable()
@@ -860,6 +881,70 @@ export class NursingService {
 			.returning()
 
 		if (!row) throw new NotFoundException("HAI tag not found")
+		return row
+	}
+
+	// ========================================================================
+	// Consent Records
+	// ========================================================================
+
+	async findConsentRecords(input: ConsentRecordListInput) {
+		const conditions = []
+		if (input.facilityId) conditions.push(eq(consentRecords.facilityId, input.facilityId))
+		if (input.encounterId) conditions.push(eq(consentRecords.encounterId, input.encounterId))
+		if (input.preEncounterId) conditions.push(eq(consentRecords.preEncounterId, input.preEncounterId))
+		if (input.consentType) conditions.push(eq(consentRecords.consentType, input.consentType))
+
+		const where = and(...conditions)
+		const offset = (input.page - 1) * input.limit
+
+		const [rows, [totalRow]] = await Promise.all([
+			db
+				.select()
+				.from(consentRecords)
+				.where(where)
+				.orderBy(desc(consentRecords.signedAt))
+				.limit(input.limit)
+				.offset(offset),
+			db.select({ count: count() }).from(consentRecords).where(where),
+		])
+
+		const total = totalRow?.count ?? 0
+		return {
+			data: rows,
+			total,
+			page: input.page,
+			limit: input.limit,
+			totalPages: Math.ceil(total / input.limit),
+		}
+	}
+
+	async findConsentRecord(id: string) {
+		const [row] = await db.select().from(consentRecords).where(eq(consentRecords.id, id)).limit(1)
+		if (!row) throw new NotFoundException("Consent record not found")
+		return row
+	}
+
+	async createConsentRecord(input: CreateConsentRecordInput, userId: string) {
+		const staffProfileId = await this.getStaffProfileId(userId)
+
+		const [row] = await db
+			.insert(consentRecords)
+			.values({
+				facilityId: input.facilityId,
+				encounterId: input.encounterId,
+				preEncounterId: input.preEncounterId,
+				consentType: input.consentType,
+				consentText: input.consentText ?? "",
+				patientSignature: input.patientSignature,
+				guardianSignature: input.guardianSignature,
+				witnessSignature: input.witnessSignature,
+				capturedByStaffId: staffProfileId,
+				signedAt: new Date(),
+			})
+			.returning()
+
+		if (!row) throw new NotFoundException("Failed to create consent record")
 		return row
 	}
 }

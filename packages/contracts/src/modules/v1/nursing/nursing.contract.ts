@@ -3,11 +3,11 @@ import { oc } from "@orpc/contract"
 import {
 	AdministerMarSchema,
 	AdministerTarSchema,
-	CreateHaiTagSchema,
-	CreateIoEntrySchema,
-	CreateShiftHandoffSchema,
-	CreateTarEntrySchema,
-	CreateVitalSignSchema,
+	ConsentRecordIdSchema,
+	ConsentRecordListResponseSchema,
+	ConsentRecordListSchema,
+	ConsentRecordSchema,
+	CreateConsentRecordSchema,
 	FinalizeHandoffSchema,
 	FlowsheetListResponseSchema,
 	FlowsheetListSchema,
@@ -299,4 +299,38 @@ export const nursingContract = {
 		})
 		.input(UpdateHaiTagSchema)
 		.output(HaiTagSchema),
+
+	// ========================================================================
+	// Consent Records
+	// ========================================================================
+
+	listConsents: oc
+		.route({
+			method: "GET",
+			path: "/consents",
+			summary: "List consent records for an encounter",
+			tags: ["Nursing — Consents"],
+		})
+		.input(ConsentRecordListSchema)
+		.output(ConsentRecordListResponseSchema),
+
+	getConsent: oc
+		.route({
+			method: "GET",
+			path: "/consents/{id}",
+			summary: "Get a consent record by ID",
+			tags: ["Nursing — Consents"],
+		})
+		.input(ConsentRecordIdSchema)
+		.output(ConsentRecordSchema),
+
+	createConsent: oc
+		.route({
+			method: "POST",
+			path: "/consents",
+			summary: "Create and persist a signed consent record",
+			tags: ["Nursing — Consents"],
+		})
+		.input(CreateConsentRecordSchema)
+		.output(ConsentRecordSchema),
 }
