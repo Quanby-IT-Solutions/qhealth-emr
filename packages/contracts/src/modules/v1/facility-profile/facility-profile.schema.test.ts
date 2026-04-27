@@ -6,6 +6,10 @@ const FACILITY_ID = "550e8400-e29b-41d4-a716-446655440000"
 
 const validProfile = {
 	facilityId: FACILITY_ID,
+	name: "Quanby General Hospital",
+	facilityType: "tertiary",
+	dohLicenseNumber: "DOH-2026-001",
+	philhealthAccreditationId: "PHIC-2026-001",
 	facilityCode: "QH-MAIN",
 	governingAuthority: "DOH Region IV-A",
 	addressLine1: "123 Health St",
@@ -29,6 +33,10 @@ describe("FacilityProfileSchema", () => {
 	it("accepts a minimal profile with all nulls", () => {
 		const minimal = {
 			facilityId: FACILITY_ID,
+			name: "Quanby Community Clinic",
+			facilityType: "community",
+			dohLicenseNumber: null,
+			philhealthAccreditationId: null,
 			facilityCode: null,
 			governingAuthority: null,
 			addressLine1: null,
