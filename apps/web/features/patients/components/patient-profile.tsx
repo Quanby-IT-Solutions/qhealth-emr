@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
+import { ArrowLeft, Eye } from "lucide-react"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
@@ -110,6 +111,18 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 	return (
 		<div className="space-y-6">
+			<div className="flex items-center gap-3">
+				<Button
+					variant="ghost"
+					size="sm"
+					className="h-8 px-2"
+					onClick={() => router.push("/patients/search")}
+				>
+					<ArrowLeft className="mr-2 size-4" />
+					Back to Search
+				</Button>
+			</div>
+
 			{/* Patient Banner */}
 			<Card>
 				<CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 pt-6">
@@ -220,13 +233,14 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 									<TableHead>Chief Complaint</TableHead>
 									<TableHead>Admission</TableHead>
 									<TableHead>Discharge</TableHead>
+									<TableHead className="w-[100px]">Actions</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
 								{patient.encounters.map(enc => (
 									<TableRow
 										key={enc.id}
-										className="cursor-pointer"
+										className="group cursor-pointer hover:bg-muted/50 transition-colors"
 										onClick={() =>
 											router.push(
 												`/patients/${patientId}/encounters/${enc.id}`
@@ -243,6 +257,21 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 										<TableCell>{formatDateTime(enc.admissionDatetime)}</TableCell>
 										<TableCell>
 											{formatDateTime(enc.dischargeDatetime)}
+										</TableCell>
+										<TableCell onClick={e => e.stopPropagation()}>
+											<Button
+												size="sm"
+												variant="ghost"
+												className="h-8 w-8 p-0"
+												title="View Encounter"
+												onClick={() =>
+													router.push(
+														`/patients/${patientId}/encounters/${enc.id}`
+													)
+												}
+											>
+												<Eye className="size-4" />
+											</Button>
 										</TableCell>
 									</TableRow>
 								))}
@@ -264,13 +293,6 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 					canManageConsents={can(permSet, "clinical_docs", "edit")}
 				/>
 			)}
-
-			{/* Actions */}
-			<div className="flex gap-3">
-				<Button variant="outline" nativeButton={false} render={<Link href="/patients/search" />}>
-					Back to Search
-				</Button>
-			</div>
 		</div>
 	)
 }

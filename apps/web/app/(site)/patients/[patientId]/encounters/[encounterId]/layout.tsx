@@ -4,7 +4,7 @@ import { use, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-import { ShieldAlert } from "lucide-react"
+import { ArrowLeft, ShieldAlert } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -185,6 +185,18 @@ export default function EncounterChartLayout({
 			}}
 		>
 			<div className="flex h-full flex-col">
+				<div>
+					<Button
+						variant="ghost"
+						size="sm"
+						className="h-8 px-2"
+						nativeButton={false}
+						render={<Link href={`/patients/${patientId}`} />}
+					>
+						<ArrowLeft className="mr-2 size-4" />
+						Back to Profile
+					</Button>
+				</div>
 				{/* Patient Banner */}
 				<div className="border-b bg-background px-6 py-4">
 					{isLoading ? (

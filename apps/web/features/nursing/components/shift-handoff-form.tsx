@@ -11,7 +11,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/core/components/ui/dialog"
-import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Separator } from "@/core/components/ui/separator"
 import {
@@ -63,13 +62,11 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 
 	function handleCreate(e: React.FormEvent<HTMLFormElement>) {
 		e.preventDefault()
-		const fd = new FormData(e.currentTarget)
 		createHandoff.mutate(
 			{
 				facilityId,
 				encounterId,
 				handoffNotes: notes || undefined,
-				incomingStaffId: (fd.get("incomingStaffId") as string) || undefined,
 			},
 			{
 				onSuccess: () => {
@@ -164,7 +161,7 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 					<form onSubmit={handleCreate} className="grid gap-3">
 						{/* Pre-fill notes if generated */}
 						{generated && !notes && (
-							<div>
+							<div className="mb-2">
 								<Button
 									type="button"
 									size="sm"
@@ -196,7 +193,7 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 								</Button>
 							</div>
 						)}
-						<div>
+						<div className="space-y-1.5">
 							<Label htmlFor="handoffNotes">Handoff Notes</Label>
 							<Textarea
 								id="handoffNotes"
@@ -205,10 +202,6 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 								onChange={e => setNotes(e.target.value)}
 								placeholder="Clinical summary for incoming nurse…"
 							/>
-						</div>
-						<div>
-							<Label htmlFor="incomingStaffId">Incoming Staff ID (optional)</Label>
-							<Input id="incomingStaffId" name="incomingStaffId" />
 						</div>
 						<div className="flex justify-end gap-2 pt-2">
 							<Button
