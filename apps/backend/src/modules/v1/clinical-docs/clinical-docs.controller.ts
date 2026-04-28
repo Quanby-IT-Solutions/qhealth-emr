@@ -90,7 +90,7 @@ export class ClinicalDocsController {
 	@Implement(v1.clinicalDocs.signNote)
 	async signNote(@Session() session: UserSession, @Ip() ip: string) {
 		return implement(v1.clinicalDocs.signNote).handler(async ({ input }) => {
-			return this.service.signNote(input, ip ?? "unknown")
+			return this.service.signNote(input, ip ?? "unknown", session.user.id)
 		})
 	}
 
@@ -119,7 +119,7 @@ export class ClinicalDocsController {
 	@Implement(v1.clinicalDocs.signAddendum)
 	async signAddendum(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.signAddendum).handler(async ({ input }) => {
-			return this.service.signAddendum(input)
+			return this.service.signAddendum(input, session.user.id)
 		})
 	}
 

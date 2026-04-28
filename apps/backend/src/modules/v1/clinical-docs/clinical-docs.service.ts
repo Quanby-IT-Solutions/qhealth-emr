@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, inArray } from "drizzle-orm"
 
 import {
@@ -16,6 +16,7 @@ import {
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
+import { AuditService } from "@/modules/v1/audit/audit.service"
 
 type ListTemplatesInput = V1Inputs["clinicalDocs"]["listTemplates"]
 type CreateTemplateInput = V1Inputs["clinicalDocs"]["createTemplate"]
@@ -53,6 +54,8 @@ interface TemplateForValidation {
 @Injectable()
 export class ClinicalDocsService {
 	private readonly logger = new Logger(ClinicalDocsService.name)
+
+	constructor(private readonly auditService: AuditService) {}
 
 	private async getStaffProfileId(userId: string, facilityId?: string): Promise<string> {
 		const conditions = [eq(staffProfiles.userId, userId), eq(staffProfiles.isActive, true)]
@@ -537,9 +540,14 @@ export class ClinicalDocsService {
 		return this.getNote(input.id)
 	}
 
-	async signNote(input: SignNoteInput, signedIp: string) {
+	async signNote(input: SignNoteInput, signedIp: string, userId: string) {
 		const [existing] = await db
-			.select({ status: clinicalNotes.status })
+			.select({
+				id: clinicalNotes.id,
+				facilityId: clinicalNotes.facilityId,
+				status: clinicalNotes.status,
+				authorStaffId: clinicalNotes.authorStaffId,
+			})
 			.from(clinicalNotes)
 			.where(eq(clinicalNotes.id, input.id))
 
@@ -548,15 +556,35 @@ export class ClinicalDocsService {
 			throw new BadRequestException("Note is already signed.")
 		}
 
+		const signerStaffId = await this.getStaffProfileId(userId, existing.facilityId)
+		if (signerStaffId !== existing.authorStaffId) {
+			throw new ForbiddenException("Only the original author can sign this note.")
+		}
+
+		const signedAt = new Date()
 		await db
 			.update(clinicalNotes)
 			.set({
 				status: "signed",
-				signedAt: new Date(),
+				signedAt,
 				signedIp,
-				updatedAt: new Date(),
+				updatedAt: signedAt,
 			})
 			.where(eq(clinicalNotes.id, input.id))
+
+		await this.auditService.log({
+			facilityId: existing.facilityId,
+			userId,
+			staffProfileId: signerStaffId,
+			action: "sign",
+			entityType: "clinical_note",
+			entityId: existing.id,
+			beforeState: { status: existing.status },
+			afterState: { status: "signed", signedAt: signedAt.toISOString(), signedIp },
+			ipAddress: signedIp,
+			userAgent: null,
+			metadata: null,
+		})
 
 		this.logger.log(`Signed clinical note ${input.id}`)
 		return this.getNote(input.id)
@@ -640,11 +668,14 @@ export class ClinicalDocsService {
 	// Note Addenda
 	// ========================================================================
 
-	async createAddendum(input: CreateAddendumInput, authorStaffId: string) {
-		const resolvedAuthorStaffId = await this.getStaffProfileId(authorStaffId)
+	async createAddendum(input: CreateAddendumInput, userId: string) {
 		// Verify the parent note is signed
 		const [note] = await db
-			.select({ status: clinicalNotes.status })
+			.select({
+				id: clinicalNotes.id,
+				facilityId: clinicalNotes.facilityId,
+				status: clinicalNotes.status,
+			})
 			.from(clinicalNotes)
 			.where(eq(clinicalNotes.id, input.noteId))
 
@@ -653,23 +684,44 @@ export class ClinicalDocsService {
 			throw new BadRequestException("Addenda can only be added to signed notes.")
 		}
 
+		const resolvedAuthorStaffId = await this.getStaffProfileId(userId, note.facilityId)
+
 		const [row] = await db
 			.insert(noteAddenda)
 			.values({
 				noteId: input.noteId,
 				content: input.content,
-				reason: input.reason ?? null,
+				reason: input.reason,
 				authorStaffId: resolvedAuthorStaffId,
 			})
 			.returning()
+
+		await this.auditService.log({
+			facilityId: note.facilityId,
+			userId,
+			staffProfileId: resolvedAuthorStaffId,
+			action: "create",
+			entityType: "note_addendum",
+			entityId: row!.id,
+			beforeState: null,
+			afterState: { noteId: input.noteId, reason: input.reason },
+			ipAddress: null,
+			userAgent: null,
+			metadata: { noteId: input.noteId },
+		})
 
 		this.logger.log(`Created addendum ${row!.id} for note ${input.noteId}`)
 		return this.getAddendum(row!.id)
 	}
 
-	async signAddendum(input: SignAddendumInput) {
+	async signAddendum(input: SignAddendumInput, userId: string) {
 		const [existing] = await db
-			.select({ status: noteAddenda.status })
+			.select({
+				id: noteAddenda.id,
+				noteId: noteAddenda.noteId,
+				status: noteAddenda.status,
+				authorStaffId: noteAddenda.authorStaffId,
+			})
 			.from(noteAddenda)
 			.where(eq(noteAddenda.id, input.id))
 
@@ -678,10 +730,37 @@ export class ClinicalDocsService {
 			throw new BadRequestException("Addendum is already signed.")
 		}
 
+		const [parent] = await db
+			.select({ facilityId: clinicalNotes.facilityId })
+			.from(clinicalNotes)
+			.where(eq(clinicalNotes.id, existing.noteId))
+
+		if (!parent) throw new NotFoundException(`Parent note ${existing.noteId} not found`)
+
+		const signerStaffId = await this.getStaffProfileId(userId, parent.facilityId)
+		if (signerStaffId !== existing.authorStaffId) {
+			throw new ForbiddenException("Only the original author can sign this addendum.")
+		}
+
+		const signedAt = new Date()
 		await db
 			.update(noteAddenda)
-			.set({ status: "signed", signedAt: new Date() })
+			.set({ status: "signed", signedAt })
 			.where(eq(noteAddenda.id, input.id))
+
+		await this.auditService.log({
+			facilityId: parent.facilityId,
+			userId,
+			staffProfileId: signerStaffId,
+			action: "sign",
+			entityType: "note_addendum",
+			entityId: existing.id,
+			beforeState: { status: existing.status },
+			afterState: { status: "signed", signedAt: signedAt.toISOString() },
+			ipAddress: null,
+			userAgent: null,
+			metadata: { noteId: existing.noteId },
+		})
 
 		this.logger.log(`Signed addendum ${input.id}`)
 		return this.getAddendum(input.id)
