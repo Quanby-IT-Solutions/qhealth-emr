@@ -93,4 +93,49 @@ export class TelemedicineController {
 			return this.telemedicineService.createPrescription(input)
 		})
 	}
+
+	// ─── Abstracts ─────────────────────────────────────────────────────────────
+
+	@RequirePermission("telemedicine", "create")
+	@Implement(v1.telemedicine.generateAbstract)
+	async generateAbstract(@Session() session: UserSession) {
+		return implement(v1.telemedicine.generateAbstract).handler(async ({ input }) => {
+			void session
+			return this.telemedicineService.generateAbstract(input)
+		})
+	}
+
+	@RequirePermission("telemedicine", "view")
+	@Implement(v1.telemedicine.getAbstract)
+	async getAbstract() {
+		return implement(v1.telemedicine.getAbstract).handler(async ({ input }) => {
+			return this.telemedicineService.getAbstract(input)
+		})
+	}
+
+	@RequirePermission("telemedicine", "view")
+	@Implement(v1.telemedicine.listEncounterAbstracts)
+	async listEncounterAbstracts() {
+		return implement(v1.telemedicine.listEncounterAbstracts).handler(async ({ input }) => {
+			return this.telemedicineService.listEncounterAbstracts(input)
+		})
+	}
+
+	@RequirePermission("telemedicine", "edit")
+	@Implement(v1.telemedicine.signAbstract)
+	async signAbstract(@Session() session: UserSession) {
+		return implement(v1.telemedicine.signAbstract).handler(async ({ input }) => {
+			void session
+			return this.telemedicineService.signAbstract(input)
+		})
+	}
+
+	@RequirePermission("telemedicine", "edit")
+	@Implement(v1.telemedicine.sendAbstract)
+	async sendAbstract(@Session() session: UserSession) {
+		return implement(v1.telemedicine.sendAbstract).handler(async ({ input }) => {
+			void session
+			return this.telemedicineService.sendAbstract(input)
+		})
+	}
 }
