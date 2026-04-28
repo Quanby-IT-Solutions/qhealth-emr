@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm"
 
 import {
@@ -941,16 +941,31 @@ export class NursingService {
 	async createConsentRecord(input: CreateConsentRecordInput, userId: string) {
 		const staffProfileId = await this.getStaffProfileId(userId)
 
+		if (!input.encounterId) {
+			throw new BadRequestException("encounterId is required to create a consent record")
+		}
+
+		// Resolve patientId from the encounter
+		const [enc] = await db
+			.select({ patientId: encounters.patientId })
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+			.limit(1)
+
+		if (!enc) throw new NotFoundException("Encounter not found")
+
 		const [row] = await db
 			.insert(consentRecords)
 			.values({
 				facilityId: input.facilityId,
 				encounterId: input.encounterId,
-				patientId: input.patientId,
+				patientId: enc.patientId,
 				preEncounterId: input.preEncounterId,
 				consentType: input.consentType as (typeof consentRecords.consentType)["_"]["data"],
-				signedByName: input.signedByName,
-				relationship: input.relationship as (typeof consentRecords.relationship)["_"]["data"],
+				signedByName: input.signedByName || "Patient / Guardian",
+				relationship:
+					(input.relationship as (typeof consentRecords.relationship)["_"]["data"] | undefined) ??
+					"self",
 				content: input.content ?? null,
 				signatureData: input.signatureData ?? null,
 				signedAt: input.signedAt ?? new Date(),
