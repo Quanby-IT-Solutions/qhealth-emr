@@ -24,6 +24,9 @@ type RawLabOrderListResponse = V1Outputs["orders"]["listLabOrders"]
 type RawImagingOrderListResponse = V1Outputs["orders"]["listImagingOrders"]
 type RawPrescriptionListResponse = V1Outputs["orders"]["listPrescriptions"]
 type RawActiveOrdersResponse = V1Outputs["orders"]["getActiveOrders"]
+type RawTranchedOrdersResponse = V1Outputs["orders"]["createTranchedOrders"]
+type RawPdeaLicenseStatus = V1Outputs["orders"]["checkPdeaLicense"]
+type RawChildOrdersResponse = V1Outputs["orders"]["getChildOrders"]
 
 function serializeDate(value: Date | string | null | undefined): string | null {
 	if (!value) return null
@@ -197,6 +200,16 @@ export interface ActiveOrdersResponse {
 	imagingOrders: ImagingOrder[]
 }
 
+export interface TranchedOrdersResponse {
+	parentOrder: MedOrder
+	childOrders: MedOrder[]
+	totalTranches: number
+}
+
+export interface PdeaLicenseStatus extends Omit<RawPdeaLicenseStatus, "expiryDate"> {
+	expiryDate: string | null
+}
+
 function mapMedOrder(order: RawMedOrder): MedOrder {
 	return {
 		...order,
@@ -279,6 +292,25 @@ function mapActiveOrders(response: RawActiveOrdersResponse): ActiveOrdersRespons
 	}
 }
 
+function mapTranchedOrders(response: RawTranchedOrdersResponse): TranchedOrdersResponse {
+	return {
+		parentOrder: mapMedOrder(response.parentOrder),
+		childOrders: response.childOrders.map(mapMedOrder),
+		totalTranches: response.totalTranches,
+	}
+}
+
+function mapPdeaLicenseStatus(response: RawPdeaLicenseStatus): PdeaLicenseStatus {
+	return {
+		...response,
+		expiryDate: serializeDate(response.expiryDate),
+	}
+}
+
+function mapChildOrders(response: RawChildOrdersResponse): MedOrder[] {
+	return response.map(mapMedOrder)
+}
+
 export const orderKeys = {
 	all: ["orders"] as const,
 	medOrders: (params: object) => [...orderKeys.all, "medications", params] as const,
@@ -352,6 +384,22 @@ export function useCreateMedOrderMutation() {
 			},
 		})
 	)
+}
+
+type CreateTranchedOrdersData = V1Inputs["orders"]["createTranchedOrders"]
+
+export function useCreateTranchedOrdersMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation<TranchedOrdersResponse, Error, CreateTranchedOrdersData>({
+		mutationFn: async data => {
+			const result = await orpc.orders.createTranchedOrders.call(data)
+			return mapTranchedOrders(result)
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
+		},
+	})
 }
 
 type UpdateMedOrderData = V1Inputs["orders"]["updateMedOrder"]
@@ -613,6 +661,35 @@ export function useActiveOrdersQuery(encounterId: string) {
 			input: { encounterId },
 			enabled: !!encounterId,
 			select: mapActiveOrders,
+		})
+	)
+}
+
+interface CheckPdeaLicenseQueryParams {
+	staffId: string
+	facilityId: string
+	enabled?: boolean
+}
+
+export function useCheckPdeaLicenseQuery(params: CheckPdeaLicenseQueryParams) {
+	return useQuery(
+		orpc.orders.checkPdeaLicense.queryOptions({
+			input: {
+				staffId: params.staffId,
+				facilityId: params.facilityId,
+			},
+			enabled: Boolean(params.enabled) && !!params.staffId && !!params.facilityId,
+			select: mapPdeaLicenseStatus,
+		})
+	)
+}
+
+export function useGetChildOrdersQuery(parentOrderId: string) {
+	return useQuery(
+		orpc.orders.getChildOrders.queryOptions({
+			input: { parentOrderId },
+			enabled: !!parentOrderId,
+			select: mapChildOrders,
 		})
 	)
 }
