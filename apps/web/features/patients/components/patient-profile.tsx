@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import {
+	ArrowLeft,
 	Calendar,
 	Clock3,
 	CreditCard,
@@ -22,7 +23,9 @@ import { Separator } from "@/core/components/ui/separator"
 import { SidebarTrigger } from "@/core/components/ui/sidebar"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { ConsentHistory } from "@/features/clinical-docs/components/consent-history"
+import { DpaStatusBadge } from "@/features/clinical-docs/components/dpa-status-badge"
 import { usePatientProfileQuery } from "@/features/patients/api/patients.hooks"
+import { usePatientSummaryQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
 import { ProblemsAllergiesTab } from "@/features/problems-allergies/components/problems-allergies-tab"
 
 function usePermissionSet() {
@@ -182,6 +185,9 @@ interface PatientProfileProps {
 export function PatientProfile({ patientId }: PatientProfileProps) {
 	const { data: patient, isLoading, isError, error } = usePatientProfileQuery(patientId)
 	const permSet = usePermissionSet()
+	const { data: summary } = usePatientSummaryQuery(
+		can(permSet, "patients", "view") ? patientId : ""
+	)
 
 	if (isLoading) {
 		return (
@@ -216,8 +222,20 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 	return (
 		<div className="bg-background">
 			<div className="mx-auto max-w-6xl px-8 py-12">
-				<div className="mb-8 md:hidden">
-					<SidebarTrigger className="border-border/60 bg-background size-9 rounded-full border shadow-sm" />
+				<div className="mb-8 flex items-center gap-3">
+					<div className="md:hidden">
+						<SidebarTrigger className="border-border/60 bg-background size-9 rounded-full border shadow-sm" />
+					</div>
+					<Button
+						variant="ghost"
+						size="sm"
+						className="h-8 px-2"
+						nativeButton={false}
+						render={<Link href="/patients/register" />}
+					>
+						<ArrowLeft className="size-4" />
+						Back to Search
+					</Button>
 				</div>
 
 				<section className="mb-8">
@@ -238,6 +256,16 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 									<span className="text-muted-foreground text-sm">
 										{patient.isActive ? "Active record" : "Inactive record"}
 									</span>
+									{summary?.hasSevereAllergies && (
+										<Badge variant="destructive">Severe Allergy</Badge>
+									)}
+									{summary && summary.activeAllergyCount > 0 && !summary.hasSevereAllergies && (
+										<Badge variant="outline">
+											{summary.activeAllergyCount} Allerg
+											{summary.activeAllergyCount === 1 ? "y" : "ies"}
+										</Badge>
+									)}
+									<DpaStatusBadge patientId={patientId} />
 								</div>
 							</div>
 						</div>
@@ -381,10 +409,6 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 						</div>
 					</>
 				)}
-
-				<Button variant="outline" nativeButton={false} render={<Link href="/patients/register" />}>
-					Back to Search
-				</Button>
 			</div>
 		</div>
 	)

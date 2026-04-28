@@ -1,6 +1,6 @@
 "use client"
 
-import { Activity, AlertTriangle, ClipboardList, Heart, RefreshCw, Stethoscope } from "lucide-react"
+import { Activity, AlertTriangle, ClipboardList, Heart, RefreshCw, Stethoscope, Wifi } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -10,6 +10,7 @@ import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { EdDashboard } from "@/features/ed/components/ed-dashboard"
 import { HaiTagForm } from "@/features/nursing/components/hai-tag-form"
 import { NbsLogbook } from "@/features/nbs/components/nbs-logbook"
+import Link from "next/link"
 
 import { useHaiTagsQuery, useVitalsQuery } from "../api/nursing.hooks"
 
@@ -206,7 +207,7 @@ export function NursingDashboard() {
 			</div>
 
 			{/* Stats */}
-			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<StatCard
 					title="Vitals Recorded Today"
 					value={totalVitalsToday}
@@ -227,6 +228,20 @@ export function NursingDashboard() {
 					icon={<ClipboardList className="size-4" />}
 					accent={activeHaiCount > 0 ? "warning" : "default"}
 				/>
+				<Card className="flex flex-col justify-between">
+					<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+						<CardTitle className="text-sm font-medium">Offline Sync</CardTitle>
+						<Wifi className="size-4 text-muted-foreground" />
+					</CardHeader>
+					<CardContent>
+						<div className="text-2xl font-bold">2 Pending</div>
+						<Link href="/nursing/sync">
+							<Button variant="link" className="h-auto p-0 text-xs text-blue-600">
+								View sync status →
+							</Button>
+						</Link>
+					</CardContent>
+				</Card>
 			</div>
 
 			{/* Tabs */}
