@@ -35,6 +35,7 @@ import {
 	HighAlertVerificationDialog,
 	type HighAlertVerificationDraft,
 } from "./high-alert-verification-dialog"
+import { S2ValidationModal } from "./s2-validation-modal"
 import { TranchingPreviewModal, type TrancheRow } from "./tranching-preview-modal"
 
 const TRANCHE_THRESHOLD_DAYS = 30
@@ -100,6 +101,9 @@ export function CreateMedOrderDialog({
 	const [allergyOverrideReasons, setAllergyOverrideReasons] = useState<Record<string, string>>({})
 	const [allergyOverriddenAlerts, setAllergyOverriddenAlerts] = useState<Set<string>>(new Set())
 
+	// ── S-2 validation gate ──────────────────────────────────────────────────
+	const [s2ValidationOpen, setS2ValidationOpen] = useState(false)
+
 	// ── Tranching modal ──────────────────────────────────────────────────────
 	const [tranchingOpen, setTranchingOpen] = useState(false)
 	const [highAlertVerified, setHighAlertVerified] = useState(false)
@@ -141,8 +145,16 @@ export function CreateMedOrderDialog({
 		: Boolean(livePdeaStatus?.canPrescribeControlled)
 
 	function handleControlledSubstanceChange(checked: boolean) {
-		if (checked && !pdeaValid) return
-		setIsControlledSubstance(checked)
+		if (!checked) {
+			setIsControlledSubstance(false)
+			return
+		}
+		// Open the S-2 validation gate; actual state set only on modal "Proceed"
+		setS2ValidationOpen(true)
+	}
+
+	function handleS2Proceed() {
+		setIsControlledSubstance(true)
 	}
 
 	// ── CDS helpers ──────────────────────────────────────────────────────────
@@ -712,7 +724,6 @@ export function CreateMedOrderDialog({
 									type="checkbox"
 									checked={isControlledSubstance}
 									onChange={e => handleControlledSubstanceChange(e.target.checked)}
-									disabled={!pdeaValid && !isControlledSubstance}
 									className="size-4 rounded border"
 								/>
 								Controlled Substance (PDEA S-2 required)
@@ -848,6 +859,15 @@ export function CreateMedOrderDialog({
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+			{/* S-2 validation gate modal */}
+			<S2ValidationModal
+				open={s2ValidationOpen}
+				onOpenChange={setS2ValidationOpen}
+				staffId={orderingStaffId}
+				facilityId={facilityId}
+				onProceed={handleS2Proceed}
+			/>
 
 			{/* Tranching preview modal */}
 			{needsTranching && (

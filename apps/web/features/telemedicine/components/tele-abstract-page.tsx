@@ -1,0 +1,426 @@
+"use client"
+
+import { useState } from "react"
+import {
+	CheckCircle2,
+	ClipboardList,
+	Download,
+	FileText,
+	Loader2,
+	Mail,
+	Pen,
+	Printer,
+	Send,
+} from "lucide-react"
+
+import { Badge } from "@/core/components/ui/badge"
+import { Button } from "@/core/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import { Separator } from "@/core/components/ui/separator"
+import {
+	type TeleAbstract,
+	useEncounterAbstractsQuery,
+	useGenerateAbstractMutation,
+	useSendAbstractMutation,
+	useSignAbstractMutation,
+} from "@/features/telemedicine/api/telemedicine.hooks"
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface TeleAbstractPageProps {
+	encounterId: string
+	onAbstractSigned?: (abstractId: string) => void
+}
+
+// ============================================================================
+// Status badge
+// ============================================================================
+
+function AbstractStatusBadge({ status }: { status: TeleAbstract["status"] }) {
+	const colorMap: Record<TeleAbstract["status"], string> = {
+		draft: "bg-yellow-100 text-yellow-800",
+		signed: "bg-green-100 text-green-800",
+		sent: "bg-blue-100 text-blue-800",
+	}
+	const labelMap: Record<TeleAbstract["status"], string> = {
+		draft: "Draft",
+		signed: "Signed",
+		sent: "Sent to Patient",
+	}
+	return <Badge className={colorMap[status]}>{labelMap[status]}</Badge>
+}
+
+// ============================================================================
+// Abstract preview (read-only)
+// ============================================================================
+
+function AbstractPreview({ abstract }: { abstract: TeleAbstract }) {
+	const soapSections = [
+		{ label: "S — Subjective", value: abstract.subjectiveNotes },
+		{ label: "O — Objective", value: abstract.objectiveNotes },
+		{ label: "A — Assessment", value: abstract.assessmentNotes },
+		{ label: "P — Plan", value: abstract.planNotes },
+	]
+
+	return (
+		<div className="space-y-4">
+			{/* Header */}
+			<div className="rounded-lg border p-4">
+				<div className="mb-3 flex items-start justify-between">
+					<div>
+						<h3 className="text-base font-bold">{abstract.facilityName}</h3>
+						<p className="text-muted-foreground text-xs">Telemedicine Encounter Abstract</p>
+					</div>
+					<AbstractStatusBadge status={abstract.status} />
+				</div>
+				<Separator className="mb-3" />
+				<div className="grid grid-cols-2 gap-2 text-sm">
+					<div>
+						<span className="text-muted-foreground">Patient: </span>
+						<span className="font-medium">{abstract.patientName}</span>
+					</div>
+					<div>
+						<span className="text-muted-foreground">Clinician: </span>
+						<span className="font-medium">{abstract.clinicianName}</span>
+					</div>
+					<div>
+						<span className="text-muted-foreground">Date: </span>
+						<span className="font-medium">
+							{new Date(abstract.createdAt).toLocaleDateString("en-PH")}
+						</span>
+					</div>
+					{abstract.clinicianPrcNumber && (
+						<div>
+							<span className="text-muted-foreground">PRC #: </span>
+							<span className="font-medium">{abstract.clinicianPrcNumber}</span>
+						</div>
+					)}
+				</div>
+			</div>
+
+			{/* Chief Complaint */}
+			<div className="rounded-lg border p-4">
+				<p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+					Chief Complaint
+				</p>
+				<p className="text-sm">{abstract.chiefComplaint || "—"}</p>
+			</div>
+
+			{/* SOAP Notes */}
+			<div className="space-y-3">
+				{soapSections.map(({ label, value }) => (
+					<div key={label} className="rounded-lg border p-4">
+						<p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+							{label}
+						</p>
+						<p className="whitespace-pre-wrap text-sm">{value || "—"}</p>
+					</div>
+				))}
+			</div>
+
+			{/* Diagnosis */}
+			<div className="rounded-lg border p-4">
+				<p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+					Diagnosis
+				</p>
+				<p className="text-sm font-medium">{abstract.diagnosis || "—"}</p>
+				{abstract.icdCode && (
+					<p className="text-muted-foreground text-xs">ICD-10: {abstract.icdCode}</p>
+				)}
+			</div>
+
+			{/* Additional Notes */}
+			{abstract.additionalNotes && (
+				<div className="rounded-lg border p-4">
+					<p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+						Additional Notes
+					</p>
+					<p className="whitespace-pre-wrap text-sm">{abstract.additionalNotes}</p>
+				</div>
+			)}
+
+			{/* Clinician signature block */}
+			{abstract.status !== "draft" && (
+				<div className="rounded-lg border border-dashed p-3 text-right">
+					<p className="text-sm font-semibold">{abstract.clinicianName}</p>
+					{abstract.clinicianPrcNumber && (
+						<p className="text-muted-foreground text-xs">PRC #{abstract.clinicianPrcNumber}</p>
+					)}
+					{abstract.signedAt && (
+						<p className="text-muted-foreground text-xs">
+							Signed: {new Date(abstract.signedAt).toLocaleString("en-PH")}
+						</p>
+					)}
+					<div className="mt-2 border-t pt-2">
+						<p className="text-muted-foreground text-xs">
+							Physician's Signature over Printed Name
+						</p>
+					</div>
+				</div>
+			)}
+
+			{/* Sent notice */}
+			{abstract.status === "sent" && abstract.sentToEmail && (
+				<div className="rounded-lg bg-blue-50 p-3">
+					<p className="text-xs font-medium text-blue-800">
+						Sent to: {abstract.sentToEmail}
+						{abstract.sentAt &&
+							` on ${new Date(abstract.sentAt).toLocaleString("en-PH")}`}
+					</p>
+				</div>
+			)}
+		</div>
+	)
+}
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
+export function TeleAbstractPage({
+	encounterId,
+	onAbstractSigned,
+}: TeleAbstractPageProps) {
+	const [additionalNotes, setAdditionalNotes] = useState("")
+	const [showSendForm, setShowSendForm] = useState(false)
+	const [sendEmail, setSendEmail] = useState("")
+	const [error, setError] = useState<string | null>(null)
+	const [activeAbstractId, setActiveAbstractId] = useState<string | null>(null)
+
+	const { data: abstracts, isLoading } = useEncounterAbstractsQuery(encounterId)
+	const generateMutation = useGenerateAbstractMutation()
+	const signMutation = useSignAbstractMutation()
+	const sendMutation = useSendAbstractMutation()
+
+	const abstract =
+		abstracts?.find((a) => a.id === activeAbstractId) ?? abstracts?.[0] ?? null
+
+	async function handleGenerate() {
+		setError(null)
+		try {
+			const result = await generateMutation.mutateAsync({
+				encounterId,
+				additionalNotes: additionalNotes.trim() || undefined,
+			})
+			setActiveAbstractId(result.id)
+			setAdditionalNotes("")
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to generate abstract.")
+		}
+	}
+
+	async function handleSign() {
+		if (!abstract) return
+		setError(null)
+		try {
+			const result = await signMutation.mutateAsync({ id: abstract.id })
+			setActiveAbstractId(result.id)
+			onAbstractSigned?.(result.id)
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to sign abstract.")
+		}
+	}
+
+	async function handleSend(e: React.FormEvent) {
+		e.preventDefault()
+		if (!abstract) return
+		setError(null)
+		if (!sendEmail.trim()) {
+			setError("Email address is required.")
+			return
+		}
+		try {
+			const result = await sendMutation.mutateAsync({ id: abstract.id, email: sendEmail.trim() })
+			setActiveAbstractId(result.id)
+			setShowSendForm(false)
+			setSendEmail("")
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to send abstract.")
+		}
+	}
+
+	if (isLoading) {
+		return (
+			<Card>
+				<CardContent className="flex items-center gap-2 py-6 text-sm text-gray-500">
+					<Loader2 className="size-4 animate-spin" />
+					Loading abstract...
+				</CardContent>
+			</Card>
+		)
+	}
+
+	return (
+		<Card>
+			<CardHeader>
+				<div className="flex items-center justify-between">
+					<CardTitle className="flex items-center gap-2 text-base">
+						<FileText className="text-primary size-5" />
+						Tele-Encounter Abstract
+					</CardTitle>
+					{!abstract && !generateMutation.isPending && (
+						<Button onClick={handleGenerate} disabled={generateMutation.isPending}>
+							<ClipboardList className="mr-1.5 size-3.5" />
+							Generate Abstract
+						</Button>
+					)}
+				</div>
+			</CardHeader>
+			<CardContent>
+				{!abstract ? (
+					<div className="space-y-5">
+						<div className="flex flex-col items-center gap-3 py-6 text-center">
+							<FileText className="text-muted-foreground size-10" />
+							<div>
+								<p className="text-sm font-medium">No abstract generated yet</p>
+								<p className="text-muted-foreground text-xs">
+									Generate an abstract to auto-populate SOAP notes, diagnosis, and plan from
+									the encounter.
+								</p>
+							</div>
+						</div>
+
+						<div className="space-y-1.5">
+							<label htmlFor="additionalNotes" className="text-sm font-medium">
+								Additional Notes (optional)
+							</label>
+							<textarea
+								id="additionalNotes"
+								className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+								rows={3}
+								value={additionalNotes}
+								onChange={(e) => setAdditionalNotes(e.target.value)}
+								placeholder="Any supplementary notes to include in the abstract..."
+							/>
+						</div>
+
+						{error && (
+							<p className="text-destructive rounded-md bg-red-50 px-3 py-2 text-sm">{error}</p>
+						)}
+
+						<Button
+							className="w-full"
+							onClick={handleGenerate}
+							disabled={generateMutation.isPending}
+						>
+							{generateMutation.isPending ? (
+								<>
+									<Loader2 className="mr-1.5 size-3.5 animate-spin" />
+									Generating Abstract...
+								</>
+							) : (
+								<>
+									<ClipboardList className="mr-1.5 size-3.5" />
+									Generate Abstract from Encounter
+								</>
+							)}
+						</Button>
+					</div>
+				) : (
+					<div className="space-y-5">
+						<AbstractPreview abstract={abstract} />
+
+						{error && (
+							<p className="text-destructive rounded-md bg-red-50 px-3 py-2 text-sm">{error}</p>
+						)}
+
+						{/* Actions */}
+						<div className="flex flex-wrap gap-3">
+							<Button variant="outline" size="sm">
+								<Printer className="mr-1.5 size-3.5" />
+								Print
+							</Button>
+							<Button variant="outline" size="sm">
+								<Download className="mr-1.5 size-3.5" />
+								Download PDF
+							</Button>
+
+							{abstract.status === "draft" && (
+								<Button size="sm" onClick={handleSign} disabled={signMutation.isPending}>
+									{signMutation.isPending ? (
+										<>
+											<Loader2 className="mr-1.5 size-3.5 animate-spin" />
+											Signing...
+										</>
+									) : (
+										<>
+											<Pen className="mr-1.5 size-3.5" />
+											Sign Abstract
+										</>
+									)}
+								</Button>
+							)}
+
+							{abstract.status === "signed" && !showSendForm && (
+								<Button
+									size="sm"
+									variant="outline"
+									onClick={() => setShowSendForm(true)}
+								>
+									<Mail className="mr-1.5 size-3.5" />
+									Send to Patient
+								</Button>
+							)}
+
+							{abstract.status === "sent" && (
+								<span className="flex items-center gap-1.5 text-sm text-green-600">
+									<CheckCircle2 className="size-4" />
+									Sent to patient
+								</span>
+							)}
+						</div>
+
+						{/* Send form */}
+						{showSendForm && abstract.status === "signed" && (
+							<form onSubmit={handleSend} className="space-y-3 rounded-lg border p-4">
+								<p className="text-sm font-medium">Send Abstract to Patient</p>
+								<div className="space-y-1.5">
+									<label htmlFor="sendEmail" className="text-sm">
+										Patient Email <span className="text-destructive">*</span>
+									</label>
+									<input
+										id="sendEmail"
+										type="email"
+										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+										value={sendEmail}
+										onChange={(e) => setSendEmail(e.target.value)}
+										placeholder="patient@example.com"
+										required
+									/>
+								</div>
+								<div className="flex justify-end gap-3">
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => {
+											setShowSendForm(false)
+											setSendEmail("")
+										}}
+									>
+										Cancel
+									</Button>
+									<Button type="submit" size="sm" disabled={sendMutation.isPending}>
+										{sendMutation.isPending ? (
+											<>
+												<Loader2 className="mr-1.5 size-3.5 animate-spin" />
+												Sending...
+											</>
+										) : (
+											<>
+												<Send className="mr-1.5 size-3.5" />
+												Send Abstract
+											</>
+										)}
+									</Button>
+								</div>
+							</form>
+						)}
+					</div>
+				)}
+			</CardContent>
+		</Card>
+	)
+}
