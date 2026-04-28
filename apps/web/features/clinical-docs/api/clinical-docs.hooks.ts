@@ -385,6 +385,26 @@ export function useSignNoteMutation() {
 	})
 }
 
+export function useSubmitFpeMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation({
+		mutationFn: (data: { noteId: string; facilityId: string }) =>
+			fetchJson<ClinicalNote>(`${API_BASE}/notes/${data.noteId}/submit-fpe`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: note => {
+			void queryClient.invalidateQueries({
+				queryKey: clinicalDocsKeys.note(note.id),
+			})
+			void queryClient.invalidateQueries({
+				queryKey: clinicalDocsKeys.all,
+			})
+		},
+	})
+}
+
 export function useNoteContextQuery(encounterId: string) {
 	return useQuery({
 		queryKey: clinicalDocsKeys.context(encounterId),

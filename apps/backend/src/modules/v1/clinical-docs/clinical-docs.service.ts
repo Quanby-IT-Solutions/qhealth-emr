@@ -39,6 +39,7 @@ type RevokeConsentInput = V1Inputs["clinicalDocs"]["revokeConsent"]
 type NoteContextInput = V1Inputs["clinicalDocs"]["getNoteContext"]
 type SignedNotesInput = V1Inputs["clinicalDocs"]["getSignedNotes"]
 type ExtractCf4DataInput = V1Inputs["clinicalDocs"]["extractCf4Data"]
+type SubmitFpeInput = V1Inputs["clinicalDocs"]["submitFpe"]
 
 type NoteType = CreateNoteInput["noteType"]
 type TemplateCategory = CreateTemplateInput["category"]
@@ -544,6 +545,61 @@ export class ClinicalDocsService {
 
 		this.logger.log(`Updated clinical note ${input.id}`)
 		return this.getNote(input.id)
+	}
+
+	private validateKonsultaCompleteness(data: unknown): { valid: boolean; missingFields: string[] } {
+		if (!data || typeof data !== "object" || Array.isArray(data)) {
+			return { valid: false, missingFields: ["All required FPE fields"] }
+		}
+		const d = data as Record<string, unknown>
+		const vs =
+			d.vitalSigns && typeof d.vitalSigns === "object" && !Array.isArray(d.vitalSigns)
+				? (d.vitalSigns as Record<string, unknown>)
+				: {}
+		const pd =
+			d.primaryDiagnosis && typeof d.primaryDiagnosis === "object" && !Array.isArray(d.primaryDiagnosis)
+				? (d.primaryDiagnosis as Record<string, unknown>)
+				: {}
+
+		const missing: string[] = []
+		if (!d.chiefComplaint) missing.push("Chief Complaint")
+		if (!vs.bloodPressure) missing.push("Blood Pressure")
+		if (!vs.weight) missing.push("Weight")
+		if (!vs.height) missing.push("Height")
+		if (!pd.code) missing.push("Primary Diagnosis Code")
+		if (!pd.description) missing.push("Primary Diagnosis Description")
+		if (!d.historyOfPresentIllness) missing.push("History of Present Illness")
+		if (!d.physicalExamGeneral) missing.push("Physical Exam (General)")
+
+		return { valid: missing.length === 0, missingFields: missing }
+	}
+
+	async submitFpe(input: SubmitFpeInput, userId: string, signedIp: string) {
+		const [existing] = await db
+			.select({
+				id: clinicalNotes.id,
+				facilityId: clinicalNotes.facilityId,
+				noteType: clinicalNotes.noteType,
+				status: clinicalNotes.status,
+				structuredData: clinicalNotes.structuredData,
+			})
+			.from(clinicalNotes)
+			.where(eq(clinicalNotes.id, input.noteId))
+
+		if (!existing) throw new NotFoundException(`Clinical note ${input.noteId} not found`)
+		if (existing.noteType !== "fpe") {
+			throw new BadRequestException("Note is not an FPE note.")
+		}
+		if (existing.status === "signed") {
+			throw new BadRequestException("FPE note is already signed.")
+		}
+
+		const { valid, missingFields } = this.validateKonsultaCompleteness(existing.structuredData)
+		if (!valid) {
+			throw new BadRequestException(`Missing required FPE fields: ${missingFields.join(", ")}`)
+		}
+
+		return this.signNote({ id: input.noteId }, signedIp, userId)
 	}
 
 	async signNote(input: SignNoteInput, signedIp: string, userId: string) {
