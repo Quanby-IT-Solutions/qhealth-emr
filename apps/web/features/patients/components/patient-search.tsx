@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { WifiOffFreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 
-import { Activity } from "lucide-react"
+import { Activity, Eye } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/core/components/ui/alert"
 import { Badge } from "@/core/components/ui/badge"
@@ -98,9 +98,10 @@ export function PatientSearch() {
 	// isOnline can gate the enabled flag below.
 	const { isOnline, offlinePatients, cachedAt } = useOfflinePatients()
 
+	// PS-042: automatically load all patients initially if no committed search — improve navigation UX
 	const { data, isLoading, isFetching } = usePatientSearchQuery(
 		committedParams ?? { facilityId, page: 1, limit: 50 },
-		{ enabled: isOnline && !!committedParams && !!facilityId },
+		{ enabled: isOnline && !!facilityId },
 	)
 
 	const handleSearch = (e: React.FormEvent) => {
@@ -115,14 +116,15 @@ export function PatientSearch() {
 		})
 	}
 
-	const results = data?.data ?? []
+	const results = isOnline ? (data?.data ?? []) : filteredOfflinePatients
 	const hasSearched = !!committedParams
 
 	// Offline: filter facility-scoped localStorage cache client-side — SS-001
 	const filteredOfflinePatients = useMemo(() => {
-		if (isOnline || !committedParams) return []
-		const term = (committedParams.search ?? "").toLowerCase()
-		const mrn = (committedParams.mrn ?? "").toLowerCase()
+		if (isOnline) return []
+		const params = committedParams ?? { search: searchTerm, mrn: mrnFilter }
+		const term = (params.search ?? "").toLowerCase()
+		const mrn = (params.mrn ?? "").toLowerCase()
 		return offlinePatients.filter(p => {
 			const fullName = `${p.firstName} ${p.lastName}`.toLowerCase()
 			const mrnMatch = !mrn || p.mrn.toLowerCase().includes(mrn)
@@ -229,9 +231,17 @@ export function PatientSearch() {
 				</CardContent>
 			</Card>
 
-			{isLoading && hasSearched && (
+			{isLoading && (
 				<div className="text-muted-foreground flex h-32 items-center justify-center">
-					Searching patients…
+					{hasSearched ? "Searching patients…" : "Loading patient list…"}
+				</div>
+			)}
+
+			{!isLoading && results.length === 0 && (
+				<div className="text-muted-foreground flex h-32 items-center justify-center border rounded-lg bg-muted/20">
+					{hasSearched 
+						? "No patients found matching your search criteria." 
+						: "No records found in the system."}
 				</div>
 			)}
 
@@ -246,31 +256,32 @@ export function PatientSearch() {
 									<TableHead>Date of Birth</TableHead>
 									<TableHead>Sex</TableHead>
 									<TableHead>Last Encounter</TableHead>
-									{showActions && <TableHead className="w-40">Actions</TableHead>}
+									<TableHead className="w-[120px]">Actions</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
 								{results.map(patient => (
-									<TableRow key={patient.id} className="cursor-pointer">
+									<TableRow
+										key={patient.id}
+										className="group cursor-pointer hover:bg-muted/50 transition-colors"
+										onClick={() => router.push(`/patients/${patient.id}`)}
+									>
 										<TableCell>
-											<Link
-												href={`/patients/${patient.id}`}
-												className="text-primary hover:underline"
-											>
+											<span className="text-primary font-medium group-hover:underline">
 												{patient.mrn}
-											</Link>
+											</span>
 										</TableCell>
 										<TableCell>
-											<Link href={`/patients/${patient.id}`}>
+											<span className="font-medium">
 												{patient.lastName}, {patient.firstName}
 												{patient.middleName ? ` ${patient.middleName}` : ""}
-											</Link>
+											</span>
 										</TableCell>
 										<TableCell>{formatDate(patient.dateOfBirth)}</TableCell>
 										<TableCell>{formatSex(patient.sex)}</TableCell>
 										<TableCell>{formatDate(patient.lastEncounterDate)}</TableCell>
-										{showActions && (
-											<TableCell>
+										<TableCell onClick={e => e.stopPropagation()}>
+											<div className="flex items-center gap-2">
 												{pendingTriageId ? (
 													<Button
 														size="sm"
@@ -283,23 +294,34 @@ export function PatientSearch() {
 													>
 														{selectedForTriage === patient.id ? "Selected" : "Select"}
 													</Button>
-												) : canTriage ? (
-													/* PS-040: OPD Register removed — triage is the required Step 1
-													   entry point (TOR Flow 1). Only triage-capable staff see an
-													   action here; registrars have no action until a pending intake
-													   is present. */
-													<Button
-														size="sm"
-														variant="ghost"
-														nativeButton={false}
-														render={<Link href={`/patients/${patient.id}/triage/new`} />}
-													>
-														<Activity className="mr-1.5 size-3.5" />
-														Start Triage
-													</Button>
-												) : null}
-											</TableCell>
-										)}
+												) : (
+													<>
+														<Button
+															size="sm"
+															variant="ghost"
+															className="h-8 w-8 p-0"
+															title="View Profile"
+															onClick={() => router.push(`/patients/${patient.id}`)}
+														>
+															<Eye className="size-4" />
+														</Button>
+														{canTriage && (
+															<Button
+																size="sm"
+																variant="ghost"
+																className="h-8 px-2 text-xs"
+																onClick={() =>
+																	router.push(`/patients/${patient.id}/triage/new`)
+																}
+															>
+																<Activity className="mr-1.5 size-3" />
+																Triage
+															</Button>
+														)}
+													</>
+												)}
+											</div>
+										</TableCell>
 									</TableRow>
 								))}
 							</TableBody>

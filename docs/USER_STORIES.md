@@ -126,6 +126,7 @@
   - **So that** non-admitted emergency cases are routed to the correct PhilHealth outpatient billing workflow
   - **Pages**: ER Disposition Page, OECB Tag Page
 
+DONE TEST - KARL
 - **Story 3.3 – ER Patient Tracker**
   - **As a** Nurse
   - **I want to** view all active ER patients with acuity, status, and elapsed time
@@ -210,18 +211,21 @@
 
 ## 6. Maternal, Neonatal & Newborn Screening
 
+STILL NOT YET TEST
 - **Story 6.1 – Newborn Screening Logbook**
   - **As a** Nurse
   - **I want to** record newborn screening with precise time-of-birth vs. time-of-screening
   - **So that** the 24–48 hour screening window mandated by NBS protocols is enforced
   - **Pages**: NBS Logbook Page, NBS Specimen Capture Page
 
+STILL NOT YET TEST
 - **Story 6.2 – Parental Consent / Waiver Capture**
   - **As a** Nurse
   - **I want to** capture electronic parental consent or waiver for newborn screening
   - **So that** statutory consent obligations are met and auditable
   - **Pages**: NBS Consent Page, Waiver Page
 
+STILL NOT YET TEST
 - **Story 6.3 – NBS Positive Result Referral Tracking**
   - **As a** Nurse
   - **I want to** track referral pathways for newborns with positive screening results
@@ -244,36 +248,42 @@
 
 ## 7. Nursing Care, MAR/TAR & Vitals
 
+DONE TEST - KARL
 - **Story 7.1 – Vital Signs & Flowsheet Documentation**
   - **As a** Nurse
   - **I want to** record vitals (BP, temperature, HR, RR, SpO₂) on a structured flowsheet
   - **So that** trends are visible and early warning scores (e.g., NEWS) are computed automatically
   - **Pages**: Vitals Entry Page, Flowsheet Page
 
+DONE TEST - KARL
 - **Story 7.2 – Medication Administration Record (MAR)**
   - **As a** Nurse
   - **I want to** administer medications using the MAR, document PRN reasons, and capture barcode scans
   - **So that** medication safety is enforced at the bedside
   - **Pages**: MAR Page, PRN Documentation Page, Barcode Scan Page
 
+DONE TEST - KARL
 - **Story 7.3 – Treatment Administration Record (TAR)**
   - **As a** Nurse
   - **I want to** document treatments administered using the TAR
   - **So that** non-medication interventions are tracked alongside medication orders
   - **Pages**: TAR Page
 
+DONE TEST - KARL
 - **Story 7.4 – Intake & Output Tracking**
   - **As a** Nurse
   - **I want to** record patient intake and output throughout the shift
   - **So that** fluid balance is monitored for clinical decisions
   - **Pages**: I/O Tracking Page
 
+DONE TEST - KARL
 - **Story 7.5 – Shift Handoff Documentation**
   - **As a** Nurse
   - **I want to** generate and review SBAR-style shift handoff notes
   - **So that** continuity of care is preserved across shifts
   - **Pages**: Shift Handoff Page, SBAR Template Page
 
+DONE TEST - KARL
 - **Story 7.6 – HAI Tagging**
   - **As a** Nurse
   - **I want to** tag Healthcare-Associated Infections (VAP, BSI, UTI, SSI) on the patient chart
@@ -302,6 +312,7 @@
   - **So that** transfusion authorization is tracked end-to-end
   - **Pages**: Cross-Match Approval Page, Blood Product Inventory Page
 
+NOT YET IMPLEMENTED -KARL 
 - **Story 8.4 – Bedside Transfusion Verification**
   - **As a** Nurse
   - **I want to** scan barcodes for patient, blood product, and CPOE order before transfusion
@@ -564,6 +575,7 @@
   - **So that** essential care continues uninterrupted
   - **Pages**: Offline Mode Indicator, Cached Patient Summary Page
 
+DONE TEST - KARL
 - **Story 18.2 – Auto-Synchronization on Reconnect**
   - **As a** Nurse
   - **I want to** have offline-charted documentation synchronize automatically when connectivity returns
