@@ -1,6 +1,7 @@
 "use client"
 
-import { Loader2, Printer } from "lucide-react"
+import { useState } from "react"
+import { Link2, Loader2, Mail, Printer, QrCode } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
 import {
@@ -13,10 +14,6 @@ import {
 import { Separator } from "@/core/components/ui/separator"
 import { useEncounterDetailQuery } from "@/features/encounters/api/encounters.hooks"
 import { usePrescriptionListQuery } from "@/features/orders/api/orders.hooks"
-
-// ============================================================================
-// Types
-// ============================================================================
 
 interface PrescriptionContent {
 	genericName?: string
@@ -32,12 +29,8 @@ interface PrescriptionContent {
 	prnReason?: string | null
 }
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
 function formatDate(value: Date | string | null | undefined): string {
-	if (!value) return "—"
+	if (!value) return "--"
 	return new Date(value).toLocaleDateString("en-PH", {
 		year: "numeric",
 		month: "long",
@@ -46,7 +39,7 @@ function formatDate(value: Date | string | null | undefined): string {
 }
 
 function formatDateTime(value: Date | string | null | undefined): string {
-	if (!value) return "—"
+	if (!value) return "--"
 	return new Date(value).toLocaleString("en-PH", {
 		year: "numeric",
 		month: "short",
@@ -66,10 +59,6 @@ function parsePrescriptionContent(raw: unknown): PrescriptionContent {
 	if (!raw || typeof raw !== "object") return {}
 	return raw as PrescriptionContent
 }
-
-// ============================================================================
-// Print trigger
-// ============================================================================
 
 interface RxPrintItem {
 	prescriberName: string
@@ -113,7 +102,7 @@ function openPrintWindow(data: PrintData): void {
         ${rx.brandName ? `<span class="brand"> (${rx.brandName})</span>` : ""}
       </div>
       <table class="rx-table">
-        <tr><td class="label">Dose / Form</td><td>${rx.dose} ${rx.doseUnit} — ${rx.doseForm}</td></tr>
+        <tr><td class="label">Dose / Form</td><td>${rx.dose} ${rx.doseUnit} - ${rx.doseForm}</td></tr>
         <tr><td class="label">Route</td><td>${rx.route}</td></tr>
         <tr><td class="label">Frequency</td><td>${rx.frequency}${rx.isPrn ? ` (PRN: ${rx.prnReason ?? "as needed"})` : ""}</td></tr>
         ${rx.durationDays ? `<tr><td class="label">Duration</td><td>${rx.durationDays} day(s)</td></tr>` : ""}
@@ -130,7 +119,7 @@ function openPrintWindow(data: PrintData): void {
         <div class="dispensing-note">For single dispensing only unless otherwise indicated.</div>
       </div>
       <div class="signed-note">Electronically signed: ${rx.signedAt}</div>
-    </div>`,
+    </div>`
 		)
 		.join("")
 
@@ -138,7 +127,7 @@ function openPrintWindow(data: PrintData): void {
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>e-Prescription — ${data.patientName}</title>
+  <title>e-Prescription - ${data.patientName}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #000; padding: 2cm; }
@@ -181,7 +170,7 @@ function openPrintWindow(data: PrintData): void {
     <div class="grid-2">
       <div class="field"><span class="label">Patient Name</span><span class="value">${data.patientName}</span></div>
       <div class="field"><span class="label">MRN</span><span class="value">${data.patientMrn}</span></div>
-      <div class="field"><span class="label">Age / Sex</span><span class="value">${data.patientAge !== null ? `${data.patientAge} yrs` : "—"} / ${data.patientSex}</span></div>
+      <div class="field"><span class="label">Age / Sex</span><span class="value">${data.patientAge !== null ? `${data.patientAge} yrs` : "--"} / ${data.patientSex}</span></div>
       <div class="field"><span class="label">Date Prescribed</span><span class="value">${data.encounterDate}</span></div>
     </div>
   </div>
@@ -199,10 +188,6 @@ function openPrintWindow(data: PrintData): void {
 	}, 500)
 }
 
-// ============================================================================
-// Component
-// ============================================================================
-
 interface PrescriptionPrintDialogProps {
 	open: boolean
 	onOpenChange: (open: boolean) => void
@@ -218,69 +203,110 @@ export function PrescriptionPrintDialog({
 	patientId,
 	onPrinted,
 }: PrescriptionPrintDialogProps) {
+	const [showQr, setShowQr] = useState(false)
 	const { data: encounter, isLoading: encounterLoading } = useEncounterDetailQuery(encounterId, {
 		enabled: open,
 	})
 	const { data: prescriptionsData, isLoading: rxLoading } = usePrescriptionListQuery({
 		encounterId,
+		patientId,
 		page: 1,
 		limit: 50,
 	})
 
 	const isLoading = encounterLoading || rxLoading
-
-	const signedPrescriptions = (prescriptionsData?.data ?? []).filter(
-		(rx) => rx.status === "signed",
-	)
+	const signedPrescriptions = (prescriptionsData?.data ?? []).filter(rx => rx.status === "signed")
+	const printData: PrintData | null = encounter
+		? {
+				patientName: encounter.patientName,
+				patientMrn: encounter.patientMrn,
+				patientAge: encounter.patientDateOfBirth
+					? calculateAge(encounter.patientDateOfBirth)
+					: null,
+				patientSex:
+					encounter.patientSex === "male"
+						? "Male"
+						: encounter.patientSex === "female"
+							? "Female"
+							: "Other",
+				encounterDate: formatDate(encounter.admissionDatetime),
+				prescriptions: signedPrescriptions.map(rx => {
+					const content = parsePrescriptionContent(rx.prescriptionContent)
+					return {
+						prescriberName: rx.prescriberStaffName ?? "--",
+						prcNumber: rx.prcLicenseNumber ?? "--",
+						ptrNumber: rx.ptrNumber ?? "--",
+						pdeaS2License: rx.pdeaS2License ?? null,
+						signedAt: formatDateTime(rx.signedAt),
+						genericName: content.genericName ?? "--",
+						brandName: content.brandName ?? null,
+						dose: content.dose ?? "--",
+						doseUnit: content.doseUnit ?? "",
+						doseForm: content.doseForm ?? "--",
+						route: content.route ?? "--",
+						frequency: content.frequency ?? "--",
+						durationDays: content.durationDays ?? null,
+						specialInstructions: content.specialInstructions ?? null,
+						isPrn: content.isPrn ?? false,
+						prnReason: content.prnReason ?? null,
+					}
+				}),
+			}
+		: null
+	const qrPayload =
+		printData === null
+			? ""
+			: JSON.stringify({
+					patientName: printData.patientName,
+					patientMrn: printData.patientMrn,
+					prescriptions: printData.prescriptions.map(rx => ({
+						genericName: rx.genericName,
+						dose: `${rx.dose} ${rx.doseUnit}`.trim(),
+						prescriberPrc: rx.prcNumber,
+						prescriberPtr: rx.ptrNumber,
+						signedAt: rx.signedAt,
+					})),
+				})
+	const qrLink = qrPayload ? `qhealth://eprescription?payload=${encodeURIComponent(qrPayload)}` : ""
 
 	function handlePrint() {
-		if (!encounter) return
-
-		const age = encounter.patientDateOfBirth
-			? calculateAge(encounter.patientDateOfBirth)
-			: null
-
-		const prescriptions: RxPrintItem[] = signedPrescriptions.map((rx) => {
-			const content = parsePrescriptionContent(rx.prescriptionContent)
-			return {
-				prescriberName: rx.prescriberStaffName ?? "—",
-				prcNumber: rx.prcLicenseNumber ?? "—",
-				ptrNumber: rx.ptrNumber ?? "—",
-				pdeaS2License: rx.pdeaS2License ?? null,
-				signedAt: formatDateTime(rx.signedAt),
-				genericName: content.genericName ?? "—",
-				brandName: content.brandName ?? null,
-				dose: content.dose ?? "—",
-				doseUnit: content.doseUnit ?? "",
-				doseForm: content.doseForm ?? "—",
-				route: content.route ?? "—",
-				frequency: content.frequency ?? "—",
-				durationDays: content.durationDays ?? null,
-				specialInstructions: content.specialInstructions ?? null,
-				isPrn: content.isPrn ?? false,
-				prnReason: content.prnReason ?? null,
-			}
-		})
-
-		openPrintWindow({
-			patientName: encounter.patientName,
-			patientMrn: encounter.patientMrn,
-			patientAge: age,
-			patientSex:
-				encounter.patientSex === "male"
-					? "Male"
-					: encounter.patientSex === "female"
-						? "Female"
-						: "Other",
-			encounterDate: formatDate(encounter.admissionDatetime),
-			prescriptions,
-		})
+		if (!printData) return
+		openPrintWindow(printData)
 		onPrinted?.()
 	}
 
+	function handleSendEmail() {
+		if (!printData) return
+
+		const bodyLines = [
+			`Patient: ${printData.patientName}`,
+			`MRN: ${printData.patientMrn}`,
+			`Date: ${printData.encounterDate}`,
+			"",
+			"Prescriptions:",
+			...printData.prescriptions.map(
+				(rx, index) =>
+					`${index + 1}. ${rx.genericName} - ${rx.dose} ${rx.doseUnit} ${rx.doseForm}, ${rx.route}, ${rx.frequency}`
+			),
+			"",
+			`Prescriber PRC/PTR: ${printData.prescriptions[0]?.prcNumber ?? "--"} / ${printData.prescriptions[0]?.ptrNumber ?? "--"}`,
+			`Signed: ${printData.prescriptions[0]?.signedAt ?? "--"}`,
+		]
+
+		const subject = `e-Prescription - ${printData.patientName}`
+		const body = bodyLines.join("\n")
+		window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+	}
+
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+		<Dialog
+			open={open}
+			onOpenChange={nextOpen => {
+				if (!nextOpen) setShowQr(false)
+				onOpenChange(nextOpen)
+			}}
+		>
+			<DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
 				<DialogHeader>
 					<DialogTitle>e-Prescription</DialogTitle>
 					<DialogDescription>
@@ -290,7 +316,7 @@ export function PrescriptionPrintDialog({
 
 				{isLoading ? (
 					<div className="flex h-32 items-center justify-center">
-						<Loader2 className="size-5 animate-spin text-muted-foreground" />
+						<Loader2 className="text-muted-foreground size-5 animate-spin" />
 					</div>
 				) : !encounter ? (
 					<div className="text-muted-foreground py-8 text-center text-sm">
@@ -298,18 +324,17 @@ export function PrescriptionPrintDialog({
 					</div>
 				) : (
 					<div className="space-y-4 py-2">
-						{/* Patient info */}
 						<div className="rounded-md border p-4 text-sm">
 							<div className="grid grid-cols-2 gap-x-6 gap-y-1">
 								<div>
-									<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+									<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 										Patient
 									</p>
 									<p className="font-semibold">{encounter.patientName}</p>
 									<p className="text-muted-foreground">MRN: {encounter.patientMrn}</p>
 								</div>
 								<div>
-									<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+									<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 										Date
 									</p>
 									<p>{formatDate(encounter.admissionDatetime)}</p>
@@ -319,9 +344,8 @@ export function PrescriptionPrintDialog({
 
 						<Separator />
 
-						{/* Signed prescriptions list */}
 						<div>
-							<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+							<p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
 								Signed Prescriptions ({signedPrescriptions.length})
 							</p>
 							{signedPrescriptions.length === 0 ? (
@@ -330,32 +354,29 @@ export function PrescriptionPrintDialog({
 								</p>
 							) : (
 								<div className="space-y-2">
-									{signedPrescriptions.map((rx) => {
+									{signedPrescriptions.map(rx => {
 										const content = parsePrescriptionContent(rx.prescriptionContent)
 										return (
-											<div
-												key={rx.id}
-												className="rounded-md border p-3 text-sm space-y-1"
-											>
+											<div key={rx.id} className="space-y-1 rounded-md border p-3 text-sm">
 												<div className="flex items-start justify-between">
 													<div>
 														<p className="font-semibold">
-															{content.genericName ?? "—"}
+															{content.genericName ?? "--"}
 															{content.brandName && (
-																<span className="text-muted-foreground font-normal ml-1">
+																<span className="text-muted-foreground ml-1 font-normal">
 																	({content.brandName})
 																</span>
 															)}
 														</p>
 														<p className="text-muted-foreground text-xs">
-															{content.dose} {content.doseUnit} —{" "}
-															{content.doseForm} · {content.route} ·{" "}
-															{content.frequency}
+															{content.dose} {content.doseUnit} - {content.doseForm} ·{" "}
+															{content.route} · {content.frequency}
 														</p>
 													</div>
-													<div className="text-right text-xs text-muted-foreground">
-														<p>{rx.prescriberStaffName ?? "—"}</p>
+													<div className="text-muted-foreground text-right text-xs">
+														<p>{rx.prescriberStaffName ?? "--"}</p>
 														<p>PRC: {rx.prcLicenseNumber}</p>
+														<p>PTR: {rx.ptrNumber}</p>
 													</div>
 												</div>
 											</div>
@@ -365,19 +386,53 @@ export function PrescriptionPrintDialog({
 							)}
 						</div>
 
-						{/* Print CTA */}
-						<div className="flex justify-end pt-2">
+						{showQr && signedPrescriptions.length > 0 && (
+							<div className="space-y-3 rounded-md border p-4">
+								<div>
+									<p className="text-sm font-medium">QR Payload Link</p>
+									<p className="text-muted-foreground text-xs">
+										No QR library is installed in this workspace, so this dialog exposes the encoded
+										payload link that can be rendered as a QR value elsewhere.
+									</p>
+								</div>
+								<a
+									href={qrLink}
+									className="text-primary inline-flex items-center gap-1 text-sm break-all underline underline-offset-4"
+								>
+									<Link2 className="size-3.5" />
+									{qrLink}
+								</a>
+								<pre className="bg-muted overflow-x-auto rounded-md p-3 text-xs whitespace-pre-wrap">
+									{qrPayload}
+								</pre>
+							</div>
+						)}
+
+						<div className="flex flex-wrap justify-end gap-2 pt-2">
 							<Button
-								onClick={handlePrint}
+								variant="outline"
+								onClick={() => setShowQr(value => !value)}
 								disabled={signedPrescriptions.length === 0}
 							>
+								<QrCode className="mr-1.5 size-4" />
+								{showQr ? "Hide QR" : "Show QR"}
+							</Button>
+							<Button
+								variant="outline"
+								onClick={handleSendEmail}
+								disabled={signedPrescriptions.length === 0}
+							>
+								<Mail className="mr-1.5 size-4" />
+								Send via Email
+							</Button>
+							<Button onClick={handlePrint} disabled={signedPrescriptions.length === 0}>
 								<Printer className="mr-1.5 size-4" />
 								Print e-Prescription
 							</Button>
 						</div>
 						{signedPrescriptions.length === 0 && (
-							<p className="text-muted-foreground text-xs text-right">
-								Print is disabled — sign a prescription first.
+							<p className="text-muted-foreground text-right text-xs">
+								Print, email, and QR actions are disabled until a prescription is signed.
 							</p>
 						)}
 					</div>

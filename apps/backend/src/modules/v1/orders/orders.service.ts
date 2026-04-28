@@ -1298,6 +1298,12 @@ export class OrdersService {
 		if (!staff.prcLicenseNumber)
 			throw new NotFoundException("Prescriber does not have a PRC license number")
 		if (!staff.ptrNumber) throw new NotFoundException("Prescriber does not have a PTR number")
+		if (staff.prcExpiry && new Date(staff.prcExpiry) < new Date()) {
+			throw new BadRequestException("Physician PRC license is expired")
+		}
+		if (staff.ptrExpiry && new Date(staff.ptrExpiry) < new Date()) {
+			throw new BadRequestException("Physician PTR number is expired")
+		}
 
 		// Fetch medication order details for prescription content
 		const [medOrder] = await db
@@ -1307,6 +1313,11 @@ export class OrdersService {
 
 		if (!medOrder)
 			throw new NotFoundException(`Medication order ${input.medicationOrderId} not found`)
+		if (medOrder.status !== "verified" && medOrder.status !== "active") {
+			throw new BadRequestException(
+				"Only verified or active medication orders can generate a prescription"
+			)
+		}
 
 		const prescriptionContent = {
 			genericName: medOrder.genericName,
@@ -1346,7 +1357,10 @@ export class OrdersService {
 	}
 
 	async signPrescription(id: string) {
-		await this.findPrescription(id)
+		const prescription = await this.findPrescription(id)
+		if (prescription.status === "signed" || prescription.status === "issued") {
+			throw new BadRequestException("Prescription is already signed")
+		}
 
 		await db
 			.update(prescriptions)
@@ -1629,6 +1643,27 @@ export class OrdersService {
 		})
 
 		const totalTranches = preview.tranches.length
+		const buildTrancheCdsAlerts = (dispenseDate: string) => {
+			if (
+				input.cdsAlerts &&
+				typeof input.cdsAlerts === "object" &&
+				!Array.isArray(input.cdsAlerts)
+			) {
+				return {
+					...(input.cdsAlerts as Record<string, unknown>),
+					pdeaDispenseDate: dispenseDate,
+				}
+			}
+
+			if (input.cdsAlerts != null) {
+				return {
+					alerts: input.cdsAlerts,
+					pdeaDispenseDate: dispenseDate,
+				}
+			}
+
+			return { pdeaDispenseDate: dispenseDate }
+		}
 
 		// Create parent order (represents the full course; not dispensed directly)
 		const [parentRow] = await db
@@ -1654,6 +1689,7 @@ export class OrdersService {
 				pdeaSchedule: input.pdeaSchedule,
 				pdeaTrancheNumber: null,
 				pdeaTrancheTotal: totalTranches,
+				noRefillInscribed: true,
 				parentOrderId: null,
 				status: "pending_verification",
 				orderingStaffId: staff.id,
@@ -1690,10 +1726,11 @@ export class OrdersService {
 					pdeaSchedule: input.pdeaSchedule,
 					pdeaTrancheNumber: tranche.trancheNumber,
 					pdeaTrancheTotal: totalTranches,
+					noRefillInscribed: true,
 					parentOrderId: parentRow.id,
 					status: "pending_verification",
 					orderingStaffId: staff.id,
-					cdsAlerts: input.cdsAlerts ?? null,
+					cdsAlerts: buildTrancheCdsAlerts(tranche.startDate),
 					cdsOverrides: input.cdsOverrides ?? null,
 				})
 				.returning()
