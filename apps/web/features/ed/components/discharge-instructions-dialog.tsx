@@ -1,6 +1,8 @@
 "use client"
 
-import { Loader2, Printer } from "lucide-react"
+import Link from "next/link"
+
+import { FileText, Loader2, Printer } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
 import {
@@ -366,9 +368,21 @@ export function DischargeInstructionsDialog({
 							)}
 						</div>
 
-						{/* Print CTA */}
-						<div className="flex justify-end pt-2">
-							<Button onClick={handlePrint}>
+						{/* Print + e-Rx CTAs */}
+						<div className="flex items-center justify-between pt-2">
+							{encounter.patientId && (
+								<Button variant="outline" asChild>
+									<Link
+										href={`/patients/${encounter.patientId}/encounters/${encounterId}/e-prescription`}
+										target="_blank"
+										rel="noopener noreferrer"
+									>
+										<FileText className="mr-1.5 size-4" />
+										Open e-Prescription
+									</Link>
+								</Button>
+							)}
+							<Button onClick={handlePrint} className="ml-auto">
 								<Printer className="mr-1.5 size-4" />
 								Print Discharge Instructions
 							</Button>
