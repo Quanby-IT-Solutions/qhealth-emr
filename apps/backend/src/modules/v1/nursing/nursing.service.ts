@@ -180,9 +180,16 @@ interface ConsentRecordListInput {
 
 interface CreateConsentRecordInput {
 	facilityId: string
-	encounterId?: string
+	encounterId: string
+	patientId: string
 	preEncounterId?: string
 	consentType: string
+	signedByName: string
+	relationship: string
+	content?: string
+	signatureData?: unknown
+	signedAt?: Date
+	witnessStaffId?: string
 	consentText?: string
 	patientSignature?: string
 	guardianSignature?: string
@@ -944,9 +951,15 @@ export class NursingService {
 			.values({
 				facilityId: input.facilityId,
 				encounterId: input.encounterId,
-				patientId: enc.patientId,
+				patientId: input.patientId,
 				preEncounterId: input.preEncounterId,
 				consentType: input.consentType,
+				signedByName: input.signedByName,
+				relationship: input.relationship,
+				content: input.content ?? null,
+				signatureData: input.signatureData ?? null,
+				signedAt: input.signedAt ?? new Date(),
+				witnessStaffId: input.witnessStaffId ?? null,
 				consentText: input.consentText ?? "",
 				signedByName: "Patient / Guardian",
 				relationship: "self",
@@ -954,7 +967,6 @@ export class NursingService {
 				guardianSignature: input.guardianSignature,
 				witnessSignature: input.witnessSignature,
 				capturedByStaffId: staffProfileId,
-				signedAt: new Date(),
 			})
 			.returning()
 
