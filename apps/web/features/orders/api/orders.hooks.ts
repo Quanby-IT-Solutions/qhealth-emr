@@ -5,8 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { type v1Contract } from "@repo/contracts"
 
-import { env } from "@/env"
 import { orpc } from "@/services/orpc/client"
+import { env } from "@/env"
 
 type V1Inputs = InferContractRouterInputs<typeof v1Contract>
 type V1Outputs = InferContractRouterOutputs<typeof v1Contract>
@@ -16,6 +16,8 @@ type RawMedOrder = V1Outputs["orders"]["getMedOrder"]
 type RawLabOrder = V1Outputs["orders"]["getLabOrder"]
 type RawImagingOrder = V1Outputs["orders"]["getImagingOrder"]
 type RawVerification = V1Outputs["orders"]["verifyOrder"]
+type RawHighAlertVerification = V1Outputs["orders"]["createHighAlertVerification"]
+type RawHighAlertVerificationQuery = V1Outputs["orders"]["getHighAlertVerification"]
 type RawPrescription = V1Outputs["orders"]["getPrescription"]
 type RawMedOrderListResponse = V1Outputs["orders"]["listMedOrders"]
 type RawLabOrderListResponse = V1Outputs["orders"]["listLabOrders"]
@@ -154,6 +156,16 @@ export interface Verification {
 	createdAt: string
 }
 
+export interface HighAlertVerification {
+	id: string
+	medicationOrderId: string
+	requestingStaffId: string
+	verifyingStaffId: string
+	verifiedAt: string
+	notes: string | null
+	createdAt: string
+}
+
 export interface Prescription {
 	id: string
 	facilityId: string
@@ -223,6 +235,14 @@ function mapVerification(verification: RawVerification): Verification {
 	}
 }
 
+function mapHighAlertVerification(verification: RawHighAlertVerification): HighAlertVerification {
+	return {
+		...verification,
+		verifiedAt: serializeRequiredDate(verification.verifiedAt),
+		createdAt: serializeRequiredDate(verification.createdAt),
+	}
+}
+
 function mapPrescription(prescription: RawPrescription): Prescription {
 	return {
 		...prescription,
@@ -268,6 +288,8 @@ export const orderKeys = {
 	imagingOrders: (params: object) => [...orderKeys.all, "imaging", params] as const,
 	imagingOrder: (id: string) => [...orderKeys.all, "imaging-detail", id] as const,
 	verificationQueue: (params: object) => [...orderKeys.all, "verification-queue", params] as const,
+	highAlertVerification: (medicationOrderId: string) =>
+		[...orderKeys.all, "high-alert-verification", medicationOrderId] as const,
 	prescriptions: (params: object) => [...orderKeys.all, "prescriptions", params] as const,
 	prescription: (id: string) => [...orderKeys.all, "prescription", id] as const,
 	active: (encounterId: string) => [...orderKeys.all, "active", encounterId] as const,
@@ -276,11 +298,7 @@ export const orderKeys = {
 type CdsEvaluateInput = V1Inputs["orders"]["evaluateCds"]
 
 export function useEvaluateCdsMutation() {
-	return useMutation<
-		CdsEvaluateResponse,
-		Error,
-		CdsEvaluateInput
-	>({
+	return useMutation<CdsEvaluateResponse, Error, CdsEvaluateInput>({
 		mutationFn: async data => {
 			const result = await orpc.orders.evaluateCds.call(data)
 			return result as CdsEvaluateResponse
@@ -502,6 +520,33 @@ export function useVerifyOrderMutation() {
 	})
 }
 
+type CreateHighAlertVerificationData = V1Inputs["orders"]["createHighAlertVerification"]
+
+export function useCreateHighAlertVerificationMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation<HighAlertVerification, Error, CreateHighAlertVerificationData>({
+		mutationFn: async data => {
+			const result = await orpc.orders.createHighAlertVerification.call(data)
+			return mapHighAlertVerification(result)
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
+		},
+	})
+}
+
+export function useGetHighAlertVerificationQuery(medicationOrderId: string) {
+	return useQuery(
+		orpc.orders.getHighAlertVerification.queryOptions({
+			input: { medicationOrderId },
+			enabled: !!medicationOrderId,
+			select: (data: RawHighAlertVerificationQuery) =>
+				data ? mapHighAlertVerification(data) : null,
+		})
+	)
+}
+
 interface PrescriptionListParams {
 	encounterId?: string
 	patientId?: string
@@ -609,7 +654,9 @@ export function usePdeaLicenseCheckMutation() {
 				licenseNumber: result.licenseNumber,
 				expiryDate: result.expiryDate,
 				remainingMonthlyQuota: null,
-				message: result.errorMessage ?? (result.canPrescribeControlled ? "License valid" : "License invalid"),
+				message:
+					result.errorMessage ??
+					(result.canPrescribeControlled ? "License valid" : "License invalid"),
 			}
 		},
 	})
@@ -643,11 +690,7 @@ interface TranchingPreviewResponse {
 }
 
 export function useTranchingPreviewMutation() {
-	return useMutation<
-		TranchingPreviewResponse,
-		Error,
-		TranchingPreviewInput
-	>({
+	return useMutation<TranchingPreviewResponse, Error, TranchingPreviewInput>({
 		mutationFn: async data => {
 			const result = await orpc.orders.previewTranches.call({
 				facilityId: data.facilityId,

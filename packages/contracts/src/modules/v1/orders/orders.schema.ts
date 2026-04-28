@@ -108,13 +108,7 @@ export const MedOrderSafetyTypeEnum = z.enum([
 	"pregnancy_category",
 ])
 
-export const MedOrderSafetySeverityEnum = z.enum([
-	"critical",
-	"major",
-	"moderate",
-	"minor",
-	"info",
-])
+export const MedOrderSafetySeverityEnum = z.enum(["critical", "major", "moderate", "minor", "info"])
 
 export const MedOrderSafetyCheckSchema = z.object({
 	id: z.string(),
@@ -410,6 +404,26 @@ export const VerificationQueueResponseSchema = PaginatedResponseSchema.extend({
 	data: z.array(MedOrderSchema),
 })
 
+export const HighAlertVerificationSchema = z.object({
+	id: z.string().uuid(),
+	medicationOrderId: z.string().uuid(),
+	requestingStaffId: z.string().uuid(),
+	verifyingStaffId: z.string().uuid(),
+	verifiedAt: dateOrString,
+	notes: z.string().nullable(),
+	createdAt: dateOrString,
+})
+
+export const CreateHighAlertVerificationSchema = z.object({
+	medicationOrderId: z.string().uuid(),
+	verifyingStaffId: z.string().uuid(),
+	notes: z.string().optional(),
+})
+
+export const GetHighAlertVerificationSchema = z.object({
+	medicationOrderId: z.string().uuid(),
+})
+
 // ============================================================================
 // Prescription Schemas
 // ============================================================================
@@ -682,12 +696,14 @@ export const OpdDispenseRecordSchema = z.object({
 	facilityId: z.string().uuid(),
 	patientId: z.string().uuid().nullable(),
 	patientName: z.string().nullable(),
-	items: z.array(z.object({
-		medicationOrderId: z.string().uuid(),
-		genericName: z.string(),
-		dispensedQuantity: z.string(),
-		lotNumber: z.string().nullable(),
-	})),
+	items: z.array(
+		z.object({
+			medicationOrderId: z.string().uuid(),
+			genericName: z.string(),
+			dispensedQuantity: z.string(),
+			lotNumber: z.string().nullable(),
+		})
+	),
 	counselingNotes: z.string().nullable(),
 	pharmacistStaffId: z.string().uuid(),
 	dispensedAt: dateOrString,

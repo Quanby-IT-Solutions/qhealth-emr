@@ -9,6 +9,7 @@ import {
 	CounselingLogListResponseSchema,
 	CounselingLogListSchema,
 	CounselingLogSchema,
+	CreateHighAlertVerificationSchema,
 	CreateImagingOrderSchema,
 	CreateLabOrderSchema,
 	CreateMedOrderSchema,
@@ -20,6 +21,8 @@ import {
 	DispenseLogListSchema,
 	DispenseLogSchema,
 	DispenseOrderInputSchema,
+	GetHighAlertVerificationSchema,
+	HighAlertVerificationSchema,
 	ImagingOrderIdSchema,
 	ImagingOrderListResponseSchema,
 	ImagingOrderListSchema,
@@ -241,6 +244,26 @@ export const ordersContract = {
 		})
 		.input(VerifyOrderSchema)
 		.output(VerificationSchema),
+
+	createHighAlertVerification: oc
+		.route({
+			method: "POST",
+			path: "/medications/{medicationOrderId}/high-alert-verify",
+			summary: "Create a dual-clinician verification record for a high-alert medication order",
+			tags: ["Orders â€” Medications"],
+		})
+		.input(CreateHighAlertVerificationSchema)
+		.output(HighAlertVerificationSchema),
+
+	getHighAlertVerification: oc
+		.route({
+			method: "GET",
+			path: "/medications/{medicationOrderId}/high-alert-verify",
+			summary: "Get the dual-clinician verification record for a high-alert medication order",
+			tags: ["Orders â€” Medications"],
+		})
+		.input(GetHighAlertVerificationSchema)
+		.output(HighAlertVerificationSchema.nullable()),
 
 	// ========================================================================
 	// Prescriptions
