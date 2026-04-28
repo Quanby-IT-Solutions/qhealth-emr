@@ -162,6 +162,44 @@ export interface CreatePrescriptionInput {
 // Query Keys
 // ============================================================================
 
+export interface TeleAbstract {
+	id: string
+	encounterId: string
+	appointmentId: string
+	patientName: string
+	clinicianName: string
+	clinicianPrcNumber: string
+	facilityName: string
+	chiefComplaint: string
+	subjectiveNotes: string
+	objectiveNotes: string
+	assessmentNotes: string
+	planNotes: string
+	diagnosis: string
+	icdCode: string | null
+	additionalNotes: string | null
+	status: "draft" | "signed" | "sent"
+	signedAt: string | null
+	signedByName: string | null
+	sentAt: string | null
+	sentToEmail: string | null
+	createdAt: string
+}
+
+export interface GenerateAbstractInput {
+	encounterId: string
+	additionalNotes?: string
+}
+
+export interface SignAbstractInput {
+	id: string
+}
+
+export interface SendAbstractInput {
+	id: string
+	email: string
+}
+
 export const telemedicineKeys = {
 	all: ["telemedicine"] as const,
 	appointments: (facilityId: string) => [...telemedicineKeys.all, "appointments", facilityId] as const,
@@ -172,6 +210,9 @@ export const telemedicineKeys = {
 	prescriptions: (encounterId: string) =>
 		[...telemedicineKeys.all, "prescriptions", encounterId] as const,
 	prescription: (id: string) => [...telemedicineKeys.all, "prescription", id] as const,
+	abstracts: (encounterId: string) =>
+		[...telemedicineKeys.all, "abstracts", encounterId] as const,
+	abstract: (id: string) => [...telemedicineKeys.all, "abstract", id] as const,
 }
 
 // ============================================================================
@@ -297,6 +338,65 @@ export function useCreatePrescriptionMutation() {
 	return useMutation<EPrescription, Error, CreatePrescriptionInput>({
 		mutationFn: (input) =>
 			fetchJson<EPrescription>(`${API_BASE}/prescriptions`, {
+				method: "POST",
+				body: JSON.stringify(input),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.all })
+		},
+	})
+}
+
+export function useEncounterAbstractsQuery(encounterId: string) {
+	return useQuery<TeleAbstract[]>({
+		queryKey: telemedicineKeys.abstracts(encounterId),
+		queryFn: () =>
+			fetchJson<TeleAbstract[]>(`${API_BASE}/abstracts?encounterId=${encounterId}`),
+		enabled: Boolean(encounterId),
+	})
+}
+
+export function useAbstractQuery(abstractId: string) {
+	return useQuery<TeleAbstract>({
+		queryKey: telemedicineKeys.abstract(abstractId),
+		queryFn: () => fetchJson<TeleAbstract>(`${API_BASE}/abstracts/${abstractId}`),
+		enabled: Boolean(abstractId),
+	})
+}
+
+export function useGenerateAbstractMutation() {
+	const queryClient = useQueryClient()
+	return useMutation<TeleAbstract, Error, GenerateAbstractInput>({
+		mutationFn: (input) =>
+			fetchJson<TeleAbstract>(`${API_BASE}/abstracts`, {
+				method: "POST",
+				body: JSON.stringify(input),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.all })
+		},
+	})
+}
+
+export function useSignAbstractMutation() {
+	const queryClient = useQueryClient()
+	return useMutation<TeleAbstract, Error, SignAbstractInput>({
+		mutationFn: (input) =>
+			fetchJson<TeleAbstract>(`${API_BASE}/abstracts/${input.id}/sign`, {
+				method: "POST",
+				body: JSON.stringify(input),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.all })
+		},
+	})
+}
+
+export function useSendAbstractMutation() {
+	const queryClient = useQueryClient()
+	return useMutation<TeleAbstract, Error, SendAbstractInput>({
+		mutationFn: (input) =>
+			fetchJson<TeleAbstract>(`${API_BASE}/abstracts/${input.id}/send`, {
 				method: "POST",
 				body: JSON.stringify(input),
 			}),
