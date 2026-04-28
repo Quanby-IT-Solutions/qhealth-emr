@@ -486,9 +486,20 @@ export const AnesthesiaNoteDataSchema = z.object({
 })
 
 // ============================================================================
+// FPE Submit
+// ============================================================================
+
+export const SubmitFpeInputSchema = z.object({
+	noteId: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	signedIp: z.string().optional(),
+})
+
+// ============================================================================
 // Type exports for new schemas
 // ============================================================================
 
 export type Cf4ExtractionResult = z.infer<typeof Cf4ExtractionResultSchema>
 export type OperativeNoteData = z.infer<typeof OperativeNoteDataSchema>
 export type AnesthesiaNoteData = z.infer<typeof AnesthesiaNoteDataSchema>
+export type SubmitFpeInput = z.infer<typeof SubmitFpeInputSchema>

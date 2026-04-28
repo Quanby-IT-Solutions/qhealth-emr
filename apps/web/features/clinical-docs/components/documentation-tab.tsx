@@ -6,6 +6,7 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { useNotesQuery } from "@/features/clinical-docs/api/clinical-docs.hooks"
 
+import { FpeEditorFlow } from "./fpe-editor-flow"
 import { NoteEditor } from "./note-editor"
 import { NoteTimeline } from "./note-timeline"
 import { NoteViewDialog } from "./note-view-dialog"
@@ -46,6 +47,25 @@ export function DocumentationTab({
 	}
 
 	if (mode === "editor" && selectedTemplate) {
+		if (selectedTemplate.category === "fpe") {
+			return (
+				<FpeEditorFlow
+					key={`fpe-${selectedTemplate.id ?? "default"}`}
+					encounterId={encounterId}
+					facilityId={facilityId}
+					patientId={patientId}
+					onBack={() => {
+						setSelectedTemplate(null)
+						setMode("template")
+					}}
+					onDone={() => {
+						setSelectedTemplate(null)
+						setMode("timeline")
+					}}
+				/>
+			)
+		}
+
 		return (
 			<NoteEditor
 				key={`${selectedTemplate.id ?? "default"}-${selectedTemplate.category}`}

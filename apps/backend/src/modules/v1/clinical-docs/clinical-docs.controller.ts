@@ -94,6 +94,14 @@ export class ClinicalDocsController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
+	@Implement(v1.clinicalDocs.submitFpe)
+	async submitFpe(@Session() session: UserSession, @Ip() ip: string) {
+		return implement(v1.clinicalDocs.submitFpe).handler(async ({ input }) => {
+			return this.service.submitFpe(input, session.user.id, ip ?? "unknown")
+		})
+	}
+
 	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.getNoteContext)
 	async getNoteContext() {

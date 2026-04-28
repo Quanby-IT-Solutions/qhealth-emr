@@ -147,7 +147,8 @@
       "Bash(where pip *)",
       "Bash(rtk find *)",
       "Bash(rtk grep *)",
-      "Bash(rtk tsc *)"
+      "Bash(rtk tsc *)",
+      "Bash(rtk ls *)"
     ]
   }
 }
