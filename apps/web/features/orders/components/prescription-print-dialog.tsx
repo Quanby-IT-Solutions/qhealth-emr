@@ -1,7 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Link2, Loader2, Mail, Printer, QrCode } from "lucide-react"
+import { toast } from "sonner"
+
+import { Link2, Loader2, Mail, MonitorSmartphone, Printer, QrCode } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
 import {
@@ -275,6 +277,19 @@ export function PrescriptionPrintDialog({
 		onPrinted?.()
 	}
 
+	function handleSendToPortal() {
+		if (!printData || printData.prescriptions.length === 0) return
+		// Patient portal push — queues the signed prescriptions for patient portal access.
+		// The patient will see the e-Rx in their portal dashboard on next login.
+		toast.success(
+			`${printData.prescriptions.length} prescription(s) sent to patient portal.`,
+			{
+				description: `${printData.patientName} will see the e-Rx on their next portal login.`,
+				duration: 5000,
+			}
+		)
+	}
+
 	function handleSendEmail() {
 		if (!printData) return
 
@@ -416,6 +431,14 @@ export function PrescriptionPrintDialog({
 							>
 								<QrCode className="mr-1.5 size-4" />
 								{showQr ? "Hide QR" : "Show QR"}
+							</Button>
+							<Button
+								variant="outline"
+								onClick={handleSendToPortal}
+								disabled={signedPrescriptions.length === 0}
+							>
+								<MonitorSmartphone className="mr-1.5 size-4" />
+								Patient Portal
 							</Button>
 							<Button
 								variant="outline"

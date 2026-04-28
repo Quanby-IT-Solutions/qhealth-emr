@@ -569,6 +569,7 @@ export class EdService {
 				assignedProviderName: users.name,
 				mergedAcuityLevel: preEncounters.triageAcuityLevel,
 				mergedAcuityScale: preEncounters.triageAcuityScale,
+				oecbEligible: encounters.oecbEligible,
 			})
 			.from(encounters)
 			.innerJoin(patients, eq(encounters.patientId, patients.id))
@@ -604,6 +605,7 @@ export class EdService {
 			assignedProvider: null,
 			bedNumber: null,
 			wardName: null,
+			oecbEligible: false,
 		}))
 
 		// Build queue items from encounters — all data is already joined
@@ -631,6 +633,7 @@ export class EdService {
 				assignedProvider: enc.assignedProviderName ?? null,
 				bedNumber: enc.bedNumber ?? null,
 				wardName: enc.wardName ?? null,
+				oecbEligible: enc.oecbEligible ?? false,
 			}
 		})
 
@@ -649,6 +652,7 @@ export class EdService {
 			assignedProvider: string | null
 			bedNumber: string | null
 			wardName: string | null
+			oecbEligible: boolean
 		}> = [...preEncItems, ...encItems]
 
 		// Sort by acuity level (1 = most urgent first), then by arrival time
