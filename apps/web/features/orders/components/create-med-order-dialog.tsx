@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { AlertCircle, Eye } from "lucide-react"
+import { AlertCircle, Eye, ShieldAlert } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -18,14 +18,20 @@ import { Label } from "@/core/components/ui/label"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
+	useCreateHighAlertVerificationMutation,
 	useCreateMedOrderMutation,
 	useEvaluateCdsMutation,
 	type CdsEvaluateResponse,
 } from "@/features/orders/api/orders.hooks"
+import { DrugSearchCombobox } from "@/features/orders/components/drug-search-combobox"
 import { useActiveAllergiesQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
 
 import { AllergyAlertBanner, type AllergyAlertItem } from "./allergy-alert-banner"
 import { CdsAlertBanner, type CdsAlertItem } from "./cds-alert-banner"
+import {
+	HighAlertVerificationDialog,
+	type HighAlertVerificationDraft,
+} from "./high-alert-verification-dialog"
 import { TranchingPreviewModal, type TrancheRow } from "./tranching-preview-modal"
 
 const TRANCHE_THRESHOLD_DAYS = 90
@@ -41,6 +47,12 @@ interface CreateMedOrderDialogProps {
 	orderingStaffId: string
 }
 
+interface PendingSubmitOptions {
+	trancheNumber?: number
+	trancheTotal?: number
+	trancheDays?: number
+}
+
 export function CreateMedOrderDialog({
 	open,
 	onOpenChange,
@@ -51,6 +63,7 @@ export function CreateMedOrderDialog({
 }: CreateMedOrderDialogProps) {
 	// ── Drug fields ──────────────────────────────────────────────────────────
 	const [genericName, setGenericName] = useState("")
+	const [formularyItemId, setFormularyItemId] = useState<string | undefined>(undefined)
 	const [brandName, setBrandName] = useState("")
 	const [dose, setDose] = useState("")
 	const [doseUnit, setDoseUnit] = useState("")
@@ -75,11 +88,21 @@ export function CreateMedOrderDialog({
 
 	// ── Tranching modal ──────────────────────────────────────────────────────
 	const [tranchingOpen, setTranchingOpen] = useState(false)
+	const [highAlertVerified, setHighAlertVerified] = useState(false)
+	const [highAlertVerifyOpen, setHighAlertVerifyOpen] = useState(false)
+	const [pendingHighAlertOrderId, setPendingHighAlertOrderId] = useState<string | null>(null)
+	const [pendingHighAlertVerification, setPendingHighAlertVerification] =
+		useState<HighAlertVerificationDraft | null>(null)
+	const [pendingSubmitOptions, setPendingSubmitOptions] = useState<PendingSubmitOptions | null>(
+		null
+	)
+	const [highAlertVerificationError, setHighAlertVerificationError] = useState<string | null>(null)
 
 	// ── Hooks ────────────────────────────────────────────────────────────────
 	const { data: profile } = useMyProfile()
 	const { data: activeAllergies } = useActiveAllergiesQuery(patientId)
 	const evaluateCds = useEvaluateCdsMutation()
+	const createHighAlertVerification = useCreateHighAlertVerificationMutation()
 	const createMedOrder = useCreateMedOrderMutation()
 
 	// ── PDEA validation ──────────────────────────────────────────────────────
@@ -101,7 +124,7 @@ export function CreateMedOrderDialog({
 	const normalizedAlerts: CdsAlertItem[] =
 		cdsResult?.alerts.map((a, i) => ({
 			id: String(i),
-			severity: a.severity as CdsAlertItem["severity"],
+			severity: a.type === "high_alert" ? "high_alert" : (a.severity as CdsAlertItem["severity"]),
 			message: a.message,
 		})) ?? []
 
@@ -133,7 +156,8 @@ export function CreateMedOrderDialog({
 	const needsTranching = isControlledSubstance && durationNum > TRANCHE_THRESHOLD_DAYS
 
 	// ── Submission readiness ─────────────────────────────────────────────────
-	const canSubmit =
+	const requiresDoubleVerification = cdsResult?.requiresDoubleVerification ?? false
+	const canProceedToSubmit =
 		!!genericName.trim() &&
 		!!dose.trim() &&
 		!!doseUnit.trim() &&
@@ -145,10 +169,25 @@ export function CreateMedOrderDialog({
 		!hasAllergyHardBlock &&
 		allergyAllSoftBlocksOverridden &&
 		(!isControlledSubstance || pdeaValid)
+	const canSubmit = canProceedToSubmit && (!requiresDoubleVerification || highAlertVerified)
 
 	// ── Handlers ──────────────────────────────────────────────────────────────
+	function resetDrugSelectionState() {
+		setBrandName("")
+		setCdsResult(null)
+		setOverrideReasons({})
+		setOverriddenAlerts(new Set())
+		setHighAlertVerified(false)
+		setHighAlertVerifyOpen(false)
+		setPendingHighAlertOrderId(null)
+		setPendingHighAlertVerification(null)
+		setPendingSubmitOptions(null)
+		setHighAlertVerificationError(null)
+	}
+
 	function resetForm() {
 		setGenericName("")
+		setFormularyItemId(undefined)
 		setBrandName("")
 		setDose("")
 		setDoseUnit("")
@@ -166,6 +205,12 @@ export function CreateMedOrderDialog({
 		setOverriddenAlerts(new Set())
 		setAllergyOverrideReasons({})
 		setAllergyOverriddenAlerts(new Set())
+		setHighAlertVerified(false)
+		setHighAlertVerifyOpen(false)
+		setPendingHighAlertOrderId(null)
+		setPendingHighAlertVerification(null)
+		setPendingSubmitOptions(null)
+		setHighAlertVerificationError(null)
 	}
 
 	function handleOpenChange(next: boolean) {
@@ -178,12 +223,21 @@ export function CreateMedOrderDialog({
 		evaluateCds.mutate(
 			{
 				patientId,
+				formularyItemId,
 				genericName: genericName.trim(),
 				isControlledSubstance,
 				orderingStaffId,
 				facilityId,
 			},
-			{ onSuccess: data => setCdsResult(data) }
+			{
+				onSuccess: data => {
+					setCdsResult(data)
+					setHighAlertVerified(false)
+					setPendingHighAlertVerification(null)
+					setPendingSubmitOptions(null)
+					setHighAlertVerificationError(null)
+				},
+			}
 		)
 	}
 
@@ -195,6 +249,14 @@ export function CreateMedOrderDialog({
 	function handleAllergyOverride(alertId: string, reason: string) {
 		setAllergyOverriddenAlerts(prev => new Set([...prev, alertId]))
 		setAllergyOverrideReasons(prev => ({ ...prev, [alertId]: reason }))
+	}
+
+	function handleHighAlertDialogOpenChange(next: boolean) {
+		setHighAlertVerifyOpen(next)
+
+		if (!next) {
+			setPendingSubmitOptions(null)
+		}
 	}
 
 	function doSubmit(trancheNumber?: number, trancheTotal?: number, trancheDays?: number) {
@@ -213,6 +275,7 @@ export function CreateMedOrderDialog({
 			{
 				facilityId,
 				encounterId,
+				formularyItemId,
 				genericName: genericName.trim(),
 				brandName: brandName.trim() || undefined,
 				dose: dose.trim(),
@@ -231,23 +294,98 @@ export function CreateMedOrderDialog({
 				cdsAlerts: cdsResult?.alerts ?? undefined,
 				cdsOverrides,
 			},
-			{ onSuccess: () => handleOpenChange(false) }
+			{
+				onSuccess: order => {
+					if (requiresDoubleVerification && pendingHighAlertVerification) {
+						createHighAlertVerification.mutate(
+							{
+								medicationOrderId: order.id,
+								verifyingStaffId: pendingHighAlertVerification.verifyingStaffId,
+								notes: pendingHighAlertVerification.notes,
+							},
+							{
+								onSuccess: () => handleOpenChange(false),
+								onError: err => {
+									setPendingHighAlertOrderId(order.id)
+									setHighAlertVerified(false)
+									setHighAlertVerificationError(
+										err instanceof Error
+											? err.message
+											: "Medication order was created, but high-alert verification still needs completion."
+									)
+									setHighAlertVerifyOpen(true)
+								},
+							}
+						)
+						return
+					}
+
+					handleOpenChange(false)
+				},
+			}
 		)
 	}
 
 	function handleSubmit() {
-		if (!canSubmit) return
+		if (pendingHighAlertOrderId) {
+			setHighAlertVerifyOpen(true)
+			return
+		}
+
+		if (!canProceedToSubmit) return
 		if (needsTranching) {
 			setTranchingOpen(true)
 			return
 		}
-		doSubmit()
+
+		if (requiresDoubleVerification && !highAlertVerified) {
+			setPendingSubmitOptions({})
+			setHighAlertVerifyOpen(true)
+			return
+		}
+
+		if (canSubmit) {
+			doSubmit()
+		}
 	}
 
 	function handleTranchingConfirm(tranches: TrancheRow[]) {
 		setTranchingOpen(false)
+		const options = {
+			trancheNumber: 1,
+			trancheTotal: tranches.length,
+			trancheDays: 30,
+		}
+
+		if (requiresDoubleVerification && !highAlertVerified) {
+			setPendingSubmitOptions(options)
+			setHighAlertVerifyOpen(true)
+			return
+		}
+
 		// Submit first tranche; backend handles remaining or user repeats
-		doSubmit(1, tranches.length, 30)
+		doSubmit(options.trancheNumber, options.trancheTotal, options.trancheDays)
+	}
+
+	function handleHighAlertPrepared(draft: HighAlertVerificationDraft) {
+		setPendingHighAlertVerification(draft)
+		setHighAlertVerificationError(null)
+	}
+
+	function handleHighAlertVerified() {
+		if (pendingHighAlertOrderId) {
+			setHighAlertVerified(true)
+			setHighAlertVerificationError(null)
+			handleOpenChange(false)
+			return
+		}
+
+		const submitOptions = pendingSubmitOptions ?? {}
+
+		setHighAlertVerified(true)
+		setHighAlertVerifyOpen(false)
+		setPendingSubmitOptions(null)
+		doSubmit(submitOptions.trancheNumber, submitOptions.trancheTotal, submitOptions.trancheDays)
 	}
 
 	return (
@@ -268,17 +406,30 @@ export function CreateMedOrderDialog({
 							<Label htmlFor="genericName">
 								Generic Name <span className="text-destructive">*</span>
 							</Label>
-							<Input
+							<DrugSearchCombobox
 								id="genericName"
+								facilityId={facilityId}
 								value={genericName}
-								onChange={e => {
-									setGenericName(e.target.value)
-									// Reset brand + CDS when generic changes
-									setBrandName("")
-									setCdsResult(null)
-									setOverrideReasons({})
-									setOverriddenAlerts(new Set())
+								onSelect={item => {
+									resetDrugSelectionState()
+
+									if (!item) {
+										setFormularyItemId(undefined)
+										return
+									}
+
+									setGenericName(item.genericName)
+									setFormularyItemId(item.id)
+
+									if (!doseForm.trim()) {
+										setDoseForm(item.doseForm)
+									}
+
+									if (!route.trim()) {
+										setRoute(item.route)
+									}
 								}}
+								onRawInput={nextValue => setGenericName(nextValue)}
 								placeholder="e.g., Amoxicillin (generic name required)"
 								autoFocus
 							/>
@@ -333,6 +484,23 @@ export function CreateMedOrderDialog({
 						)}
 
 						{/* ── Allergy Alert Banner ──────────────────────── */}
+						{requiresDoubleVerification && (
+							<div className="flex items-center gap-2 rounded-md border border-purple-300 bg-purple-50 px-3 py-2 text-sm text-purple-800 dark:border-purple-700 dark:bg-purple-950 dark:text-purple-300">
+								<ShieldAlert className="size-4 shrink-0 text-purple-600 dark:text-purple-300" />
+								<span>
+									Dual clinician verification required before submitting.
+									{highAlertVerified ? " Co-signature captured." : ""}
+								</span>
+							</div>
+						)}
+
+						{highAlertVerificationError && (
+							<div className="border-destructive/30 bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+								<AlertCircle className="size-4 shrink-0" />
+								<span>{highAlertVerificationError}</span>
+							</div>
+						)}
+
 						{normalizedAllergyAlerts.length > 0 && (
 							<AllergyAlertBanner
 								alerts={normalizedAllergyAlerts}
@@ -523,14 +691,25 @@ export function CreateMedOrderDialog({
 						</Button>
 						{needsTranching ? (
 							<Button
-								disabled={!canSubmit || createMedOrder.isPending}
+								disabled={
+									!canProceedToSubmit ||
+									createMedOrder.isPending ||
+									createHighAlertVerification.isPending
+								}
 								onClick={() => setTranchingOpen(true)}
 							>
 								<Eye className="mr-1 size-4" />
 								Preview Tranches
 							</Button>
 						) : (
-							<Button disabled={!canSubmit || createMedOrder.isPending} onClick={handleSubmit}>
+							<Button
+								disabled={
+									!canProceedToSubmit ||
+									createMedOrder.isPending ||
+									createHighAlertVerification.isPending
+								}
+								onClick={handleSubmit}
+							>
 								{createMedOrder.isPending ? "Creating…" : "Create Order"}
 							</Button>
 						)}
@@ -551,6 +730,16 @@ export function CreateMedOrderDialog({
 					durationDays={durationNum}
 				/>
 			)}
+
+			<HighAlertVerificationDialog
+				open={highAlertVerifyOpen}
+				onOpenChange={handleHighAlertDialogOpenChange}
+				medicationOrderId={pendingHighAlertOrderId ?? ""}
+				requestingStaffId={orderingStaffId}
+				drugName={genericName.trim()}
+				onPrepareVerification={handleHighAlertPrepared}
+				onVerified={handleHighAlertVerified}
+			/>
 		</>
 	)
 }

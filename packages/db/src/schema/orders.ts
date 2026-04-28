@@ -1,4 +1,4 @@
-import { type AnyPgColumn, index } from "drizzle-orm/pg-core"
+import { index, type AnyPgColumn } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
 import { encounters, patients, preEncounters } from "./core.js"
@@ -21,9 +21,7 @@ export const dispenseLogs = createTable(
 			.uuid("medication_order_id")
 			.notNull()
 			.references((): AnyPgColumn => medicationOrders.id, { onDelete: "restrict" }),
-		patientId: t
-			.uuid("patient_id")
-			.references(() => patients.id, { onDelete: "set null" }),
+		patientId: t.uuid("patient_id").references(() => patients.id, { onDelete: "set null" }),
 		dispensedQuantity: t.numeric("dispensed_quantity", { precision: 8, scale: 2 }).notNull(),
 		quantityUnit: t.text("quantity_unit").notNull(),
 		lotNumber: t.text("lot_number"),
@@ -57,12 +55,8 @@ export const counselingLogs = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "set null" }),
-		patientId: t
-			.uuid("patient_id")
-			.references(() => patients.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
+		patientId: t.uuid("patient_id").references(() => patients.id, { onDelete: "set null" }),
 		medicationOrderId: t
 			.uuid("medication_order_id")
 			.references((): AnyPgColumn => medicationOrders.id, { onDelete: "set null" }),
@@ -95,9 +89,7 @@ export const medicationOrders = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
 		preEncounterId: t
 			.uuid("pre_encounter_id")
 			.references(() => preEncounters.id, { onDelete: "set null" }),
@@ -164,9 +156,7 @@ export const labOrders = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
 		preEncounterId: t
 			.uuid("pre_encounter_id")
 			.references(() => preEncounters.id, { onDelete: "set null" }),
@@ -183,7 +173,9 @@ export const labOrders = createTable(
 			.text("status")
 			.notNull()
 			.default("ordered")
-			.$type<"pending" | "ordered" | "collected" | "in_progress" | "resulted" | "completed" | "cancelled">(),
+			.$type<
+				"pending" | "ordered" | "collected" | "in_progress" | "resulted" | "completed" | "cancelled"
+			>(),
 		specimenType: t.text("specimen_type"),
 		orderingStaffId: t
 			.uuid("ordering_staff_id")
@@ -215,16 +207,11 @@ export const imagingOrders = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
 		preEncounterId: t
 			.uuid("pre_encounter_id")
 			.references(() => preEncounters.id, { onDelete: "set null" }),
-		modality: t
-			.text("modality")
-			.notNull()
-			.$type<"xray" | "ct" | "mri" | "ultrasound" | "other">(),
+		modality: t.text("modality").notNull().$type<"xray" | "ct" | "mri" | "ultrasound" | "other">(),
 		bodyPart: t.text("body_part").notNull(),
 		clinicalIndication: t.text("clinical_indication"),
 		priority: t
@@ -270,10 +257,7 @@ export const orderVerifications = createTable(
 			.uuid("medication_order_id")
 			.notNull()
 			.references(() => medicationOrders.id, { onDelete: "cascade" }),
-		action: t
-			.text("action")
-			.notNull()
-			.$type<"approved" | "rejected" | "modified">(),
+		action: t.text("action").notNull().$type<"approved" | "rejected" | "modified">(),
 		pharmacistStaffId: t
 			.uuid("pharmacist_staff_id")
 			.notNull()
@@ -286,6 +270,32 @@ export const orderVerifications = createTable(
 	t => [
 		index("order_verifications_medication_order_id_idx").on(t.medicationOrderId),
 		index("order_verifications_pharmacist_staff_id_idx").on(t.pharmacistStaffId),
+	]
+)
+
+export const highAlertVerifications = createTable(
+	"high_alert_verifications",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		medicationOrderId: t
+			.uuid("medication_order_id")
+			.notNull()
+			.references(() => medicationOrders.id, { onDelete: "cascade" }),
+		requestingStaffId: t
+			.uuid("requesting_staff_id")
+			.notNull()
+			.references(() => staffProfiles.id, { onDelete: "restrict" }),
+		verifyingStaffId: t
+			.uuid("verifying_staff_id")
+			.notNull()
+			.references(() => staffProfiles.id, { onDelete: "restrict" }),
+		verifiedAt: t.timestamp("verified_at").notNull().defaultNow(),
+		notes: t.text("notes"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("high_alert_verifications_medication_order_id_idx").on(t.medicationOrderId),
+		index("high_alert_verifications_verifying_staff_id_idx").on(t.verifyingStaffId),
 	]
 )
 
@@ -317,11 +327,7 @@ export const prescriptions = createTable(
 		ptrNumber: t.text("ptr_number").notNull(),
 		pdeaS2License: t.text("pdea_s2_license"),
 		prescriptionContent: t.jsonb("prescription_content").notNull(),
-		status: t
-			.text("status")
-			.notNull()
-			.default("draft")
-			.$type<"draft" | "signed" | "issued">(),
+		status: t.text("status").notNull().default("draft").$type<"draft" | "signed" | "issued">(),
 		signedAt: t.timestamp("signed_at"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),

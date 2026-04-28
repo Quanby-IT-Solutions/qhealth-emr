@@ -1,12 +1,15 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, count, desc, eq, inArray, ilike, or, sql } from "drizzle-orm"
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { and, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 
 import {
+	auditLogs,
 	counselingLogs,
 	dispenseLogs,
+	drugGenerics,
 	encounters,
 	encounterStatusEvents,
 	formularyItems,
+	highAlertVerifications,
 	imagingOrders,
 	labOrders,
 	medicationOrders,
@@ -36,6 +39,7 @@ type CreateImagingOrderInput = V1Inputs["orders"]["createImagingOrder"]
 type UpdateImagingOrderInput = V1Inputs["orders"]["updateImagingOrder"]
 type VerificationQueueInput = V1Inputs["orders"]["getVerificationQueue"]
 type VerifyOrderInput = V1Inputs["orders"]["verifyOrder"]
+type CreateHighAlertVerificationInput = V1Inputs["orders"]["createHighAlertVerification"]
 type PrescriptionListInput = V1Inputs["orders"]["listPrescriptions"]
 type CreatePrescriptionInput = V1Inputs["orders"]["createPrescription"]
 type ActiveOrdersInput = V1Inputs["orders"]["getActiveOrders"]
@@ -56,13 +60,119 @@ export class OrdersService {
 
 	constructor(private readonly problemsAllergiesService: ProblemsAllergiesService) {}
 
+	private async findFormularyItemForCds(
+		input: Pick<CdsEvaluateInput, "facilityId" | "formularyItemId" | "genericName">
+	) {
+		if (input.formularyItemId) {
+			const [formularyItem] = await db
+				.select()
+				.from(formularyItems)
+				.where(eq(formularyItems.id, input.formularyItemId))
+				.limit(1)
+
+			return formularyItem ?? null
+		}
+
+		const [formularyItem] = await db
+			.select({
+				id: formularyItems.id,
+				facilityId: formularyItems.facilityId,
+				drugGenericId: formularyItems.drugGenericId,
+				drugBrandId: formularyItems.drugBrandId,
+				doseForm: formularyItems.doseForm,
+				strength: formularyItems.strength,
+				route: formularyItems.route,
+				isActive: formularyItems.isActive,
+				isHighAlert: formularyItems.isHighAlert,
+				highAlertNotes: formularyItems.highAlertNotes,
+				isRestricted: formularyItems.isRestricted,
+				restrictionNotes: formularyItems.restrictionNotes,
+				formularyNotes: formularyItems.formularyNotes,
+				createdAt: formularyItems.createdAt,
+				updatedAt: formularyItems.updatedAt,
+			})
+			.from(formularyItems)
+			.innerJoin(drugGenerics, eq(formularyItems.drugGenericId, drugGenerics.id))
+			.where(
+				and(
+					eq(formularyItems.facilityId, input.facilityId),
+					eq(formularyItems.isActive, true),
+					sql`lower(${drugGenerics.genericName}) = ${input.genericName.trim().toLowerCase()}`
+				)
+			)
+			.orderBy(desc(formularyItems.createdAt))
+			.limit(1)
+
+		return formularyItem ?? null
+	}
+
+	private hasNonEmptyCdsOverrides(cdsOverrides: unknown) {
+		if (!cdsOverrides) {
+			return false
+		}
+
+		if (Array.isArray(cdsOverrides)) {
+			return cdsOverrides.length > 0
+		}
+
+		if (typeof cdsOverrides === "object") {
+			const overrides = (cdsOverrides as { overrides?: unknown }).overrides
+			if (Array.isArray(overrides)) {
+				return overrides.length > 0
+			}
+
+			return Object.keys(cdsOverrides as Record<string, unknown>).length > 0
+		}
+
+		return false
+	}
+
+	private hasHighAlertAlert(cdsAlerts: unknown) {
+		if (!Array.isArray(cdsAlerts)) {
+			return false
+		}
+
+		return cdsAlerts.some(alert => {
+			if (!alert || typeof alert !== "object") {
+				return false
+			}
+
+			return (alert as { type?: unknown }).type === "high_alert"
+		})
+	}
+
+	private async writeAuditLog(input: {
+		facilityId: string
+		userId: string
+		staffProfileId?: string | null
+		action: "create" | "read" | "update" | "delete" | "sign" | "verify" | "override"
+		entityType: string
+		entityId: string
+		metadata?: unknown
+	}) {
+		await db.insert(auditLogs).values({
+			facilityId: input.facilityId,
+			userId: input.userId,
+			staffProfileId: input.staffProfileId ?? null,
+			action: input.action,
+			entityType: input.entityType,
+			entityId: input.entityId,
+			metadata: input.metadata ?? null,
+		})
+	}
+
 	// ========================================================================
 	// CDS Evaluation
 	// ========================================================================
 
 	async evaluateCds(input: CdsEvaluateInput) {
 		const alerts: {
-			type: "allergy_hard_block" | "allergy_soft_block" | "formulary_warning" | "high_alert" | "s2_license_block"
+			type:
+				| "allergy_hard_block"
+				| "allergy_soft_block"
+				| "formulary_warning"
+				| "high_alert"
+				| "s2_license_block"
 			severity: "hard_block" | "soft_block" | "warning" | "info"
 			message: string
 			details?: Record<string, unknown>
@@ -80,42 +190,50 @@ export class OrdersService {
 						type: "allergy_hard_block",
 						severity: "hard_block",
 						message: `Patient has a SEVERE allergy to ${allergy.allergenName}. This order cannot proceed.`,
-						details: { allergenName: allergy.allergenName, allergenType: allergy.allergenType, severity: allergy.severity },
+						details: {
+							allergenName: allergy.allergenName,
+							allergenType: allergy.allergenType,
+							severity: allergy.severity,
+						},
 					})
 				} else {
 					alerts.push({
 						type: "allergy_soft_block",
 						severity: "soft_block",
 						message: `Patient has a ${allergy.severity} allergy to ${allergy.allergenName}. Override required to proceed.`,
-						details: { allergenName: allergy.allergenName, allergenType: allergy.allergenType, severity: allergy.severity },
+						details: {
+							allergenName: allergy.allergenName,
+							allergenType: allergy.allergenType,
+							severity: allergy.severity,
+						},
 					})
 				}
 			}
 		}
 
 		// Step 2 & 3: Formulary check + High-alert check
-		if (input.formularyItemId) {
-			const [formularyItem] = await db
-				.select()
-				.from(formularyItems)
-				.where(eq(formularyItems.id, input.formularyItemId))
+		const formularyItem = await this.findFormularyItemForCds(input)
 
-			if (!formularyItem || !formularyItem.isActive) {
-				alerts.push({
-					type: "formulary_warning",
-					severity: "warning",
-					message: "This drug is off-formulary or inactive at this facility.",
-					details: formularyItem?.formularyNotes ? { formularyNotes: formularyItem.formularyNotes } : undefined,
-				})
-			} else if (formularyItem.isHighAlert) {
-				// Step 3: High-alert check
-				alerts.push({
-					type: "high_alert",
-					severity: "warning",
-					message: "This is a HIGH-ALERT medication. Double verification by a pharmacist is required.",
-					details: formularyItem.highAlertNotes ? { highAlertNotes: formularyItem.highAlertNotes } : undefined,
-				})
-			}
+		if (!formularyItem || !formularyItem.isActive) {
+			alerts.push({
+				type: "formulary_warning",
+				severity: "warning",
+				message: "This drug is off-formulary or inactive at this facility.",
+				details: formularyItem?.formularyNotes
+					? { formularyNotes: formularyItem.formularyNotes }
+					: undefined,
+			})
+		} else if (formularyItem.isHighAlert) {
+			// Step 3: High-alert check
+			alerts.push({
+				type: "high_alert",
+				severity: "warning",
+				message:
+					"This is a HIGH-ALERT medication. Double verification by a pharmacist is required.",
+				details: formularyItem.highAlertNotes
+					? { highAlertNotes: formularyItem.highAlertNotes }
+					: undefined,
+			})
 		}
 
 		// Step 4: S-2 License check
@@ -129,7 +247,8 @@ export class OrdersService {
 				alerts.push({
 					type: "s2_license_block",
 					severity: "hard_block",
-					message: "Ordering staff does not have a PDEA S-2 license. Cannot prescribe controlled substances.",
+					message:
+						"Ordering staff does not have a PDEA S-2 license. Cannot prescribe controlled substances.",
 				})
 			} else if (staff.pdeaS2Expiry) {
 				const expiryDate = new Date(staff.pdeaS2Expiry)
@@ -206,16 +325,18 @@ export class OrdersService {
 					? titleMap[candidate.type as keyof typeof titleMap]
 					: "Clinical safety check"
 
-			return [{
-				id: `${candidate.type ?? "alert"}-${index}`,
-				type: mappedType,
-				severity: mappedSeverity,
-				title: mappedTitle,
-				message: candidate.message ?? "Clinical safety check triggered.",
-				details: candidate.details,
-				isHardBlock: candidate.severity === "hard_block",
-				requiresOverride: candidate.severity === "soft_block",
-			}]
+			return [
+				{
+					id: `${candidate.type ?? "alert"}-${index}`,
+					type: mappedType,
+					severity: mappedSeverity,
+					title: mappedTitle,
+					message: candidate.message ?? "Clinical safety check triggered.",
+					details: candidate.details,
+					isHardBlock: candidate.severity === "hard_block",
+					requiresOverride: candidate.severity === "soft_block",
+				},
+			]
 		})
 	}
 
@@ -239,7 +360,8 @@ export class OrdersService {
 
 		const conditions: ReturnType<typeof eq>[] = []
 		if (input.encounterId) conditions.push(eq(medicationOrders.encounterId, input.encounterId))
-		if (input.preEncounterId) conditions.push(eq(medicationOrders.preEncounterId, input.preEncounterId))
+		if (input.preEncounterId)
+			conditions.push(eq(medicationOrders.preEncounterId, input.preEncounterId))
 		if (input.status) conditions.push(eq(medicationOrders.status, input.status))
 
 		const whereClause = conditions.length > 0 ? and(...conditions) : undefined
@@ -412,6 +534,18 @@ export class OrdersService {
 			})
 			.returning()
 
+		if (created && this.hasNonEmptyCdsOverrides(input.cdsOverrides)) {
+			await this.writeAuditLog({
+				facilityId: input.facilityId,
+				userId,
+				staffProfileId: staff.id,
+				action: "override",
+				entityType: "medication_order",
+				entityId: created.id,
+				metadata: input.cdsOverrides,
+			})
+		}
+
 		this.logger.log(`Created medication order ${created!.id}`)
 
 		return this.findMedOrder(created!.id)
@@ -427,7 +561,8 @@ export class OrdersService {
 		if (input.route !== undefined) updateValues.route = input.route
 		if (input.frequency !== undefined) updateValues.frequency = input.frequency
 		if (input.durationDays !== undefined) updateValues.durationDays = input.durationDays
-		if (input.specialInstructions !== undefined) updateValues.specialInstructions = input.specialInstructions
+		if (input.specialInstructions !== undefined)
+			updateValues.specialInstructions = input.specialInstructions
 		if (input.isPrn !== undefined) updateValues.isPrn = input.isPrn
 		if (input.prnReason !== undefined) updateValues.prnReason = input.prnReason
 		if (input.status !== undefined) updateValues.status = input.status
@@ -619,7 +754,8 @@ export class OrdersService {
 				updateData.specimenReceivedAt = new Date()
 			}
 		}
-		if (input.collectionDatetime !== undefined) updateData.collectionDatetime = input.collectionDatetime
+		if (input.collectionDatetime !== undefined)
+			updateData.collectionDatetime = input.collectionDatetime
 		if (input.resultedDatetime !== undefined) updateData.resultedDatetime = input.resultedDatetime
 		if (input.results !== undefined) updateData.results = input.results
 		// SLA-016 Step 2: billing clearance timestamp persisted explicitly
@@ -641,7 +777,8 @@ export class OrdersService {
 
 		const conditions: ReturnType<typeof eq>[] = []
 		if (input.encounterId) conditions.push(eq(imagingOrders.encounterId, input.encounterId))
-		if (input.preEncounterId) conditions.push(eq(imagingOrders.preEncounterId, input.preEncounterId))
+		if (input.preEncounterId)
+			conditions.push(eq(imagingOrders.preEncounterId, input.preEncounterId))
 		if (input.status) conditions.push(eq(imagingOrders.status, input.status))
 
 		const whereClause = conditions.length > 0 ? and(...conditions) : undefined
@@ -708,9 +845,9 @@ export class OrdersService {
 				report: imagingOrders.report,
 				structuredResults: imagingOrders.structuredResults,
 				cdsAlerts: imagingOrders.cdsAlerts,
-			studyStartedAt: imagingOrders.studyStartedAt,
-			imagingOrderReceivedAt: imagingOrders.imagingOrderReceivedAt,
-			billingClearedAt: imagingOrders.billingClearedAt,
+				studyStartedAt: imagingOrders.studyStartedAt,
+				imagingOrderReceivedAt: imagingOrders.imagingOrderReceivedAt,
+				billingClearedAt: imagingOrders.billingClearedAt,
 				createdAt: imagingOrders.createdAt,
 				updatedAt: imagingOrders.updatedAt,
 			})
@@ -782,7 +919,10 @@ export class OrdersService {
 			if (input.status === "in_progress") {
 				// Fetch current to avoid overwriting an existing timestamp
 				const [current] = await db
-					.select({ studyStartedAt: imagingOrders.studyStartedAt, imagingOrderReceivedAt: imagingOrders.imagingOrderReceivedAt })
+					.select({
+						studyStartedAt: imagingOrders.studyStartedAt,
+						imagingOrderReceivedAt: imagingOrders.imagingOrderReceivedAt,
+					})
 					.from(imagingOrders)
 					.where(eq(imagingOrders.id, input.id))
 					.limit(1)
@@ -806,12 +946,16 @@ export class OrdersService {
 				}
 			}
 		}
-		if (input.scheduledDatetime !== undefined) updateData.scheduledDatetime = input.scheduledDatetime
-		if (input.completedDatetime !== undefined) updateData.completedDatetime = input.completedDatetime
+		if (input.scheduledDatetime !== undefined)
+			updateData.scheduledDatetime = input.scheduledDatetime
+		if (input.completedDatetime !== undefined)
+			updateData.completedDatetime = input.completedDatetime
 		if (input.report !== undefined) updateData.report = input.report
-		if (input.structuredResults !== undefined) updateData.structuredResults = input.structuredResults
+		if (input.structuredResults !== undefined)
+			updateData.structuredResults = input.structuredResults
 		// SLA-019: explicit receipt timestamp from radiology staff (overrides auto-set)
-		if (input.imagingOrderReceivedAt !== undefined) updateData.imagingOrderReceivedAt = input.imagingOrderReceivedAt
+		if (input.imagingOrderReceivedAt !== undefined)
+			updateData.imagingOrderReceivedAt = input.imagingOrderReceivedAt
 		// SLA-016 Step 2: billing clearance timestamp persisted explicitly
 		if (input.billingClearedAt !== undefined) updateData.billingClearedAt = input.billingClearedAt
 
@@ -831,7 +975,7 @@ export class OrdersService {
 
 		const whereClause = and(
 			eq(medicationOrders.facilityId, input.facilityId),
-			eq(medicationOrders.status, "pending_verification"),
+			eq(medicationOrders.status, "pending_verification")
 		)
 
 		const [[totalResult], rows] = await Promise.all([
@@ -884,7 +1028,7 @@ export class OrdersService {
 						WHEN ${medicationOrders.isControlledSubstance} = true THEN 0
 						ELSE 1
 					END`,
-					desc(medicationOrders.createdAt),
+					desc(medicationOrders.createdAt)
 				)
 				.limit(limit)
 				.offset(offset),
@@ -897,18 +1041,18 @@ export class OrdersService {
 				const { alertCount, criticalAlertCount } = this.getAlertCounts(row.cdsAlerts)
 
 				return {
-				...row,
-				isTranche: row.parentOrderId !== null,
-				patientName:
-					row.patientLastName && row.patientFirstName
-						? `${row.patientLastName}, ${row.patientFirstName}`
-						: null,
-				patientWeight: null,
-				patientCreatinine: null,
-				priority: "routine" as const,
-				alertCount,
-				criticalAlertCount,
-				receivedAt: row.createdAt,
+					...row,
+					isTranche: row.parentOrderId !== null,
+					patientName:
+						row.patientLastName && row.patientFirstName
+							? `${row.patientLastName}, ${row.patientFirstName}`
+							: null,
+					patientWeight: null,
+					patientCreatinine: null,
+					priority: "routine" as const,
+					alertCount,
+					criticalAlertCount,
+					receivedAt: row.createdAt,
 				}
 			}),
 			total,
@@ -919,7 +1063,10 @@ export class OrdersService {
 	}
 
 	async verifyOrder(input: VerifyOrderInput, userId: string) {
-		const [pharmacist] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId))
+		const [pharmacist] = await db
+			.select()
+			.from(staffProfiles)
+			.where(eq(staffProfiles.userId, userId))
 		if (!pharmacist) throw new NotFoundException("Pharmacist staff profile not found for user")
 
 		// Capture the order before status update so we have facilityId/encounterId/fromStatus
@@ -950,7 +1097,9 @@ export class OrdersService {
 			.set({ status: statusMap[input.action], updatedAt: new Date() })
 			.where(eq(medicationOrders.id, input.medicationOrderId))
 
-		this.logger.log(`Order ${input.medicationOrderId} ${input.action} by pharmacist ${pharmacist.id}`)
+		this.logger.log(
+			`Order ${input.medicationOrderId} ${input.action} by pharmacist ${pharmacist.id}`
+		)
 
 		// SLA-004: Write durable pharmacy SLA event for all verification outcomes.
 		// Only encounter-linked orders are tracked; pre-encounter orders have no encounter ID.
@@ -990,6 +1139,75 @@ export class OrdersService {
 			.where(eq(orderVerifications.id, verification!.id))
 
 		return result!
+	}
+
+	async createHighAlertVerification(input: CreateHighAlertVerificationInput, userId: string) {
+		const [sessionStaff] = await db
+			.select({ id: staffProfiles.id })
+			.from(staffProfiles)
+			.where(eq(staffProfiles.userId, userId))
+			.limit(1)
+
+		const [order] = await db
+			.select({
+				id: medicationOrders.id,
+				facilityId: medicationOrders.facilityId,
+				orderingStaffId: medicationOrders.orderingStaffId,
+				cdsAlerts: medicationOrders.cdsAlerts,
+			})
+			.from(medicationOrders)
+			.where(eq(medicationOrders.id, input.medicationOrderId))
+			.limit(1)
+
+		if (!order || !this.hasHighAlertAlert(order.cdsAlerts)) {
+			throw new NotFoundException("High-alert medication order not found")
+		}
+
+		if (input.verifyingStaffId === order.orderingStaffId) {
+			throw new BadRequestException("A clinician cannot co-sign their own high-alert order")
+		}
+
+		const [verification] = await db
+			.insert(highAlertVerifications)
+			.values({
+				medicationOrderId: input.medicationOrderId,
+				requestingStaffId: order.orderingStaffId,
+				verifyingStaffId: input.verifyingStaffId,
+				verifiedAt: new Date(),
+				notes: input.notes ?? null,
+			})
+			.returning()
+
+		if (!verification) {
+			throw new NotFoundException("High-alert verification could not be created")
+		}
+
+		await this.writeAuditLog({
+			facilityId: order.facilityId,
+			userId,
+			staffProfileId: sessionStaff?.id ?? null,
+			action: "verify",
+			entityType: "high_alert_verification",
+			entityId: verification.id,
+			metadata: {
+				medicationOrderId: input.medicationOrderId,
+				verifyingStaffId: input.verifyingStaffId,
+				notes: input.notes ?? null,
+			},
+		})
+
+		return verification
+	}
+
+	async getHighAlertVerification(medicationOrderId: string) {
+		const [verification] = await db
+			.select()
+			.from(highAlertVerifications)
+			.where(eq(highAlertVerifications.medicationOrderId, medicationOrderId))
+			.orderBy(desc(highAlertVerifications.verifiedAt))
+			.limit(1)
+
+		return verification ?? null
 	}
 
 	// ========================================================================
@@ -1077,7 +1295,8 @@ export class OrdersService {
 		const [staff] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId))
 		if (!staff) throw new NotFoundException("Staff profile not found for user")
 
-		if (!staff.prcLicenseNumber) throw new NotFoundException("Prescriber does not have a PRC license number")
+		if (!staff.prcLicenseNumber)
+			throw new NotFoundException("Prescriber does not have a PRC license number")
 		if (!staff.ptrNumber) throw new NotFoundException("Prescriber does not have a PTR number")
 
 		// Fetch medication order details for prescription content
@@ -1086,7 +1305,8 @@ export class OrdersService {
 			.from(medicationOrders)
 			.where(eq(medicationOrders.id, input.medicationOrderId))
 
-		if (!medOrder) throw new NotFoundException(`Medication order ${input.medicationOrderId} not found`)
+		if (!medOrder)
+			throw new NotFoundException(`Medication order ${input.medicationOrderId} not found`)
 
 		const prescriptionContent = {
 			genericName: medOrder.genericName,
@@ -1118,7 +1338,9 @@ export class OrdersService {
 			})
 			.returning()
 
-		this.logger.log(`Created prescription ${created!.id} from medication order ${input.medicationOrderId}`)
+		this.logger.log(
+			`Created prescription ${created!.id} from medication order ${input.medicationOrderId}`
+		)
 
 		return this.findPrescription(created!.id)
 	}
@@ -1180,8 +1402,8 @@ export class OrdersService {
 				.where(
 					and(
 						eq(medicationOrders.encounterId, input.encounterId),
-						inArray(medicationOrders.status, ["pending_verification", "verified", "active"]),
-					),
+						inArray(medicationOrders.status, ["pending_verification", "verified", "active"])
+					)
 				)
 				.orderBy(desc(medicationOrders.createdAt)),
 			db
@@ -1212,8 +1434,8 @@ export class OrdersService {
 				.where(
 					and(
 						eq(labOrders.encounterId, input.encounterId),
-						inArray(labOrders.status, ["ordered", "collected"]),
-					),
+						inArray(labOrders.status, ["ordered", "collected"])
+					)
 				)
 				.orderBy(desc(labOrders.createdAt)),
 			db
@@ -1243,8 +1465,8 @@ export class OrdersService {
 				.where(
 					and(
 						eq(imagingOrders.encounterId, input.encounterId),
-						inArray(imagingOrders.status, ["ordered", "scheduled", "in_progress"]),
-					),
+						inArray(imagingOrders.status, ["ordered", "scheduled", "in_progress"])
+					)
 				)
 				.orderBy(desc(imagingOrders.createdAt)),
 		])
@@ -1272,7 +1494,9 @@ export class OrdersService {
 				userId: staffProfiles.userId,
 			})
 			.from(staffProfiles)
-			.where(and(eq(staffProfiles.id, input.staffId), eq(staffProfiles.facilityId, input.facilityId)))
+			.where(
+				and(eq(staffProfiles.id, input.staffId), eq(staffProfiles.facilityId, input.facilityId))
+			)
 			.limit(1)
 
 		if (!staff) {
@@ -1339,14 +1563,16 @@ export class OrdersService {
 				reason: null,
 				totalDays: input.durationDays,
 				maxDaysPerTranche: MAX_DAYS_PER_TRANCHE,
-				tranches: [{
-					trancheNumber: 1,
-					startDate: startDate.toISOString().split("T")[0]!,
-					endDate: endDate.toISOString().split("T")[0]!,
-					durationDays: input.durationDays,
-					quantityPerTranche: null,
-					noRefill: true,
-				}],
+				tranches: [
+					{
+						trancheNumber: 1,
+						startDate: startDate.toISOString().split("T")[0]!,
+						endDate: endDate.toISOString().split("T")[0]!,
+						durationDays: input.durationDays,
+						quantityPerTranche: null,
+						noRefill: true,
+					},
+				],
 			}
 		}
 
@@ -1480,7 +1706,9 @@ export class OrdersService {
 			...childIds.map(id => this.findMedOrder(id)),
 		])
 
-		this.logger.log(`Created PDEA tranched order: parent=${parentRow.id}, tranches=${totalTranches}`)
+		this.logger.log(
+			`Created PDEA tranched order: parent=${parentRow.id}, tranches=${totalTranches}`
+		)
 
 		return {
 			parentOrder: parentOrder!,
@@ -1570,7 +1798,10 @@ export class OrdersService {
 
 		// Get medication order to retrieve patient info
 		const [order] = await db
-			.select({ encounterId: medicationOrders.encounterId, facilityId: medicationOrders.facilityId })
+			.select({
+				encounterId: medicationOrders.encounterId,
+				facilityId: medicationOrders.facilityId,
+			})
 			.from(medicationOrders)
 			.where(eq(medicationOrders.id, input.medicationOrderId))
 			.limit(1)
@@ -1613,7 +1844,8 @@ export class OrdersService {
 		const limit = Number(input.limit) || 50
 		const conditions = []
 		if (input.facilityId) conditions.push(eq(dispenseLogs.facilityId, input.facilityId))
-		if (input.medicationOrderId) conditions.push(eq(dispenseLogs.medicationOrderId, input.medicationOrderId))
+		if (input.medicationOrderId)
+			conditions.push(eq(dispenseLogs.medicationOrderId, input.medicationOrderId))
 		if (input.patientId) conditions.push(eq(dispenseLogs.patientId, input.patientId))
 
 		const where = and(...conditions)
@@ -1758,9 +1990,7 @@ export class OrdersService {
 				.limit(1)
 			if (patient) {
 				patientName =
-					patient.lastName && patient.firstName
-						? `${patient.lastName}, ${patient.firstName}`
-						: null
+					patient.lastName && patient.firstName ? `${patient.lastName}, ${patient.firstName}` : null
 			}
 		}
 
@@ -1774,7 +2004,10 @@ export class OrdersService {
 
 		for (const item of input.items) {
 			const [order] = await db
-				.select({ genericName: medicationOrders.genericName, facilityId: medicationOrders.facilityId })
+				.select({
+					genericName: medicationOrders.genericName,
+					facilityId: medicationOrders.facilityId,
+				})
 				.from(medicationOrders)
 				.where(eq(medicationOrders.id, item.medicationOrderId))
 				.limit(1)
