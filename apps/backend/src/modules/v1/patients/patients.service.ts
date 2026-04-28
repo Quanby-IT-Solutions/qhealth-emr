@@ -95,6 +95,11 @@ export class PatientsService {
 			conditions.push(eq(patients.dateOfBirth, filter.dateOfBirth))
 		}
 
+		if (filter.philhealthMemberId) {
+			const philhealthMemberId = this.escapeLike(filter.philhealthMemberId)
+			conditions.push(ilike(patients.philhealthMemberId, `%${philhealthMemberId}%`))
+		}
+
 		const whereClause = and(...conditions)
 
 		// Subquery for last encounter date
@@ -119,6 +124,7 @@ export class PatientsService {
 					middleName: patients.middleName,
 					dateOfBirth: patients.dateOfBirth,
 					sex: patients.sex,
+					philhealthMemberId: patients.philhealthMemberId,
 					isActive: patients.isActive,
 					lastEncounterDate: lastEncounterSq.lastEncounterDate,
 				})

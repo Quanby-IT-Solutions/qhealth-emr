@@ -19,7 +19,7 @@ export const patientContract = {
 		.route({
 			method: "GET",
 			path: "/patients",
-			summary: "Search patients by name, MRN, or date of birth",
+			summary: "Search patients by name, MRN, date of birth, or PhilHealth number",
 			tags: ["Patients"],
 		})
 		.input(PatientSearchSchema)

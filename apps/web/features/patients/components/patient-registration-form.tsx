@@ -13,15 +13,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CreatePatientSchema } from "@repo/contracts"
 
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
-import { useListCliniciansQuery } from "@/features/patients/api/patients.hooks"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { useRegisterPatientWithOpdEncounterMutation } from "@/features/patients/api/patients.hooks"
+import {
+	useCreatePatientMutation,
+	useListCliniciansQuery,
+	useRegisterPatientWithOpdEncounterMutation,
+} from "@/features/patients/api/patients.hooks"
 
-export function PatientRegistrationForm() {
+interface PatientRegistrationFormProps {
+	mode?: "standalone" | "triage-linked"
+}
+
+export function PatientRegistrationForm({
+	mode = "triage-linked",
+}: PatientRegistrationFormProps) {
 	const router = useRouter()
 	const searchParams = useSearchParams()
 	// pendingTriageId is present when the registrar arrives from the walk-in triage reconciliation flow
 	const pendingTriageId = searchParams.get("pendingTriageId") ?? ""
+	const isStandaloneRegistration = mode === "standalone"
 
 	const { data: profile } = useMyProfile()
 	const facilityId = useActiveFacilityId()
@@ -33,10 +43,15 @@ export function PatientRegistrationForm() {
 	const canCreate = profile?.activeRole?.permissions.some(
 		(p: { module: string; action: string }) => p.module === "patients" && p.action === "create"
 	) ?? false
+	const createPatient = useCreatePatientMutation()
 	const registerPatient = useRegisterPatientWithOpdEncounterMutation()
 
 	const [errors, setErrors] = useState<Record<string, string>>({})
 	const [clinicianStaffId, setClinicianStaffId] = useState("")
+	const [createdPatientResult, setCreatedPatientResult] = useState<{
+		patientId: string
+		mrn: string
+	} | null>(null)
 	const [regQueueResult, setRegQueueResult] = useState<{
 		queueNumber: number
 		encounterId: string
@@ -73,9 +88,7 @@ export function PatientRegistrationForm() {
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
-		// PS-036: clinicianStaffId is required for OPD registration; submit button is disabled
-		// when empty, but guard here ensures the mutation always receives a non-empty value
-		if (!facilityId || !canCreate || !clinicianStaffId) return
+		if (!facilityId || !canCreate) return
 
 		const payload = {
 			facilityId,
@@ -110,17 +123,30 @@ export function PatientRegistrationForm() {
 		}
 
 		setErrors({})
+		if (isStandaloneRegistration) {
+			const created = await createPatient.mutateAsync(result.data)
+			setCreatedPatientResult({
+				patientId: created.id,
+				mrn: created.mrn,
+			})
+			return
+		}
+
+		// PS-036: clinicianStaffId is required for OPD registration; submit button is disabled
+		// when empty, but guard here ensures the mutation always receives a non-empty value.
+		if (!clinicianStaffId) return
+
 		// PS-034: single atomic endpoint creates patient + OPD encounter in one DB transaction.
 		// PS-033: if pendingTriageId is set, the intake is also linked atomically (no separate call).
 		const reg = await registerPatient.mutateAsync({
 			...result.data,
 			admittingStaffId: staffId || undefined,
-			clinicianStaffId: clinicianStaffId,
+			clinicianStaffId,
 			pendingTriageId: pendingTriageId || undefined,
 		})
 
 		// PS-035: show queue number confirmation before navigating
-		if (reg.queueNumber != null) {
+		if (reg.queueNumber !== null) {
 			setRegQueueResult({
 				queueNumber: reg.queueNumber,
 				encounterId: reg.encounterId,
@@ -156,11 +182,42 @@ export function PatientRegistrationForm() {
 		)
 	}
 
+	if (createdPatientResult) {
+		return (
+			<Card>
+				<CardHeader>
+					<CardTitle>Registration Complete</CardTitle>
+				</CardHeader>
+				<CardContent className="space-y-6">
+					<div className="flex flex-col items-center gap-3 py-4">
+						<p className="text-muted-foreground text-center text-sm">
+							Patient record created for {form.lastName}, {form.firstName} (MRN:{" "}
+							{createdPatientResult.mrn})
+						</p>
+						<p className="text-muted-foreground text-xs">
+							The new patient record is ready for chart review and encounter creation.
+						</p>
+					</div>
+					<div className="flex flex-wrap gap-3">
+						<Button
+							onClick={() => router.push(`/patients/${createdPatientResult.patientId}`)}
+						>
+							View Patient Record
+						</Button>
+						<Button variant="outline" onClick={() => router.push("/patients/register")}>
+							Register Another Patient
+						</Button>
+					</div>
+				</CardContent>
+			</Card>
+		)
+	}
+
 	// PS-038: triage-first gate — OPD patient registration must originate from a triage intake.
 	// Direct navigation to /patients/register without a pendingTriageId is blocked so that every
 	// new OPD patient has a triage arrival timestamp, chief complaint, and baseline vitals before
 	// Step 2 registration (TOR Flow 1 Step 1 → Step 2 sequence).
-	if (!pendingTriageId) {
+	if (!isStandaloneRegistration && !pendingTriageId) {
 		return (
 			<Card>
 				<CardContent className="flex flex-col items-center gap-6 py-12">
@@ -217,7 +274,7 @@ export function PatientRegistrationForm() {
 	return (
 		<form onSubmit={handleSubmit} className="space-y-6">
 			{/* Walk-in triage reconciliation context banner */}
-			{pendingTriageId && (
+			{!isStandaloneRegistration && pendingTriageId && (
 				<Alert className="border-amber-300 bg-amber-50">
 					<AlertTitle className="text-amber-900">Walk-in Triage Reconciliation</AlertTitle>
 					<AlertDescription className="text-amber-800 text-sm">
@@ -430,56 +487,82 @@ export function PatientRegistrationForm() {
 				</CardContent>
 			</Card>
 
-			{/* Clinic Assignment — required for OPD encounter creation (TOR Flow 1 Step 2) */}
-			<Card>
-				<CardHeader>
-					<CardTitle>Clinic Assignment</CardTitle>
-				</CardHeader>
-				<CardContent>
-					<div className="max-w-sm space-y-1.5">
-						<Label htmlFor="clinicianStaffId">Attending Clinician / Clinic *</Label>
-						<Select
-							value={clinicianStaffId || null}
-							onValueChange={v => setClinicianStaffId(String(v))}
-						>
-							<SelectTrigger id="clinicianStaffId">
-								<SelectValue placeholder="Select a clinician…" />
-							</SelectTrigger>
-							<SelectContent>
-								{clinicianOptions.map(opt => (
-									<SelectItem key={opt.staffProfileId} value={opt.staffProfileId}>
-										{opt.name}{opt.department ? ` — ${opt.department}` : ""}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-						<p className="text-muted-foreground text-xs">
-							Required to assign a clinic-specific queue number (TOR Flow 1 Step 2).
-						</p>
-					</div>
-				</CardContent>
-			</Card>
+			{!isStandaloneRegistration && (
+				<Card>
+					<CardHeader>
+						<CardTitle>Clinic Assignment</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div className="max-w-sm space-y-1.5">
+							<Label htmlFor="clinicianStaffId">Attending Clinician / Clinic *</Label>
+							<Select
+								value={clinicianStaffId || null}
+								onValueChange={v => setClinicianStaffId(String(v))}
+							>
+								<SelectTrigger
+									id="clinicianStaffId"
+									data-placeholder={!clinicianStaffId ? "" : undefined}
+								>
+									{clinicianStaffId ? (
+										<SelectValue />
+									) : (
+										<span className="text-muted-foreground">Select a clinician…</span>
+									)}
+								</SelectTrigger>
+								<SelectContent>
+									{clinicianOptions.map(opt => (
+										<SelectItem key={opt.staffProfileId} value={opt.staffProfileId}>
+											{opt.name}{opt.department ? ` — ${opt.department}` : ""}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+							<p className="text-muted-foreground text-xs">
+								Required to assign a clinic-specific queue number (TOR Flow 1 Step 2).
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+			)}
 
 			{/* Actions */}
 			<div className="flex justify-end gap-3">
 				<Button
 					type="button"
 					variant="outline"
-					onClick={() => router.push("/patients/search")}
+					onClick={() =>
+						router.push(
+							isStandaloneRegistration
+								? "/patients/register"
+								: pendingTriageId
+									? `/patients/search?pendingTriageId=${pendingTriageId}`
+									: "/patients/search"
+						)
+					}
 				>
 					Cancel
 				</Button>
 				<Button
 					type="submit"
-					disabled={registerPatient.isPending || !facilityId || !clinicianStaffId}
+					disabled={
+						!facilityId ||
+						(isStandaloneRegistration
+							? createPatient.isPending
+							: registerPatient.isPending || !clinicianStaffId)
+					}
 				>
-					{registerPatient.isPending ? "Registering…" : "Register Patient"}
+					{(isStandaloneRegistration ? createPatient.isPending : registerPatient.isPending)
+						? "Registering…"
+						: "Register Patient"}
 				</Button>
 			</div>
 
-			{registerPatient.isError && (
+			{(isStandaloneRegistration ? createPatient.isError : registerPatient.isError) && (
 				<p className="text-destructive text-sm">
-					Failed to register patient: {registerPatient.error.message}
+					Failed to register patient:{" "}
+					{isStandaloneRegistration
+						? createPatient.error?.message
+						: registerPatient.error?.message}
 				</p>
 			)}
 		</form>
