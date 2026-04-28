@@ -13,6 +13,7 @@ import {
 } from "@/core/components/ui/dialog"
 import { Label } from "@/core/components/ui/label"
 import { Separator } from "@/core/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { Textarea } from "@/core/components/ui/textarea"
 import {
 	useNoteDetailQuery,
@@ -22,6 +23,7 @@ import {
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 import { AmendmentForm } from "./amendment-form"
+import { NoteHistory } from "./note-history"
 import { NoteSigning } from "./note-signing"
 
 function formatDateTime(dateStr: string | null | undefined) {
@@ -161,89 +163,103 @@ export function NoteViewDialog({
 									</div>
 								)}
 
-								{isEditing ? (
-									<div className="space-y-2">
-										<Label>Content</Label>
-										<Textarea
-											rows={12}
-											value={editContent}
-											onChange={e => setEditContent(e.target.value)}
-										/>
-										<div className="flex gap-2">
-											<Button
-												size="sm"
-												onClick={handleSave}
-												disabled={updateNote.isPending}
-											>
-												{updateNote.isPending ? "Saving…" : "Save Draft"}
-											</Button>
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() => setEditContent(null)}
-											>
-												Cancel
-											</Button>
-										</div>
-									</div>
-								) : (
-									<div className="bg-muted/50 rounded-md border p-4 whitespace-pre-wrap text-sm">
-										{note.content || "No content"}
-									</div>
-								)}
+								<Tabs defaultValue="content">
+									<TabsList>
+										<TabsTrigger value="content">Content</TabsTrigger>
+										<TabsTrigger value="history">
+											History
+											{note.addenda && note.addenda.length > 0 && (
+												<Badge variant="secondary" className="ml-1.5 px-1.5 text-xs">
+													{1 + note.addenda.length}
+												</Badge>
+											)}
+										</TabsTrigger>
+									</TabsList>
 
-								{/* Addenda Section */}
-								{note.addenda && note.addenda.length > 0 && (
-									<>
-										<Separator />
-										<div className="space-y-3">
-											<h4 className="text-sm font-medium">Addenda</h4>
-											{note.addenda.map(addendum => (
-												<div
-													key={addendum.id}
-													className="bg-muted/30 space-y-1 rounded border p-3"
-												>
-													<div className="flex items-center justify-between text-xs">
-														<span>
-															{addendum.authorStaffName ?? "Unknown"} ·{" "}
-															{formatDateTime(addendum.createdAt)}
-														</span>
-														<Badge
-															variant={
-																addendum.status === "signed"
-																	? "default"
-																	: "secondary"
-															}
-														>
-															{addendum.status === "signed"
-																? "Signed"
-																: "Draft"}
-														</Badge>
-													</div>
-													{addendum.reason && (
-														<div className="text-muted-foreground text-xs">
-															Reason: {addendum.reason}
-														</div>
-													)}
-													<div className="whitespace-pre-wrap text-sm">
-														{addendum.content}
-													</div>
-													{addendum.status === "draft" && (
-														<Button
-															size="sm"
-															variant="outline"
-															className="mt-1"
-															onClick={() => handleSignAddendum(addendum.id)}
-															disabled={signAddendum.isPending}
-														>
-															Sign Addendum
-														</Button>
-													)}
+									<TabsContent value="content" className="mt-3 space-y-3">
+										{isEditing ? (
+											<div className="space-y-2">
+												<Label>Content</Label>
+												<Textarea
+													rows={12}
+													value={editContent}
+													onChange={e => setEditContent(e.target.value)}
+												/>
+												<div className="flex gap-2">
+													<Button
+														size="sm"
+														onClick={handleSave}
+														disabled={updateNote.isPending}
+													>
+														{updateNote.isPending ? "Saving…" : "Save Draft"}
+													</Button>
+													<Button
+														size="sm"
+														variant="outline"
+														onClick={() => setEditContent(null)}
+													>
+														Cancel
+													</Button>
 												</div>
-											))}
-										</div>
-									</>
-								)}
+											</div>
+										) : (
+											<div className="bg-muted/50 rounded-md border p-4 whitespace-pre-wrap text-sm">
+												{note.content || "No content"}
+											</div>
+										)}
+
+										{/* Quick-action: sign any draft addenda from the content view */}
+										{note.addenda && note.addenda.some(a => a.status === "draft") && (
+											<>
+												<Separator />
+												<div className="space-y-2">
+													<h4 className="text-sm font-medium">
+														Pending Addenda
+													</h4>
+													{note.addenda
+														.filter(a => a.status === "draft")
+														.map(addendum => (
+															<div
+																key={addendum.id}
+																className="bg-muted/30 space-y-1 rounded border p-3"
+															>
+																<div className="flex items-center justify-between text-xs">
+																	<span>
+																		{addendum.authorStaffName ?? "Unknown"} ·{" "}
+																		{formatDateTime(addendum.createdAt)}
+																	</span>
+																	<Badge variant="secondary">Draft</Badge>
+																</div>
+																{addendum.reason && (
+																	<div className="text-muted-foreground text-xs">
+																		Reason: {addendum.reason}
+																	</div>
+																)}
+																<div className="whitespace-pre-wrap text-sm">
+																	{addendum.content}
+																</div>
+																<Button
+																	size="sm"
+																	variant="outline"
+																	className="mt-1"
+																	onClick={() =>
+																		handleSignAddendum(addendum.id)
+																	}
+																	disabled={signAddendum.isPending}
+																>
+																	Sign Addendum
+																</Button>
+															</div>
+														))}
+												</div>
+											</>
+										)}
+									</TabsContent>
+
+									<TabsContent value="history" className="mt-3">
+										<NoteHistory note={note} />
+									</TabsContent>
+								</Tabs>
 							</div>
 						)}
 

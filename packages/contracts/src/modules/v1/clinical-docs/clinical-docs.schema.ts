@@ -259,7 +259,7 @@ export type NoteContext = z.infer<typeof NoteContextSchema>
 export const CreateAddendumSchema = z.object({
 	noteId: z.string().uuid(),
 	content: z.string().min(1).max(10000),
-	reason: z.string().max(1000).optional(),
+	reason: z.string().min(1).max(1000),
 })
 
 export const SignAddendumSchema = z.object({
