@@ -16,10 +16,13 @@ import {
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Textarea } from "@/core/components/ui/textarea"
+import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
+	useCheckPdeaLicenseQuery,
 	useCreateHighAlertVerificationMutation,
 	useCreateMedOrderMutation,
+	useCreateTranchedOrdersMutation,
 	useEvaluateCdsMutation,
 	type CdsEvaluateResponse,
 } from "@/features/orders/api/orders.hooks"
@@ -34,7 +37,7 @@ import {
 } from "./high-alert-verification-dialog"
 import { TranchingPreviewModal, type TrancheRow } from "./tranching-preview-modal"
 
-const TRANCHE_THRESHOLD_DAYS = 90
+const TRANCHE_THRESHOLD_DAYS = 30
 
 type CdsResult = CdsEvaluateResponse
 
@@ -51,6 +54,17 @@ interface PendingSubmitOptions {
 	trancheNumber?: number
 	trancheTotal?: number
 	trancheDays?: number
+	useTranchedOrders?: boolean
+	trancheStartDate?: string
+}
+
+function formatDisplayDate(dateStr: string | null | undefined) {
+	if (!dateStr) return "--"
+	return new Date(dateStr).toLocaleDateString("en-PH", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	})
 }
 
 export function CreateMedOrderDialog({
@@ -104,6 +118,7 @@ export function CreateMedOrderDialog({
 	const evaluateCds = useEvaluateCdsMutation()
 	const createHighAlertVerification = useCreateHighAlertVerificationMutation()
 	const createMedOrder = useCreateMedOrderMutation()
+	const createTranchedOrders = useCreateTranchedOrdersMutation()
 
 	// ── PDEA validation ──────────────────────────────────────────────────────
 	const staffProfile =
@@ -114,6 +129,16 @@ export function CreateMedOrderDialog({
 	const pdeaExpiry = staffProfile?.pdeaS2Expiry ?? null
 	const pdeaExpired = pdeaExpiry != null ? new Date(pdeaExpiry) < new Date() : false
 	const pdeaValid = pdeaLicense != null && !pdeaExpired
+	const pdeaLicenseStatus = useCheckPdeaLicenseQuery({
+		staffId: orderingStaffId,
+		facilityId,
+		enabled: isControlledSubstance && !!orderingStaffId && !!facilityId,
+	})
+	const livePdeaStatus = pdeaLicenseStatus.data
+	const hasLivePdeaValidation = !isControlledSubstance || pdeaLicenseStatus.isSuccess
+	const livePdeaCanPrescribe = !isControlledSubstance
+		? true
+		: Boolean(livePdeaStatus?.canPrescribeControlled)
 
 	function handleControlledSubstanceChange(checked: boolean) {
 		if (checked && !pdeaValid) return
@@ -164,11 +189,13 @@ export function CreateMedOrderDialog({
 		!!doseForm.trim() &&
 		!!route.trim() &&
 		!!frequency.trim() &&
+		(!isControlledSubstance || !!pdeaSchedule.trim()) &&
 		!hasHardBlock &&
 		allSoftBlocksOverridden &&
 		!hasAllergyHardBlock &&
 		allergyAllSoftBlocksOverridden &&
-		(!isControlledSubstance || pdeaValid)
+		hasLivePdeaValidation &&
+		livePdeaCanPrescribe
 	const canSubmit = canProceedToSubmit && (!requiresDoubleVerification || highAlertVerified)
 
 	// ── Handlers ──────────────────────────────────────────────────────────────
@@ -259,6 +286,34 @@ export function CreateMedOrderDialog({
 		}
 	}
 
+	function handleOrderCreated(orderId: string) {
+		if (requiresDoubleVerification && pendingHighAlertVerification) {
+			createHighAlertVerification.mutate(
+				{
+					medicationOrderId: orderId,
+					verifyingStaffId: pendingHighAlertVerification.verifyingStaffId,
+					notes: pendingHighAlertVerification.notes,
+				},
+				{
+					onSuccess: () => handleOpenChange(false),
+					onError: err => {
+						setPendingHighAlertOrderId(orderId)
+						setHighAlertVerified(false)
+						setHighAlertVerificationError(
+							err instanceof Error
+								? err.message
+								: "Medication order was created, but high-alert verification still needs completion."
+						)
+						setHighAlertVerifyOpen(true)
+					},
+				}
+			)
+			return
+		}
+
+		handleOpenChange(false)
+	}
+
 	function doSubmit(trancheNumber?: number, trancheTotal?: number, trancheDays?: number) {
 		const cdsOverrides =
 			overriddenAlerts.size > 0
@@ -295,33 +350,46 @@ export function CreateMedOrderDialog({
 				cdsOverrides,
 			},
 			{
-				onSuccess: order => {
-					if (requiresDoubleVerification && pendingHighAlertVerification) {
-						createHighAlertVerification.mutate(
-							{
-								medicationOrderId: order.id,
-								verifyingStaffId: pendingHighAlertVerification.verifyingStaffId,
-								notes: pendingHighAlertVerification.notes,
-							},
-							{
-								onSuccess: () => handleOpenChange(false),
-								onError: err => {
-									setPendingHighAlertOrderId(order.id)
-									setHighAlertVerified(false)
-									setHighAlertVerificationError(
-										err instanceof Error
-											? err.message
-											: "Medication order was created, but high-alert verification still needs completion."
-									)
-									setHighAlertVerifyOpen(true)
-								},
-							}
-						)
-						return
-					}
+				onSuccess: order => handleOrderCreated(order.id),
+			}
+		)
+	}
 
-					handleOpenChange(false)
-				},
+	function submitTranchedOrder(startDate?: string) {
+		const cdsOverrides =
+			overriddenAlerts.size > 0
+				? {
+						overrides: [...overriddenAlerts].map(id => ({
+							alertId: id,
+							reason: overrideReasons[id] ?? "",
+							overriddenAt: new Date().toISOString(),
+						})),
+					}
+				: undefined
+
+		createTranchedOrders.mutate(
+			{
+				facilityId,
+				encounterId,
+				formularyItemId,
+				genericName: genericName.trim(),
+				brandName: brandName.trim() || undefined,
+				dose: dose.trim(),
+				doseUnit: doseUnit.trim(),
+				doseForm: doseForm.trim(),
+				route: route.trim(),
+				frequency: frequency.trim(),
+				durationDays: durationNum,
+				specialInstructions: specialInstructions.trim() || undefined,
+				isPrn,
+				prnReason: isPrn ? prnReason.trim() || undefined : undefined,
+				pdeaSchedule: pdeaSchedule.trim(),
+				startDate,
+				cdsAlerts: cdsResult?.alerts ?? undefined,
+				cdsOverrides,
+			},
+			{
+				onSuccess: result => handleOrderCreated(result.parentOrder.id),
 			}
 		)
 	}
@@ -352,9 +420,8 @@ export function CreateMedOrderDialog({
 	function handleTranchingConfirm(tranches: TrancheRow[]) {
 		setTranchingOpen(false)
 		const options = {
-			trancheNumber: 1,
-			trancheTotal: tranches.length,
-			trancheDays: 30,
+			useTranchedOrders: true,
+			trancheStartDate: tranches[0]?.startDate.toISOString().slice(0, 10),
 		}
 
 		if (requiresDoubleVerification && !highAlertVerified) {
@@ -363,8 +430,7 @@ export function CreateMedOrderDialog({
 			return
 		}
 
-		// Submit first tranche; backend handles remaining or user repeats
-		doSubmit(options.trancheNumber, options.trancheTotal, options.trancheDays)
+		submitTranchedOrder(options.trancheStartDate)
 	}
 
 	function handleHighAlertPrepared(draft: HighAlertVerificationDraft) {
@@ -385,6 +451,12 @@ export function CreateMedOrderDialog({
 		setHighAlertVerified(true)
 		setHighAlertVerifyOpen(false)
 		setPendingSubmitOptions(null)
+
+		if (submitOptions.useTranchedOrders) {
+			submitTranchedOrder(submitOptions.trancheStartDate)
+			return
+		}
+
 		doSubmit(submitOptions.trancheNumber, submitOptions.trancheTotal, submitOptions.trancheDays)
 	}
 
@@ -591,7 +663,7 @@ export function CreateMedOrderDialog({
 							<div className="flex items-center gap-2 rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-200">
 								<Eye className="size-4 shrink-0" />
 								<span>
-									This order spans more than 90 days. PDEA regulations require dispensing in 30-day
+									This order spans more than 30 days. PDEA regulations require dispensing in 30-day
 									tranches. Click <strong>Preview Tranches</strong> to review before submitting.
 								</span>
 							</div>
@@ -671,7 +743,59 @@ export function CreateMedOrderDialog({
 								</div>
 							)}
 
-							{isControlledSubstance && pdeaValid && (
+							{isControlledSubstance && (
+								<div
+									className={cn(
+										"space-y-1 rounded-md border px-3 py-2 text-sm",
+										livePdeaStatus?.canPrescribeControlled
+											? "border-emerald-300 bg-emerald-50 text-emerald-900"
+											: "border-destructive bg-destructive/10 text-destructive"
+									)}
+								>
+									<div className="flex items-center gap-2">
+										<Badge
+											variant={
+												pdeaLicenseStatus.isLoading
+													? "secondary"
+													: livePdeaStatus?.canPrescribeControlled
+														? "default"
+														: "destructive"
+											}
+											className="text-[10px]"
+										>
+											{pdeaLicenseStatus.isLoading
+												? "Validating"
+												: livePdeaStatus?.canPrescribeControlled
+													? "Valid"
+													: "Invalid"}
+										</Badge>
+										<span className="font-medium">
+											S-2 License #{livePdeaStatus?.licenseNumber ?? pdeaLicense ?? "--"}
+										</span>
+									</div>
+									<div className="text-xs">
+										Expiry: {formatDisplayDate(livePdeaStatus?.expiryDate ?? pdeaExpiry)}
+									</div>
+									<div className="text-xs">
+										Days Until Expiry:{" "}
+										{livePdeaStatus?.daysUntilExpiry != null
+											? livePdeaStatus.daysUntilExpiry
+											: "--"}
+									</div>
+									{livePdeaStatus?.errorMessage && (
+										<div className="text-xs">{livePdeaStatus.errorMessage}</div>
+									)}
+									{pdeaLicenseStatus.isError && (
+										<div className="text-xs">
+											{pdeaLicenseStatus.error instanceof Error
+												? pdeaLicenseStatus.error.message
+												: "Unable to validate PDEA S-2 license right now."}
+										</div>
+									)}
+								</div>
+							)}
+
+							{isControlledSubstance && (
 								<div className="space-y-2 pl-6">
 									<Label htmlFor="pdeaSchedule">PDEA Schedule</Label>
 									<Input
@@ -694,18 +818,26 @@ export function CreateMedOrderDialog({
 								disabled={
 									!canProceedToSubmit ||
 									createMedOrder.isPending ||
+									createTranchedOrders.isPending ||
 									createHighAlertVerification.isPending
 								}
 								onClick={() => setTranchingOpen(true)}
 							>
-								<Eye className="mr-1 size-4" />
-								Preview Tranches
+								{createTranchedOrders.isPending ? (
+									"Creating…"
+								) : (
+									<>
+										<Eye className="mr-1 size-4" />
+										Preview Tranches
+									</>
+								)}
 							</Button>
 						) : (
 							<Button
 								disabled={
 									!canProceedToSubmit ||
 									createMedOrder.isPending ||
+									createTranchedOrders.isPending ||
 									createHighAlertVerification.isPending
 								}
 								onClick={handleSubmit}

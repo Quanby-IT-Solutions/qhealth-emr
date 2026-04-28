@@ -119,8 +119,7 @@ export function CreateOrderSetDialog({
 				<DialogHeader>
 					<DialogTitle>Create Order Set</DialogTitle>
 					<DialogDescription>
-						Select a predefined order bundle to place multiple lab and imaging
-						orders at once.
+						Select a predefined order bundle to place multiple lab and imaging orders at once.
 					</DialogDescription>
 				</DialogHeader>
 
@@ -129,9 +128,7 @@ export function CreateOrderSetDialog({
 						<p className="text-sm font-medium">Available Order Sets</p>
 						<RadioGroup
 							value={selectedSetId}
-							onValueChange={(value) =>
-								setSelectedSetId(typeof value === "string" ? value : "")
-							}
+							onValueChange={value => setSelectedSetId(typeof value === "string" ? value : "")}
 						>
 							{ORDER_SETS.map(orderSet => {
 								const radioId = `order-set-${orderSet.id}`
@@ -140,15 +137,9 @@ export function CreateOrderSetDialog({
 								return (
 									<Card
 										key={orderSet.id}
-										className={cn(
-											"gap-0 transition-colors",
-											isSelected && "ring-primary ring-2"
-										)}
+										className={cn("gap-0 transition-colors", isSelected && "ring-primary ring-2")}
 									>
-										<Label
-											htmlFor={radioId}
-											className="flex cursor-pointer items-start gap-3 p-4"
-										>
+										<Label htmlFor={radioId} className="flex cursor-pointer items-start gap-3 p-4">
 											<RadioGroupItem
 												id={radioId}
 												value={orderSet.id}
@@ -157,9 +148,7 @@ export function CreateOrderSetDialog({
 											/>
 											<div className="space-y-1">
 												<div className="font-medium">{orderSet.name}</div>
-												<div className="text-sm text-muted-foreground">
-													{orderSet.description}
-												</div>
+												<div className="text-muted-foreground text-sm">{orderSet.description}</div>
 											</div>
 										</Label>
 									</Card>
@@ -184,15 +173,11 @@ export function CreateOrderSetDialog({
 									className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
 								>
 									<div className="flex min-w-0 items-center gap-2">
-										<Badge
-											variant={order.type === "lab" ? "secondary" : "outline"}
-										>
+										<Badge variant={order.type === "lab" ? "secondary" : "outline"}>
 											{order.type === "lab" ? "Lab" : "Imaging"}
 										</Badge>
 										<div className="min-w-0">
-											<div className="truncate font-medium">
-												{getOrderPreviewLabel(order)}
-											</div>
+											<div className="truncate font-medium">{getOrderPreviewLabel(order)}</div>
 											{"panelName" in order.payload && order.payload.panelName ? (
 												<div className="text-muted-foreground text-xs">
 													{order.payload.panelName}
