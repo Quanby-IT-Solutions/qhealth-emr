@@ -953,6 +953,9 @@ export class NursingService {
 			.limit(1)
 
 		if (!enc) throw new NotFoundException("Encounter not found")
+		if (enc.patientId !== input.patientId) {
+			throw new BadRequestException("patientId does not match the encounter patient")
+		}
 
 		const [row] = await db
 			.insert(consentRecords)
@@ -962,10 +965,8 @@ export class NursingService {
 				patientId: enc.patientId,
 				preEncounterId: input.preEncounterId,
 				consentType: input.consentType as (typeof consentRecords.consentType)["_"]["data"],
-				signedByName: input.signedByName || "Patient / Guardian",
-				relationship:
-					(input.relationship as (typeof consentRecords.relationship)["_"]["data"] | undefined) ??
-					"self",
+				signedByName: input.signedByName,
+				relationship: input.relationship as (typeof consentRecords.relationship)["_"]["data"],
 				content: input.content ?? null,
 				signatureData: input.signatureData ?? null,
 				signedAt: input.signedAt ?? new Date(),
