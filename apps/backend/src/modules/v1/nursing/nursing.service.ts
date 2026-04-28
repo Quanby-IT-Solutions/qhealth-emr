@@ -928,14 +928,28 @@ export class NursingService {
 	async createConsentRecord(input: CreateConsentRecordInput, userId: string) {
 		const staffProfileId = await this.getStaffProfileId(userId)
 
+		if (!input.encounterId) throw new Error("encounterId is required to create a consent record")
+
+		// Resolve patientId from the encounter
+		const [enc] = await db
+			.select({ patientId: encounters.patientId })
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+			.limit(1)
+
+		if (!enc) throw new NotFoundException("Encounter not found")
+
 		const [row] = await db
 			.insert(nursingConsentRecords)
 			.values({
 				facilityId: input.facilityId,
 				encounterId: input.encounterId,
+				patientId: enc.patientId,
 				preEncounterId: input.preEncounterId,
 				consentType: input.consentType,
 				consentText: input.consentText ?? "",
+				signedByName: "Patient / Guardian",
+				relationship: "self",
 				patientSignature: input.patientSignature,
 				guardianSignature: input.guardianSignature,
 				witnessSignature: input.witnessSignature,
