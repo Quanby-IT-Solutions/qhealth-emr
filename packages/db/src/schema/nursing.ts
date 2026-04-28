@@ -1,7 +1,7 @@
 import { index } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
-import { encounters, preEncounters } from "./core.js"
+import { encounters, patients, preEncounters } from "./core.js"
 import { medicationOrders } from "./orders.js"
 import { facilities, staffProfiles } from "./rbac.js"
 
@@ -19,11 +19,29 @@ export const nursingConsentRecords = createTable(
 			.references(() => facilities.id, { onDelete: "restrict" }),
 		encounterId: t
 			.uuid("encounter_id")
+			.notNull()
 			.references(() => encounters.id, { onDelete: "cascade" }),
+		patientId: t
+			.uuid("patient_id")
+			.notNull()
+			.references(() => patients.id, { onDelete: "restrict" }),
+		consentType: t.text("consent_type").notNull(),
+		signedByName: t.text("signed_by_name").notNull(),
+		relationship: t.text("relationship").notNull(),
+		content: t.text("content"),
+		signatureData: t.jsonb("signature_data"),
+		signedAt: t.timestamp("signed_at"),
+		witnessStaffId: t
+			.uuid("witness_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		isActive: t.boolean("is_active").notNull().default(true),
+		revokedAt: t.timestamp("revoked_at"),
+		revocationReason: t.text("revocation_reason"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 		preEncounterId: t
 			.uuid("pre_encounter_id")
 			.references(() => preEncounters.id, { onDelete: "set null" }),
-		consentType: t.text("consent_type").notNull(),
 		consentText: t.text("consent_text").notNull().default(""),
 		patientSignature: t.text("patient_signature"),
 		guardianSignature: t.text("guardian_signature"),
@@ -32,8 +50,6 @@ export const nursingConsentRecords = createTable(
 			.uuid("captured_by_staff_id")
 			.notNull()
 			.references(() => staffProfiles.id, { onDelete: "restrict" }),
-		signedAt: t.timestamp("signed_at").notNull().defaultNow(),
-		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [
 		index("consent_records_facility_id_idx").on(t.facilityId),
