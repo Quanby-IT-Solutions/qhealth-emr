@@ -63,6 +63,7 @@ describe("IntegrationSchema", () => {
 		lastSyncStatus: null,
 		lastTestedAt: null,
 		lastTestStatus: null,
+		lastTestReadinessLevel: null,
 		credentialStatus: "unset",
 		createdAt: new Date("2024-01-01"),
 		updatedAt: new Date("2024-01-01"),
