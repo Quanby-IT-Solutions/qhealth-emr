@@ -80,25 +80,6 @@ const EMPTY_OFFLINE = {
 	lastFailureMessage: null,
 }
 
-const EMPTY_STATUTORY_READINESS = {
-	facilitiesWithoutStatutoryReporting: 0,
-	totalFacilities: 0,
-}
-
-const EMPTY_STATUTORY_OPS = {
-	pidsr: { blockedOrRejected: false, draftCount: 0 },
-	hai: { pendingCount: 0 },
-	ahsr: { currentMonthReady: true },
-}
-
-const EMPTY_DATA_QUALITY = {
-	incompleteRecordsCount: 0,
-	duplicateRecordsCount: 0,
-	missingIcd10Count: 0,
-	missingRvsCount: 0,
-	cf4DraftCount: 0,
-}
-
 function makeIntegrationHealth(fhirFailures: number) {
 	return {
 		failedCount: fhirFailures,
@@ -129,9 +110,6 @@ function stubService(fhirFailures: number, consentEnforced = false) {
 	)
 	jest.spyOn(service as never, "getArtaSla").mockResolvedValue(EMPTY_ARTA as never)
 	jest.spyOn(service as never, "getOfflineReadiness").mockResolvedValue(EMPTY_OFFLINE as never)
-	jest.spyOn(service as never, "getStatutoryReadiness").mockResolvedValue(EMPTY_STATUTORY_READINESS as never)
-	jest.spyOn(service as never, "getStatutoryOps").mockResolvedValue(EMPTY_STATUTORY_OPS as never)
-	jest.spyOn(service as never, "getDataQuality").mockResolvedValue(EMPTY_DATA_QUALITY as never)
 
 	return service
 }
@@ -231,9 +209,6 @@ jest.mock("@/config/api-versions.config", () => ({
 		},
 	},
 }))
-jest.mock("./admin-dashboard.service", () => ({
-	AdminDashboardService: class AdminDashboardService {},
-}))
 jest.mock("@/modules/v1/rbac/rbac.guard", () => ({
 	RBAC_PERMISSION_KEY: "rbac",
 	RBAC_PERMISSIONS_KEY: "rbac_all",
@@ -261,9 +236,9 @@ describe("AdminDashboardController — RBAC guard metadata (ADMIN-003)", () => {
 		expect(perm).toEqual({ module: "medical_records", action: "view" })
 	})
 
-	it("civilRegistryOps is guarded by admin:view", () => {
+	it("civilRegistryOps is guarded by civil_registry:view", () => {
 		const perm = getGuard("civilRegistryOps")
-		expect(perm).toEqual({ module: "admin", action: "view" })
+		expect(perm).toEqual({ module: "civil_registry", action: "view" })
 	})
 
 	it("summary is guarded by admin:view", () => {
@@ -271,14 +246,14 @@ describe("AdminDashboardController — RBAC guard metadata (ADMIN-003)", () => {
 		expect(perm).toEqual({ module: "admin", action: "view" })
 	})
 
-	it("exportCompliance is guarded by admin:view", () => {
+	it("exportCompliance is guarded by audit:view", () => {
 		const perm = getGuard("exportCompliance")
-		expect(perm).toEqual({ module: "admin", action: "view" })
+		expect(perm).toEqual({ module: "audit", action: "view" })
 	})
 
-	it("medicationCompliance is guarded by admin:view", () => {
+	it("medicationCompliance is guarded by formulary:clinical_policy", () => {
 		const perm = getGuard("medicationCompliance")
-		expect(perm).toEqual({ module: "admin", action: "view" })
+		expect(perm).toEqual({ module: "formulary", action: "clinical_policy" })
 	})
 })
 
