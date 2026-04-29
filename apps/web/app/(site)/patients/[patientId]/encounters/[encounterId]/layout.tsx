@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-import { ArrowLeft, ShieldAlert } from "lucide-react"
+import { ArrowLeft, ShieldAlert, WifiOff } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -19,6 +19,7 @@ import {
 import { Separator } from "@/core/components/ui/separator"
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 import { useMyActiveBreakGlassQuery } from "@/features/audit/api/audit.hooks"
 import { BreakGlassForm } from "@/features/audit/components/break-glass-form"
 import { useEncounterDetailQuery } from "@/features/encounters/api/encounters.hooks"
@@ -72,6 +73,7 @@ export default function EncounterChartLayout({
 	const pathname = usePathname()
 	const permSet = usePermissionSet()
 	const { data: profile } = useMyProfile()
+	const { isOnline } = useOfflineSync()
 	const activeStaffProfile = getActiveStaffProfile(profile)
 	const activeFacilityId = activeStaffProfile?.facilityId
 	const breakGlassRequired =
@@ -304,6 +306,12 @@ export default function EncounterChartLayout({
 									{summary?.hasSevereAllergies ? "⚠ " : ""}
 									{summary?.activeAllergyCount} Allerg
 									{summary?.activeAllergyCount === 1 ? "y" : "ies"}
+								</Badge>
+							)}
+							{!isOnline && (
+								<Badge variant="secondary" className="gap-1 border-amber-300 bg-amber-100 text-amber-800">
+									<WifiOff className="size-3" />
+									Cached
 								</Badge>
 							)}
 
