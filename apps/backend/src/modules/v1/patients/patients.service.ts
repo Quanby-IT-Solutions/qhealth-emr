@@ -70,10 +70,16 @@ export class PatientsService {
 		const page = Number(filter.page) || 1
 		const limit = Number(filter.limit) || 50
 		const offset = (page - 1) * limit
+		const isActive =
+			filter.isActive === true || filter.isActive === "true"
+				? true
+				: filter.isActive === false || filter.isActive === "false"
+					? false
+					: true
 
 		const conditions = [eq(patients.facilityId, filter.facilityId)]
 
-		conditions.push(eq(patients.isActive, filter.isActive ?? true))
+		conditions.push(eq(patients.isActive, isActive))
 
 		if (filter.search) {
 			const s = this.escapeLike(filter.search)

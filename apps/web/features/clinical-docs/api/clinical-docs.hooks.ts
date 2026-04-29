@@ -112,7 +112,7 @@ interface ClinicalNoteListResponse {
 interface ConsentRecord {
 	id: string
 	facilityId: string
-	encounterId: string
+	encounterId: string | null
 	patientId: string
 	consentType: "general" | "procedure" | "research" | "blood_transfusion" | "surgery" | "dpa"
 	signedByName: string
@@ -469,7 +469,7 @@ export function useCreateConsentMutation() {
 	return useMutation({
 		mutationFn: (data: {
 			facilityId: string
-			encounterId: string
+			encounterId?: string
 			patientId: string
 			consentType: ConsentRecord["consentType"]
 			signedByName: string
@@ -482,8 +482,13 @@ export function useCreateConsentMutation() {
 				body: JSON.stringify(data),
 			}),
 		onSuccess: (_data, variables) => {
+			if (variables.encounterId) {
+				void queryClient.invalidateQueries({
+					queryKey: clinicalDocsKeys.consents(variables.encounterId),
+				})
+			}
 			void queryClient.invalidateQueries({
-				queryKey: clinicalDocsKeys.consents(variables.encounterId),
+				queryKey: clinicalDocsKeys.patientConsents(variables.patientId),
 			})
 		},
 	})

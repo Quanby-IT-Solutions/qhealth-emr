@@ -25,6 +25,17 @@ export const patientContract = {
 		.input(PatientSearchSchema)
 		.output(PatientSearchResponseSchema),
 
+	listClinicians: oc
+		.route({
+			method: "GET",
+			path: "/patients/clinicians",
+			summary:
+				"List active clinicians for a facility — accessible to registrar (opd:view), no admin permission required",
+			tags: ["Patients"],
+		})
+		.input(ListCliniciansInputSchema)
+		.output(ClinicianListResponseSchema),
+
 	get: oc
 		.route({
 			method: "GET",
@@ -68,15 +79,4 @@ export const patientContract = {
 		})
 		.input(RegisterPatientWithOpdEncounterInputSchema)
 		.output(RegisterPatientWithOpdEncounterResponseSchema),
-
-	listClinicians: oc
-		.route({
-			method: "GET",
-			path: "/patients/clinicians",
-			summary:
-				"List active clinicians for a facility — accessible to registrar (opd:view), no admin permission required",
-			tags: ["Patients"],
-		})
-		.input(ListCliniciansInputSchema)
-		.output(ClinicianListResponseSchema),
 }

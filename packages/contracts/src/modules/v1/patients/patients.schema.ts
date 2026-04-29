@@ -66,7 +66,7 @@ export const PatientSearchSchema = PaginationInputSchema.extend({
 	dateOfBirth: z.string().optional(),
 	philhealthMemberId: z.string().optional(),
 	facilityId: z.string().uuid(),
-	isActive: z.boolean().optional().default(true),
+	isActive: z.coerce.boolean().optional().default(true),
 })
 
 export type PatientSearchInput = z.infer<typeof PatientSearchSchema>

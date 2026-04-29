@@ -277,6 +277,7 @@ export function PatientRegisterPageContent() {
 			chiefComplaint,
 			admittingStaffId: staffId,
 			clinicianStaffId,
+			consentCaptured: true,
 		})
 
 		if (encounter.queueNumber !== null) {

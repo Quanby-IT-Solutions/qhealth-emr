@@ -2,13 +2,14 @@
 
 import { use, useState } from "react"
 
-import { ArrowUpDown, Plus } from "lucide-react"
+import { ArrowUpDown, ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { Badge } from "@/core/components/ui/badge"
-import { Button } from "@/core/components/ui/button"
+import { Button, buttonVariants } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import { Skeleton } from "@/core/components/ui/skeleton"
 import {
 	Table,
 	TableBody,
@@ -25,6 +26,32 @@ type EncounterStatus = "active" | "discharged" | "closed" | "cancelled"
 type EncounterType = "inpatient" | "outpatient" | "emergency" | "telemedicine"
 type SortDir = "asc" | "desc"
 
+const STATUS_FILTERS: { label: string; value: EncounterStatus | undefined }[] = [
+	{ label: "All", value: undefined },
+	{ label: "Active", value: "active" },
+	{ label: "Discharged", value: "discharged" },
+	{ label: "Closed", value: "closed" },
+]
+
+const LIMIT = 10
+
+function typeBadge(type: EncounterType) {
+	switch (type) {
+		case "outpatient":
+			return (
+				<Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+					OPD
+				</Badge>
+			)
+		case "emergency":
+			return <Badge variant="destructive">ER</Badge>
+		case "inpatient":
+			return <Badge variant="default">IPD</Badge>
+		case "telemedicine":
+			return <Badge variant="outline">Tele</Badge>
+	}
+}
+
 function statusBadgeVariant(
 	status: EncounterStatus
 ): "default" | "secondary" | "destructive" | "outline" {
@@ -40,19 +67,6 @@ function statusBadgeVariant(
 	}
 }
 
-function formatEncounterType(type: EncounterType): string {
-	switch (type) {
-		case "inpatient":
-			return "IPD"
-		case "outpatient":
-			return "OPD"
-		case "emergency":
-			return "ER"
-		case "telemedicine":
-			return "Telemedicine"
-	}
-}
-
 function formatDate(value: Date | string | null | undefined): string {
 	if (!value) return "—"
 	const d = typeof value === "string" ? new Date(value) : value
@@ -65,6 +79,16 @@ function formatDate(value: Date | string | null | undefined): string {
 	})
 }
 
+function TableSkeleton() {
+	return (
+		<div className="space-y-2">
+			{Array.from({ length: LIMIT }).map((_, i) => (
+				<Skeleton key={i} className="h-10 w-full rounded" />
+			))}
+		</div>
+	)
+}
+
 export default function EncounterListPage({
 	params,
 }: {
@@ -74,12 +98,15 @@ export default function EncounterListPage({
 	const router = useRouter()
 	const facilityId = useActiveFacilityId()
 	const { data: patient } = usePatientProfileQuery(patientId)
+
+	const [statusFilter, setStatusFilter] = useState<EncounterStatus | undefined>("active")
+	const [currentPage, setCurrentPage] = useState(1)
+	const [sortDir, setSortDir] = useState<SortDir>("desc")
+
 	const { data, isLoading } = useEncounterListQuery(
-		{ facilityId: facilityId ?? "", patientId },
+		{ facilityId: facilityId ?? "", patientId, status: statusFilter, page: currentPage, limit: LIMIT },
 		{ enabled: !!facilityId }
 	)
-
-	const [sortDir, setSortDir] = useState<SortDir>("desc")
 
 	const encounters = [...(data?.data ?? [])].sort((a, b) => {
 		const aTime = new Date(a.admissionDatetime).getTime()
@@ -87,25 +114,47 @@ export default function EncounterListPage({
 		return sortDir === "desc" ? bTime - aTime : aTime - bTime
 	})
 
+	const totalPages = data?.totalPages ?? 1
 	const patientName = patient ? `${patient.lastName}, ${patient.firstName}` : "Patient"
+
+	function handleStatusChange(value: EncounterStatus | undefined) {
+		setStatusFilter(value)
+		setCurrentPage(1)
+	}
 
 	return (
 		<Card>
-			<CardHeader className="flex flex-row items-center justify-between space-y-0">
+			<CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 				<CardTitle>Encounters — {patientName}</CardTitle>
-				<Button asChild size="sm">
-					<Link href={`/patients/${patientId}/encounters/new`}>
-						<Plus className="mr-1 size-4" />
-						New Encounter
-					</Link>
-				</Button>
+				<Link
+					href={`/patients/${patientId}/encounters/new`}
+					className={buttonVariants({ size: "sm" })}
+				>
+					<Plus className="mr-1 size-4" />
+					New Encounter
+				</Link>
 			</CardHeader>
-			<CardContent>
+
+			<CardContent className="space-y-4">
+				{/* Status filter */}
+				<div className="flex flex-wrap gap-1.5">
+					{STATUS_FILTERS.map(f => (
+						<Button
+							key={String(f.value)}
+							variant={statusFilter === f.value ? "default" : "outline"}
+							size="sm"
+							onClick={() => handleStatusChange(f.value)}
+						>
+							{f.label}
+						</Button>
+					))}
+				</div>
+
 				{isLoading ? (
-					<p className="text-muted-foreground py-8 text-center text-sm">Loading encounters…</p>
+					<TableSkeleton />
 				) : encounters.length === 0 ? (
 					<p className="text-muted-foreground py-8 text-center text-sm">
-						No encounters found for this patient.
+						No {statusFilter ?? ""} encounters found for this patient.
 					</p>
 				) : (
 					<Table>
@@ -137,16 +186,20 @@ export default function EncounterListPage({
 										router.push(`/patients/${patientId}/encounters/${encounter.id}`)
 									}
 								>
-									<TableCell className="font-medium">
-										{formatEncounterType(encounter.encounterType)}
-									</TableCell>
+									<TableCell>{typeBadge(encounter.encounterType)}</TableCell>
 									<TableCell>
-										<Badge variant={statusBadgeVariant(encounter.status)} className="capitalize">
+										<Badge
+											variant={statusBadgeVariant(encounter.status)}
+											className="capitalize"
+										>
 											{encounter.status}
 										</Badge>
 									</TableCell>
 									<TableCell className="max-w-48 truncate text-sm">
-										{encounter.chiefComplaint ?? "—"}
+										{encounter.chiefComplaint
+											? encounter.chiefComplaint.slice(0, 60) +
+											  (encounter.chiefComplaint.length > 60 ? "…" : "")
+											: "—"}
 									</TableCell>
 									<TableCell className="text-sm">
 										{formatDate(encounter.admissionDatetime)}
@@ -162,6 +215,33 @@ export default function EncounterListPage({
 						</TableBody>
 					</Table>
 				)}
+
+				{/* Pagination */}
+				{!isLoading && totalPages > 1 ? (
+					<div className="flex items-center justify-between text-sm">
+						<span className="text-muted-foreground">
+							Page {currentPage} of {totalPages}
+						</span>
+						<div className="flex gap-1">
+							<Button
+								variant="outline"
+								size="icon"
+								onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+								disabled={currentPage <= 1}
+							>
+								<ChevronLeft className="size-4" />
+							</Button>
+							<Button
+								variant="outline"
+								size="icon"
+								onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+								disabled={currentPage >= totalPages}
+							>
+								<ChevronRight className="size-4" />
+							</Button>
+						</div>
+					</div>
+				) : null}
 			</CardContent>
 		</Card>
 	)

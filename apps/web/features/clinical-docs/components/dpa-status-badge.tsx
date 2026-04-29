@@ -45,17 +45,14 @@ export function DpaStatusBadge({ patientId }: DpaStatusBadgeProps) {
 	)
 	const latest = sorted[0]
 
+	if (!latest) {
+		return null
+	}
+
 	if (latest.revokedAt) {
 		return (
 			<Tooltip>
-				<TooltipTrigger
-					render={
-						<Badge
-							variant="destructive"
-							className="cursor-default gap-1"
-						/>
-					}
-				>
+				<TooltipTrigger render={<Badge variant="destructive" className="cursor-default gap-1" />}>
 					<ShieldCheck className="size-3" />
 					DPA Revoked
 				</TooltipTrigger>
@@ -75,9 +72,7 @@ export function DpaStatusBadge({ patientId }: DpaStatusBadgeProps) {
 		<Tooltip>
 			<TooltipTrigger
 				render={
-					<Badge
-						className="cursor-default gap-1 bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-200"
-					/>
+					<Badge className="cursor-default gap-1 bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-200" />
 				}
 			>
 				<ShieldCheck className="size-3" />

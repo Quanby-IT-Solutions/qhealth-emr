@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common"
+import {
+	BadRequestException,
+	ForbiddenException,
+	Injectable,
+	Logger,
+	NotFoundException,
+} from "@nestjs/common"
 import { and, count, desc, eq, inArray } from "drizzle-orm"
 
 import {
@@ -881,12 +887,18 @@ export class ClinicalDocsService {
 	}
 
 	async createConsent(input: CreateConsentInput, witnessStaffId: string) {
-		const resolvedWitnessStaffId = await this.getStaffProfileId(witnessStaffId)
+		// Witness is optional — if the acting user has no staff profile, store null rather than throwing
+		let resolvedWitnessStaffId: string | null = null
+		try {
+			resolvedWitnessStaffId = await this.getStaffProfileId(witnessStaffId)
+		} catch {
+			this.logger.warn(`No staff profile for user ${witnessStaffId}; consent will have no witness`)
+		}
 		const [row] = await db
 			.insert(consentRecords)
 			.values({
 				facilityId: input.facilityId,
-				encounterId: input.encounterId,
+				encounterId: input.encounterId ?? null,
 				patientId: input.patientId,
 				consentType: input.consentType,
 				signedByName: input.signedByName,

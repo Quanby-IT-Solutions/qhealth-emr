@@ -277,7 +277,7 @@ export const AddendumIdSchema = z.object({
 export const ConsentRecordSchema = z.object({
 	id: z.string().uuid(),
 	facilityId: z.string().uuid(),
-	encounterId: z.string().uuid(),
+	encounterId: z.string().uuid().nullable(),
 	patientId: z.string().uuid(),
 	consentType: ConsentTypeEnum,
 	signedByName: z.string(),
@@ -296,7 +296,7 @@ export type ConsentRecord = z.infer<typeof ConsentRecordSchema>
 
 export const CreateConsentRecordSchema = z.object({
 	facilityId: z.string().uuid(),
-	encounterId: z.string().uuid(),
+	encounterId: z.string().uuid().optional(),
 	patientId: z.string().uuid(),
 	consentType: ConsentTypeEnum,
 	signedByName: z.string().min(1).max(255),

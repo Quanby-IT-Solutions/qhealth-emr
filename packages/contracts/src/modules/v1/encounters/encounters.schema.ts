@@ -143,11 +143,13 @@ export const CreateEncounterSchema = z.object({
 
 	// PS-001: Link to triage intake record (pre-registration vitals)
 	triageIntakeId: z.string().uuid().optional(),
+
+	consentCaptured: z.boolean(),
 }).superRefine((data, ctx) => {
 	// PS-036: clinicianStaffId required for outpatient encounters to ensure clinic-scoped queue assignment
 	if (data.encounterType === "outpatient" && !data.clinicianStaffId) {
 		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
+			code: "custom",
 			message: "clinicianStaffId is required for outpatient encounter registration",
 			path: ["clinicianStaffId"],
 		})
@@ -155,11 +157,19 @@ export const CreateEncounterSchema = z.object({
 	// PS-044: triageIntakeId required for outpatient encounters (TOR Flow 1 Step 1 mandatory)
 	if (data.encounterType === "outpatient" && !data.triageIntakeId) {
 		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
+			code: "custom",
 			message:
 				"triageIntakeId is required for outpatient encounter registration (TOR Flow 1 Step 1)",
 			path: ["triageIntakeId"],
 		})
+	}
+	// ER and IPD require attendingStaffId
+	if ((data.encounterType === "emergency" || data.encounterType === "inpatient") && !data.attendingStaffId) {
+		ctx.addIssue({ code: "custom", message: "attendingStaffId is required for emergency and inpatient encounters", path: ["attendingStaffId"] })
+	}
+	// IPD requires bedId
+	if (data.encounterType === "inpatient" && !data.bedId) {
+		ctx.addIssue({ code: "custom", message: "bedId is required for inpatient encounters", path: ["bedId"] })
 	}
 })
 
