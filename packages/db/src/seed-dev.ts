@@ -62,6 +62,24 @@ if (!DATABASE_URL) {
 
 const db = createDBClient(DATABASE_URL)
 
+async function assertSeedSchemaReady() {
+	const result = await db.execute(
+		sql`SELECT to_regclass('public.facilities') AS facilities, to_regclass('public.problems') AS problems`
+	)
+	const row = result.rows[0] as
+		| {
+				facilities?: string | null
+				problems?: string | null
+		  }
+		| undefined
+
+	if (!row?.facilities || !row?.problems) {
+		throw new Error(
+			'Database schema is not initialized. Run "pnpm db:push" before running "pnpm db:seed".'
+		)
+	}
+}
+
 async function ensureProblemsTerminologyColumns() {
 	await db.execute(sql`ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "snomed_code" text`)
 	await db.execute(sql`ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "snomed_display" text`)
@@ -1873,6 +1891,7 @@ async function ensureNursingScenarios(params: {
 
 async function main() {
 	console.log("Seeding qhealth-emr development data...")
+	await assertSeedSchemaReady()
 	await ensureProblemsTerminologyColumns()
 	const facility = await ensureFacility()
 
