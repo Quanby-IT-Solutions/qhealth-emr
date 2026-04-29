@@ -1,7 +1,5 @@
 "use client"
 
-import { useState } from "react"
-
 import {
 	AlertTriangle,
 	CheckCircle2,
@@ -112,34 +110,20 @@ export function SyncStatusBanner({
 // ============================================================================
 
 interface SyncStatusProps {
-	initialQueue?: QueuedItem[]
+	syncState: SyncState
+	queue: QueuedItem[]
+	progress: number
+	lastSyncedAt: string | null
+	onSync: () => void
 }
 
-export function SyncStatus({ initialQueue = [] }: SyncStatusProps) {
-	// Demo state — in production this would come from a service worker / zustand store
-	const [syncState, setSyncState] = useState<SyncState>(
-		typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "online"
-	)
-	const [queue] = useState<QueuedItem[]>(initialQueue)
-	const [progress, setProgress] = useState(0)
-	const [lastSynced] = useState<string>(new Date().toISOString())
-
-	function handleManualSync() {
-		if (syncState === "offline") return
-		setSyncState("syncing")
-		setProgress(0)
-		const interval = setInterval(() => {
-			setProgress((p) => {
-				if (p >= 100) {
-					clearInterval(interval)
-					setSyncState("online")
-					return 100
-				}
-				return p + 20
-			})
-		}, 300)
-	}
-
+export function SyncStatus({
+	syncState,
+	queue,
+	progress,
+	lastSyncedAt,
+	onSync,
+}: SyncStatusProps) {
 	return (
 		<div className="space-y-4">
 			{/* Status card */}
@@ -161,7 +145,7 @@ export function SyncStatus({ initialQueue = [] }: SyncStatusProps) {
 						<Button
 							variant="outline"
 							size="sm"
-							onClick={handleManualSync}
+							onClick={onSync}
 							disabled={syncState === "offline" || syncState === "syncing"}
 						>
 							<RefreshCw className="mr-1.5 size-3.5" />
@@ -174,8 +158,10 @@ export function SyncStatus({ initialQueue = [] }: SyncStatusProps) {
 					{syncState === "online" && queue.length === 0 && (
 						<div className="flex items-center gap-2 text-sm text-green-600">
 							<CheckCircle2 className="size-4" />
-							All records synchronized. Last sync:{" "}
-							{new Date(lastSynced).toLocaleString("en-PH")}
+							All records synchronized.{" "}
+							{lastSyncedAt && (
+								<>Last sync: {new Date(lastSyncedAt).toLocaleString("en-PH")}</>
+							)}
 						</div>
 					)}
 
