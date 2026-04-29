@@ -1,11 +1,9 @@
-import { Controller, Req } from "@nestjs/common"
+import { Controller } from "@nestjs/common"
 import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
-import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
-import { buildChartAccessActor } from "@/modules/v1/audit/chart-access.service"
 import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { OrdersService } from "./orders.service"
@@ -32,17 +30,17 @@ export class OrdersController {
 
 	@RequirePermission("orders", "view")
 	@Implement(v1.orders.listMedOrders)
-	async listMedOrders(@Session() session: UserSession, @Req() req: Request) {
+	async listMedOrders() {
 		return implement(v1.orders.listMedOrders).handler(async ({ input }) => {
-			return this.ordersService.findMedOrders(input, buildChartAccessActor(session, req))
+			return this.ordersService.findMedOrders(input)
 		})
 	}
 
 	@RequirePermission("orders", "view")
 	@Implement(v1.orders.getMedOrder)
-	async getMedOrder(@Session() session: UserSession, @Req() req: Request) {
+	async getMedOrder() {
 		return implement(v1.orders.getMedOrder).handler(async ({ input }) => {
-			return this.ordersService.findMedOrder(input.id, buildChartAccessActor(session, req))
+			return this.ordersService.findMedOrder(input.id)
 		})
 	}
 
@@ -76,17 +74,17 @@ export class OrdersController {
 
 	@RequirePermission("orders", "view")
 	@Implement(v1.orders.listLabOrders)
-	async listLabOrders(@Session() session: UserSession, @Req() req: Request) {
+	async listLabOrders() {
 		return implement(v1.orders.listLabOrders).handler(async ({ input }) => {
-			return this.ordersService.findLabOrders(input, buildChartAccessActor(session, req))
+			return this.ordersService.findLabOrders(input)
 		})
 	}
 
 	@RequirePermission("orders", "view")
 	@Implement(v1.orders.getLabOrder)
-	async getLabOrder(@Session() session: UserSession, @Req() req: Request) {
+	async getLabOrder() {
 		return implement(v1.orders.getLabOrder).handler(async ({ input }) => {
-			return this.ordersService.findLabOrder(input.id, buildChartAccessActor(session, req))
+			return this.ordersService.findLabOrder(input.id)
 		})
 	}
 
@@ -112,17 +110,17 @@ export class OrdersController {
 
 	@RequirePermission("orders", "view")
 	@Implement(v1.orders.listImagingOrders)
-	async listImagingOrders(@Session() session: UserSession, @Req() req: Request) {
+	async listImagingOrders() {
 		return implement(v1.orders.listImagingOrders).handler(async ({ input }) => {
-			return this.ordersService.findImagingOrders(input, buildChartAccessActor(session, req))
+			return this.ordersService.findImagingOrders(input)
 		})
 	}
 
 	@RequirePermission("orders", "view")
 	@Implement(v1.orders.getImagingOrder)
-	async getImagingOrder(@Session() session: UserSession, @Req() req: Request) {
+	async getImagingOrder() {
 		return implement(v1.orders.getImagingOrder).handler(async ({ input }) => {
-			return this.ordersService.findImagingOrder(input.id, buildChartAccessActor(session, req))
+			return this.ordersService.findImagingOrder(input.id)
 		})
 	}
 
@@ -172,12 +170,9 @@ export class OrdersController {
 
 	@RequirePermission("orders", "view")
 	@Implement(v1.orders.getHighAlertVerification)
-	async getHighAlertVerification(@Session() session: UserSession, @Req() req: Request) {
+	async getHighAlertVerification() {
 		return implement(v1.orders.getHighAlertVerification).handler(async ({ input }) => {
-			return this.ordersService.getHighAlertVerification(
-				input.medicationOrderId,
-				buildChartAccessActor(session, req)
-			)
+			return this.ordersService.getHighAlertVerification(input.medicationOrderId)
 		})
 	}
 
@@ -187,17 +182,17 @@ export class OrdersController {
 
 	@RequirePermission("orders", "view")
 	@Implement(v1.orders.listPrescriptions)
-	async listPrescriptions(@Session() session: UserSession, @Req() req: Request) {
+	async listPrescriptions() {
 		return implement(v1.orders.listPrescriptions).handler(async ({ input }) => {
-			return this.ordersService.findPrescriptions(input, buildChartAccessActor(session, req))
+			return this.ordersService.findPrescriptions(input)
 		})
 	}
 
 	@RequirePermission("orders", "view")
 	@Implement(v1.orders.getPrescription)
-	async getPrescription(@Session() session: UserSession, @Req() req: Request) {
+	async getPrescription() {
 		return implement(v1.orders.getPrescription).handler(async ({ input }) => {
-			return this.ordersService.findPrescription(input.id, buildChartAccessActor(session, req))
+			return this.ordersService.findPrescription(input.id)
 		})
 	}
 
@@ -223,9 +218,9 @@ export class OrdersController {
 
 	@RequirePermission("orders", "view")
 	@Implement(v1.orders.getActiveOrders)
-	async getActiveOrders(@Session() session: UserSession, @Req() req: Request) {
+	async getActiveOrders() {
 		return implement(v1.orders.getActiveOrders).handler(async ({ input }) => {
-			return this.ordersService.getActiveOrders(input, buildChartAccessActor(session, req))
+			return this.ordersService.getActiveOrders(input)
 		})
 	}
 
