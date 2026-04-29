@@ -85,7 +85,16 @@ export function useBreakGlassEventsQuery(filter: {
 }
 
 export function useCreateBreakGlassMutation() {
-	return useMutation(orpc.audit.breakGlass.create.mutationOptions())
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.audit.breakGlass.create.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({
+					queryKey: orpc.audit.breakGlass.list.key(),
+				}),
+		})
+	)
 }
 
 export function useBreakGlassEventDetailQuery(id: string | null) {
@@ -108,6 +117,50 @@ export function usePatientBreakGlassEventsQuery(params: {
 				reviewStatus: params.reviewStatus as BreakGlassEvent["reviewStatus"] | undefined,
 				page: 1,
 				limit: 100,
+			},
+		})
+	)
+}
+
+export function useBreakGlassExportMutation() {
+	return useMutation(
+		orpc.audit.breakGlass.exportCsv.mutationOptions({
+			onSuccess: (data) => {
+				if (data.data.length === 0) return
+
+				const headers = [
+					"id",
+					"clinicianStaffId",
+					"patientId",
+					"reasonCategory",
+					"justification",
+					"accessGrantedAt",
+					"accessExpiresAt",
+					"reviewStatus",
+					"reviewedByStaffId",
+					"reviewNotes",
+					"reviewedAt",
+					"createdAt",
+				]
+				const rows = data.data.map(event =>
+					headers
+						.map(h => {
+							const val = event[h as keyof typeof event]
+							if (val == null) return ""
+							const str = val instanceof Date ? val.toISOString() : String(val)
+							return `"${str.replace(/"/g, '""')}"`
+						})
+						.join(",")
+				)
+
+				const csv = [headers.join(","), ...rows].join("\n")
+				const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+				const url = URL.createObjectURL(blob)
+				const a = document.createElement("a")
+				a.href = url
+				a.download = `break-glass-events-${new Date().toISOString().slice(0, 10)}.csv`
+				a.click()
+				URL.revokeObjectURL(url)
 			},
 		})
 	)

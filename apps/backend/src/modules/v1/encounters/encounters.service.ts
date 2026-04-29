@@ -26,6 +26,10 @@ import {
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
+import {
+	type ChartAccessActor,
+	ChartAccessService,
+} from "@/modules/v1/audit/chart-access.service"
 import { resolveStepTarget } from "@/utils/sla-step-target"
 
 type WorkflowType = "opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing"
@@ -42,7 +46,10 @@ type LinkedEncountersInput = V1Inputs["encounter"]["getLinked"]
 export class EncountersService {
 	private readonly logger = new Logger(EncountersService.name)
 
-	constructor(private readonly auditService: AuditService) {}
+	constructor(
+		private readonly auditService: AuditService,
+		private readonly chartAccessService: ChartAccessService
+	) {}
 
 	// ========================================================================
 	// Helper: resolve staffProfileId from userId (null-safe for audit)
@@ -100,7 +107,12 @@ export class EncountersService {
 	// List encounters for a patient
 	// ========================================================================
 
-	async list(filter: EncounterListInput) {
+	async list(filter: EncounterListInput, actor?: ChartAccessActor) {
+		await this.chartAccessService.ensurePatientChartReadAccess(actor, filter.patientId, {
+			entityType: "encounter_list",
+			entityId: filter.patientId,
+		})
+
 		const page = Number(filter.page) || 1
 		const limit = Number(filter.limit) || 50
 		const offset = (page - 1) * limit
@@ -172,7 +184,12 @@ export class EncountersService {
 	// Get encounter detail
 	// ========================================================================
 
-	async findById(input: EncounterIdInput) {
+	async findById(input: EncounterIdInput, actor?: ChartAccessActor) {
+		await this.chartAccessService.ensureEncounterChartReadAccess(actor, input.id, {
+			entityType: "encounter",
+			entityId: input.id,
+		})
+
 		// Subquery aliases for admitting and attending staff — eliminates 2 separate queries
 		const admittingStaffSq = db
 			.select({ id: staffProfiles.id, name: users.name })

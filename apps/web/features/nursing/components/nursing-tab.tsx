@@ -22,9 +22,10 @@ interface NursingTabProps {
 	patientId: string
 	patientDateOfBirth?: string
 	patientName?: string
+	readOnly?: boolean
 }
 
-export function NursingTab({ encounterId, facilityId, patientId, patientDateOfBirth, patientName }: NursingTabProps) {
+export function NursingTab({ encounterId, facilityId, patientId, patientDateOfBirth, patientName, readOnly }: NursingTabProps) {
 	return (
 		<Tabs defaultValue="vitals">
 			<TabsList variant="line">
@@ -41,25 +42,25 @@ export function NursingTab({ encounterId, facilityId, patientId, patientDateOfBi
 			</TabsList>
 
 			<TabsContent value="vitals">
-				<VitalsPanel encounterId={encounterId} facilityId={facilityId} />
+				<VitalsPanel encounterId={encounterId} facilityId={facilityId} readOnly={readOnly} />
 			</TabsContent>
 			<TabsContent value="mar">
-				<MarScreen encounterId={encounterId} facilityId={facilityId} />
+				<MarScreen encounterId={encounterId} facilityId={facilityId} readOnly={readOnly} />
 			</TabsContent>
 			<TabsContent value="tar">
-				<TarScreen encounterId={encounterId} facilityId={facilityId} />
+				<TarScreen encounterId={encounterId} facilityId={facilityId} readOnly={readOnly} />
 			</TabsContent>
 			<TabsContent value="io">
-				<IoTracking encounterId={encounterId} facilityId={facilityId} />
+				<IoTracking encounterId={encounterId} facilityId={facilityId} readOnly={readOnly} />
 			</TabsContent>
 			<TabsContent value="flowsheets">
 				<FlowsheetGrid encounterId={encounterId} facilityId={facilityId} />
 			</TabsContent>
 			<TabsContent value="handoff">
-				<ShiftHandoffForm encounterId={encounterId} facilityId={facilityId} />
+				<ShiftHandoffForm encounterId={encounterId} facilityId={facilityId} readOnly={readOnly} />
 			</TabsContent>
 			<TabsContent value="hai">
-				<HaiTagForm encounterId={encounterId} facilityId={facilityId} />
+				<HaiTagForm encounterId={encounterId} facilityId={facilityId} readOnly={readOnly} />
 			</TabsContent>
 			{patientDateOfBirth && isNewborn(patientDateOfBirth) && (
 				<TabsContent value="nbs">
@@ -69,6 +70,7 @@ export function NursingTab({ encounterId, facilityId, patientId, patientDateOfBi
 						facilityId={facilityId}
 						patientDateOfBirth={patientDateOfBirth}
 						patientName={patientName}
+						readOnly={readOnly}
 					/>
 				</TabsContent>
 			)}

@@ -16,6 +16,7 @@ interface PatientSearchParams {
 	isActive?: boolean
 	page?: number
 	limit?: number
+	clinicianStaffId?: string
 }
 
 export function usePatientSearchQuery(
@@ -32,6 +33,7 @@ export function usePatientSearchQuery(
 				isActive: params.isActive,
 				page: params.page ?? 1,
 				limit: params.limit ?? 50,
+				clinicianStaffId: params.clinicianStaffId,
 			},
 			enabled: options?.enabled ?? !!params.facilityId,
 			staleTime: 30 * 1000,
