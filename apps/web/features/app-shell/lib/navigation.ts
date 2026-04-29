@@ -96,7 +96,7 @@ interface NavItemConfig {
  *
  * Dashboard          — always visible
  * Register Patient   — roles that create patient records (adt/create → Registrar, Admin)
- * Patients           — anyone who can view clinical data (adt, clinical_docs, orders, nursing, billing)
+ * Patients           — patient-facing roles with read access, excluding registrar's duplicate entry
  * Bed Management     — roles that modify ADT records (adt/edit → Admin, Registrar-like)
  * Emergency          — roles that create pre-encounters (adt/create) OR chart nursing in ER (nursing/create)
  * Pharmacy           — roles with order-verify authority (orders/verify → Pharmacist)
@@ -122,8 +122,11 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "patient",
 		requiredPermissions: [{ module: "patients", action: "view" }],
 		// Pharmacists, Lab Techs, Radiologists, PIDSR Officers access patient data
-		// via their primary workflow nav, not the global Patients list
+		// via their primary workflow nav, not the global Patients list.
+		// Registrars already use "Register Patient" for the same destination, so
+		// hide this duplicate entry for the registrar role bundle.
 		excludePermissions: [
+			{ module: "patients", action: "edit" }, // Registrar
 			{ module: "orders", action: "verify" }, // Pharmacist
 			{ module: "laboratory", action: "view" }, // Lab Technologist, Blood Bank Technician
 			{ module: "radiology", action: "view" }, // Radiologist
