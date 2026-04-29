@@ -1,26 +1,10 @@
 "use client"
 
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { useNursingSync } from "@/features/nursing/lib/use-nursing-sync"
 import { SyncStatus } from "@/features/nursing/components/sync-status"
 
 export default function NursingSyncPage() {
-	const { data: profile } = useMyProfile()
-	// In a real implementation, we would fetch the actual queue from IndexedDB
-	// For this demo/implementation template, we'll provide some mock data
-	const mockQueue = [
-		{
-			id: "q1",
-			type: "vital_sign" as const,
-			description: "BP 120/80, HR 72",
-			createdAt: new Date().toISOString(),
-		},
-		{
-			id: "q2",
-			type: "handoff" as const,
-			description: "SBAR Shift Transition Note",
-			createdAt: new Date().toISOString(),
-		},
-	]
+	const { syncPhase, queue, progress, lastSyncedAt, triggerSync } = useNursingSync()
 
 	return (
 		<div className="space-y-6">
@@ -32,7 +16,13 @@ export default function NursingSyncPage() {
 			</div>
 
 			<div className="w-full">
-				<SyncStatus initialQueue={mockQueue} />
+				<SyncStatus
+					syncState={syncPhase}
+					queue={queue}
+					progress={progress}
+					lastSyncedAt={lastSyncedAt}
+					onSync={triggerSync}
+				/>
 			</div>
 		</div>
 	)
