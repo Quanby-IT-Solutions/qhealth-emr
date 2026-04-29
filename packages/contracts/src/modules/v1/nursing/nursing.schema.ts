@@ -382,7 +382,7 @@ export const ConsentTypeEnum = z.enum([
 export const ConsentRecordSchema = z.object({
 	id: z.string().uuid(),
 	facilityId: z.string().uuid(),
-	encounterId: z.string().uuid(),
+	encounterId: z.string().uuid().nullable(),
 	patientId: z.string().uuid(),
 	preEncounterId: z.string().uuid().nullable(),
 	consentType: z.string(),
@@ -401,7 +401,7 @@ export const ConsentRecordSchema = z.object({
 	patientSignature: z.string().nullable(),
 	guardianSignature: z.string().nullable(),
 	witnessSignature: z.string().nullable(),
-	capturedByStaffId: z.string().uuid(),
+	capturedByStaffId: z.string().uuid().nullable(),
 })
 
 export const CreateConsentRecordSchema = z.object({
