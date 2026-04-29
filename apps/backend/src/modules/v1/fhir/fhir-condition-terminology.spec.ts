@@ -36,6 +36,7 @@ function makeBundle(conditionOverrides: Record<string, unknown> = {}): FhirBundl
 							},
 						],
 					},
+					code: { text: "Test condition" },
 					subject: { reference: "Patient/pat-1" },
 					...conditionOverrides,
 				},
