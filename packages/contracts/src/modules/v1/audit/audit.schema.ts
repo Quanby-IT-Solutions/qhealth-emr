@@ -19,6 +19,12 @@ export const BreakGlassReasonCategoryEnum = z.enum([
 	"covering_for_absent_provider",
 	"administrative_need",
 	"other",
+	"cardiac_arrest",
+	"motor_vehicle_accident",
+	"code_blue",
+	"trauma",
+	"sepsis",
+	"stroke",
 ])
 
 export const BreakGlassReviewStatusEnum = z.enum(["pending", "appropriate", "flagged"])
@@ -214,6 +220,11 @@ export const ConfigHistoryListResponseSchema = z.object({
 // ============================================================================
 
 export const AuditLogExportFilterSchema = AuditLogFilterSchema.omit({
+	page: true,
+	limit: true,
+})
+
+export const BreakGlassExportFilterSchema = BreakGlassFilterSchema.omit({
 	page: true,
 	limit: true,
 })

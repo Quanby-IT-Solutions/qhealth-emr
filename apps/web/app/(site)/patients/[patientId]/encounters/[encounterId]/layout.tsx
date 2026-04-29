@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useState } from "react"
+import { use, useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -41,6 +41,23 @@ function calculateAge(dob: string) {
 	return Math.floor((now.getTime() - birth.getTime()) / (1000 * 60 * 60 * 24 * 365.25))
 }
 
+const BREAK_GLASS_REQUIRED_MESSAGE = "Break-glass required for this patient chart."
+
+function getActiveStaffProfile(
+	profile:
+		| {
+				staffProfiles?: Array<{ id: string; facilityId: string; roles: Array<{ id: string }> }>
+				activeRole?: { id: string } | null
+		  }
+		| undefined
+) {
+	return (
+		profile?.staffProfiles?.find(staffProfile =>
+			staffProfile.roles.some(role => role.id === profile?.activeRole?.id)
+		) ?? profile?.staffProfiles?.[0]
+	)
+}
+
 export default function EncounterChartLayout({
 	children,
 	params,
@@ -49,24 +66,36 @@ export default function EncounterChartLayout({
 	params: Promise<{ patientId: string; encounterId: string }>
 }) {
 	const { patientId, encounterId } = use(params)
-	const { data: encounter, isLoading, isError } = useEncounterDetailQuery(encounterId)
+	const encounterQuery = useEncounterDetailQuery(encounterId)
+	const { data: encounter, isLoading, isError, error, refetch: refetchEncounter } = encounterQuery
 	const { data: summary } = usePatientSummaryQuery(encounter?.patientId ?? "")
 	const pathname = usePathname()
 	const permSet = usePermissionSet()
 	const { data: profile } = useMyProfile()
+	const activeStaffProfile = getActiveStaffProfile(profile)
+	const activeFacilityId = activeStaffProfile?.facilityId
+	const breakGlassRequired =
+		error?.message?.includes(BREAK_GLASS_REQUIRED_MESSAGE) ||
+		String(error).includes(BREAK_GLASS_REQUIRED_MESSAGE)
 
 	// Break-Glass state
 	const [breakGlassOpen, setBreakGlassOpen] = useState(false)
 	const { data: activeBreakGlass } = useMyActiveBreakGlassQuery({
-		facilityId: encounter?.facilityId,
-		patientId: encounter?.patientId,
-		staffId: profile?.staffProfiles?.[0]?.id,
+		facilityId: encounter?.facilityId ?? activeFacilityId,
+		patientId: encounter?.patientId ?? patientId,
+		staffId: activeStaffProfile?.id,
 	})
 
 	// Clinicians with audit:create can invoke break-glass
 	const canInvokeBreakGlass = can(permSet, "audit", "create")
 
 	const base = `/patients/${patientId}/encounters/${encounterId}`
+
+	useEffect(() => {
+		if (breakGlassRequired && activeBreakGlass) {
+			void refetchEncounter()
+		}
+	}, [activeBreakGlass, breakGlassRequired, refetchEncounter])
 
 	// Each tab declares which permission it needs. Summary is always shown.
 	// Tabs are omitted entirely when the role lacks the required permission —
@@ -208,7 +237,29 @@ export default function EncounterChartLayout({
 					{isLoading ? (
 						<div className="h-12 animate-pulse rounded bg-muted" />
 					) : isError ? (
-						<p className="text-sm text-destructive">You do not have permission to view this encounter.</p>
+						breakGlassRequired && canInvokeBreakGlass && activeFacilityId ? (
+							<div className="w-full max-w-lg space-y-4">
+								<div>
+									<p className="text-sm font-medium text-foreground">Break-Glass Required</p>
+									<p className="text-sm text-muted-foreground">
+										This encounter is outside your regular access scope. Submit an emergency override
+										request to unlock temporary read-only access.
+									</p>
+								</div>
+								<BreakGlassForm
+									patientId={patientId}
+									facilityId={activeFacilityId}
+									entityType="encounter"
+									entityId={encounterId}
+									activeEvent={activeBreakGlass}
+									onSuccess={() => {
+										void refetchEncounter()
+									}}
+								/>
+							</div>
+						) : (
+							<p className="text-sm text-destructive">You do not have permission to view this encounter.</p>
+						)
 					) : encounter ? (
 						<div className="flex flex-wrap items-center gap-x-6 gap-y-2">
 							<div>
@@ -289,7 +340,10 @@ export default function EncounterChartLayout({
 											entityType="encounter"
 											entityId={encounterId}
 											activeEvent={activeBreakGlass}
-											onSuccess={() => setBreakGlassOpen(false)}
+											onSuccess={() => {
+												setBreakGlassOpen(false)
+												void refetchEncounter()
+											}}
 											onCancel={() => setBreakGlassOpen(false)}
 										/>
 									</DialogContent>
@@ -299,35 +353,39 @@ export default function EncounterChartLayout({
 					) : null}
 				</div>
 
-				{/* Tab Bar */}
-				<div className="border-b bg-background">
-					<nav className="flex overflow-x-auto px-6" aria-label="Encounter chart tabs">
-						{tabs.map(tab => {
-							const isActive =
-								tab.href === base
-									? pathname === base || pathname === `${base}/`
-									: pathname.startsWith(tab.href)
-							return (
-								<Link
-									key={tab.href}
-									href={tab.href}
-									className={cn(
-										"whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors",
-										isActive
-											? "border-primary text-foreground"
-											: "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
-									)}
-									aria-current={isActive ? "page" : undefined}
-								>
-									{tab.label}
-								</Link>
-							)
-						})}
-					</nav>
-				</div>
+				{encounter ? (
+					<>
+						{/* Tab Bar */}
+						<div className="border-b bg-background">
+							<nav className="flex overflow-x-auto px-6" aria-label="Encounter chart tabs">
+								{tabs.map(tab => {
+									const isActive =
+										tab.href === base
+											? pathname === base || pathname === `${base}/`
+											: pathname.startsWith(tab.href)
+									return (
+										<Link
+											key={tab.href}
+											href={tab.href}
+											className={cn(
+												"whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+												isActive
+													? "border-primary text-foreground"
+													: "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
+											)}
+											aria-current={isActive ? "page" : undefined}
+										>
+											{tab.label}
+										</Link>
+									)
+								})}
+							</nav>
+						</div>
 
-				{/* Page content */}
-				<main className="flex-1 overflow-auto p-6">{children}</main>
+						{/* Page content */}
+						<main className="flex-1 overflow-auto p-6">{children}</main>
+					</>
+				) : null}
 			</div>
 		</ChartContext.Provider>
 	)

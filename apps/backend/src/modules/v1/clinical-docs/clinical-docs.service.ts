@@ -17,6 +17,11 @@ import {
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
+import {
+	type ChartAccessActor,
+	type ChartAccessRecord,
+	ChartAccessService,
+} from "@/modules/v1/audit/chart-access.service"
 
 type ListTemplatesInput = V1Inputs["clinicalDocs"]["listTemplates"]
 type CreateTemplateInput = V1Inputs["clinicalDocs"]["createTemplate"]
@@ -56,7 +61,10 @@ interface TemplateForValidation {
 export class ClinicalDocsService {
 	private readonly logger = new Logger(ClinicalDocsService.name)
 
-	constructor(private readonly auditService: AuditService) {}
+	constructor(
+		private readonly auditService: AuditService,
+		private readonly chartAccessService: ChartAccessService
+	) {}
 
 	private async getStaffProfileId(userId: string, facilityId?: string): Promise<string> {
 		const conditions = [eq(staffProfiles.userId, userId), eq(staffProfiles.isActive, true)]
@@ -75,6 +83,24 @@ export class ClinicalDocsService {
 		}
 
 		return row.id
+	}
+
+	private async ensureChartReadAccess(
+		actor: ChartAccessActor | undefined,
+		input: {
+			encounterId?: string | null
+			patientId?: string | null
+			record: ChartAccessRecord
+		}
+	) {
+		if (input.encounterId) {
+			await this.chartAccessService.ensureEncounterChartReadAccess(actor, input.encounterId, input.record)
+			return
+		}
+
+		if (input.patientId) {
+			await this.chartAccessService.ensurePatientChartReadAccess(actor, input.patientId, input.record)
+		}
 	}
 
 	private sectionKeyFromLabel(label: string) {
@@ -362,7 +388,15 @@ export class ClinicalDocsService {
 	// Clinical Notes
 	// ========================================================================
 
-	async listNotes(input: ListNotesInput) {
+	async listNotes(input: ListNotesInput, actor?: ChartAccessActor) {
+		await this.ensureChartReadAccess(actor, {
+			encounterId: input.encounterId ?? null,
+			record: {
+				entityType: "clinical_note_list",
+				entityId: input.encounterId ?? input.preEncounterId ?? "clinical-notes",
+			},
+		})
+
 		const page = Number(input.page ?? 1)
 		const limit = Number(input.limit ?? 50)
 		const offset = (page - 1) * limit
@@ -424,7 +458,7 @@ export class ClinicalDocsService {
 		}
 	}
 
-	async getNote(id: string) {
+	async getNote(id: string, actor?: ChartAccessActor) {
 		const [row] = await db
 			.select({
 				id: clinicalNotes.id,
@@ -451,6 +485,10 @@ export class ClinicalDocsService {
 			.where(eq(clinicalNotes.id, id))
 
 		if (!row) throw new NotFoundException(`Clinical note ${id} not found`)
+		await this.ensureChartReadAccess(actor, {
+			encounterId: row.encounterId,
+			record: { entityType: "clinical_note", entityId: row.id },
+		})
 
 		// Fetch addenda
 		const addendaRows = await db
@@ -646,7 +684,12 @@ export class ClinicalDocsService {
 		return this.getNote(input.id)
 	}
 
-	async getNoteContext(input: NoteContextInput) {
+	async getNoteContext(input: NoteContextInput, actor?: ChartAccessActor) {
+		await this.chartAccessService.ensureEncounterChartReadAccess(actor, input.encounterId, {
+			entityType: "clinical_note_context",
+			entityId: input.encounterId,
+		})
+
 		const [encounter] = await db
 			.select({
 				id: encounters.id,
@@ -848,7 +891,16 @@ export class ClinicalDocsService {
 	// Consent Records
 	// ========================================================================
 
-	async listConsents(input: ListConsentsInput) {
+	async listConsents(input: ListConsentsInput, actor?: ChartAccessActor) {
+		await this.ensureChartReadAccess(actor, {
+			encounterId: input.encounterId ?? null,
+			patientId: input.patientId ?? null,
+			record: {
+				entityType: "consent_list",
+				entityId: input.encounterId ?? input.patientId ?? "consents",
+			},
+		})
+
 		const page = Number(input.page ?? 1)
 		const limit = Number(input.limit ?? 50)
 		const offset = (page - 1) * limit
@@ -908,7 +960,7 @@ export class ClinicalDocsService {
 		}
 	}
 
-	async getConsent(id: string) {
+	async getConsent(id: string, actor?: ChartAccessActor) {
 		const [row] = await db
 			.select({
 				id: consentRecords.id,
@@ -933,6 +985,11 @@ export class ClinicalDocsService {
 			.where(eq(consentRecords.id, id))
 
 		if (!row) throw new NotFoundException(`Consent record ${id} not found`)
+		await this.ensureChartReadAccess(actor, {
+			encounterId: row.encounterId,
+			patientId: row.patientId,
+			record: { entityType: "consent_record", entityId: row.id },
+		})
 		return row
 	}
 
@@ -982,7 +1039,12 @@ export class ClinicalDocsService {
 	// Cross-module: Signed Notes for CF4 Extraction
 	// ========================================================================
 
-	async getSignedNotes(input: SignedNotesInput) {
+	async getSignedNotes(input: SignedNotesInput, actor?: ChartAccessActor) {
+		await this.chartAccessService.ensureEncounterChartReadAccess(actor, input.encounterId, {
+			entityType: "signed_clinical_notes",
+			entityId: input.encounterId,
+		})
+
 		const rows = await db
 			.select({
 				id: clinicalNotes.id,
@@ -1014,8 +1076,8 @@ export class ClinicalDocsService {
 		return { notes: rows }
 	}
 
-	async extractCf4Data(input: ExtractCf4DataInput) {
-		const { notes } = await this.getSignedNotes({ encounterId: input.encounterId })
+	async extractCf4Data(input: ExtractCf4DataInput, actor?: ChartAccessActor) {
+		const { notes } = await this.getSignedNotes({ encounterId: input.encounterId }, actor)
 		const extractedAt = new Date().toISOString()
 
 		const pickField = (

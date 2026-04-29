@@ -55,9 +55,10 @@ function statusBadge(status: TarStatus) {
 interface TarScreenProps {
 	encounterId: string
 	facilityId: string
+	readOnly?: boolean
 }
 
-export function TarScreen({ encounterId, facilityId }: TarScreenProps) {
+export function TarScreen({ encounterId, facilityId, readOnly }: TarScreenProps) {
 	const [createOpen, setCreateOpen] = useState(false)
 	const [administeringId, setAdministeringId] = useState<string | null>(null)
 
@@ -172,11 +173,13 @@ export function TarScreen({ encounterId, facilityId }: TarScreenProps) {
 				</DialogContent>
 			</Dialog>
 
-			<div className="mb-4 flex justify-end">
-				<Button size="sm" onClick={() => setCreateOpen(true)}>
-					Add Treatment
-				</Button>
-			</div>
+			{!readOnly && (
+				<div className="mb-4 flex justify-end">
+					<Button size="sm" onClick={() => setCreateOpen(true)}>
+						Add Treatment
+					</Button>
+				</div>
+			)}
 
 			{tarEntries.isLoading ? (
 				<div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
@@ -214,7 +217,7 @@ export function TarScreen({ encounterId, facilityId }: TarScreenProps) {
 										{t.notes ?? "—"}
 									</TableCell>
 									<TableCell>
-										{t.status === "due" && (
+										{!readOnly && t.status === "due" && (
 											<Button
 												size="sm"
 												variant="outline"

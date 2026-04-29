@@ -70,6 +70,9 @@ export function PatientSearch() {
 	const canTriage = permissions.some(
 		p => p.module === "opd" && (p.action === "create" || p.action === "edit"),
 	)
+	const isBreakGlassEnforced = permissions.some(
+		p => p.module === "audit" && p.action === "create",
+	)
 
 	const [searchTerm, setSearchTerm] = useState("")
 	const [mrnFilter, setMrnFilter] = useState("")
@@ -92,6 +95,7 @@ export function PatientSearch() {
 		dateOfBirth?: string
 		page: number
 		limit: number
+		clinicianStaffId?: string
 	} | null>(null)
 
 	// Offline continuity — SS-001: load facility cache before the server query so
@@ -100,7 +104,7 @@ export function PatientSearch() {
 
 	// PS-042: automatically load all patients initially if no committed search — improve navigation UX
 	const { data, isLoading, isFetching } = usePatientSearchQuery(
-		committedParams ?? { facilityId, page: 1, limit: 50 },
+		committedParams ?? { facilityId, page: 1, limit: 50, clinicianStaffId: isBreakGlassEnforced && staffId ? staffId : undefined },
 		{ enabled: isOnline && !!facilityId },
 	)
 
@@ -113,6 +117,7 @@ export function PatientSearch() {
 			dateOfBirth: dobFilter || undefined,
 			page: 1,
 			limit: 50,
+			clinicianStaffId: isBreakGlassEnforced && staffId ? staffId : undefined,
 		})
 	}
 
@@ -272,10 +277,17 @@ export function PatientSearch() {
 											</span>
 										</TableCell>
 										<TableCell>
-											<span className="font-medium">
-												{patient.lastName}, {patient.firstName}
-												{patient.middleName ? ` ${patient.middleName}` : ""}
-											</span>
+											<div className="flex items-center gap-1.5">
+												<span className="font-medium">
+													{patient.lastName}, {patient.firstName}
+													{patient.middleName ? ` ${patient.middleName}` : ""}
+												</span>
+												{isBreakGlassEnforced && (patient as { hasDirectAccess?: boolean }).hasDirectAccess === false && (
+													<Badge variant="secondary" className="shrink-0 text-[10px]">
+														Restricted
+													</Badge>
+												)}
+											</div>
 										</TableCell>
 										<TableCell>{formatDate(patient.dateOfBirth)}</TableCell>
 										<TableCell>{formatSex(patient.sex)}</TableCell>

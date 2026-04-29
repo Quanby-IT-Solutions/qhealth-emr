@@ -1,9 +1,11 @@
-import { Controller } from "@nestjs/common"
+import { Controller, Req } from "@nestjs/common"
 import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
+import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
+import { buildChartAccessActor } from "@/modules/v1/audit/chart-access.service"
 import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { EncountersService } from "./encounters.service"
@@ -14,17 +16,17 @@ export class EncountersController {
 
 	@RequirePermission("patients", "view")
 	@Implement(v1.encounter.list)
-	async list() {
+	async list(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.encounter.list).handler(async ({ input }) => {
-			return this.encountersService.list(input)
+			return this.encountersService.list(input, buildChartAccessActor(session, req))
 		})
 	}
 
 	@RequirePermission("patients", "view")
 	@Implement(v1.encounter.get)
-	async get() {
+	async get(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.encounter.get).handler(async ({ input }) => {
-			return this.encountersService.findById(input)
+			return this.encountersService.findById(input, buildChartAccessActor(session, req))
 		})
 	}
 

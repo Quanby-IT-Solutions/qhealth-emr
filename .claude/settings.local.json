@@ -148,7 +148,9 @@
       "Bash(rtk find *)",
       "Bash(rtk grep *)",
       "Bash(rtk tsc *)",
-      "Bash(rtk ls *)"
+      "Bash(rtk ls *)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|js\\)$\")",
+      "Bash(rtk read *)"
     ]
   }
 }

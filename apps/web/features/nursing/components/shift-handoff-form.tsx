@@ -45,9 +45,10 @@ function formatDateTime(dateStr: string | null | undefined) {
 interface ShiftHandoffFormProps {
 	encounterId: string
 	facilityId: string
+	readOnly?: boolean
 }
 
-export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormProps) {
+export function ShiftHandoffForm({ encounterId, facilityId, readOnly }: ShiftHandoffFormProps) {
 	const [createOpen, setCreateOpen] = useState(false)
 	const [notes, setNotes] = useState("")
 
@@ -81,8 +82,8 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 
 	return (
 		<div className="space-y-4">
-			{/* Generate summary card */}
-			<Card>
+			{/* Generate summary card — nurses only */}
+			{!readOnly && <Card>
 				<CardHeader className="flex flex-row items-center justify-between">
 					<CardTitle>Handoff Summary Generator</CardTitle>
 					<Button
@@ -150,10 +151,10 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 						</div>
 					</CardContent>
 				)}
-			</Card>
+			</Card>}
 
-			{/* New handoff dialog */}
-			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
+			{/* New handoff dialog — nurses only */}
+			{!readOnly && <Dialog open={createOpen} onOpenChange={setCreateOpen}>
 				<DialogContent className="sm:max-w-lg">
 					<DialogHeader>
 						<DialogTitle>Create Shift Handoff</DialogTitle>
@@ -217,14 +218,16 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 						</div>
 					</form>
 				</DialogContent>
-			</Dialog>
+			</Dialog>}
 
 			{/* Handoff history */}
 			<div className="flex items-center justify-between">
 				<h3 className="font-semibold">Shift Handoffs</h3>
-				<Button size="sm" onClick={() => setCreateOpen(true)}>
-					New Handoff
-				</Button>
+				{!readOnly && (
+					<Button size="sm" onClick={() => setCreateOpen(true)}>
+						New Handoff
+					</Button>
+				)}
 			</div>
 
 			{handoffs.isLoading ? (
@@ -263,7 +266,7 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 										{formatDateTime(h.signedAt)}
 									</TableCell>
 									<TableCell>
-										{h.status === "draft" && (
+										{!readOnly && h.status === "draft" && (
 											<Button
 												size="sm"
 												variant="outline"
