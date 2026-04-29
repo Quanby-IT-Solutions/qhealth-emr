@@ -53,6 +53,12 @@ type DeleteCatalogEntryInput = V1Inputs["formulary"]["codeSetAdmin"]["deleteEntr
 type CatalogVersionFilterInput = V1Inputs["formulary"]["codeSetAdmin"]["listVersions"]
 type PublishCatalogVersionInput = V1Inputs["formulary"]["codeSetAdmin"]["publishVersion"]
 
+type CatalogType = "icd10" | "loinc" | "rxnorm" | "rvs" | "snomed_ct"
+type CatalogUploadStatus = "completed" | "failed"
+
+type CatalogUploadRow<T> = T & { catalogType: CatalogType; status: CatalogUploadStatus }
+type CatalogTypedRow<T> = T & { catalogType: CatalogType }
+
 export interface FormularyActor {
 	userId: string
 	facilityId: string
@@ -858,7 +864,13 @@ export class FormularyService {
 		])
 
 		const total = totalResult[0]?.count ?? 0
-		return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
+		return {
+			data: data as Array<CatalogUploadRow<(typeof data)[number]>>,
+			total,
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit),
+		}
 	}
 
 	async recordCatalogUpload(input: RecordCatalogUploadInput, actor: FormularyActor) {
@@ -892,7 +904,7 @@ export class FormularyService {
 			metadata: { catalogType: created!.catalogType, entryCount: created!.entryCount },
 		})
 
-		return created!
+		return created! as CatalogUploadRow<NonNullable<typeof created>>
 	}
 
 	async setCodeActive(input: SetCodeActiveInput, actor: FormularyActor) {
@@ -974,7 +986,13 @@ export class FormularyService {
 		])
 
 		const total = totalResult[0]?.count ?? 0
-		return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
+		return {
+			data: data as Array<CatalogTypedRow<(typeof data)[number]>>,
+			total,
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit),
+		}
 	}
 
 	async createDeprecatedMapping(input: CreateDeprecatedMappingInput, actor: FormularyActor) {
@@ -1003,7 +1021,7 @@ export class FormularyService {
 			metadata: null,
 		})
 
-		return created!
+		return created! as CatalogTypedRow<NonNullable<typeof created>>
 	}
 
 	async updateDeprecatedMapping(input: UpdateDeprecatedMappingInput, actor: FormularyActor) {
@@ -1038,7 +1056,7 @@ export class FormularyService {
 			metadata: null,
 		})
 
-		return updated
+		return updated as CatalogTypedRow<typeof updated>
 	}
 
 	async deleteDeprecatedMapping(input: DeleteDeprecatedMappingInput, actor: FormularyActor) {
@@ -1075,8 +1093,8 @@ export class FormularyService {
 	// ========================================================================
 
 	/** Map a catalog type string to its Drizzle table */
-	private getCatalogTable(catalogType: string) {
-		const tableMap: Record<string, typeof icd10Codes | typeof loincCodes | typeof rxnormCodes | typeof rvsCodes | typeof snomedCtCodes> = {
+	private getCatalogTable(catalogType: CatalogType) {
+		const tableMap: Record<CatalogType, typeof icd10Codes | typeof loincCodes | typeof rxnormCodes | typeof rvsCodes | typeof snomedCtCodes> = {
 			icd10: icd10Codes,
 			loinc: loincCodes,
 			rxnorm: rxnormCodes,
@@ -1089,7 +1107,7 @@ export class FormularyService {
 	}
 
 	/** Project any catalog row to the flat CatalogEntry response shape */
-	private projectCatalogRow(row: Record<string, unknown>, catalogType: string) {
+	private projectCatalogRow(row: Record<string, unknown>, catalogType: CatalogType) {
 		return {
 			id: row["id"] as string,
 			catalogType,
@@ -1174,15 +1192,16 @@ export class FormularyService {
 	}
 
 	async createCatalogEntry(input: CreateCatalogEntryInput, actor: FormularyActor) {
-		const { catalogType, ...fields } = input as Record<string, unknown> & { catalogType: string }
+		const { catalogType, ...fields } = input as Record<string, unknown> & { catalogType: CatalogType }
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const table: any = this.getCatalogTable(catalogType)
 
-		const [created] = await db
+		const rows = (await db
 			.insert(table)
 			.values({ ...fields, createdByUserId: actor.userId })
-			.returning()
+			.returning()) as Array<Record<string, unknown>>
+		const created = rows[0]!
 
 		await this.auditService.log({
 			facilityId: actor.facilityId,
@@ -1308,7 +1327,7 @@ export class FormularyService {
 			metadata: { catalogType: input.catalogType, versionTag: input.versionTag },
 		})
 
-		return version!
+		return version! as CatalogTypedRow<NonNullable<typeof version>>
 	}
 
 	async listCatalogVersions(filter: CatalogVersionFilterInput) {
@@ -1334,6 +1353,12 @@ export class FormularyService {
 		])
 
 		const total = totalResult[0]?.count ?? 0
-		return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
+		return {
+			data: data as Array<CatalogTypedRow<(typeof data)[number]>>,
+			total,
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit),
+		}
 	}
 }

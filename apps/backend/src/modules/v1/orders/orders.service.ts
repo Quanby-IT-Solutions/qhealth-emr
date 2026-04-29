@@ -62,7 +62,7 @@ export class OrdersService {
 
 	async evaluateCds(input: CdsEvaluateInput) {
 		const alerts: {
-			type: "allergy_hard_block" | "allergy_soft_block" | "formulary_warning" | "high_alert" | "s2_license_block"
+			type: "allergy_hard_block" | "allergy_soft_block" | "formulary_warning" | "formulary_restricted" | "high_alert" | "s2_license_block"
 			severity: "hard_block" | "soft_block" | "warning" | "info"
 			message: string
 			details?: Record<string, unknown>

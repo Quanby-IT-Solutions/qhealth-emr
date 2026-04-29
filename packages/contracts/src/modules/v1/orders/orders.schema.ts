@@ -65,6 +65,7 @@ export const CdsAlertTypeEnum = z.enum([
 	"allergy_hard_block",
 	"allergy_soft_block",
 	"formulary_warning",
+	"formulary_restricted",
 	"high_alert",
 	"s2_license_block",
 ])
