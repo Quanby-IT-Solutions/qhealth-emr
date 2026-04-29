@@ -1,8 +1,9 @@
 "use client"
 
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Search01FreeIcons, WifiOffFreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import Link from "next/link"
 
 import { Separator } from "@/core/components/ui/separator"
 import { SidebarTrigger } from "@/core/components/ui/sidebar"
@@ -12,11 +13,17 @@ import { RoleSwitcher } from "@/features/app-shell/components/role-switcher"
 import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 
 export function AppTopbar() {
+	const pathname = usePathname()
 	const { data: profile } = useMyProfile()
 	const { isOnline } = useOfflineSync()
 	const canSearchPatients =
 		profile?.activeRole?.permissions.some(p => p.module === "patients" && p.action === "view") ??
 		false
+	const isPatientProfilePage = /^\/patients\/[^/]+$/.test(pathname)
+
+	if (isPatientProfilePage) {
+		return null
+	}
 
 	return (
 		<>
@@ -28,7 +35,7 @@ export function AppTopbar() {
 				<div className="flex flex-1 items-center">
 					{canSearchPatients && (
 						<Link
-							href="/patients/search"
+							href="/patients/register"
 							className="bg-muted/40 hover:bg-muted/60 flex h-8 w-full max-w-sm items-center gap-2 rounded-md border px-3 text-sm transition-colors"
 						>
 							<HugeiconsIcon icon={Search01FreeIcons} className="text-muted-foreground size-4" />

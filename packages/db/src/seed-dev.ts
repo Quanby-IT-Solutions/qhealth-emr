@@ -31,7 +31,7 @@ import {
 	marEntries,
 	medicationOrders,
 	noteTemplates,
-	nursingConsentRecords,
+	consentRecords,
 	patients,
 	payments,
 	pidsrCases,
@@ -61,6 +61,24 @@ if (!DATABASE_URL) {
 }
 
 const db = createDBClient(DATABASE_URL)
+
+async function assertSeedSchemaReady() {
+	const result = await db.execute(
+		sql`SELECT to_regclass('public.facilities') AS facilities, to_regclass('public.problems') AS problems`
+	)
+	const row = result.rows[0] as
+		| {
+				facilities?: string | null
+				problems?: string | null
+		  }
+		| undefined
+
+	if (!row?.facilities || !row?.problems) {
+		throw new Error(
+			'Database schema is not initialized. Run "pnpm db:push" before running "pnpm db:seed".'
+		)
+	}
+}
 
 async function ensureProblemsTerminologyColumns() {
 	await db.execute(sql`ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "snomed_code" text`)
@@ -1795,10 +1813,10 @@ async function ensureNursingScenarios(params: {
 	// General consent — ER encounter
 	const [generalConsent] = await db
 		.select()
-		.from(nursingConsentRecords)
-		.where(and(eq(nursingConsentRecords.encounterId, erEncounterId), eq(nursingConsentRecords.consentType, "general")))
+		.from(consentRecords)
+		.where(and(eq(consentRecords.encounterId, erEncounterId), eq(consentRecords.consentType, "general")))
 	if (!generalConsent) {
-		await db.insert(nursingConsentRecords).values({
+		await db.insert(consentRecords).values({
 			facilityId,
 			encounterId: erEncounterId,
 			patientId: erPatientId,
@@ -1817,10 +1835,10 @@ async function ensureNursingScenarios(params: {
 	// DPA consent — ER encounter
 	const [dpaConsent] = await db
 		.select()
-		.from(nursingConsentRecords)
-		.where(and(eq(nursingConsentRecords.encounterId, erEncounterId), eq(nursingConsentRecords.consentType, "dpa")))
+		.from(consentRecords)
+		.where(and(eq(consentRecords.encounterId, erEncounterId), eq(consentRecords.consentType, "dpa")))
 	if (!dpaConsent) {
-		await db.insert(nursingConsentRecords).values({
+		await db.insert(consentRecords).values({
 			facilityId,
 			encounterId: erEncounterId,
 			patientId: erPatientId,
@@ -1839,12 +1857,12 @@ async function ensureNursingScenarios(params: {
 	// General consent — Inpatient encounter
 	const [ipGeneralConsent] = await db
 		.select()
-		.from(nursingConsentRecords)
+		.from(consentRecords)
 		.where(
-			and(eq(nursingConsentRecords.encounterId, inpatientEncounterId), eq(nursingConsentRecords.consentType, "general"))
+			and(eq(consentRecords.encounterId, inpatientEncounterId), eq(consentRecords.consentType, "general"))
 		)
 	if (!ipGeneralConsent) {
-		await db.insert(nursingConsentRecords).values({
+		await db.insert(consentRecords).values({
 			facilityId,
 			encounterId: inpatientEncounterId,
 			patientId: inpatientPatientId,
@@ -1873,6 +1891,7 @@ async function ensureNursingScenarios(params: {
 
 async function main() {
 	console.log("Seeding qhealth-emr development data...")
+	await assertSeedSchemaReady()
 	await ensureProblemsTerminologyColumns()
 	const facility = await ensureFacility()
 

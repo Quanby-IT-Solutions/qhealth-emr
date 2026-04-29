@@ -20,7 +20,15 @@ export const noteTemplates = createTable(
 		category: t
 			.text("category")
 			.notNull()
-			.$type<"admission" | "progress" | "consultation" | "discharge_summary" | "fpe" | "operative" | "anesthesia">(),
+			.$type<
+				| "admission"
+				| "progress"
+				| "consultation"
+				| "discharge_summary"
+				| "fpe"
+				| "operative"
+				| "anesthesia"
+			>(),
 		sections: t.jsonb("sections").notNull().default([]),
 		isActive: t.boolean("is_active").notNull().default(true),
 		createdByStaffId: t
@@ -43,19 +51,23 @@ export const clinicalNotes = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
 		preEncounterId: t
 			.uuid("pre_encounter_id")
 			.references(() => preEncounters.id, { onDelete: "set null" }),
-		templateId: t
-			.uuid("template_id")
-			.references(() => noteTemplates.id, { onDelete: "set null" }),
+		templateId: t.uuid("template_id").references(() => noteTemplates.id, { onDelete: "set null" }),
 		noteType: t
 			.text("note_type")
 			.notNull()
-			.$type<"admission" | "progress" | "consultation" | "discharge_summary" | "fpe" | "operative" | "anesthesia">(),
+			.$type<
+				| "admission"
+				| "progress"
+				| "consultation"
+				| "discharge_summary"
+				| "fpe"
+				| "operative"
+				| "anesthesia"
+			>(),
 		content: t.text("content").notNull().default(""),
 		structuredData: t.jsonb("structured_data"),
 		status: t.text("status").notNull().default("draft").$type<"draft" | "signed">(),
@@ -105,10 +117,10 @@ export const consentRecords = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.notNull()
-			.references(() => encounters.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
+		preEncounterId: t
+			.uuid("pre_encounter_id")
+			.references(() => preEncounters.id, { onDelete: "set null" }),
 		patientId: t
 			.uuid("patient_id")
 			.notNull()
@@ -116,7 +128,9 @@ export const consentRecords = createTable(
 		consentType: t
 			.text("consent_type")
 			.notNull()
-			.$type<"general" | "procedure" | "research" | "blood_transfusion" | "surgery" | "dpa" | "nbs">(),
+			.$type<
+				"general" | "procedure" | "research" | "blood_transfusion" | "surgery" | "dpa" | "nbs"
+			>(),
 		signedByName: t.text("signed_by_name").notNull(),
 		relationship: t
 			.text("relationship")
@@ -131,12 +145,22 @@ export const consentRecords = createTable(
 		isActive: t.boolean("is_active").notNull().default(true),
 		revokedAt: t.timestamp("revoked_at"),
 		revocationReason: t.text("revocation_reason"),
+		consentText: t.text("consent_text").notNull().default(""),
+		patientSignature: t.text("patient_signature"),
+		guardianSignature: t.text("guardian_signature"),
+		witnessSignature: t.text("witness_signature"),
+		// Nullable: clinical-docs consent capture path has no designated capturing staff member
+		capturedByStaffId: t
+			.uuid("captured_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "restrict" }),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 	}),
 	t => [
 		index("consent_records_encounter_id_idx").on(t.encounterId),
 		index("consent_records_patient_id_idx").on(t.patientId),
+		index("consent_records_facility_id_idx").on(t.facilityId),
+		index("consent_records_consent_type_idx").on(t.consentType),
 	]
 )
 
@@ -152,9 +176,7 @@ export const problems = createTable(
 			.uuid("patient_id")
 			.notNull()
 			.references(() => patients.id, { onDelete: "cascade" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
 		icd10Code: t.text("icd10_code"),
 		icd10Display: t.text("icd10_display"),
 		snomedCode: t.text("snomed_code"),
@@ -195,10 +217,7 @@ export const allergies = createTable(
 			.notNull()
 			.$type<"medication" | "food" | "environmental">(),
 		reactionType: t.text("reaction_type"),
-		severity: t
-			.text("severity")
-			.notNull()
-			.$type<"mild" | "moderate" | "severe">(),
+		severity: t.text("severity").notNull().$type<"mild" | "moderate" | "severe">(),
 		onsetDate: t.date("onset_date"),
 		isActive: t.boolean("is_active").notNull().default(true),
 		documentingStaffId: t
@@ -228,13 +247,13 @@ export const medicalRecordsRequests = createTable(
 			.uuid("patient_id")
 			.notNull()
 			.references(() => patients.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
 		requestType: t
 			.text("request_type")
 			.notNull()
-			.$type<"chart_release" | "medical_certificate" | "discharge_summary_copy" | "laboratory_results">(),
+			.$type<
+				"chart_release" | "medical_certificate" | "discharge_summary_copy" | "laboratory_results"
+			>(),
 		requestedByName: t.text("requested_by_name").notNull(),
 		requestedByRelationship: t
 			.text("requested_by_relationship")

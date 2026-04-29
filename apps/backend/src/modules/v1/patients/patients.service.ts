@@ -77,10 +77,16 @@ export class PatientsService {
 		const page = Number(filter.page) || 1
 		const limit = Number(filter.limit) || 50
 		const offset = (page - 1) * limit
+		const isActive =
+			filter.isActive === true || filter.isActive === "true"
+				? true
+				: filter.isActive === false || filter.isActive === "false"
+					? false
+					: true
 
 		const conditions = [eq(patients.facilityId, filter.facilityId)]
 
-		conditions.push(eq(patients.isActive, filter.isActive ?? true))
+		conditions.push(eq(patients.isActive, isActive))
 
 		if (filter.search) {
 			const s = this.escapeLike(filter.search)
@@ -100,6 +106,11 @@ export class PatientsService {
 
 		if (filter.dateOfBirth) {
 			conditions.push(eq(patients.dateOfBirth, filter.dateOfBirth))
+		}
+
+		if (filter.philhealthMemberId) {
+			const philhealthMemberId = this.escapeLike(filter.philhealthMemberId)
+			conditions.push(ilike(patients.philhealthMemberId, `%${philhealthMemberId}%`))
 		}
 
 		const whereClause = and(...conditions)
@@ -126,6 +137,7 @@ export class PatientsService {
 					middleName: patients.middleName,
 					dateOfBirth: patients.dateOfBirth,
 					sex: patients.sex,
+					philhealthMemberId: patients.philhealthMemberId,
 					isActive: patients.isActive,
 					lastEncounterDate: lastEncounterSq.lastEncounterDate,
 				})

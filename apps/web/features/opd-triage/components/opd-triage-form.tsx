@@ -1,7 +1,7 @@
 "use client"
 
-import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
@@ -37,13 +37,10 @@ export function OpdTriageForm({ patientId }: OpdTriageFormProps) {
 		weightKg: "",
 	})
 
-	const update = (field: string, value: string) =>
-		setForm(prev => ({ ...prev, [field]: value }))
+	const update = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }))
 
-	const parseOptionalInt = (v: string) =>
-		v.trim() !== "" ? parseInt(v, 10) : undefined
-	const parseOptionalFloat = (v: string) =>
-		v.trim() !== "" ? parseFloat(v) : undefined
+	const parseOptionalInt = (v: string) => (v.trim() !== "" ? parseInt(v, 10) : undefined)
+	const parseOptionalFloat = (v: string) => (v.trim() !== "" ? parseFloat(v) : undefined)
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
@@ -67,22 +64,21 @@ export function OpdTriageForm({ patientId }: OpdTriageFormProps) {
 
 		if (patientId) {
 			// Registered patient: proceed directly to encounter creation
-			router.push(
-				`/patients/${patientId}/encounters/new?type=outpatient&triageId=${intake.id}`
-			)
+			router.push(`/patients/${patientId}/encounters/new?type=outpatient&triageId=${intake.id}`)
 		} else {
 			// Pre-registration: go to registrar queue so intake can be linked to a patient
-			router.push(`/patients/search?pendingTriageId=${intake.id}`)
+			router.push(`/patients/register?pendingTriageId=${intake.id}`)
 		}
 	}
 
 	return (
-		<form onSubmit={(e) => void handleSubmit(e)} className="space-y-6 max-w-2xl mx-auto">
+		<form onSubmit={e => void handleSubmit(e)} className="mx-auto max-w-2xl space-y-6">
 			{!patientId && (
 				<Card className="border-amber-200 bg-amber-50">
 					<CardContent className="pt-4 pb-3">
 						<p className="text-sm text-amber-800">
-							<strong>Walk-in triage</strong> — Patient is not yet registered. Complete triage now and a registrar will link this intake to the patient record.
+							<strong>Walk-in triage</strong> — Patient is not yet registered. Complete triage now
+							and a registrar will link this intake to the patient record.
 						</p>
 					</CardContent>
 				</Card>
@@ -100,7 +96,7 @@ export function OpdTriageForm({ patientId }: OpdTriageFormProps) {
 							required
 							placeholder="Describe the patient's main concern"
 							value={form.chiefComplaint}
-							onChange={(e) => update("chiefComplaint", e.target.value)}
+							onChange={e => update("chiefComplaint", e.target.value)}
 							rows={3}
 						/>
 					</div>
@@ -121,7 +117,7 @@ export function OpdTriageForm({ patientId }: OpdTriageFormProps) {
 							max={300}
 							placeholder="120"
 							value={form.systolicBp}
-							onChange={(e) => update("systolicBp", e.target.value)}
+							onChange={e => update("systolicBp", e.target.value)}
 						/>
 					</div>
 					<div className="space-y-1">
@@ -133,7 +129,7 @@ export function OpdTriageForm({ patientId }: OpdTriageFormProps) {
 							max={200}
 							placeholder="80"
 							value={form.diastolicBp}
-							onChange={(e) => update("diastolicBp", e.target.value)}
+							onChange={e => update("diastolicBp", e.target.value)}
 						/>
 					</div>
 					<div className="space-y-1">
@@ -146,7 +142,7 @@ export function OpdTriageForm({ patientId }: OpdTriageFormProps) {
 							max={45}
 							placeholder="36.5"
 							value={form.temperatureCelsius}
-							onChange={(e) => update("temperatureCelsius", e.target.value)}
+							onChange={e => update("temperatureCelsius", e.target.value)}
 						/>
 					</div>
 					<div className="space-y-1">
@@ -158,7 +154,7 @@ export function OpdTriageForm({ patientId }: OpdTriageFormProps) {
 							max={300}
 							placeholder="72"
 							value={form.heartRateBpm}
-							onChange={(e) => update("heartRateBpm", e.target.value)}
+							onChange={e => update("heartRateBpm", e.target.value)}
 						/>
 					</div>
 					<div className="space-y-1">
@@ -170,7 +166,7 @@ export function OpdTriageForm({ patientId }: OpdTriageFormProps) {
 							max={100}
 							placeholder="16"
 							value={form.respiratoryRate}
-							onChange={(e) => update("respiratoryRate", e.target.value)}
+							onChange={e => update("respiratoryRate", e.target.value)}
 						/>
 					</div>
 					<div className="space-y-1">
@@ -183,7 +179,7 @@ export function OpdTriageForm({ patientId }: OpdTriageFormProps) {
 							max={100}
 							placeholder="98"
 							value={form.oxygenSatPct}
-							onChange={(e) => update("oxygenSatPct", e.target.value)}
+							onChange={e => update("oxygenSatPct", e.target.value)}
 						/>
 					</div>
 					<div className="space-y-1">
@@ -196,7 +192,7 @@ export function OpdTriageForm({ patientId }: OpdTriageFormProps) {
 							max={300}
 							placeholder="165"
 							value={form.heightCm}
-							onChange={(e) => update("heightCm", e.target.value)}
+							onChange={e => update("heightCm", e.target.value)}
 						/>
 					</div>
 					<div className="space-y-1">
@@ -209,24 +205,17 @@ export function OpdTriageForm({ patientId }: OpdTriageFormProps) {
 							max={500}
 							placeholder="65"
 							value={form.weightKg}
-							onChange={(e) => update("weightKg", e.target.value)}
+							onChange={e => update("weightKg", e.target.value)}
 						/>
 					</div>
 				</CardContent>
 			</Card>
 
 			<div className="flex justify-end gap-3">
-				<Button
-					type="button"
-					variant="outline"
-					onClick={() => router.back()}
-				>
+				<Button type="button" variant="outline" onClick={() => router.back()}>
 					Cancel
 				</Button>
-				<Button
-					type="submit"
-					disabled={createTriage.isPending || !form.chiefComplaint.trim()}
-				>
+				<Button type="submit" disabled={createTriage.isPending || !form.chiefComplaint.trim()}>
 					{createTriage.isPending
 						? "Saving…"
 						: patientId

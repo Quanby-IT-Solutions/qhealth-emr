@@ -1,14 +1,19 @@
 import {
 	BadRequestException,
+	ConflictException,
+	HttpException,
+	HttpStatus,
 	Injectable,
 	Logger,
 	NotFoundException,
+	UnprocessableEntityException,
 } from "@nestjs/common"
-import { and, count, desc, eq, gte, inArray, lt, max, sql } from "drizzle-orm"
+import { and, count, desc, eq, gte, inArray, isNull, lt, max, sql } from "drizzle-orm"
 
 import {
 	beds,
 	clinicalNotes,
+	consentRecords,
 	deathReports,
 	encounterStatusEvents,
 	encounters,
@@ -101,6 +106,33 @@ export class EncountersService {
 			notes: params.notes ?? null,
 			occurredAt: params.occurredAt ?? new Date(),
 		})
+	}
+
+	// ========================================================================
+	// Private: OPD Queue Number Assignment
+	// ========================================================================
+
+	// PS-002/PS-036: MAX+1 per clinician per day. Known race: two simultaneous
+	// registrations may read the same MAX. Acceptable for typical facility volume.
+	private async assignQueueNumber(facilityId: string, clinicianStaffId: string): Promise<number> {
+		const todayStart = new Date()
+		todayStart.setUTCHours(0, 0, 0, 0)
+		const tomorrowStart = new Date(todayStart)
+		tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1)
+
+		const [result] = await db
+			.select({ maxQueue: max(encounters.queueNumber) })
+			.from(encounters)
+			.where(
+				and(
+					eq(encounters.facilityId, facilityId),
+					eq(encounters.clinicianStaffId, clinicianStaffId),
+					gte(encounters.admissionDatetime, todayStart),
+					lt(encounters.admissionDatetime, tomorrowStart),
+				)
+			)
+
+		return (result?.maxQueue ?? 0) + 1
 	}
 
 	// ========================================================================
@@ -370,14 +402,40 @@ export class EncountersService {
 	// ========================================================================
 
 	async create(input: CreateEncounterInput, userId?: string) {
+		if (!input.consentCaptured) {
+			throw new UnprocessableEntityException('Patient consent must be captured before creating an encounter')
+		}
+
 		// Verify patient exists
 		const [patient] = await db
 			.select({ id: patients.id })
 			.from(patients)
-			.where(eq(patients.id, input.patientId))
+			.where(and(eq(patients.id, input.patientId), eq(patients.facilityId, input.facilityId)))
 
 		if (!patient) {
-			throw new NotFoundException(`Patient ${input.patientId} not found`)
+			throw new NotFoundException(`Patient ${input.patientId} not found in this facility`)
+		}
+
+		// RA 10173: DPA consent must be active before clinical registration
+		const [dpaConsent] = await db
+			.select({ id: consentRecords.id })
+			.from(consentRecords)
+			.where(
+				and(
+					eq(consentRecords.patientId, input.patientId),
+					eq(consentRecords.facilityId, input.facilityId),
+					eq(consentRecords.consentType, "dpa"),
+					eq(consentRecords.isActive, true),
+					isNull(consentRecords.revokedAt),
+				)
+			)
+			.limit(1)
+
+		if (!dpaConsent) {
+			throw new HttpException(
+				{ statusCode: 422, message: "DPA consent is required before creating an encounter.", error: "CONSENT_REQUIRED" },
+				HttpStatus.UNPROCESSABLE_ENTITY,
+			)
 		}
 
 		// If inpatient and bed assigned, validate and mark bed as occupied
@@ -386,10 +444,19 @@ export class EncountersService {
 			if (!bed) {
 				throw new NotFoundException(`Bed ${input.bedId} not found`)
 			}
+			if (bed.facilityId !== input.facilityId) {
+				throw new NotFoundException(`Bed ${input.bedId} not found in this facility`)
+			}
 			if (bed.status !== "available") {
-				throw new BadRequestException(`Bed ${bed.bedNumber} is not available`)
+				throw new ConflictException(`Bed ${bed.bedNumber} is not available`)
 			}
 		}
+
+		// ENC-BE-003: assign queue number before the transaction so the helper can be tested independently
+		const queueNumber =
+			input.encounterType === "outpatient" && input.clinicianStaffId
+				? await this.assignQueueNumber(input.facilityId, input.clinicianStaffId)
+				: null
 
 		// Wrap encounter insert + bed update in a transaction to prevent orphaned bed state.
 		// Re-checking bed availability inside the transaction prevents the most common race
@@ -402,7 +469,7 @@ export class EncountersService {
 					.where(eq(beds.id, input.bedId))
 				// Re-check inside the transaction — serialized against concurrent bed assignments
 				if (!bed || bed.status !== "available") {
-					throw new BadRequestException(
+					throw new ConflictException(
 						`Bed ${input.bedId} is not available`
 					)
 				}
@@ -464,37 +531,6 @@ export class EncountersService {
 						"The selected clinician is not a valid active staff member for this facility"
 					)
 				}
-			}
-
-			// Generate OPD queue number for outpatient encounters (sequential per clinic per day)
-			let queueNumber: number | null = null
-			if (input.encounterType === "outpatient") {
-				const todayStart = new Date()
-				todayStart.setUTCHours(0, 0, 0, 0)
-				const tomorrowStart = new Date(todayStart)
-				tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1)
-
-// PS-036: clinicianStaffId required for outpatient — validated by contract; this is defense-in-depth
-				if (!input.clinicianStaffId) {
-					throw new BadRequestException(
-						"clinicianStaffId is required for outpatient encounter registration"
-					)
-				}
-
-				// PS-002/PS-036: Always scope queue per clinician (clinic) per day
-				const queueConditions: Parameters<typeof and>[0][] = [
-					eq(encounters.facilityId, input.facilityId),
-					eq(encounters.encounterType, sql`'outpatient'`),
-					gte(encounters.admissionDatetime, todayStart),
-					lt(encounters.admissionDatetime, tomorrowStart),
-					eq(encounters.clinicianStaffId, input.clinicianStaffId),
-				]
-
-				const [maxResult] = await tx
-					.select({ maxQueue: max(encounters.queueNumber) })
-					.from(encounters)
-					.where(and(...queueConditions))
-				queueNumber = (maxResult?.maxQueue ?? 0) + 1
 			}
 
 			const [enc] = await tx

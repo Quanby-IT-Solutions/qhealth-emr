@@ -57,15 +57,16 @@ export const PatientSchema = z.object({
 export type Patient = z.infer<typeof PatientSchema>
 
 // ============================================================================
-// Search Input — search by name, MRN, DOB with pagination
+// Search Input — search by name, MRN, DOB, or PhilHealth number with pagination
 // ============================================================================
 
 export const PatientSearchSchema = PaginationInputSchema.extend({
 	search: z.string().optional(),
 	mrn: z.string().optional(),
 	dateOfBirth: z.string().optional(),
+	philhealthMemberId: z.string().optional(),
 	facilityId: z.string().uuid(),
-	isActive: z.boolean().optional().default(true),
+	isActive: z.coerce.boolean().optional().default(true),
 	clinicianStaffId: z.string().uuid().optional(),
 })
 
@@ -83,6 +84,7 @@ export const PatientSearchResultSchema = PatientSchema.pick({
 	middleName: true,
 	dateOfBirth: true,
 	sex: true,
+	philhealthMemberId: true,
 	isActive: true,
 }).extend({
 	lastEncounterDate: dateOrString.nullable(),

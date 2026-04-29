@@ -6,7 +6,7 @@ import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
 import { buildChartAccessActor } from "@/modules/v1/audit/chart-access.service"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { ClinicalDocsService } from "./clinical-docs.service"
 
@@ -137,7 +137,10 @@ export class ClinicalDocsController {
 	// Consent Records
 	// ========================================================================
 
-	@RequirePermission("clinical_docs", "view")
+	@RequireAnyPermissions([
+		{ module: "clinical_docs", action: "view" },
+		{ module: "patients", action: "view" },
+	])
 	@Implement(v1.clinicalDocs.listConsents)
 	async listConsents(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.clinicalDocs.listConsents).handler(async ({ input }) => {
@@ -145,7 +148,10 @@ export class ClinicalDocsController {
 		})
 	}
 
-	@RequirePermission("clinical_docs", "view")
+	@RequireAnyPermissions([
+		{ module: "clinical_docs", action: "view" },
+		{ module: "patients", action: "view" },
+	])
 	@Implement(v1.clinicalDocs.getConsent)
 	async getConsent(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.clinicalDocs.getConsent).handler(async ({ input }) => {
@@ -153,7 +159,10 @@ export class ClinicalDocsController {
 		})
 	}
 
-	@RequirePermission("clinical_docs", "create")
+	@RequireAnyPermissions([
+		{ module: "clinical_docs", action: "create" },
+		{ module: "adt", action: "create" },
+	])
 	@Implement(v1.clinicalDocs.createConsent)
 	async createConsent(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.createConsent).handler(async ({ input }) => {
@@ -162,7 +171,10 @@ export class ClinicalDocsController {
 		})
 	}
 
-	@RequirePermission("clinical_docs", "edit")
+	@RequireAnyPermissions([
+		{ module: "clinical_docs", action: "edit" },
+		{ module: "adt", action: "edit" },
+	])
 	@Implement(v1.clinicalDocs.revokeConsent)
 	async revokeConsent(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.revokeConsent).handler(async ({ input }) => {
