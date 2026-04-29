@@ -162,6 +162,9 @@ export function PatientRegisterPageContent() {
 			permission.module === "opd" &&
 			(permission.action === "create" || permission.action === "edit")
 	)
+	const isBreakGlassEnforced = permissions.some(
+		permission => permission.module === "audit" && permission.action === "create"
+	)
 	const canAccessPage = canSearchPatients || canOpenRegistrationWorkflow
 	const shouldFallbackToForm = canOpenRegistrationWorkflow && !canSearchPatients
 
@@ -181,6 +184,7 @@ export function PatientRegisterPageContent() {
 		philhealthMemberId?: string
 		page: number
 		limit: number
+		clinicianStaffId?: string
 	} | null>(null)
 
 	const trimmedNameFilter = nameFilter.trim()
@@ -198,7 +202,12 @@ export function PatientRegisterPageContent() {
 	const { isOnline, offlinePatients, cachedAt } = useOfflinePatients()
 
 	const { data, isLoading, isFetching } = usePatientSearchQuery(
-		committedParams ?? { facilityId, page: 1, limit: 50 },
+		committedParams ?? {
+			facilityId,
+			page: 1,
+			limit: 50,
+			clinicianStaffId: isBreakGlassEnforced && staffId ? staffId : undefined,
+		},
 		{ enabled: canSearchPatients && !!facilityId && !!committedParams && isOnline }
 	)
 
@@ -251,6 +260,7 @@ export function PatientRegisterPageContent() {
 			philhealthMemberId: trimmedPhilhealthFilter || undefined,
 			page: 1,
 			limit: 50,
+			clinicianStaffId: isBreakGlassEnforced && staffId ? staffId : undefined,
 		})
 	}
 
@@ -507,6 +517,11 @@ export function PatientRegisterPageContent() {
 														>
 															{patient.mrn}
 														</Badge>
+														{isBreakGlassEnforced && patient.hasDirectAccess === false && (
+															<Badge variant="outline" className="rounded-full">
+																Restricted
+															</Badge>
+														)}
 													</div>
 													<p className="text-muted-foreground text-sm">{meta.join(" · ")}</p>
 												</div>

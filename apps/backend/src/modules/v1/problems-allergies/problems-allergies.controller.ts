@@ -1,9 +1,11 @@
-import { Controller } from "@nestjs/common"
+import { Controller, Req } from "@nestjs/common"
 import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
+import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
+import { buildChartAccessActor } from "@/modules/v1/audit/chart-access.service"
 import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { ProblemsAllergiesService } from "./problems-allergies.service"
@@ -18,17 +20,17 @@ export class ProblemsAllergiesController {
 
 	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.problemsAllergies.listProblems)
-	async listProblems() {
+	async listProblems(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.listProblems).handler(async ({ input }) => {
-			return this.service.listProblems(input)
+			return this.service.listProblems(input, buildChartAccessActor(session, req))
 		})
 	}
 
 	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.problemsAllergies.getProblem)
-	async getProblem() {
+	async getProblem(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.getProblem).handler(async ({ input }) => {
-			return this.service.getProblem(input.id)
+			return this.service.getProblem(input.id, buildChartAccessActor(session, req))
 		})
 	}
 
@@ -70,17 +72,17 @@ export class ProblemsAllergiesController {
 
 	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.problemsAllergies.listAllergies)
-	async listAllergies() {
+	async listAllergies(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.listAllergies).handler(async ({ input }) => {
-			return this.service.listAllergies(input)
+			return this.service.listAllergies(input, buildChartAccessActor(session, req))
 		})
 	}
 
 	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.problemsAllergies.getAllergy)
-	async getAllergy() {
+	async getAllergy(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.getAllergy).handler(async ({ input }) => {
-			return this.service.getAllergy(input.id)
+			return this.service.getAllergy(input.id, buildChartAccessActor(session, req))
 		})
 	}
 
@@ -142,17 +144,17 @@ export class ProblemsAllergiesController {
 
 	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.problemsAllergies.getActiveAllergies)
-	async getActiveAllergies() {
+	async getActiveAllergies(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.getActiveAllergies).handler(async ({ input }) => {
-			return this.service.getActiveAllergies(input)
+			return this.service.getActiveAllergies(input, buildChartAccessActor(session, req))
 		})
 	}
 
 	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.problemsAllergies.getPatientSummary)
-	async getPatientSummary() {
+	async getPatientSummary(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.getPatientSummary).handler(async ({ input }) => {
-			return this.service.getPatientSummary(input)
+			return this.service.getPatientSummary(input, buildChartAccessActor(session, req))
 		})
 	}
 }

@@ -20,7 +20,13 @@ import type { BreakGlassEvent } from "@/features/audit/api/audit.hooks"
 type ReasonCategory = z.infer<typeof BreakGlassReasonCategoryEnum>
 
 const REASON_CATEGORIES: { value: ReasonCategory; label: string }[] = [
-	{ value: "life_threatening_emergency", label: "Life-Threatening Emergency" },
+	{ value: "cardiac_arrest", label: "Cardiac Arrest" },
+	{ value: "code_blue", label: "Code Blue" },
+	{ value: "stroke", label: "Stroke" },
+	{ value: "sepsis", label: "Sepsis" },
+	{ value: "trauma", label: "Trauma" },
+	{ value: "motor_vehicle_accident", label: "Motor Vehicle Accident" },
+	{ value: "life_threatening_emergency", label: "Life-Threatening Emergency (Other)" },
 	{ value: "covering_for_absent_provider", label: "Covering for Absent Provider" },
 	{ value: "administrative_need", label: "Administrative Need" },
 	{ value: "other", label: "Other" },
@@ -112,6 +118,52 @@ export function BreakGlassForm({
 	const [acknowledged, setAcknowledged] = useState(false)
 	const createBreakGlassMutation = useCreateBreakGlassMutation()
 
+	if (activeEvent) {
+		return (
+			<Card className="mx-auto max-w-lg border-orange-300 dark:border-orange-700">
+				<CardHeader className="bg-orange-50 dark:bg-orange-950/30">
+					<div className="flex items-start justify-between gap-2">
+						<div>
+							<CardTitle className="text-orange-800 dark:text-orange-200">Emergency Override Access</CardTitle>
+							<CardDescription>
+								Your emergency override session is already active for this patient. Temporary read access
+								remains available until it expires automatically.
+							</CardDescription>
+						</div>
+						{activeEvent.accessExpiresAt && (
+							<BreakGlassCountdown accessExpiresAt={activeEvent.accessExpiresAt as unknown as string} />
+						)}
+					</div>
+				</CardHeader>
+				<CardContent className="space-y-4 pt-4">
+					<div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800 dark:border-orange-700 dark:bg-orange-950/20 dark:text-orange-200">
+						<p className="font-medium">Active Break-Glass Session</p>
+						<p className="mt-0.5">
+							Access expires at{" "}
+							<span className="font-medium">
+								{new Date(activeEvent.accessExpiresAt as unknown as string).toLocaleString("en-PH", {
+									hour: "2-digit",
+									minute: "2-digit",
+									day: "numeric",
+									month: "short",
+								})}
+							</span>
+							.
+						</p>
+					</div>
+
+					<div className="flex justify-end gap-2">
+						{onCancel && (
+							<Button variant="outline" onClick={onCancel}>
+								Close
+							</Button>
+						)}
+					</div>
+				</CardContent>
+			</Card>
+		)
+	}
+
 	const canSubmit =
 		reasonCategory && justification.trim().length >= 10 && acknowledged && !createBreakGlassMutation.isPending
 
@@ -141,30 +193,9 @@ export function BreakGlassForm({
 							the Glass&quot; request to gain temporary access. This action is logged and will be reviewed.
 						</CardDescription>
 					</div>
-					{activeEvent?.accessExpiresAt && (
-						<BreakGlassCountdown accessExpiresAt={activeEvent.accessExpiresAt as unknown as string} />
-					)}
 				</div>
 			</CardHeader>
 			<CardContent className="space-y-4 pt-4">
-				{activeEvent && (
-					<div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800 dark:border-orange-700 dark:bg-orange-950/20 dark:text-orange-200">
-						<p className="font-medium">Active Break-Glass Session</p>
-						<p className="mt-0.5">
-							You currently have an active emergency override session. Access expires at{" "}
-							<span className="font-medium">
-								{new Date(activeEvent.accessExpiresAt as unknown as string).toLocaleString("en-PH", {
-									hour: "2-digit",
-									minute: "2-digit",
-									day: "numeric",
-									month: "short",
-								})}
-							</span>
-							.
-						</p>
-					</div>
-				)}
-
 				<div className="space-y-2">
 					<Label htmlFor="reason-category">Reason Category *</Label>
 					<Select value={reasonCategory || null} onValueChange={v => setReasonCategory(v ?? "")}>

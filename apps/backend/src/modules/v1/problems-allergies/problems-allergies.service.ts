@@ -14,6 +14,10 @@ import {
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
+import {
+	type ChartAccessActor,
+	ChartAccessService,
+} from "@/modules/v1/audit/chart-access.service"
 
 type ListProblemsInput = V1Inputs["problemsAllergies"]["listProblems"]
 type CreateProblemInput = V1Inputs["problemsAllergies"]["createProblem"]
@@ -33,7 +37,10 @@ type PatientSummaryInput = V1Inputs["problemsAllergies"]["getPatientSummary"]
 export class ProblemsAllergiesService {
 	private readonly logger = new Logger(ProblemsAllergiesService.name)
 
-	constructor(private readonly auditService: AuditService) {}
+	constructor(
+		private readonly auditService: AuditService,
+		private readonly chartAccessService: ChartAccessService
+	) {}
 
 	private escapeLikePattern(input: string): string {
 		return input.replace(/[\\%_]/g, "\\$&")
@@ -110,7 +117,12 @@ export class ProblemsAllergiesService {
 	// Problems
 	// ========================================================================
 
-	async listProblems(input: ListProblemsInput) {
+	async listProblems(input: ListProblemsInput, actor?: ChartAccessActor) {
+		await this.chartAccessService.ensurePatientChartReadAccess(actor, input.patientId, {
+			entityType: "problem_list",
+			entityId: input.patientId,
+		})
+
 		const page = Number(input.page ?? 1)
 		const limit = Number(input.limit ?? 50)
 		const offset = (page - 1) * limit
@@ -161,7 +173,7 @@ export class ProblemsAllergiesService {
 		}
 	}
 
-	async getProblem(id: string) {
+	async getProblem(id: string, actor?: ChartAccessActor) {
 		const [row] = await db
 			.select({
 				id: problems.id,
@@ -186,6 +198,10 @@ export class ProblemsAllergiesService {
 			.where(eq(problems.id, id))
 
 		if (!row) throw new NotFoundException(`Problem ${id} not found`)
+		await this.chartAccessService.ensurePatientChartReadAccess(actor, row.patientId, {
+			entityType: "problem",
+			entityId: row.id,
+		})
 		return row
 	}
 
@@ -485,7 +501,12 @@ export class ProblemsAllergiesService {
 	// Allergies
 	// ========================================================================
 
-	async listAllergies(input: ListAllergiesInput) {
+	async listAllergies(input: ListAllergiesInput, actor?: ChartAccessActor) {
+		await this.chartAccessService.ensurePatientChartReadAccess(actor, input.patientId, {
+			entityType: "allergy_list",
+			entityId: input.patientId,
+		})
+
 		const page = Number(input.page ?? 1)
 		const limit = Number(input.limit ?? 50)
 		const offset = (page - 1) * limit
@@ -538,7 +559,7 @@ export class ProblemsAllergiesService {
 		}
 	}
 
-	async getAllergy(id: string) {
+	async getAllergy(id: string, actor?: ChartAccessActor) {
 		const [row] = await db
 			.select({
 				id: allergies.id,
@@ -561,6 +582,10 @@ export class ProblemsAllergiesService {
 			.where(eq(allergies.id, id))
 
 		if (!row) throw new NotFoundException(`Allergy ${id} not found`)
+		await this.chartAccessService.ensurePatientChartReadAccess(actor, row.patientId, {
+			entityType: "allergy",
+			entityId: row.id,
+		})
 		return row
 	}
 
@@ -667,7 +692,12 @@ export class ProblemsAllergiesService {
 	// CDS / Cross-module
 	// ========================================================================
 
-	async getActiveAllergies(input: ActiveAllergiesInput) {
+	async getActiveAllergies(input: ActiveAllergiesInput, actor?: ChartAccessActor) {
+		await this.chartAccessService.ensurePatientChartReadAccess(actor, input.patientId, {
+			entityType: "active_allergies",
+			entityId: input.patientId,
+		})
+
 		const rows = await db
 			.select({
 				id: allergies.id,
@@ -695,7 +725,12 @@ export class ProblemsAllergiesService {
 		return { allergies: rows, hasSevereAllergies }
 	}
 
-	async getPatientSummary(input: PatientSummaryInput) {
+	async getPatientSummary(input: PatientSummaryInput, actor?: ChartAccessActor) {
+		await this.chartAccessService.ensurePatientChartReadAccess(actor, input.patientId, {
+			entityType: "patient_summary",
+			entityId: input.patientId,
+		})
+
 		// Active problems
 		const activeProblems = await db
 			.select({

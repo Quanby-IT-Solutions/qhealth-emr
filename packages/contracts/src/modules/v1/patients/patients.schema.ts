@@ -67,6 +67,7 @@ export const PatientSearchSchema = PaginationInputSchema.extend({
 	philhealthMemberId: z.string().optional(),
 	facilityId: z.string().uuid(),
 	isActive: z.coerce.boolean().optional().default(true),
+	clinicianStaffId: z.string().uuid().optional(),
 })
 
 export type PatientSearchInput = z.infer<typeof PatientSearchSchema>
@@ -87,6 +88,7 @@ export const PatientSearchResultSchema = PatientSchema.pick({
 	isActive: true,
 }).extend({
 	lastEncounterDate: dateOrString.nullable(),
+	hasDirectAccess: z.boolean(),
 })
 
 export const PatientSearchResponseSchema = PaginatedResponseSchema.extend({
