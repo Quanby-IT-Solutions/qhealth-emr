@@ -22,6 +22,15 @@ export class PatientsController {
 		})
 	}
 
+	// Static subpaths must be registered before /patients/{id} to avoid route shadowing.
+	@RequirePermission("opd", "view")
+	@Implement(v1.patient.listClinicians)
+	async listClinicians() {
+		return implement(v1.patient.listClinicians).handler(async ({ input }) => {
+			return this.patientsService.listClinicians(input)
+		})
+	}
+
 	@RequirePermission("patients", "view")
 	@Implement(v1.patient.get)
 	async get(@Session() session: UserSession, @Req() req: Request) {
@@ -53,14 +62,6 @@ export class PatientsController {
 	async registerWithOpdEncounter(@Session() session: UserSession) {
 		return implement(v1.patient.registerWithOpdEncounter).handler(async ({ input }) => {
 			return this.patientsService.registerWithOpdEncounter(input, session.user.id)
-		})
-	}
-
-	@RequirePermission("opd", "view")
-	@Implement(v1.patient.listClinicians)
-	async listClinicians() {
-		return implement(v1.patient.listClinicians).handler(async ({ input }) => {
-			return this.patientsService.listClinicians(input)
 		})
 	}
 }

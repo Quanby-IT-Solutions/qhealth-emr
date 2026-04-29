@@ -37,7 +37,7 @@ export function useOfflinePatients(): UseOfflinePatientsResult {
 
 	// Load live patients when online so we can keep the cache fresh
 	const { data: searchResult } = usePatientSearchQuery(
-		{ facilityId: facilityId ?? "", isActive: true, limit: 500 },
+		{ facilityId: facilityId ?? "", isActive: true, limit: 100 },
 		{ enabled: isOnline && !!facilityId }
 	)
 

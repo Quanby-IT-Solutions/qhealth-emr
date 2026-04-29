@@ -21,8 +21,8 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/core/components/ui/select"
-import { useListCliniciansQuery } from "@/features/patients/api/patients.hooks"
 import { useOpdTriageQuery } from "@/features/opd-triage/api/opd-triage.hooks"
+import { useListCliniciansQuery } from "@/features/patients/api/patients.hooks"
 
 interface LinkTriageBannerProps {
 	pendingTriageId: string
@@ -37,11 +37,15 @@ interface LinkTriageBannerProps {
 	 * @param clinicianStaffId - the clinician/clinic chosen during confirmation
 	 * @param chiefComplaint - chief complaint from the triage intake (PS-045)
 	 */
-	onLinked: (patientId: string, clinicianStaffId: string | undefined, chiefComplaint: string | undefined) => Promise<void>
+	onLinked: (
+		patientId: string,
+		clinicianStaffId: string,
+		chiefComplaint: string | undefined
+	) => Promise<void>
 }
 
 /**
- * Shown on the patient-search page when there is a pending walk-in triage
+ * Shown on the patient registration page when there is a pending walk-in triage
  * that needs to be linked to a patient record. The registrar searches for
  * the patient and clicks "Link" to reconcile.
  */
@@ -69,14 +73,14 @@ export function LinkTriageBanner({
 	})
 
 	async function handleConfirmLink() {
-		if (!selectedPatientId) return
+		if (!selectedPatientId || !intake) return
 		setIsProcessing(true)
 		try {
 			// PS-033: encounter creation (via onLinked) atomically links the triage intake —
 			// no separate linkToPatient call needed; encounters.service.ts sets patientId +
 			// status=registered + encounterId in a single DB transaction when triageIntakeId is provided
 			setConfirmOpen(false)
-			await onLinked(selectedPatientId, selectedClinicianId || undefined, intake.chiefComplaint ?? undefined) // PS-045
+			await onLinked(selectedPatientId, selectedClinicianId, intake.chiefComplaint ?? undefined) // PS-045
 		} finally {
 			setIsProcessing(false)
 		}
@@ -93,14 +97,12 @@ export function LinkTriageBanner({
 						Chief complaint: <strong>{intake.chiefComplaint}</strong>.
 					</p>
 					<p className="mt-1 text-sm">
-						Search for the patient below and click <strong>Link to Triage</strong> to complete registration.
+						Search for the patient below and click <strong>Link to Triage</strong> to complete
+						registration.
 					</p>
 					{selectedPatientId && (
 						<div className="mt-3">
-							<Button
-								size="sm"
-								onClick={() => setConfirmOpen(true)}
-							>
+							<Button size="sm" onClick={() => setConfirmOpen(true)}>
 								<Link2 className="mr-1.5 size-3.5" />
 								Link to Triage — {selectedPatientName}
 							</Button>
@@ -109,26 +111,43 @@ export function LinkTriageBanner({
 				</AlertDescription>
 			</Alert>
 
-			<Dialog open={confirmOpen} onOpenChange={open => { if (!isProcessing) setConfirmOpen(open) }}>
+			<Dialog
+				open={confirmOpen}
+				onOpenChange={open => {
+					if (!isProcessing) setConfirmOpen(open)
+				}}
+			>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>Complete Registration</DialogTitle>
 						<DialogDescription>
 							Link the walk-in triage intake (arrived {arrivalTime}) to{" "}
-							<strong>{selectedPatientName}</strong>, create the OPD encounter, and assign a
-							queue number for the selected clinic.
+							<strong>{selectedPatientName}</strong>, create the OPD encounter, and assign a queue
+							number for the selected clinic.
 						</DialogDescription>
 					</DialogHeader>
 					<div className="space-y-1.5 py-2">
 						<Label htmlFor="link-clinician">Attending Clinician / Clinic *</Label>
-						<Select value={selectedClinicianId} onValueChange={setSelectedClinicianId}>
-							<SelectTrigger id="link-clinician" className="w-full">
-								<SelectValue placeholder="Select a clinician…" />
+						<Select
+							value={selectedClinicianId}
+							onValueChange={value => setSelectedClinicianId(value ?? "")}
+						>
+							<SelectTrigger
+								id="link-clinician"
+								className="w-full"
+								data-placeholder={!selectedClinicianId ? "" : undefined}
+							>
+								{selectedClinicianId ? (
+									<SelectValue />
+								) : (
+									<span className="text-muted-foreground">Select a clinician…</span>
+								)}
 							</SelectTrigger>
 							<SelectContent>
 								{clinicianOptions.map(opt => (
 									<SelectItem key={opt.staffProfileId} value={opt.staffProfileId}>
-										{opt.name}{opt.department ? ` — ${opt.department}` : ""}
+										{opt.name}
+										{opt.department ? ` — ${opt.department}` : ""}
 									</SelectItem>
 								))}
 							</SelectContent>

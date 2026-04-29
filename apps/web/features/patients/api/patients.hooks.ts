@@ -13,6 +13,7 @@ interface PatientSearchParams {
 	search?: string
 	mrn?: string
 	dateOfBirth?: string
+	philhealthMemberId?: string
 	isActive?: boolean
 	page?: number
 	limit?: number
@@ -30,6 +31,7 @@ export function usePatientSearchQuery(
 				search: params.search,
 				mrn: params.mrn,
 				dateOfBirth: params.dateOfBirth,
+				philhealthMemberId: params.philhealthMemberId,
 				isActive: params.isActive,
 				page: params.page ?? 1,
 				limit: params.limit ?? 50,

@@ -68,6 +68,10 @@ export function useCloseEncounterMutation() {
 	)
 }
 
+export function useCaptureDpaConsentMutation() {
+	return useMutation(orpc.clinicalDocs.createConsent.mutationOptions())
+}
+
 export function useDischargeChecklistQuery(encounterId: string, options?: { enabled?: boolean }) {
 	return useQuery(
 		orpc.encounter.checklist.queryOptions({

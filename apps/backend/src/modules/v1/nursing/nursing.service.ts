@@ -1,14 +1,14 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm"
 
 import {
+	consentRecords,
 	encounters,
 	flowsheetEntries,
 	haiTags,
 	ioEntries,
 	marEntries,
 	medicationOrders,
-	nursingConsentRecords,
 	problems,
 	shiftHandoffs,
 	staffProfiles,
@@ -180,9 +180,16 @@ interface ConsentRecordListInput {
 
 interface CreateConsentRecordInput {
 	facilityId: string
-	encounterId?: string
+	encounterId: string
+	patientId: string
 	preEncounterId?: string
 	consentType: string
+	signedByName: string
+	relationship: string
+	content?: string
+	signatureData?: unknown
+	signedAt?: Date
+	witnessStaffId?: string
 	consentText?: string
 	patientSignature?: string
 	guardianSignature?: string
@@ -890,10 +897,16 @@ export class NursingService {
 
 	async findConsentRecords(input: ConsentRecordListInput) {
 		const conditions = []
-		if (input.facilityId) conditions.push(eq(nursingConsentRecords.facilityId, input.facilityId))
-		if (input.encounterId) conditions.push(eq(nursingConsentRecords.encounterId, input.encounterId))
-		if (input.preEncounterId) conditions.push(eq(nursingConsentRecords.preEncounterId, input.preEncounterId))
-		if (input.consentType) conditions.push(eq(nursingConsentRecords.consentType, input.consentType))
+		if (input.facilityId) conditions.push(eq(consentRecords.facilityId, input.facilityId))
+		if (input.encounterId) conditions.push(eq(consentRecords.encounterId, input.encounterId))
+		if (input.preEncounterId) conditions.push(eq(consentRecords.preEncounterId, input.preEncounterId))
+		if (input.consentType)
+			conditions.push(
+				eq(
+					consentRecords.consentType,
+					input.consentType as (typeof consentRecords.consentType)["_"]["data"]
+				)
+			)
 
 		const where = and(...conditions)
 		const offset = (input.page - 1) * input.limit
@@ -901,12 +914,12 @@ export class NursingService {
 		const [rows, [totalRow]] = await Promise.all([
 			db
 				.select()
-				.from(nursingConsentRecords)
+				.from(consentRecords)
 				.where(where)
-				.orderBy(desc(nursingConsentRecords.signedAt))
+				.orderBy(desc(consentRecords.signedAt))
 				.limit(input.limit)
 				.offset(offset),
-			db.select({ count: count() }).from(nursingConsentRecords).where(where),
+			db.select({ count: count() }).from(consentRecords).where(where),
 		])
 
 		const total = totalRow?.count ?? 0
@@ -920,7 +933,7 @@ export class NursingService {
 	}
 
 	async findConsentRecord(id: string) {
-		const [row] = await db.select().from(nursingConsentRecords).where(eq(nursingConsentRecords.id, id)).limit(1)
+		const [row] = await db.select().from(consentRecords).where(eq(consentRecords.id, id)).limit(1)
 		if (!row) throw new NotFoundException("Consent record not found")
 		return row
 	}
@@ -928,7 +941,9 @@ export class NursingService {
 	async createConsentRecord(input: CreateConsentRecordInput, userId: string) {
 		const staffProfileId = await this.getStaffProfileId(userId)
 
-		if (!input.encounterId) throw new Error("encounterId is required to create a consent record")
+		if (!input.encounterId) {
+			throw new BadRequestException("encounterId is required to create a consent record")
+		}
 
 		// Resolve patientId from the encounter
 		const [enc] = await db
@@ -938,23 +953,29 @@ export class NursingService {
 			.limit(1)
 
 		if (!enc) throw new NotFoundException("Encounter not found")
+		if (enc.patientId !== input.patientId) {
+			throw new BadRequestException("patientId does not match the encounter patient")
+		}
 
 		const [row] = await db
-			.insert(nursingConsentRecords)
+			.insert(consentRecords)
 			.values({
 				facilityId: input.facilityId,
 				encounterId: input.encounterId,
 				patientId: enc.patientId,
 				preEncounterId: input.preEncounterId,
-				consentType: input.consentType,
+				consentType: input.consentType as (typeof consentRecords.consentType)["_"]["data"],
+				signedByName: input.signedByName,
+				relationship: input.relationship as (typeof consentRecords.relationship)["_"]["data"],
+				content: input.content ?? null,
+				signatureData: input.signatureData ?? null,
+				signedAt: input.signedAt ?? new Date(),
+				witnessStaffId: input.witnessStaffId ?? null,
 				consentText: input.consentText ?? "",
-				signedByName: "Patient / Guardian",
-				relationship: "self",
 				patientSignature: input.patientSignature,
 				guardianSignature: input.guardianSignature,
 				witnessSignature: input.witnessSignature,
 				capturedByStaffId: staffProfileId,
-				signedAt: new Date(),
 			})
 			.returning()
 

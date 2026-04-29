@@ -96,7 +96,7 @@ interface NavItemConfig {
  *
  * Dashboard          — always visible
  * Register Patient   — roles that create patient records (adt/create → Registrar, Admin)
- * Patients           — anyone who can view clinical data (adt, clinical_docs, orders, nursing, billing)
+ * Patients           — patient-facing roles with read access, excluding registrar's duplicate entry
  * Bed Management     — roles that modify ADT records (adt/edit → Admin, Registrar-like)
  * Emergency          — roles that create pre-encounters (adt/create) OR chart nursing in ER (nursing/create)
  * Pharmacy           — roles with order-verify authority (orders/verify → Pharmacist)
@@ -112,24 +112,21 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "Register Patient",
 		href: "/patients/register",
 		iconName: "patient",
-		requiredPermissions: [
-			{ module: "adt", action: "create" },
-		],
+		requiredPermissions: [{ module: "adt", action: "create" }],
 		// Registration is for Registrars/Triage, not clinical staff who sign documents
-		excludePermissions: [
-			{ module: "clinical_docs", action: "sign" },
-		],
+		excludePermissions: [{ module: "clinical_docs", action: "sign" }],
 	},
 	{
 		title: "Patients",
-		href: "/patients/search",
+		href: "/patients/register",
 		iconName: "patient",
-		requiredPermissions: [
-			{ module: "patients", action: "view" },
-		],
+		requiredPermissions: [{ module: "patients", action: "view" }],
 		// Pharmacists, Lab Techs, Radiologists, PIDSR Officers access patient data
-		// via their primary workflow nav, not the global Patients list
+		// via their primary workflow nav, not the global Patients list.
+		// Registrars already use "Register Patient" for the same destination, so
+		// hide this duplicate entry for the registrar role bundle.
 		excludePermissions: [
+			{ module: "patients", action: "edit" }, // Registrar
 			{ module: "orders", action: "verify" }, // Pharmacist
 			{ module: "laboratory", action: "view" }, // Lab Technologist, Blood Bank Technician
 			{ module: "radiology", action: "view" }, // Radiologist
@@ -147,9 +144,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 			{ module: "adt", action: "edit" }, // Registrar fallback (also manages appointments)
 		],
 		// Exclude Nurses who have adt:edit for bed management, not scheduling
-		excludePermissions: [
-			{ module: "nursing", action: "create" },
-		],
+		excludePermissions: [{ module: "nursing", action: "create" }],
 	},
 	{
 		title: "Bed Management",
@@ -160,9 +155,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 			{ module: "adt", action: "delete" },
 		],
 		// Exclude Scheduler who has adt:view/create but shouldn't manage beds
-		excludePermissions: [
-			{ module: "scheduling", action: "view" },
-		],
+		excludePermissions: [{ module: "scheduling", action: "view" }],
 	},
 	{
 		title: "Emergency",
@@ -170,9 +163,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "emergency",
 		// ed:view is the dedicated ED module permission (seeded for Triage Officer, Nurse, Physician)
 		// Replaces the proxy adt:create/nursing:create approach — no excludePermissions needed
-		requiredPermissions: [
-			{ module: "ed", action: "view" },
-		],
+		requiredPermissions: [{ module: "ed", action: "view" }],
 	},
 	{
 		title: "Surgical Services",
@@ -180,9 +171,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "surgical",
 		// Dedicated surgical module permission (seeded for Surgeon/Anesthesiologist)
 		// Admin does not have surgical access per TOR
-		requiredPermissions: [
-			{ module: "surgical", action: "view" },
-		],
+		requiredPermissions: [{ module: "surgical", action: "view" }],
 	},
 	{
 		title: "OPD",
@@ -192,9 +181,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		// Seeded for: Admin, Physician, Surgeon, Nurse, Registrar
 		// NOT seeded for: Anesthesiologist (works only in OR), Auditor (non-clinical role)
 		// NOTE: Auditor doesn't have opd:view, so OPD is already hidden from them
-		requiredPermissions: [
-			{ module: "opd", action: "view" },
-		],
+		requiredPermissions: [{ module: "opd", action: "view" }],
 	},
 	{
 		title: "Laboratory",
@@ -202,9 +189,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "laboratory",
 		// Laboratory module is seeded for Lab Technologist role
 		// Admin does not have laboratory access per TOR
-		requiredPermissions: [
-			{ module: "laboratory", action: "view" },
-		],
+		requiredPermissions: [{ module: "laboratory", action: "view" }],
 	},
 	{
 		title: "Radiology",
@@ -212,26 +197,20 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "radiology",
 		// Radiology module is seeded for Radiologist role
 		// Admin does not have radiology access per TOR
-		requiredPermissions: [
-			{ module: "radiology", action: "view" },
-		],
+		requiredPermissions: [{ module: "radiology", action: "view" }],
 	},
 	{
 		title: "Pharmacy",
 		href: "/pharmacy",
 		iconName: "pill",
-		requiredPermissions: [
-			{ module: "orders", action: "verify" },
-		],
+		requiredPermissions: [{ module: "orders", action: "verify" }],
 	},
 	{
 		title: "OPD Dispensing",
 		href: "/pharmacy/opd",
 		iconName: "pill",
 		// Primary sidebar for Pharmacist — hidden from admins and physicians
-		requiredPermissions: [
-			{ module: "orders", action: "verify" },
-		],
+		requiredPermissions: [{ module: "orders", action: "verify" }],
 		excludePermissions: [
 			{ module: "admin", action: "view" },
 			{ module: "clinical_docs", action: "sign" },
@@ -254,22 +233,16 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "Nursing",
 		href: "/nursing",
 		iconName: "nursing",
-		requiredPermissions: [
-			{ module: "nursing", action: "view" },
-		],
+		requiredPermissions: [{ module: "nursing", action: "view" }],
 		// Physicians have nursing:view to read nursing notes, not to manage the nursing dashboard
-		excludePermissions: [
-			{ module: "clinical_docs", action: "sign" },
-		],
+		excludePermissions: [{ module: "clinical_docs", action: "sign" }],
 	},
 	{
 		title: "Nutrition",
 		href: "/nutrition",
 		iconName: "nutrition",
 		// Primary nav for Dietitian
-		requiredPermissions: [
-			{ module: "nutrition", action: "view" },
-		],
+		requiredPermissions: [{ module: "nutrition", action: "view" }],
 	},
 	{
 		title: "Telemedicine",
@@ -277,21 +250,15 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "video",
 		// telemedicine:view is the dedicated module permission seeded for Physician only
 		// Matches the page-level gate and aligns with TOR: Physicians conduct virtual consultations
-		requiredPermissions: [
-			{ module: "telemedicine", action: "view" },
-		],
+		requiredPermissions: [{ module: "telemedicine", action: "view" }],
 	},
 	{
 		title: "Billing",
 		href: "/billing",
 		iconName: "billing",
-		requiredPermissions: [
-			{ module: "billing", action: "view" },
-		],
+		requiredPermissions: [{ module: "billing", action: "view" }],
 		// Billing dashboard is for Billing Staff, not clinical staff who create notes
-		excludePermissions: [
-			{ module: "clinical_docs", action: "create" },
-		],
+		excludePermissions: [{ module: "clinical_docs", action: "create" }],
 	},
 ]
 
@@ -311,9 +278,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		// medical_records:view is the dedicated module permission
 		// Seeded for: HIM Coder (view/create/edit) and Registrar (view)
 		// Admin does not have medical records access per TOR
-		requiredPermissions: [
-			{ module: "medical_records", action: "view" },
-		],
+		requiredPermissions: [{ module: "medical_records", action: "view" }],
 		isSecondary: true,
 	},
 	{
@@ -322,9 +287,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "records",
 		// HIM Coder owns chart completion queue, deficiency tracking, coding queue
 		// medical_records:view is the correct boundary — aligns with the backend guard
-		requiredPermissions: [
-			{ module: "medical_records", action: "view" },
-		],
+		requiredPermissions: [{ module: "medical_records", action: "view" }],
 		isSecondary: true,
 	},
 	{
@@ -334,9 +297,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		// NBS access is controlled by dedicated nbs:view permission
 		// Seeded for Nurse role (ward nurses/midwives who perform screening)
 		// Admin does not have NBS access per TOR
-		requiredPermissions: [
-			{ module: "nbs", action: "view" },
-		],
+		requiredPermissions: [{ module: "nbs", action: "view" }],
 		isSecondary: true,
 	},
 	{
@@ -374,23 +335,17 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "FHIR Export",
 		href: "/admin/fhir",
 		iconName: "report",
-		requiredPermissions: [
-			{ module: "admin", action: "view" },
-		],
+		requiredPermissions: [{ module: "admin", action: "view" }],
 		// Also require fhir:view — the page itself enforces both permissions,
 		// so the nav link should only appear when the user can actually access it.
-		requireAllPermissions: [
-			{ module: "fhir", action: "view" },
-		],
+		requireAllPermissions: [{ module: "fhir", action: "view" }],
 		isSecondary: true,
 	},
 	{
 		title: "ARTA / SLA",
 		href: "/admin/sla",
 		iconName: "sla",
-		requiredPermissions: [
-			{ module: "admin", action: "view" },
-		],
+		requiredPermissions: [{ module: "admin", action: "view" }],
 		isSecondary: true,
 	},
 	{
@@ -417,14 +372,10 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "Facility Profile",
 		href: "/admin/facility-profile",
 		iconName: "settings",
-		requiredPermissions: [
-			{ module: "admin", action: "view" },
-		],
+		requiredPermissions: [{ module: "admin", action: "view" }],
 		// Also require facility_profile:view — the page and API enforce this permission,
 		// so the nav link must only appear when the user can actually access it.
-		requireAllPermissions: [
-			{ module: "facility_profile", action: "view" },
-		],
+		requireAllPermissions: [{ module: "facility_profile", action: "view" }],
 		isSecondary: true,
 	},
 	{
@@ -445,9 +396,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "social-work",
 		// msw:view is the dedicated module permission (seeded for Medical Social Worker)
 		// No excludePermissions needed — msw:view is role-specific
-		requiredPermissions: [
-			{ module: "msw", action: "view" },
-		],
+		requiredPermissions: [{ module: "msw", action: "view" }],
 		isSecondary: true,
 	},
 	{
@@ -456,9 +405,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "nutrition",
 		// nutrition:view is the dedicated module permission (seeded for Clinical Dietitian)
 		// Nurses access dietary information via clinical notes, not the Nutrition module
-		requiredPermissions: [
-			{ module: "nutrition", action: "view" },
-		],
+		requiredPermissions: [{ module: "nutrition", action: "view" }],
 		isSecondary: true,
 	},
 	{
@@ -467,14 +414,12 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "blood-bank",
 		// Blood Bank is tied to Laboratory module (Lab Techs handle cross-matching)
 		// Admin does not have blood bank access per TOR
-		requiredPermissions: [
-			{ module: "laboratory", action: "view" },
-		],
+		requiredPermissions: [{ module: "laboratory", action: "view" }],
 		isSecondary: true,
 	},
 	{
 		title: "Patients",
-		href: "/patients/search",
+		href: "/patients/register",
 		iconName: "patient",
 		// Lab Techs, Radiologists, and Pharmacists access patients from SECONDARY for contextual lookup
 		requiredPermissions: [
@@ -482,9 +427,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 			{ module: "radiology", action: "view" },
 			{ module: "orders", action: "verify" },
 		],
-		excludePermissions: [
-			{ module: "admin", action: "view" },
-		],
+		excludePermissions: [{ module: "admin", action: "view" }],
 		isSecondary: true,
 	},
 	{
@@ -505,23 +448,17 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		href: "/pharmacy/opd",
 		iconName: "pill",
 		// OPD dispensing for outpatient prescription processing
-		requiredPermissions: [
-			{ module: "orders", action: "verify" },
-		],
+		requiredPermissions: [{ module: "orders", action: "verify" }],
 		isSecondary: true,
 	},
 	{
 		title: "Reporting",
 		href: "/reporting",
 		iconName: "report",
-		requiredPermissions: [
-			{ module: "reporting", action: "view" },
-		],
+		requiredPermissions: [{ module: "reporting", action: "view" }],
 		// Reporting dashboard is for Surveillance Officers; clinical staff access death reporting
 		// via disposition triggers, not via this nav link
-		excludePermissions: [
-			{ module: "clinical_docs", action: "sign" },
-		],
+		excludePermissions: [{ module: "clinical_docs", action: "sign" }],
 		isSecondary: true,
 	},
 	{
@@ -550,18 +487,14 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "Audit Trail",
 		href: "/audit",
 		iconName: "audit",
-		requiredPermissions: [
-			{ module: "audit", action: "view" },
-		],
+		requiredPermissions: [{ module: "audit", action: "view" }],
 		isSecondary: true,
 	},
 	{
 		title: "Administration",
 		href: "/admin",
 		iconName: "settings",
-		requiredPermissions: [
-			{ module: "admin", action: "view" },
-		],
+		requiredPermissions: [{ module: "admin", action: "view" }],
 		isSecondary: true,
 	},
 ]
@@ -586,10 +519,7 @@ interface Permission {
  * integration_registry:view, etc.). Clinical module nav items must not include
  * admin:view in their requiredPermissions.
  */
-export function filterNavItems(
-	items: NavItemConfig[],
-	permissions: Permission[]
-): NavItemConfig[] {
+export function filterNavItems(items: NavItemConfig[], permissions: Permission[]): NavItemConfig[] {
 	const permSet = new Set(permissions.map(p => `${p.module}:${p.action}`))
 
 	return items.filter(item => {
@@ -617,18 +547,18 @@ export function filterNavItems(
  */
 export const ROLE_DASHBOARD_WIDGETS: Record<string, string[]> = {
 	// TOR: System Admin — governance, config, audit, integration, ARTA/SLA visibility
-	administrator: [
+	"administrator": [
 		"admin-access-governance",
 		"admin-platform-control",
 		"admin-integrations",
 		"admin-audit",
 		"admin-arta-sla",
 	],
-	registrar: ["my-patient-list", "quick-stats", "alerts"],
-	clinician: ["my-patient-list", "pending-orders", "unsigned-notes", "alerts"],
-	physician: ["my-patient-list", "pending-orders", "unsigned-notes", "alerts"],
-	nurse: ["my-patient-list", "pending-orders", "alerts", "quick-stats"],
-	pharmacist: ["pending-orders", "alerts", "quick-stats"],
+	"registrar": ["my-patient-list", "quick-stats", "alerts"],
+	"clinician": ["my-patient-list", "pending-orders", "unsigned-notes", "alerts"],
+	"physician": ["my-patient-list", "pending-orders", "unsigned-notes", "alerts"],
+	"nurse": ["my-patient-list", "pending-orders", "alerts", "quick-stats"],
+	"pharmacist": ["pending-orders", "alerts", "quick-stats"],
 	"billing officer": ["quick-stats", "alerts"],
 }
 
