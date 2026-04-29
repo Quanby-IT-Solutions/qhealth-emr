@@ -13,6 +13,7 @@ import { NbsLogbook } from "@/features/nbs/components/nbs-logbook"
 import Link from "next/link"
 
 import { useHaiTagsQuery, useVitalsQuery } from "../api/nursing.hooks"
+import { useNursingSync } from "../lib/use-nursing-sync"
 
 // ============================================================================
 // Stats Card
@@ -159,6 +160,7 @@ function HaiSummaryTab({ facilityId }: HaiSummaryTabProps) {
 export function NursingDashboard() {
 	const { data: profile, isLoading } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+	const { queue: offlineQueue, syncPhase } = useNursingSync()
 
 	const { data: vitalsData, refetch: refetchVitals } = useVitalsQuery({
 		facilityId,
@@ -234,7 +236,15 @@ export function NursingDashboard() {
 						<Wifi className="size-4 text-muted-foreground" />
 					</CardHeader>
 					<CardContent>
-						<div className="text-2xl font-bold">2 Pending</div>
+						<div className="text-2xl font-bold">
+							{syncPhase === "syncing"
+								? "Syncing…"
+								: syncPhase === "conflict"
+									? "Conflict"
+									: offlineQueue.length > 0
+										? `${offlineQueue.length} Pending`
+										: "Synced"}
+						</div>
 						<Link href="/nursing/sync">
 							<Button variant="link" className="h-auto p-0 text-xs text-blue-600">
 								View sync status →
