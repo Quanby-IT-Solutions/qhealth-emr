@@ -16,21 +16,23 @@ import {
 	TableRow,
 } from "@/core/components/ui/table"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { ConsentHistory } from "@/features/clinical-docs/components/consent-history"
+import { DpaStatusBadge } from "@/features/clinical-docs/components/dpa-status-badge"
 import { usePatientProfileQuery } from "@/features/patients/api/patients.hooks"
+import { usePatientSummaryQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
+import { ProblemsAllergiesTab } from "@/features/problems-allergies/components/problems-allergies-tab"
 
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
 	return permSet.has(`${module}:${action}`)
 }
-import { ConsentHistory } from "@/features/clinical-docs/components/consent-history"
-import { DpaStatusBadge } from "@/features/clinical-docs/components/dpa-status-badge"
-import { usePatientSummaryQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
-import { ProblemsAllergiesTab } from "@/features/problems-allergies/components/problems-allergies-tab"
 
 function formatDate(dateVal: Date | string | null | undefined) {
 	if (!dateVal) return "—"
@@ -88,7 +90,9 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 	const router = useRouter()
 	const { data: patient, isLoading, isError, error } = usePatientProfileQuery(patientId)
 	const permSet = usePermissionSet()
-	const { data: summary } = usePatientSummaryQuery(can(permSet, "patients", "view") ? patientId : "")
+	const { data: summary } = usePatientSummaryQuery(
+		can(permSet, "patients", "view") ? patientId : ""
+	)
 
 	if (isLoading) {
 		return (
@@ -122,8 +126,8 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 					</div>
 					<Separator orientation="vertical" className="hidden h-10 sm:block" />
 					<div className="text-sm">
-						<span className="text-muted-foreground">DOB:</span>{" "}
-						{formatDate(patient.dateOfBirth)} ({calculateAge(patient.dateOfBirth)})
+						<span className="text-muted-foreground">DOB:</span> {formatDate(patient.dateOfBirth)} (
+						{calculateAge(patient.dateOfBirth)})
 					</div>
 					<div className="text-sm">
 						<span className="text-muted-foreground">Sex:</span>{" "}
@@ -135,9 +139,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 						</div>
 					)}
 					{!patient.isActive && <Badge variant="destructive">Inactive</Badge>}
-					{summary?.hasSevereAllergies && (
-						<Badge variant="destructive">⚠ Severe Allergy</Badge>
-					)}
+					{summary?.hasSevereAllergies && <Badge variant="destructive">⚠ Severe Allergy</Badge>}
 					{summary && summary.activeAllergyCount > 0 && !summary.hasSevereAllergies && (
 						<Badge variant="default">
 							{summary.activeAllergyCount} Allerg{summary.activeAllergyCount === 1 ? "y" : "ies"}
@@ -157,7 +159,13 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 						<div>
 							<dt className="text-muted-foreground">Address</dt>
 							<dd>
-								{[patient.addressLine1, patient.addressLine2, patient.city, patient.province, patient.zipCode]
+								{[
+									patient.addressLine1,
+									patient.addressLine2,
+									patient.city,
+									patient.province,
+									patient.zipCode,
+								]
 									.filter(Boolean)
 									.join(", ") || "—"}
 							</dd>
@@ -192,7 +200,11 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 			{/* Problems & Allergies */}
 			{(can(permSet, "clinical_docs", "view") || can(permSet, "orders", "view")) && (
-				<ProblemsAllergiesTab patientId={patientId} facilityId={patient.facilityId} canWrite={can(permSet, "clinical_docs", "sign")} />
+				<ProblemsAllergiesTab
+					patientId={patientId}
+					facilityId={patient.facilityId}
+					canWrite={can(permSet, "clinical_docs", "sign")}
+				/>
 			)}
 
 			{/* Encounter History */}
@@ -227,23 +239,15 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 									<TableRow
 										key={enc.id}
 										className="cursor-pointer"
-										onClick={() =>
-											router.push(
-												`/patients/${patientId}/encounters/${enc.id}`
-											)
-										}
+										onClick={() => router.push(`/patients/${patientId}/encounters/${enc.id}`)}
 									>
 										<TableCell className="capitalize">{enc.encounterType}</TableCell>
 										<TableCell>
-											<Badge variant={encounterStatusVariant(enc.status)}>
-												{enc.status}
-											</Badge>
+											<Badge variant={encounterStatusVariant(enc.status)}>{enc.status}</Badge>
 										</TableCell>
 										<TableCell>{enc.chiefComplaint ?? "—"}</TableCell>
 										<TableCell>{formatDateTime(enc.admissionDatetime)}</TableCell>
-										<TableCell>
-											{formatDateTime(enc.dischargeDatetime)}
-										</TableCell>
+										<TableCell>{formatDateTime(enc.dischargeDatetime)}</TableCell>
 									</TableRow>
 								))}
 							</TableBody>
@@ -267,7 +271,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 			{/* Actions */}
 			<div className="flex gap-3">
-				<Button variant="outline" nativeButton={false} render={<Link href="/patients/search" />}>
+				<Button variant="outline" nativeButton={false} render={<Link href="/patients/register" />}>
 					Back to Search
 				</Button>
 			</div>

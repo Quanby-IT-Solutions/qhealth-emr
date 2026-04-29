@@ -1,7 +1,7 @@
 "use client"
 
-import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -67,7 +67,7 @@ export function CreateEncounterForm({
 		chiefComplaint: "",
 		bedId: "",
 		clinicianStaffId: "",
-	})	// Pre-fill chiefComplaint from triage intake once loaded
+	}) // Pre-fill chiefComplaint from triage intake once loaded
 	const [triagedPrefilled, setTriagedPrefilled] = useState(false)
 	if (triageData && !triagedPrefilled) {
 		setForm(prev => ({ ...prev, chiefComplaint: prev.chiefComplaint || triageData.chiefComplaint }))
@@ -76,8 +76,7 @@ export function CreateEncounterForm({
 	const [assignedQueueNumber, setAssignedQueueNumber] = useState<number | null>(null)
 	const [createdEncounterId, setCreatedEncounterId] = useState<string | null>(null)
 
-	const update = (field: string, value: string) =>
-		setForm(prev => ({ ...prev, [field]: value }))
+	const update = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }))
 
 	const availableBeds = (bedData?.wards ?? []).flatMap(ward =>
 		ward.beds
@@ -85,8 +84,7 @@ export function CreateEncounterForm({
 			.map(bed => ({ ...bed, wardName: ward.name, wardType: ward.wardType }))
 	)
 
-	const needsBed =
-		form.encounterType === "inpatient" || form.encounterType === "emergency"
+	const needsBed = form.encounterType === "inpatient" || form.encounterType === "emergency"
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
@@ -102,11 +100,12 @@ export function CreateEncounterForm({
 			attendingStaffId: staffId || undefined,
 			bedId: form.bedId || undefined,
 			triageIntakeId: triageId || undefined,
-			clinicianStaffId: form.encounterType === "outpatient" ? (form.clinicianStaffId || undefined) : undefined,
+			clinicianStaffId:
+				form.encounterType === "outpatient" ? form.clinicianStaffId || undefined : undefined,
 		})
 
 		// For OPD encounters, show queue number confirmation before navigating
-		if (encounter.queueNumber != null) {
+		if (encounter.queueNumber !== null) {
 			setAssignedQueueNumber(encounter.queueNumber)
 			setCreatedEncounterId(encounter.id)
 			return
@@ -116,7 +115,7 @@ export function CreateEncounterForm({
 	}
 
 	// Queue number confirmation state (OPD only)
-	if (assignedQueueNumber != null && createdEncounterId) {
+	if (assignedQueueNumber !== null && createdEncounterId) {
 		return (
 			<Card>
 				<CardHeader>
@@ -136,7 +135,7 @@ export function CreateEncounterForm({
 						>
 							View Encounter
 						</Button>
-						<Button variant="outline" onClick={() => router.push(`/patients/search`)}>
+						<Button variant="outline" onClick={() => router.push(`/patients/register`)}>
 							Next Patient
 						</Button>
 					</div>
@@ -176,8 +175,15 @@ export function CreateEncounterForm({
 								value={form.clinicianStaffId}
 								onValueChange={value => update("clinicianStaffId", value ?? "")}
 							>
-								<SelectTrigger className="w-full">
-									<SelectValue placeholder="Select a clinician…" />
+								<SelectTrigger
+									className="w-full"
+									data-placeholder={!form.clinicianStaffId ? "" : undefined}
+								>
+									{form.clinicianStaffId ? (
+										<SelectValue />
+									) : (
+										<span className="text-muted-foreground">Select a clinician…</span>
+									)}
 								</SelectTrigger>
 								<SelectContent>
 									{clinicianOptions.map(opt => (

@@ -56,22 +56,12 @@ interface PatientRegistrationFormProps {
 	mode?: "standalone" | "triage-linked"
 }
 
-function buildBackToSearchHref({
-	isStandaloneRegistration,
-	pendingTriageId,
-}: {
-	isStandaloneRegistration: boolean
-	pendingTriageId: string
-}) {
-	if (isStandaloneRegistration) {
-		return "/patients/register"
-	}
-
+function buildBackToSearchHref({ pendingTriageId }: { pendingTriageId: string }) {
 	if (pendingTriageId) {
-		return `/patients/search?pendingTriageId=${pendingTriageId}`
+		return `/patients/register?pendingTriageId=${pendingTriageId}`
 	}
 
-	return "/patients/search"
+	return "/patients/register"
 }
 
 function formatRegisteredPatientName({
@@ -153,10 +143,7 @@ export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegis
 	const searchParams = useSearchParams()
 	const pendingTriageId = searchParams.get("pendingTriageId") ?? ""
 	const isStandaloneRegistration = mode === "standalone"
-	const backToSearchHref = buildBackToSearchHref({
-		isStandaloneRegistration,
-		pendingTriageId,
-	})
+	const backToSearchHref = buildBackToSearchHref({ pendingTriageId })
 	const fieldClassName = "h-11 rounded-xl border-border/60 bg-background"
 	const primaryButtonClassName = "bg-foreground text-background hover:bg-foreground/90"
 
@@ -393,7 +380,7 @@ export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegis
 						<Button
 							variant="outline"
 							className="border-border/60 bg-background"
-							onClick={() => router.push("/patients/search")}
+							onClick={() => router.push("/patients/register")}
 						>
 							Back to patient search
 						</Button>
@@ -452,7 +439,7 @@ export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegis
 							<Button
 								variant="outline"
 								className="border-border/60 bg-background"
-								onClick={() => router.push("/patients/search")}
+								onClick={() => router.push("/patients/register")}
 							>
 								Register another
 							</Button>
