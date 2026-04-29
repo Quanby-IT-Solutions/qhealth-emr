@@ -1,11 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { Calendar, ClipboardList, Pill, Video } from "lucide-react"
+import { Calendar, ClipboardList, FileText, Pill, Video } from "lucide-react"
 
 import { Card, CardContent } from "@/core/components/ui/card"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { EPrescriptionCard } from "@/features/telemedicine/components/e-prescription-card"
+import { TeleAbstractPage } from "@/features/telemedicine/components/tele-abstract-page"
 import { TelemedicineEncounterForm } from "@/features/telemedicine/components/telemedicine-encounter-form"
 import { VideoCallPanel } from "@/features/telemedicine/components/video-call-panel"
 import { VirtualVisitScheduler } from "@/features/telemedicine/components/virtual-visit-scheduler"
@@ -14,7 +15,7 @@ import { VirtualVisitScheduler } from "@/features/telemedicine/components/virtua
 // Types
 // ============================================================================
 
-type ActiveTab = "scheduler" | "encounter" | "video" | "prescription"
+type ActiveTab = "scheduler" | "encounter" | "video" | "abstract" | "prescription"
 
 interface TabConfig {
 	id: ActiveTab
@@ -45,6 +46,12 @@ const TABS: TabConfig[] = [
 		label: "Video Call",
 		icon: Video,
 		description: "Join or share video call link with patient",
+	},
+	{
+		id: "abstract",
+		label: "Abstract",
+		icon: FileText,
+		description: "Generate and sign encounter abstract for patient",
 	},
 	{
 		id: "prescription",
@@ -93,7 +100,12 @@ export function TelemedicineDashboard() {
 
 	function handleEncounterCreated(encounterId: string) {
 		setActiveEncounterId(encounterId)
-		// Auto-advance to prescription tab
+		// Auto-advance to abstract tab
+		setActiveTab("abstract")
+	}
+
+	function handleAbstractSigned() {
+		// Auto-advance to prescription tab after signing abstract
 		setActiveTab("prescription")
 	}
 
@@ -108,7 +120,7 @@ export function TelemedicineDashboard() {
 			</div>
 
 			{/* Tab Navigation */}
-			<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+			<div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
 				{TABS.map(({ id, label, icon: Icon, description }) => (
 					<button
 						key={id}
@@ -178,6 +190,33 @@ export function TelemedicineDashboard() {
 
 			{activeTab === "video" && (
 				<VideoCallPanel appointmentId={selectedAppointmentId ?? undefined} />
+			)}
+
+			{activeTab === "abstract" && (
+				<>
+					{activeEncounterId ? (
+						<TeleAbstractPage
+							encounterId={activeEncounterId}
+							onAbstractSigned={handleAbstractSigned}
+						/>
+					) : (
+						<Card>
+							<CardContent className="py-10 text-center">
+								<FileText className="text-muted-foreground mx-auto mb-3 size-10" />
+								<p className="text-muted-foreground text-sm">
+									Please complete a clinical encounter first to generate an abstract.
+								</p>
+								<button
+									type="button"
+									onClick={() => setActiveTab("encounter")}
+									className="text-primary mt-2 text-sm underline underline-offset-2"
+								>
+									Go to Clinical Note
+								</button>
+							</CardContent>
+						</Card>
+					)}
+				</>
 			)}
 
 			{activeTab === "prescription" && (

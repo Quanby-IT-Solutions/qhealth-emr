@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, count, desc, eq, gte, ilike, lt, max, or, sql } from "drizzle-orm"
+import { and, count, desc, eq, gte, ilike, inArray, lt, max, or, sql } from "drizzle-orm"
 
 import { encounterStatusEvents, encounters, opdTriageIntakes, patients, staffProfiles, users } from "@repo/db/schema"
 
@@ -7,6 +7,10 @@ import { db } from "@/common/database/database.client"
 import { resolveStepTarget } from "@/utils/sla-step-target"
 import type { V1Inputs } from "@/config/contract-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
+import {
+	type ChartAccessActor,
+	ChartAccessService,
+} from "@/modules/v1/audit/chart-access.service"
 
 type PatientSearchInput = V1Inputs["patient"]["search"]
 type CreatePatientInput = V1Inputs["patient"]["create"]
@@ -18,7 +22,10 @@ type ListCliniciansInput = V1Inputs["patient"]["listClinicians"]
 export class PatientsService {
 	private readonly logger = new Logger(PatientsService.name)
 
-	constructor(private readonly auditService: AuditService) {}
+	constructor(
+		private readonly auditService: AuditService,
+		private readonly chartAccessService: ChartAccessService
+	) {}
 
 	// ========================================================================
 	// Helper: resolve staffProfileId from userId (null-safe for audit)
@@ -133,10 +140,35 @@ export class PatientsService {
 
 		const total = totalResult[0]?.count ?? 0
 
+		const hasDirectAccessSet = new Set<string>()
+		if (filter.clinicianStaffId && data.length > 0) {
+			const patientIds = data.map(r => r.id)
+			const accessRows = await db
+				.selectDistinct({ patientId: encounters.patientId })
+				.from(encounters)
+				.where(
+					and(
+						inArray(encounters.patientId, patientIds),
+						inArray(encounters.status, ["active", "discharged", "closed"]),
+						or(
+							eq(encounters.clinicianStaffId, filter.clinicianStaffId),
+							eq(encounters.attendingStaffId, filter.clinicianStaffId),
+							eq(encounters.admittingStaffId, filter.clinicianStaffId)
+						)
+					)
+				)
+			for (const row of accessRows) {
+				hasDirectAccessSet.add(row.patientId)
+			}
+		}
+
 		return {
 			data: data.map(row => ({
 				...row,
 				lastEncounterDate: row.lastEncounterDate ?? null,
+				hasDirectAccess: filter.clinicianStaffId
+					? hasDirectAccessSet.has(row.id)
+					: true,
 			})),
 			total,
 			page,
@@ -149,12 +181,17 @@ export class PatientsService {
 	// Get by ID (with encounter history)
 	// ========================================================================
 
-	async findById(id: string, actor?: { userId: string; ipAddress?: string | null; userAgent?: string | null }) {
+	async findById(id: string, actor?: ChartAccessActor) {
 		const [patient] = await db.select().from(patients).where(eq(patients.id, id))
 
 		if (!patient) {
 			throw new NotFoundException(`Patient ${id} not found`)
 		}
+
+		const access = await this.chartAccessService.ensurePatientChartReadAccess(actor, id, {
+			entityType: "patient",
+			entityId: id,
+		})
 
 		// PS-049: emit DPA audit record for patient lookup
 		if (actor?.userId) {
@@ -170,7 +207,15 @@ export class PatientsService {
 				afterState: null,
 				ipAddress: actor.ipAddress ?? null,
 				userAgent: actor.userAgent ?? null,
-				metadata: { mrn: patient.mrn },
+				metadata: {
+					mrn: patient.mrn,
+					...(access.mode === "break_glass"
+						? {
+								accessMode: "break_glass",
+								breakGlassEventId: access.breakGlassEventId ?? null,
+							}
+						: {}),
+				},
 			})
 		}
 

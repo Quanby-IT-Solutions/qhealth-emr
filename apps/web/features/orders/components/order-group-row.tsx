@@ -1,11 +1,12 @@
 "use client"
 
-import { ChevronDown, ChevronRight } from "lucide-react"
 import { useState } from "react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { TableCell, TableRow } from "@/core/components/ui/table"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
 import { cn } from "@/core/lib/utils"
 
 interface MedOrderRow {
@@ -37,6 +38,7 @@ interface OrderGroupRowProps {
 	onGenerateRx?: (id: string) => void
 	discontinuePending?: boolean
 	createRxPending?: boolean
+	prescriberHasValidLicense?: boolean
 }
 
 export function OrderGroupRow({
@@ -48,6 +50,7 @@ export function OrderGroupRow({
 	onGenerateRx,
 	discontinuePending,
 	createRxPending,
+	prescriberHasValidLicense = true,
 }: OrderGroupRowProps) {
 	const [expanded, setExpanded] = useState(false)
 	const hasChildren = tranches.length > 0
@@ -62,8 +65,8 @@ export function OrderGroupRow({
 							<button
 								type="button"
 								aria-label={expanded ? "Collapse tranches" : "Expand tranches"}
-								className="rounded p-0.5 hover:bg-muted"
-								onClick={() => setExpanded((v) => !v)}
+								className="hover:bg-muted rounded p-0.5"
+								onClick={() => setExpanded(v => !v)}
 							>
 								{expanded ? (
 									<ChevronDown className="size-3.5" />
@@ -75,9 +78,7 @@ export function OrderGroupRow({
 						<div>
 							<div className="font-bold">{parent.genericName}</div>
 							{parent.brandName && (
-								<div className="text-muted-foreground text-xs">
-									{parent.brandName}
-								</div>
+								<div className="text-muted-foreground text-xs">{parent.brandName}</div>
 							)}
 							{parent.isControlledSubstance && (
 								<Badge variant="outline" className="mt-0.5 text-[10px]">
@@ -92,14 +93,10 @@ export function OrderGroupRow({
 				</TableCell>
 				<TableCell>{parent.route}</TableCell>
 				<TableCell>{parent.frequency}</TableCell>
-				<TableCell>
-					{parent.durationDays != null ? `${parent.durationDays}d` : "—"}
-				</TableCell>
+				<TableCell>{parent.durationDays != null ? `${parent.durationDays}d` : "—"}</TableCell>
 				<TableCell>{parent.isPrn ? "Yes" : "No"}</TableCell>
 				<TableCell>
-					<Badge variant={statusBadge(parent.status)}>
-						{parent.status.replace(/_/g, " ")}
-					</Badge>
+					<Badge variant={statusBadge(parent.status)}>{parent.status.replace(/_/g, " ")}</Badge>
 				</TableCell>
 				<TableCell>{parent.orderingStaffName ?? "—"}</TableCell>
 				<TableCell>{formatDate(parent.createdAt)}</TableCell>
@@ -115,17 +112,23 @@ export function OrderGroupRow({
 								Discontinue
 							</Button>
 						)}
-						{(parent.status === "active" || parent.status === "verified") &&
-							onGenerateRx && (
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={createRxPending}
-									onClick={() => onGenerateRx(parent.id)}
-								>
-									Generate Rx
-								</Button>
-							)}
+						{(parent.status === "active" || parent.status === "verified") && onGenerateRx && (
+							<Tooltip>
+								<TooltipTrigger render={<span className="inline-flex" />}>
+									<Button
+										variant="outline"
+										size="sm"
+										disabled={createRxPending || !prescriberHasValidLicense}
+										onClick={() => onGenerateRx(parent.id)}
+									>
+										Generate Rx
+									</Button>
+								</TooltipTrigger>
+								{!prescriberHasValidLicense && (
+									<TooltipContent>PRC/PTR not verified or expired</TooltipContent>
+								)}
+							</Tooltip>
+						)}
 					</div>
 				</TableCell>
 			</TableRow>
@@ -133,14 +136,11 @@ export function OrderGroupRow({
 			{/* Child tranche rows */}
 			{hasChildren &&
 				expanded &&
-				tranches.map((tranche) => (
-					<TableRow
-						key={tranche.id}
-						className={cn("bg-muted/30 hover:bg-muted/50")}
-					>
+				tranches.map(tranche => (
+					<TableRow key={tranche.id} className={cn("bg-muted/30 hover:bg-muted/50")}>
 						<TableCell className="pl-10">
 							<div className="text-muted-foreground text-sm">
-								<span className="font-medium text-foreground">
+								<span className="text-foreground font-medium">
 									Tranche #{tranche.pdeaTrancheNumber}
 								</span>{" "}
 								of {tranche.pdeaTrancheTotal}
@@ -160,9 +160,7 @@ export function OrderGroupRow({
 								{tranche.status.replace(/_/g, " ")}
 							</Badge>
 						</TableCell>
-						<TableCell className="text-sm">
-							{tranche.orderingStaffName ?? "—"}
-						</TableCell>
+						<TableCell className="text-sm">{tranche.orderingStaffName ?? "—"}</TableCell>
 						<TableCell className="text-sm">{formatDate(tranche.createdAt)}</TableCell>
 						<TableCell />
 					</TableRow>

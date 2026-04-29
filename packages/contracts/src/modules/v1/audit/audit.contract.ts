@@ -6,6 +6,7 @@ import {
 	AuditLogListResponseSchema,
 	AuditLogSchema,
 	BreakGlassEventSchema,
+	BreakGlassExportFilterSchema,
 	BreakGlassFilterSchema,
 	BreakGlassIdSchema,
 	BreakGlassListResponseSchema,
@@ -112,4 +113,14 @@ export const breakGlassContract = {
 		})
 		.input(BreakGlassPatternsFilterSchema)
 		.output(BreakGlassPatternsSchema),
+
+	exportCsv: oc
+		.route({
+			method: "GET",
+			path: "/break-glass/export",
+			summary: "Export filtered break-glass events as CSV",
+			tags: ["Audit", "Break Glass"],
+		})
+		.input(BreakGlassExportFilterSchema)
+		.output(BreakGlassListResponseSchema),
 }

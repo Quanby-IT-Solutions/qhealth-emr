@@ -160,6 +160,22 @@ export class OrdersController {
 		})
 	}
 
+	@RequirePermission("orders", "create")
+	@Implement(v1.orders.createHighAlertVerification)
+	async createHighAlertVerification(@Session() session: UserSession) {
+		return implement(v1.orders.createHighAlertVerification).handler(async ({ input }) => {
+			return this.ordersService.createHighAlertVerification(input, session.user.id)
+		})
+	}
+
+	@RequirePermission("orders", "view")
+	@Implement(v1.orders.getHighAlertVerification)
+	async getHighAlertVerification() {
+		return implement(v1.orders.getHighAlertVerification).handler(async ({ input }) => {
+			return this.ordersService.getHighAlertVerification(input.medicationOrderId)
+		})
+	}
+
 	// ========================================================================
 	// Prescriptions
 	// ========================================================================

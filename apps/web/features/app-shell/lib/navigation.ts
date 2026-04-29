@@ -257,6 +257,10 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		requiredPermissions: [
 			{ module: "nursing", action: "view" },
 		],
+		// Physicians have nursing:view to read nursing notes, not to manage the nursing dashboard
+		excludePermissions: [
+			{ module: "clinical_docs", action: "sign" },
+		],
 	},
 	{
 		title: "Nutrition",
@@ -513,6 +517,11 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		requiredPermissions: [
 			{ module: "reporting", action: "view" },
 		],
+		// Reporting dashboard is for Surveillance Officers; clinical staff access death reporting
+		// via disposition triggers, not via this nav link
+		excludePermissions: [
+			{ module: "clinical_docs", action: "sign" },
+		],
 		isSecondary: true,
 	},
 	{
@@ -617,6 +626,7 @@ export const ROLE_DASHBOARD_WIDGETS: Record<string, string[]> = {
 	],
 	registrar: ["my-patient-list", "quick-stats", "alerts"],
 	clinician: ["my-patient-list", "pending-orders", "unsigned-notes", "alerts"],
+	physician: ["my-patient-list", "pending-orders", "unsigned-notes", "alerts"],
 	nurse: ["my-patient-list", "pending-orders", "alerts", "quick-stats"],
 	pharmacist: ["pending-orders", "alerts", "quick-stats"],
 	"billing officer": ["quick-stats", "alerts"],

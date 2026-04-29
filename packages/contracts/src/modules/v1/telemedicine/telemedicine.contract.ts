@@ -8,11 +8,17 @@ import {
 	CreateEncounterInputSchema,
 	CreatePrescriptionInputSchema,
 	EPrescriptionSchema,
+	GenerateAbstractInputSchema,
+	GetAbstractInputSchema,
 	GetAppointmentInputSchema,
 	GetEncounterInputSchema,
 	GetPrescriptionInputSchema,
 	ListAppointmentsInputSchema,
+	ListEncounterAbstractsInputSchema,
 	ListPrescriptionsInputSchema,
+	SendAbstractInputSchema,
+	SignAbstractInputSchema,
+	TeleAbstractSchema,
 	TelemedicineAppointmentSchema,
 	TelemedicineEncounterSchema,
 } from "./telemedicine.schema.js"
@@ -113,4 +119,56 @@ export const telemedicineContract = {
 		})
 		.input(CreatePrescriptionInputSchema)
 		.output(EPrescriptionSchema),
+
+	// ─── Abstracts ─────────────────────────────────────────────────────────────
+
+	generateAbstract: oc
+		.route({
+			method: "POST",
+			path: "/abstracts",
+			summary: "Generate tele-encounter abstract from encounter data",
+			tags: ["Telemedicine"],
+		})
+		.input(GenerateAbstractInputSchema)
+		.output(TeleAbstractSchema),
+
+	getAbstract: oc
+		.route({
+			method: "GET",
+			path: "/abstracts/{id}",
+			summary: "Get a tele-encounter abstract by ID",
+			tags: ["Telemedicine"],
+		})
+		.input(GetAbstractInputSchema)
+		.output(TeleAbstractSchema),
+
+	listEncounterAbstracts: oc
+		.route({
+			method: "GET",
+			path: "/abstracts",
+			summary: "List abstracts for a telemedicine encounter",
+			tags: ["Telemedicine"],
+		})
+		.input(ListEncounterAbstractsInputSchema)
+		.output(z.array(TeleAbstractSchema)),
+
+	signAbstract: oc
+		.route({
+			method: "POST",
+			path: "/abstracts/{id}/sign",
+			summary: "Sign a tele-encounter abstract",
+			tags: ["Telemedicine"],
+		})
+		.input(SignAbstractInputSchema)
+		.output(TeleAbstractSchema),
+
+	sendAbstract: oc
+		.route({
+			method: "POST",
+			path: "/abstracts/{id}/send",
+			summary: "Send abstract to patient via email",
+			tags: ["Telemedicine"],
+		})
+		.input(SendAbstractInputSchema)
+		.output(TeleAbstractSchema),
 }

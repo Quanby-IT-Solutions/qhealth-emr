@@ -1,13 +1,21 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, countDistinct, desc, eq, gte, lte, sql } from "drizzle-orm"
 
-import { auditLogs, breakGlassEvents, patients, staffProfiles } from "@repo/db/schema"
+import {
+	auditLogs,
+	breakGlassEvents,
+	patients,
+	rolePermissions,
+	staffProfiles,
+	userRoles,
+} from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 
 type AuditLogFilterInput = V1Inputs["audit"]["log"]["list"]
 type BreakGlassFilterInput = V1Inputs["audit"]["breakGlass"]["list"]
+type BreakGlassExportFilterInput = V1Inputs["audit"]["breakGlass"]["exportCsv"]
 type BreakGlassPatternsInput = V1Inputs["audit"]["breakGlass"]["patterns"]
 type CreateBreakGlassInput = V1Inputs["audit"]["breakGlass"]["create"]
 type ReviewBreakGlassInput = V1Inputs["audit"]["breakGlass"]["review"]
@@ -50,6 +58,29 @@ export class AuditService {
 		}
 
 		return row.id
+	}
+
+	async findBreakGlassReviewerStaffIds(
+		facilityId: string,
+		options?: { excludeStaffId?: string | null }
+	) {
+		const reviewerRows = await db
+			.selectDistinct({ staffProfileId: staffProfiles.id })
+			.from(staffProfiles)
+			.innerJoin(userRoles, eq(userRoles.staffProfileId, staffProfiles.id))
+			.innerJoin(rolePermissions, eq(rolePermissions.roleId, userRoles.roleId))
+			.where(
+				and(
+					eq(staffProfiles.facilityId, facilityId),
+					eq(staffProfiles.isActive, true),
+					eq(rolePermissions.module, "audit"),
+					eq(rolePermissions.action, "view")
+				)
+			)
+
+		return reviewerRows
+			.map(row => row.staffProfileId)
+			.filter(staffProfileId => staffProfileId !== options?.excludeStaffId)
 	}
 
 	/**
@@ -322,6 +353,46 @@ export class AuditService {
 			page,
 			limit,
 			totalPages: Math.ceil(total / limit),
+		}
+	}
+
+	/**
+	 * Export break-glass events without pagination (capped at 10,000 rows).
+	 */
+	async exportBreakGlassEvents(filter: BreakGlassExportFilterInput) {
+		const { facilityId, reviewStatus, clinicianStaffId, patientId, dateFrom, dateTo } = filter
+
+		const conditions = [eq(breakGlassEvents.facilityId, facilityId)]
+
+		if (reviewStatus) {
+			conditions.push(eq(breakGlassEvents.reviewStatus, reviewStatus))
+		}
+		if (clinicianStaffId) {
+			conditions.push(eq(breakGlassEvents.clinicianStaffId, clinicianStaffId))
+		}
+		if (patientId) {
+			conditions.push(eq(breakGlassEvents.patientId, patientId))
+		}
+		if (dateFrom) {
+			conditions.push(gte(breakGlassEvents.accessGrantedAt, new Date(dateFrom)))
+		}
+		if (dateTo) {
+			conditions.push(lte(breakGlassEvents.accessGrantedAt, new Date(dateTo)))
+		}
+
+		const data = await db
+			.select()
+			.from(breakGlassEvents)
+			.where(and(...conditions))
+			.orderBy(desc(breakGlassEvents.createdAt))
+			.limit(10000)
+
+		return {
+			data,
+			total: data.length,
+			page: 1,
+			limit: data.length,
+			totalPages: 1,
 		}
 	}
 

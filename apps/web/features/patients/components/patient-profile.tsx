@@ -1,8 +1,10 @@
 "use client"
 
+import { useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
+import { ArrowLeft, Eye } from "lucide-react"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
@@ -16,6 +18,8 @@ import {
 	TableRow,
 } from "@/core/components/ui/table"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { useMyActiveBreakGlassQuery } from "@/features/audit/api/audit.hooks"
+import { BreakGlassForm } from "@/features/audit/components/break-glass-form"
 import { usePatientProfileQuery } from "@/features/patients/api/patients.hooks"
 
 function usePermissionSet() {
@@ -84,11 +88,47 @@ interface PatientProfileProps {
 	patientId: string
 }
 
+const BREAK_GLASS_REQUIRED_MESSAGE = "Break-glass required for this patient chart."
+
+function getActiveStaffProfile(
+	profile:
+		| {
+				staffProfiles?: Array<{ id: string; facilityId: string; roles: Array<{ id: string }> }>
+				activeRole?: { id: string } | null
+		  }
+		| undefined
+) {
+	return (
+		profile?.staffProfiles?.find(staffProfile =>
+			staffProfile.roles.some(role => role.id === profile?.activeRole?.id)
+		) ?? profile?.staffProfiles?.[0]
+	)
+}
+
 export function PatientProfile({ patientId }: PatientProfileProps) {
 	const router = useRouter()
-	const { data: patient, isLoading, isError, error } = usePatientProfileQuery(patientId)
+	const patientQuery = usePatientProfileQuery(patientId)
+	const { data: patient, isLoading, isError, error, refetch: refetchPatient } = patientQuery
 	const permSet = usePermissionSet()
-	const { data: summary } = usePatientSummaryQuery(can(permSet, "patients", "view") ? patientId : "")
+	const { data: profile } = useMyProfile()
+	const activeStaffProfile = getActiveStaffProfile(profile)
+	const activeFacilityId = activeStaffProfile?.facilityId
+	const canBreakGlass = can(permSet, "audit", "create")
+	const breakGlassRequired =
+		error?.message?.includes(BREAK_GLASS_REQUIRED_MESSAGE) ||
+		String(error).includes(BREAK_GLASS_REQUIRED_MESSAGE)
+	const { data: activeBreakGlass } = useMyActiveBreakGlassQuery({
+		facilityId: activeFacilityId,
+		patientId,
+		staffId: activeStaffProfile?.id,
+	})
+	const { data: summary } = usePatientSummaryQuery(patient ? patientId : "")
+
+	useEffect(() => {
+		if (breakGlassRequired && activeBreakGlass) {
+			void refetchPatient()
+		}
+	}, [activeBreakGlass, breakGlassRequired, refetchPatient])
 
 	if (isLoading) {
 		return (
@@ -99,6 +139,46 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 	}
 
 	if (isError) {
+		if (breakGlassRequired && canBreakGlass && activeFacilityId) {
+			return (
+				<div className="space-y-6">
+					<div className="flex items-center gap-3">
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-8 px-2"
+							onClick={() => router.push("/patients/search")}
+						>
+							<ArrowLeft className="mr-2 size-4" />
+							Back to Search
+						</Button>
+					</div>
+
+					<Card>
+						<CardHeader>
+							<CardTitle>Break-Glass Required</CardTitle>
+						</CardHeader>
+						<CardContent className="space-y-4">
+							<p className="text-sm text-muted-foreground">
+								This patient chart is outside your regular access scope. Submit an emergency override
+								request to unlock temporary read-only access.
+							</p>
+							<BreakGlassForm
+								patientId={patientId}
+								facilityId={activeFacilityId}
+								entityType="patient"
+								entityId={patientId}
+								activeEvent={activeBreakGlass}
+								onSuccess={() => {
+									void refetchPatient()
+								}}
+							/>
+						</CardContent>
+					</Card>
+				</div>
+			)
+		}
+
 		return (
 			<div className="text-destructive flex h-48 items-center justify-center">
 				Failed to load patient: {error.message}
@@ -110,6 +190,18 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 	return (
 		<div className="space-y-6">
+			<div className="flex items-center gap-3">
+				<Button
+					variant="ghost"
+					size="sm"
+					className="h-8 px-2"
+					onClick={() => router.push("/patients/search")}
+				>
+					<ArrowLeft className="mr-2 size-4" />
+					Back to Search
+				</Button>
+			</div>
+
 			{/* Patient Banner */}
 			<Card>
 				<CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 pt-6">
@@ -220,13 +312,14 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 									<TableHead>Chief Complaint</TableHead>
 									<TableHead>Admission</TableHead>
 									<TableHead>Discharge</TableHead>
+									<TableHead className="w-[100px]">Actions</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
 								{patient.encounters.map(enc => (
 									<TableRow
 										key={enc.id}
-										className="cursor-pointer"
+										className="group cursor-pointer hover:bg-muted/50 transition-colors"
 										onClick={() =>
 											router.push(
 												`/patients/${patientId}/encounters/${enc.id}`
@@ -243,6 +336,21 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 										<TableCell>{formatDateTime(enc.admissionDatetime)}</TableCell>
 										<TableCell>
 											{formatDateTime(enc.dischargeDatetime)}
+										</TableCell>
+										<TableCell onClick={e => e.stopPropagation()}>
+											<Button
+												size="sm"
+												variant="ghost"
+												className="h-8 w-8 p-0"
+												title="View Encounter"
+												onClick={() =>
+													router.push(
+														`/patients/${patientId}/encounters/${enc.id}`
+													)
+												}
+											>
+												<Eye className="size-4" />
+											</Button>
 										</TableCell>
 									</TableRow>
 								))}
@@ -264,13 +372,6 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 					canManageConsents={can(permSet, "clinical_docs", "edit")}
 				/>
 			)}
-
-			{/* Actions */}
-			<div className="flex gap-3">
-				<Button variant="outline" nativeButton={false} render={<Link href="/patients/search" />}>
-					Back to Search
-				</Button>
-			</div>
 		</div>
 	)
 }

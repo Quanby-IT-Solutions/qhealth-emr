@@ -72,7 +72,7 @@ import { DeathReportingController } from "./death-reporting.controller"
 // ============================================================================
 function getPermission(methodName: string) {
 	// Metadata is attached to descriptor.value (the method function itself).
-	const method = (DeathReportingController.prototype as Record<string, unknown>)[methodName] as Function
+	const method = (DeathReportingController.prototype as unknown as Record<string, unknown>)[methodName] as Function
 	return Reflect.getMetadata(RBAC_PERMISSION_KEY, method) as
 		| { module: string; action: string }
 		| undefined

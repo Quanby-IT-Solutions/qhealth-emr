@@ -125,7 +125,7 @@ function stubService(fhirFailures: number, consentEnforced = false) {
 		consentEnforced,
 	} as never)
 	jest.spyOn(service as never, "withMissingSchemaFallback").mockImplementation(
-		async (_section: unknown, _fid: unknown, fn: () => Promise<unknown>) => fn()
+		(async (...args: unknown[]) => (args[2] as () => Promise<unknown>)()) as never
 	)
 	jest.spyOn(service as never, "getArtaSla").mockResolvedValue(EMPTY_ARTA as never)
 	jest.spyOn(service as never, "getOfflineReadiness").mockResolvedValue(EMPTY_OFFLINE as never)

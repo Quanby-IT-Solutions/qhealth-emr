@@ -29,7 +29,9 @@ import { useEdQueueQuery } from "@/features/ed/api/ed.hooks"
 import { acuityColor, acuityLabel } from "@/features/ed/lib/acuity-utils"
 import { orpc } from "@/services/orpc/client"
 import { useNotifications } from "@/services/notifications/notification-provider"
+import { toast } from "sonner"
 
+import { DischargeInstructionsDialog } from "./discharge-instructions-dialog"
 import { DispositionForm } from "./disposition-form"
 import { MergeDialog } from "./merge-dialog"
 import { PreEncounterForm } from "./pre-encounter-form"
@@ -97,6 +99,10 @@ export function EdDashboard() {
 		traumaAlias: string
 	} | null>(null)
 	const [disposeItem, setDisposeItem] = useState<{
+		encounterId: string
+		patientName: string
+	} | null>(null)
+	const [dischargeInstructionsItem, setDischargeInstructionsItem] = useState<{
 		encounterId: string
 		patientName: string
 	} | null>(null)
@@ -385,9 +391,31 @@ export function EdDashboard() {
 							encounterId={disposeItem.encounterId}
 							facilityId={facilityId}
 							onSuccess={() => setDisposeItem(null)}
+							onDischargeSuccess={result => {
+								if (result.oecbEligible) {
+									toast(
+										"Patient tagged as OECB-eligible — routed to PhilHealth outpatient billing track."
+									)
+								}
+								setDischargeInstructionsItem({
+									encounterId: result.encounterId,
+									patientName: disposeItem.patientName,
+								})
+							}}
 						/>
 					</DialogContent>
 				</Dialog>
+			)}
+
+			{/* Discharge Instructions Dialog */}
+			{dischargeInstructionsItem && (
+				<DischargeInstructionsDialog
+					open={!!dischargeInstructionsItem}
+					onOpenChange={open => {
+						if (!open) setDischargeInstructionsItem(null)
+					}}
+					encounterId={dischargeInstructionsItem.encounterId}
+				/>
 			)}
 		</div>
 	)

@@ -1,9 +1,11 @@
-import { Controller, Ip } from "@nestjs/common"
+import { Controller, Ip, Req } from "@nestjs/common"
 import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
+import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
+import { buildChartAccessActor } from "@/modules/v1/audit/chart-access.service"
 import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { ClinicalDocsService } from "./clinical-docs.service"
@@ -55,17 +57,17 @@ export class ClinicalDocsController {
 
 	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.listNotes)
-	async listNotes() {
+	async listNotes(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.clinicalDocs.listNotes).handler(async ({ input }) => {
-			return this.service.listNotes(input)
+			return this.service.listNotes(input, buildChartAccessActor(session, req))
 		})
 	}
 
 	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.getNote)
-	async getNote() {
+	async getNote(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.clinicalDocs.getNote).handler(async ({ input }) => {
-			return this.service.getNote(input.id)
+			return this.service.getNote(input.id, buildChartAccessActor(session, req))
 		})
 	}
 
@@ -90,7 +92,23 @@ export class ClinicalDocsController {
 	@Implement(v1.clinicalDocs.signNote)
 	async signNote(@Session() session: UserSession, @Ip() ip: string) {
 		return implement(v1.clinicalDocs.signNote).handler(async ({ input }) => {
-			return this.service.signNote(input, ip ?? "unknown")
+			return this.service.signNote(input, ip ?? "unknown", session.user.id)
+		})
+	}
+
+	@RequirePermission("clinical_docs", "sign")
+	@Implement(v1.clinicalDocs.submitFpe)
+	async submitFpe(@Session() session: UserSession, @Ip() ip: string) {
+		return implement(v1.clinicalDocs.submitFpe).handler(async ({ input }) => {
+			return this.service.submitFpe(input, session.user.id, ip ?? "unknown")
+		})
+	}
+
+	@RequirePermission("clinical_docs", "view")
+	@Implement(v1.clinicalDocs.getNoteContext)
+	async getNoteContext(@Session() session: UserSession, @Req() req: Request) {
+		return implement(v1.clinicalDocs.getNoteContext).handler(async ({ input }) => {
+			return this.service.getNoteContext(input, buildChartAccessActor(session, req))
 		})
 	}
 
@@ -111,7 +129,7 @@ export class ClinicalDocsController {
 	@Implement(v1.clinicalDocs.signAddendum)
 	async signAddendum(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.signAddendum).handler(async ({ input }) => {
-			return this.service.signAddendum(input)
+			return this.service.signAddendum(input, session.user.id)
 		})
 	}
 
@@ -121,17 +139,17 @@ export class ClinicalDocsController {
 
 	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.listConsents)
-	async listConsents() {
+	async listConsents(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.clinicalDocs.listConsents).handler(async ({ input }) => {
-			return this.service.listConsents(input)
+			return this.service.listConsents(input, buildChartAccessActor(session, req))
 		})
 	}
 
 	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.getConsent)
-	async getConsent() {
+	async getConsent(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.clinicalDocs.getConsent).handler(async ({ input }) => {
-			return this.service.getConsent(input.id)
+			return this.service.getConsent(input.id, buildChartAccessActor(session, req))
 		})
 	}
 
@@ -158,17 +176,17 @@ export class ClinicalDocsController {
 
 	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.getSignedNotes)
-	async getSignedNotes() {
+	async getSignedNotes(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.clinicalDocs.getSignedNotes).handler(async ({ input }) => {
-			return this.service.getSignedNotes(input)
+			return this.service.getSignedNotes(input, buildChartAccessActor(session, req))
 		})
 	}
 
 	@RequirePermission("clinical_docs", "view")
 	@Implement(v1.clinicalDocs.extractCf4Data)
-	async extractCf4Data() {
+	async extractCf4Data(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.clinicalDocs.extractCf4Data).handler(async ({ input }) => {
-			return this.service.extractCf4Data(input)
+			return this.service.extractCf4Data(input, buildChartAccessActor(session, req))
 		})
 	}
 }

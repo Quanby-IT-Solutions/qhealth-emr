@@ -4,6 +4,7 @@ import { Badge } from "@/core/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { acuityColor } from "@/features/ed/lib/acuity-utils"
 
+import { OecbTagIndicator } from "./oecb-tag-indicator"
 import { TraumaAliasBadge } from "./trauma-alias-badge"
 
 interface QueueItem {
@@ -21,6 +22,7 @@ interface QueueItem {
 	assignedProvider: string | null
 	bedNumber: string | null
 	wardName: string | null
+	oecbEligible?: boolean
 }
 
 interface TrackingBoardProps {
@@ -115,6 +117,13 @@ export function TrackingBoard({ items }: TrackingBoardProps) {
 														alias={item.traumaAlias ?? item.id}
 														acuityLevel={item.acuityLevel}
 													/>
+											)}
+
+											{item.type === "encounter" && (
+												<OecbTagIndicator
+													oecbEligible={item.oecbEligible ?? false}
+													hideWhenIneligible
+												/>
 											)}
 										</CardContent>
 									</Card>

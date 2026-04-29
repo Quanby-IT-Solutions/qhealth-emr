@@ -974,9 +974,11 @@ export class FhirBundleBuilderService {
 					)
 				// Keep the first validated/finalized RVS per operation record
 				for (const r of rvsRows) {
-					if (!rvsMap.has(r.operationRecordId)) {
-						rvsMap.set(r.operationRecordId, { rvsCode: r.rvsCode, rvsDescription: r.rvsDescription })
+					if (!r.operationRecordId || rvsMap.has(r.operationRecordId)) {
+						continue
 					}
+
+					rvsMap.set(r.operationRecordId, { rvsCode: r.rvsCode, rvsDescription: r.rvsDescription })
 				}
 			}
 
@@ -992,7 +994,7 @@ export class FhirBundleBuilderService {
 						coding: rvs?.rvsCode
 							? [{ system: "https://www.philhealth.gov.ph/rvs", code: rvs.rvsCode, display: rvs.rvsDescription ?? undefined }]
 							: [],
-						text: op.procedureDescription,
+						...(op.procedureDescription ? { text: op.procedureDescription } : {}),
 					},
 					subject: ref("Patient", patientId),
 					...(op.encounterId ? { encounter: ref("Encounter", op.encounterId) } : {}),

@@ -56,6 +56,14 @@ export class AuditController {
 	// Break Glass
 	// ===========================================================================
 
+	@RequirePermission("audit", "export")
+	@Implement(v1.audit.breakGlass.exportCsv)
+	async exportBreakGlass() {
+		return implement(v1.audit.breakGlass.exportCsv).handler(async ({ input }) => {
+			return this.auditService.exportBreakGlassEvents(input)
+		})
+	}
+
 	@RequirePermission("audit", "view")
 	@Implement(v1.audit.breakGlass.list)
 	async listBreakGlass() {
@@ -95,18 +103,27 @@ export class AuditController {
 				userId: session.user.id,
 			})
 
-			await this.notificationService.send({
-				facilityId: input.facilityId,
-				recipientStaffId: staffProfileId,
-				topic: "break_glass",
-				title: "Break-Glass Access Requested",
-				body: `Emergency access requested for patient. Reason: ${input.reasonCategory}`,
-				data: {
-					breakGlassEventId: event.id,
-					patientId: input.patientId,
-					reasonCategory: input.reasonCategory,
-				},
-			})
+			const reviewerStaffIds = await this.auditService.findBreakGlassReviewerStaffIds(
+				input.facilityId,
+				{ excludeStaffId: staffProfileId }
+			)
+			await Promise.allSettled(
+				reviewerStaffIds.map(reviewerStaffId =>
+					this.notificationService.send({
+						facilityId: input.facilityId,
+						recipientStaffId: reviewerStaffId,
+						topic: "break_glass",
+						title: "Break-Glass Access Requested",
+						body: `Emergency access requested for patient. Reason: ${input.reasonCategory}`,
+						data: {
+							breakGlassEventId: event.id,
+							patientId: input.patientId,
+							reasonCategory: input.reasonCategory,
+							requestingStaffId: staffProfileId,
+						},
+					})
+				)
+			)
 
 			return event
 		})

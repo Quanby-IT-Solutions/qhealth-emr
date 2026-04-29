@@ -77,6 +77,7 @@ interface NbsCardProps {
 	facilityId: string
 	patientDateOfBirth: string
 	patientName?: string
+	readOnly?: boolean
 }
 
 export function NbsCard({
@@ -85,6 +86,7 @@ export function NbsCard({
 	facilityId,
 	patientDateOfBirth,
 	patientName,
+	readOnly,
 }: NbsCardProps) {
 	// Only show for newborns
 	if (!isNewborn(patientDateOfBirth)) return null
@@ -96,6 +98,7 @@ export function NbsCard({
 			facilityId={facilityId}
 			patientDateOfBirth={patientDateOfBirth}
 			patientName={patientName}
+			readOnly={readOnly}
 		/>
 	)
 }
@@ -106,6 +109,7 @@ function NbsCardInner({
 	facilityId,
 	patientDateOfBirth,
 	patientName,
+	readOnly,
 }: NbsCardProps) {
 	const { data: screening, isLoading } = useNbsScreeningQuery(encounterId)
 	const { data: consent } = useNbsConsentQuery(screening?.id ?? "")
@@ -143,7 +147,7 @@ function NbsCardInner({
 						)}
 					</div>
 					<div className="flex gap-1.5">
-						{screening && (
+						{screening && (!readOnly || consent) && (
 							<>
 								<Button
 									type="button"
@@ -189,7 +193,7 @@ function NbsCardInner({
 					)}
 
 					{/* Initiate button when no screening record yet */}
-					{!screening && !isLoading && (
+					{!readOnly && !screening && !isLoading && (
 						<div className="flex items-center gap-3">
 							<Button
 								type="button"
