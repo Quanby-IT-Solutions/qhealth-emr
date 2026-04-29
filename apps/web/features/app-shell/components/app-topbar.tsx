@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Search01FreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 
@@ -11,10 +12,16 @@ import { NotificationBadge } from "@/features/app-shell/components/notification-
 import { RoleSwitcher } from "@/features/app-shell/components/role-switcher"
 
 export function AppTopbar() {
+	const pathname = usePathname()
 	const { data: profile } = useMyProfile()
 	const canSearchPatients =
 		profile?.activeRole?.permissions.some(p => p.module === "patients" && p.action === "view") ??
 		false
+	const isPatientProfilePage = /^\/patients\/[^/]+$/.test(pathname)
+
+	if (isPatientProfilePage) {
+		return null
+	}
 
 	return (
 		<header className="bg-background flex h-12 shrink-0 items-center gap-2 border-b px-4">
