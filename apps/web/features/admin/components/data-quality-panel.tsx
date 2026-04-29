@@ -15,6 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { Skeleton } from "@/core/components/ui/skeleton"
 import { cn } from "@/core/lib/utils"
 
+import type { DataQualitySection } from "@repo/contracts"
+
 import { useAdminDashboardSummaryQuery } from "@/features/admin/api/admin-dashboard.hooks"
 
 // ── Metric Row ────────────────────────────────────────────────────────────────
@@ -59,7 +61,7 @@ function MetricRow({
 
 export function DataQualityPanel() {
 	const { data, isLoading, isError } = useAdminDashboardSummaryQuery()
-	const dq = data?.dataQuality
+	const dq = (data as (typeof data & { dataQuality?: DataQualitySection }) | undefined)?.dataQuality
 
 	return (
 		<div className="space-y-6">

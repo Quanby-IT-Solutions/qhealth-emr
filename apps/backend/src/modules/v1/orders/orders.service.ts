@@ -107,14 +107,28 @@ export class OrdersService {
 					message: "This drug is off-formulary or inactive at this facility.",
 					details: formularyItem?.formularyNotes ? { formularyNotes: formularyItem.formularyNotes } : undefined,
 				})
-			} else if (formularyItem.isHighAlert) {
+			} else {
+				// Step 2a: Restricted-state check (FORM-002)
+				if (formularyItem.isRestricted) {
+					alerts.push({
+						type: "formulary_restricted",
+						severity: "soft_block",
+						message: "This drug is RESTRICTED at this facility. Pharmacist authorisation is required before proceeding.",
+						details: formularyItem.restrictionNotes
+							? { restrictionNotes: formularyItem.restrictionNotes }
+							: undefined,
+					})
+				}
+
 				// Step 3: High-alert check
-				alerts.push({
-					type: "high_alert",
-					severity: "warning",
-					message: "This is a HIGH-ALERT medication. Double verification by a pharmacist is required.",
-					details: formularyItem.highAlertNotes ? { highAlertNotes: formularyItem.highAlertNotes } : undefined,
-				})
+				if (formularyItem.isHighAlert) {
+					alerts.push({
+						type: "high_alert",
+						severity: "warning",
+						message: "This is a HIGH-ALERT medication. Double verification by a pharmacist is required.",
+						details: formularyItem.highAlertNotes ? { highAlertNotes: formularyItem.highAlertNotes } : undefined,
+					})
+				}
 			}
 		}
 

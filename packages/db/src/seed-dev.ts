@@ -94,7 +94,7 @@ type ModuleName =
 	| "medical_records"
 	| "notifications"
 
-type ActionName = "view" | "create" | "edit" | "sign" | "delete" | "verify" | "export"
+type ActionName = "view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "manage_catalog" | "clinical_policy" | "terminology_admin"
 
 interface DemoUser {
 	email: string
@@ -271,9 +271,8 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["system_settings", ["view", "create", "edit"]], // System configuration
 		["facility_profile", ["view", "create", "edit"]], // Facility profile management
 		["integration_registry", ["view", "create", "edit", "delete"]], // Integration oversight
-		["reporting", ["view", "export"]], // Reporting access (view only)
 		["adt", ["view"]], // Census visibility (no clinical write)
-		["formulary", ["view"]], // Formulary visibility (no create/edit)
+		["formulary", ["view"]], // Formulary catalog read-only — TOR: System Admin has no clinical write access
 		["fhir", ["view", "export"]], // FHIR export management
 		["notifications", ["view"]], // All staff receive system notifications
 	],
@@ -308,7 +307,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 	],
 	Pharmacist: [
 		["orders", ["view", "edit", "verify"]],
-		["formulary", ["view", "create", "edit"]],
+		["formulary", ["view", "create", "edit", "manage_catalog", "clinical_policy"]], // manage_catalog: drug generic/brand catalog master-data authoring
 		["clinical_docs", ["view"]],
 		["patients", ["view"]], // Patient record access for dispensing verification
 		["notifications", ["view"]], // All staff receive system notifications

@@ -239,11 +239,15 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 	},
 	{
 		title: "Formulary",
-		href: "/admin/formulary",
+		href: "/pharmacy/formulary",
 		iconName: "formulary",
-		// Primary sidebar for Pharmacist
+		// Primary sidebar for Pharmacist — note-editing workflow
 		requiredPermissions: [
 			{ module: "orders", action: "verify" },
+		],
+		// Admin users access the governance surface at /admin/formulary instead
+		excludePermissions: [
+			{ module: "admin", action: "view" },
 		],
 	},
 	{
@@ -335,8 +339,8 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "Civil Registry",
 		href: "/admin/civil-registry",
 		iconName: "records",
-		// civil_registry:view is the dedicated module permission
-		// Seeded for Registrar (view/create/edit)
+		// Civil registry operations belong to civil_registry-role staff (Registrar, Nurse/Midwife).
+		// The page gate and backend guard both require civil_registry:view — align nav to match.
 		requiredPermissions: [
 			{ module: "civil_registry", action: "view" },
 		],
@@ -426,6 +430,9 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		requiredPermissions: [
 			{ module: "integration_registry", action: "view" },
 		],
+		requireAllPermissions: [
+			{ module: "admin", action: "view" },
+		],
 		isSecondary: true,
 	},
 	{
@@ -482,6 +489,10 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "formulary",
 		requiredPermissions: [
 			{ module: "formulary", action: "view" },
+		],
+		// Dual-gate: admin governance surface requires admin:view (FORM-005)
+		requireAllPermissions: [
+			{ module: "admin", action: "view" },
 		],
 		isSecondary: true,
 	},
@@ -562,7 +573,7 @@ interface Permission {
  *
  * TOR note: Administrators are not granted a broad navigation bypass. Their
  * visible items are determined by the explicit permissions seeded for the
- * Administrator role (admin:view, audit:view, formulary:view, reporting:view,
+ * Administrator role (admin:view, audit:view, formulary:view,
  * integration_registry:view, etc.). Clinical module nav items must not include
  * admin:view in their requiredPermissions.
  */

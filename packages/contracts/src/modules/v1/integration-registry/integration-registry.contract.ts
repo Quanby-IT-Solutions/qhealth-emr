@@ -2,6 +2,7 @@ import { oc } from "@orpc/contract"
 import { z } from "zod"
 
 import {
+	ConnectivityTestResultSchema,
 	CreateIntegrationSchema,
 	CredentialRefsSchema,
 	IntegrationIdSchema,
@@ -87,4 +88,20 @@ export const integrationRegistryContract = {
 			tags: ["Integration Registry"],
 		})
 		.output(CredentialRefsSchema),
+
+	/**
+	 * Perform an on-demand connectivity test against an integration's endpoint.
+	 * Returns HTTP status, latency, and a human-readable detail string.
+	 * Requires edit permission — identical to the save action.
+	 */
+	testConnectivity: oc
+		.route({
+			method: "POST",
+			path: "/{id}/test-connectivity",
+			summary: "Test connectivity to an integration endpoint",
+			tags: ["Integration Registry"],
+		})
+		.input(IntegrationIdSchema)
+		.output(ConnectivityTestResultSchema),
+
 }

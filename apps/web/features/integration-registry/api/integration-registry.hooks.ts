@@ -56,3 +56,7 @@ export function useDeleteIntegrationMutation() {
 		})
 	)
 }
+
+export function useTestConnectivityMutation() {
+	return useMutation(orpc.integrationRegistry.testConnectivity.mutationOptions())
+}

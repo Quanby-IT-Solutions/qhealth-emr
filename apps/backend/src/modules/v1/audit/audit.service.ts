@@ -92,7 +92,7 @@ export class AuditService {
 	 * Query audit logs with filtering and pagination.
 	 */
 	async findAll(filter: AuditLogFilterInput) {
-		const { facilityId, startDate, endDate, userId, action, entityType, patientMrn } = filter
+		const { facilityId, startDate, endDate, userId, action, entityType, entityId, patientMrn } = filter
 		const page = Number(filter.page) || 1
 		const limit = Number(filter.limit) || 50
 
@@ -112,6 +112,9 @@ export class AuditService {
 		}
 		if (entityType) {
 			conditions.push(eq(auditLogs.entityType, entityType))
+		}
+		if (entityId) {
+			conditions.push(eq(auditLogs.entityId, entityId))
 		}
 		if (patientMrn) {
 			conditions.push(sql`exists (
@@ -169,7 +172,7 @@ export class AuditService {
 	 * Export audit logs (no pagination, respects filters).
 	 */
 	async exportLogs(filter: Omit<AuditLogFilterInput, "page" | "limit">) {
-		const { facilityId, startDate, endDate, userId, action, entityType, patientMrn } = filter
+		const { facilityId, startDate, endDate, userId, action, entityType, entityId, patientMrn } = filter
 
 		const conditions = [eq(auditLogs.facilityId, facilityId)]
 
@@ -187,6 +190,9 @@ export class AuditService {
 		}
 		if (entityType) {
 			conditions.push(eq(auditLogs.entityType, entityType))
+		}
+		if (entityId) {
+			conditions.push(eq(auditLogs.entityId, entityId))
 		}
 		if (patientMrn) {
 			conditions.push(sql`exists (

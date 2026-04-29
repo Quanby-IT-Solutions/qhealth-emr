@@ -108,6 +108,6 @@ export const fhirContract = {
 			summary: "Get FHIR/NHDR integration system status",
 			tags: ["FHIR"],
 		})
-		.input(z.object({}))
+		.input(z.object({ facilityId: z.string() }))
 		.output(FhirSystemStatusSchema),
 }

@@ -9,6 +9,12 @@ export const IntegrationKindEnum = z.enum([
 	"civil_registry",
 	"hai",
 	"philhealth",
+	"erp",
+	"lis",
+	"pacs",
+	"telemedicine",
+	"nhdr",
+	"pidsr",
 	"custom",
 ])
 
@@ -42,6 +48,7 @@ export const IntegrationSchema = z.object({
 	name: z.string(),
 	endpointUrl: z.string().url(),
 	credentialsRef: z.string().nullable(),
+	webhookUrl: z.string().url().nullable(),
 	enabled: z.boolean(),
 	notes: z.string().nullable(),
 	lastSyncAt: z
@@ -49,6 +56,12 @@ export const IntegrationSchema = z.object({
 		.transform(v => (typeof v === "string" ? new Date(v) : v))
 		.nullable(),
 	lastSyncStatus: z.enum(["ok", "error"]).nullable(),
+	lastTestedAt: z
+		.union([z.date(), z.string()])
+		.transform(v => (typeof v === "string" ? new Date(v) : v))
+		.nullable(),
+	lastTestStatus: z.enum(["ok", "error"]).nullable(),
+	lastTestReadinessLevel: z.enum(["activation", "transport", "none"]).nullable(),
 	createdAt: z
 		.union([z.date(), z.string()])
 		.transform(v => (typeof v === "string" ? new Date(v) : v)),
@@ -71,6 +84,7 @@ export const CreateIntegrationSchema = z.object({
 	name: z.string().min(1, "Name is required").max(200),
 	endpointUrl: z.string().url("Must be a valid URL"),
 	credentialsRef: z.string().nullable().optional(),
+	webhookUrl: z.string().url().nullable().optional(),
 	enabled: z.boolean().optional().default(false),
 	notes: z.string().nullable().optional(),
 })
@@ -83,6 +97,7 @@ export const UpdateIntegrationSchema = z.object({
 	name: z.string().min(1).max(200).optional(),
 	endpointUrl: z.string().url().optional(),
 	credentialsRef: z.string().nullable().optional(),
+	webhookUrl: z.string().url().nullable().optional(),
 	enabled: z.boolean().optional(),
 	notes: z.string().nullable().optional(),
 })
@@ -98,5 +113,28 @@ export const IntegrationIdSchema = z.object({
 // ============================================================================
 
 export const CredentialRefsSchema = z.array(z.string())
+
+// ============================================================================
+// Connectivity test response
+// ============================================================================
+
+export const ProbeCheckResultSchema = z.object({
+	name: z.string(),
+	status: z.enum(["pass", "fail", "skipped"]),
+	detail: z.string(),
+})
+
+export type ProbeCheckResult = z.infer<typeof ProbeCheckResultSchema>
+
+export const ConnectivityTestResultSchema = z.object({
+	status: z.enum(["ok", "error"]),
+	readinessLevel: z.enum(["activation", "transport", "none"]),
+	latencyMs: z.number().nullable(),
+	detail: z.string(),
+	credentialProbed: z.boolean(),
+	checks: z.array(ProbeCheckResultSchema),
+})
+
+export type ConnectivityTestResult = z.infer<typeof ConnectivityTestResultSchema>
 
 export type CredentialRefs = z.infer<typeof CredentialRefsSchema>

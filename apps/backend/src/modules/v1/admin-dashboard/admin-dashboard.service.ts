@@ -46,7 +46,6 @@ import type {
 	AccessGovernanceSection,
 	AuditSummarySection,
 	CivilRegistryOpsSection,
-	DataQualitySection,
 	ExportComplianceList,
 	ExportComplianceQuery,
 	HimOpsSection,
@@ -55,8 +54,6 @@ import type {
 	OfflineReadinessSection,
 	PlatformControlSection,
 	RecentChange,
-	StatutoryOpsSection,
-	StatutoryReadinessSection,
 } from "@repo/contracts"
 
 function isMissingDatabaseObjectError(error: unknown): boolean {
@@ -88,56 +85,6 @@ const EMPTY_OFFLINE_READINESS: OfflineReadinessSection = {
 	recentJobs: [],
 	lastFailedAt: null,
 	lastFailureMessage: null,
-}
-
-const EMPTY_STATUTORY_READINESS: StatutoryReadinessSection = {
-	fhirNhdr: { name: "FHIR / NHDR", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
-	philhealth: { name: "PhilHealth / CF4", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
-	hai: { name: "HAI Reporting", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
-	pidsr: { name: "PIDSR", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
-	civilRegistry: { name: "Civil Registry", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
-}
-
-const EMPTY_STATUTORY_OPS: StatutoryOpsSection = {
-	pidsr: {
-		category1Count: 0,
-		category2Count: 0,
-		draftCount: 0,
-		submittedCount: 0,
-		rejectedCount: 0,
-		blockedCount: 0,
-		lastSubmittedAt: null,
-		blockedOrRejected: false,
-	},
-	hai: {
-		openSurveillanceCount: 0,
-		reviewedCount: 0,
-		pendingCount: 0,
-		byType: [],
-	},
-	ahsr: {
-		snapshotCount: 0,
-		lastSnapshotMonth: null,
-		currentMonthReady: false,
-		currentYearBor: null,
-		currentYearGrossDeathRate: null,
-		currentYearNetDeathRate: null,
-		topMorbidities: [],
-		topMortalities: [],
-	},
-}
-
-const EMPTY_DATA_QUALITY: DataQualitySection = {
-	cf4DraftCount: 0,
-	cf4SubmittedThisMonth: 0,
-	missingIcd10Count: 0,
-	missingRvsCount: 0,
-	ahsrLastSnapshotMonth: null,
-	ahsrCurrentMonthReady: false,
-	cf4WithExtractedData: 0,
-	cf4MissingExtractedData: 0,
-	cf4ExtractionCompletePct: 100,
-	cf4SectionCompleteness: [],
 }
 
 @Injectable()
@@ -178,12 +125,9 @@ export class AdminDashboardService {
 			this.getAuditSummary(facilityId),
 		])
 
-		const [artaSla, offlineReadiness, statutoryReadiness, statutoryOps, dataQuality] = await Promise.all([
+		const [artaSla, offlineReadiness] = await Promise.all([
 			this.withMissingSchemaFallback("ARTA/SLA", facilityId, () => this.getArtaSla(facilityId), EMPTY_ARTA_SLA),
 			this.withMissingSchemaFallback("offline readiness", facilityId, () => this.getOfflineReadiness(facilityId), EMPTY_OFFLINE_READINESS),
-			this.withMissingSchemaFallback("statutory readiness", facilityId, () => this.getStatutoryReadiness(facilityId), EMPTY_STATUTORY_READINESS),
-			this.withMissingSchemaFallback("statutory operations", facilityId, () => this.getStatutoryOps(facilityId), EMPTY_STATUTORY_OPS),
-			this.withMissingSchemaFallback("data quality", facilityId, () => this.getDataQuality(facilityId), EMPTY_DATA_QUALITY),
 		])
 
 		// Strip FHIR-specific telemetry when the caller lacks fhir:view — TOR §4.2 least-privilege
@@ -191,7 +135,7 @@ export class AdminDashboardService {
 			? integrationHealth
 			: { ...integrationHealth, fhirFailures: 0 }
 
-		const alerts = this.buildAlerts(governance, platform, effectiveIntegrationHealth, audit, artaSla, offlineReadiness, statutoryOps, dataQuality)
+		const alerts = this.buildAlerts(governance, platform, effectiveIntegrationHealth, audit, artaSla, offlineReadiness)
 		const summaryCards = this.buildSummaryCards(governance, effectiveIntegrationHealth, audit, artaSla)
 		const recentChanges = [
 			...governance.recentRoleChanges,
@@ -211,9 +155,6 @@ export class AdminDashboardService {
 			audit,
 			artaSla,
 			offlineReadiness,
-			statutoryReadiness,
-			statutoryOps,
-			dataQuality,
 		}
 	}
 
@@ -668,8 +609,6 @@ export class AdminDashboardService {
 		audit: AuditSummarySection,
 		artaSla: ArtaSlaSection,
 		offlineReadiness: OfflineReadinessSection,
-		statutoryOps: StatutoryOpsSection,
-		dataQuality: DataQualitySection
 	): AdminDashboardAlert[] {
 		const alerts: AdminDashboardAlert[] = []
 
@@ -818,87 +757,6 @@ export class AdminDashboardService {
 			})
 		}
 
-		// ── Statutory Ops (AD-001) ─────────────────────────────────────────────
-
-		if (statutoryOps.pidsr.blockedOrRejected) {
-			alerts.push({
-				id: "pidsr-blocked",
-				severity: "critical",
-				category: "statutory",
-				title: "PIDSR submission blocked or rejected",
-				description: "One or more PIDSR case reports are blocked or rejected by DOH. Immediate action required.",
-				link: "/reporting/pidsr",
-			})
-		}
-
-		if (statutoryOps.pidsr.draftCount > 5) {
-			alerts.push({
-				id: "pidsr-draft-backlog",
-				severity: "warning",
-				category: "statutory",
-				title: `${statutoryOps.pidsr.draftCount} PIDSR draft reports pending submission`,
-				description: "A large number of PIDSR reports remain in draft. Review and submit to DOH.",
-				link: "/reporting/pidsr",
-			})
-		}
-
-		if (statutoryOps.hai.pendingCount > 0) {
-			alerts.push({
-				id: "hai-pending",
-				severity: "warning",
-				category: "statutory",
-				title: `${statutoryOps.hai.pendingCount} HAI surveillance case(s) need review`,
-				description: "Healthcare-associated infection cases are awaiting infection control review.",
-				link: "/reporting/hai",
-			})
-		}
-
-		if (!statutoryOps.ahsr.currentMonthReady) {
-			alerts.push({
-				id: "ahsr-not-ready",
-				severity: "info",
-				category: "statutory",
-				title: "Annual Hospital Statistical Report not yet ready for current month",
-				description: "AHSR snapshot for this month has not been generated. Ensure monthly close activities are complete.",
-				link: "/reporting",
-			})
-		}
-
-		// ── Data Quality (AD-003) ─────────────────────────────────────────────
-
-		if (dataQuality.missingIcd10Count > 0) {
-			alerts.push({
-				id: "missing-icd10",
-				severity: "warning",
-				category: "data_quality",
-				title: `${dataQuality.missingIcd10Count} resolved problem(s) missing ICD-10 code`,
-				description: "Resolved diagnoses without ICD-10 codes affect PhilHealth billing and statutory reports.",
-				link: "/admin/data-quality",
-			})
-		}
-
-		if (dataQuality.missingRvsCount > 0) {
-			alerts.push({
-				id: "missing-rvs",
-				severity: "warning",
-				category: "data_quality",
-				title: `${dataQuality.missingRvsCount} surgical procedure(s) missing RVS code`,
-				description: "Surgical procedures without RVS codes cannot be billed correctly.",
-				link: "/admin/data-quality",
-			})
-		}
-
-		if (dataQuality.cf4DraftCount > 10) {
-			alerts.push({
-				id: "cf4-draft-backlog",
-				severity: "warning",
-				category: "data_quality",
-				title: `${dataQuality.cf4DraftCount} CF4 claims in draft`,
-				description: "High CF4 draft count may indicate billing workflow bottlenecks.",
-				link: "/billing",
-			})
-		}
-
 		// ── Governance anomaly detection (AD-006) ─────────────────────────────
 
 		if (audit.privilegedChangeCount7d > 20) {
@@ -1029,56 +887,6 @@ export class AdminDashboardService {
 		}
 	}
 
-	// ── Statutory Reporting Readiness ─────────────────────────────────────────
-
-	private async getStatutoryReadiness(facilityId: string): Promise<StatutoryReadinessSection> {
-		const integrationRows = await db
-			.select({
-				kind: integrations.kind,
-				name: integrations.name,
-				enabled: integrations.enabled,
-				lastSyncAt: integrations.lastSyncAt,
-				lastSyncStatus: integrations.lastSyncStatus,
-				credentialsRef: integrations.credentialsRef,
-			})
-			.from(integrations)
-			.where(eq(integrations.facilityId, facilityId))
-
-		const byKind = new Map(integrationRows.map(r => [r.kind, r]))
-
-		type DomainStatus = "ready" | "warning" | "blocked" | "degraded" | "not_configured"
-
-		function computeDomainStatus(
-			integration: (typeof integrationRows)[0] | undefined
-		): { status: DomainStatus; detail: string | null } {
-			if (!integration) return { status: "not_configured", detail: "No integration configured" }
-			if (!integration.enabled) return { status: "blocked", detail: "Integration is disabled" }
-			if (!integration.credentialsRef) return { status: "warning", detail: "Missing credential reference" }
-			if (integration.lastSyncStatus === "error") return { status: "degraded", detail: "Last sync failed" }
-			if (!integration.lastSyncAt) return { status: "warning", detail: "Never synced — verify endpoint is reachable" }
-			return { status: "ready", detail: null }
-		}
-
-		const fhir = computeDomainStatus(byKind.get("fhir"))
-		const philhealth = computeDomainStatus(byKind.get("philhealth"))
-		const hai = computeDomainStatus(byKind.get("hai"))
-		// PIDSR is modeled through a dedicated custom integration entry when configured.
-		// Fall back to civil_registry to preserve existing facilities that still share the endpoint.
-		const pidsrIntegration = integrationRows.find(
-			integration => integration.kind === "custom" && integration.name.toLowerCase().includes("pidsr")
-		)
-		const pidsr = computeDomainStatus(pidsrIntegration ?? byKind.get("civil_registry"))
-		const civilRegistry = computeDomainStatus(byKind.get("civil_registry"))
-
-		return {
-			fhirNhdr: { name: "FHIR / NHDR", ...fhir, link: "/admin/integration-registry" },
-			philhealth: { name: "PhilHealth / CF4", ...philhealth, link: "/admin/integration-registry" },
-			hai: { name: "HAI Reporting", ...hai, link: "/admin/integration-registry" },
-			pidsr: { name: "PIDSR", ...pidsr, link: "/admin/integration-registry" },
-			civilRegistry: { name: "Civil Registry", ...civilRegistry, link: "/admin/integration-registry" },
-		}
-	}
-
 	// ── Summary cards ──────────────────────────────────────────────────────────
 
 	private buildSummaryCards(
@@ -1117,255 +925,6 @@ export class AdminDashboardService {
 				link: "/admin/sla",
 			},
 		]
-	}
-
-	// ── Statutory Operations (AD-001) ──────────────────────────────────────────
-
-	private async getStatutoryOps(facilityId: string): Promise<StatutoryOpsSection> {
-		const now = new Date()
-		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-
-		// ── PIDSR ─────────────────────────────────────────────────────────────
-		const pidsrRows = await db
-			.select({
-				category: pidsrCases.category,
-				reportStatus: pidsrCases.reportStatus,
-				updatedAt: pidsrCases.updatedAt,
-			})
-			.from(pidsrCases)
-			.where(and(eq(pidsrCases.facilityId, facilityId), gte(pidsrCases.updatedAt, startOfMonth)))
-
-		const category1Count = pidsrRows.filter(r => r.category === "category_1").length
-		const category2Count = pidsrRows.filter(r => r.category === "category_2").length
-		const draftCount = pidsrRows.filter(r => r.reportStatus === "draft").length
-		const submittedCount = pidsrRows.filter(r => r.reportStatus === "submitted").length
-		// AD-004: derive blocked/rejected from real schema states
-		const rejectedCount = pidsrRows.filter(r => r.reportStatus === "rejected").length
-		const blockedCount = pidsrRows.filter(r => r.reportStatus === "blocked").length
-		const blockedOrRejected = rejectedCount > 0 || blockedCount > 0
-
-		// Last submitted timestamp (across all time)
-		const [lastSubmittedRow] = await db
-			.select({ submittedAt: pidsrCases.updatedAt })
-			.from(pidsrCases)
-			.where(and(eq(pidsrCases.facilityId, facilityId), eq(pidsrCases.reportStatus, "submitted")))
-			.orderBy(desc(pidsrCases.updatedAt))
-			.limit(1)
-
-		// ── HAI Surveillance ──────────────────────────────────────────────────
-		const surveillanceRows = await db
-			.select({
-				isReviewed: surveillanceFlags.isReviewed,
-				flagType: surveillanceFlags.flagType,
-			})
-			.from(surveillanceFlags)
-			.where(and(eq(surveillanceFlags.facilityId, facilityId), gte(surveillanceFlags.createdAt, startOfMonth)))
-
-		const openSurveillanceCount = surveillanceRows.length
-		const reviewedCount = surveillanceRows.filter(r => r.isReviewed).length
-		const pendingCount = surveillanceRows.filter(r => !r.isReviewed).length
-
-		// Group by flagType
-		const byTypeMap = new Map<string, number>()
-		for (const row of surveillanceRows) {
-			const key = row.flagType ?? "unknown"
-			byTypeMap.set(key, (byTypeMap.get(key) ?? 0) + 1)
-		}
-		const byType = Array.from(byTypeMap.entries()).map(([type, count]) => ({ type, count }))
-
-		// ── AHSR Snapshot ─────────────────────────────────────────────────────
-		const currentYear = now.getFullYear()
-		const currentMonth = now.getMonth() + 1
-
-		const [ahsrSnapshotCountRow] = await db
-			.select({ n: count() })
-			.from(ahsrSnapshots)
-			.where(eq(ahsrSnapshots.facilityId, facilityId))
-
-		const [latestAhsr] = await db
-			.select({ reportYear: ahsrSnapshots.reportYear, reportMonth: ahsrSnapshots.reportMonth })
-			.from(ahsrSnapshots)
-			.where(eq(ahsrSnapshots.facilityId, facilityId))
-			.orderBy(desc(ahsrSnapshots.reportYear), desc(ahsrSnapshots.reportMonth))
-			.limit(1)
-
-		const ahsrLastSnapshotMonth = latestAhsr
-			? `${latestAhsr.reportYear}-${String(latestAhsr.reportMonth).padStart(2, "0")}`
-			: null
-		const ahsrCurrentMonthReady =
-			latestAhsr?.reportYear === currentYear && latestAhsr?.reportMonth === currentMonth
-
-		// Fetch current-year AHSR metrics for admin oversight (AD-003)
-		let ahsrMetrics: Awaited<ReturnType<typeof this.reportingService.getAhsrMetrics>> | null = null
-		try {
-			ahsrMetrics = await this.reportingService.getAhsrMetrics({ facilityId, year: currentYear })
-		} catch {
-			// Non-fatal: AHSR metrics may not be available if no clinical data exists yet
-		}
-
-		return {
-			pidsr: {
-				category1Count,
-				category2Count,
-				draftCount,
-				submittedCount,
-				rejectedCount,
-				blockedCount,
-				lastSubmittedAt: lastSubmittedRow?.submittedAt ?? null,
-				blockedOrRejected,
-			},
-			hai: {
-				openSurveillanceCount,
-				reviewedCount,
-				pendingCount,
-				byType,
-			},
-			ahsr: {
-				snapshotCount: ahsrSnapshotCountRow?.n ?? 0,
-				lastSnapshotMonth: ahsrLastSnapshotMonth,
-				currentMonthReady: ahsrCurrentMonthReady,
-				currentYearBor: ahsrMetrics?.bedOccupancyRate ?? null,
-				currentYearGrossDeathRate: ahsrMetrics?.grossDeathRate ?? null,
-				currentYearNetDeathRate: ahsrMetrics?.netDeathRate ?? null,
-				topMorbidities: ahsrMetrics?.topMorbidities ?? [],
-				topMortalities: ahsrMetrics?.topMortalities ?? [],
-			},
-		}
-	}
-
-	// ── Data Quality (AD-002) ──────────────────────────────────────────────────
-
-	private async getDataQuality(facilityId: string): Promise<DataQualitySection> {
-		const now = new Date()
-		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-
-		// ── CF4 claims ────────────────────────────────────────────────────────
-		const [cf4DraftRow] = await db
-			.select({ n: count() })
-			.from(cf4Claims)
-			.where(and(eq(cf4Claims.facilityId, facilityId), eq(cf4Claims.status, "draft")))
-
-		const [cf4SubmittedRow] = await db
-			.select({ n: count() })
-			.from(cf4Claims)
-			.where(
-				and(
-					eq(cf4Claims.facilityId, facilityId),
-					eq(cf4Claims.status, "submitted"),
-					gte(cf4Claims.submittedAt, startOfMonth)
-				)
-			)
-
-		// ── Missing ICD-10 codes ───────────────────────────────────────────────
-		// Count RESOLVED problems with no icd10Code: these are encounters that
-		// have closed but coding was never completed (AD-003: more accurate completeness metric)
-		const [missingIcd10Row] = await db
-			.select({ n: count() })
-			.from(problems)
-			.where(
-				and(
-					eq(problems.facilityId, facilityId),
-					isNull(problems.icd10Code),
-					eq(problems.status, "resolved")
-				)
-			)
-
-		// ── Missing RVS codes ─────────────────────────────────────────────────
-		const [missingRvsRow] = await db
-			.select({ n: count() })
-			.from(surgicalRvsAssignments)
-			.innerJoin(operationRecords, eq(surgicalRvsAssignments.operationRecordId, operationRecords.id))
-			.where(
-				and(
-					eq(operationRecords.facilityId, facilityId),
-					isNull(surgicalRvsAssignments.rvsCode)
-				)
-			)
-
-		// ── AHSR snapshot ─────────────────────────────────────────────────────
-		const currentYear = now.getFullYear()
-		const currentMonth = now.getMonth() + 1
-
-		const [latestSnapshot] = await db
-			.select({ reportYear: ahsrSnapshots.reportYear, reportMonth: ahsrSnapshots.reportMonth })
-			.from(ahsrSnapshots)
-			.where(eq(ahsrSnapshots.facilityId, facilityId))
-			.orderBy(desc(ahsrSnapshots.reportYear), desc(ahsrSnapshots.reportMonth))
-			.limit(1)
-
-		const ahsrLastSnapshotMonth = latestSnapshot
-			? `${latestSnapshot.reportYear}-${String(latestSnapshot.reportMonth).padStart(2, "0")}`
-			: null
-		const ahsrCurrentMonthReady =
-			latestSnapshot?.reportYear === currentYear && latestSnapshot?.reportMonth === currentMonth
-
-		// ── AD-016: CF4 extraction completeness ───────────────────────────────
-		// For non-draft claims, assess whether the auto-extracted clinical payload
-		// is complete enough for compliant PhilHealth CF4 submission.
-		const nonDraftClaims = await db
-			.select({ extractedData: cf4Claims.extractedData })
-			.from(cf4Claims)
-			.where(
-				and(
-					eq(cf4Claims.facilityId, facilityId),
-					sql`${cf4Claims.status} != 'draft'`
-				)
-			)
-
-		const CF4_REQUIRED_SECTIONS = [
-			"chiefComplaint",
-			"historyOfPresentIllness",
-			"physicalExamFindings",
-			"finalDiagnosis",
-		] as const
-
-		const CF4_SECTION_LABELS: Record<string, string> = {
-			chiefComplaint: "Chief Complaint",
-			historyOfPresentIllness: "History of Present Illness",
-			physicalExamFindings: "Physical Exam Findings",
-			finalDiagnosis: "Final Diagnosis",
-		}
-
-		const nonDraftTotal = nonDraftClaims.length
-		const sectionMissingCounts = new Map<string, number>(
-			CF4_REQUIRED_SECTIONS.map(s => [s, 0])
-		)
-
-		let extractedDataPresentCount = 0
-		for (const claim of nonDraftClaims) {
-			const data = claim.extractedData as Record<string, unknown> | null
-			if (!data) continue
-			extractedDataPresentCount++
-			for (const section of CF4_REQUIRED_SECTIONS) {
-				const val = data[section]
-				if (!val || (typeof val === "string" && val.trim() === "")) {
-					sectionMissingCounts.set(section, (sectionMissingCounts.get(section) ?? 0) + 1)
-				}
-			}
-		}
-
-		const cf4MissingExtractedData = nonDraftTotal - extractedDataPresentCount
-		const cf4WithExtractedData = extractedDataPresentCount
-		const cf4ExtractionCompletePct =
-			nonDraftTotal > 0 ? Math.round((cf4WithExtractedData / nonDraftTotal) * 100) : 100
-
-		const cf4SectionCompleteness = CF4_REQUIRED_SECTIONS.map(section => ({
-			section: CF4_SECTION_LABELS[section] ?? section,
-			missingCount: sectionMissingCounts.get(section) ?? 0,
-		}))
-
-		return {
-			cf4DraftCount: cf4DraftRow?.n ?? 0,
-			cf4SubmittedThisMonth: cf4SubmittedRow?.n ?? 0,
-			missingIcd10Count: missingIcd10Row?.n ?? 0,
-			missingRvsCount: missingRvsRow?.n ?? 0,
-			ahsrLastSnapshotMonth,
-			ahsrCurrentMonthReady,
-			cf4WithExtractedData,
-			cf4MissingExtractedData,
-			cf4ExtractionCompletePct,
-			cf4SectionCompleteness,
-		}
 	}
 
 	// ── HIM Operations (AD-004) ────────────────────────────────────────────────

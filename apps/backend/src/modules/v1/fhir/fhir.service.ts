@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, sql } from "drizzle-orm"
 
-import { auditLogs, dataExports, fhirExports, staffProfiles, users } from "@repo/db/schema"
+import { auditLogs, dataExports, fhirExports, integrations, staffProfiles, users } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import { env } from "@/config/env.config"
@@ -439,6 +439,33 @@ export class FhirService {
 			endDate: now.toISOString().split("T")[0]!,
 		}
 
+		// ── Resolve NHDR config from Integration Registry (authoritative source) ─
+		// The registry row is facility-scoped and takes precedence over global env vars.
+		// If no enabled registry row is found, the adapter falls back to NHDR_BASE_URL / NHDR_API_KEY.
+		const [nhdrRegistryRow] = await db
+			.select({ id: integrations.id, endpointUrl: integrations.endpointUrl, credentialsRef: integrations.credentialsRef })
+			.from(integrations)
+			.where(
+				and(
+					eq(integrations.facilityId, existing.facilityId),
+					eq(integrations.kind, "nhdr"),
+					eq(integrations.enabled, true),
+				)
+			)
+			.limit(1)
+
+		if (!nhdrRegistryRow) {
+			throw new Error(
+				"NHDR submission blocked: no enabled NHDR integration is configured for this facility " +
+				"in the Integration Registry. Configure one at Admin \u2192 Integration Registry."
+			)
+		}
+
+		const nhdrRuntimeConfig = {
+			baseUrl: nhdrRegistryRow.endpointUrl,
+			apiKey: nhdrRegistryRow.credentialsRef ? process.env[nhdrRegistryRow.credentialsRef] : undefined,
+		}
+
 		// ── Submit via NHDR adapter ──────────────────────────────────────────
 		const ack = await this.nhdrAdapter.submit({
 			exportId,
@@ -447,7 +474,7 @@ export class FhirService {
 			periodEnd: dateRange.endDate,
 			ndjsonContent: existing.bundleData,
 			submittedByName,
-		})
+		}, nhdrRuntimeConfig)
 
 		const [submittedByStaff] = await db
 			.select({ id: staffProfiles.id })
@@ -492,6 +519,11 @@ export class FhirService {
 				consentOutcome: "granted",
 				status: "completed",
 			}),
+			// ── INTREG-014: Write sync outcome back to the integration row ──────
+			db
+				.update(integrations)
+				.set({ lastSyncAt: now, lastSyncStatus: "ok", updatedAt: now })
+				.where(eq(integrations.id, nhdrRegistryRow.id)),
 		])
 
 		return {
@@ -603,18 +635,37 @@ export class FhirService {
 	// System status
 	// ========================================================================
 
-	async getSystemStatus(): Promise<FhirSystemStatus> {
+	async getSystemStatus(facilityId: string): Promise<FhirSystemStatus> {
 		const nhdrMode = env.NHDR_MODE
-		const nhdrConfigured =
-			nhdrMode === "real" &&
-			!!env.NHDR_BASE_URL &&
-			!!env.NHDR_API_KEY
+
+		// Scope the NHDR registry lookup to the active facility only.
+		// A different facility's enabled NHDR row must not influence this result.
+		const [registryNhdr] = await db
+			.select({ endpointUrl: integrations.endpointUrl, credentialsRef: integrations.credentialsRef })
+			.from(integrations)
+			.where(
+				and(
+					eq(integrations.facilityId, facilityId),
+					eq(integrations.kind, "nhdr"),
+					eq(integrations.enabled, true),
+				)
+			)
+			.limit(1)
+
+		const nhdrConfigured = nhdrMode === "real" && registryNhdr !== undefined
 
 		let nhdrEndpointNote: string
 		if (nhdrMode === "real") {
-			nhdrEndpointNote = nhdrConfigured
-				? "NHDR integration is active. Submissions are sent to the configured NHDR endpoint."
-				: "NHDR mode is set to 'real' but NHDR_BASE_URL or NHDR_API_KEY is missing. Submissions will fail."
+			if (registryNhdr) {
+				const hasKey = registryNhdr.credentialsRef && process.env[registryNhdr.credentialsRef]
+				nhdrEndpointNote = hasKey
+					? "NHDR integration is active and configured via the Integration Registry."
+					: "NHDR integration is configured in the Integration Registry but the credential environment variable is not set. Submissions will fail."
+			} else {
+				nhdrEndpointNote =
+					"NHDR mode is set to 'real' but no active NHDR integration is configured. " +
+					"Configure one in Admin \u2192 Integration Registry."
+			}
 		} else {
 			nhdrEndpointNote =
 				"NHDR integration is in mock mode. Submissions return a PENDING acknowledgement and are not forwarded to the NHDR."
@@ -623,7 +674,7 @@ export class FhirService {
 		return {
 			nhdrMode,
 			nhdrConfigured,
-			nhdrBaseUrl: env.NHDR_BASE_URL ?? null,
+			nhdrBaseUrl: registryNhdr?.endpointUrl ?? null,
 			nhdrEndpointNote,
 		}
 	}

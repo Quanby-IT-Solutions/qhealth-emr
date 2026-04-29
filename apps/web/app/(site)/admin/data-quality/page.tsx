@@ -16,7 +16,7 @@ function can(permSet: Set<string>, module: string, action: string) {
 export default function AdminDataQualityPage() {
 	const permSet = usePermissionSet()
 
-	if (!can(permSet, "admin", "view")) {
+	if (!can(permSet, "medical_records", "view")) {
 		return (
 			<div className="flex items-center justify-center p-8 text-muted-foreground">
 				You do not have permission to access data quality.

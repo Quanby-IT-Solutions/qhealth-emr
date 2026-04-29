@@ -163,3 +163,83 @@ export const snomedCtCodes = createTable(
 		index("snomed_ct_codes_semantic_tag_idx").on(t.semanticTag),
 	]
 )
+
+// ============================================================================
+// TERMINOLOGY GOVERNANCE — Catalog uploads & deprecated code mappings
+// ============================================================================
+
+/**
+ * Tracks admin-initiated catalog refresh events. Each row records when an
+ * admin registered a terminology catalog refresh, which catalog type was
+ * updated, and how many entries were affected.
+ */
+export const codeSetCatalogUploads = createTable(
+	"code_set_catalog_uploads",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		/** One of: icd10 | loinc | rxnorm | rvs | snomed_ct */
+		catalogType: t.text("catalog_type").notNull(),
+		version: t.text("version"),
+		notes: t.text("notes"),
+		entryCount: t.integer("entry_count").notNull().default(0),
+		uploadedByUserId: t.text("uploaded_by_user_id").notNull(),
+		/** completed | failed */
+		status: t.text("status").notNull().default("completed"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("code_set_catalog_uploads_catalog_type_idx").on(t.catalogType),
+		index("code_set_catalog_uploads_created_at_idx").on(t.createdAt),
+	]
+)
+
+/**
+ * Deprecated-code mapping table. When a code is retired or replaced, the
+ * admin registers a mapping from the old code to its replacement (or null if
+ * retired with no replacement). CDS / order-entry surfaces query this table
+ * to surface migration warnings.
+ */
+export const deprecatedCodeMappings = createTable(
+	"deprecated_code_mappings",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		/** One of: icd10 | loinc | rxnorm | rvs | snomed_ct */
+		catalogType: t.text("catalog_type").notNull(),
+		fromCode: t.text("from_code").notNull(),
+		/** null = retired with no replacement */
+		toCode: t.text("to_code"),
+		notes: t.text("notes"),
+		isActive: t.boolean("is_active").notNull().default(true),
+		createdByUserId: t.text("created_by_user_id").notNull(),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("deprecated_code_mappings_catalog_type_idx").on(t.catalogType),
+		index("deprecated_code_mappings_from_code_idx").on(t.fromCode),
+	]
+)
+
+/**
+ * Catalog version records — each row represents an authoritative publish event
+ * for a terminology catalog. Administrators tag and publish versioned snapshots
+ * so downstream modules can reference a known-good baseline.
+ */
+export const catalogVersions = createTable(
+	"catalog_versions",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		/** One of: icd10 | loinc | rxnorm | rvs | snomed_ct */
+		catalogType: t.text("catalog_type").notNull(),
+		versionTag: t.text("version_tag").notNull(),
+		publishedByUserId: t.text("published_by_user_id").notNull(),
+		publishedAt: t.timestamp("published_at").notNull().defaultNow(),
+		entryCount: t.integer("entry_count").notNull().default(0),
+		notes: t.text("notes"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("catalog_versions_catalog_type_idx").on(t.catalogType),
+		index("catalog_versions_published_at_idx").on(t.publishedAt),
+	]
+)

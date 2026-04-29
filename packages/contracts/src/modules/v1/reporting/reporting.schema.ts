@@ -159,7 +159,11 @@ export const WeeklyReportSummarySchema = z.object({
 			count: z.number(),
 		})
 	),
-	status: z.enum(["generated", "submitted"]),
+	// "generated": assembled but no enabled integration found — not transmitted
+	// "submitted": assembled and successfully transmitted to PIDSR endpoint
+	// "failed":    assembled but transmission attempt failed
+	status: z.enum(["generated", "submitted", "failed"]),
+	transmissionNote: z.string().optional(),
 })
 
 export type WeeklyReportSummary = z.infer<typeof WeeklyReportSummarySchema>

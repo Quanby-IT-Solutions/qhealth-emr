@@ -220,7 +220,7 @@ export function SlaDashboard() {
 						Live
 					</div>
 					<Button asChild size="sm" variant="outline">
-						<Link href="/reporting/sla">Compliance Report</Link>
+						<Link href="/admin/sla">Compliance Report</Link>
 					</Button>
 				</div>
 			</div>

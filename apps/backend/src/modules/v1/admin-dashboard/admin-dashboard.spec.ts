@@ -15,6 +15,9 @@
  *
  * All ESM-only and transitive-contract-importing packages are stubbed via
  * jest.mock() at the module level.
+ *
+ * ADMIN-003 addendum: controller guard metadata tests for himOps and
+ * civilRegistryOps are appended at the end of this file.
  */
 
 // ── ESM / transitive dependency stubs ────────────────────────────────────────
@@ -196,6 +199,86 @@ describe("AdminDashboardService.getSummary — FHIR telemetry permission boundar
 			const result = await service.getSummary("facility-1")
 			expect(result.integrations.fhirFailures).toBe(4)
 		})
+	})
+})
+
+// ── ADMIN-003: Controller guard metadata ─────────────────────────────────────
+//
+// Verifies that AdminDashboardController methods carry the correct
+// @RequirePermission metadata:
+//   • himOps           → medical_records:view  (HIM staff access, not admin)
+//   • civilRegistryOps → admin:view            (admin oversight surface)
+//
+// Uses Reflect.getMetadata so no DI container spin-up is needed.
+
+jest.mock("@orpc/nest", () => ({
+	Implement: () => () => {},
+}))
+jest.mock("@orpc/server", () => ({
+	implement: jest.fn().mockReturnValue({ handler: jest.fn() }),
+}))
+jest.mock("@thallesp/nestjs-better-auth", () => ({
+	Session: () => () => {},
+}))
+jest.mock("@/config/api-versions.config", () => ({
+	v1: {
+		adminDashboard: {
+			summary: {},
+			himOps: {},
+			exportCompliance: {},
+			civilRegistryOps: {},
+			medicationCompliance: {},
+		},
+	},
+}))
+jest.mock("./admin-dashboard.service", () => ({
+	AdminDashboardService: class AdminDashboardService {},
+}))
+jest.mock("@/modules/v1/rbac/rbac.guard", () => ({
+	RBAC_PERMISSION_KEY: "rbac",
+	RBAC_PERMISSIONS_KEY: "rbac_all",
+	RequirePermission: (module: string, action: string) =>
+		(target: object, key: string | symbol) => {
+			Reflect.defineMetadata("rbac", { module, action }, target, key)
+		},
+	RequirePermissions: (permissions: Array<{ module: string; action: string }>) =>
+		(target: object, key: string | symbol) => {
+			Reflect.defineMetadata("rbac_all", permissions, target, key)
+		},
+}))
+
+import { AdminDashboardController } from "./admin-dashboard.controller"
+
+type PermEntry = { module: string; action: string }
+
+function getGuard(methodName: keyof AdminDashboardController): PermEntry | undefined {
+	return Reflect.getMetadata("rbac", AdminDashboardController.prototype, methodName)
+}
+
+describe("AdminDashboardController — RBAC guard metadata (ADMIN-003)", () => {
+	it("himOps is guarded by medical_records:view", () => {
+		const perm = getGuard("himOps")
+		expect(perm).toEqual({ module: "medical_records", action: "view" })
+	})
+
+	it("civilRegistryOps is guarded by admin:view", () => {
+		const perm = getGuard("civilRegistryOps")
+		expect(perm).toEqual({ module: "admin", action: "view" })
+	})
+
+	it("summary is guarded by admin:view", () => {
+		const perm = getGuard("summary")
+		expect(perm).toEqual({ module: "admin", action: "view" })
+	})
+
+	it("exportCompliance is guarded by admin:view", () => {
+		const perm = getGuard("exportCompliance")
+		expect(perm).toEqual({ module: "admin", action: "view" })
+	})
+
+	it("medicationCompliance is guarded by admin:view", () => {
+		const perm = getGuard("medicationCompliance")
+		expect(perm).toEqual({ module: "admin", action: "view" })
 	})
 })
 

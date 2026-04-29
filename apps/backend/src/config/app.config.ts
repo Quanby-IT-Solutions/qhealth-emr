@@ -14,10 +14,15 @@ const logger = new Logger("AppConfig")
  */
 export const INTEGRATION_CREDENTIAL_ENV_VARS = [
 	"FHIR_API_KEY",
-	"NHDR_FHIR_API_KEY",
+	"NHDR_API_KEY",
 	"CIVIL_REGISTRY_API_KEY",
 	"HAI_API_KEY",
 	"PHILHEALTH_CEWS_API_KEY",
+	"ERP_API_KEY",
+	"LIS_API_KEY",
+	"PACS_API_KEY",
+	"TELEMEDICINE_API_KEY",
+	"PIDSR_API_KEY",
 	"CUSTOM_INTEGRATION_API_KEY",
 ] as const satisfies readonly string[]
 

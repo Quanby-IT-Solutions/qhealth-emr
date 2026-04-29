@@ -18,6 +18,14 @@ function can(permSet: Set<string>, module: string, action: string) {
 export default function CodeSetsPage() {
 	const permSet = usePermissionSet()
 
+	if (!can(permSet, "admin", "view")) {
+		return (
+			<div className="flex items-center justify-center p-8 text-muted-foreground">
+				You do not have permission to access this page.
+			</div>
+		)
+	}
+
 	if (!can(permSet, "formulary", "view")) {
 		return (
 			<div className="flex items-center justify-center p-8 text-muted-foreground">
@@ -36,7 +44,7 @@ export default function CodeSetsPage() {
 			</div>
 
 			<Suspense fallback={<p>Loading code sets...</p>}>
-				<CodeSetBrowser />
+				<CodeSetBrowser canEdit={false} />
 			</Suspense>
 		</div>
 	)

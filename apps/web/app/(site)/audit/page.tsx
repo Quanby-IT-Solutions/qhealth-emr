@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 
 import { Button } from "@/core/components/ui/button"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
@@ -20,6 +21,9 @@ function can(permSet: Set<string>, module: string, action: string) {
 export default function AuditPage() {
 	const facilityId = useActiveFacilityId()
 	const permSet = usePermissionSet()
+	const searchParams = useSearchParams()
+	const initialEntityType = searchParams.get("entityType") ?? undefined
+	const initialEntityId = searchParams.get("entityId") ?? undefined
 
 	if (!can(permSet, "audit", "view")) {
 		return (
@@ -44,7 +48,11 @@ export default function AuditPage() {
 			</div>
 
 			{facilityId ? (
-				<AuditLogTable facilityId={facilityId} />
+				<AuditLogTable
+					facilityId={facilityId}
+					initialEntityType={initialEntityType}
+					initialEntityId={initialEntityId}
+				/>
 			) : (
 				<p className="text-muted-foreground">Loading facility context...</p>
 			)}

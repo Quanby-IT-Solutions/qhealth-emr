@@ -87,8 +87,8 @@ export class FhirController {
 	@RequirePermissions([{ module: "admin", action: "view" }, { module: "fhir", action: "view" }])
 	@Implement(v1.fhir.getSystemStatus)
 	async getSystemStatus() {
-		return implement(v1.fhir.getSystemStatus).handler(async () => {
-			return this.fhirService.getSystemStatus()
+		return implement(v1.fhir.getSystemStatus).handler(async ({ input }) => {
+			return this.fhirService.getSystemStatus(input.facilityId)
 		})
 	}
 }

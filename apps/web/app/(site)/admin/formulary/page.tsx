@@ -21,6 +21,14 @@ export default function FormularyPage() {
 	const facilityId = useActiveFacilityId()
 	const permSet = usePermissionSet()
 
+	if (!can(permSet, "admin", "view")) {
+		return (
+			<div className="flex items-center justify-center p-8 text-muted-foreground">
+				You do not have permission to access this page.
+			</div>
+		)
+	}
+
 	if (!can(permSet, "formulary", "view")) {
 		return (
 			<div className="flex items-center justify-center p-8 text-muted-foreground">
@@ -35,7 +43,7 @@ export default function FormularyPage() {
 				<div>
 					<h1 className="text-2xl font-bold">Facility Formulary</h1>
 					<p className="text-muted-foreground">
-						Manage approved drugs for this facility. Add, remove, and annotate formulary items.
+						Manage approved drugs for this facility. Add, remove, and update master-data records.
 					</p>
 				</div>
 				<Button variant="outline" nativeButton={false} render={<Link href="/admin/formulary/code-sets" />}>
@@ -44,7 +52,12 @@ export default function FormularyPage() {
 			</div>
 
 			{facilityId ? (
-				<FormularyManager facilityId={facilityId} />
+				<FormularyManager
+					facilityId={facilityId}
+					canEdit={false}
+					canDelete={false}
+					canEditFlags={false}
+				/>
 			) : (
 				<p className="text-muted-foreground">Loading facility context...</p>
 			)}

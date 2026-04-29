@@ -83,17 +83,23 @@ function statusBadge(status: string) {
 // Main Dashboard
 // ============================================================================
 
-export function ReportingDashboard() {
+export function ReportingDashboard({ canEdit = true, canExport = true }: { canEdit?: boolean; canExport?: boolean }) {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 
 	const router = useRouter()
 	const searchParams = useSearchParams()
-	const currentTab = searchParams.get("tab") ?? "surveillance"
+	const defaultTab = canEdit ? "surveillance" : "ahsr"
+	const rawTab = searchParams.get("tab") ?? defaultTab
+
+	// Oversight-only users must not land on operator tabs.
+	const oversightTabs = ["ahsr", ...(canExport ? ["export"] : [])]
+	const visibleTab = !canEdit && !oversightTabs.includes(rawTab) ? "ahsr" : rawTab
 
 	function handleTabChange(value: string) {
 		const params = new URLSearchParams(searchParams.toString())
-		if (value === "surveillance") {
+		const isDefault = value === defaultTab
+		if (isDefault) {
 			params.delete("tab")
 		} else {
 			params.set("tab", value)
@@ -109,43 +115,56 @@ export function ReportingDashboard() {
 		)
 	}
 
+	const heading = canEdit ? "Statutory Reporting" : "Reporting Oversight"
+	const description = canEdit
+		? "PIDSR surveillance, case management, weekly reports, AHSR metrics, and HAI reporting"
+		: "AHSR metrics and oversight reporting. Contact the Reporting Officer for PIDSR operations, weekly reporting, and AHSR exports."
+
 	return (
 		<div className="space-y-6">
 			<div>
-				<h1 className="text-2xl font-bold">Statutory Reporting</h1>
-				<p className="text-muted-foreground">
-					PIDSR surveillance, case management, weekly reports, AHSR metrics, and HAI reporting
-				</p>
+				<h1 className="text-2xl font-bold">{heading}</h1>
+				<p className="text-muted-foreground">{description}</p>
 			</div>
 
-			<Tabs value={currentTab} onValueChange={handleTabChange}>
+			<Tabs value={visibleTab} onValueChange={handleTabChange}>
 				<TabsList variant="line">
-					<TabsTrigger value="surveillance">Surveillance Flags</TabsTrigger>
-					<TabsTrigger value="pidsr">PIDSR</TabsTrigger>
-					<TabsTrigger value="weekly">Weekly Report</TabsTrigger>
+					{canEdit && <TabsTrigger value="surveillance">Surveillance Flags</TabsTrigger>}
+					{canEdit && <TabsTrigger value="pidsr">PIDSR</TabsTrigger>}
+					{canEdit && <TabsTrigger value="weekly">Weekly Report</TabsTrigger>}
 					<TabsTrigger value="ahsr">AHSR Dashboard</TabsTrigger>
-					<TabsTrigger value="hai">HAI Report</TabsTrigger>
-					<TabsTrigger value="export">Export</TabsTrigger>
+					{canEdit && <TabsTrigger value="hai">HAI Report</TabsTrigger>}
+					{canExport && <TabsTrigger value="export">Export</TabsTrigger>}
 				</TabsList>
 
-				<TabsContent value="surveillance">
-					<SurveillancePanel facilityId={facilityId} />
-				</TabsContent>
-				<TabsContent value="pidsr">
-					<PidsrDashboard facilityId={facilityId} />
-				</TabsContent>
-				<TabsContent value="weekly">
-					<WeeklyReportPanel facilityId={facilityId} />
-				</TabsContent>
+				{canEdit && (
+					<TabsContent value="surveillance">
+						<SurveillancePanel facilityId={facilityId} />
+					</TabsContent>
+				)}
+				{canEdit && (
+					<TabsContent value="pidsr">
+						<PidsrDashboard facilityId={facilityId} />
+					</TabsContent>
+				)}
+				{canEdit && (
+					<TabsContent value="weekly">
+						<WeeklyReportPanel facilityId={facilityId} />
+					</TabsContent>
+				)}
 				<TabsContent value="ahsr">
-					<AhsrDashboard facilityId={facilityId} />
+					<AhsrDashboard facilityId={facilityId} canEdit={canEdit} canExport={canExport} />
 				</TabsContent>
-				<TabsContent value="hai">
-					<HaiReport facilityId={facilityId} />
-				</TabsContent>
-				<TabsContent value="export">
-					<ReportExport facilityId={facilityId} />
-				</TabsContent>
+				{canEdit && (
+					<TabsContent value="hai">
+						<HaiReport facilityId={facilityId} />
+					</TabsContent>
+				)}
+				{canExport && (
+					<TabsContent value="export">
+						<ReportExport facilityId={facilityId} />
+					</TabsContent>
+				)}
 			</Tabs>
 		</div>
 	)
@@ -686,7 +705,7 @@ function WeeklyReportPanel({ facilityId }: { facilityId: string }) {
 // AHSR Panel
 // ============================================================================
 
-function AhsrPanel({ facilityId }: { facilityId: string }) {
+function AhsrPanel({ facilityId, canEdit = true, canExport = true }: { facilityId: string; canEdit?: boolean; canExport?: boolean }) {
 	const currentYear = new Date().getFullYear()
 	const [year, setYear] = useState(currentYear)
 	const [month, setMonth] = useState<string>("all")
@@ -790,9 +809,11 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 									))}
 								</SelectContent>
 							</Select>
+						{canExport && (
 							<Button variant="outline" onClick={handleExport} disabled={exportMut.isPending}>
 								{exportMut.isPending ? "Exporting…" : "Export Snapshot"}
 							</Button>
+						)}
 						</div>
 					</div>
 				</CardHeader>
@@ -863,7 +884,7 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 											<TableHead>ICD-10</TableHead>
 											<TableHead className="text-right">Count</TableHead>
 											<TableHead className="text-right">%</TableHead>
-											<TableHead />
+											{canEdit && <TableHead />}
 										</TableRow>
 									</TableHeader>
 									<TableBody>
@@ -875,13 +896,15 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 												<TableCell className="text-right">{m.count}</TableCell>
 												<TableCell className="text-right">{m.percentage.toFixed(1)}%</TableCell>
 												<TableCell className="text-right">
-													<Button
-														size="sm"
-														variant="ghost"
-														onClick={() => openDrilldown("morbidity", m.icdCode)}
-													>
-														Drilldown
-													</Button>
+													{canEdit && (
+														<Button
+															size="sm"
+															variant="ghost"
+															onClick={() => openDrilldown("morbidity", m.icdCode)}
+														>
+															Drilldown
+														</Button>
+													)}
 												</TableCell>
 											</TableRow>
 										))}
@@ -908,7 +931,7 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 											<TableHead>ICD-10</TableHead>
 											<TableHead className="text-right">Count</TableHead>
 											<TableHead className="text-right">%</TableHead>
-											<TableHead />
+											{canEdit && <TableHead />}
 										</TableRow>
 									</TableHeader>
 									<TableBody>
@@ -920,13 +943,15 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 												<TableCell className="text-right">{m.count}</TableCell>
 												<TableCell className="text-right">{m.percentage.toFixed(1)}%</TableCell>
 												<TableCell className="text-right">
-													<Button
-														size="sm"
-														variant="ghost"
-														onClick={() => openDrilldown("mortality", m.icdCode)}
-													>
-														Drilldown
-													</Button>
+													{canEdit && (
+														<Button
+															size="sm"
+															variant="ghost"
+															onClick={() => openDrilldown("mortality", m.icdCode)}
+														>
+															Drilldown
+														</Button>
+													)}
 												</TableCell>
 											</TableRow>
 										))}
@@ -951,7 +976,7 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 											<TableHead>HAI Type</TableHead>
 											<TableHead className="text-right">Count</TableHead>
 											<TableHead className="text-right">Rate / 1000 Admissions</TableHead>
-											<TableHead />
+											{canEdit && <TableHead />}
 										</TableRow>
 									</TableHeader>
 									<TableBody>
@@ -961,13 +986,15 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 												<TableCell className="text-right">{h.count}</TableCell>
 												<TableCell className="text-right">{h.rate.toFixed(2)}</TableCell>
 												<TableCell className="text-right">
-													<Button
-														size="sm"
-														variant="ghost"
-														onClick={() => openDrilldown("hai", undefined, h.haiType)}
-													>
-														Drilldown
-													</Button>
+													{canEdit && (
+														<Button
+															size="sm"
+															variant="ghost"
+															onClick={() => openDrilldown("hai", undefined, h.haiType)}
+														>
+															Drilldown
+														</Button>
+													)}
 												</TableCell>
 											</TableRow>
 										))}

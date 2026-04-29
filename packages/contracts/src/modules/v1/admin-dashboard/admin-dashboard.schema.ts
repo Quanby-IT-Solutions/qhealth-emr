@@ -258,9 +258,6 @@ export const AdminDashboardSummarySchema = z.object({
 	audit: AuditSummarySectionSchema,
 	artaSla: ArtaSlaSectionSchema,
 	offlineReadiness: OfflineReadinessSectionSchema,
-	statutoryReadiness: StatutoryReadinessSectionSchema,
-	statutoryOps: StatutoryOpsSectionSchema,
-	dataQuality: DataQualitySectionSchema,
 })
 
 export type AdminDashboardSummary = z.infer<typeof AdminDashboardSummarySchema>

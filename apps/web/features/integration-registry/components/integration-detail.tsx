@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 
 import { useRouter } from "next/navigation"
 
-import { Save, Trash2, X } from "lucide-react"
+import { useQueryClient } from "@tanstack/react-query"
+import { Info, Save, Trash2, Wifi, X } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -33,16 +34,26 @@ import {
 	useCredentialRefsQuery,
 	useDeleteIntegrationMutation,
 	useIntegrationDetailQuery,
+	useTestConnectivityMutation,
 	useUpdateIntegrationMutation,
 } from "@/features/integration-registry/api/integration-registry.hooks"
+import { orpc } from "@/services/orpc/client"
 
 const KIND_LABELS: Record<string, string> = {
 	fhir: "FHIR",
-	civil_registry: "Civil Registry",
 	hai: "HAI",
 	philhealth: "PhilHealth",
+	erp: "ERP",
+	lis: "LIS",
+	pacs: "PACS",
+	telemedicine: "Telemedicine",
+	nhdr: "NHDR",
+	pidsr: "PIDSR",
 	custom: "Custom",
 }
+
+/** Fields whose change requires disabling the integration before saving. */
+const CONNECTION_CRITICAL_FIELDS: Array<keyof DraftState> = ["endpointUrl", "credentialsRef", "kind"]
 
 const CREDENTIAL_STATUS_VARIANT: Record<
 	string,
@@ -58,6 +69,7 @@ interface DraftState {
 	name: string
 	kind: string
 	endpointUrl: string
+	webhookUrl: string
 	credentialsRef: string
 	enabled: boolean
 	notes: string
@@ -69,11 +81,15 @@ type IntegrationData = {
 	kind: string
 	name: string
 	endpointUrl: string
+	webhookUrl: string | null
 	credentialsRef: string | null
 	enabled: boolean
 	notes: string | null
 	lastSyncAt: Date | null
 	lastSyncStatus: "ok" | "error" | null
+	lastTestedAt: Date | null
+	lastTestStatus: "ok" | "error" | null
+	lastTestReadinessLevel: "activation" | "transport" | "none" | null
 	credentialStatus: "ok" | "missing_in_env" | "not_in_whitelist" | "unset"
 	createdAt: Date
 	updatedAt: Date
@@ -84,6 +100,7 @@ function toDraft(i: IntegrationData): DraftState {
 		name: i.name,
 		kind: i.kind,
 		endpointUrl: i.endpointUrl,
+		webhookUrl: i.webhookUrl ?? "",
 		credentialsRef: i.credentialsRef ?? "",
 		enabled: i.enabled,
 		notes: i.notes ?? "",
@@ -96,14 +113,24 @@ interface IntegrationDetailProps {
 
 export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 	const router = useRouter()
+	const queryClient = useQueryClient()
 	const { data: integration, isLoading, error } = useIntegrationDetailQuery(integrationId)
 	const { data: credentialRefs = [] } = useCredentialRefsQuery()
 	const updateMutation = useUpdateIntegrationMutation()
 	const deleteMutation = useDeleteIntegrationMutation()
+	const testMutation = useTestConnectivityMutation()
 
 	const [draft, setDraft] = useState<DraftState | null>(null)
 	const [isDirty, setIsDirty] = useState(false)
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+	const [connectivityResult, setConnectivityResult] = useState<{
+		status: "ok" | "error"
+		readinessLevel: "activation" | "transport" | "none"
+		latencyMs: number | null
+		detail: string
+		credentialProbed: boolean
+		checks: Array<{ name: string; status: "pass" | "fail" | "skipped"; detail: string }>
+	} | null>(null)
 
 	useEffect(() => {
 		if (integration && !isDirty) {
@@ -134,6 +161,11 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 	)
 	const hasChanges = changedFields.length > 0
 
+	// If any connection-critical field changes on an enabled integration, the backend will
+	// reject the save. Detect this early to show a clear UX warning.
+	const connectionCriticalChanged = CONNECTION_CRITICAL_FIELDS.some(f => changedFields.includes(f))
+	const blockedByConnectionChange = connectionCriticalChanged && !!(integration as IntegrationData)?.enabled
+
 	function patch<K extends keyof DraftState>(field: K, value: DraftState[K]) {
 		setDraft(prev => (prev ? { ...prev, [field]: value } : prev))
 		setIsDirty(true)
@@ -151,8 +183,8 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 
 		const payload: Record<string, unknown> = { id: integrationId }
 		for (const field of changedFields) {
-			if (field === "credentialsRef") {
-				payload.credentialsRef = draft.credentialsRef || null
+			if (field === "credentialsRef" || field === "webhookUrl") {
+				payload[field] = draft[field] || null
 			} else {
 				payload[field] = draft[field]
 			}
@@ -169,6 +201,13 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 		router.push("/admin/integration-registry")
 	}
 
+	async function handleTestConnectivity() {
+		const result = await testMutation.mutateAsync({ id: integrationId })
+		setConnectivityResult(result)
+		// Refresh integration data so readiness gate reflects the new test outcome
+		queryClient.invalidateQueries({ queryKey: orpc.integrationRegistry.key() })
+	}
+
 	const credBadge =
 		CREDENTIAL_STATUS_VARIANT[integration?.credentialStatus ?? "unset"] ??
 		CREDENTIAL_STATUS_VARIANT.unset!
@@ -176,13 +215,41 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 
 	return (
 		<div className="space-y-4">
+			{/* FHIR / NHDR ownership notice */}
+			{(draft.kind === "fhir" || draft.kind === "nhdr") && (
+				<div className="flex items-start gap-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm dark:border-blue-800 dark:bg-blue-950">
+					<Info className="mt-0.5 size-4 shrink-0 text-blue-600 dark:text-blue-400" />
+					<div className="space-y-1">
+						<p className="font-medium text-blue-900 dark:text-blue-100">
+							FHIR / NHDR connectivity record
+						</p>
+						<p className="text-blue-700 dark:text-blue-300">
+							This entry stores the connection endpoint and credential reference for{" "}
+							{draft.kind === "nhdr" ? "NHDR" : "FHIR"} only. For FHIR R4 bundle exports,
+							patient consent tracking, and NHDR submission management, go to{" "}
+							<a href="/admin/fhir" className="font-medium underline">
+								Admin → FHIR / NHDR
+							</a>
+							.
+						</p>
+					</div>
+				</div>
+			)}
+
 			{/* Unsaved changes banner */}
 			{hasChanges && (
 				<div className="flex items-center justify-between rounded-md border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm dark:border-amber-700 dark:bg-amber-950">
-					<span className="text-amber-800 dark:text-amber-200">
-						{changedFields.length} unsaved{" "}
-						{changedFields.length === 1 ? "change" : "changes"}
-					</span>
+					<div className="flex flex-col gap-0.5">
+						<span className="text-amber-800 dark:text-amber-200">
+							{changedFields.length} unsaved{" "}
+							{changedFields.length === 1 ? "change" : "changes"}
+						</span>
+						{blockedByConnectionChange && (
+							<span className="text-destructive text-xs">
+								Endpoint, credential, or kind cannot change on a live integration — disable it first, then re-test.
+							</span>
+						)}
+					</div>
 					<div className="flex gap-2">
 						<Button variant="ghost" size="sm" onClick={handleDiscard}>
 							<X className="mr-1.5 size-4" />
@@ -191,7 +258,7 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 						<Button
 							size="sm"
 							onClick={handleSave}
-							disabled={updateMutation.isPending}
+							disabled={updateMutation.isPending || blockedByConnectionChange}
 						>
 							<Save className="mr-1.5 size-4" />
 							{updateMutation.isPending ? "Saving…" : "Save changes"}
@@ -247,42 +314,78 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 								/>
 							</div>
 
-							<div className="space-y-1.5">
-								<Label htmlFor="credentialsRef">Credential reference</Label>
-								<Select
-									value={draft.credentialsRef || "__none__"}
-									onValueChange={v =>
-										patch("credentialsRef", v === "__none__" ? "" : v)
-									}
-								>
-									<SelectTrigger id="credentialsRef">
-										<SelectValue placeholder="No credential" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="__none__">No credential</SelectItem>
-										{credentialRefs.map(ref => (
-											<SelectItem key={ref} value={ref}>
-												{ref}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-								<div className="flex items-center gap-2 mt-1">
-									<Badge variant={credBadge.variant} className="text-xs">
-										{credBadge.label}
-									</Badge>
-								</div>
-							</div>
+						<div className="space-y-1.5">
+							<Label htmlFor="webhookUrl">Webhook URL <span className="text-muted-foreground">(optional)</span></Label>
+							<Input
+								id="webhookUrl"
+								value={draft.webhookUrl}
+								onChange={e => patch("webhookUrl", e.target.value)}
+								placeholder="https://your-system.example.ph/webhook"
+							/>
+						</div>
 
-							<div className="flex items-center gap-3">
-								<Switch
-									id="enabled"
-									checked={draft.enabled}
-									onCheckedChange={v => patch("enabled", v)}
-								/>
-								<Label htmlFor="enabled" className="cursor-pointer">
-									{draft.enabled ? "Enabled" : "Disabled"}
-								</Label>
+						<div className="space-y-1.5">
+							<Label htmlFor="credentialsRef">Credential reference</Label>
+							<Select
+								value={draft.credentialsRef || "__none__"}
+								onValueChange={v =>
+									patch("credentialsRef", v === "__none__" ? "" : v)
+								}
+							>
+								<SelectTrigger id="credentialsRef">
+									<SelectValue placeholder="No credential" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="__none__">No credential</SelectItem>
+									{credentialRefs.map(ref => (
+										<SelectItem key={ref} value={ref}>
+											{ref}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+							<div className="flex items-center gap-2 mt-1">
+								<Badge variant={credBadge.variant} className="text-xs">
+									{credBadge.label}
+								</Badge>
+							</div>
+						</div>
+
+							<div className="space-y-1.5">
+								<div className="flex items-center gap-3">
+									<Switch
+										id="enabled"
+										checked={draft.enabled}
+										onCheckedChange={v => patch("enabled", v)}
+									/>
+									<Label htmlFor="enabled" className="cursor-pointer">
+										{draft.enabled ? "Enabled" : "Disabled"}
+									</Label>
+								</div>
+								{draft.enabled && !integration?.enabled && (() => {
+									const WINDOW_MS = 10 * 60 * 1000
+									const testedAt = integration?.lastTestedAt ? new Date(integration.lastTestedAt) : null
+									const intKind = (integration as IntegrationData).kind
+									const kindRequiresActivation = intKind === "fhir" || intKind === "nhdr"
+									const isRecentOk =
+										integration?.lastTestStatus === "ok" &&
+										testedAt !== null &&
+										Date.now() - testedAt.getTime() < WINDOW_MS
+									const isActivationReady = isRecentOk && (integration as IntegrationData).lastTestReadinessLevel === "activation"
+									const isTransportReady = isRecentOk && (integration as IntegrationData).lastTestReadinessLevel === "transport"
+									const canEnable = kindRequiresActivation ? isActivationReady : (isActivationReady || isTransportReady)
+									if (!canEnable) {
+										const hint = kindRequiresActivation
+											? "An activation-grade connectivity test is required before enabling. Run the test from the connectivity panel on the right."
+											: (isTransportReady
+												? null // transport-ready: no blocking message — save will succeed
+												: "A successful connectivity test is required before enabling. Run the test from the connectivity panel on the right.")
+										return hint ? (
+											<p className="text-destructive text-xs">{hint}</p>
+										) : null
+									}
+									return null
+								})()}
 							</div>
 
 							<div className="space-y-1.5">
@@ -350,6 +453,86 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 						</CardContent>
 					</Card>
 
+					{/* Connectivity test */}
+					<Card>
+						<CardHeader>
+							<CardTitle className="text-sm font-semibold">Connectivity test</CardTitle>
+						</CardHeader>
+						<CardContent className="space-y-3">
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={handleTestConnectivity}
+								disabled={testMutation.isPending}
+							>
+								<Wifi className="mr-1.5 size-4" />
+								{testMutation.isPending ? "Testing…" : "Test connectivity"}
+							</Button>
+							{connectivityResult && (
+								<div className="space-y-2">
+									<div className="flex flex-wrap items-center gap-2">
+									{connectivityResult.readinessLevel === "activation" && connectivityResult.status === "ok" && (
+										<Badge variant="default" className="text-xs">
+											Activation-ready
+										</Badge>
+									)}
+									{(connectivityResult.readinessLevel === "transport" ||
+										(connectivityResult.readinessLevel === "activation" &&
+											connectivityResult.status === "error")) && (
+											<Badge variant="secondary" className="border-amber-400 text-xs text-amber-700 dark:text-amber-300">
+												Transport only
+											</Badge>
+										)}
+										{connectivityResult.readinessLevel === "none" && (
+											<Badge variant="destructive" className="text-xs">
+												Unreachable
+											</Badge>
+										)}
+										<Badge variant="outline" className="text-xs">
+											{connectivityResult.credentialProbed
+												? "Credentialed probe"
+												: "Unauthenticated probe"}
+										</Badge>
+										{connectivityResult.latencyMs !== null && (
+											<span className="text-muted-foreground text-xs">
+												{connectivityResult.latencyMs}ms
+											</span>
+										)}
+									</div>
+									<p className="text-muted-foreground text-xs">{connectivityResult.detail}</p>
+									{connectivityResult.readinessLevel === "transport" && (
+										<p className="text-xs text-amber-700 dark:text-amber-400">
+											Transport-only result — cannot activate until contract-level validation passes.
+										</p>
+									)}
+									{connectivityResult.checks.length > 0 && (
+										<ul className="space-y-0.5">
+											{connectivityResult.checks.map((check, i) => (
+												<li key={i} className="flex items-start gap-1.5 text-xs">
+													<span
+														className={
+															check.status === "pass"
+																? "text-green-600 dark:text-green-400"
+																: check.status === "fail"
+																	? "text-destructive"
+																	: "text-muted-foreground"
+														}
+													>
+														{check.status === "pass" ? "✓" : check.status === "fail" ? "✗" : "–"}
+													</span>
+													<span className="text-muted-foreground">
+														<span className="font-medium text-foreground">{check.name}</span>:{" "}
+														{check.detail}
+													</span>
+												</li>
+											))}
+										</ul>
+									)}
+								</div>
+							)}
+						</CardContent>
+					</Card>
+
 					<Card>
 						<CardHeader>
 							<CardTitle className="text-sm font-semibold">Recent changes</CardTitle>
@@ -365,13 +548,14 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 									: "—"}
 							</p>
 							<a
-								href={`/admin/audit?entityType=integration&entityId=${integrationId}`}
+								href={`/audit?entityType=integration&entityId=${integrationId}`}
 								className="text-primary text-xs hover:underline"
 							>
 								View full history →
 							</a>
 						</CardContent>
 					</Card>
+
 				</div>
 			</div>
 

@@ -4,7 +4,6 @@ import { useState } from "react"
 
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import {
 	Select,
@@ -13,7 +12,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/core/components/ui/select"
-import { useExportReportMutation } from "@/features/reporting/api/reporting.hooks"
+import { useExportAhsrMutation } from "@/features/reporting/api/reporting.hooks"
 
 interface ReportExportProps {
 	facilityId: string
@@ -21,48 +20,37 @@ interface ReportExportProps {
 
 export function ReportExport({ facilityId }: ReportExportProps) {
 	const currentYear = new Date().getFullYear()
-	const [reportType, setReportType] = useState<"ahsr" | "pidsr" | "hai">("ahsr")
-	const [format, setFormat] = useState<"csv" | "pdf" | "xml">("csv")
 	const [year, setYear] = useState(currentYear)
 	const [month, setMonth] = useState<string>("all")
-	const [dateFrom, setDateFrom] = useState("")
-	const [dateTo, setDateTo] = useState("")
 	const [resultMsg, setResultMsg] = useState<string | null>(null)
-	const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
-	const [fileName, setFileName] = useState<string | null>(null)
+	const [snapshotId, setSnapshotId] = useState<string | null>(null)
 
-	const { mutate: exportReport, isPending } = useExportReportMutation()
+	const { mutate: exportAhsr, isPending } = useExportAhsrMutation()
 
 	function handleSubmit(e: React.FormEvent) {
 		e.preventDefault()
 		setResultMsg(null)
-		setDownloadUrl(null)
-		setFileName(null)
-		exportReport(
+		setSnapshotId(null)
+		exportAhsr(
 			{
 				facilityId,
-				reportType,
-				format,
 				year,
 				month: month === "all" ? undefined : Number(month),
-				dateFrom: dateFrom || undefined,
-				dateTo: dateTo || undefined,
 			},
 			{
 				onSuccess: (data) => {
 					setResultMsg(data.message)
-					setDownloadUrl(data.downloadUrl ?? null)
-					setFileName(data.fileName ?? null)
+					setSnapshotId(data.snapshotId)
 				},
 				onError: () => {
-					setResultMsg("Export failed. Please try again.")
+					setResultMsg("Export request failed. Please try again.")
 				},
 			}
 		)
 	}
 
 	const months = [
-		{ value: "all", label: "All months" },
+		{ value: "all", label: "All months (full year)" },
 		{ value: "1", label: "January" },
 		{ value: "2", label: "February" },
 		{ value: "3", label: "March" },
@@ -80,48 +68,14 @@ export function ReportExport({ facilityId }: ReportExportProps) {
 	return (
 		<Card className="max-w-lg">
 			<CardHeader>
-				<CardTitle>Generate Report Export</CardTitle>
+				<CardTitle>Generate AHSR Export</CardTitle>
 			</CardHeader>
 			<CardContent>
+				<p className="text-muted-foreground mb-4 text-sm">
+					Export a snapshot of Annual Hospital Statistical Report (AHSR) data for the selected
+					period. PIDSR and HAI exports are available to the Reporting Officer.
+				</p>
 				<form className="space-y-4" onSubmit={handleSubmit}>
-					<div className="space-y-1">
-						<Label>Report Type</Label>
-						<Select
-							value={reportType}
-							onValueChange={(v) => {
-								if (v) setReportType(v as "ahsr" | "pidsr" | "hai")
-							}}
-						>
-							<SelectTrigger>
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="ahsr">AHSR — Annual Hospital Statistical Report</SelectItem>
-								<SelectItem value="pidsr">PIDSR — Philippine Integrated Disease Surveillance</SelectItem>
-								<SelectItem value="hai">HAI — Healthcare-Associated Infections</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-
-					<div className="space-y-1">
-						<Label>Format</Label>
-						<Select
-							value={format}
-							onValueChange={(v) => {
-								if (v) setFormat(v as "csv" | "pdf" | "xml")
-							}}
-						>
-							<SelectTrigger>
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="csv">CSV</SelectItem>
-								<SelectItem value="pdf">PDF</SelectItem>
-								<SelectItem value="xml">XML</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-
 					<div className="grid grid-cols-2 gap-3">
 						<div className="space-y-1">
 							<Label>Year</Label>
@@ -166,43 +120,16 @@ export function ReportExport({ facilityId }: ReportExportProps) {
 						</div>
 					</div>
 
-					{(reportType === "pidsr" || reportType === "hai") && (
-						<div className="grid grid-cols-2 gap-3">
-							<div className="space-y-1">
-								<Label>Date From (optional)</Label>
-								<Input
-									type="date"
-									value={dateFrom}
-									onChange={(e) => setDateFrom(e.target.value)}
-								/>
-							</div>
-							<div className="space-y-1">
-								<Label>Date To (optional)</Label>
-								<Input
-									type="date"
-									value={dateTo}
-									onChange={(e) => setDateTo(e.target.value)}
-								/>
-							</div>
-						</div>
-					)}
-
 					<Button type="submit" className="w-full" disabled={isPending}>
-						{isPending ? "Generating…" : "Generate Export"}
+						{isPending ? "Requesting snapshot…" : "Generate AHSR Snapshot"}
 					</Button>
 				</form>
 
 				{resultMsg && (
-					<div className="mt-4 space-y-1 rounded-md border p-3 text-sm">
+					<div className="mt-4 rounded-md border p-3 text-sm space-y-1">
 						<p>{resultMsg}</p>
-						{downloadUrl && (
-							<a
-								href={downloadUrl}
-								download={fileName ?? undefined}
-								className="text-primary font-medium underline"
-							>
-								{fileName ? `Download ${fileName}` : "Download file"}
-							</a>
+						{snapshotId && (
+							<p className="text-muted-foreground text-xs">Snapshot ID: {snapshotId}</p>
 						)}
 					</div>
 				)}

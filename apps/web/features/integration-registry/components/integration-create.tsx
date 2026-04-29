@@ -10,14 +10,7 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/core/components/ui/select"
-import { Switch } from "@/core/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 import {
 	useCreateIntegrationMutation,
@@ -26,9 +19,14 @@ import {
 
 const KIND_LABELS: Record<string, string> = {
 	fhir: "FHIR",
-	civil_registry: "Civil Registry",
 	hai: "HAI",
 	philhealth: "PhilHealth",
+	erp: "ERP",
+	lis: "LIS",
+	pacs: "PACS",
+	telemedicine: "Telemedicine",
+	nhdr: "NHDR",
+	pidsr: "PIDSR",
 	custom: "Custom",
 }
 
@@ -40,8 +38,8 @@ export function IntegrationCreate() {
 	const [name, setName] = useState("")
 	const [kind, setKind] = useState<string>("")
 	const [endpointUrl, setEndpointUrl] = useState("")
+	const [webhookUrl, setWebhookUrl] = useState("")
 	const [credentialsRef, setCredentialsRef] = useState<string>("")
-	const [enabled, setEnabled] = useState(false)
 	const [notes, setNotes] = useState("")
 	const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -64,10 +62,11 @@ export function IntegrationCreate() {
 
 		const created = await createMutation.mutateAsync({
 			name: name.trim(),
-			kind: kind as "fhir" | "civil_registry" | "hai" | "philhealth" | "custom",
+			kind: kind as "fhir" | "hai" | "philhealth" | "erp" | "lis" | "pacs" | "telemedicine" | "nhdr" | "pidsr" | "custom",
 			endpointUrl: endpointUrl.trim(),
+			webhookUrl: webhookUrl.trim() || null,
 			credentialsRef: credentialsRef || null,
-			enabled,
+			enabled: false,
 			notes: notes.trim() || null,
 		})
 
@@ -124,6 +123,16 @@ export function IntegrationCreate() {
 				</div>
 
 				<div className="space-y-1.5">
+					<Label htmlFor="webhookUrl">Webhook URL <span className="text-muted-foreground">(optional)</span></Label>
+					<Input
+						id="webhookUrl"
+						value={webhookUrl}
+						onChange={e => setWebhookUrl(e.target.value)}
+						placeholder="https://your-system.example.ph/webhook"
+					/>
+				</div>
+
+				<div className="space-y-1.5">
 					<Label htmlFor="credentialsRef">Credential reference</Label>
 					<Select
 						value={credentialsRef || "__none__"}
@@ -141,13 +150,6 @@ export function IntegrationCreate() {
 							))}
 						</SelectContent>
 					</Select>
-				</div>
-
-				<div className="flex items-center gap-3">
-					<Switch id="enabled" checked={enabled} onCheckedChange={setEnabled} />
-					<Label htmlFor="enabled" className="cursor-pointer">
-						{enabled ? "Enabled" : "Disabled"}
-					</Label>
 				</div>
 
 				<div className="space-y-1.5">

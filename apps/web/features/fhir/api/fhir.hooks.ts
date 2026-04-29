@@ -273,10 +273,11 @@ export interface FhirSystemStatus {
 	nhdrEndpointNote: string
 }
 
-export function useNhdrSystemStatusQuery() {
+export function useNhdrSystemStatusQuery(facilityId: string) {
 	return useQuery<FhirSystemStatus>({
-		queryKey: ["fhir", "system-status"],
-		queryFn: () => fetchJson(API_BASE + "/system-status"),
+		queryKey: ["fhir", "system-status", facilityId],
+		queryFn: () => fetchJson(API_BASE + "/system-status" + buildQueryString({ facilityId })),
+		enabled: !!facilityId,
 	})
 }
 

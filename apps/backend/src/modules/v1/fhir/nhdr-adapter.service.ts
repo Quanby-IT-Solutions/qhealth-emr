@@ -32,17 +32,20 @@ export interface NhdrAcknowledgment {
 export class NhdrAdapterService {
 	private readonly logger = new Logger(NhdrAdapterService.name)
 
-	async submit(req: NhdrSubmissionRequest): Promise<NhdrAcknowledgment> {
+	async submit(req: NhdrSubmissionRequest, runtimeConfig?: { baseUrl?: string; apiKey?: string }): Promise<NhdrAcknowledgment> {
 		if (env.NHDR_MODE === "real") {
-			return this.submitReal(req)
+			return this.submitReal(req, runtimeConfig)
 		}
 		return this.submitMock(req)
 	}
 
-	private async submitReal(req: NhdrSubmissionRequest): Promise<NhdrAcknowledgment> {
-		const baseUrl = env.NHDR_BASE_URL
+	private async submitReal(req: NhdrSubmissionRequest, runtimeConfig?: { baseUrl?: string; apiKey?: string }): Promise<NhdrAcknowledgment> {
+		const baseUrl = runtimeConfig?.baseUrl
 		if (!baseUrl) {
-			throw new Error("NHDR_BASE_URL is not configured but NHDR_MODE=real")
+			throw new Error(
+				"NHDR submission requires a registry-configured endpoint. " +
+				"Enable an NHDR integration in Admin \u2192 Integration Registry."
+			)
 		}
 
 		const url = `${baseUrl}/submissions`
@@ -50,8 +53,9 @@ export class NhdrAdapterService {
 			"Content-Type": "application/fhir+ndjson",
 			"Accept": "application/json",
 		}
-		if (env.NHDR_API_KEY) {
-			headers["X-API-Key"] = env.NHDR_API_KEY
+		const apiKey = runtimeConfig?.apiKey
+		if (apiKey) {
+			headers["X-API-Key"] = apiKey
 		}
 
 		this.logger.log(`Submitting FHIR bundle to NHDR: exportId=${req.exportId}`)

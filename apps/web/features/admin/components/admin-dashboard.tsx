@@ -6,15 +6,12 @@ import {
 	ArrowRight01FreeIcons,
 	Building04FreeIcons,
 	ChartFreeIcons,
-	CheckmarkSquare01FreeIcons,
 	Database02FreeIcons,
 	DashboardSquare01FreeIcons,
 	FileEditFreeIcons,
 	FlagFreeIcons,
-	FlashFreeIcons,
 	Plug01FreeIcons,
 	LockFreeIcons,
-	News01FreeIcons,
 	Settings02FreeIcons,
 	UserAddFreeIcons,
 	UserCircleFreeIcons,
@@ -41,13 +38,10 @@ import type {
 	AccessGovernanceSection,
 	ArtaSlaSection,
 	AuditSummarySection,
-	DataQualitySection,
 	IntegrationHealthSection,
 	OfflineReadinessSection,
 	PlatformControlSection,
 	RecentChange,
-	StatutoryOpsSection,
-	StatutoryReadinessSection,
 } from "@repo/contracts"
 
 // ── Quick Actions ─────────────────────────────────────────────────────────────
@@ -60,7 +54,6 @@ const QUICK_ACTIONS = [
 	{ label: "System Settings", href: "/admin/settings", icon: Settings02FreeIcons },
 	{ label: "Facility Profile", href: "/admin/facility-profile", icon: Building04FreeIcons },
 	{ label: "Integration Registry", href: "/admin/integration-registry", icon: Plug01FreeIcons },
-	{ label: "HIM Operations", href: "/admin/him-ops", icon: CheckmarkSquare01FreeIcons },
 	{ label: "Audit Trail", href: "/audit", icon: FileEditFreeIcons },
 	{ label: "ARTA / SLA", href: "/admin/sla", icon: Timer02FreeIcons },
 ] as const
@@ -394,7 +387,6 @@ function AuditWidget({ data }: { data: AuditSummarySection }) {
 				<div className="flex gap-2 pt-1">
 					<Link href="/audit/break-glass" className={buttonVariants({ variant: "outline", size: "sm" })}>Break-Glass Review</Link>
 					<Link href="/audit" className={buttonVariants({ variant: "outline", size: "sm" })}>Audit Trail</Link>
-					<Link href="/admin/export-compliance" className={buttonVariants({ variant: "outline", size: "sm" })}>Export Audit</Link>
 				</div>
 			</CardContent>
 		</Card>
@@ -566,278 +558,6 @@ function OfflineReadinessWidget({ data }: { data: OfflineReadinessSection }) {
 	)
 }
 
-// ── Statutory Reporting Widget ────────────────────────────────────────────────
-
-function StatutoryReadinessWidget({ data, canViewFhir }: { data: StatutoryReadinessSection; canViewFhir: boolean }) {
-	const domains = [data.fhirNhdr, data.philhealth, data.hai, data.pidsr, data.civilRegistry]
-
-	const statusBadge = (status: StatutoryReadinessSection["fhirNhdr"]["status"]) => {
-		switch (status) {
-			case "ready":
-				return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 text-[10px] px-1">Ready</Badge>
-			case "warning":
-				return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 text-[10px] px-1">Warning</Badge>
-			case "blocked":
-				return <Badge variant="destructive" className="text-[10px] px-1">Blocked</Badge>
-			case "degraded":
-				return <Badge variant="destructive" className="text-[10px] px-1">Degraded</Badge>
-			case "not_configured":
-				return <Badge variant="outline" className="text-[10px] px-1">Not Configured</Badge>
-		}
-	}
-
-	return (
-		<Card>
-			<CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-				<HugeiconsIcon icon={Shield01FreeIcons} className="size-5 text-muted-foreground" />
-				<CardTitle className="text-sm font-medium">Statutory Reporting</CardTitle>
-				<Link href="/admin/integration-registry" className="ml-auto text-xs text-primary hover:underline">
-					Integrations →
-				</Link>
-			</CardHeader>
-			<CardContent className="space-y-2">
-				{domains.map(domain => (
-					<div key={domain.name} className="flex items-center justify-between gap-2">
-						<div className="min-w-0 flex-1">
-							<span className="text-sm truncate">{domain.name}</span>
-							{domain.detail && (
-								<p className="text-xs text-muted-foreground truncate">{domain.detail}</p>
-							)}
-						</div>
-						{statusBadge(domain.status)}
-					</div>
-				))}
-				<div className="flex gap-2 pt-1">
-					{canViewFhir && (
-						<Link
-							href="/admin/fhir"
-							className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-						>
-							FHIR Export
-						</Link>
-					)}
-					<Link
-						href="/admin/civil-registry"
-						className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-					>
-						Civil Registry
-					</Link>
-				</div>
-			</CardContent>
-		</Card>
-	)
-}
-
-// ── Statutory Operations Widget (AD-001) ──────────────────────────────────────
-
-function StatutoryOpsWidget({ data }: { data: StatutoryOpsSection }) {
-	return (
-		<Card>
-			<CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-				<HugeiconsIcon icon={News01FreeIcons} className="size-5 text-muted-foreground" />
-				<CardTitle className="text-sm font-medium">Statutory Reporting Ops</CardTitle>
-			</CardHeader>
-			<CardContent className="space-y-4">
-				{/* PIDSR */}
-				<div>
-					<p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-						PIDSR
-					</p>
-					<div className="grid grid-cols-2 gap-2">
-						<StatBlock label="Category 1" value={data.pidsr.category1Count} href="/reporting/pidsr" />
-						<StatBlock label="Category 2" value={data.pidsr.category2Count} href="/reporting/pidsr" />
-						<StatBlock
-							label="Draft"
-							value={data.pidsr.draftCount}
-							severity={data.pidsr.draftCount > 5 ? "warning" : undefined}
-							href="/reporting/pidsr"
-						/>
-						<StatBlock label="Submitted" value={data.pidsr.submittedCount} href="/reporting/pidsr" />
-					</div>
-					{data.pidsr.blockedOrRejected && (
-						<div className="mt-2 flex items-center gap-1.5 text-xs text-destructive">
-							<HugeiconsIcon icon={FlashFreeIcons} className="size-3.5" />
-							<span>One or more PIDSR reports are blocked / rejected</span>
-						</div>
-					)}
-					{data.pidsr.lastSubmittedAt && (
-						<p className="mt-1.5 text-[11px] text-muted-foreground">
-							Last submitted: {new Date(data.pidsr.lastSubmittedAt).toLocaleDateString("en-PH")}
-						</p>
-					)}
-				</div>
-
-				{/* AHSR (AD-002 + AD-003) */}
-				<div>
-					<p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-						AHSR
-					</p>
-					<div className="grid grid-cols-3 gap-2">
-						<StatBlock label="Snapshots" value={data.ahsr.snapshotCount} href="/reporting" />
-						<div className="space-y-0.5 p-1">
-							<div className="text-xs text-muted-foreground">Last snapshot</div>
-							<div className="text-sm font-medium">{data.ahsr.lastSnapshotMonth ?? "—"}</div>
-						</div>
-						<div className="space-y-0.5 p-1">
-							<div className="text-xs text-muted-foreground">This month</div>
-							<div className={cn(
-								"text-sm font-medium",
-								data.ahsr.currentMonthReady
-									? "text-green-600 dark:text-green-400"
-									: "text-muted-foreground"
-							)}>
-								{data.ahsr.currentMonthReady ? "Ready" : "Not ready"}
-							</div>
-						</div>
-					</div>
-					{/* AD-003: Current-year statutory metrics */}
-					{(data.ahsr.currentYearBor !== null || data.ahsr.currentYearGrossDeathRate !== null) && (
-						<div className="mt-2 space-y-1">
-							{data.ahsr.currentYearBor !== null && (
-								<div className="flex justify-between text-xs">
-									<span className="text-muted-foreground">Bed Occupancy Rate</span>
-									<span className="font-medium">{data.ahsr.currentYearBor.toFixed(1)}%</span>
-								</div>
-							)}
-							{data.ahsr.currentYearGrossDeathRate !== null && (
-								<div className="flex justify-between text-xs">
-									<span className="text-muted-foreground">Gross Death Rate</span>
-									<span className="font-medium">{data.ahsr.currentYearGrossDeathRate.toFixed(2)}‰</span>
-								</div>
-							)}
-							{data.ahsr.currentYearNetDeathRate !== null && (
-								<div className="flex justify-between text-xs">
-									<span className="text-muted-foreground">Net Death Rate</span>
-									<span className="font-medium">{data.ahsr.currentYearNetDeathRate.toFixed(2)}‰</span>
-								</div>
-							)}
-						</div>
-					)}
-					{data.ahsr.topMorbidities.length > 0 && (
-						<div className="mt-2">
-							<p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Top Morbidities</p>
-							<div className="space-y-0.5">
-								{data.ahsr.topMorbidities.slice(0, 5).map(item => (
-									<div key={item.icdCode} className="flex items-center justify-between text-xs">
-										<span className="text-muted-foreground truncate max-w-[130px]" title={item.diseaseName}>{item.diseaseName}</span>
-										<span className="font-medium">{item.count}</span>
-									</div>
-								))}
-							</div>
-						</div>
-					)}
-					{data.ahsr.topMortalities.length > 0 && (
-						<div className="mt-2">
-							<p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Top Mortalities</p>
-							<div className="space-y-0.5">
-								{data.ahsr.topMortalities.slice(0, 5).map(item => (
-									<div key={item.icdCode} className="flex items-center justify-between text-xs">
-										<span className="text-muted-foreground truncate max-w-[130px]" title={item.diseaseName}>{item.diseaseName}</span>
-										<span className="font-medium">{item.count}</span>
-									</div>
-								))}
-							</div>
-						</div>
-					)}
-				</div>
-
-				{/* HAI */}
-				<div>
-					<p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-						HAI Surveillance
-					</p>
-					<div className="grid grid-cols-3 gap-2">
-						<StatBlock label="Open" value={data.hai.openSurveillanceCount} />
-						<StatBlock label="Reviewed" value={data.hai.reviewedCount} />
-						<StatBlock
-							label="Pending"
-							value={data.hai.pendingCount}
-							severity={data.hai.pendingCount > 0 ? "warning" : undefined}
-						/>
-					</div>
-					{data.hai.byType.length > 0 && (
-						<div className="mt-2 space-y-1">
-							{data.hai.byType.slice(0, 3).map(t => (
-								<div key={t.type} className="flex justify-between text-xs">
-									<span className="text-muted-foreground capitalize">{t.type.replaceAll("_", " ")}</span>
-									<span className="font-medium">{t.count}</span>
-								</div>
-							))}
-						</div>
-					)}
-				</div>
-			</CardContent>
-		</Card>
-	)
-}
-
-// ── Data Quality Widget (AD-002) ──────────────────────────────────────────────
-
-function DataQualityWidget({ data }: { data: DataQualitySection }) {
-	const hasIssues = data.missingIcd10Count > 0 || data.missingRvsCount > 0 || data.cf4DraftCount > 10
-
-	return (
-		<Card>
-			<CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-				<HugeiconsIcon icon={CheckmarkSquare01FreeIcons} className="size-5 text-muted-foreground" />
-				<CardTitle className="text-sm font-medium">Clinical Data Quality</CardTitle>
-				{hasIssues && (
-					<Badge className="ml-auto text-[10px] px-1.5 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
-						Issues
-					</Badge>
-				)}
-			</CardHeader>
-			<CardContent className="space-y-3">
-				<div className="space-y-1.5 text-sm">
-					<div className="flex justify-between items-center">
-						<span className="text-muted-foreground text-xs">Missing ICD-10</span>
-						<span className={cn("font-medium text-sm", data.missingIcd10Count > 0 && "text-yellow-600 dark:text-yellow-400")}>
-							{data.missingIcd10Count}
-						</span>
-					</div>
-					<div className="flex justify-between items-center">
-						<span className="text-muted-foreground text-xs">Missing RVS code</span>
-						<span className={cn("font-medium text-sm", data.missingRvsCount > 0 && "text-yellow-600 dark:text-yellow-400")}>
-							{data.missingRvsCount}
-						</span>
-					</div>
-					<div className="flex justify-between items-center">
-						<span className="text-muted-foreground text-xs">CF4 drafts</span>
-						<span className={cn("font-medium text-sm", data.cf4DraftCount > 10 && "text-yellow-600 dark:text-yellow-400")}>
-							{data.cf4DraftCount}
-						</span>
-					</div>
-					<div className="flex justify-between items-center">
-						<span className="text-muted-foreground text-xs">CF4 submitted (this month)</span>
-						<span className="font-medium text-sm">{data.cf4SubmittedThisMonth}</span>
-					</div>
-				</div>
-
-				<div className="rounded-md bg-muted/50 p-2 space-y-1">
-					<p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">AHSR</p>
-					<div className="flex justify-between items-center text-xs">
-						<span className="text-muted-foreground">Last snapshot</span>
-						<span className="font-medium">{data.ahsrLastSnapshotMonth ?? "None"}</span>
-					</div>
-					<div className="flex justify-between items-center text-xs">
-						<span className="text-muted-foreground">Current month ready</span>
-						<span className={cn("font-medium", data.ahsrCurrentMonthReady ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
-							{data.ahsrCurrentMonthReady ? "Yes" : "No"}
-						</span>
-					</div>
-				</div>
-
-				<Link href="/admin/data-quality" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full")}>
-					Review Data Quality
-				</Link>
-				<Link href="/admin/medication-compliance" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full")}>
-					Medication Compliance
-				</Link>
-			</CardContent>
-		</Card>
-	)
-}
-
 // ── Shared sub-components ─────────────────────────────────────────────────────
 
 function StatBlock({
@@ -963,9 +683,6 @@ export function AdminDashboard() {
 				<AuditWidget data={data.audit} />
 				<ArtaSlaWidget data={data.artaSla} />
 				<OfflineReadinessWidget data={data.offlineReadiness} />
-				<StatutoryReadinessWidget data={data.statutoryReadiness} canViewFhir={canViewFhir} />
-				<StatutoryOpsWidget data={data.statutoryOps} />
-				<DataQualityWidget data={data.dataQuality} />
 			</div>
 		</div>
 	)

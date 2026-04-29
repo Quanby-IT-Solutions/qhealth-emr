@@ -52,6 +52,17 @@ export const env = createEnv({
 		NHDR_MODE: z.enum(["mock", "real"]).default("mock"),
 		NHDR_BASE_URL: z.string().url().optional(),
 		NHDR_API_KEY: z.string().optional(),
+
+		// Additional integration credential env-vars
+		FHIR_API_KEY: z.string().optional(),
+		CIVIL_REGISTRY_API_KEY: z.string().optional(),
+		HAI_API_KEY: z.string().optional(),
+		ERP_API_KEY: z.string().optional(),
+		LIS_API_KEY: z.string().optional(),
+		PACS_API_KEY: z.string().optional(),
+		TELEMEDICINE_API_KEY: z.string().optional(),
+		PIDSR_API_KEY: z.string().optional(),
+		CUSTOM_INTEGRATION_API_KEY: z.string().optional(),
 	},
 	runtimeEnv: process.env,
 	skipValidation: !!process.env.CI || process.env.npm_lifecycle_event === "lint",

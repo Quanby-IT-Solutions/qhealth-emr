@@ -54,7 +54,7 @@ export class AdminDashboardController {
 		})
 	}
 
-	@RequirePermission("admin", "view")
+	@RequirePermission("audit", "view")
 	@Implement(v1.adminDashboard.exportCompliance)
 	async exportCompliance(@Session() _session: UserSession, @Req() req: Request) {
 		return implement(v1.adminDashboard.exportCompliance).handler(async ({ input }) => {
@@ -63,7 +63,7 @@ export class AdminDashboardController {
 		})
 	}
 
-	@RequirePermission("admin", "view")
+	@RequirePermission("civil_registry", "view")
 	@Implement(v1.adminDashboard.civilRegistryOps)
 	async civilRegistryOps(@Session() _session: UserSession, @Req() req: Request) {
 		return implement(v1.adminDashboard.civilRegistryOps).handler(async () => {
@@ -72,7 +72,7 @@ export class AdminDashboardController {
 		})
 	}
 
-	@RequirePermission("admin", "view")
+	@RequirePermission("formulary", "clinical_policy")
 	@Implement(v1.adminDashboard.medicationCompliance)
 	async medicationCompliance(@Session() _session: UserSession, @Req() req: Request) {
 		return implement(v1.adminDashboard.medicationCompliance).handler(async () => {

@@ -53,6 +53,7 @@ jest.mock("@repo/db/schema", () => {
 		auditLogs: proxy(),
 		dataExports: proxy(),
 		facilities: proxy(),
+		integrations: proxy(),
 	}
 })
 
@@ -237,13 +238,20 @@ describe("FhirService — audit trails (FHIR-001)", () => {
 			submissionDate: "2024-12-01",
 		}
 
+		const NHDR_REGISTRY_ROW = {
+			endpointUrl: "https://nhdr.gov.ph/fhir",
+			credentialsRef: null,
+		}
+
 		function setupHappyPath() {
 			let selectCount = 0
 			mockDb.select.mockImplementation(() => {
 				selectCount++
 				// Call 1: getExportRow
 				if (selectCount === 1) return makeLimitBuilder([EXPORT_ROW])
-				// Call 2: staff profile lookup for submittedByStaff
+				// Call 2: Integration Registry lookup for enabled NHDR row
+				if (selectCount === 2) return makeLimitBuilder([NHDR_REGISTRY_ROW])
+				// Call 3: staff profile lookup for submittedByStaff
 				return makeLimitBuilder([STAFF_ROW])
 			})
 			nhdrAdapter.submit.mockResolvedValue(ACK)

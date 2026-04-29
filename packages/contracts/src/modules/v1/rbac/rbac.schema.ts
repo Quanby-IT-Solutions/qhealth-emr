@@ -45,6 +45,9 @@ export const RbacActionEnum = z.enum([
 	"delete",
 	"verify",
 	"export",
+	"manage_catalog",
+	"clinical_policy",
+	"terminology_admin",
 ])
 
 export const FacilityTypeEnum = z.enum(["community", "district", "tertiary"])

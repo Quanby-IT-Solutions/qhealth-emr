@@ -115,7 +115,7 @@ export const rolePermissions = createTable(
 		action: t
 			.text("action")
 			.notNull()
-			.$type<"view" | "create" | "edit" | "sign" | "delete" | "verify" | "export">(),
+			.$type<"view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "manage_catalog" | "clinical_policy" | "terminology_admin">(),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [index("role_permissions_role_id_idx").on(t.roleId), uniqueIndex("role_permissions_role_module_action_unique").on(t.roleId, t.module, t.action)]
