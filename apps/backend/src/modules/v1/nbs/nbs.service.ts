@@ -91,7 +91,7 @@ function mapLogEntryToScreening(row: {
 	waiverReason: string | null
 	referralStatus: "none" | "referred" | "completed"
 	referralFacility: string | null
-	referralDate: Date | null
+	referralDate: Date | string | null
 	referralNotes: string | null
 	screenedByStaffId: string | null
 	createdAt: Date
@@ -261,26 +261,26 @@ export class NbsService {
 		const screeningResult: NbsScreeningResultJson = {
 			...existingScreeningResult,
 			...(input.specimenBarcode ? { sampleId: input.specimenBarcode } : {}),
-			...(input.specimenType ? { testType: input.specimenType } : {}),
+			...(input.specimenType ? { testType: (input.specimenType === "heel_prick" || input.specimenType === "cord_blood") ? input.specimenType : undefined } : {}),
 			conditions: [
 				...(existingScreeningResult.conditions ?? []),
 				...(input.result_ch
-					? [{ condition: "CH", result: input.result_ch === "positive" ? "abnormal" : "normal" }]
+					? [{ condition: "CH", result: (input.result_ch === "positive" ? "abnormal" : "normal") as "normal" | "abnormal" }]
 					: []),
 				...(input.result_cah
-					? [{ condition: "CAH", result: input.result_cah === "positive" ? "abnormal" : "normal" }]
+					? [{ condition: "CAH", result: (input.result_cah === "positive" ? "abnormal" : "normal") as "normal" | "abnormal" }]
 					: []),
 				...(input.result_g6pd
-					? [{ condition: "G6PD", result: input.result_g6pd === "positive" ? "abnormal" : "normal" }]
+					? [{ condition: "G6PD", result: (input.result_g6pd === "positive" ? "abnormal" : "normal") as "normal" | "abnormal" }]
 					: []),
 				...(input.result_gal
-					? [{ condition: "GAL", result: input.result_gal === "positive" ? "abnormal" : "normal" }]
+					? [{ condition: "GAL", result: (input.result_gal === "positive" ? "abnormal" : "normal") as "normal" | "abnormal" }]
 					: []),
 				...(input.result_pku
-					? [{ condition: "PKU", result: input.result_pku === "positive" ? "abnormal" : "normal" }]
+					? [{ condition: "PKU", result: (input.result_pku === "positive" ? "abnormal" : "normal") as "normal" | "abnormal" }]
 					: []),
 				...(input.result_msud
-					? [{ condition: "MSUD", result: input.result_msud === "positive" ? "abnormal" : "normal" }]
+					? [{ condition: "MSUD", result: (input.result_msud === "positive" ? "abnormal" : "normal") as "normal" | "abnormal" }]
 					: []),
 			],
 		}
@@ -595,7 +595,7 @@ export class NbsService {
 			referralStatus: createdReferral.referralStatus,
 			acceptedAt: null,
 			completedAt: null,
-			referralNotes: createdReferral.referralNotes,
+			referralNotes: createdReferral.referralNotes ?? null,
 			performedBy: createdReferral.performedBy,
 			performedByName: createdReferral.performedByName,
 			createdAt: new Date(createdReferral.createdAt),
@@ -769,16 +769,16 @@ export class NbsService {
 			const middle = row.middleName ? ` ${row.middleName}` : ""
 			return {
 				id: row.id,
-				encounterId: row.encounterId,
+				encounterId: row.encounterId!,
 				patientId: row.patientId,
 				patientName: `${row.firstName}${middle} ${row.lastName}`.trim(),
 				patientMrn: row.mrn,
-				birthDatetime: row.birthDatetime.toISOString(),
-				specimenCollectedAt: row.screeningDatetime ? row.screeningDatetime.toISOString() : null,
+				birthDatetime: row.birthDatetime,
+				specimenCollectedAt: row.screeningDatetime,
 				status: statusMap[row.status] ?? "pending",
 				result_overall: resultOverall,
 				facilityId: row.facilityId,
-				createdAt: row.createdAt.toISOString(),
+				createdAt: row.createdAt,
 			}
 		})
 
