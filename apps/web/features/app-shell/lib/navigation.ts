@@ -215,7 +215,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		],
 	},
 	{
-		title: "Blood Bank",
+		title: "Blood Bank Approval",
 		href: "/laboratory/blood-bank",
 		iconName: "blood-bank",
 		requiredPermissions: [

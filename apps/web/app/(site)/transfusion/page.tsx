@@ -7,6 +7,17 @@ import { Button } from "@/core/components/ui/button"
 import { Input } from "@/core/components/ui/input"
 import { Textarea } from "@/core/components/ui/textarea"
 import { Scan, User, Droplet, FileText, CheckCircle2 } from "lucide-react"
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/core/components/ui/dialog"
+import { Label } from "@/core/components/ui/label"
+import { toast } from "sonner"
 
 function usePermissionSet() {
     const { data: profile } = useMyProfile()
@@ -20,6 +31,13 @@ function can(permSet: Set<string>, module: string, action: string) {
 
 export default function TransfusionPage() {
     const permSet = usePermissionSet()
+    const [modalOpen, setModalOpen] = useState(false)
+    const [witness, setWitness] = useState("")
+    const [bp, setBp] = useState("")
+    const [hr, setHr] = useState("")
+    const [temp, setTemp] = useState("")
+    const [reactions, setReactions] = useState("")
+    const [showErrors, setShowErrors] = useState(false)
 
     const [scanned, setScanned] = useState({
         wristband: false,
@@ -38,6 +56,28 @@ export default function TransfusionPage() {
 
     const toggleScan = (key: keyof typeof scanned) => {
         setScanned(prev => ({ ...prev, [key]: !prev[key] }))
+    }
+
+    function handleStartTransfusion() {
+        if (!witness.trim() || !bp.trim() || !hr.trim() || !temp.trim()) {
+            setShowErrors(true)
+            toast.error("Please complete all documentation fields before starting transfusion")
+            return
+        }
+        setShowErrors(false)
+        setModalOpen(true)
+    }
+
+    function handleConfirmStart() {
+        toast.success("Transfusion started successfully")
+        setModalOpen(false)
+        setScanned({ wristband: false, bloodProduct: false, cpoe: false })
+        setWitness("")
+        setBp("")
+        setHr("")
+        setTemp("")
+        setReactions("")
+        setShowErrors(false)
     }
 
     if (!can(permSet, "laboratory", "view")) {
@@ -108,7 +148,7 @@ export default function TransfusionPage() {
                                 </div>
                                 {!scanned.wristband && (
                                     <div className="text-xs text-muted-foreground/50 font-mono tracking-wide uppercase">
-                                        Tap
+                                        Upload
                                     </div>
                                 )}
                             </div>
@@ -142,7 +182,7 @@ export default function TransfusionPage() {
                                 </div>
                                 {!scanned.bloodProduct && (
                                     <div className="text-xs text-muted-foreground/50 font-mono tracking-wide uppercase">
-                                        Tap
+                                        Upload
                                     </div>
                                 )}
                             </div>
@@ -176,7 +216,7 @@ export default function TransfusionPage() {
                                 </div>
                                 {!scanned.cpoe && (
                                     <div className="text-xs text-muted-foreground/50 font-mono tracking-wide uppercase">
-                                        Tap
+                                        Upload
                                     </div>
                                 )}
                             </div>
@@ -189,6 +229,7 @@ export default function TransfusionPage() {
                             </div>
                             <Button
                                 disabled={!allDone}
+                                onClick={handleStartTransfusion}
                                 className={`transition-all duration-200 font-medium px-5 py-2 rounded-md
                                     ${allDone
                                         ? "bg-green-600 hover:bg-green-500 active:scale-95 text-white shadow-md hover:shadow-green-500/30 cursor-pointer"
@@ -214,26 +255,125 @@ export default function TransfusionPage() {
                                 <label className="text-xs text-muted-foreground block mb-1">
                                     Witness
                                 </label>
-                                <Input placeholder="Second nurse name" />
+                                <Input 
+                                    placeholder="Second nurse name" 
+                                    value={witness} 
+                                    onChange={e => setWitness(e.target.value)} 
+                                    className={showErrors && !witness.trim() ? "border-red-500" : ""}
+                                />
                             </div>
 
                             <div className="grid grid-cols-3 gap-2">
-                                <Input placeholder="BP" />
-                                <Input placeholder="HR" />
-                                <Input placeholder="Temp" />
+                                <Input 
+                                    placeholder="BP" 
+                                    value={bp} 
+                                    onChange={e => setBp(e.target.value)} 
+                                    className={showErrors && !bp.trim() ? "border-red-500" : ""}
+                                />
+                                <Input 
+                                    placeholder="HR" 
+                                    value={hr} 
+                                    onChange={e => setHr(e.target.value)} 
+                                    className={showErrors && !hr.trim() ? "border-red-500" : ""}
+                                />
+                                <Input 
+                                    placeholder="Temp" 
+                                    value={temp} 
+                                    onChange={e => setTemp(e.target.value)} 
+                                    className={showErrors && !temp.trim() ? "border-red-500" : ""}
+                                />
                             </div>
 
                             <div>
                                 <label className="text-xs text-muted-foreground block mb-1">
                                     Reactions
                                 </label>
-                                <Textarea placeholder="None observed..." />
+                                <Textarea placeholder="None observed..." value={reactions} onChange={e => setReactions(e.target.value)} />
                             </div>
 
                         </CardContent>
                     </Card>
                 </div>
             </div>
+
+            <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+                <DialogContent className="max-w-lg p-0 gap-0 max-h-[85vh] flex flex-col overflow-hidden">
+                    <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
+                        <DialogTitle>Start Transfusion</DialogTitle>
+                        <DialogDescription>
+                            Confirm all verification steps and documentation before starting transfusion.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 px-6 overflow-y-auto flex-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                        <style jsx>{`
+                            div::-webkit-scrollbar {
+                                display: none;
+                            }
+                        `}</style>
+                        <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                            <div className="font-medium mb-2">Patient Information</div>
+                            <div className="space-y-1 text-xs text-muted-foreground">
+                                <p>Name: Yusuf Mansour</p>
+                                <p>MRN: 551003</p>
+                                <p>Blood Group: A+</p>
+                                <p>Location: Surg-2, Bed 8</p>
+                            </div>
+                        </div>
+
+                        <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                            <div className="font-medium mb-2">Verification Status</div>
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2 text-xs">
+                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                    <span>Patient wristband scanned</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs">
+                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                    <span>Blood product unit scanned</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs">
+                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                    <span>CPOE order scanned</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <Label className="mb-2 text-xs text-muted-foreground">Witness Nurse</Label>
+                            <Input value={witness} readOnly />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                            <div>
+                                <Label className="mb-2 text-xs text-muted-foreground">BP</Label>
+                                <Input value={bp} readOnly />
+                            </div>
+                            <div>
+                                <Label className="mb-2 text-xs text-muted-foreground">HR</Label>
+                                <Input value={hr} readOnly />
+                            </div>
+                            <div>
+                                <Label className="mb-2 text-xs text-muted-foreground">Temp</Label>
+                                <Input value={temp} readOnly />
+                            </div>
+                        </div>
+
+                        <div className="pb-4">
+                            <Label className="mb-2 text-xs text-muted-foreground">Reactions</Label>
+                            <Textarea value={reactions} readOnly className="min-h-20" />
+                        </div>
+                    </div>
+
+                    <DialogFooter className="px-6 py-2 mb-0 border-t bg-background flex-shrink-0">
+                        <DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
+                        <Button onClick={handleConfirmStart} className="bg-green-600 hover:bg-green-700">
+                            <CheckCircle2 className="mr-2 size-4" />
+                            Confirm & Start
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

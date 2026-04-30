@@ -61,7 +61,7 @@ export default function ProcedureLoggingPage() {
                                 <DialogTitle>Patient Barcode Scan</DialogTitle>
                             </DialogHeader>
 
-                            <div className="p-4">
+                            <div className="p-1">
                                 <div className="rounded-md border-2 border-dashed border-border h-36 flex items-center justify-center mb-4">
                                     <div className="text-muted-foreground text-sm">Awaiting scan…</div>
                                 </div>

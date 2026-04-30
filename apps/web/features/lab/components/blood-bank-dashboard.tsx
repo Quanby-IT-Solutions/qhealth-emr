@@ -1,22 +1,328 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, type ReactElement } from "react"
 
-import { CheckCircle2, Droplets, Package, ShieldAlert } from "lucide-react"
+import { CheckCircle2, Droplets, Package, ShieldAlert, XCircle } from "lucide-react"
+import { toast } from "sonner"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/core/components/ui/dialog"
+import { Input } from "@/core/components/ui/input"
+import { Label } from "@/core/components/ui/label"
 import { Progress } from "@/core/components/ui/progress"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
+import { Separator } from "@/core/components/ui/separator"
+import { Textarea } from "@/core/components/ui/textarea"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { type CrossMatchRequest, useCrossMatchListQuery } from "@/features/lab/api/lab.hooks"
+import {
+	type CrossMatchRequest,
+	useApproveCrossMatchMutation,
+	useCrossMatchListQuery,
+} from "@/features/lab/api/lab.hooks"
+import { env } from "@/env"
 
 function requestStatusBadge(status: CrossMatchRequest["status"]) {
 	if (status === "approved") {
 		return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Approved</Badge>
 	}
+	if (status === "cross_matched") {
+		return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Cross-matched</Badge>
+	}
 	return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Pending approval</Badge>
 }
+
+type BloodBankActionModalProps = {
+	request: CrossMatchRequest
+	action: "approve" | "reject"
+	children: ReactElement
+}
+
+const actionModalCopy = {
+	approve: {
+		title: "Approve & cross-match",
+		description: "Review compatibility details, assigned products, and release readiness.",
+		confirmLabel: "Approve cross-match",
+	},
+	reject: {
+		title: "Reject cross-match request",
+		description: "Record why this blood product request cannot be approved.",
+		confirmLabel: "Reject request",
+	},
+} satisfies Record<
+	BloodBankActionModalProps["action"],
+	{
+		title: string
+		description: string
+		confirmLabel: string
+	}
+>
+
+const resolutionLabels = {
+	routine: "Routine release",
+	urgent: "Urgent release",
+	emergency: "Emergency release",
+	compatibility_failed: "Compatibility failed",
+	specimen_issue: "Specimen issue",
+	insufficient_stock: "Insufficient compatible stock",
+	cancelled_by_clinician: "Cancelled by clinician",
+} satisfies Record<string, string>
+
+function formatDateTime(value: string | null | undefined) {
+	if (!value) return "N/A"
+	return new Date(value).toLocaleString("en-PH", {
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	})
+}
+
+function BloodBankActionModal({ request, action, children }: BloodBankActionModalProps) {
+	const [open, setOpen] = useState(false)
+	const [compatibilityResult, setCompatibilityResult] = useState<"compatible" | "incompatible">(
+		action === "approve" ? "compatible" : "incompatible",
+	)
+	const [resolution, setResolution] = useState(
+		action === "approve" ? "routine" : "compatibility_failed",
+	)
+	const [notes, setNotes] = useState(
+		action === "approve"
+			? `${request.componentType} cross-match reviewed for ${request.patientName}. Units verified and ready for issue.`
+			: `Cross-match request for ${request.patientName} rejected pending correction or clinical review.`,
+	)
+	const approveCrossMatch = useApproveCrossMatchMutation()
+	const copy = actionModalCopy[action]
+	const unitBarcodes = request.bloodUnits.map(unit => unit.unitBarcode).join(", ")
+	const isMockRequest = request.id.startsWith("mock-")
+
+	function handleConfirm() {
+		if (isMockRequest) {
+			toast.success(action === "approve" ? "Cross-match approved." : "Cross-match request rejected.")
+			setOpen(false)
+			return
+		}
+
+		approveCrossMatch.mutate(
+			{
+				id: request.id,
+				compatibilityResult,
+				bloodUnitIds:
+					compatibilityResult === "compatible" ? request.bloodUnits.map(unit => unit.id) : [],
+			},
+			{
+				onSuccess: () => {
+					toast.success(action === "approve" ? "Cross-match approved." : "Cross-match request rejected.")
+					setOpen(false)
+				},
+				onError: () => {
+					toast.error("Unable to save blood bank action.")
+				},
+			},
+		)
+	}
+
+	return (
+		<Dialog open={open} onOpenChange={setOpen}>
+			<DialogTrigger render={children} />
+			<DialogContent className="max-w-xl p-0 gap-0 max-h-[90vh] flex flex-col overflow-hidden">
+				<DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
+					<DialogTitle>{copy.title}</DialogTitle>
+					<DialogDescription>{copy.description}</DialogDescription>
+				</DialogHeader>
+
+				<div className="space-y-4 px-6 overflow-y-auto flex-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+					<style jsx>{`
+						div::-webkit-scrollbar {
+							display: none;
+						}
+					`}</style>
+					<div className="rounded-md border bg-muted/30 p-3 text-sm">
+						<div className="flex items-start justify-between gap-3">
+							<div>
+								<p className="font-medium">{request.patientName}</p>
+								<p className="text-xs text-muted-foreground">
+									MRN {request.patientId.slice(0, 8).toUpperCase()} &middot; Requested{" "}
+									{formatDateTime(request.requestedAt)}
+								</p>
+							</div>
+							{requestStatusBadge(request.status)}
+						</div>
+						<Separator className="my-3" />
+						<div className="grid gap-2 sm:grid-cols-2">
+							<div>
+								<p className="text-xs text-muted-foreground">Blood type</p>
+								<p className="font-medium text-blue-700">{request.bloodType ?? "Unknown"}</p>
+							</div>
+							<div>
+								<p className="text-xs text-muted-foreground">Component</p>
+								<p>{request.componentType}</p>
+							</div>
+							<div>
+								<p className="text-xs text-muted-foreground">Units requested</p>
+								<p>{request.unitsRequested}</p>
+							</div>
+							<div>
+								<p className="text-xs text-muted-foreground">Urgency</p>
+								<p className="capitalize">{request.urgency}</p>
+							</div>
+						</div>
+						{request.clinicalIndication ? (
+							<p className="mt-3 text-xs text-muted-foreground">
+								Indication: {request.clinicalIndication}
+							</p>
+						) : null}
+					</div>
+
+					<div className="grid gap-4 sm:grid-cols-2">
+						<div>
+							<Label className="mb-2 text-xs text-muted-foreground">Compatibility result</Label>
+							<Input value={compatibilityResult === "compatible" ? "Compatible" : "Incompatible"} readOnly />
+						</div>
+						<div>
+							<Label className="mb-2 text-xs text-muted-foreground">
+								{action === "approve" ? "Release priority" : "Rejection reason"}
+							</Label>
+							<Input value={resolutionLabels[resolution]} readOnly />
+						</div>
+					</div>
+
+					<div>
+						<Label className="mb-2 text-xs text-muted-foreground">Assigned unit barcodes</Label>
+						<Input value={unitBarcodes || "No units assigned"} readOnly />
+					</div>
+
+					<div className="pb-4">
+						<Label className="mb-2 text-xs text-muted-foreground">
+							{action === "approve" ? "Cross-match notes" : "Rejection notes"}
+						</Label>
+						<Textarea
+							value={notes}
+							readOnly
+							className="min-h-24"
+						/>
+					</div>
+				</div>
+
+				<DialogFooter className="px-6 py-4 -mb-2 pt-2 border-t bg-background flex-shrink-0">
+					<DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
+					<Button
+						disabled={approveCrossMatch.isPending}
+						onClick={handleConfirm}
+						className={
+							action === "reject"
+								? "bg-rose-600 text-white hover:bg-rose-700"
+								: "bg-emerald-600 text-white hover:bg-emerald-700"
+						}
+					>
+						{action === "approve" ? (
+							<CheckCircle2 className="mr-2 size-4" />
+						) : (
+							<XCircle className="mr-2 size-4" />
+						)}
+						{approveCrossMatch.isPending ? "Saving..." : copy.confirmLabel}
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	)
+}
+
+// Mock cross-match requests for local development
+const MOCK_CROSSMATCH_REQUESTS: CrossMatchRequest[] = [
+	{
+		id: "mock-cm-1",
+		facilityId: "mock-facility",
+		patientName: "Garcia, Maria",
+		patientId: "MRN000001",
+		bloodType: "O-",
+		componentType: "RBC",
+		unitsRequested: 1,
+		urgency: "routine",
+		clinicalIndication: "Pre-op",
+		compatibilityResult: null,
+		status: "pending",
+		requestedBy: "nurse-1",
+		requestedAt: new Date().toISOString(),
+		crossMatchedBy: null,
+		crossMatchedAt: null,
+		approvedBy: null,
+		approvedAt: null,
+		issuedBy: null,
+		issuedAt: null,
+		bloodUnits: [
+			{ id: "unit-1", unitBarcode: "U-1", bloodType: "O-", componentType: "RBC", expiryDate: new Date(Date.now() + 7 * 86400000).toISOString(), status: "available", donorId: null },
+		],
+		createdAt: new Date().toISOString(),
+	},
+	{
+		id: "mock-cm-2",
+		facilityId: "mock-facility",
+		patientName: "Reyes, Juan",
+		patientId: "MRN000002",
+		bloodType: "A+",
+		componentType: "RBC",
+		unitsRequested: 2,
+		urgency: "urgent",
+		clinicalIndication: "Trauma",
+		compatibilityResult: null,
+		status: "cross_matched",
+		requestedBy: "nurse-2",
+		requestedAt: new Date().toISOString(),
+		crossMatchedBy: "lab-1",
+		crossMatchedAt: new Date().toISOString(),
+		approvedBy: null,
+		approvedAt: null,
+		issuedBy: null,
+		issuedAt: null,
+		bloodUnits: [
+			{ id: "unit-2", unitBarcode: "U-2", bloodType: "A+", componentType: "RBC", expiryDate: new Date(Date.now() + 5 * 86400000).toISOString(), status: "available", donorId: null },
+			{ id: "unit-3", unitBarcode: "U-3", bloodType: "A+", componentType: "RBC", expiryDate: new Date(Date.now() + 5 * 86400000).toISOString(), status: "available", donorId: null },
+		],
+		createdAt: new Date().toISOString(),
+	},
+	{
+		id: "mock-cm-3",
+		facilityId: "mock-facility",
+		patientName: "Dela Cruz, Ana",
+		patientId: "MRN000003",
+		bloodType: "O+",
+		componentType: "Platelets",
+		unitsRequested: 1,
+		urgency: "routine",
+		clinicalIndication: "Postpartum",
+		compatibilityResult: "compatible",
+		status: "approved",
+		requestedBy: "nurse-3",
+		requestedAt: new Date().toISOString(),
+		crossMatchedBy: "lab-2",
+		crossMatchedAt: new Date().toISOString(),
+		approvedBy: "transfusion-officer",
+		approvedAt: new Date().toISOString(),
+		issuedBy: null,
+		issuedAt: new Date().toISOString(),
+		bloodUnits: [
+			{ id: "unit-4", unitBarcode: "U-4", bloodType: "O+", componentType: "Platelets", expiryDate: new Date(Date.now() + 3 * 86400000).toISOString(), status: "available", donorId: null },
+		],
+		createdAt: new Date().toISOString(),
+	},
+]
 
 const bloodTypes = ["O-", "O+", "A+", "A-", "B+", "AB+"] as const
 
@@ -28,10 +334,20 @@ export function BloodBankDashboard() {
 	const crossMatchedQuery = useCrossMatchListQuery({ facilityId, status: "cross_matched", limit: 50 })
 	const approvedQuery = useCrossMatchListQuery({ facilityId, status: "approved", limit: 50 })
 
-	const requests = useMemo(
-		() => [...(pendingQuery.data?.data ?? []), ...(crossMatchedQuery.data?.data ?? []), ...(approvedQuery.data?.data ?? [])],
-		[pendingQuery.data?.data, crossMatchedQuery.data?.data, approvedQuery.data?.data]
+	const queryRequests = useMemo(
+		() => [
+			...(pendingQuery.data?.data ?? []),
+			...(crossMatchedQuery.data?.data ?? []),
+			...(approvedQuery.data?.data ?? []),
+		],
+		[pendingQuery.data?.data, crossMatchedQuery.data?.data, approvedQuery.data?.data],
 	)
+
+	// Use mock requests during development when API returns none
+	const requests =
+		queryRequests.length === 0 && env.NODE_ENV === "development"
+			? MOCK_CROSSMATCH_REQUESTS
+			: queryRequests
 
 	const pendingApprovals = (pendingQuery.data?.total ?? 0) + (crossMatchedQuery.data?.total ?? 0)
 	const issuedToday = approvedQuery.data?.data.filter(req => {
@@ -120,11 +436,17 @@ export function BloodBankDashboard() {
 									</div>
 								</div>
 								<div className="mt-3 flex flex-wrap gap-2">
-									<Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
-										<CheckCircle2 className="mr-1 size-3.5" />
-										Approve & cross-match
-									</Button>
-									<Button size="sm" variant="outline">Reject</Button>
+									<BloodBankActionModal request={req} action="approve">
+										<Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+											<CheckCircle2 className="mr-1 size-3.5" />
+											Approve & cross-match
+										</Button>
+									</BloodBankActionModal>
+									<BloodBankActionModal request={req} action="reject">
+										<Button size="sm" variant="outline">
+											Reject
+										</Button>
+									</BloodBankActionModal>
 								</div>
 							</div>
 						))}

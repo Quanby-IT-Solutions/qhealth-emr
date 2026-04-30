@@ -64,7 +64,7 @@ export function AppSidebar() {
 						<SidebarMenu>
 							{primaryItems.map(item => {
 								const Icon = NAV_ICONS[item.iconName]
-								const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+								const isActive = pathname === item.href
 								return (
 									<SidebarMenuItem key={`primary-${item.href}`}>
 										<SidebarMenuButton isActive={isActive} tooltip={item.title}>
@@ -99,7 +99,7 @@ export function AppSidebar() {
 										<SidebarMenu>
 											{secondaryItems.map(item => {
 												const Icon = NAV_ICONS[item.iconName]
-												const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+												const isActive = pathname === item.href
 												return (
 													<SidebarMenuItem key={`secondary-${item.href}`}>
 														<SidebarMenuButton isActive={isActive} tooltip={item.title}>

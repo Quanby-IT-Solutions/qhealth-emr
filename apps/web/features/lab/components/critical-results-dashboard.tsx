@@ -1,17 +1,165 @@
 "use client"
 
-import { useMemo } from "react"
-
+import { useMemo, type ReactElement } from "react"
 import { Bell, PhoneCall, Send, Siren, TriangleAlert } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/core/components/ui/dialog"
+import { Input } from "@/core/components/ui/input"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
+import { Textarea } from "@/core/components/ui/textarea"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { useLabDashboardQuery } from "@/features/lab/api/lab.hooks"
+import { useLabDashboardQuery, type LabOrder } from "@/features/lab/api/lab.hooks"
+import { env } from "@/env"
+
+// Mock orders for local development
+const MOCK_ORDERS: LabOrder[] = [
+	{
+		id: "mock-cr-1",
+		facilityId: "mock-facility",
+		encounterId: "enc001",
+		preEncounterId: null,
+		patientId: "MRN000001",
+		patientName: "Garcia, Maria",
+		loincCode: null,
+		panelCode: null,
+		testName: "Potassium",
+		panelName: "Chemistry",
+		priority: "routine",
+		status: "completed",
+		specimenType: null,
+		orderingStaffId: "",
+		orderingStaffName: "Dr. Santos",
+		collectionDatetime: new Date().toISOString(),
+		resultedDatetime: new Date().toISOString(),
+		results: {
+			items: [
+				{
+					testName: "K+",
+					value: "7.2",
+					unit: "mmol/L",
+					referenceRange: "3.5-5.1",
+					flag: "C",
+					isCritical: true,
+					isAbnormal: true,
+				},
+			],
+			reportedBy: null,
+			reportedAt: null,
+			comments: null,
+		},
+		hasCriticalValues: true,
+		createdAt: new Date().toISOString(),
+		updatedAt: new Date().toISOString(),
+	},
+	{
+		id: "mock-cr-2",
+		facilityId: "mock-facility",
+		encounterId: "enc002",
+		preEncounterId: null,
+		patientId: "MRN000002",
+		patientName: "Reyes, Juan",
+		loincCode: null,
+		panelCode: null,
+		testName: "Hemoglobin",
+		panelName: "Hematology",
+		priority: "routine",
+		status: "completed",
+		specimenType: null,
+		orderingStaffId: "",
+		orderingStaffName: "Dr. Lee",
+		collectionDatetime: new Date().toISOString(),
+		resultedDatetime: new Date().toISOString(),
+		results: {
+			items: [
+				{
+					testName: "Hgb",
+					value: "6.1",
+					unit: "g/dL",
+					referenceRange: "13.5-17.5",
+					flag: "C",
+					isCritical: true,
+					isAbnormal: true,
+				},
+			],
+			reportedBy: null,
+			reportedAt: null,
+			comments: null,
+		},
+		hasCriticalValues: true,
+		createdAt: new Date().toISOString(),
+		updatedAt: new Date().toISOString(),
+	},
+]
 
 type QueueStatus = "pending_ack" | "sms_escalated" | "acknowledged"
+
+type CriticalQueueItem = {
+	id: string
+	patientName: string
+	mrn: string
+	ward: string
+	doctor: string
+	testName: string | null
+	value: string
+	unit: string
+	reference: string
+	status: QueueStatus
+	elapsedMinutes: number
+}
+
+type CriticalActionModalProps = {
+	item: CriticalQueueItem
+	action: "inbox" | "call" | "re-escalate"
+	children: ReactElement
+}
+
+const actionModalCopy = {
+	"inbox": {
+		title: "Send inbox message",
+		description: "Send a critical result notification to the ordering physician inbox.",
+		confirmLabel: "Send message",
+		channel: "Physician inbox",
+	},
+	"call": {
+		title: "Call physician",
+		description: "Document a direct phone call for this critical result.",
+		confirmLabel: "Log call",
+		channel: "Phone call",
+	},
+	"re-escalate": {
+		title: "Re-escalate critical result",
+		description: "Escalate this result again when acknowledgement is delayed.",
+		confirmLabel: "Re-escalate",
+		channel: "Inbox + SMS + call queue",
+	},
+} satisfies Record<
+	CriticalActionModalProps["action"],
+	{
+		title: string
+		description: string
+		confirmLabel: string
+		channel: string
+	}
+>
 
 function statusBadge(status: QueueStatus) {
 	switch (status) {
@@ -20,8 +168,128 @@ function statusBadge(status: QueueStatus) {
 		case "sms_escalated":
 			return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">SMS escalated</Badge>
 		default:
-			return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Acknowledged</Badge>
+			return (
+				<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Acknowledged</Badge>
+			)
 	}
+}
+
+function CriticalActionModal({ item, action, children }: CriticalActionModalProps) {
+	const copy = actionModalCopy[action]
+	const resultText =
+		`${item.testName ?? "Critical result"}: ${String(item.value)} ${item.unit}`.trim()
+	const message =
+		action === "call"
+			? `Called ${item.doctor} regarding ${resultText} for ${item.patientName}.`
+			: `Critical result for ${item.patientName} (${item.mrn}): ${resultText}. Ref ${item.reference}. Please acknowledge.`
+
+	return (
+		<Dialog>
+			<DialogTrigger render={children} />
+			<DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+				<DialogHeader className="flex-shrink-0">
+					<DialogTitle>{copy.title}</DialogTitle>
+					<DialogDescription>{copy.description}</DialogDescription>
+				</DialogHeader>
+
+				<div className="space-y-4 overflow-y-auto flex-1 -mr-4 pr-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+					<div className="bg-muted/30 rounded-md border p-3 text-sm">
+						<div className="flex items-start justify-between gap-3">
+							<div>
+								<p className="font-medium">{item.patientName}</p>
+								<p className="text-muted-foreground text-xs">
+									MRN {item.mrn} &middot; {item.ward}
+								</p>
+							</div>
+							{statusBadge(item.status)}
+						</div>
+						<Separator className="my-3" />
+						<div className="grid gap-2 sm:grid-cols-2">
+							<div>
+								<p className="text-muted-foreground text-xs">Result</p>
+								<p className="font-medium text-rose-700">{resultText}</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground text-xs">Reference</p>
+								<p>{item.reference}</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground text-xs">Physician</p>
+								<p>{item.doctor}</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground text-xs">Channel</p>
+								<p>{copy.channel}</p>
+							</div>
+						</div>
+					</div>
+
+					<div className="grid gap-4 sm:grid-cols-2">
+						<div>
+							<label className="text-muted-foreground text-xs">
+								{action === "call" ? "Call outcome" : "Priority"}
+							</label>
+							<Select>
+								<SelectTrigger className="w-full">
+									<SelectValue>{action === "call" ? "Reached physician" : "STAT"}</SelectValue>
+								</SelectTrigger>
+								<SelectContent>
+									{action === "call" ? (
+										<>
+											<SelectItem value="reached">Reached physician</SelectItem>
+											<SelectItem value="voicemail">Left voicemail</SelectItem>
+											<SelectItem value="no_answer">No answer</SelectItem>
+										</>
+									) : (
+										<>
+											<SelectItem value="stat">STAT</SelectItem>
+											<SelectItem value="urgent">Urgent</SelectItem>
+											<SelectItem value="routine">Routine</SelectItem>
+										</>
+									)}
+								</SelectContent>
+							</Select>
+						</div>
+						<div>
+							<label className="text-muted-foreground text-xs">Follow-up in</label>
+							<Select>
+								<SelectTrigger className="w-full">
+									<SelectValue>10 minutes</SelectValue>
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="5">5 minutes</SelectItem>
+									<SelectItem value="10">10 minutes</SelectItem>
+									<SelectItem value="15">15 minutes</SelectItem>
+									<SelectItem value="30">30 minutes</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+					</div>
+
+					<div>
+						<label className="text-muted-foreground text-xs">
+							{action === "call" ? "Call notes" : "Message"}
+						</label>
+						<Textarea defaultValue={message} className="min-h-28" />
+					</div>
+				</div>
+
+				<DialogFooter className="flex-shrink-0 pt-2">
+					<DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
+					<Button
+						className={action === "re-escalate" ? "bg-rose-600 text-white hover:bg-rose-700" : ""}
+					>
+						{action === "call" ? (
+							<PhoneCall className="mr-2 size-4" />
+						) : (
+							<Send className="mr-2 size-4" />
+						)}
+						{copy.confirmLabel}
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	)
 }
 
 export function CriticalResultsDashboard() {
@@ -39,12 +307,20 @@ export function CriticalResultsDashboard() {
 		limit: 50,
 	})
 
-	const criticalQueue = useMemo(() => {
-		const candidates = [...(completedQuery.data?.data ?? []), ...(inProgressQuery.data?.data ?? [])]
-			.filter(order => order.hasCriticalValues)
-			.slice(0, 6)
+	const criticalQueue = useMemo<CriticalQueueItem[]>(() => {
+		let candidates: LabOrder[] = [
+			...(completedQuery.data?.data ?? []),
+			...(inProgressQuery.data?.data ?? []),
+		]
 
-		return candidates.map((order, index) => {
+		// Fallback to mock orders in development when API returns none
+		if (candidates.length === 0 && env.NODE_ENV === "development") {
+			candidates = MOCK_ORDERS
+		}
+
+		candidates = candidates.filter(order => order.hasCriticalValues).slice(0, 6)
+
+		return candidates.map((order: LabOrder, index: number) => {
 			const queueStatus: QueueStatus =
 				index % 3 === 0 ? "pending_ack" : index % 3 === 1 ? "sms_escalated" : "acknowledged"
 			const minutes = index === 0 ? 2 : index === 1 ? 8 : 14 + index
@@ -55,7 +331,7 @@ export function CriticalResultsDashboard() {
 				ward: order.encounterId ? `Ward-${order.encounterId.slice(0, 3).toUpperCase()}` : "N/A",
 				doctor: order.orderingStaffName ?? "Attending physician",
 				testName: order.panelName ?? order.testName,
-				value: order.results?.items.find(item => item.isCritical)?.value ?? "—",
+				value: String(order.results?.items.find(item => item.isCritical)?.value ?? "—"),
 				unit: order.results?.items.find(item => item.isCritical)?.unit ?? "",
 				reference: order.results?.items.find(item => item.isCritical)?.referenceRange ?? "N/A",
 				status: queueStatus,
@@ -83,20 +359,138 @@ export function CriticalResultsDashboard() {
 			<div className="flex items-start justify-between gap-3">
 				<div>
 					<h1 className="text-2xl font-semibold">Critical Result Flagging</h1>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Life-threatening values routed directly to the ordering physician
 					</p>
 				</div>
-				<Button size="sm" className="gap-2">
-					<TriangleAlert className="size-4" />
-					Flag new critical
-				</Button>
+				<Dialog>
+					<DialogTrigger>
+						<Button size="sm" className="gap-2">
+							<TriangleAlert className="size-4" />
+							Flag new critical
+						</Button>
+					</DialogTrigger>
+
+					<DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+						<DialogHeader className="flex-shrink-0">
+							<DialogTitle>Flag new critical result</DialogTitle>
+							<DialogDescription>
+								Manually escalate a life-threatening value to the ordering physician.
+							</DialogDescription>
+						</DialogHeader>
+
+						<div className="overflow-y-auto flex-1 -mr-4 pr-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+							<form className="space-y-4">
+							<div className="grid grid-cols-2 gap-4">
+								<div>
+									<label className="text-muted-foreground text-xs">Patient name</label>
+									<Input placeholder="Last, First" />
+								</div>
+								<div>
+									<label className="text-muted-foreground text-xs">MRN</label>
+									<Input placeholder="000000" />
+								</div>
+							</div>
+
+							<div className="grid grid-cols-2 gap-4">
+								<div>
+									<label className="text-muted-foreground text-xs">Ward / location</label>
+									<Input placeholder="ICU-3" />
+								</div>
+								<div>
+									<label className="text-muted-foreground text-xs">Accession #</label>
+									<Input placeholder="LAB-..." />
+								</div>
+							</div>
+
+							<div className="grid grid-cols-4 gap-4">
+								<div>
+									<label className="text-muted-foreground text-xs">Analyte</label>
+									<Input placeholder="K+" />
+								</div>
+								<div>
+									<label className="text-muted-foreground text-xs">Value</label>
+									<Input placeholder="6.8" />
+								</div>
+								<div>
+									<label className="text-muted-foreground text-xs">Unit</label>
+									<Input placeholder="mmol/L" />
+								</div>
+								<div>
+									<label className="text-muted-foreground text-xs">Severity</label>
+									<Select>
+										<SelectTrigger className="w-full">
+											<SelectValue>Critical</SelectValue>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="critical">Critical</SelectItem>
+											<SelectItem value="urgent">Urgent</SelectItem>
+											<SelectItem value="warning">Warning</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+							</div>
+
+							<div className="grid grid-cols-2 gap-4">
+								<div>
+									<label className="text-muted-foreground text-xs">Ref low</label>
+									<Input placeholder="3.5" />
+								</div>
+								<div>
+									<label className="text-muted-foreground text-xs">Ref high</label>
+									<Input placeholder="5.1" />
+								</div>
+							</div>
+
+							<div className="grid grid-cols-2 gap-4">
+								<div>
+									<label className="text-muted-foreground text-xs">Ordering physician</label>
+									<Input placeholder="Dr. Hassan" />
+								</div>
+								<div>
+									<label className="text-muted-foreground text-xs">Initial channel</label>
+									<Select>
+										<SelectTrigger className="w-full">
+											<SelectValue>Inbox alert</SelectValue>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="inbox">Inbox alert</SelectItem>
+											<SelectItem value="sms">SMS</SelectItem>
+											<SelectItem value="call">Phone call</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+							</div>
+
+								<div>
+									<label className="text-muted-foreground text-xs">Lab tech notes</label>
+									<Textarea placeholder="Repeat draw confirmed; specimen non-hemolyzed." />
+								</div>
+							</form>
+						</div>
+
+						<DialogFooter className="flex-shrink-0 pt-2">
+								<div className="flex w-full items-center justify-between">
+									<span className="text-muted-foreground text-xs">
+										All actions are audit-logged.
+									</span>
+									<div className="flex gap-2">
+										<DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
+										<Button className="bg-rose-600 text-white hover:bg-rose-700">
+											<Send className="mr-2 size-4" />
+											Flag & notify
+										</Button>
+									</div>
+								</div>
+							</DialogFooter>
+					</DialogContent>
+				</Dialog>
 			</div>
 
 			<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">
+						<CardTitle className="text-muted-foreground text-xs tracking-wide uppercase">
 							Active Criticals
 						</CardTitle>
 					</CardHeader>
@@ -107,35 +501,35 @@ export function CriticalResultsDashboard() {
 				</Card>
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">
+						<CardTitle className="text-muted-foreground text-xs tracking-wide uppercase">
 							Pending Ack
 						</CardTitle>
 					</CardHeader>
 					<CardContent className="flex items-end justify-between">
 						<p className="text-3xl font-semibold">{pendingAck}</p>
-						<Bell className="size-4 text-muted-foreground" />
+						<Bell className="text-muted-foreground size-4" />
 					</CardContent>
 				</Card>
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">
+						<CardTitle className="text-muted-foreground text-xs tracking-wide uppercase">
 							Avg Ack Time
 						</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-1">
 						<p className="text-3xl font-semibold text-emerald-600">{avgAckMins.toFixed(1)}m</p>
-						<p className="text-xs text-muted-foreground">Target &lt; 10m</p>
+						<p className="text-muted-foreground text-xs">Target &lt; 10m</p>
 					</CardContent>
 				</Card>
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">
+						<CardTitle className="text-muted-foreground text-xs tracking-wide uppercase">
 							Released Today
 						</CardTitle>
 					</CardHeader>
 					<CardContent className="flex items-end justify-between">
 						<p className="text-3xl font-semibold">{releasedToday}</p>
-						<TriangleAlert className="size-4 text-muted-foreground" />
+						<TriangleAlert className="text-muted-foreground size-4" />
 					</CardContent>
 				</Card>
 			</div>
@@ -147,42 +541,52 @@ export function CriticalResultsDashboard() {
 					</CardHeader>
 					<CardContent className="space-y-3">
 						{criticalQueue.length === 0 ? (
-							<p className="py-8 text-center text-sm text-muted-foreground">No active critical values.</p>
+							<p className="text-muted-foreground py-8 text-center text-sm">
+								No active critical values.
+							</p>
 						) : (
 							criticalQueue.map(item => (
 								<div
 									key={item.id}
-									className="rounded-md border bg-muted/20 p-3 transition hover:bg-muted/30"
+									className="bg-muted/20 hover:bg-muted/30 rounded-md border p-3 transition"
 								>
 									<div className="mb-2 flex items-center justify-between gap-2">
 										<div className="flex items-center gap-2">
 											{statusBadge(item.status)}
-											<span className="text-xs text-muted-foreground">+{item.elapsedMinutes} min</span>
+											<span className="text-muted-foreground text-xs">
+												+{item.elapsedMinutes} min
+											</span>
 										</div>
 										<div className="text-right">
 											<p className="text-lg font-semibold text-rose-700">
 												{String(item.value)} {item.unit}
 											</p>
-											<p className="text-xs text-muted-foreground">Ref {item.reference}</p>
+											<p className="text-muted-foreground text-xs">Ref {item.reference}</p>
 										</div>
 									</div>
 									<p className="font-medium">{item.patientName}</p>
-									<p className="text-xs text-muted-foreground">
+									<p className="text-muted-foreground text-xs">
 										MRN {item.mrn} · {item.ward} · Dr. {item.doctor}
 									</p>
-									<p className="mt-1 text-xs text-muted-foreground">{item.testName}</p>
+									<p className="text-muted-foreground mt-1 text-xs">{item.testName}</p>
 									<div className="mt-3 flex flex-wrap gap-2">
-										<Button variant="outline" size="sm" className="gap-1">
-											<Send className="size-3.5" />
-											Inbox message
-										</Button>
-										<Button variant="outline" size="sm" className="gap-1">
-											<PhoneCall className="size-3.5" />
-											Call physician
-										</Button>
-										<Button size="sm" className="bg-rose-600 hover:bg-rose-700">
-											Re-escalate
-										</Button>
+										<CriticalActionModal item={item} action="inbox">
+											<Button variant="outline" size="sm" className="gap-1">
+												<Send className="size-3.5" />
+												Inbox message
+											</Button>
+										</CriticalActionModal>
+										<CriticalActionModal item={item} action="call">
+											<Button variant="outline" size="sm" className="gap-1">
+												<PhoneCall className="size-3.5" />
+												Call physician
+											</Button>
+										</CriticalActionModal>
+										<CriticalActionModal item={item} action="re-escalate">
+											<Button size="sm" className="bg-rose-600 hover:bg-rose-700">
+												Re-escalate
+											</Button>
+										</CriticalActionModal>
 									</div>
 								</div>
 							))
@@ -197,7 +601,9 @@ export function CriticalResultsDashboard() {
 					<CardContent className="space-y-3 text-sm">
 						<div className="flex items-center justify-between">
 							<span>Inbox alert</span>
-							<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Immediate</Badge>
+							<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+								Immediate
+							</Badge>
 						</div>
 						<Separator />
 						<div className="flex items-center justify-between">
@@ -214,7 +620,7 @@ export function CriticalResultsDashboard() {
 							<span>Charge nurse CC</span>
 							<Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Always</Badge>
 						</div>
-						<p className="pt-2 text-xs text-muted-foreground">
+						<p className="text-muted-foreground pt-2 text-xs">
 							All actions are logged in the patient&apos;s audit trail and accessible via the chart
 							timeline.
 						</p>
