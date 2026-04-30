@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 
-import { AlertCircle, CheckCircle, Pencil } from "lucide-react"
+import { differenceInHours, format } from "date-fns"
+import { AlertCircle, CheckCircle, Clock, Pencil } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -17,6 +18,7 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/core/components/ui/tooltip"
 
 import type {
 	CreateNbsScreeningInput,
@@ -189,6 +191,14 @@ export function NbsScreeningForm({
 	const isPending = createMutation.isPending || updateMutation.isPending
 	const isError = createMutation.isError || updateMutation.isError
 
+	// Calculate hours from birth
+	const hoursFromBirth = specimenCollectedAt
+		? differenceInHours(new Date(specimenCollectedAt), new Date(birthDatetime))
+		: null
+	const isIdealWindow = hoursFromBirth !== null && hoursFromBirth >= 24 && hoursFromBirth <= 48
+	const isTooEarly = hoursFromBirth !== null && hoursFromBirth < 24
+	const isLate = hoursFromBirth !== null && hoursFromBirth > 48
+
 	const updateResult = (key: ConditionKey, val: string) =>
 		setResults((prev) => ({ ...prev, [key]: val as ResultValue | "" }))
 
@@ -283,6 +293,11 @@ export function NbsScreeningForm({
 							{existing.specimenCollectedAt
 								? new Date(existing.specimenCollectedAt).toLocaleString()
 								: "—"}
+							{existing.specimenCollectedAt && (
+								<Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 ${isIdealWindow ? "text-green-600 border-green-200" : isTooEarly ? "text-amber-600 border-amber-200" : "text-red-600 border-red-200"}`}>
+									{hoursFromBirth}h
+								</Badge>
+							)}
 						</p>
 					</div>
 					<div>
@@ -355,7 +370,11 @@ export function NbsScreeningForm({
 									onValueChange={(v) => setSpecimenType(v as NbsSpecimenType | "")}
 								>
 									<SelectTrigger id="specimenType">
-										<SelectValue placeholder="Select type…" />
+										<SelectValue>
+											{specimenType
+												? SPECIMEN_TYPE_LABELS[specimenType as NbsSpecimenType]
+												: "Select type..."}
+										</SelectValue>
 									</SelectTrigger>
 									<SelectContent>
 										{Object.entries(SPECIMEN_TYPE_LABELS).map(([val, label]) => (
@@ -376,13 +395,48 @@ export function NbsScreeningForm({
 								/>
 							</div>
 							<div className="space-y-1.5">
-								<Label htmlFor="specimenCollectedAt">Date/Time Collected</Label>
+								<div className="flex items-center justify-between">
+									<Label htmlFor="specimenCollectedAt">Date/Time Collected</Label>
+									{hoursFromBirth !== null && (
+										<TooltipProvider>
+											<Tooltip>
+												<TooltipTrigger>
+													<div className="flex items-center gap-1 cursor-help">
+														<Clock className={`h-3 w-3 ${isIdealWindow ? "text-green-500" : isTooEarly ? "text-amber-500" : "text-red-500"}`} />
+														<span className={`text-[10px] font-bold ${isIdealWindow ? "text-green-600" : isTooEarly ? "text-amber-600" : "text-red-600"}`}>
+															{hoursFromBirth}h from birth
+														</span>
+													</div>
+												</TooltipTrigger>
+												<TooltipContent side="top" className="text-[11px] max-w-50">
+													<p>Birth: {format(new Date(birthDatetime), "MMM dd, HH:mm")}</p>
+													<hr className="my-1" />
+													{isIdealWindow && <p className="text-green-600">Perfect! Within the 24-48h window.</p>}
+													{isTooEarly && <p className="text-amber-600">Screening before 24h of life may result in false negatives.</p>}
+													{isLate && <p className="text-red-600">Late screening. Ideal window is 24-48h of life.</p>}
+												</TooltipContent>
+											</Tooltip>
+										</TooltipProvider>
+									)}
+								</div>
 								<Input
 									id="specimenCollectedAt"
 									type="datetime-local"
+									className={
+										isTooEarly 
+											? "border-amber-400 focus-visible:ring-amber-500" 
+											: isLate 
+												? "border-red-400 focus-visible:ring-red-500" 
+												: ""
+									}
 									value={specimenCollectedAt}
 									onChange={(e) => setSpecimenCollectedAt(e.target.value)}
 								/>
+								{isTooEarly && (
+									<p className="text-[10px] text-amber-600 font-medium">
+										Warning: Collecting before 24 hours (Currently {hoursFromBirth}h).
+									</p>
+								)}
 							</div>
 							{existing && (
 								<div className="space-y-1.5">
@@ -415,10 +469,10 @@ export function NbsScreeningForm({
 										</Label>
 										<Select
 											value={results[key]}
-											onValueChange={(v) => updateResult(key, v)}
+											onValueChange={(v) => updateResult(key, v ?? "")}
 										>
 											<SelectTrigger id={key}>
-												<SelectValue placeholder="—" />
+												<SelectValue>{results[key] || "—"}</SelectValue>
 											</SelectTrigger>
 											<SelectContent>
 												<SelectItem value="negative">Negative</SelectItem>
@@ -439,7 +493,7 @@ export function NbsScreeningForm({
 										}
 									>
 										<SelectTrigger id="resultOverall">
-											<SelectValue placeholder="—" />
+											<SelectValue>{resultOverall || "—"}</SelectValue>
 										</SelectTrigger>
 										<SelectContent>
 											<SelectItem value="normal">Normal</SelectItem>

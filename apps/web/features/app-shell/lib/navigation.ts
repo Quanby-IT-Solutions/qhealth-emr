@@ -117,6 +117,16 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		excludePermissions: [{ module: "clinical_docs", action: "sign" }],
 	},
 	{
+		// Nurse-specific patient list: browse & filter all active patients without
+		// the strict Name+DOB dedup requirement of the registrar workflow.
+		title: "Patients",
+		href: "/patients/search",
+		iconName: "patient",
+		requiredPermissions: [{ module: "nursing", action: "create" }],
+		// Triage Officers also have nursing:create but they use "Register Patient"
+		excludePermissions: [{ module: "adt", action: "create" }],
+	},
+	{
 		title: "Patients",
 		href: "/patients/register",
 		iconName: "patient",
@@ -125,12 +135,14 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		// via their primary workflow nav, not the global Patients list.
 		// Registrars already use "Register Patient" for the same destination, so
 		// hide this duplicate entry for the registrar role bundle.
+		// Nurses get their own /patients/search list above.
 		excludePermissions: [
 			{ module: "patients", action: "edit" }, // Registrar
 			{ module: "orders", action: "verify" }, // Pharmacist
 			{ module: "laboratory", action: "view" }, // Lab Technologist, Blood Bank Technician
 			{ module: "radiology", action: "view" }, // Radiologist
 			{ module: "reporting", action: "edit" }, // PIDSR Officer
+			{ module: "nursing", action: "create" }, // Nurse — uses /patients/search instead
 		],
 	},
 	{
