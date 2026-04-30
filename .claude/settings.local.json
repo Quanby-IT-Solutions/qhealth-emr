@@ -87,7 +87,8 @@
       "Bash(grep -E \"\\\\.\\(ts|tsx|js\\)$\")",
       "Bash(git -C \"D:/PROJECTS/qhealth-emr\" status)",
       "Bash(git -C \"D:/PROJECTS/qhealth-emr\" diff .claude/settings.local.json)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(pnpm run *)"
     ]
   }
 }
