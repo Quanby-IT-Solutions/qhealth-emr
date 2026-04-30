@@ -211,7 +211,7 @@ DONE TEST - KARL
 
 ## 6. Maternal, Neonatal & Newborn Screening
 
-STILL NOT YET TEST
+DONE - KARL
 - **Story 6.1 – Newborn Screening Logbook**
   - **As a** Nurse
   - **I want to** record newborn screening with precise time-of-birth vs. time-of-screening

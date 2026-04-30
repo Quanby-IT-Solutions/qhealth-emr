@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
 	ArrowLeft,
@@ -203,6 +204,35 @@ function getActiveStaffProfile(
 }
 
 export function PatientProfile({ patientId }: PatientProfileProps) {
+	const router = useRouter()
+	const searchParams = useSearchParams()
+	const sourceFromQuery = searchParams.get("from")
+	const [source, setSource] = useState<string | null>(sourceFromQuery)
+
+	useEffect(() => {
+		if (sourceFromQuery === "list" || sourceFromQuery === "register") {
+			setSource(sourceFromQuery)
+			sessionStorage.setItem("patientProfileSource", sourceFromQuery)
+			return
+		}
+
+		const storedSource = sessionStorage.getItem("patientProfileSource")
+		if (storedSource === "list" || storedSource === "register") {
+			setSource(storedSource)
+		}
+	}, [sourceFromQuery])
+
+	const handleBackToPrevious = () => {
+		if (source === "list") {
+			router.push("/patients/search")
+			return
+		}
+		if (source === "register") {
+			router.push("/patients/register")
+			return
+		}
+		router.back()
+	}
 	const patientQuery = usePatientProfileQuery(patientId)
 	const { data: patient, isLoading, isError, error, refetch: refetchPatient } = patientQuery
 	const permSet = usePermissionSet()
@@ -217,6 +247,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 		facilityId: activeFacilityId,
 		patientId,
 		staffId: activeStaffProfile?.id,
+		enabled: canBreakGlass,
 	})
 	const { data: summary } = usePatientSummaryQuery(patient ? patientId : "")
 
@@ -245,8 +276,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 							variant="ghost"
 							size="sm"
 							className="h-8 px-2"
-							nativeButton={false}
-							render={<Link href="/patients/register" />}
+							onClick={handleBackToPrevious}
 						>
 							<ArrowLeft className="size-4" />
 							Back to Search
@@ -299,7 +329,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 	return (
 		<div className="bg-background">
-			<div className="mx-auto max-w-6xl px-8 py-12">
+			<div className="w-full">
 				<div className="mb-8 flex items-center gap-3">
 					<div className="md:hidden">
 						<SidebarTrigger className="border-border/60 bg-background size-9 rounded-full border shadow-sm" />
@@ -308,8 +338,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 						variant="ghost"
 						size="sm"
 						className="h-8 px-2"
-						nativeButton={false}
-						render={<Link href="/patients/register" />}
+						onClick={handleBackToPrevious}
 					>
 						<ArrowLeft className="size-4" />
 						Back to Search

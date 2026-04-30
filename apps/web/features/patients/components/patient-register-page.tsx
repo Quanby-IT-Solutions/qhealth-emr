@@ -532,7 +532,7 @@ export function PatientRegisterPageContent() {
 														size="sm"
 														className="justify-between"
 														nativeButton={false}
-														render={<Link href={`/patients/${patient.id}`} />}
+														render={<Link href={`/patients/${patient.id}?from=register`} />}
 													>
 														Open
 														<ArrowRight className="size-4" />
@@ -668,7 +668,7 @@ export function PatientRegisterPageContent() {
 											size="sm"
 											className="justify-between"
 											nativeButton={false}
-											render={<Link href={`/patients/${patient.id}`} />}
+											render={<Link href={`/patients/${patient.id}?from=register`} />}
 										>
 											Open
 											<ArrowRight className="size-4" />

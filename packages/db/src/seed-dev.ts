@@ -31,6 +31,7 @@ import {
 	marEntries,
 	medicationOrders,
 	noteTemplates,
+	nbsLogEntries,
 	consentRecords,
 	patients,
 	payments,
@@ -659,6 +660,43 @@ async function ensurePatient(facilityId: string, mrn: string, firstName: string,
 			phone: "09171234567",
 			emergencyContactName: "Relative Contact",
 			emergencyContactPhone: "09170000000",
+			isActive: true,
+		})
+		.returning()
+	return created!
+}
+
+// Like ensurePatient but always updates dateOfBirth so the NBS tab (< 30-day rule)
+// stays active on every seed run.
+async function ensureNewbornPatient(facilityId: string, mrn: string, firstName: string, lastName: string, dateOfBirth: string, sex: "male" | "female" | "other") {
+	const [existing] = await db
+		.select()
+		.from(patients)
+		.where(and(eq(patients.facilityId, facilityId), eq(patients.mrn, mrn)))
+	if (existing) {
+		// Always refresh DOB so the patient stays < 30 days old across seed runs
+		const [updated] = await db
+			.update(patients)
+			.set({ dateOfBirth, updatedAt: new Date() })
+			.where(eq(patients.id, existing.id))
+			.returning()
+		return updated!
+	}
+	const [created] = await db
+		.insert(patients)
+		.values({
+			facilityId,
+			mrn,
+			firstName,
+			lastName,
+			dateOfBirth,
+			sex,
+			addressLine1: "123 Health Ave",
+			city: "Quezon City",
+			province: "Metro Manila",
+			phone: "09171234567",
+			emergencyContactName: "Maria Santos (Mother)",
+			emergencyContactPhone: "09171234567",
 			isActive: true,
 		})
 		.returning()
@@ -1917,14 +1955,164 @@ async function main() {
 	const erWard = await ensureWard(facility.id, "Emergency Room", "er", 2)
 	const medWard = await ensureWard(facility.id, "Medical Ward", "general", 4)
 	await ensureWard(facility.id, "Intensive Care Unit", "icu", 2)
+	const nurseryWard = await ensureWard(facility.id, "Nursery", "nursery", 4)
 
 	const erBed1 = await ensureBed(facility.id, erWard.id, "ER-01")
 	await ensureBed(facility.id, erWard.id, "ER-02")
 	const medBed1 = await ensureBed(facility.id, medWard.id, "MED-101")
+	const nurseryBed1 = await ensureBed(facility.id, nurseryWard.id, "NUR-01")
 
 	const patient1 = await ensurePatient(facility.id, "QH-000001", "Juan", "Dela Cruz", "1985-01-15", "male")
 	const patient2 = await ensurePatient(facility.id, "QH-000002", "Maria", "Santos", "1992-07-03", "female")
 	await ensurePatient(facility.id, "QH-000003", "Pedro", "Reyes", "1978-11-21", "male")
+
+	// Newborn patient — DOB set to ~36 hours ago so the NBS tab (< 30 days rule) is always visible.
+	// Re-run the seed if this patient's age exceeds 28 days.
+	const newbornDOB = new Date(Date.now() - 36 * 3_600_000).toISOString().slice(0, 10)
+	const newbornPatient = await ensureNewbornPatient(facility.id, "QH-NBN-001", "Baby", "Santos", newbornDOB, "female")
+	const newbornReferralDOB = new Date(Date.now() - 30 * 3_600_000).toISOString().slice(0, 10)
+	const newbornReferralPatient = await ensureNewbornPatient(
+		facility.id,
+		"QH-NBN-002",
+		"Baby Boy",
+		"Reyes",
+		newbornReferralDOB,
+		"male"
+	)
+	const nurseryEncounter = await ensureEncounter(
+		facility.id,
+		newbornPatient.id,
+		staffMap.get("nurse@qhealth.local")!,
+		nurseryBed1.id,
+		"inpatient",
+		"Newborn admission for routine care and newborn screening",
+	)
+	const nurseryReferralBed = await ensureBed(facility.id, nurseryWard.id, "NUR-02")
+	const nurseryReferralEncounter = await ensureEncounter(
+		facility.id,
+		newbornReferralPatient.id,
+		staffMap.get("nurse@qhealth.local")!,
+		nurseryReferralBed.id,
+		"inpatient",
+		"Newborn admission for referral tracking test",
+	)
+	await db
+		.update(beds)
+		.set({ status: "occupied", currentEncounterId: nurseryEncounter.id, updatedAt: new Date() })
+		.where(eq(beds.id, nurseryBed1.id))
+	await db
+		.update(beds)
+		.set({ status: "occupied", currentEncounterId: nurseryReferralEncounter.id, updatedAt: new Date() })
+		.where(eq(beds.id, nurseryReferralBed.id))
+
+	// Seed one demo NBS logbook row so /nbs has visible data out-of-the-box.
+	const [existingNbsRow] = await db
+		.select()
+		.from(nbsLogEntries)
+		.where(
+			and(
+				eq(nbsLogEntries.facilityId, facility.id),
+				eq(nbsLogEntries.encounterId, nurseryEncounter.id)
+			)
+		)
+	if (!existingNbsRow) {
+		const birthAt = new Date(Date.now() - 36 * 3_600_000)
+		const screenedAt = new Date(Date.now() - 30 * 3_600_000)
+		await db.insert(nbsLogEntries).values({
+			facilityId: facility.id,
+			encounterId: nurseryEncounter.id,
+			patientId: newbornPatient.id,
+			birthDatetime: birthAt,
+			screeningDatetime: screenedAt,
+			hoursElapsed: 6,
+			screeningResult: {
+				sampleId: "NBS-0001",
+				testType: "heel_prick",
+				conditions: [
+					{ condition: "CH", result: "normal" },
+					{ condition: "CAH", result: "normal" },
+					{ condition: "G6PD", result: "normal" },
+				],
+				labName: "QHealth Lab",
+			},
+			consentStatus: "consented",
+			status: "screened",
+			screenedByStaffId: staffMap.get("nurse@qhealth.local")!,
+		})
+	}
+
+	const [babySantosNbs] = await db
+		.select()
+		.from(nbsLogEntries)
+		.where(and(eq(nbsLogEntries.facilityId, facility.id), eq(nbsLogEntries.patientId, newbornPatient.id)))
+
+	if (babySantosNbs) {
+		const [existingConsent] = await db
+			.select()
+			.from(consentRecords)
+			.where(
+				and(
+					eq(consentRecords.encounterId, babySantosNbs.encounterId!),
+					eq(consentRecords.consentType, "nbs")
+				)
+			)
+
+		if (!existingConsent) {
+			await db.insert(consentRecords).values({
+				facilityId: facility.id,
+				encounterId: babySantosNbs.encounterId,
+				patientId: babySantosNbs.patientId,
+				consentType: "nbs",
+				signedByName: "Baby Santos Mother",
+				relationship: "parent",
+				consentText: "Parental consent for newborn screening.",
+				patientSignature: "Baby Santos Mother",
+				witnessSignature: "Nurse Ana Reyes",
+				capturedByStaffId: staffMap.get("nurse@qhealth.local")!,
+				signedAt: new Date(Date.now() - 29 * 3_600_000),
+			})
+		}
+	}
+
+	const [babyReyesNbs] = await db
+		.select()
+		.from(nbsLogEntries)
+		.where(
+			and(
+				eq(nbsLogEntries.facilityId, facility.id),
+				eq(nbsLogEntries.encounterId, nurseryReferralEncounter.id)
+			)
+		)
+
+	if (!babyReyesNbs) {
+		const birthAt = new Date(Date.now() - 30 * 3_600_000)
+		const screenedAt = new Date(Date.now() - 23 * 3_600_000)
+		await db.insert(nbsLogEntries).values({
+			facilityId: facility.id,
+			encounterId: nurseryReferralEncounter.id,
+			patientId: newbornReferralPatient.id,
+			birthDatetime: birthAt,
+			screeningDatetime: screenedAt,
+			hoursElapsed: 7,
+			screeningResult: {
+				sampleId: "NBS-0002",
+				testType: "heel_prick",
+				conditions: [
+					{ condition: "CH", result: "abnormal" },
+					{ condition: "CAH", result: "normal" },
+					{ condition: "G6PD", result: "normal" },
+				],
+				labName: "QHealth Lab",
+			},
+			consentStatus: "consented",
+			referralStatus: "referred",
+			referralFacility: "Regional NBS Referral Center",
+			referralDate: new Date().toISOString().slice(0, 10),
+			referralNotes: "Seeded positive screening follow-up referral.",
+			status: "referred",
+			screenedByStaffId: staffMap.get("nurse@qhealth.local")!,
+		})
+	}
 
 	const preEncounter = await ensurePreEncounter(facility.id, `TRAUMA-${new Date().getFullYear()}-0001`, staffMap.get("nurse@qhealth.local")!)
 	const erEncounter = await ensureEncounter(facility.id, patient2.id, staffMap.get("doctor@qhealth.local")!, erBed1.id, "emergency", "Fever and productive cough")

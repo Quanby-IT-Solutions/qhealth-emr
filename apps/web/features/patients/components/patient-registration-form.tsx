@@ -356,7 +356,9 @@ export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegis
 							</Button>
 							<Button
 								className={primaryButtonClassName}
-								onClick={() => router.push(`/patients/${createdPatientResult.patientId}`)}
+								onClick={() =>
+									router.push(`/patients/${createdPatientResult.patientId}?from=register`)
+								}
 							>
 								View patient record
 							</Button>

@@ -225,6 +225,7 @@ export function useMyActiveBreakGlassQuery(params: {
 	facilityId: string | undefined
 	patientId: string | undefined
 	staffId: string | undefined
+	enabled?: boolean
 }) {
 	const query = useQuery({
 		...orpc.audit.breakGlass.list.queryOptions({
@@ -236,7 +237,11 @@ export function useMyActiveBreakGlassQuery(params: {
 				limit: 10,
 			},
 		}),
-		enabled: !!params.facilityId && !!params.patientId && !!params.staffId,
+		enabled:
+			(params.enabled ?? true) &&
+			!!params.facilityId &&
+			!!params.patientId &&
+			!!params.staffId,
 		select: data => {
 			// Find an event that is still active (accessExpiresAt > now)
 			const now = new Date()
