@@ -22,25 +22,37 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
 	if (entries.length === 0) return ""
-	return "?" + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
+	return (
+		"?" +
+		entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
+	)
 }
 
 // ============================================================================
 // Types (exported for use in feature components)
 // ============================================================================
 
-interface TemplateSection {
+export interface TemplateSection {
 	key: string
 	label: string
 	type: "rich_text" | "structured"
 	defaultContent?: string
 }
 
-interface NoteTemplate {
+export type ClinicalNoteType =
+	| "admission"
+	| "progress"
+	| "consultation"
+	| "discharge_summary"
+	| "fpe"
+	| "operative"
+	| "anesthesia"
+
+export interface NoteTemplate {
 	id: string
 	facilityId: string
 	name: string
-	category: "admission" | "progress" | "consultation" | "discharge_summary" | "fpe"
+	category: ClinicalNoteType
 	sections: TemplateSection[]
 	isActive: boolean
 	createdByStaffId: string | null
@@ -69,14 +81,14 @@ interface Addendum {
 	createdAt: string
 }
 
-interface ClinicalNote {
+export interface ClinicalNote {
 	id: string
 	facilityId: string
 	encounterId: string | null
 	preEncounterId: string | null
 	templateId: string | null
 	templateName: string | null
-	noteType: "admission" | "progress" | "consultation" | "discharge_summary" | "fpe"
+	noteType: ClinicalNoteType
 	content: string
 	structuredData: unknown
 	status: "draft" | "signed"
@@ -100,7 +112,7 @@ interface ClinicalNoteListResponse {
 interface ConsentRecord {
 	id: string
 	facilityId: string
-	encounterId: string
+	encounterId: string | null
 	patientId: string
 	consentType: "general" | "procedure" | "research" | "blood_transfusion" | "surgery" | "dpa"
 	signedByName: string
@@ -130,6 +142,49 @@ interface SignedNotesResponse {
 	notes: ClinicalNote[]
 }
 
+export interface NoteContext {
+	encounterId: string
+	patientId: string | null
+	latestVitals: {
+		id: string
+		temperature: string | null
+		bpSystolic: number | null
+		bpDiastolic: number | null
+		heartRate: number | null
+		respiratoryRate: number | null
+		spo2: string | null
+		painScore: number | null
+		weight: string | null
+		height: string | null
+		newsScore: number | null
+		newsRiskLevel: "low" | "medium" | "high" | null
+		recordedAt: string
+	} | null
+	activeAllergies: Array<{
+		id: string
+		allergenName: string
+		allergenType: "medication" | "food" | "environmental"
+		reactionType: string | null
+		severity: "mild" | "moderate" | "severe"
+		onsetDate: string | null
+	}>
+	recentLabs: Array<{
+		id: string
+		testName: string
+		panelName: string | null
+		status:
+			| "pending"
+			| "ordered"
+			| "collected"
+			| "in_progress"
+			| "resulted"
+			| "completed"
+			| "cancelled"
+		resultedDatetime: string | null
+		results: unknown
+	}>
+}
+
 // ============================================================================
 // Query Keys
 // ============================================================================
@@ -141,9 +196,11 @@ export const clinicalDocsKeys = {
 	notes: (encounterId?: string, preEncounterId?: string) =>
 		[...clinicalDocsKeys.all, "notes", encounterId, preEncounterId] as const,
 	note: (id: string) => [...clinicalDocsKeys.all, "note", id] as const,
+	context: (encounterId: string) => [...clinicalDocsKeys.all, "context", encounterId] as const,
 	consents: (encounterId: string) => [...clinicalDocsKeys.all, "consents", encounterId] as const,
 	consent: (id: string) => [...clinicalDocsKeys.all, "consent", id] as const,
-	patientConsents: (patientId: string) => [...clinicalDocsKeys.all, "patient-consents", patientId] as const,
+	patientConsents: (patientId: string) =>
+		[...clinicalDocsKeys.all, "patient-consents", patientId] as const,
 	signedNotes: (encounterId: string) =>
 		[...clinicalDocsKeys.all, "signed-notes", encounterId] as const,
 }
@@ -158,7 +215,11 @@ export function useNoteTemplatesQuery(params: {
 	isActive?: boolean
 }) {
 	return useQuery({
-		queryKey: clinicalDocsKeys.templates(params.facilityId),
+		queryKey: [
+			...clinicalDocsKeys.templates(params.facilityId),
+			params.category,
+			params.isActive,
+		] as const,
 		queryFn: () =>
 			fetchJson<NoteTemplateListResponse>(
 				`${API_BASE}/templates${buildQueryString({
@@ -293,7 +354,7 @@ export function useUpdateNoteMutation() {
 				method: "PUT",
 				body: JSON.stringify(data),
 			}),
-		onSuccess: (note) => {
+		onSuccess: note => {
 			void queryClient.invalidateQueries({
 				queryKey: clinicalDocsKeys.note(note.id),
 			})
@@ -313,7 +374,7 @@ export function useSignNoteMutation() {
 				method: "PUT",
 				body: JSON.stringify(data),
 			}),
-		onSuccess: (note) => {
+		onSuccess: note => {
 			void queryClient.invalidateQueries({
 				queryKey: clinicalDocsKeys.note(note.id),
 			})
@@ -321,6 +382,39 @@ export function useSignNoteMutation() {
 				queryKey: clinicalDocsKeys.all,
 			})
 		},
+	})
+}
+
+export function useSubmitFpeMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation({
+		mutationFn: (data: { noteId: string; facilityId: string }) =>
+			fetchJson<ClinicalNote>(`${API_BASE}/notes/${data.noteId}/submit-fpe`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		onSuccess: note => {
+			void queryClient.invalidateQueries({
+				queryKey: clinicalDocsKeys.note(note.id),
+			})
+			void queryClient.invalidateQueries({
+				queryKey: clinicalDocsKeys.all,
+			})
+		},
+	})
+}
+
+export function useNoteContextQuery(encounterId: string) {
+	return useQuery({
+		queryKey: clinicalDocsKeys.context(encounterId),
+		queryFn: () =>
+			fetchJson<NoteContext>(
+				`${API_BASE}/context${buildQueryString({
+					encounterId,
+				})}`
+			),
+		enabled: !!encounterId,
 	})
 }
 
@@ -366,10 +460,7 @@ export function useSignAddendumMutation() {
 // Consent Record Hooks
 // ============================================================================
 
-export function useConsentsQuery(params: {
-	encounterId: string
-	consentType?: string
-}) {
+export function useConsentsQuery(params: { encounterId: string; consentType?: string }) {
 	return useQuery({
 		queryKey: clinicalDocsKeys.consents(params.encounterId),
 		queryFn: () =>
@@ -398,7 +489,7 @@ export function useCreateConsentMutation() {
 	return useMutation({
 		mutationFn: (data: {
 			facilityId: string
-			encounterId: string
+			encounterId?: string
 			patientId: string
 			consentType: ConsentRecord["consentType"]
 			signedByName: string
@@ -411,8 +502,13 @@ export function useCreateConsentMutation() {
 				body: JSON.stringify(data),
 			}),
 		onSuccess: (_data, variables) => {
+			if (variables.encounterId) {
+				void queryClient.invalidateQueries({
+					queryKey: clinicalDocsKeys.consents(variables.encounterId),
+				})
+			}
 			void queryClient.invalidateQueries({
-				queryKey: clinicalDocsKeys.consents(variables.encounterId),
+				queryKey: clinicalDocsKeys.patientConsents(variables.patientId),
 			})
 		},
 	})
@@ -457,10 +553,7 @@ export function useRevokeConsentWithReasonMutation() {
 	})
 }
 
-export function usePatientConsentsQuery(params: {
-	patientId: string
-	consentType?: string
-}) {
+export function usePatientConsentsQuery(params: { patientId: string; consentType?: string }) {
 	return useQuery({
 		queryKey: clinicalDocsKeys.patientConsents(params.patientId),
 		queryFn: () =>

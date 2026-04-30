@@ -170,6 +170,7 @@ export const EdQueueItemSchema = z.object({
 	assignedProvider: z.string().nullable(),
 	bedNumber: z.string().nullable(),
 	wardName: z.string().nullable(),
+	oecbEligible: z.boolean().default(false),
 })
 
 export type EdQueueItem = z.infer<typeof EdQueueItemSchema>

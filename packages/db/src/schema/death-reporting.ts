@@ -72,6 +72,16 @@ export const deathReports = createTable(
 			.notNull()
 			.default("draft")
 			.$type<"draft" | "completed" | "submitted">(),
+		// SLA-005: authoritative checkpoint — set when the family submits the certificate request
+		requestedAt: t.timestamp("requested_at"),
+		// SLA-015: authoritative checkpoint — set when payment is received for the death certificate
+		paidAt: t.timestamp("paid_at"),
+		// SLA-021: Flow 7 Step 3 release audit — staff member who physically issued the death certificate
+		releasedByStaffId: t
+			.uuid("released_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		// SLA-021: Flow 7 Step 3 release audit — when the certificate was released to the family
+		releasedAt: t.timestamp("released_at"),
 		completedAt: t.timestamp("completed_at"),
 		submittedAt: t.timestamp("submitted_at"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),

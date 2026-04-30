@@ -1,7 +1,8 @@
 "use client"
 
+import { AdminDashboard } from "@/features/admin/components/admin-dashboard"
 import { DashboardWidgets } from "@/features/app-shell/components/dashboard-widgets"
-import { getDashboardWidgets } from "@/features/app-shell/lib/navigation"
+import { getDashboardWidgets, isAdminRole } from "@/features/app-shell/lib/navigation"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 export default function DashboardPage() {
@@ -24,6 +25,8 @@ export default function DashboardPage() {
 				<div className="text-muted-foreground flex h-48 items-center justify-center">
 					Loading dashboard…
 				</div>
+			) : isAdminRole(roleName) ? (
+				<AdminDashboard />
 			) : (
 				<DashboardWidgets widgetIds={widgetIds} />
 			)}

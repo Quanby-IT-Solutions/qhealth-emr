@@ -7,6 +7,7 @@ import { Observable, map } from "rxjs"
 
 import { v1 } from "@/config/api-versions.config"
 import { env } from "@/config/env.config"
+import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { NotificationService } from "./notification.service"
 
@@ -25,6 +26,7 @@ export class NotificationController {
 	// SSE Stream — not an oRPC endpoint, registered directly as GET
 	// ===========================================================================
 
+	@RequirePermission("notifications", "view")
 	@Sse("v1/notification/stream")
 	stream(
 		@Req() req: Request,
@@ -76,6 +78,7 @@ export class NotificationController {
 	// oRPC Notification Endpoints
 	// ===========================================================================
 
+	@RequirePermission("notifications", "view")
 	@Implement(v1.notification.list)
 	async listNotifications(
 		@Session()
@@ -90,6 +93,7 @@ export class NotificationController {
 	// IMPORTANT: unreadCount must be declared BEFORE get so that the literal
 	// path "/notifications/unread-count" is registered before the parameterized
 	// path "/notifications/:id", which would otherwise greedily match it.
+	@RequirePermission("notifications", "view")
 	@Implement(v1.notification.unreadCount)
 	async unreadCount(
 		@Session()
@@ -100,6 +104,7 @@ export class NotificationController {
 		})
 	}
 
+	@RequirePermission("notifications", "view")
 	@Implement(v1.notification.get)
 	async getNotification() {
 		return implement(v1.notification.get).handler(async ({ input }) => {
@@ -107,6 +112,7 @@ export class NotificationController {
 		})
 	}
 
+	@RequirePermission("notifications", "view")
 	@Implement(v1.notification.markRead)
 	async markRead() {
 		return implement(v1.notification.markRead).handler(async ({ input }) => {
@@ -114,6 +120,7 @@ export class NotificationController {
 		})
 	}
 
+	@RequirePermission("notifications", "view")
 	@Implement(v1.notification.markAllRead)
 	async markAllRead(
 		@Session()

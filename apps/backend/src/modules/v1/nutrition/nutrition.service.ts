@@ -7,7 +7,7 @@ import {
 	staffProfiles,
 	users,
 } from "@repo/db/schema"
-import type { NutritionAssessment } from "@repo/contracts"
+import type { NutritionAssessment, ScreeningScoreInput, ScreeningScoreResult } from "@repo/contracts"
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
@@ -490,5 +490,87 @@ export class NutritionService {
 		this.logger.log(`Saved meal plan for nutrition assessment ${input.assessmentId}`)
 
 		return this.get(input.assessmentId)
+	}
+
+	// =========================================================================
+	// Screening Tool Scoring
+	// =========================================================================
+
+	scoreScreening(input: ScreeningScoreInput): ScreeningScoreResult {
+		if (input.tool === "nrs_2002") {
+			const ageAdj = input.age >= 70 ? 1 : 0
+			const score = input.nutritionalImpairmentScore + input.severityOfDiseaseScore + ageAdj
+
+			let risk: ScreeningScoreResult["risk"]
+			let interpretation: string
+			let recommendation: string
+
+			if (score < 3) {
+				risk = "low"
+				interpretation = `NRS-2002 score ${score} — Not at nutritional risk`
+				recommendation = "Re-screen weekly. No nutritional intervention required at this time."
+			} else if (score <= 4) {
+				risk = "moderate"
+				interpretation = `NRS-2002 score ${score} — At nutritional risk`
+				recommendation = "Initiate nutritional care plan. Reassess after intervention."
+			} else {
+				risk = "high"
+				interpretation = `NRS-2002 score ${score} — High nutritional risk`
+				recommendation = "Immediate dietitian referral. Begin nutritional support without delay."
+			}
+
+			return { tool: "nrs_2002", score, risk, interpretation, recommendation }
+		}
+
+		if (input.tool === "must") {
+			const score = input.bmiScore + input.weightLossScore + input.acuteDiseaseEffect
+
+			let risk: ScreeningScoreResult["risk"]
+			let interpretation: string
+			let recommendation: string
+
+			if (score === 0) {
+				risk = "low"
+				interpretation = `MUST score ${score} — Low malnutrition risk`
+				recommendation = "Routine clinical care. Re-screen at intervals per ward policy."
+			} else if (score === 1) {
+				risk = "moderate"
+				interpretation = `MUST score ${score} — Medium malnutrition risk`
+				recommendation = "Observe dietary intake for 3 days. If no improvement, refer to dietitian."
+			} else {
+				risk = "high"
+				interpretation = `MUST score ${score} — High malnutrition risk`
+				recommendation = "Refer to dietitian. Set nutrition goals and monitor weekly."
+			}
+
+			return { tool: "must", score, risk, interpretation, recommendation }
+		}
+
+		// SGA: A = well-nourished (0), B = mild/moderate (1), C = severe (2)
+		const scoreMap = { A: 0, B: 1, C: 2 } as const
+		const riskMap: Record<"A" | "B" | "C", ScreeningScoreResult["risk"]> = {
+			A: "low",
+			B: "moderate",
+			C: "high",
+		}
+		const interpretationMap = {
+			A: "SGA-A — Well-nourished",
+			B: "SGA-B — Mildly to moderately malnourished",
+			C: "SGA-C — Severely malnourished",
+		}
+		const recommendationMap = {
+			A: "Continue routine dietary care. Reassess if clinical condition changes.",
+			B: "Dietitian follow-up. Review dietary intake and initiate targeted intervention.",
+			C: "Urgent dietitian consult. Initiate aggressive nutritional support. Monitor closely.",
+		}
+
+		const score = scoreMap[input.rating]
+		return {
+			tool: "sga",
+			score,
+			risk: riskMap[input.rating],
+			interpretation: interpretationMap[input.rating],
+			recommendation: recommendationMap[input.rating],
+		}
 	}
 }

@@ -18,6 +18,7 @@ interface OperationRecordFormProps {
 	caseId: string
 	surgeonStaffId: string
 	existing: OperationRecord | null | undefined
+	canEdit?: boolean
 }
 
 interface FormState {
@@ -64,7 +65,7 @@ function buildInitialState(existing: OperationRecord | null | undefined): FormSt
 	}
 }
 
-export function OperationRecordForm({ caseId, surgeonStaffId, existing }: OperationRecordFormProps) {
+export function OperationRecordForm({ caseId, surgeonStaffId, existing, canEdit = true }: OperationRecordFormProps) {
 	const [form, setForm] = useState<FormState>(() => buildInitialState(existing))
 	const save = useSaveOperationRecordMutation()
 
@@ -316,7 +317,7 @@ export function OperationRecordForm({ caseId, surgeonStaffId, existing }: Operat
 			<Separator />
 
 			<div className="flex justify-end">
-				<Button onClick={handleSubmit} disabled={!canSubmit}>
+				<Button onClick={handleSubmit} disabled={!canSubmit || !canEdit}>
 					<Save className="mr-2 size-4" />
 					{save.isPending ? "Saving…" : "Save Operation Record"}
 				</Button>

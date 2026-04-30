@@ -4,6 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
+import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { LabService } from "./lab.service"
 
@@ -15,6 +16,7 @@ export class LabController {
 	// Blood Bank — Cross-Match Requests
 	// ========================================================================
 
+	@RequirePermission("laboratory", "view")
 	@Implement(v1.lab.listCrossMatches)
 	async listCrossMatches() {
 		return implement(v1.lab.listCrossMatches).handler(async ({ input }) => {
@@ -22,6 +24,7 @@ export class LabController {
 		})
 	}
 
+	@RequirePermission("laboratory", "view")
 	@Implement(v1.lab.getCrossMatch)
 	async getCrossMatch() {
 		return implement(v1.lab.getCrossMatch).handler(async ({ input }) => {
@@ -29,6 +32,7 @@ export class LabController {
 		})
 	}
 
+	@RequirePermission("laboratory", "create")
 	@Implement(v1.lab.createCrossMatch)
 	async createCrossMatch(@Session() session: UserSession) {
 		return implement(v1.lab.createCrossMatch).handler(async ({ input }) => {
@@ -36,6 +40,7 @@ export class LabController {
 		})
 	}
 
+	@RequirePermission("laboratory", "edit")
 	@Implement(v1.lab.approveCrossMatch)
 	async approveCrossMatch(@Session() session: UserSession) {
 		return implement(v1.lab.approveCrossMatch).handler(async ({ input }) => {
@@ -47,6 +52,7 @@ export class LabController {
 	// Blood Bank — Bedside Verification
 	// ========================================================================
 
+	@RequirePermission("laboratory", "edit")
 	@Implement(v1.lab.bedsideVerify)
 	async bedsideVerify(@Session() session: UserSession) {
 		return implement(v1.lab.bedsideVerify).handler(async ({ input }) => {

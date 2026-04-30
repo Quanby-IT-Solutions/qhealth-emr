@@ -71,9 +71,10 @@ const HAI_TYPE_LABELS: Record<HaiType, string> = {
 interface HaiTagFormProps {
 	encounterId: string
 	facilityId: string
+	readOnly?: boolean
 }
 
-export function HaiTagForm({ encounterId, facilityId }: HaiTagFormProps) {
+export function HaiTagForm({ encounterId, facilityId, readOnly }: HaiTagFormProps) {
 	const [createOpen, setCreateOpen] = useState(false)
 
 	const haiTags = useHaiTagsQuery({ encounterId, facilityId })
@@ -102,8 +103,8 @@ export function HaiTagForm({ encounterId, facilityId }: HaiTagFormProps) {
 
 	return (
 		<>
-			{/* Report HAI dialog */}
-			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
+			{/* Report HAI dialog — nurses only */}
+			{!readOnly && <Dialog open={createOpen} onOpenChange={setCreateOpen}>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>Report Healthcare-Associated Infection</DialogTitle>
@@ -154,13 +155,15 @@ export function HaiTagForm({ encounterId, facilityId }: HaiTagFormProps) {
 						</div>
 					</form>
 				</DialogContent>
-			</Dialog>
+			</Dialog>}
 
 			<div className="mb-4 flex items-center justify-between">
 				<h3 className="font-semibold">Healthcare-Associated Infections</h3>
-				<Button size="sm" onClick={() => setCreateOpen(true)}>
-					Report HAI
-				</Button>
+				{!readOnly && (
+					<Button size="sm" onClick={() => setCreateOpen(true)}>
+						Report HAI
+					</Button>
+				)}
 			</div>
 
 			{haiTags.isLoading ? (
@@ -202,7 +205,7 @@ export function HaiTagForm({ encounterId, facilityId }: HaiTagFormProps) {
 									</TableCell>
 									<TableCell>
 										<div className="flex gap-1">
-											{h.status === "suspected" && (
+											{!readOnly && h.status === "suspected" && (
 												<Button
 													size="sm"
 													variant="outline"
@@ -217,7 +220,7 @@ export function HaiTagForm({ encounterId, facilityId }: HaiTagFormProps) {
 													Confirm
 												</Button>
 											)}
-											{h.status !== "resolved" && (
+											{!readOnly && h.status !== "resolved" && (
 												<Button
 													size="sm"
 													variant="outline"

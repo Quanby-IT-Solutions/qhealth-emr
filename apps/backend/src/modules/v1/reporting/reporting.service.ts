@@ -10,6 +10,7 @@ import {
 	clinicalNotes,
 	encounters,
 	haiTags,
+	integrations,
 	notifications,
 	patients,
 	pidsrCases,
@@ -48,7 +49,7 @@ interface ListPidsrCasesInput {
 	page: number
 	limit: number
 	facilityId: string
-	reportStatus?: "draft" | "submitted"
+	reportStatus?: "draft" | "submitted" | "rejected" | "blocked"
 	category?: string
 	dateFrom?: string
 	dateTo?: string
@@ -157,6 +158,105 @@ export class ReportingService {
 			.limit(1)
 		if (!row) throw new NotFoundException("Staff profile not found")
 		return row.id
+	}
+
+	// ========================================================================
+	// PIDSR auto-transmission helper (INTREG-013)
+	// ========================================================================
+
+	/**
+	 * Silently attempt to transmit a PIDSR case to the facility-scoped PIDSR
+	 * endpoint.  Used by auto-detection paths so that a manual submit action is
+	 * not required when an enabled integration is configured.
+	 *
+	 * Differences from the manual `submitPidsrCase`:
+	 * - When no integration exists the case is left as "draft" (not "blocked").
+	 *   The admin can configure an integration and manually submit later.
+	 * - Errors are caught and recorded but never thrown — the caller continues.
+	 */
+	private async _autoTransmitPidsrCase(caseId: string, facilityId: string): Promise<void> {
+		const [pidsrIntegration] = await db
+			.select({ id: integrations.id, endpointUrl: integrations.endpointUrl, credentialsRef: integrations.credentialsRef })
+			.from(integrations)
+			.where(
+				and(
+					eq(integrations.facilityId, facilityId),
+					eq(integrations.kind, "pidsr"),
+					eq(integrations.enabled, true),
+				)
+			)
+			.limit(1)
+
+		if (!pidsrIntegration) {
+			// No integration configured — leave the case as draft, nothing to do.
+			return
+		}
+
+		const now = new Date()
+		const apiKey = pidsrIntegration.credentialsRef
+			? process.env[pidsrIntegration.credentialsRef]
+			: undefined
+
+		let submissionStatus: "submitted" | "rejected" = "rejected"
+		let submissionData: Record<string, unknown>
+
+		try {
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+				Accept: "application/json",
+			}
+			if (apiKey) headers["X-API-Key"] = apiKey
+
+			const response = await fetch(pidsrIntegration.endpointUrl, {
+				method: "POST",
+				headers,
+				body: JSON.stringify({ caseId, submittedAt: now.toISOString(), mode: "auto" }),
+			})
+
+			const responseBody = await response.text().catch(() => "(no body)")
+
+			if (response.ok) {
+				submissionStatus = "submitted"
+				submissionData = {
+					submittedVia: "auto_transmission",
+					httpStatus: response.status,
+					response: responseBody,
+					submittedAt: now.toISOString(),
+				}
+			} else {
+				submissionData = {
+					submittedVia: "auto_transmission",
+					error: `HTTP ${response.status}`,
+					response: responseBody,
+					attemptedAt: now.toISOString(),
+				}
+			}
+		} catch (err) {
+			submissionData = {
+				submittedVia: "auto_transmission",
+				error: err instanceof Error ? err.message : "Unknown transmission error",
+				attemptedAt: now.toISOString(),
+			}
+		}
+
+		await db
+			.update(pidsrCases)
+			.set({
+				reportStatus: submissionStatus,
+				submittedAt: submissionStatus === "submitted" ? now : null,
+				submissionData,
+				updatedAt: new Date(),
+			})
+			.where(eq(pidsrCases.id, caseId))
+
+		await db
+			.update(integrations)
+			.set({
+				lastSyncAt: now,
+				lastSyncStatus: submissionStatus === "submitted" ? "ok" : "error",
+				updatedAt: new Date(),
+			})
+			.where(eq(integrations.id, pidsrIntegration.id))
 	}
 
 	private getDetectionRuleId(diseaseCode: string): string {
@@ -398,7 +498,18 @@ export class ReportingService {
 					})
 					.returning({ id: pidsrCases.id })
 
-				if (newCase) pidsrCaseId = newCase.id
+				if (newCase) {
+					pidsrCaseId = newCase.id
+					// INTREG-013: Category 1 cases require immediate transmission.
+					// Attempt auto-submission now so no manual action is needed when an
+					// enabled PIDSR integration is configured for this facility.
+					const isCategory1 = CATEGORY_1_DISEASES.some(
+						d => d.code === (matched?.code ?? flag.triggerValue)
+					)
+					if (isCategory1) {
+						await this._autoTransmitPidsrCase(newCase.id, enc.facilityId)
+					}
+				}
 			}
 		}
 
@@ -596,27 +707,127 @@ export class ReportingService {
 
 	async submitPidsrCase(input: SubmitPidsrCaseInput) {
 		const [existing] = await db
-			.select({ id: pidsrCases.id, reportStatus: pidsrCases.reportStatus })
+			.select({ id: pidsrCases.id, reportStatus: pidsrCases.reportStatus, facilityId: pidsrCases.facilityId })
 			.from(pidsrCases)
 			.where(eq(pidsrCases.id, input.id))
 			.limit(1)
 
 		if (!existing) throw new NotFoundException("PIDSR case not found")
 
-		// Stubbed — mark as submitted
+		// Resolve active, enabled PIDSR integration for this case's facility
+		const [pidsrIntegration] = await db
+			.select({ id: integrations.id, endpointUrl: integrations.endpointUrl, credentialsRef: integrations.credentialsRef })
+			.from(integrations)
+			.where(
+				and(
+					eq(integrations.facilityId, existing.facilityId),
+					eq(integrations.kind, "pidsr"),
+					eq(integrations.enabled, true),
+				)
+			)
+			.limit(1)
+
+		const now = new Date()
+
+		if (!pidsrIntegration) {
+			// No active integration — block the submission and record the reason
+			await db
+				.update(pidsrCases)
+				.set({
+					reportStatus: "blocked",
+					submissionData: {
+						error: "No active PIDSR integration configured for this facility.",
+						blockedAt: now.toISOString(),
+					},
+					updatedAt: new Date(),
+				})
+				.where(eq(pidsrCases.id, input.id))
+
+			return {
+				success: false,
+				message:
+					"PIDSR submission blocked: no active PIDSR integration is configured for this facility. " +
+					"Configure and enable one in Admin → Integration Registry.",
+			}
+		}
+
+		// Resolve API key from environment (credentialsRef is the env var name)
+		const apiKey = pidsrIntegration.credentialsRef
+			? process.env[pidsrIntegration.credentialsRef]
+			: undefined
+
+		// POST the case to the PIDSR endpoint
+		let submissionStatus: "submitted" | "rejected" = "rejected"
+		let submissionData: Record<string, unknown>
+
+		try {
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+				Accept: "application/json",
+			}
+			if (apiKey) {
+				headers["X-API-Key"] = apiKey
+			}
+
+			const response = await fetch(pidsrIntegration.endpointUrl, {
+				method: "POST",
+				headers,
+				body: JSON.stringify({ caseId: existing.id, submittedAt: now.toISOString() }),
+			})
+
+			const responseBody = await response.text().catch(() => "(no body)")
+
+			if (response.ok) {
+				submissionStatus = "submitted"
+				submissionData = {
+					submittedVia: "integration_registry",
+					httpStatus: response.status,
+					response: responseBody,
+					submittedAt: now.toISOString(),
+				}
+			} else {
+				submissionData = {
+					submittedVia: "integration_registry",
+					error: `HTTP ${response.status}`,
+					response: responseBody,
+					attemptedAt: now.toISOString(),
+				}
+			}
+		} catch (err) {
+			submissionData = {
+				submittedVia: "integration_registry",
+				error: err instanceof Error ? err.message : "Unknown submission error",
+				attemptedAt: now.toISOString(),
+			}
+		}
+
 		await db
 			.update(pidsrCases)
 			.set({
-				reportStatus: "submitted",
-				submittedAt: new Date(),
-				submissionData: { submittedVia: "stub", submittedAt: new Date().toISOString() },
+				reportStatus: submissionStatus,
+				submittedAt: submissionStatus === "submitted" ? now : null,
+				submissionData,
 				updatedAt: new Date(),
 			})
 			.where(eq(pidsrCases.id, input.id))
 
+		// INTREG-014: Write sync outcome back to the integration row so the admin
+		// dashboard reflects the real last-transmission result.
+		await db
+			.update(integrations)
+			.set({
+				lastSyncAt: now,
+				lastSyncStatus: submissionStatus === "submitted" ? "ok" : "error",
+				updatedAt: new Date(),
+			})
+			.where(eq(integrations.id, pidsrIntegration.id))
+
 		return {
-			success: true,
-			message: "Integration pending — PIDSR submission is stubbed. Case marked as submitted.",
+			success: submissionStatus === "submitted",
+			message:
+				submissionStatus === "submitted"
+					? "PIDSR case submitted successfully."
+					: `PIDSR submission failed: ${(submissionData.error as string | undefined) ?? "Unknown error"}`,
 		}
 	}
 
@@ -662,17 +873,88 @@ export class ReportingService {
 			}
 		}
 
-		return {
+		const diseaseBreakdown = Array.from(diseaseMap.values()).map(d => ({
+			diseaseCode: d.code,
+			diseaseName: d.name,
+			count: d.count,
+		}))
+
+		const reportPayload = {
 			weekStartDate: weekStartStr,
 			weekEndDate: weekEndStr,
 			totalCases: cases.length,
 			confirmedCases: cases.filter(c => c.caseClassification === "confirmed").length,
-			diseaseBreakdown: Array.from(diseaseMap.values()).map(d => ({
-				diseaseCode: d.code,
-				diseaseName: d.name,
-				count: d.count,
-			})),
-			status: "generated" as const,
+			diseaseBreakdown,
+		}
+
+		// INTREG-013: Attempt automatic transmission of the weekly report when an
+		// enabled PIDSR integration is configured for this facility.
+		const [pidsrIntegration] = await db
+			.select({ id: integrations.id, endpointUrl: integrations.endpointUrl, credentialsRef: integrations.credentialsRef })
+			.from(integrations)
+			.where(
+				and(
+					eq(integrations.facilityId, input.facilityId),
+					eq(integrations.kind, "pidsr"),
+					eq(integrations.enabled, true),
+				)
+			)
+			.limit(1)
+
+		if (!pidsrIntegration) {
+			// No integration configured — return the generated report without transmission.
+			return {
+				...reportPayload,
+				status: "generated" as const,
+				transmissionNote: "No enabled PIDSR integration is configured for this facility. Configure one in Admin → Integration Registry.",
+			}
+		}
+
+		const now = new Date()
+		const apiKey = pidsrIntegration.credentialsRef
+			? process.env[pidsrIntegration.credentialsRef]
+			: undefined
+
+		try {
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+				Accept: "application/json",
+			}
+			if (apiKey) headers["X-API-Key"] = apiKey
+
+			const response = await fetch(pidsrIntegration.endpointUrl, {
+				method: "POST",
+				headers,
+				body: JSON.stringify({ type: "weekly_report", ...reportPayload, submittedAt: now.toISOString() }),
+			})
+
+			const syncStatus: "ok" | "error" = response.ok ? "ok" : "error"
+			await db
+				.update(integrations)
+				.set({ lastSyncAt: now, lastSyncStatus: syncStatus, updatedAt: now })
+				.where(eq(integrations.id, pidsrIntegration.id))
+
+			if (response.ok) {
+				return { ...reportPayload, status: "submitted" as const }
+			}
+
+			const errText = await response.text().catch(() => `HTTP ${response.status}`)
+			return {
+				...reportPayload,
+				status: "failed" as const,
+				transmissionNote: `Transmission failed: ${errText}`,
+			}
+		} catch (err) {
+			await db
+				.update(integrations)
+				.set({ lastSyncAt: now, lastSyncStatus: "error", updatedAt: now })
+				.where(eq(integrations.id, pidsrIntegration.id))
+
+			return {
+				...reportPayload,
+				status: "failed" as const,
+				transmissionNote: `Transmission failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+			}
 		}
 	}
 
@@ -781,7 +1063,9 @@ export class ReportingService {
 			)
 		const bedOccupancyRate = borRow?.avgBor ? Number(borRow.avgBor) : null
 
-		// Top 10 Morbidities — ICD-10 codes from problems for admitted patients in period
+		// Top 10 Morbidities — ICD-10 codes from problems scoped to admitted encounters in period
+		// AD-009: join via problems.encounterId (encounter-scoped) so each diagnosis is counted
+		// only once per the specific admission encounter, not for every encounter the patient had.
 		const morbidityRows = await db
 			.select({
 				icdCode: problems.icd10Code,
@@ -790,7 +1074,7 @@ export class ReportingService {
 			})
 			.from(problems)
 			.innerJoin(encounters, and(
-				eq(problems.patientId, encounters.patientId),
+				eq(problems.encounterId, encounters.id),
 				eq(encounters.facilityId, input.facilityId),
 				gte(encounters.admissionDatetime, new Date(dateStart)),
 				input.month
@@ -811,7 +1095,9 @@ export class ReportingService {
 			percentage: totalMorbidityCount > 0 ? (r.count / totalMorbidityCount) * 100 : 0,
 		}))
 
-		// Top 10 Mortalities — ICD-10 codes from problems for deceased encounters
+		// Top 10 Mortalities — ICD-10 codes from problems scoped to deceased encounters in period
+		// AD-009: join via problems.encounterId (encounter-scoped) so each diagnosis is counted
+		// only once per the specific death encounter, not for every encounter the patient had.
 		const mortalityRows = await db
 			.select({
 				icdCode: problems.icd10Code,
@@ -820,7 +1106,7 @@ export class ReportingService {
 			})
 			.from(problems)
 			.innerJoin(encounters, and(
-				eq(problems.patientId, encounters.patientId),
+				eq(problems.encounterId, encounters.id),
 				eq(encounters.facilityId, input.facilityId),
 				eq(encounters.disposition, "deceased"),
 				isNotNull(encounters.dischargeDatetime),

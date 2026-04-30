@@ -4,6 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
+import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { AuditService } from "./audit.service"
 import { NotificationService } from "../notifications/notification.service"
@@ -19,6 +20,7 @@ export class AuditController {
 	// Audit Logs
 	// ===========================================================================
 
+	@RequirePermission("audit", "view")
 	@Implement(v1.audit.log.list)
 	async listAuditLogs() {
 		return implement(v1.audit.log.list).handler(async ({ input }) => {
@@ -26,6 +28,7 @@ export class AuditController {
 		})
 	}
 
+	@RequirePermission("audit", "view")
 	@Implement(v1.audit.log.get)
 	async getAuditLog() {
 		return implement(v1.audit.log.get).handler(async ({ input }) => {
@@ -33,6 +36,7 @@ export class AuditController {
 		})
 	}
 
+	@RequirePermission("audit", "export")
 	@Implement(v1.audit.log.exportCsv)
 	async exportAuditLogs() {
 		return implement(v1.audit.log.exportCsv).handler(async ({ input }) => {
@@ -40,10 +44,27 @@ export class AuditController {
 		})
 	}
 
+	@RequirePermission("audit", "view")
+	@Implement(v1.audit.log.configHistory)
+	async getConfigHistory() {
+		return implement(v1.audit.log.configHistory).handler(async ({ input }) => {
+			return this.auditService.getConfigHistory(input)
+		})
+	}
+
 	// ===========================================================================
 	// Break Glass
 	// ===========================================================================
 
+	@RequirePermission("audit", "export")
+	@Implement(v1.audit.breakGlass.exportCsv)
+	async exportBreakGlass() {
+		return implement(v1.audit.breakGlass.exportCsv).handler(async ({ input }) => {
+			return this.auditService.exportBreakGlassEvents(input)
+		})
+	}
+
+	@RequirePermission("audit", "view")
 	@Implement(v1.audit.breakGlass.list)
 	async listBreakGlass() {
 		return implement(v1.audit.breakGlass.list).handler(async ({ input }) => {
@@ -51,6 +72,7 @@ export class AuditController {
 		})
 	}
 
+	@RequirePermission("audit", "view")
 	@Implement(v1.audit.breakGlass.get)
 	async getBreakGlass() {
 		return implement(v1.audit.breakGlass.get).handler(async ({ input }) => {
@@ -58,6 +80,15 @@ export class AuditController {
 		})
 	}
 
+	@RequirePermission("audit", "view")
+	@Implement(v1.audit.breakGlass.patterns)
+	async getBreakGlassPatterns() {
+		return implement(v1.audit.breakGlass.patterns).handler(async ({ input }) => {
+			return this.auditService.getBreakGlassPatterns(input)
+		})
+	}
+
+	@RequirePermission("audit", "create")
 	@Implement(v1.audit.breakGlass.create)
 	async createBreakGlass(
 		@Session()
@@ -72,23 +103,33 @@ export class AuditController {
 				userId: session.user.id,
 			})
 
-			await this.notificationService.send({
-				facilityId: input.facilityId,
-				recipientStaffId: staffProfileId,
-				topic: "break_glass",
-				title: "Break-Glass Access Requested",
-				body: `Emergency access requested for patient. Reason: ${input.reasonCategory}`,
-				data: {
-					breakGlassEventId: event.id,
-					patientId: input.patientId,
-					reasonCategory: input.reasonCategory,
-				},
-			})
+			const reviewerStaffIds = await this.auditService.findBreakGlassReviewerStaffIds(
+				input.facilityId,
+				{ excludeStaffId: staffProfileId }
+			)
+			await Promise.allSettled(
+				reviewerStaffIds.map(reviewerStaffId =>
+					this.notificationService.send({
+						facilityId: input.facilityId,
+						recipientStaffId: reviewerStaffId,
+						topic: "break_glass",
+						title: "Break-Glass Access Requested",
+						body: `Emergency access requested for patient. Reason: ${input.reasonCategory}`,
+						data: {
+							breakGlassEventId: event.id,
+							patientId: input.patientId,
+							reasonCategory: input.reasonCategory,
+							requestingStaffId: staffProfileId,
+						},
+					})
+				)
+			)
 
 			return event
 		})
 	}
 
+	@RequirePermission("audit", "view")
 	@Implement(v1.audit.breakGlass.review)
 	async reviewBreakGlass(
 		@Session()

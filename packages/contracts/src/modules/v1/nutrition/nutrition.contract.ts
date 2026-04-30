@@ -8,6 +8,8 @@ import {
 	NutritionAssessmentSchema,
 	NutritionByEncounterSchema,
 	SaveMealPlanSchema,
+	ScreeningScoreInputSchema,
+	ScreeningScoreResultSchema,
 	UpdateNutritionAssessmentSchema,
 } from "./nutrition.schema.js"
 
@@ -79,4 +81,18 @@ export const nutritionContract = {
 		})
 		.input(SaveMealPlanSchema)
 		.output(NutritionAssessmentSchema),
+
+	// ========================================================================
+	// Screening Tool Scoring
+	// ========================================================================
+
+	scoreScreening: oc
+		.route({
+			method: "POST",
+			path: "/screening/score",
+			summary: "Calculate malnutrition risk score for a screening tool",
+			tags: ["Nutrition"],
+		})
+		.input(ScreeningScoreInputSchema)
+		.output(ScreeningScoreResultSchema),
 }

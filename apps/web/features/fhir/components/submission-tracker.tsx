@@ -163,9 +163,11 @@ interface SubmissionTrackerProps {
 	facilityId: string
 	/** Optionally highlight submit action for a specific export */
 	pendingExport?: FhirExport | null
+	/** Whether the current user has admin:edit permission. Controls mutation visibility. */
+	canEdit: boolean
 }
 
-export function SubmissionTracker({ facilityId, pendingExport }: SubmissionTrackerProps) {
+export function SubmissionTracker({ facilityId, pendingExport, canEdit }: SubmissionTrackerProps) {
 	const { data: submissions, isLoading, error } = useNhdrSubmissionsQuery(facilityId)
 
 	return (
@@ -197,7 +199,7 @@ export function SubmissionTracker({ facilityId, pendingExport }: SubmissionTrack
 			</CardHeader>
 			<CardContent>
 				{/* Pending export call-to-action */}
-				{pendingExport && pendingExport.status === "completed" && !pendingExport.nhdrSubmissionId && (
+				{canEdit && pendingExport && pendingExport.status === "completed" && !pendingExport.nhdrSubmissionId && (
 					<div className="mb-6 flex items-center justify-between rounded-lg border bg-muted/40 p-4">
 						<div>
 							<p className="text-sm font-medium">Export ready for submission</p>

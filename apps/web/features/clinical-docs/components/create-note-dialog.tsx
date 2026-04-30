@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Plus, X } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
 import {
@@ -11,6 +12,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/core/components/ui/dialog"
+import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
@@ -21,6 +23,11 @@ import {
 	TemplateSelector,
 	type NoteTypeValue,
 } from "./template-selector"
+
+interface DiagnosisEntry {
+	code: string
+	description: string
+}
 
 interface SelectedTemplate {
 	id: string
@@ -45,6 +52,7 @@ export function CreateNoteDialog({
 	const [templateId, setTemplateId] = useState<string>("")
 	const [selectedTemplate, setSelectedTemplate] = useState<SelectedTemplate | null>(null)
 	const [content, setContent] = useState("")
+	const [diagnoses, setDiagnoses] = useState<DiagnosisEntry[]>([])
 
 	const createNote = useCreateNoteMutation()
 
@@ -53,6 +61,21 @@ export function CreateNoteDialog({
 		setTemplateId("")
 		setSelectedTemplate(null)
 		setContent("")
+		setDiagnoses([])
+	}
+
+	function addDiagnosis() {
+		setDiagnoses(prev => [...prev, { code: "", description: "" }])
+	}
+
+	function removeDiagnosis(index: number) {
+		setDiagnoses(prev => prev.filter((_, i) => i !== index))
+	}
+
+	function updateDiagnosis(index: number, field: keyof DiagnosisEntry, value: string) {
+		setDiagnoses(prev =>
+			prev.map((d, i) => (i === index ? { ...d, [field]: value } : d))
+		)
 	}
 
 	function handleTemplateChange(id: string, tpl: SelectedTemplate | null) {
@@ -72,6 +95,7 @@ export function CreateNoteDialog({
 
 	function handleSubmit() {
 		if (!noteType) return
+		const validDiagnoses = diagnoses.filter(d => d.code.trim() && d.description.trim())
 		createNote.mutate(
 			{
 				facilityId,
@@ -79,6 +103,7 @@ export function CreateNoteDialog({
 				templateId: templateId || undefined,
 				noteType: noteType as NoteTypeValue,
 				content,
+				structuredData: validDiagnoses.length > 0 ? { diagnoses: validDiagnoses } : undefined,
 			},
 			{
 				onSuccess: () => {
@@ -92,7 +117,8 @@ export function CreateNoteDialog({
 	const canSubmit =
 		!!noteType &&
 		!requiresTemplate(noteType, templateId) &&
-		!createNote.isPending
+		!createNote.isPending &&
+		(noteType !== "consultation" || diagnoses.filter(d => d.code.trim() && d.description.trim()).length > 0)
 
 	return (
 		<Dialog
@@ -107,7 +133,8 @@ export function CreateNoteDialog({
 					<DialogTitle>Create Clinical Note</DialogTitle>
 					<DialogDescription>
 						Select a note type and choose a template. Admission Notes, Discharge
-						Summaries, and FPE notes require a template.
+						Summaries, FPE notes, and Consultation notes require a template.
+						Consultation notes use the SOAP structure (Subjective, Objective, Assessment, Plan).
 					</DialogDescription>
 				</DialogHeader>
 
@@ -121,28 +148,80 @@ export function CreateNoteDialog({
 							setTemplateId("")
 							setSelectedTemplate(null)
 							setContent("")
+							setDiagnoses([])
 						}}
 						onTemplateChange={handleTemplateChange}
 					/>
 
-					{noteType && (
-						<>
-							<Separator />
-							<div className="space-y-2">
-								<Label>Note Content</Label>
-								<Textarea
-									placeholder={
-										selectedTemplate
-											? "Sections pre-filled from template. Edit as needed…"
-											: "Enter note content…"
-									}
-									rows={8}
-									value={content}
-									onChange={e => setContent(e.target.value)}
-								/>
-							</div>
-						</>
-					)}
+					{noteType === "consultation" && (
+					<>
+						<Separator />
+						<div className="space-y-2">
+							<Label>
+								ICD-10 Diagnoses <span className="text-destructive">*</span>
+							</Label>
+							{diagnoses.map((d, i) => (
+								<div key={i} className="flex items-center gap-2">
+									<Input
+										placeholder="Code (e.g. J18.9)"
+										value={d.code}
+										onChange={e => updateDiagnosis(i, "code", e.target.value)}
+										className="w-32 shrink-0"
+									/>
+									<Input
+										placeholder="Description"
+										value={d.description}
+										onChange={e => updateDiagnosis(i, "description", e.target.value)}
+										className="flex-1"
+									/>
+									<Button
+										type="button"
+										size="icon"
+										variant="ghost"
+										className="size-8 shrink-0"
+										onClick={() => removeDiagnosis(i)}
+									>
+										<X className="size-4" />
+									</Button>
+								</div>
+							))}
+							<Button
+								type="button"
+								size="sm"
+								variant="outline"
+								onClick={addDiagnosis}
+								className="gap-1"
+							>
+								<Plus className="size-4" />
+								Add Diagnosis
+							</Button>
+							{diagnoses.filter(d => d.code.trim() && d.description.trim()).length === 0 && (
+								<p className="text-destructive text-xs">
+									At least one ICD-10 diagnosis is required for consultation notes.
+								</p>
+							)}
+						</div>
+					</>
+				)}
+
+				{noteType && (
+					<>
+						<Separator />
+						<div className="space-y-2">
+							<Label>Note Content</Label>
+							<Textarea
+								placeholder={
+									selectedTemplate
+										? "Sections pre-filled from template. Edit as needed…"
+										: "Enter note content…"
+								}
+								rows={8}
+								value={content}
+								onChange={e => setContent(e.target.value)}
+							/>
+						</div>
+					</>
+				)}
 				</div>
 
 				<DialogFooter>

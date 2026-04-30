@@ -47,7 +47,7 @@ function SlaAlertItem({ event, onDismiss }: { event: SlaEvent; onDismiss: (id: s
 						{WORKFLOW_LABELS[event.workflowType]}
 					</p>
 					<p className="text-xs">
-						<span className="font-medium">{event.patientName}</span> ·{" "}
+					<span className="font-medium">{event.patientName ?? "—"}</span> ·{" "}
 						{formatMinutes(event.elapsedMinutes)} elapsed of {formatMinutes(event.targetMinutes)} target (
 						{pct}%)
 					</p>

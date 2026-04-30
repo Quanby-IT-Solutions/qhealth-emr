@@ -15,11 +15,11 @@ import {
 } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Switch } from "@/core/components/ui/switch"
 import {
 	type CreateExportInput,
 	FHIR_RESOURCE_TYPES,
 	type FhirResourceType,
+	UNSUPPORTED_FHIR_RESOURCE_TYPES,
 	useCreateExportMutation,
 } from "@/features/fhir/api/fhir.hooks"
 
@@ -46,9 +46,8 @@ export function ExportConfigForm({ facilityId, open, onOpenChange }: ExportConfi
 	const [dateStart, setDateStart] = useState(firstOfMonth)
 	const [dateEnd, setDateEnd] = useState(today)
 	const [selectedTypes, setSelectedTypes] = useState<Set<FhirResourceType>>(
-		new Set(FHIR_RESOURCE_TYPES),
+		new Set(FHIR_RESOURCE_TYPES.filter(t => !UNSUPPORTED_FHIR_RESOURCE_TYPES.has(t))),
 	)
-	const [validateOnExport, setValidateOnExport] = useState(true)
 	const [submitError, setSubmitError] = useState<string | null>(null)
 
 	const mutation = useCreateExportMutation()
@@ -66,7 +65,7 @@ export function ExportConfigForm({ facilityId, open, onOpenChange }: ExportConfi
 	}
 
 	function selectAll() {
-		setSelectedTypes(new Set(FHIR_RESOURCE_TYPES))
+		setSelectedTypes(new Set(FHIR_RESOURCE_TYPES.filter(t => !UNSUPPORTED_FHIR_RESOURCE_TYPES.has(t))))
 	}
 
 	function clearAll() {
@@ -89,7 +88,7 @@ export function ExportConfigForm({ facilityId, open, onOpenChange }: ExportConfi
 			dateRangeStart: dateStart,
 			dateRangeEnd: dateEnd,
 			resourceTypes: Array.from(selectedTypes),
-			validateOnExport,
+			validateOnExport: true,
 		}
 
 		try {
@@ -116,8 +115,8 @@ export function ExportConfigForm({ facilityId, open, onOpenChange }: ExportConfi
 			],
 		},
 		{
-			label: "Medications",
-			types: ["MedicationRequest"],
+			label: "Medications & Nutrition",
+			types: ["MedicationRequest", "NutritionOrder"],
 		},
 		{
 			label: "Billing & Coverage",
@@ -190,34 +189,44 @@ export function ExportConfigForm({ facilityId, open, onOpenChange }: ExportConfi
 										{group.label}
 									</p>
 									<div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-										{group.types.map(type => (
-											<label
-												key={type}
-												className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
-											>
-												<Checkbox
-													checked={selectedTypes.has(type)}
-													onCheckedChange={() => toggleResource(type)}
-												/>
-												{type}
-											</label>
-										))}
+										{group.types.map(type => {
+											const isUnsupported = UNSUPPORTED_FHIR_RESOURCE_TYPES.has(type)
+											return (
+												<label
+													key={type}
+													className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+														isUnsupported
+															? "cursor-not-allowed opacity-50 bg-muted/30"
+															: "cursor-pointer hover:bg-muted/50"
+													}`}
+													title={isUnsupported ? "Not yet available — source data not implemented" : undefined}
+												>
+													<Checkbox
+														checked={selectedTypes.has(type)}
+														onCheckedChange={isUnsupported ? undefined : () => toggleResource(type)}
+														disabled={isUnsupported}
+													/>
+													<span>{type}</span>
+													{isUnsupported && (
+														<span className="ml-auto text-[10px] text-muted-foreground">(soon)</span>
+													)}
+												</label>
+											)
+										})}
 									</div>
 								</div>
 							))}
 						</div>
 					</div>
 
-					{/* Validation */}
-					<div className="flex items-center justify-between rounded-lg border p-4">
+					{/* Validation is always required — informational note only */}
+					<div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-4">
 						<div>
-							<p className="text-sm font-medium">Validate on Export</p>
+							<p className="text-sm font-medium">FHIR R4 Validation</p>
 							<p className="text-xs text-muted-foreground">
-								Run FHIR R4 validation before generating the export bundle. Recommended for NHDR
-								submission.
+								Validation runs automatically on every export and is required for NHDR submission (TOR §4.1).
 							</p>
 						</div>
-						<Switch checked={validateOnExport} onCheckedChange={setValidateOnExport} />
 					</div>
 
 					{submitError && (

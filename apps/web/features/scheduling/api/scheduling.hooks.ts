@@ -144,12 +144,33 @@ export interface QueueEntry {
 	status: AppointmentStatus
 }
 
+export type QueueEntryStatus = "waiting" | "in_progress" | "completed"
+
+export interface UnifiedQueueEntry {
+	entryType: "appointment" | "walk_in"
+	id: string
+	appointmentId: string | null
+	encounterId: string | null
+	queueNumber: number | null
+	slotTime: string | null
+	checkInTime: string | null
+	status: QueueEntryStatus
+	patientId: string
+	patientName?: string
+	patientMrn?: string
+	clinicianStaffId: string | null
+	clinicianName?: string
+}
+
 export interface ClinicQueueResponse {
-	clinicId: string
-	clinicName: string
-	date: string
-	entries: QueueEntry[]
-	currentPosition: number | null
+	entries: UnifiedQueueEntry[]
+	clinicName: string | null
+	stats: {
+		waiting: number
+		inProgress: number
+		completed: number
+		total: number
+	}
 }
 
 // ============================================================================
@@ -163,8 +184,10 @@ export const schedulingKeys = {
 	slots: (params: object) => [...schedulingKeys.all, "slots", params] as const,
 	appointments: () => [...schedulingKeys.all, "appointments"] as const,
 	appointment: (id: string) => [...schedulingKeys.appointments(), id] as const,
-	queue: (clinicId: string, date: string) =>
-		[...schedulingKeys.all, "queue", clinicId, date] as const,
+	queue: (clinicId: string, date: string, clinicianStaffId?: string) =>
+		clinicianStaffId
+			? ([...schedulingKeys.all, "queue", clinicId, date, clinicianStaffId] as const)
+			: ([...schedulingKeys.all, "queue", clinicId, date] as const),
 }
 
 // ============================================================================
@@ -353,17 +376,31 @@ export function useCancelAppointmentMutation() {
 // ============================================================================
 
 export function useClinicQueueQuery(
-	params: { facilityId?: string; clinicId?: string; date: string },
+	params: { facilityId?: string; clinicId?: string; clinicianStaffId?: string; date: string },
 	options?: { refetchInterval?: number }
 ) {
 	const hasFilter = !!params.facilityId || !!params.clinicId
 	return useQuery({
-		queryKey: schedulingKeys.queue(params.facilityId || params.clinicId || "", params.date),
+		queryKey: schedulingKeys.queue(params.facilityId || params.clinicId || "", params.date, params.clinicianStaffId),
 		queryFn: () =>
 			fetchJson<ClinicQueueResponse>(
 				`${API_BASE}/queue${buildQueryString(params)}`
 			),
 		enabled: hasFilter && !!params.date,
 		refetchInterval: options?.refetchInterval ?? 30_000,
+	})
+}
+
+export function useUpdateEncounterQueueStatusMutation() {
+	const qc = useQueryClient()
+	return useMutation({
+		mutationFn: ({ id, status }: { id: string; status: "in_progress" | "completed" }) =>
+			fetchJson<{ id: string; queueStatus: string }>(
+				`${env.NEXT_PUBLIC_API_BASE_URL}/v1/scheduling/encounters/${id}/queue-status`,
+				{ method: "PUT", body: JSON.stringify({ id, status }) }
+			),
+		onSuccess: () => {
+			void qc.invalidateQueries({ queryKey: schedulingKeys.all })
+		},
 	})
 }

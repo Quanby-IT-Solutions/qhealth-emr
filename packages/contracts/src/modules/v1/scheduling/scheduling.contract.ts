@@ -18,6 +18,8 @@ import {
 	CreateClinicTemplateSchema,
 	UpdateAppointmentStatusSchema,
 	UpdateClinicTemplateSchema,
+	UpdateEncounterQueueStatusResponseSchema,
+	UpdateEncounterQueueStatusSchema,
 } from "./scheduling.schema.js"
 
 export const schedulingContract = {
@@ -127,9 +129,20 @@ export const schedulingContract = {
 		.route({
 			method: "GET",
 			path: "/queue",
-			summary: "Get clinic queue for a date with stats",
+			summary: "Get clinic queue for a date with stats (appointments + walk-ins unified)",
 			tags: ["Scheduling"],
 		})
 		.input(ClinicQueueQuerySchema)
 		.output(ClinicQueueResponseSchema),
+
+	// PS-003: Advance walk-in OPD encounter through the clinic queue
+	updateEncounterQueueStatus: oc
+		.route({
+			method: "PUT",
+			path: "/encounters/{id}/queue-status",
+			summary: "Update walk-in OPD encounter queue status (waiting→in_progress→completed)",
+			tags: ["Scheduling"],
+		})
+		.input(UpdateEncounterQueueStatusSchema)
+		.output(UpdateEncounterQueueStatusResponseSchema),
 }

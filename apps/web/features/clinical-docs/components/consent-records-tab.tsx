@@ -57,12 +57,14 @@ interface ConsentRecordsTabProps {
 	encounterId: string
 	facilityId: string
 	patientId: string
+	canManageConsents?: boolean
 }
 
 export function ConsentRecordsTab({
 	encounterId,
 	facilityId,
 	patientId,
+	canManageConsents,
 }: ConsentRecordsTabProps) {
 	const { data, isLoading } = useConsentsQuery({ encounterId })
 	const [createOpen, setCreateOpen] = useState(false)
@@ -84,9 +86,11 @@ export function ConsentRecordsTab({
 			<Card>
 				<CardHeader className="flex flex-row items-center justify-between">
 					<CardTitle>Consent Records</CardTitle>
-					<Button size="sm" onClick={() => setCreateOpen(true)}>
-						Capture Consent
-					</Button>
+					{canManageConsents && (
+						<Button size="sm" onClick={() => setCreateOpen(true)}>
+							Capture Consent
+						</Button>
+					)}
 				</CardHeader>
 				<CardContent className="p-0">
 					{isLoading ? (
@@ -132,7 +136,7 @@ export function ConsentRecordsTab({
 												{consent.witnessStaffName ?? "—"}
 											</TableCell>
 											<TableCell>
-												{!isRevoked && (
+											{!isRevoked && canManageConsents && (
 													<Button
 														size="sm"
 														variant="outline"

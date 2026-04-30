@@ -4,6 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
+import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { ReportingService } from "./reporting.service"
 
@@ -15,6 +16,7 @@ export class ReportingController {
 	// Surveillance Flags
 	// ========================================================================
 
+	@RequirePermission("reporting", "edit")
 	@Implement(v1.reporting.listSurveillanceFlags)
 	async listSurveillanceFlags() {
 		return implement(v1.reporting.listSurveillanceFlags).handler(async ({ input }) => {
@@ -22,6 +24,7 @@ export class ReportingController {
 		})
 	}
 
+	@RequirePermission("reporting", "edit")
 	@Implement(v1.reporting.reviewSurveillanceFlag)
 	async reviewSurveillanceFlag(@Session() session: UserSession) {
 		return implement(v1.reporting.reviewSurveillanceFlag).handler(async ({ input }) => {
@@ -29,6 +32,7 @@ export class ReportingController {
 		})
 	}
 
+	@RequirePermission("reporting", "edit")
 	@Implement(v1.reporting.scanEncounter)
 	async scanEncounter() {
 		return implement(v1.reporting.scanEncounter).handler(async ({ input }) => {
@@ -36,6 +40,7 @@ export class ReportingController {
 		})
 	}
 
+	@RequirePermission("reporting", "edit")
 	@Implement(v1.reporting.listDetectionRules)
 	async listDetectionRules() {
 		return implement(v1.reporting.listDetectionRules).handler(async ({ input }) => {
@@ -43,6 +48,7 @@ export class ReportingController {
 		})
 	}
 
+	@RequirePermission("reporting", "edit")
 	@Implement(v1.reporting.runAutoDetection)
 	async runAutoDetection() {
 		return implement(v1.reporting.runAutoDetection).handler(async ({ input }) => {
@@ -54,6 +60,7 @@ export class ReportingController {
 	// PIDSR Cases
 	// ========================================================================
 
+	@RequirePermission("reporting", "edit")
 	@Implement(v1.reporting.listPidsrCases)
 	async listPidsrCases() {
 		return implement(v1.reporting.listPidsrCases).handler(async ({ input }) => {
@@ -61,6 +68,7 @@ export class ReportingController {
 		})
 	}
 
+	@RequirePermission("reporting", "edit")
 	@Implement(v1.reporting.getPidsrCase)
 	async getPidsrCase() {
 		return implement(v1.reporting.getPidsrCase).handler(async ({ input }) => {
@@ -68,6 +76,7 @@ export class ReportingController {
 		})
 	}
 
+	@RequirePermission("reporting", "edit")
 	@Implement(v1.reporting.submitPidsrCase)
 	async submitPidsrCase() {
 		return implement(v1.reporting.submitPidsrCase).handler(async ({ input }) => {
@@ -79,6 +88,7 @@ export class ReportingController {
 	// Weekly Report
 	// ========================================================================
 
+	@RequirePermission("reporting", "edit")
 	@Implement(v1.reporting.generateWeeklyReport)
 	async generateWeeklyReport() {
 		return implement(v1.reporting.generateWeeklyReport).handler(async ({ input }) => {
@@ -90,6 +100,7 @@ export class ReportingController {
 	// AHSR
 	// ========================================================================
 
+	@RequirePermission("reporting", "view")
 	@Implement(v1.reporting.getAhsrMetrics)
 	async getAhsrMetrics() {
 		return implement(v1.reporting.getAhsrMetrics).handler(async ({ input }) => {
@@ -97,6 +108,7 @@ export class ReportingController {
 		})
 	}
 
+	@RequirePermission("reporting", "view")
 	@Implement(v1.reporting.getAhsrRealTime)
 	async getAhsrRealTime() {
 		return implement(v1.reporting.getAhsrRealTime).handler(async ({ input }) => {
@@ -104,6 +116,7 @@ export class ReportingController {
 		})
 	}
 
+	@RequirePermission("reporting", "edit")
 	@Implement(v1.reporting.drilldownAhsr)
 	async drilldownAhsr() {
 		return implement(v1.reporting.drilldownAhsr).handler(async ({ input }) => {
@@ -111,6 +124,7 @@ export class ReportingController {
 		})
 	}
 
+	@RequirePermission("reporting", "export")
 	@Implement(v1.reporting.exportAhsr)
 	async exportAhsr(@Session() session: UserSession) {
 		return implement(v1.reporting.exportAhsr).handler(async ({ input }) => {

@@ -3,6 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { env } from "@/env"
+import { orpc } from "@/services/orpc/client"
+import { useOfflineNursingMutation } from "@/features/nursing/lib/use-offline-mutation"
 
 const API_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/nursing`
 
@@ -228,16 +230,20 @@ interface CreateVitalInput {
 }
 
 export function useCreateVitalMutation() {
-	const queryClient = useQueryClient()
-	return useMutation({
-		mutationFn: (data: CreateVitalInput) =>
-			fetchJson<VitalSign>(`${API_BASE}/vitals`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
+	return useOfflineNursingMutation<VitalSign, CreateVitalInput>({
+		endpoint: `${API_BASE}/vitals`,
+		method: "POST",
+		recordType: "vital_sign",
+		describe: (d) => {
+			const parts: string[] = []
+			if (d.bpSystolic && d.bpDiastolic) parts.push(`BP ${d.bpSystolic}/${d.bpDiastolic}`)
+			if (d.heartRate) parts.push(`HR ${d.heartRate}`)
+			if (d.temperature) parts.push(`T ${d.temperature}°C`)
+			if (d.spo2) parts.push(`SpO₂ ${d.spo2}%`)
+			return parts.length ? parts.join(", ") : "Vital signs"
 		},
+		facilityId: (d) => d.facilityId,
+		encounterId: (d) => d.encounterId ?? d.preEncounterId ?? "",
 	})
 }
 
@@ -407,16 +413,14 @@ interface CreateIoEntryInput {
 }
 
 export function useCreateIoEntryMutation() {
-	const queryClient = useQueryClient()
-	return useMutation({
-		mutationFn: (data: CreateIoEntryInput) =>
-			fetchJson<IoEntry>(`${API_BASE}/io`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
-		},
+	return useOfflineNursingMutation<IoEntry, CreateIoEntryInput>({
+		endpoint: `${API_BASE}/io`,
+		method: "POST",
+		recordType: "io_entry",
+		describe: (d) =>
+			`${d.ioType === "intake" ? "Intake" : "Output"} — ${d.route}${d.description ? ` (${d.description})` : ""} ${d.amountMl} mL`,
+		facilityId: (d) => d.facilityId,
+		encounterId: (d) => d.encounterId ?? d.preEncounterId ?? "",
 	})
 }
 
@@ -515,16 +519,13 @@ interface CreateHandoffInput {
 }
 
 export function useCreateHandoffMutation() {
-	const queryClient = useQueryClient()
-	return useMutation({
-		mutationFn: (data: CreateHandoffInput) =>
-			fetchJson<ShiftHandoff>(`${API_BASE}/handoffs`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
-		},
+	return useOfflineNursingMutation<ShiftHandoff, CreateHandoffInput>({
+		endpoint: `${API_BASE}/handoffs`,
+		method: "POST",
+		recordType: "handoff",
+		describe: (d) => d.handoffNotes ? `Shift handoff: ${d.handoffNotes.slice(0, 60)}` : "Shift handoff note",
+		facilityId: (d) => d.facilityId,
+		encounterId: (d) => d.encounterId,
 	})
 }
 
@@ -583,16 +584,13 @@ interface CreateHaiTagInput {
 }
 
 export function useCreateHaiTagMutation() {
-	const queryClient = useQueryClient()
-	return useMutation({
-		mutationFn: (data: CreateHaiTagInput) =>
-			fetchJson<HaiTag>(`${API_BASE}/hai-tags`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
-		},
+	return useOfflineNursingMutation<HaiTag, CreateHaiTagInput>({
+		endpoint: `${API_BASE}/hai-tags`,
+		method: "POST",
+		recordType: "hai_tag",
+		describe: (d) => `${d.haiType.toUpperCase()} — onset ${d.onsetDate}`,
+		facilityId: (d) => d.facilityId,
+		encounterId: (d) => d.encounterId,
 	})
 }
 
@@ -757,5 +755,95 @@ export function useNewsScoreHistoryQuery(params: {
 				`${API_BASE}/news/history${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
 			),
 		enabled: !!params.encounterId,
+	})
+}
+
+// ============================================================================
+// Consent Records
+// ============================================================================
+
+export const ConsentTypeLabels: Record<string, string> = {
+	general: "General Consent",
+	dpa: "Data Privacy Act (DPA) Consent",
+	nbs: "Newborn Screening Consent",
+	transfusion: "Blood Transfusion Consent",
+	surgery: "Surgical Consent",
+	anesthesia: "Anesthesia Consent",
+	philhealth: "PhilHealth Authorization",
+	do_not_resuscitate: "Do Not Resuscitate (DNR) Order",
+	hiv_testing: "HIV Testing Consent",
+	organ_donation: "Organ Donation Consent",
+	research: "Research Participation Consent",
+	telemedicine: "Telemedicine Consent",
+}
+
+export interface ConsentRecord {
+	id: string
+	facilityId: string
+	encounterId: string | null
+	preEncounterId: string | null
+	consentType: string
+	consentText: string
+	patientSignature: string | null
+	guardianSignature: string | null
+	witnessSignature: string | null
+	capturedByStaffId: string
+	signedAt: string
+	createdAt: string
+}
+
+export interface CreateConsentInput {
+	facilityId: string
+	encounterId?: string
+	preEncounterId?: string
+	consentType: string
+	consentText?: string
+	patientSignature?: string
+	guardianSignature?: string
+	witnessSignature?: string
+}
+
+export function useConsentsQuery(params: {
+	facilityId?: string
+	encounterId?: string
+	preEncounterId?: string
+	consentType?: string
+	page?: number
+	limit?: number
+}) {
+	return useQuery({
+		...orpc.nursing.listConsents.queryOptions({
+			input: {
+				facilityId: params.facilityId,
+				encounterId: params.encounterId,
+				preEncounterId: params.preEncounterId,
+				consentType: params.consentType,
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			enabled: !!(params.encounterId || params.preEncounterId || params.facilityId),
+		}),
+		queryKey: [...nursingKeys.all, "consents", params] as const,
+	})
+}
+
+export function useConsentQuery(id: string | null) {
+	return useQuery({
+		...orpc.nursing.getConsent.queryOptions({
+			input: id ? { id } : undefined,
+			enabled: !!id,
+		}),
+		queryKey: [...nursingKeys.all, "consent", id ?? ""] as const,
+	})
+}
+
+export function useCreateConsentMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: (data: CreateConsentInput) =>
+			orpc.nursing.createConsent.call(data),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
+		},
 	})
 }

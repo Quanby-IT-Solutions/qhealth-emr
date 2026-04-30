@@ -24,7 +24,7 @@ export const PidsrCategoryEnum = z.enum(["category_1", "category_2"])
 
 export const CaseClassificationEnum = z.enum(["suspected", "probable", "confirmed"])
 
-export const PidsrReportStatusEnum = z.enum(["draft", "submitted"])
+export const PidsrReportStatusEnum = z.enum(["draft", "submitted", "rejected", "blocked"])
 
 export const SurveillanceFlagTypeEnum = z.enum(["icd10_match", "syndromic_keyword"])
 
@@ -159,7 +159,11 @@ export const WeeklyReportSummarySchema = z.object({
 			count: z.number(),
 		})
 	),
-	status: z.enum(["generated", "submitted"]),
+	// "generated": assembled but no enabled integration found — not transmitted
+	// "submitted": assembled and successfully transmitted to PIDSR endpoint
+	// "failed":    assembled but transmission attempt failed
+	status: z.enum(["generated", "submitted", "failed"]),
+	transmissionNote: z.string().optional(),
 })
 
 export type WeeklyReportSummary = z.infer<typeof WeeklyReportSummarySchema>

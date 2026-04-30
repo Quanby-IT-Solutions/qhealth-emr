@@ -3,6 +3,8 @@ import { oc } from "@orpc/contract"
 import {
 	ActiveAllergiesResponseSchema,
 	ActiveAllergiesSchema,
+	AllergenSearchResponseSchema,
+	AllergenSearchSchema,
 	AllergyIdSchema,
 	AllergyListResponseSchema,
 	AllergyListSchema,
@@ -10,6 +12,8 @@ import {
 	CreateAllergySchema,
 	CreateProblemSchema,
 	DeactivateAllergySchema,
+	DeleteProblemSchema,
+	Icd10SearchResponseSchema,
 	PatientSummaryResponseSchema,
 	PatientSummarySchema,
 	ProblemIdSchema,
@@ -17,6 +21,9 @@ import {
 	ProblemListSchema,
 	ProblemSchema,
 	ResolveProblemSchema,
+	SnomedCtSearchResponseSchema,
+	SnomedCtSearchSchema,
+	TerminologySearchSchema,
 	UpdateAllergySchema,
 	UpdateProblemSchema,
 } from "./problems-allergies.schema.js"
@@ -76,6 +83,16 @@ export const problemsAllergiesContract = {
 		.input(ResolveProblemSchema)
 		.output(ProblemSchema),
 
+	deleteProblem: oc
+		.route({
+			method: "DELETE",
+			path: "/problems/{id}",
+			summary: "Delete a problem",
+			tags: ["Problems & Allergies"],
+		})
+		.input(DeleteProblemSchema)
+		.output(ProblemSchema),
+
 	// ========================================================================
 	// Allergies
 	// ========================================================================
@@ -129,6 +146,40 @@ export const problemsAllergiesContract = {
 		})
 		.input(DeactivateAllergySchema)
 		.output(AllergySchema),
+
+	// ========================================================================
+	// Terminology / Search
+	// ========================================================================
+
+	searchIcd10: oc
+		.route({
+			method: "GET",
+			path: "/terminology/icd10",
+			summary: "Search ICD-10 codes for problem documentation",
+			tags: ["Problems & Allergies"],
+		})
+		.input(TerminologySearchSchema)
+		.output(Icd10SearchResponseSchema),
+
+	searchSnomedCt: oc
+		.route({
+			method: "GET",
+			path: "/terminology/snomed-ct",
+			summary: "Search SNOMED CT concepts for problem documentation",
+			tags: ["Problems & Allergies"],
+		})
+		.input(SnomedCtSearchSchema)
+		.output(SnomedCtSearchResponseSchema),
+
+	searchAllergens: oc
+		.route({
+			method: "GET",
+			path: "/allergens/search",
+			summary: "Search allergen names",
+			tags: ["Problems & Allergies"],
+		})
+		.input(AllergenSearchSchema)
+		.output(AllergenSearchResponseSchema),
 
 	// ========================================================================
 	// CDS / Cross-module

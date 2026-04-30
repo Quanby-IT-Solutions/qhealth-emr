@@ -50,6 +50,7 @@ export type SlaWorkflowType =
 	| "emergency_triage"
 	| "surgical_scheduling"
 	| "billing_processing"
+	| "certificate_issuance"
 
 export interface SlaConfig {
 	id: string
@@ -67,8 +68,8 @@ export interface SlaEvent {
 	id: string
 	facilityId: string
 	encounterId: string | null
-	patientId: string
-	patientName: string
+	patientId: string | null
+	patientName: string | null
 	workflowType: SlaWorkflowType
 	startedAt: string
 	completedAt: string | null
@@ -79,6 +80,7 @@ export interface SlaEvent {
 	escalatedToStaffId: string | null
 	notes: string | null
 	createdAt: string
+	currentStep?: string | null
 }
 
 export interface SlaEventListResponse {
@@ -93,8 +95,10 @@ export interface SlaConfigListResponse {
 	data: SlaConfig[]
 }
 
-export interface SlaComplianceMetric {
-	workflowType: SlaWorkflowType
+export interface SlaStepMetric {
+	stepStatus: string
+	/** Human-readable label from the backend (resolves TOR step name when known) */
+	stepLabel?: string
 	totalCount: number
 	onTimeCount: number
 	approachingCount: number
@@ -104,11 +108,29 @@ export interface SlaComplianceMetric {
 	avgTargetMinutes: number
 }
 
+export interface SlaComplianceMetric {
+	workflowType: SlaWorkflowType
+	totalCount: number
+	onTimeCount: number
+	approachingCount: number
+	exceededCount: number
+	compliancePct: number
+	avgElapsedMinutes: number
+	avgTargetMinutes: number
+	stepMetrics?: SlaStepMetric[]
+	timingAccuracy?: "checkpoint" | "partial" | "proxy"
+}
+
 export interface SlaComplianceReport {
 	facilityId: string
 	periodStart: string
 	periodEnd: string
+	/** Operational SLA Score — all workflows including proxy/partial timing */
 	overallCompliancePct: number
+	/** ARTA-Authoritative Compliance — checkpoint-backed workflows only */
+	authoritativeCompliancePct: number
+	authoritativeCount: number
+	authoritativeOnTimeCount: number
 	metrics: SlaComplianceMetric[]
 }
 
@@ -162,6 +184,8 @@ export function useSlaEventsQuery(params: {
 						limit: params.limit ?? 50,
 					})
 			),
+		refetchInterval: 30_000,
+		staleTime: 25_000,
 	})
 }
 
@@ -265,6 +289,7 @@ const WORKFLOW_LABELS: Record<SlaWorkflowType, string> = {
 	emergency_triage: "Emergency Triage",
 	surgical_scheduling: "Surgical Scheduling",
 	billing_processing: "Billing Processing",
+	certificate_issuance: "Certificate Issuance (Flow 7)",
 }
 
 export { WORKFLOW_LABELS }
@@ -280,6 +305,7 @@ export const DEFAULT_SLA_TARGETS: Record<SlaWorkflowType, number> = {
 	emergency_triage: 10,
 	surgical_scheduling: 2880, // 2 working days
 	billing_processing: 60,
+	certificate_issuance: 30, // 30 min per TOR Flow 7
 }
 
 export function getSlaStatus(elapsedMinutes: number, targetMinutes: number, warningPct = 80): SlaStatus {
@@ -297,3 +323,128 @@ export function useLocalSlaFacilityId() {
 }
 
 export { buildQueryString, fetchJson }
+
+// ============================================================================
+// SLA Step Config Types
+// ============================================================================
+
+export type SlaStepType =
+	| "opd_triage"
+	| "opd_registration"
+	| "opd_vitals"
+	| "opd_consultation"
+	| "opd_disposition"
+	| "ed_rapid_triage"
+	| "ed_registration"
+	| "ed_disposition"
+	| "ancillary_order_receipt"
+	| "ancillary_payment_clearance"
+	| "ancillary_procedure"
+	| "ancillary_release"
+	| "admission_order"
+	| "admission_bed_assignment"
+	| "admission_financial_orientation"
+	| "admission_physical_transfer"
+	| "discharge_may_go_home"
+	| "discharge_chart_completion"
+	| "discharge_clearance"
+	| "discharge_bill_generation"
+	| "discharge_gate_pass"
+	| "pharmacy_rx_verification"
+	| "pharmacy_clearance"
+	| "pharmacy_dispensing"
+	| "records_request"
+	| "records_payment"
+	| "records_processing_release"
+
+export interface SlaStepConfig {
+	id: string
+	facilityId: string
+	stepType: SlaStepType
+	targetMinutes: number
+	warningThresholdPct: number
+	isActive: boolean
+	description: string
+	createdAt: string
+	updatedAt: string
+}
+
+export interface SlaStepConfigListResponse {
+	data: SlaStepConfig[]
+}
+
+export interface CreateSlaStepConfigInput {
+	facilityId: string
+	stepType: SlaStepType
+	targetMinutes: number
+	warningThresholdPct: number
+	description: string
+}
+
+export interface UpdateSlaStepConfigInput {
+	targetMinutes?: number
+	warningThresholdPct?: number
+	description?: string
+	isActive?: boolean
+}
+
+// ============================================================================
+// SLA Step Config Query Keys
+// ============================================================================
+
+export const slaStepKeys = {
+	all: ["sla-step-configs"] as const,
+	list: (facilityId: string) => [...slaStepKeys.all, facilityId] as const,
+}
+
+// ============================================================================
+// SLA Step Config Hooks
+// ============================================================================
+
+export function useSlaStepConfigsQuery(facilityId: string) {
+	return useQuery<SlaStepConfigListResponse>({
+		queryKey: slaStepKeys.list(facilityId),
+		queryFn: () =>
+			fetchJson(API_BASE + "/step-configs" + buildQueryString({ facilityId })),
+		enabled: !!facilityId,
+	})
+}
+
+export function useCreateSlaStepConfigMutation() {
+	const queryClient = useQueryClient()
+	return useMutation<SlaStepConfig, Error, CreateSlaStepConfigInput>({
+		mutationFn: input =>
+			fetchJson(API_BASE + "/step-configs", {
+				method: "POST",
+				body: JSON.stringify(input),
+			}),
+		onSuccess: (_, variables) => {
+			void queryClient.invalidateQueries({ queryKey: slaStepKeys.list(variables.facilityId) })
+		},
+	})
+}
+
+export function useUpdateSlaStepConfigMutation() {
+	const queryClient = useQueryClient()
+	return useMutation<SlaStepConfig, Error, { id: string; facilityId: string } & UpdateSlaStepConfigInput>({
+		mutationFn: ({ id, facilityId: _fid, ...input }) =>
+			fetchJson(API_BASE + `/step-configs/${id}`, {
+				method: "PATCH",
+				body: JSON.stringify(input),
+			}),
+		onSuccess: (data) => {
+			void queryClient.invalidateQueries({ queryKey: slaStepKeys.list(data.facilityId) })
+		},
+	})
+}
+
+export function useDeleteSlaStepConfigMutation() {
+	const queryClient = useQueryClient()
+	return useMutation<void, Error, { id: string; facilityId: string }>({
+		mutationFn: ({ id }) =>
+			fetchJson(API_BASE + `/step-configs/${id}`, { method: "DELETE" }),
+		onSuccess: (_, variables) => {
+			void queryClient.invalidateQueries({ queryKey: slaStepKeys.list(variables.facilityId) })
+		},
+	})
+}

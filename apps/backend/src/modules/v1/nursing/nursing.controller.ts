@@ -4,6 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
+import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { NursingService } from "./nursing.service"
 
@@ -15,6 +16,7 @@ export class NursingController {
 	// Vital Signs
 	// ========================================================================
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.listVitals)
 	async listVitals() {
 		return implement(v1.nursing.listVitals).handler(async ({ input }) => {
@@ -22,6 +24,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.getVital)
 	async getVital() {
 		return implement(v1.nursing.getVital).handler(async ({ input }) => {
@@ -29,6 +32,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "create")
 	@Implement(v1.nursing.createVital)
 	async createVital(@Session() session: UserSession) {
 		return implement(v1.nursing.createVital).handler(async ({ input }) => {
@@ -40,6 +44,7 @@ export class NursingController {
 	// MAR Entries
 	// ========================================================================
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.listMarEntries)
 	async listMarEntries() {
 		return implement(v1.nursing.listMarEntries).handler(async ({ input }) => {
@@ -47,6 +52,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.getMarEntry)
 	async getMarEntry() {
 		return implement(v1.nursing.getMarEntry).handler(async ({ input }) => {
@@ -54,6 +60,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "create")
 	@Implement(v1.nursing.administerMar)
 	async administerMar(@Session() session: UserSession) {
 		return implement(v1.nursing.administerMar).handler(async ({ input }) => {
@@ -65,6 +72,7 @@ export class NursingController {
 	// TAR Entries
 	// ========================================================================
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.listTarEntries)
 	async listTarEntries() {
 		return implement(v1.nursing.listTarEntries).handler(async ({ input }) => {
@@ -72,6 +80,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.getTarEntry)
 	async getTarEntry() {
 		return implement(v1.nursing.getTarEntry).handler(async ({ input }) => {
@@ -79,6 +88,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "create")
 	@Implement(v1.nursing.createTarEntry)
 	async createTarEntry(@Session() session: UserSession) {
 		return implement(v1.nursing.createTarEntry).handler(async ({ input }) => {
@@ -86,6 +96,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "create")
 	@Implement(v1.nursing.administerTar)
 	async administerTar(@Session() session: UserSession) {
 		return implement(v1.nursing.administerTar).handler(async ({ input }) => {
@@ -97,6 +108,7 @@ export class NursingController {
 	// I/O Entries
 	// ========================================================================
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.listIoEntries)
 	async listIoEntries() {
 		return implement(v1.nursing.listIoEntries).handler(async ({ input }) => {
@@ -104,6 +116,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "create")
 	@Implement(v1.nursing.createIoEntry)
 	async createIoEntry(@Session() session: UserSession) {
 		return implement(v1.nursing.createIoEntry).handler(async ({ input }) => {
@@ -111,6 +124,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.getIoBalance)
 	async getIoBalance() {
 		return implement(v1.nursing.getIoBalance).handler(async ({ input }) => {
@@ -122,6 +136,7 @@ export class NursingController {
 	// Flowsheet Entries
 	// ========================================================================
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.listFlowsheetEntries)
 	async listFlowsheetEntries() {
 		return implement(v1.nursing.listFlowsheetEntries).handler(async ({ input }) => {
@@ -133,6 +148,7 @@ export class NursingController {
 	// Shift Handoffs
 	// ========================================================================
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.listHandoffs)
 	async listHandoffs() {
 		return implement(v1.nursing.listHandoffs).handler(async ({ input }) => {
@@ -140,6 +156,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.getHandoff)
 	async getHandoff() {
 		return implement(v1.nursing.getHandoff).handler(async ({ input }) => {
@@ -147,6 +164,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.generateHandoffSummary)
 	async generateHandoffSummary() {
 		return implement(v1.nursing.generateHandoffSummary).handler(async ({ input }) => {
@@ -154,6 +172,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "create")
 	@Implement(v1.nursing.createHandoff)
 	async createHandoff(@Session() session: UserSession) {
 		return implement(v1.nursing.createHandoff).handler(async ({ input }) => {
@@ -161,6 +180,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "create")
 	@Implement(v1.nursing.finalizeHandoff)
 	async finalizeHandoff(@Session() session: UserSession) {
 		return implement(v1.nursing.finalizeHandoff).handler(async ({ input }) => {
@@ -172,6 +192,7 @@ export class NursingController {
 	// HAI Tags
 	// ========================================================================
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.listHaiTags)
 	async listHaiTags() {
 		return implement(v1.nursing.listHaiTags).handler(async ({ input }) => {
@@ -179,6 +200,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "view")
 	@Implement(v1.nursing.getHaiTag)
 	async getHaiTag() {
 		return implement(v1.nursing.getHaiTag).handler(async ({ input }) => {
@@ -186,6 +208,7 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "create")
 	@Implement(v1.nursing.createHaiTag)
 	async createHaiTag(@Session() session: UserSession) {
 		return implement(v1.nursing.createHaiTag).handler(async ({ input }) => {
@@ -193,10 +216,39 @@ export class NursingController {
 		})
 	}
 
+	@RequirePermission("nursing", "create")
 	@Implement(v1.nursing.updateHaiTag)
 	async updateHaiTag() {
 		return implement(v1.nursing.updateHaiTag).handler(async ({ input }) => {
 			return this.nursingService.updateHaiTag(input)
+		})
+	}
+
+	// ========================================================================
+	// Consent Records
+	// ========================================================================
+
+	@RequirePermission("nursing", "view")
+	@Implement(v1.nursing.listConsents)
+	async listConsents() {
+		return implement(v1.nursing.listConsents).handler(async ({ input }) => {
+			return this.nursingService.findConsentRecords(input)
+		})
+	}
+
+	@RequirePermission("nursing", "view")
+	@Implement(v1.nursing.getConsent)
+	async getConsent() {
+		return implement(v1.nursing.getConsent).handler(async ({ input }) => {
+			return this.nursingService.findConsentRecord(input.id)
+		})
+	}
+
+	@RequirePermission("nursing", "create")
+	@Implement(v1.nursing.createConsent)
+	async createConsent(@Session() session: UserSession) {
+		return implement(v1.nursing.createConsent).handler(async ({ input }) => {
+			return this.nursingService.createConsentRecord(input, session.user.id)
 		})
 	}
 }

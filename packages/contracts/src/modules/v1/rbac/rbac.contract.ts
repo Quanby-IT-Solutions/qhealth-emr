@@ -2,16 +2,24 @@ import { oc } from "@orpc/contract"
 import { z } from "zod"
 
 import {
+	AddFacilityMembershipSchema,
+	AddRoleAssignmentSchema,
+	ArchiveRoleResponseSchema,
 	AssignUserRolesSchema,
 	CreateRoleSchema,
 	CreateStaffProfileSchema,
 	CreateUserSchema,
+	CreateUserWithFacilitiesSchema,
+	CreateUserWithFacilitiesResponseSchema,
 	FacilitySchema,
 	InitiatePasswordResetSchema,
 	LicenseStatusSchema,
 	ListRolesQuerySchema,
 	ListUsersQuerySchema,
 	PaginatedUsersSchema,
+	ReEnableUserSchema,
+	RemoveFacilityMembershipSchema,
+	RemoveRoleAssignmentSchema,
 	RoleIdSchema,
 	RoleSchema,
 	RoleWithPermissionsSchema,
@@ -172,6 +180,16 @@ export const rbacContract = {
 		.input(RoleIdSchema.extend(SetRolePermissionsSchema.shape))
 		.output(RoleWithPermissionsSchema),
 
+	archiveRole: oc
+		.route({
+			method: "DELETE",
+			path: "/roles/{id}",
+			summary: "Archive a role (admin only). System default roles cannot be archived.",
+			tags: ["RBAC"],
+		})
+		.input(RoleIdSchema)
+		.output(ArchiveRoleResponseSchema),
+
 	// ── User-Role Assignment ────────────────────────────────────────────
 
 	assignUserRoles: oc
@@ -219,4 +237,72 @@ export const rbacContract = {
 		})
 		.input(UserIdSchema)
 		.output(z.object({ user: UserSummarySchema, staffProfiles: z.array(StaffProfileWithRolesSchema) })),
+
+	// ── Access Governance — Multi-facility user creation ────────────────
+
+	createUser: oc
+		.route({
+			method: "POST",
+			path: "/users",
+			summary: "Create a user with multi-facility memberships (admin only)",
+			tags: ["RBAC"],
+		})
+		.input(CreateUserWithFacilitiesSchema)
+		.output(CreateUserWithFacilitiesResponseSchema),
+
+	// ── Access Governance — Re-enable user ─────────────────────────────
+
+	reEnableUser: oc
+		.route({
+			method: "POST",
+			path: "/staff/{staffProfileId}/re-enable",
+			summary: "Re-enable a deactivated staff profile (admin only)",
+			tags: ["RBAC"],
+		})
+		.input(ReEnableUserSchema)
+		.output(z.object({ success: z.boolean() })),
+
+	// ── Access Governance — Facility membership ─────────────────────────
+
+	addStaffFacility: oc
+		.route({
+			method: "POST",
+			path: "/users/{userId}/facilities",
+			summary: "Add a facility membership for a user (admin only)",
+			tags: ["RBAC"],
+		})
+		.input(AddFacilityMembershipSchema)
+		.output(z.object({ staffProfileId: z.string().uuid() })),
+
+	removeStaffFacility: oc
+		.route({
+			method: "DELETE",
+			path: "/staff/{staffProfileId}/facilities",
+			summary: "Remove a facility membership (admin only)",
+			tags: ["RBAC"],
+		})
+		.input(RemoveFacilityMembershipSchema)
+		.output(z.object({ success: z.boolean() })),
+
+	// ── Access Governance — Role assignment ─────────────────────────────
+
+	addUserRole: oc
+		.route({
+			method: "POST",
+			path: "/staff/{staffProfileId}/roles",
+			summary: "Add a role to a staff profile (admin only)",
+			tags: ["RBAC"],
+		})
+		.input(AddRoleAssignmentSchema)
+		.output(z.object({ success: z.boolean() })),
+
+	removeUserRole: oc
+		.route({
+			method: "DELETE",
+			path: "/staff/{staffProfileId}/roles/{roleId}",
+			summary: "Remove a role from a staff profile (admin only)",
+			tags: ["RBAC"],
+		})
+		.input(RemoveRoleAssignmentSchema)
+		.output(z.object({ success: z.boolean() })),
 }

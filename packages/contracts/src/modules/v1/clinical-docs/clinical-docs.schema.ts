@@ -56,13 +56,7 @@ export const ConsentTypeEnum = z.enum([
 	"dpa",
 ])
 
-export const ConsentRelationshipEnum = z.enum([
-	"self",
-	"parent",
-	"guardian",
-	"spouse",
-	"other",
-])
+export const ConsentRelationshipEnum = z.enum(["self", "parent", "guardian", "spouse", "other"])
 
 // ============================================================================
 // Template Section Definition (JSONB structure)
@@ -116,9 +110,7 @@ export const NoteTemplateIdSchema = z.object({
 export const NoteTemplateListSchema = PaginationInputSchema.extend({
 	facilityId: z.string().uuid(),
 	category: TemplateCategoryEnum.optional(),
-	isActive: z
-		.union([z.boolean(), z.string().transform(v => v === "true")])
-		.optional(),
+	isActive: z.union([z.boolean(), z.string().transform(v => v === "true")]).optional(),
 })
 
 export const NoteTemplateListResponseSchema = PaginatedResponseSchema.extend({
@@ -201,13 +193,73 @@ export const ClinicalNoteListResponseSchema = PaginatedResponseSchema.extend({
 })
 
 // ============================================================================
+// Note Authoring Context
+// ============================================================================
+
+export const NoteContextInputSchema = z.object({
+	encounterId: z.string().uuid(),
+})
+
+export const NoteContextSchema = z.object({
+	encounterId: z.string().uuid(),
+	patientId: z.string().uuid().nullable(),
+	latestVitals: z
+		.object({
+			id: z.string().uuid(),
+			temperature: z.string().nullable(),
+			bpSystolic: z.number().nullable(),
+			bpDiastolic: z.number().nullable(),
+			heartRate: z.number().nullable(),
+			respiratoryRate: z.number().nullable(),
+			spo2: z.string().nullable(),
+			painScore: z.number().nullable(),
+			weight: z.string().nullable(),
+			height: z.string().nullable(),
+			newsScore: z.number().nullable(),
+			newsRiskLevel: z.enum(["low", "medium", "high"]).nullable(),
+			recordedAt: dateOrString,
+		})
+		.nullable(),
+	activeAllergies: z.array(
+		z.object({
+			id: z.string().uuid(),
+			allergenName: z.string(),
+			allergenType: z.enum(["medication", "food", "environmental"]),
+			reactionType: z.string().nullable(),
+			severity: z.enum(["mild", "moderate", "severe"]),
+			onsetDate: z.string().nullable(),
+		})
+	),
+	recentLabs: z.array(
+		z.object({
+			id: z.string().uuid(),
+			testName: z.string(),
+			panelName: z.string().nullable(),
+			status: z.enum([
+				"pending",
+				"ordered",
+				"collected",
+				"in_progress",
+				"resulted",
+				"completed",
+				"cancelled",
+			]),
+			resultedDatetime: dateOrString.nullable(),
+			results: z.any().nullable(),
+		})
+	),
+})
+
+export type NoteContext = z.infer<typeof NoteContextSchema>
+
+// ============================================================================
 // Note Addenda Schemas
 // ============================================================================
 
 export const CreateAddendumSchema = z.object({
 	noteId: z.string().uuid(),
 	content: z.string().min(1).max(10000),
-	reason: z.string().max(1000).optional(),
+	reason: z.string().min(1).max(1000),
 })
 
 export const SignAddendumSchema = z.object({
@@ -225,7 +277,7 @@ export const AddendumIdSchema = z.object({
 export const ConsentRecordSchema = z.object({
 	id: z.string().uuid(),
 	facilityId: z.string().uuid(),
-	encounterId: z.string().uuid(),
+	encounterId: z.string().uuid().nullable(),
 	patientId: z.string().uuid(),
 	consentType: ConsentTypeEnum,
 	signedByName: z.string(),
@@ -244,7 +296,7 @@ export type ConsentRecord = z.infer<typeof ConsentRecordSchema>
 
 export const CreateConsentRecordSchema = z.object({
 	facilityId: z.string().uuid(),
-	encounterId: z.string().uuid(),
+	encounterId: z.string().uuid().optional(),
 	patientId: z.string().uuid(),
 	consentType: ConsentTypeEnum,
 	signedByName: z.string().min(1).max(255),
@@ -312,14 +364,16 @@ export const Cf4ExtractionResultSchema = z.object({
 	courseInWard: Cf4FieldSourceSchema.nullable(),
 
 	// Vital signs on admission
-	vitalSigns: z.object({
-		bloodPressure: z.string().nullable(),
-		heartRate: z.string().nullable(),
-		respiratoryRate: z.string().nullable(),
-		temperature: z.string().nullable(),
-		oxygenSaturation: z.string().nullable(),
-		sourceNoteId: z.string().uuid().nullable(),
-	}).nullable(),
+	vitalSigns: z
+		.object({
+			bloodPressure: z.string().nullable(),
+			heartRate: z.string().nullable(),
+			respiratoryRate: z.string().nullable(),
+			temperature: z.string().nullable(),
+			oxygenSaturation: z.string().nullable(),
+			sourceNoteId: z.string().uuid().nullable(),
+		})
+		.nullable(),
 
 	// Procedures performed (from operative notes)
 	procedures: z.array(
@@ -413,20 +467,32 @@ export const AnesthesiaNoteDataSchema = z.object({
 	bloodProducts: z.string().nullable(),
 
 	// Vitals during procedure
-	intraOpVitals: z.array(
-		z.object({
-			time: z.string(),
-			bp: z.string().nullable(),
-			hr: z.number().nullable(),
-			spo2: z.number().nullable(),
-			etco2: z.number().nullable(),
-		})
-	).nullable(),
+	intraOpVitals: z
+		.array(
+			z.object({
+				time: z.string(),
+				bp: z.string().nullable(),
+				hr: z.number().nullable(),
+				spo2: z.number().nullable(),
+				etco2: z.number().nullable(),
+			})
+		)
+		.nullable(),
 
 	// Recovery
 	pacuArrivalTime: z.string().nullable(),
 	aldrete: z.number().nullable(),
 	complications: z.string().nullable(),
+})
+
+// ============================================================================
+// FPE Submit
+// ============================================================================
+
+export const SubmitFpeInputSchema = z.object({
+	noteId: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	signedIp: z.string().optional(),
 })
 
 // ============================================================================
@@ -436,3 +502,4 @@ export const AnesthesiaNoteDataSchema = z.object({
 export type Cf4ExtractionResult = z.infer<typeof Cf4ExtractionResultSchema>
 export type OperativeNoteData = z.infer<typeof OperativeNoteDataSchema>
 export type AnesthesiaNoteData = z.infer<typeof AnesthesiaNoteDataSchema>
+export type SubmitFpeInput = z.infer<typeof SubmitFpeInputSchema>

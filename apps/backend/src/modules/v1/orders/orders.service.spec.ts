@@ -5,6 +5,24 @@ import { db } from "@/common/database/database.client"
 import { ProblemsAllergiesService } from "../problems-allergies/problems-allergies.service"
 import { OrdersService } from "./orders.service"
 
+// Bypass the @repo/contracts barrel (which transitively loads @orpc/contract
+// as ESM) — these tests don't use any contract objects at runtime.
+jest.mock("@repo/contracts", () => ({
+	SLA_STEP_DEFAULT_TARGETS: {},
+}))
+
+// resolveStepTarget queries slaStepConfigs which is outside the scope of
+// these orders.service tests. Stub it to a no-op.
+jest.mock("@/utils/sla-step-target", () => ({
+	resolveStepTarget: jest.fn().mockResolvedValue(null),
+}))
+
+// closeOpenSlaStep queries encounterStatusEvents which is outside the scope
+// of these orders.service tests. Stub it to a no-op.
+jest.mock("@/utils/sla-events", () => ({
+	closeOpenSlaStep: jest.fn().mockResolvedValue(undefined),
+}))
+
 jest.mock("@/common/database/database.client", () => ({
 	db: {
 		select: jest.fn(),
@@ -31,6 +49,7 @@ jest.mock("@repo/db/schema", () => {
 		orderVerifications: createTable(),
 		patients: createTable(),
 		prescriptions: createTable(),
+		slaStepConfigs: createTable(),
 		staffProfiles: createTable(),
 		users: createTable(),
 	}
@@ -322,6 +341,9 @@ describe("OrdersService", () => {
 		mockDb.insert.mockImplementationOnce(() =>
 			createInsertBuilder([{ id: "verification-1" }])
 		)
+		// Subsequent insert calls (e.g. encounterStatusEvents for SLA tracking)
+		// — return a no-op chainable builder.
+		mockDb.insert.mockImplementation(() => createInsertBuilder([]))
 		mockDb.update.mockImplementationOnce(() => createUpdateBuilder())
 
 		const result = await service.verifyOrder(
@@ -332,7 +354,7 @@ describe("OrdersService", () => {
 			"user-1"
 		)
 
-		expect(mockDb.insert).toHaveBeenCalledTimes(1)
+		expect(mockDb.insert).toHaveBeenCalled()
 		expect(mockDb.update).toHaveBeenCalledTimes(1)
 		const updateBuilder = mockDb.update.mock.results[0]?.value as ReturnType<typeof createUpdateBuilder>
 		expect(updateBuilder.set).toHaveBeenCalledWith(

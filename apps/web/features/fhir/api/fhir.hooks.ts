@@ -14,6 +14,7 @@ export const FHIR_RESOURCE_TYPES = [
 	"Observation",
 	"DiagnosticReport",
 	"MedicationRequest",
+	"NutritionOrder",
 	"Procedure",
 	"Condition",
 	"Immunization",
@@ -25,6 +26,16 @@ export const FHIR_RESOURCE_TYPES = [
 	"Location",
 ] as const
 
+/**
+ * Resource types not yet backed by real DB queries.
+ * These are shown as disabled options in the export form.
+ */
+export const UNSUPPORTED_FHIR_RESOURCE_TYPES = new Set<FhirResourceType>([
+	"Immunization",
+	"Coverage",
+	"ClaimResponse",
+])
+
 export type FhirResourceType = (typeof FHIR_RESOURCE_TYPES)[number]
 
 // ============================================================================
@@ -35,6 +46,7 @@ export type FhirExportStatus =
 	| "pending"
 	| "processing"
 	| "completed"
+	| "invalid"
 	| "failed"
 	| "submitted"
 	| "accepted"
@@ -222,6 +234,54 @@ export function useSubmitToNhdrMutation() {
 }
 
 // ============================================================================
+// Bundle download
+// ============================================================================
+
+/**
+ * Programmatically fetch the FHIR NDJSON bundle for an export and trigger
+ * a browser file download. This avoids cross-origin anchor href issues by
+ * fetching through the credentialed API base and creating a Blob URL.
+ */
+export async function downloadBundleAsync(exportId: string): Promise<void> {
+	const res = await fetch(API_BASE + `/exports/${exportId}/bundle`, {
+		credentials: "include",
+	})
+	if (!res.ok) {
+		const text = await res.text().catch(() => res.statusText)
+		throw new Error(text || `HTTP ${res.status}`)
+	}
+	const data = (await res.json()) as { ndjson: string; filename: string }
+	const blob = new Blob([data.ndjson], { type: "application/x-ndjson" })
+	const url = URL.createObjectURL(blob)
+	const a = document.createElement("a")
+	a.href = url
+	a.download = data.filename
+	document.body.appendChild(a)
+	a.click()
+	document.body.removeChild(a)
+	URL.revokeObjectURL(url)
+}
+
+// ============================================================================
+// System status
+// ============================================================================
+
+export interface FhirSystemStatus {
+	nhdrMode: "mock" | "real"
+	nhdrConfigured: boolean
+	nhdrBaseUrl: string | null
+	nhdrEndpointNote: string
+}
+
+export function useNhdrSystemStatusQuery(facilityId: string) {
+	return useQuery<FhirSystemStatus>({
+		queryKey: ["fhir", "system-status", facilityId],
+		queryFn: () => fetchJson(API_BASE + "/system-status" + buildQueryString({ facilityId })),
+		enabled: !!facilityId,
+	})
+}
+
+// ============================================================================
 // Helpers
 // ============================================================================
 
@@ -232,6 +292,8 @@ export function getExportStatusColor(status: FhirExportStatus): string {
 			return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
 		case "completed":
 			return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+		case "invalid":
+			return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
 		case "submitted":
 			return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
 		case "accepted":
@@ -264,6 +326,8 @@ export function formatExportStatusLabel(status: FhirExportStatus): string {
 			return "Processing"
 		case "completed":
 			return "Completed"
+		case "invalid":
+			return "Validation Failed"
 		case "failed":
 			return "Failed"
 		case "submitted":

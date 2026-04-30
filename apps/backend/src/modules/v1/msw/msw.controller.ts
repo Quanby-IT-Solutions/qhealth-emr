@@ -4,6 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
+import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { MswService } from "./msw.service"
 
@@ -11,6 +12,7 @@ import { MswService } from "./msw.service"
 export class MswController {
 	constructor(private readonly mswService: MswService) {}
 
+	@RequirePermission("msw", "view")
 	@Implement(v1.msw.list)
 	async list() {
 		return implement(v1.msw.list).handler(async ({ input }) => {
@@ -18,6 +20,7 @@ export class MswController {
 		})
 	}
 
+	@RequirePermission("msw", "view")
 	@Implement(v1.msw.get)
 	async get() {
 		return implement(v1.msw.get).handler(async ({ input }) => {
@@ -25,6 +28,7 @@ export class MswController {
 		})
 	}
 
+	@RequirePermission("msw", "view")
 	@Implement(v1.msw.getByEncounter)
 	async getByEncounter() {
 		return implement(v1.msw.getByEncounter).handler(async ({ input }) => {
@@ -32,6 +36,7 @@ export class MswController {
 		})
 	}
 
+	@RequirePermission("msw", "create")
 	@Implement(v1.msw.create)
 	async create(@Session() session: UserSession) {
 		return implement(v1.msw.create).handler(async ({ input }) => {
@@ -39,6 +44,7 @@ export class MswController {
 		})
 	}
 
+	@RequirePermission("msw", "edit")
 	@Implement(v1.msw.update)
 	async update(@Session() session: UserSession) {
 		return implement(v1.msw.update).handler(async ({ input }) => {
@@ -47,6 +53,7 @@ export class MswController {
 		})
 	}
 
+	@RequirePermission("msw", "edit")
 	@Implement(v1.msw.issueCoe)
 	async issueCoe(@Session() session: UserSession) {
 		return implement(v1.msw.issueCoe).handler(async ({ input }) => {
@@ -54,6 +61,7 @@ export class MswController {
 		})
 	}
 
+	@RequirePermission("msw", "edit")
 	@Implement(v1.msw.addMalasakit)
 	async addMalasakit(@Session() session: UserSession) {
 		return implement(v1.msw.addMalasakit).handler(async ({ input }) => {
@@ -62,6 +70,7 @@ export class MswController {
 		})
 	}
 
+	@RequirePermission("msw", "edit")
 	@Implement(v1.msw.captureAnnexSignature)
 	async captureAnnexSignature(@Session() session: UserSession) {
 		return implement(v1.msw.captureAnnexSignature).handler(async ({ input }) => {
@@ -70,6 +79,7 @@ export class MswController {
 		})
 	}
 
+	@RequirePermission("msw", "edit")
 	@Implement(v1.msw.tagBenefits)
 	async tagBenefits(@Session() session: UserSession) {
 		return implement(v1.msw.tagBenefits).handler(async ({ input }) => {

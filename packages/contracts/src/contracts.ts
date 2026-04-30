@@ -5,17 +5,44 @@
 
 // V1 contracts (routers)
 export { v1Contract } from "./modules/v1/v1.contract.js"
-export type { V1Contract } from "./modules/v1/v1.contract.js"
+
+// Admin dashboard schemas — exported for frontend and backend consumption
+export type {
+	AdminDashboardSummary,
+	AdminDashboardAlert,
+	AdminSummaryCard,
+	RecentChange,
+	AccessGovernanceSection,
+	PlatformControlSection,
+	IntegrationHealthSection,
+	AuditSummarySection,
+	ArtaSlaSection,
+	OfflineReadinessSection,
+	StatutoryReadinessSection,
+	StatutoryOpsSection,
+	DataQualitySection,
+	HimOpsSection,
+	ExportAuditRecord,
+	ExportComplianceList,
+	ExportComplianceQuery,
+	CivilRegistryOpsSection,
+	MedicationComplianceSection,
+} from "./modules/v1/admin-dashboard/admin-dashboard.schema.js"
+
+// FHIR schemas — exported for backend service typing
+export type { FhirSystemStatus } from "./modules/v1/fhir/fhir.schema.js"
 
 // Patient schemas — exported for frontend validation (e.g. CreatePatientSchema.safeParse)
 export {
 	CreatePatientSchema,
 	UpdatePatientSchema,
 	PatientSearchSchema,
+	RegisterPatientWithOpdEncounterInputSchema,
 	type CreatePatientInput,
 	type UpdatePatientInput,
 	type PatientSearchInput,
 	type Patient,
+	type RegisterPatientWithOpdEncounterInput,
 } from "./modules/v1/patients/patients.schema.js"
 
 // Encounter schemas — exported for shared types (e.g. EncounterDetail in chart context)
@@ -50,6 +77,10 @@ export {
 export {
 	SlaStatusEnum,
 	SlaWorkflowTypeEnum,
+	SlaStepTypeEnum,
+	SLA_STEP_LABELS,
+	SLA_STEP_DEFAULT_TARGETS,
+	SLA_STEP_TO_EVENT_STATUS,
 	SlaConfigSchema,
 	SlaEventSchema,
 	SlaEventsQuerySchema,
@@ -60,8 +91,11 @@ export {
 	UpdateSlaConfigSchema,
 	SlaComplianceQuerySchema,
 	SlaComplianceReportSchema,
+	SlaStepMetricSchema,
+	SlaComplianceMetricSchema,
 	type SlaStatus,
 	type SlaWorkflowType,
+	type SlaStepType,
 	type SlaConfig,
 	type SlaEvent,
 	type SlaEventsQuery,
@@ -72,7 +106,28 @@ export {
 	type UpdateSlaConfig,
 	type SlaComplianceQuery,
 	type SlaComplianceReport,
+	type SlaStepMetric,
+	type SlaComplianceMetric,
+	type SlaStepConfig,
+	type SlaStepConfigsQuery,
+	type SlaStepConfigsResponse,
+	type CreateSlaStepConfig,
+	type UpdateSlaStepConfig,
 } from "./modules/v1/sla/sla.schema.js"
+
+// OPD Triage schemas — exported for frontend validation and types
+export {
+	OpdTriageIntakeSchema,
+	CreateOpdTriageIntakeSchema,
+	OpdTriageIntakeIdSchema,
+	LinkOpdTriageToPatientSchema,
+	ListPendingTriageSchema,
+	OpdTriageIntakeWithPatientSchema,
+	type OpdTriageIntake,
+	type CreateOpdTriageIntakeInput,
+	type LinkOpdTriageToPatientInput,
+	type OpdTriageIntakeWithPatient,
+} from "./modules/v1/opd-triage/opd-triage.schema.js"
 
 // NBS schemas — exported for frontend validation and types
 export {
@@ -178,9 +233,19 @@ export {
 	NutritionAssessmentSchema,
 	CreateNutritionAssessmentSchema,
 	MealPlanSchema,
+	ScreeningScoreInputSchema,
+	ScreeningScoreResultSchema,
+	Nrs2002InputSchema,
+	MustInputSchema,
+	SgaInputSchema,
 	type NutritionAssessment,
 	type CreateNutritionAssessment,
 	type MealPlan,
+	type ScreeningScoreInput,
+	type ScreeningScoreResult,
+	type Nrs2002Input,
+	type MustInput,
+	type SgaInput,
 } from "./modules/v1/nutrition/nutrition.schema.js"
 
 // MSW (Medical Social Work) schemas — exported for frontend validation
@@ -249,3 +314,9 @@ export {
 // export { v2Contract, type V2Contract } from "./modules/v2/v2.contract.js"
 // export const v2 = { ... }
 // export type { Todo as V2Todo, ... } from "./modules/v2/..."
+
+// System settings schemas — exported for frontend consumption
+export type {
+	SystemSettings,
+	TriggerOfflineCacheJobResult,
+} from "./modules/v1/system-settings/system-settings.schema.js"

@@ -1,21 +1,29 @@
 import "dotenv/config"
 
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 
 import { createDBClient } from "./client.js"
 import {
 	allergies,
 	ahsrSnapshots,
+	auditLogs,
 	beds,
+	breakGlassEvents,
 	chargeMasterItems,
 	charges,
 	clinicalNotes,
 	drugBrands,
 	drugGenerics,
 	encounters,
+	facilityProfiles,
 	facilities,
+	featureFlags,
+	featureFlagTargets,
+	flowsheetEntries,
 	formularyItems,
+	haiTags,
 	imagingOrders,
+	integrations,
 	invoiceLineItems,
 	invoices,
 	ioEntries,
@@ -23,6 +31,7 @@ import {
 	marEntries,
 	medicationOrders,
 	noteTemplates,
+	consentRecords,
 	patients,
 	payments,
 	pidsrCases,
@@ -30,8 +39,10 @@ import {
 	problems,
 	rolePermissions,
 	roles,
+	shiftHandoffs,
 	staffProfiles,
 	surveillanceFlags,
+	systemSettings,
 	tarEntries,
 	userRoles,
 	users,
@@ -51,6 +62,29 @@ if (!DATABASE_URL) {
 
 const db = createDBClient(DATABASE_URL)
 
+async function assertSeedSchemaReady() {
+	const result = await db.execute(
+		sql`SELECT to_regclass('public.facilities') AS facilities, to_regclass('public.problems') AS problems`
+	)
+	const row = result.rows[0] as
+		| {
+				facilities?: string | null
+				problems?: string | null
+		  }
+		| undefined
+
+	if (!row?.facilities || !row?.problems) {
+		throw new Error(
+			'Database schema is not initialized. Run "pnpm db:push" before running "pnpm db:seed".'
+		)
+	}
+}
+
+async function ensureProblemsTerminologyColumns() {
+	await db.execute(sql`ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "snomed_code" text`)
+	await db.execute(sql`ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "snomed_display" text`)
+}
+
 type ModuleName =
 	| "adt"
 	| "clinical_docs"
@@ -67,8 +101,22 @@ type ModuleName =
 	| "laboratory"
 	| "radiology"
 	| "scheduling"
+	| "feature_flags"
+	| "system_settings"
+	| "facility_profile"
+	| "integration_registry"
+	| "patients"
+	| "telemedicine"
+	| "ed"
+	| "nbs"
+	| "msw"
+	| "death_reporting"
+	| "fhir"
+	| "civil_registry"
+	| "medical_records"
+	| "notifications"
 
-type ActionName = "view" | "create" | "edit" | "sign" | "delete" | "verify" | "export"
+type ActionName = "view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "manage_catalog" | "clinical_policy" | "terminology_admin"
 
 interface DemoUser {
 	email: string
@@ -237,21 +285,23 @@ const demoUsers: DemoUser[] = [
 ]
 
 const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
+	// TOR: System Admin manages configuration, users, roles, and feature flags.
+	// Has NO clinical write access (no create/edit/sign/verify/delete on clinical modules).
 	Administrator: [
-		["adt", ["view", "create", "edit", "delete", "export"]],
-		["clinical_docs", ["view", "create", "edit", "sign", "delete", "export"]],
-		["orders", ["view", "create", "edit", "sign", "verify", "delete"]],
-		["nursing", ["view", "create", "edit", "sign"]],
-		["billing", ["view", "create", "edit", "delete", "export"]],
-		["formulary", ["view", "create", "edit", "delete"]],
-		["reporting", ["view", "create", "edit", "verify", "export"]],
-		["audit", ["view", "export"]],
-		["admin", ["view", "create", "edit", "delete", "export"]],
-		["opd", ["view"]], // OPD dashboard access
+		["admin", ["view", "create", "edit", "delete", "export"]], // User/role management
+		["feature_flags", ["view", "create", "edit", "delete"]], // Feature flag management
+		["system_settings", ["view", "create", "edit"]], // System configuration
+		["facility_profile", ["view", "create", "edit"]], // Facility profile management
+		["integration_registry", ["view", "create", "edit", "delete"]], // Integration oversight
+		["adt", ["view"]], // Census visibility (no clinical write)
+		["formulary", ["view"]], // Formulary catalog read-only — TOR: System Admin has no clinical write access
+		["fhir", ["view", "export"]], // FHIR export management
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Physician: [
 		// Physicians view patients and create encounters, but don't manage scheduling/beds (Registrar's job)
 		["adt", ["view", "create"]],
+		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
 		["orders", ["view", "create", "edit", "sign"]],
 		["nursing", ["view"]],
@@ -259,92 +309,159 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["formulary", ["view"]],
 		["reporting", ["view", "create"]],
 		["opd", ["view"]], // OPD dashboard access
+		["telemedicine", ["view", "create", "edit"]], // Virtual consultation access
+		["ed", ["view"]], // Emergency department patient viewing
+		["death_reporting", ["view", "create", "edit"]], // Physician authors FMDRF/FNDRF forms
+		["audit", ["create"]], // Break-glass emergency access invocation
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Nurse: [
 		["adt", ["view", "edit"]], // edit for bed management access
-		["clinical_docs", ["view", "create", "edit"]],
+		["patients", ["view"]], // Patient record access (search, profile)
+		["clinical_docs", ["view"]],
 		["orders", ["view"]],
 		["nursing", ["view", "create", "edit", "sign"]],
 		["formulary", ["view"]],
-		// NO opd:view — Nurses work in wards/ED, not OPD
+		["ed", ["view"]], // Emergency department access
+		["nbs", ["view", "create", "edit"]], // Newborn screening workflows
+		["opd", ["view"]], // TOR: Nurses participate in OPD triage and vital-sign capture
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Pharmacist: [
 		["orders", ["view", "edit", "verify"]],
-		["formulary", ["view", "create", "edit"]],
+		["formulary", ["view", "create", "edit", "manage_catalog", "clinical_policy"]], // manage_catalog: drug generic/brand catalog master-data authoring
 		["clinical_docs", ["view"]],
+		["patients", ["view"]], // Patient record access for dispensing verification
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Billing Officer": [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access for billing reconciliation
 		["billing", ["view", "create", "edit", "export"]],
 		["clinical_docs", ["view"]],
 		["reporting", ["view", "export"]],
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"PIDSR Officer": [
+		["patients", ["view"]], // Patient record access for disease surveillance
 		["clinical_docs", ["view"]],
 		["reporting", ["view", "create", "edit", "verify", "export"]],
-		["audit", ["view", "export"]],
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Registrar: [
 		["adt", ["view", "create", "edit"]],
+		["patients", ["view", "create", "edit"]], // TOR: Registrar views, creates and updates patient records
 		["opd", ["view"]], // OPD dashboard access for patient routing
+		["death_reporting", ["view"]], // TOR: Registrar issues and tracks death certificates (FMDRF/FNDRF)
+		["civil_registry", ["view", "create", "edit"]], // TOR: Registrar registers births/deaths via civil registry forms
+		["medical_records", ["view"]], // TOR: Registrar processes medical certificate requests
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Triage Officer": [
 		["adt", ["view", "create"]],
+		["patients", ["view"]], // Patient record access for triage intake lookup
+		["clinical_docs", ["view"]], // TOR: Triage needs allergy/problem history for patient safety
 		["nursing", ["view", "create"]],
+		["ed", ["view", "create"]], // Emergency department triage workflows
+		["opd", ["view"]], // TOR: Triage Officers staff the OPD triage desk
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Surgeon: [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
 		["orders", ["view", "create", "sign"]],
-		["surgical", ["view"]], // Surgical tab visibility
+		["surgical", ["view", "create", "edit"]], // Surgical tab visibility + create/save operation/anesthesia records
 		["formulary", ["view"]],
 		["opd", ["view"]], // OPD dashboard access (per TOR)
+		["death_reporting", ["view", "create", "edit"]], // Surgeon may author FMDRF/FNDRF for surgical cases
+		["audit", ["create"]], // Break-glass emergency access invocation
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Anesthesiologist: [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
 		["orders", ["view", "create"]],
-		["surgical", ["view"]], // Surgical tab visibility
+		["surgical", ["view", "edit"]], // Surgical tab visibility + save anesthesia records
 		["formulary", ["view"]],
+		["audit", ["create"]], // Break-glass emergency access invocation
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Lab Technologist": [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access for order lookup
 		["orders", ["view", "edit"]],
 		["laboratory", ["view", "edit"]],
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Radiologist: [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access for imaging lookup
 		["radiology", ["view", "edit"]],
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Blood Bank Technician": [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access for blood bank orders
 		["orders", ["view", "edit"]],
-		["laboratory", ["view"]], // Blood Bank nav access
+		["laboratory", ["view", "create", "edit"]], // Blood Bank nav + submit cross-match + approve/bedside verify
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"HIM Coder": [
 		["adt", ["view"]],
-		["clinical_docs", ["view", "create", "edit"]],
+		["patients", ["view"]], // Patient record access for coding and HIM
+		["clinical_docs", ["view", "edit"]],
 		["reporting", ["view"]], // HAI tracking and report access
+		["medical_records", ["view", "create", "edit"]], // TOR: HIM manages medical records release and chart completion
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Medical Social Worker": [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access for social work assessment
 		["billing", ["view"]],
 		["clinical_docs", ["view"]],
+		["msw", ["view", "create", "edit"]], // MSW assessment and COE workflows
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Clinical Dietitian": [
 		["adt", ["view"]],
+		["patients", ["view"]], // Patient record access for dietary assessment
 		// Dietitians use nutrition module, not nursing (avoids unintended nav visibility)
 		["nutrition", ["view", "edit"]],
 		["clinical_docs", ["view"]],
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Scheduler: [
 		["adt", ["view", "create"]],
+		["patients", ["view"]], // Patient record access for appointment scheduling
 		["scheduling", ["view", "create", "edit"]],
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 	Auditor: [
 		["adt", ["view"]],
+		["patients", ["view"]], // TOR: Auditor/Privacy Officer has read-all access
+		["clinical_docs", ["view"]], // TOR: clinical documentation audit
+		["nursing", ["view"]], // TOR: nursing records audit
+		["orders", ["view"]], // TOR: medication order audit trail
+		["billing", ["view"]], // TOR: billing and charge audit
+		["formulary", ["view"]], // TOR: formulary compliance audit
+		["laboratory", ["view"]], // TOR: lab result audit
+		["radiology", ["view"]], // TOR: imaging order audit
 		["audit", ["view", "export"]],
 		["reporting", ["view"]],
+		["telemedicine", ["view"]], // TOR: telemedicine encounter audit
+		["msw", ["view"]], // TOR: social work assessment audit
+		["nutrition", ["view"]], // TOR: nutrition assessment audit
+		["nbs", ["view"]], // TOR: newborn screening audit
+		["surgical", ["view"]], // TOR: surgical record audit
+		["ed", ["view"]], // TOR: emergency department audit
+		["death_reporting", ["view"]], // TOR: death certificate audit
+		["scheduling", ["view"]], // TOR: scheduling audit
+		["civil_registry", ["view"]], // TOR: civil registry audit
+		["medical_records", ["view"]], // TOR: medical records release audit
+		["opd", ["view"]], // TOR: OPD encounter audit
+		["notifications", ["view"]], // All staff receive system notifications
 	],
 }
 
@@ -678,6 +795,24 @@ async function ensureClinicalData(params: {
 			.returning()
 	}
 
+	// PS-003: Seed a dedicated OPD Consultation SOAP template so consultation notes are structured
+	const [consultTemplate] = await db
+		.select()
+		.from(noteTemplates)
+		.where(and(eq(noteTemplates.facilityId, params.facilityId), eq(noteTemplates.name, "Outpatient Consultation (SOAP)")))
+	if (!consultTemplate) {
+		await db
+			.insert(noteTemplates)
+			.values({
+				facilityId: params.facilityId,
+				name: "Outpatient Consultation (SOAP)",
+				category: "consultation",
+				sections: ["Subjective", "Objective", "Assessment", "Plan"],
+				isActive: true,
+				createdByStaffId: params.staffId,
+			})
+	}
+
 	const [note] = await db
 		.select()
 		.from(clinicalNotes)
@@ -983,8 +1118,780 @@ async function ensureNursingAndOrders(params: {
 	}
 }
 
+async function seedAdminScenarios(params: {
+	facilityId: string
+	adminUserId: string
+	adminStaffId: string
+	doctorStaffId: string
+	patientId: string
+}) {
+	const { facilityId, adminUserId, adminStaffId, doctorStaffId, patientId } = params
+
+	// ── Facility Profile (partially complete to trigger dashboard alert) ───────
+	const [existingProfile] = await db
+		.select()
+		.from(facilityProfiles)
+		.where(eq(facilityProfiles.facilityId, facilityId))
+	if (!existingProfile) {
+		await db.insert(facilityProfiles).values({
+			facilityId,
+			facilityCode: "QH-MAIN",
+			governingAuthority: "DOH Region NCR",
+			addressLine1: "123 Mabini Street",
+			city: "Quezon City",
+			province: "Metro Manila",
+			// Intentionally omitting zipCode, telephone, email, adminContactName,
+			// adminContactEmail to keep profile ~60% complete for demo
+		})
+	}
+
+	// ── System Settings ───────────────────────────────────────────────────────
+	const [existingSettings] = await db
+		.select()
+		.from(systemSettings)
+		.where(eq(systemSettings.facilityId, facilityId))
+	if (!existingSettings) {
+		await db.insert(systemSettings).values({
+			facilityId,
+			timezone: "Asia/Manila",
+			chartRetentionYears: 10,
+			// supportMailbox and serviceDeskHotline intentionally omitted
+			// to trigger "missing critical settings" dashboard alert
+			breakGlassRequiresReason: true,
+			autoFreezeChargesOnDischarge: true,
+			requireDpaConsentBeforeExport: true,
+			enableOfflineSummaryCache: false,
+			policySections: {
+				artaSla: { targetMinutes: 30, enableBanner: true },
+				exportDefaults: { defaultFormat: "ndjson" },
+			},
+			updatedAt: new Date(),
+		})
+	}
+
+	// ── Feature Flags (include one high-risk enabled flag) ────────────────────
+	const flagDefs = [
+		{
+			key: "break-glass-auto-expire",
+			name: "Break-Glass Auto Expiry",
+			description: "Automatically expire emergency access sessions after 4 hours.",
+			group: "compliance" as const,
+			riskLevel: "low" as const,
+			defaultEnabled: true,
+		},
+		{
+			key: "fhir-r4-export",
+			name: "FHIR R4 Export",
+			description: "Enable FHIR R4-compatible patient data export for NHDR submission.",
+			group: "integration" as const,
+			riskLevel: "moderate" as const,
+			defaultEnabled: false,
+		},
+		{
+			key: "offline-summary-cache",
+			name: "Offline Summary Cache",
+			description: "Cache active patient summaries for offline access in low-connectivity areas.",
+			group: "platform-control" as const,
+			riskLevel: "high" as const,
+			defaultEnabled: true, // High-risk + enabled → triggers dashboard alert
+		},
+	]
+	for (const def of flagDefs) {
+		const [existing] = await db
+			.select()
+			.from(featureFlags)
+			.where(eq(featureFlags.key, def.key))
+		if (!existing) {
+			await db.insert(featureFlags).values(def)
+		}
+	}
+
+	// ── Integrations (include one failed and one with missing credentials) ────
+	const integrationDefs = [
+		{
+			kind: "fhir" as const,
+			name: "NHDR FHIR R4",
+			endpointUrl: "https://nhdr.doh.gov.ph/fhir/r4",
+			credentialsRef: "NHDR_API_KEY",
+			enabled: true,
+			lastSyncAt: new Date(Date.now() - 36 * 60 * 60 * 1000), // 36h ago → stale
+			lastSyncStatus: "error" as const,
+		},
+		{
+			kind: "philhealth" as const,
+			name: "PhilHealth eClaims",
+			endpointUrl: "https://eclaims.philhealth.gov.ph/api",
+			credentialsRef: null, // No credentials → triggers alert
+			enabled: true,
+			lastSyncAt: null,
+			lastSyncStatus: null,
+		},
+		{
+			kind: "civil_registry" as const,
+			name: "PSA Civil Registry",
+			endpointUrl: "https://api.psa.gov.ph/civil-registry",
+			credentialsRef: "PSA_API_KEY",
+			enabled: false, // Disabled
+			lastSyncAt: null,
+			lastSyncStatus: null,
+		},
+	]
+	for (const def of integrationDefs) {
+		const [existing] = await db
+			.select()
+			.from(integrations)
+			.where(
+				and(
+					eq(integrations.facilityId, facilityId),
+					eq(integrations.kind, def.kind),
+					eq(integrations.name, def.name)
+				)
+			)
+		if (!existing) {
+			await db.insert(integrations).values({ facilityId, ...def })
+		}
+	}
+
+	// ── Audit Logs (privileged changes for dashboard visibility) ──────────────
+	const auditEntries = [
+		{
+			entityType: "feature_flag",
+			action: "update" as const,
+			description: "Enabled offline-summary-cache flag",
+		},
+		{
+			entityType: "role_permission",
+			action: "create" as const,
+			description: "Added admin:export to Administrator role",
+		},
+		{
+			entityType: "integration",
+			action: "create" as const,
+			description: "Added NHDR FHIR R4 integration",
+		},
+	]
+	for (const entry of auditEntries) {
+		await db.insert(auditLogs).values({
+			facilityId,
+			userId: adminUserId,
+			staffProfileId: adminStaffId,
+			action: entry.action,
+			entityType: entry.entityType,
+			entityId: crypto.randomUUID(),
+			metadata: { description: entry.description },
+			createdAt: new Date(Date.now() - Math.random() * 5 * 24 * 60 * 60 * 1000),
+		})
+	}
+
+	// ── Break-Glass Event (for dashboard audit widget) ────────────────────────
+	const [existingBg] = await db
+		.select()
+		.from(breakGlassEvents)
+		.where(
+			and(
+				eq(breakGlassEvents.facilityId, facilityId),
+				eq(breakGlassEvents.clinicianStaffId, doctorStaffId)
+			)
+		)
+	if (!existingBg) {
+		const expiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000)
+		await db.insert(breakGlassEvents).values({
+			facilityId,
+			clinicianStaffId: doctorStaffId,
+			patientId,
+			reasonCategory: "emergency",
+			justification: "Patient unconscious, no prior consent; emergency clinical access required.",
+			accessGrantedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+			accessExpiresAt: expiresAt,
+			reviewStatus: "pending",
+		})
+	}
+
+	console.log("  ✓ Admin dashboard seed scenarios complete")
+}
+
+// ============================================================================
+// NURSING SCENARIOS — Rich seed data for testing all nurse-role features
+// ============================================================================
+
+async function ensureNursingScenarios(params: {
+	facilityId: string
+	erEncounterId: string
+	inpatientEncounterId: string
+	erPatientId: string
+	inpatientPatientId: string
+	nurseStaffId: string
+	doctorStaffId: string
+	paracetamolFormulaId: string
+}) {
+	const { facilityId, erEncounterId, inpatientEncounterId, erPatientId, inpatientPatientId, nurseStaffId, doctorStaffId, paracetamolFormulaId } = params
+	const now = new Date()
+	const h = (hours: number) => new Date(now.getTime() + hours * 3_600_000)
+
+	// ── Amlodipine drug → formulary (for inpatient hypertension order) ────────
+	let [amlodipineGeneric] = await db
+		.select()
+		.from(drugGenerics)
+		.where(eq(drugGenerics.genericName, "Amlodipine"))
+	if (!amlodipineGeneric) {
+		;[amlodipineGeneric] = await db
+			.insert(drugGenerics)
+			.values({ genericName: "Amlodipine", rxnormCode: "17767", atcCode: "C08CA01" })
+			.returning()
+	}
+
+	let [amlodipineBrand] = await db
+		.select()
+		.from(drugBrands)
+		.where(and(eq(drugBrands.drugGenericId, amlodipineGeneric!.id), eq(drugBrands.brandName, "Norvasc")))
+	if (!amlodipineBrand) {
+		;[amlodipineBrand] = await db
+			.insert(drugBrands)
+			.values({ drugGenericId: amlodipineGeneric!.id, brandName: "Norvasc", manufacturer: "Pfizer" })
+			.returning()
+	}
+
+	let [amlodipineFormulary] = await db
+		.select()
+		.from(formularyItems)
+		.where(and(eq(formularyItems.facilityId, facilityId), eq(formularyItems.drugGenericId, amlodipineGeneric!.id)))
+	if (!amlodipineFormulary) {
+		;[amlodipineFormulary] = await db
+			.insert(formularyItems)
+			.values({
+				facilityId,
+				drugGenericId: amlodipineGeneric!.id,
+				drugBrandId: amlodipineBrand!.id,
+				doseForm: "tablet",
+				strength: "5 mg",
+				route: "oral",
+				isActive: true,
+			})
+			.returning()
+	}
+
+	// ── Medication orders ─────────────────────────────────────────────────────
+	// Paracetamol (ER encounter — already seeded in ensureNursingAndOrders, just retrieve it)
+	let [paracetamolOrder] = await db
+		.select()
+		.from(medicationOrders)
+		.where(and(eq(medicationOrders.encounterId, erEncounterId), eq(medicationOrders.genericName, "Paracetamol")))
+	if (!paracetamolOrder) {
+		;[paracetamolOrder] = await db
+			.insert(medicationOrders)
+			.values({
+				facilityId,
+				encounterId: erEncounterId,
+				formularyItemId: paracetamolFormulaId,
+				genericName: "Paracetamol",
+				brandName: "Biogesic",
+				rxnormCode: "161",
+				dose: "500",
+				doseUnit: "mg",
+				doseForm: "tablet",
+				route: "oral",
+				frequency: "q6h",
+				durationDays: 3,
+				status: "active",
+				orderingStaffId: doctorStaffId,
+			})
+			.returning()
+	}
+
+	// Amlodipine (inpatient encounter — hypertension)
+	let [amlodipineOrder] = await db
+		.select()
+		.from(medicationOrders)
+		.where(
+			and(eq(medicationOrders.encounterId, inpatientEncounterId), eq(medicationOrders.genericName, "Amlodipine"))
+		)
+	if (!amlodipineOrder) {
+		;[amlodipineOrder] = await db
+			.insert(medicationOrders)
+			.values({
+				facilityId,
+				encounterId: inpatientEncounterId,
+				formularyItemId: amlodipineFormulary!.id,
+				genericName: "Amlodipine",
+				brandName: "Norvasc",
+				rxnormCode: "17767",
+				dose: "5",
+				doseUnit: "mg",
+				doseForm: "tablet",
+				route: "oral",
+				frequency: "OD",
+				durationDays: 30,
+				status: "active",
+				orderingStaffId: doctorStaffId,
+			})
+			.returning()
+	}
+
+	// ── Vital signs — ER encounter (trend: 3 readings over last 16 hours) ─────
+	// Entry at 16h ago
+	const [vitals16h] = await db
+		.select()
+		.from(vitalSigns)
+		.where(and(eq(vitalSigns.encounterId, erEncounterId), eq(vitalSigns.bpSystolic, 110)))
+	if (!vitals16h) {
+		await db.insert(vitalSigns).values({
+			facilityId,
+			encounterId: erEncounterId,
+			temperature: "38.8",
+			bpSystolic: 110,
+			bpDiastolic: 70,
+			heartRate: 102,
+			respiratoryRate: 22,
+			spo2: "94.0",
+			painScore: 6,
+			newsScore: 5,
+			newsRiskLevel: "medium",
+			recordedByStaffId: nurseStaffId,
+			recordedAt: h(-16),
+		})
+	}
+
+	// Entry at 8h ago
+	const [vitals8h] = await db
+		.select()
+		.from(vitalSigns)
+		.where(and(eq(vitalSigns.encounterId, erEncounterId), eq(vitalSigns.bpSystolic, 115)))
+	if (!vitals8h) {
+		await db.insert(vitalSigns).values({
+			facilityId,
+			encounterId: erEncounterId,
+			temperature: "38.3",
+			bpSystolic: 115,
+			bpDiastolic: 75,
+			heartRate: 96,
+			respiratoryRate: 20,
+			spo2: "96.0",
+			painScore: 4,
+			newsScore: 3,
+			newsRiskLevel: "low",
+			recordedByStaffId: nurseStaffId,
+			recordedAt: h(-8),
+		})
+	}
+
+	// ── Vital signs — Inpatient encounter (hypertension patient) ─────────────
+	const [ipVitals1] = await db
+		.select()
+		.from(vitalSigns)
+		.where(and(eq(vitalSigns.encounterId, inpatientEncounterId), eq(vitalSigns.bpSystolic, 162)))
+	if (!ipVitals1) {
+		await db.insert(vitalSigns).values({
+			facilityId,
+			encounterId: inpatientEncounterId,
+			temperature: "36.7",
+			bpSystolic: 162,
+			bpDiastolic: 98,
+			heartRate: 78,
+			respiratoryRate: 16,
+			spo2: "99.0",
+			painScore: 2,
+			newsScore: 2,
+			newsRiskLevel: "low",
+			recordedByStaffId: nurseStaffId,
+			recordedAt: h(-12),
+		})
+	}
+
+	const [ipVitals2] = await db
+		.select()
+		.from(vitalSigns)
+		.where(and(eq(vitalSigns.encounterId, inpatientEncounterId), eq(vitalSigns.bpSystolic, 148)))
+	if (!ipVitals2) {
+		await db.insert(vitalSigns).values({
+			facilityId,
+			encounterId: inpatientEncounterId,
+			temperature: "36.5",
+			bpSystolic: 148,
+			bpDiastolic: 92,
+			heartRate: 74,
+			respiratoryRate: 16,
+			spo2: "99.0",
+			painScore: 1,
+			newsScore: 1,
+			newsRiskLevel: "low",
+			recordedByStaffId: nurseStaffId,
+			recordedAt: h(-4),
+		})
+	}
+
+	// ── Flowsheet entries ─────────────────────────────────────────────────────
+	const [gcsEntry] = await db
+		.select()
+		.from(flowsheetEntries)
+		.where(and(eq(flowsheetEntries.encounterId, inpatientEncounterId), eq(flowsheetEntries.parameterName, "GCS")))
+	if (!gcsEntry) {
+		await db.insert(flowsheetEntries).values([
+			{
+				facilityId,
+				encounterId: inpatientEncounterId,
+				parameterName: "GCS",
+				parameterValue: "15",
+				unit: "points",
+				recordedByStaffId: nurseStaffId,
+				recordedAt: h(-12),
+			},
+			{
+				facilityId,
+				encounterId: inpatientEncounterId,
+				parameterName: "GCS",
+				parameterValue: "15",
+				unit: "points",
+				recordedByStaffId: nurseStaffId,
+				recordedAt: h(-4),
+			},
+			{
+				facilityId,
+				encounterId: erEncounterId,
+				parameterName: "GCS",
+				parameterValue: "14",
+				unit: "points",
+				recordedByStaffId: nurseStaffId,
+				recordedAt: h(-16),
+			},
+			{
+				facilityId,
+				encounterId: erEncounterId,
+				parameterName: "Pain Scale",
+				parameterValue: "6",
+				unit: "/10",
+				recordedByStaffId: nurseStaffId,
+				recordedAt: h(-8),
+			},
+		])
+	}
+
+	// ── MAR entries — ER encounter (Paracetamol q6h — multiple statuses) ─────
+	const [marDue] = await db
+		.select()
+		.from(marEntries)
+		.where(and(eq(marEntries.encounterId, erEncounterId), eq(marEntries.status, "due")))
+	if (!marDue) {
+		await db.insert(marEntries).values({
+			facilityId,
+			encounterId: erEncounterId,
+			medicationOrderId: paracetamolOrder!.id,
+			scheduledTime: h(2),
+			status: "due",
+		})
+	}
+
+	const [marMissed] = await db
+		.select()
+		.from(marEntries)
+		.where(and(eq(marEntries.encounterId, erEncounterId), eq(marEntries.status, "missed")))
+	if (!marMissed) {
+		await db.insert(marEntries).values({
+			facilityId,
+			encounterId: erEncounterId,
+			medicationOrderId: paracetamolOrder!.id,
+			scheduledTime: h(-12),
+			status: "missed",
+			notes: "Patient was away for imaging procedure",
+		})
+	}
+
+	const [marHeld] = await db
+		.select()
+		.from(marEntries)
+		.where(and(eq(marEntries.encounterId, erEncounterId), eq(marEntries.status, "held")))
+	if (!marHeld) {
+		await db.insert(marEntries).values({
+			facilityId,
+			encounterId: erEncounterId,
+			medicationOrderId: paracetamolOrder!.id,
+			scheduledTime: h(-18),
+			status: "held",
+			notes: "Held per physician order — NPO for procedure",
+		})
+	}
+
+	// ── MAR entries — Inpatient encounter (Amlodipine OD) ────────────────────
+	const [ipMarGiven] = await db
+		.select()
+		.from(marEntries)
+		.where(and(eq(marEntries.encounterId, inpatientEncounterId), eq(marEntries.status, "given")))
+	if (!ipMarGiven) {
+		await db.insert(marEntries).values([
+			{
+				facilityId,
+				encounterId: inpatientEncounterId,
+				medicationOrderId: amlodipineOrder!.id,
+				scheduledTime: h(-24),
+				status: "given",
+				administeredDose: "5 mg",
+				administeredRoute: "oral",
+				administeredByStaffId: nurseStaffId,
+				administeredAt: h(-23),
+				notes: "Given after breakfast",
+			},
+			{
+				facilityId,
+				encounterId: inpatientEncounterId,
+				medicationOrderId: amlodipineOrder!.id,
+				scheduledTime: h(0),
+				status: "due",
+			},
+		])
+	}
+
+	// ── Additional TAR entries ────────────────────────────────────────────────
+	const [tarWoundDressing] = await db
+		.select()
+		.from(tarEntries)
+		.where(and(eq(tarEntries.encounterId, inpatientEncounterId), eq(tarEntries.treatmentDescription, "Wound dressing change")))
+	if (!tarWoundDressing) {
+		await db.insert(tarEntries).values([
+			{
+				facilityId,
+				encounterId: inpatientEncounterId,
+				treatmentDescription: "Wound dressing change",
+				scheduledTime: h(-8),
+				status: "given",
+				administeredByStaffId: nurseStaffId,
+				administeredAt: h(-7),
+				notes: "Clean wound, no signs of infection",
+			},
+			{
+				facilityId,
+				encounterId: inpatientEncounterId,
+				treatmentDescription: "Wound dressing change",
+				scheduledTime: h(8),
+				status: "due",
+			},
+			{
+				facilityId,
+				encounterId: erEncounterId,
+				treatmentDescription: "Steam inhalation",
+				scheduledTime: h(1),
+				status: "due",
+			},
+		])
+	}
+
+	// ── I/O entries — IVF intake + urine output ───────────────────────────────
+	const [ivfEntry] = await db
+		.select()
+		.from(ioEntries)
+		.where(and(eq(ioEntries.encounterId, erEncounterId), eq(ioEntries.description, "IVF - PNSS 1L")))
+	if (!ivfEntry) {
+		await db.insert(ioEntries).values([
+			{
+				facilityId,
+				encounterId: erEncounterId,
+				ioType: "intake",
+				route: "intravenous",
+				description: "IVF - PNSS 1L",
+				amountMl: "1000.0",
+				recordedByStaffId: nurseStaffId,
+				recordedAt: h(-10),
+			},
+			{
+				facilityId,
+				encounterId: erEncounterId,
+				ioType: "output",
+				route: "urinary catheter",
+				description: "Urine via Foley catheter",
+				amountMl: "350.0",
+				recordedByStaffId: nurseStaffId,
+				recordedAt: h(-6),
+			},
+			{
+				facilityId,
+				encounterId: erEncounterId,
+				ioType: "output",
+				route: "urinary catheter",
+				description: "Urine via Foley catheter",
+				amountMl: "280.0",
+				recordedByStaffId: nurseStaffId,
+				recordedAt: h(-2),
+			},
+			{
+				facilityId,
+				encounterId: inpatientEncounterId,
+				ioType: "intake",
+				route: "oral",
+				description: "Water intake",
+				amountMl: "400.0",
+				recordedByStaffId: nurseStaffId,
+				recordedAt: h(-8),
+			},
+			{
+				facilityId,
+				encounterId: inpatientEncounterId,
+				ioType: "output",
+				route: "urine",
+				description: "Voided urine",
+				amountMl: "320.0",
+				recordedByStaffId: nurseStaffId,
+				recordedAt: h(-6),
+			},
+		])
+	}
+
+	// ── Shift handoffs ────────────────────────────────────────────────────────
+	// Signed handoff from night shift (ER encounter)
+	const [signedHandoff] = await db
+		.select()
+		.from(shiftHandoffs)
+		.where(and(eq(shiftHandoffs.encounterId, erEncounterId), eq(shiftHandoffs.status, "signed")))
+	if (!signedHandoff) {
+		await db.insert(shiftHandoffs).values({
+			facilityId,
+			encounterId: erEncounterId,
+			outgoingStaffId: nurseStaffId,
+			incomingStaffId: nurseStaffId,
+			handoffNotes: `SITUATION: Maria Santos, 33F, admitted via ER with fever and productive cough. Dx: Community acquired pneumonia.\n\nBACKGROUND: Allergic to Penicillin. On Paracetamol 500mg q6h. IVF PNSS 1L running at 30 gtts/min. CBC and CXR pending.\n\nASSESSMENT: Patient is awake, febrile at 38.3°C, SpO2 96%. NEWS score 3 (Low risk). Productive cough, no hemoptysis.\n\nRECOMMENDATION: Monitor vitals q4h. Ensure next Paracetamol dose at 0600H. Follow up pending lab results with attending physician. Maintain fluid intake/output monitoring.`,
+			status: "signed",
+			signedAt: h(-8),
+			createdAt: h(-8),
+		})
+	}
+
+	// Draft handoff for current shift (Inpatient encounter)
+	const [draftHandoff] = await db
+		.select()
+		.from(shiftHandoffs)
+		.where(and(eq(shiftHandoffs.encounterId, inpatientEncounterId), eq(shiftHandoffs.status, "draft")))
+	if (!draftHandoff) {
+		await db.insert(shiftHandoffs).values({
+			facilityId,
+			encounterId: inpatientEncounterId,
+			outgoingStaffId: nurseStaffId,
+			handoffNotes: `SITUATION: Juan Dela Cruz, 41M, admitted for uncontrolled hypertension. Current BP 148/92.\n\nBACKGROUND: On Amlodipine 5mg OD. No known allergies.\n\nASSESSMENT: BP improving. Patient ambulatory, tolerating oral medications well.\n\nRECOMMENDATION: Continue BP monitoring q4h. Amlodipine due at next AM shift.`,
+			status: "draft",
+			createdAt: h(-1),
+		})
+	}
+
+	// ── HAI tags ──────────────────────────────────────────────────────────────
+	// Suspected CAUTI on ER encounter (Foley catheter in situ)
+	const [cautiTag] = await db
+		.select()
+		.from(haiTags)
+		.where(and(eq(haiTags.encounterId, erEncounterId), eq(haiTags.haiType, "cauti")))
+	if (!cautiTag) {
+		await db.insert(haiTags).values({
+			facilityId,
+			encounterId: erEncounterId,
+			haiType: "cauti",
+			onsetDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+				.toISOString()
+				.split("T")[0]!,
+			status: "suspected",
+			notes: "Foley catheter inserted 48h ago. Patient reports dysuria. Urine culture sent.",
+			documentedByStaffId: nurseStaffId,
+		})
+	}
+
+	// Confirmed CLABSI on inpatient encounter
+	const [clabiTag] = await db
+		.select()
+		.from(haiTags)
+		.where(and(eq(haiTags.encounterId, inpatientEncounterId), eq(haiTags.haiType, "clabsi")))
+	if (!clabiTag) {
+		await db.insert(haiTags).values({
+			facilityId,
+			encounterId: inpatientEncounterId,
+			haiType: "clabsi",
+			onsetDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2)
+				.toISOString()
+				.split("T")[0]!,
+			status: "confirmed",
+			confirmedAt: h(-6),
+			notes: "Blood cultures positive for Staphylococcus epidermidis. Central line removed. IV antibiotics started.",
+			documentedByStaffId: nurseStaffId,
+		})
+	}
+
+	// ── Consent records ───────────────────────────────────────────────────────
+	// General consent — ER encounter
+	const [generalConsent] = await db
+		.select()
+		.from(consentRecords)
+		.where(and(eq(consentRecords.encounterId, erEncounterId), eq(consentRecords.consentType, "general")))
+	if (!generalConsent) {
+		await db.insert(consentRecords).values({
+			facilityId,
+			encounterId: erEncounterId,
+			patientId: erPatientId,
+			consentType: "general",
+			signedByName: "Maria Santos",
+			relationship: "self",
+			consentText:
+				"I, the undersigned, hereby give my consent for the medical/surgical treatment, tests, and procedures deemed necessary by the attending physician and medical staff of QHealth Community Hospital during this admission.",
+			patientSignature: "Maria Santos",
+			witnessSignature: "Nurse Ana Reyes",
+			capturedByStaffId: nurseStaffId,
+			signedAt: h(-20),
+		})
+	}
+
+	// DPA consent — ER encounter
+	const [dpaConsent] = await db
+		.select()
+		.from(consentRecords)
+		.where(and(eq(consentRecords.encounterId, erEncounterId), eq(consentRecords.consentType, "dpa")))
+	if (!dpaConsent) {
+		await db.insert(consentRecords).values({
+			facilityId,
+			encounterId: erEncounterId,
+			patientId: erPatientId,
+			consentType: "dpa",
+			signedByName: "Maria Santos",
+			relationship: "self",
+			consentText:
+				"In accordance with the Data Privacy Act of 2012 (RA 10173), I consent to the collection, processing, and sharing of my personal health information with authorized personnel for purposes of medical care, billing, and statutory reporting.",
+			patientSignature: "Maria Santos",
+			witnessSignature: "Nurse Ana Reyes",
+			capturedByStaffId: nurseStaffId,
+			signedAt: h(-20),
+		})
+	}
+
+	// General consent — Inpatient encounter
+	const [ipGeneralConsent] = await db
+		.select()
+		.from(consentRecords)
+		.where(
+			and(eq(consentRecords.encounterId, inpatientEncounterId), eq(consentRecords.consentType, "general"))
+		)
+	if (!ipGeneralConsent) {
+		await db.insert(consentRecords).values({
+			facilityId,
+			encounterId: inpatientEncounterId,
+			patientId: inpatientPatientId,
+			consentType: "general",
+			signedByName: "Juan Dela Cruz",
+			relationship: "self",
+			consentText:
+				"I, the undersigned, hereby give my consent for the medical/surgical treatment, tests, and procedures deemed necessary by the attending physician and medical staff of QHealth Community Hospital during this admission.",
+			patientSignature: "Juan Dela Cruz",
+			witnessSignature: "Nurse Ana Reyes",
+			capturedByStaffId: nurseStaffId,
+			signedAt: h(-14),
+		})
+	}
+
+	console.log("  ✓ Nursing scenario seed complete")
+	console.log("    - Vitals: trend data for ER & inpatient encounters")
+	console.log("    - MAR: given / due / missed / held entries across both encounters")
+	console.log("    - TAR: wound dressing, nebulization entries")
+	console.log("    - I/O: IVF intake, urine output across both encounters")
+	console.log("    - Flowsheet: GCS and pain scale entries")
+	console.log("    - Handoffs: 1 signed (ER) + 1 draft (inpatient)")
+	console.log("    - HAI tags: CAUTI suspected (ER) + CLABSI confirmed (inpatient)")
+	console.log("    - Consents: general + DPA (ER), general (inpatient)")
+}
+
 async function main() {
 	console.log("Seeding qhealth-emr development data...")
+	await assertSeedSchemaReady()
+	await ensureProblemsTerminologyColumns()
 	const facility = await ensureFacility()
 
 	const roleMap = new Map<string, string>()
@@ -1041,11 +1948,30 @@ async function main() {
 		formularyItemId: refs.formulary.id,
 		chargeItemId: refs.chargeItem.id,
 		billingStaffId: staffMap.get("billing@qhealth.local")!,
-		reportingStaffId: staffMap.get("surveillance@qhealth.local")!,
+		reportingStaffId: staffMap.get("pidsr@qhealth.local")!,
 	})
 
 	await db.update(beds).set({ status: "occupied", currentEncounterId: erEncounter.id, updatedAt: new Date() }).where(eq(beds.id, erBed1.id))
 	await db.update(beds).set({ status: "occupied", currentEncounterId: inpatientEncounter.id, updatedAt: new Date() }).where(eq(beds.id, medBed1.id))
+
+	await seedAdminScenarios({
+		facilityId: facility.id,
+		adminUserId: authUsers.get("admin@qhealth.local")!,
+		adminStaffId: staffMap.get("admin@qhealth.local")!,
+		doctorStaffId: staffMap.get("doctor@qhealth.local")!,
+		patientId: patient1.id,
+	})
+
+	await ensureNursingScenarios({
+		facilityId: facility.id,
+		erEncounterId: erEncounter.id,
+		inpatientEncounterId: inpatientEncounter.id,
+		erPatientId: patient2.id,
+		inpatientPatientId: patient1.id,
+		nurseStaffId: staffMap.get("nurse@qhealth.local")!,
+		doctorStaffId: staffMap.get("doctor@qhealth.local")!,
+		paracetamolFormulaId: refs.formulary.id,
+	})
 
 	console.log("Seed complete.")
 	console.log("Login credentials:")

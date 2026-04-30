@@ -16,6 +16,8 @@ import {
 	CreateConsentRecordSchema,
 	CreateNoteTemplateSchema,
 	ExtractCf4DataInputSchema,
+	NoteContextInputSchema,
+	NoteContextSchema,
 	NoteTemplateIdSchema,
 	NoteTemplateListResponseSchema,
 	NoteTemplateListSchema,
@@ -25,6 +27,7 @@ import {
 	SignClinicalNoteSchema,
 	SignedNotesResponseSchema,
 	SignedNotesSchema,
+	SubmitFpeInputSchema,
 	UpdateClinicalNoteSchema,
 	UpdateNoteTemplateSchema,
 } from "./clinical-docs.schema.js"
@@ -128,6 +131,16 @@ export const clinicalDocsContract = {
 		.input(SignClinicalNoteSchema)
 		.output(ClinicalNoteSchema),
 
+	getNoteContext: oc
+		.route({
+			method: "GET",
+			path: "/context",
+			summary: "Get chart context snippets for clinical note authoring",
+			tags: ["Clinical Documentation"],
+		})
+		.input(NoteContextInputSchema)
+		.output(NoteContextSchema),
+
 	// ========================================================================
 	// Note Addenda
 	// ========================================================================
@@ -219,4 +232,14 @@ export const clinicalDocsContract = {
 		})
 		.input(ExtractCf4DataInputSchema)
 		.output(Cf4ExtractionResultSchema),
+
+	submitFpe: oc
+		.route({
+			method: "POST",
+			path: "/notes/{noteId}/submit-fpe",
+			summary: "Submit and archive an FPE note, triggering Konsulta capitation",
+			tags: ["Clinical Documentation"],
+		})
+		.input(SubmitFpeInputSchema)
+		.output(ClinicalNoteSchema),
 }

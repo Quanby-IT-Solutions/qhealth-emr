@@ -158,6 +158,16 @@ export function useUpdateFormularyItemMutation() {
 	)
 }
 
+export function useUpdateFormularyClinicalPolicyMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.formulary.item.updateClinicalPolicy.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.formulary.item.key() }),
+		})
+	)
+}
+
 export function useDeleteFormularyItemMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
@@ -248,6 +258,223 @@ export function useRvsSearchQuery(
 				limit: params.limit ?? 50,
 			},
 			staleTime: 5 * 60 * 1000,
+		})
+	)
+}
+
+// ============================================================================
+// SNOMED CT Codes
+// ============================================================================
+
+export function useSnomedCtSearchQuery(
+	params: {
+		search?: string
+		semanticTag?: string
+		page?: number
+		limit?: number
+	} = {}
+) {
+	return useQuery(
+		orpc.formulary.snomedCt.search.queryOptions({
+			input: {
+				search: params.search,
+				semanticTag: params.semanticTag,
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			staleTime: 5 * 60 * 1000,
+		})
+	)
+}
+
+// ============================================================================
+// Code Set Admin — catalog uploads (FORM-001)
+// ============================================================================
+
+export function useCodeSetUploadsQuery(
+	params: {
+		catalogType?: string
+		page?: number
+		limit?: number
+	} = {}
+) {
+	return useQuery(
+		orpc.formulary.codeSetAdmin.listUploads.queryOptions({
+			input: {
+				catalogType: params.catalogType,
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			staleTime: 60 * 1000,
+		})
+	)
+}
+
+export function useRecordCatalogUploadMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.formulary.codeSetAdmin.recordUpload.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.formulary.codeSetAdmin.key() }),
+		})
+	)
+}
+
+export function useSetCodeActiveMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.formulary.codeSetAdmin.setCodeActive.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.formulary.key() }),
+		})
+	)
+}
+
+// ============================================================================
+// Code Set Admin — deprecated code mappings (FORM-001)
+// ============================================================================
+
+export function useDeprecatedMappingsQuery(
+	params: {
+		catalogType?: string
+		fromCode?: string
+		isActive?: boolean
+		page?: number
+		limit?: number
+	} = {}
+) {
+	return useQuery(
+		orpc.formulary.codeSetAdmin.listDeprecations.queryOptions({
+			input: {
+				catalogType: params.catalogType,
+				fromCode: params.fromCode,
+				isActive: params.isActive,
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			staleTime: 60 * 1000,
+		})
+	)
+}
+
+export function useCreateDeprecationMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.formulary.codeSetAdmin.createDeprecation.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.formulary.codeSetAdmin.key() }),
+		})
+	)
+}
+
+export function useUpdateDeprecationMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.formulary.codeSetAdmin.updateDeprecation.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.formulary.codeSetAdmin.key() }),
+		})
+	)
+}
+
+export function useDeleteDeprecationMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.formulary.codeSetAdmin.deleteDeprecation.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.formulary.codeSetAdmin.key() }),
+		})
+	)
+}
+
+// ============================================================================
+// Catalog Entry Editor — FORM-006
+// ============================================================================
+
+export function useAdminCatalogSearchQuery(
+	params: {
+		catalogType: "icd10" | "loinc" | "rxnorm" | "rvs" | "snomed_ct"
+		search?: string
+		isActive?: boolean
+		page?: number
+		limit?: number
+	},
+	options?: { enabled?: boolean }
+) {
+	return useQuery(
+		orpc.formulary.codeSetAdmin.adminSearchEntries.queryOptions({
+			input: {
+				catalogType: params.catalogType,
+				search: params.search,
+				isActive: params.isActive,
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			staleTime: 30 * 1000,
+			enabled: options?.enabled ?? true,
+		})
+	)
+}
+
+export function useCreateCatalogEntryMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.formulary.codeSetAdmin.createEntry.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.formulary.codeSetAdmin.key() }),
+		})
+	)
+}
+
+export function useUpdateCatalogEntryMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.formulary.codeSetAdmin.updateEntry.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.formulary.codeSetAdmin.key() }),
+		})
+	)
+}
+
+export function useDeleteCatalogEntryMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.formulary.codeSetAdmin.deleteEntry.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.formulary.codeSetAdmin.key() }),
+		})
+	)
+}
+
+// ============================================================================
+// Catalog Versions — FORM-006
+// ============================================================================
+
+export function useCatalogVersionsQuery(
+	params: {
+		catalogType?: "icd10" | "loinc" | "rxnorm" | "rvs" | "snomed_ct"
+		page?: number
+		limit?: number
+	} = {}
+) {
+	return useQuery(
+		orpc.formulary.codeSetAdmin.listVersions.queryOptions({
+			input: {
+				catalogType: params.catalogType,
+				page: params.page ?? 1,
+				limit: params.limit ?? 20,
+			},
+			staleTime: 60 * 1000,
+		})
+	)
+}
+
+export function usePublishCatalogVersionMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.formulary.codeSetAdmin.publishVersion.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.formulary.codeSetAdmin.key() }),
 		})
 	)
 }

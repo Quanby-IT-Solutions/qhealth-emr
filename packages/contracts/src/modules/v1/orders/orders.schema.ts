@@ -65,6 +65,7 @@ export const CdsAlertTypeEnum = z.enum([
 	"allergy_hard_block",
 	"allergy_soft_block",
 	"formulary_warning",
+	"formulary_restricted",
 	"high_alert",
 	"s2_license_block",
 ])
@@ -108,13 +109,7 @@ export const MedOrderSafetyTypeEnum = z.enum([
 	"pregnancy_category",
 ])
 
-export const MedOrderSafetySeverityEnum = z.enum([
-	"critical",
-	"major",
-	"moderate",
-	"minor",
-	"info",
-])
+export const MedOrderSafetySeverityEnum = z.enum(["critical", "major", "moderate", "minor", "info"])
 
 export const MedOrderSafetyCheckSchema = z.object({
 	id: z.string(),
@@ -261,11 +256,27 @@ export const LabOrderSchema = z.object({
 	resultedDatetime: dateOrString.nullable(),
 	results: z.unknown(),
 	cdsAlerts: z.unknown(),
+	/** SLA-016: set when lab acknowledges specimen receipt */
+	specimenReceivedAt: dateOrString.nullable().optional(),
+	/** SLA-016: set when billing clears payment for the lab order */
+	billingClearedAt: dateOrString.nullable().optional(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 })
 
 export const LabOrderIdSchema = z.object({ id: z.string().uuid() })
+
+// SLA-016: update lab order — status transitions auto-set specimenReceivedAt;
+// billingClearedAt is provided explicitly when billing clears the order.
+export const UpdateLabOrderSchema = z.object({
+	id: z.string().uuid(),
+	status: LabOrderStatusEnum.optional(),
+	collectionDatetime: dateOrString.optional(),
+	resultedDatetime: dateOrString.optional(),
+	results: z.unknown().optional(),
+	/** Explicit billing-clearance timestamp (Flow 3 Step 2). Set by billing staff when payment clears. */
+	billingClearedAt: dateOrString.optional(),
+})
 
 export const CreateLabOrderSchema = z.object({
 	facilityId: z.string().uuid(),
@@ -311,11 +322,33 @@ export const ImagingOrderSchema = z.object({
 	report: z.string().nullable(),
 	structuredResults: z.unknown(),
 	cdsAlerts: z.unknown(),
+	/** SLA-016: set when radiology begins the study */
+	studyStartedAt: dateOrString.nullable().optional(),
+	/** SLA-019: set when radiology acknowledges receipt of the imaging order (Flow 3 Step 1 authoritative checkpoint) */
+	imagingOrderReceivedAt: dateOrString.nullable().optional(),
+	/** SLA-016: set when billing clears payment for the imaging order */
+	billingClearedAt: dateOrString.nullable().optional(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 })
 
 export const ImagingOrderIdSchema = z.object({ id: z.string().uuid() })
+
+// SLA-016/SLA-019: update imaging order — status transition to "in_progress" auto-sets studyStartedAt;
+// imagingOrderReceivedAt is provided explicitly when radiology acknowledges receipt (Flow 3 Step 1);
+// billingClearedAt is provided explicitly when billing clears the order (Flow 3 Step 2).
+export const UpdateImagingOrderSchema = z.object({
+	id: z.string().uuid(),
+	status: ImagingOrderStatusEnum.optional(),
+	scheduledDatetime: dateOrString.optional(),
+	completedDatetime: dateOrString.optional(),
+	report: z.string().optional(),
+	structuredResults: z.unknown().optional(),
+	/** SLA-019: explicit receipt timestamp — set when radiology acknowledges order receipt (Flow 3 Step 1). */
+	imagingOrderReceivedAt: dateOrString.optional(),
+	/** Explicit billing-clearance timestamp (Flow 3 Step 2). Set by billing staff when payment clears. */
+	billingClearedAt: dateOrString.optional(),
+})
 
 export const CreateImagingOrderSchema = z.object({
 	facilityId: z.string().uuid(),
@@ -370,6 +403,26 @@ export const VerificationQueueSchema = PaginationInputSchema.extend({
 
 export const VerificationQueueResponseSchema = PaginatedResponseSchema.extend({
 	data: z.array(MedOrderSchema),
+})
+
+export const HighAlertVerificationSchema = z.object({
+	id: z.string().uuid(),
+	medicationOrderId: z.string().uuid(),
+	requestingStaffId: z.string().uuid(),
+	verifyingStaffId: z.string().uuid(),
+	verifiedAt: dateOrString,
+	notes: z.string().nullable(),
+	createdAt: dateOrString,
+})
+
+export const CreateHighAlertVerificationSchema = z.object({
+	medicationOrderId: z.string().uuid(),
+	verifyingStaffId: z.string().uuid(),
+	notes: z.string().optional(),
+})
+
+export const GetHighAlertVerificationSchema = z.object({
+	medicationOrderId: z.string().uuid(),
 })
 
 // ============================================================================
@@ -537,3 +590,172 @@ export const ParentOrderIdSchema = z.object({
 })
 
 export type ParentOrderId = z.infer<typeof ParentOrderIdSchema>
+
+// ============================================================================
+// Dispense Log Schemas
+// ============================================================================
+
+export const DispenseLogSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	medicationOrderId: z.string().uuid(),
+	patientId: z.string().uuid().nullable(),
+	dispensedQuantity: z.string(),
+	quantityUnit: z.string(),
+	lotNumber: z.string().nullable(),
+	expiryDate: z.string().nullable(),
+	counselingNotes: z.string().nullable(),
+	patientEducation: z.unknown(),
+	pharmacistStaffId: z.string().uuid(),
+	dispensedAt: dateOrString,
+	createdAt: dateOrString,
+})
+
+export const DispenseOrderInputSchema = z.object({
+	medicationOrderId: z.string().uuid(),
+	dispensedQuantity: z.coerce.number().positive(),
+	quantityUnit: z.string().min(1),
+	lotNumber: z.string().optional(),
+	expiryDate: z.string().optional(),
+	counselingNotes: z.string().optional(),
+	patientEducation: z.array(z.string()).optional(),
+})
+
+export const DispenseLogListSchema = PaginationInputSchema.extend({
+	facilityId: z.string().uuid().optional(),
+	medicationOrderId: z.string().uuid().optional(),
+	patientId: z.string().uuid().optional(),
+	date: z.string().optional(),
+})
+
+export const DispenseLogListResponseSchema = PaginatedResponseSchema.extend({
+	data: z.array(DispenseLogSchema),
+})
+
+export const DispenseLogIdSchema = z.object({ id: z.string().uuid() })
+
+// ============================================================================
+// OPD Prescription Search Schemas
+// ============================================================================
+
+export const OpdPrescriptionItemSchema = z.object({
+	id: z.string().uuid(),
+	genericName: z.string(),
+	brandName: z.string().nullable(),
+	dose: z.string(),
+	doseUnit: z.string(),
+	doseForm: z.string(),
+	route: z.string(),
+	frequency: z.string(),
+	durationDays: z.number().nullable(),
+	isControlledSubstance: z.boolean(),
+	pdeaSchedule: z.string().nullable(),
+	status: z.string(),
+})
+
+export const OpdPrescriptionSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	patientName: z.string(),
+	patientMrn: z.string(),
+	patientDateOfBirth: z.string().nullable(),
+	prescriberName: z.string().nullable(),
+	prescriberPrc: z.string(),
+	prescribedAt: dateOrString,
+	status: PrescriptionStatusEnum,
+	items: z.array(OpdPrescriptionItemSchema),
+})
+
+export const OpdPrescriptionSearchSchema = z.object({
+	q: z.string().min(1),
+	facilityId: z.string().uuid().optional(),
+})
+
+// ============================================================================
+// OPD Dispense Schemas
+// ============================================================================
+
+export const OpdDispenseItemInputSchema = z.object({
+	medicationOrderId: z.string().uuid(),
+	dispensedQuantity: z.coerce.number().positive(),
+	lotNumber: z.string().optional(),
+})
+
+export const OpdDispenseInputSchema = z.object({
+	prescriptionId: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	items: z.array(OpdDispenseItemInputSchema).min(1),
+	counselingNotes: z.string().optional(),
+	patientEducation: z.array(z.string()).optional(),
+})
+
+export const OpdDispenseRecordSchema = z.object({
+	id: z.string().uuid(),
+	prescriptionId: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid().nullable(),
+	patientName: z.string().nullable(),
+	items: z.array(
+		z.object({
+			medicationOrderId: z.string().uuid(),
+			genericName: z.string(),
+			dispensedQuantity: z.string(),
+			lotNumber: z.string().nullable(),
+		})
+	),
+	counselingNotes: z.string().nullable(),
+	pharmacistStaffId: z.string().uuid(),
+	dispensedAt: dateOrString,
+})
+
+export const OpdDispenseHistorySchema = PaginationInputSchema.extend({
+	facilityId: z.string().uuid(),
+	date: z.string().optional(),
+})
+
+export const OpdDispenseHistoryResponseSchema = PaginatedResponseSchema.extend({
+	data: z.array(OpdDispenseRecordSchema),
+})
+
+// ============================================================================
+// Counseling Log Schemas
+// ============================================================================
+
+export const CounselingChecklistItemSchema = z.object({
+	item: z.string(),
+	checked: z.boolean(),
+})
+
+export const CounselingLogSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid().nullable(),
+	patientId: z.string().uuid().nullable(),
+	medicationOrderId: z.string().uuid().nullable(),
+	checklistItems: z.array(CounselingChecklistItemSchema),
+	patientSignature: z.string().nullable(),
+	pharmacistStaffId: z.string().uuid(),
+	counseledAt: dateOrString,
+	createdAt: dateOrString,
+})
+
+export const SaveCounselingLogInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid().optional(),
+	patientId: z.string().uuid().optional(),
+	medicationOrderId: z.string().uuid().optional(),
+	checklistItems: z.array(CounselingChecklistItemSchema).min(1),
+	patientSignature: z.string().optional(),
+})
+
+export const CounselingLogListSchema = PaginationInputSchema.extend({
+	facilityId: z.string().uuid().optional(),
+	encounterId: z.string().uuid().optional(),
+	patientId: z.string().uuid().optional(),
+})
+
+export const CounselingLogListResponseSchema = PaginatedResponseSchema.extend({
+	data: z.array(CounselingLogSchema),
+})

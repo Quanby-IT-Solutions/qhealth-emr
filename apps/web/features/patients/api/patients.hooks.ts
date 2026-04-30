@@ -13,9 +13,11 @@ interface PatientSearchParams {
 	search?: string
 	mrn?: string
 	dateOfBirth?: string
+	philhealthMemberId?: string
 	isActive?: boolean
 	page?: number
 	limit?: number
+	clinicianStaffId?: string
 }
 
 export function usePatientSearchQuery(
@@ -29,9 +31,11 @@ export function usePatientSearchQuery(
 				search: params.search,
 				mrn: params.mrn,
 				dateOfBirth: params.dateOfBirth,
+				philhealthMemberId: params.philhealthMemberId,
 				isActive: params.isActive,
 				page: params.page ?? 1,
 				limit: params.limit ?? 50,
+				clinicianStaffId: params.clinicianStaffId,
 			},
 			enabled: options?.enabled ?? !!params.facilityId,
 			staleTime: 30 * 1000,
@@ -86,5 +90,33 @@ export function useUpdatePatientMutation() {
 	)
 }
 
+// ============================================================================
+// Register with OPD Encounter (PS-034 — atomic patient + encounter creation)
+// ============================================================================
 
+export function useRegisterPatientWithOpdEncounterMutation() {
+	const queryClient = useQueryClient()
 
+	return useMutation(
+		orpc.patient.registerWithOpdEncounter.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({
+					queryKey: orpc.patient.key(),
+				}),
+		})
+	)
+}
+
+// ============================================================================
+// List Clinicians — registrar-accessible (PS-047), replaces admin-only listStaff
+// ============================================================================
+
+export function useListCliniciansQuery(facilityId: string | undefined) {
+	return useQuery(
+		orpc.patient.listClinicians.queryOptions({
+			input: { facilityId: facilityId ?? "" },
+			enabled: !!facilityId,
+			staleTime: 60 * 1000,
+		})
+	)
+}

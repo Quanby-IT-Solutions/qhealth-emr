@@ -1,21 +1,38 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm"
+import { and, count, countDistinct, desc, eq, gte, lte, sql } from "drizzle-orm"
 
-import { auditLogs, breakGlassEvents, patients, staffProfiles } from "@repo/db/schema"
+import {
+	auditLogs,
+	breakGlassEvents,
+	patients,
+	rolePermissions,
+	staffProfiles,
+	userRoles,
+} from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 
 type AuditLogFilterInput = V1Inputs["audit"]["log"]["list"]
 type BreakGlassFilterInput = V1Inputs["audit"]["breakGlass"]["list"]
+type BreakGlassExportFilterInput = V1Inputs["audit"]["breakGlass"]["exportCsv"]
+type BreakGlassPatternsInput = V1Inputs["audit"]["breakGlass"]["patterns"]
 type CreateBreakGlassInput = V1Inputs["audit"]["breakGlass"]["create"]
 type ReviewBreakGlassInput = V1Inputs["audit"]["breakGlass"]["review"]
+type ConfigHistoryFilterInput = V1Inputs["audit"]["log"]["configHistory"]
+
+/**
+ * Transaction handle type derived from the Drizzle client. Pass a transaction
+ * handle here to make the audit insert participate in the caller's transaction
+ * (so the audit row rolls back if the outer transaction rolls back).
+ */
+export type DBTransaction = Parameters<Parameters<typeof db["transaction"]>[0]>[0]
 
 interface LogAuditEntry {
 	facilityId: string
 	userId: string
 	staffProfileId: string | null
-	action: "create" | "update" | "delete" | "sign" | "verify" | "override"
+	action: "create" | "read" | "update" | "delete" | "sign" | "verify" | "override"
 	entityType: string
 	entityId: string
 	beforeState: Record<string, unknown> | null
@@ -43,12 +60,43 @@ export class AuditService {
 		return row.id
 	}
 
+	async findBreakGlassReviewerStaffIds(
+		facilityId: string,
+		options?: { excludeStaffId?: string | null }
+	) {
+		const reviewerRows = await db
+			.selectDistinct({ staffProfileId: staffProfiles.id })
+			.from(staffProfiles)
+			.innerJoin(userRoles, eq(userRoles.staffProfileId, staffProfiles.id))
+			.innerJoin(rolePermissions, eq(rolePermissions.roleId, userRoles.roleId))
+			.where(
+				and(
+					eq(staffProfiles.facilityId, facilityId),
+					eq(staffProfiles.isActive, true),
+					eq(rolePermissions.module, "audit"),
+					eq(rolePermissions.action, "view")
+				)
+			)
+
+		return reviewerRows
+			.map(row => row.staffProfileId)
+			.filter(staffProfileId => staffProfileId !== options?.excludeStaffId)
+	}
+
 	/**
 	 * Write an audit log entry. Called by @Audited() decorator and directly by services.
+	 *
+	 * @param entry   The audit entry to write.
+	 * @param options Optional options object.
+	 * @param options.tx When supplied the insert runs inside this Drizzle transaction
+	 *                   so the audit row participates in the caller's transaction and
+	 *                   rolls back together with the data change on failure. When
+	 *                   omitted the singleton `db` client is used (existing behaviour).
 	 */
-	async log(entry: LogAuditEntry) {
+	async log(entry: LogAuditEntry, options?: { tx?: DBTransaction }) {
+		const client = options?.tx ?? db
 		try {
-			const [created] = await db
+			const [created] = await client
 				.insert(auditLogs)
 				.values({
 					facilityId: entry.facilityId,
@@ -75,7 +123,7 @@ export class AuditService {
 	 * Query audit logs with filtering and pagination.
 	 */
 	async findAll(filter: AuditLogFilterInput) {
-		const { facilityId, startDate, endDate, userId, action, entityType, patientMrn } = filter
+		const { facilityId, startDate, endDate, userId, action, entityType, entityId, patientMrn } = filter
 		const page = Number(filter.page) || 1
 		const limit = Number(filter.limit) || 50
 
@@ -95,6 +143,9 @@ export class AuditService {
 		}
 		if (entityType) {
 			conditions.push(eq(auditLogs.entityType, entityType))
+		}
+		if (entityId) {
+			conditions.push(eq(auditLogs.entityId, entityId))
 		}
 		if (patientMrn) {
 			conditions.push(sql`exists (
@@ -152,7 +203,7 @@ export class AuditService {
 	 * Export audit logs (no pagination, respects filters).
 	 */
 	async exportLogs(filter: Omit<AuditLogFilterInput, "page" | "limit">) {
-		const { facilityId, startDate, endDate, userId, action, entityType, patientMrn } = filter
+		const { facilityId, startDate, endDate, userId, action, entityType, entityId, patientMrn } = filter
 
 		const conditions = [eq(auditLogs.facilityId, facilityId)]
 
@@ -170,6 +221,9 @@ export class AuditService {
 		}
 		if (entityType) {
 			conditions.push(eq(auditLogs.entityType, entityType))
+		}
+		if (entityId) {
+			conditions.push(eq(auditLogs.entityId, entityId))
 		}
 		if (patientMrn) {
 			conditions.push(sql`exists (
@@ -252,7 +306,7 @@ export class AuditService {
 	 * List break-glass events with filtering.
 	 */
 	async findBreakGlassEvents(filter: BreakGlassFilterInput) {
-		const { facilityId, reviewStatus, clinicianStaffId, patientId } = filter
+		const { facilityId, reviewStatus, clinicianStaffId, patientId, dateFrom, dateTo } = filter
 		const page = Number(filter.page) || 1
 		const limit = Number(filter.limit) || 50
 
@@ -266,6 +320,12 @@ export class AuditService {
 		}
 		if (patientId) {
 			conditions.push(eq(breakGlassEvents.patientId, patientId))
+		}
+		if (dateFrom) {
+			conditions.push(gte(breakGlassEvents.accessGrantedAt, new Date(dateFrom)))
+		}
+		if (dateTo) {
+			conditions.push(lte(breakGlassEvents.accessGrantedAt, new Date(dateTo)))
 		}
 
 		const whereClause = and(...conditions)
@@ -293,6 +353,46 @@ export class AuditService {
 			page,
 			limit,
 			totalPages: Math.ceil(total / limit),
+		}
+	}
+
+	/**
+	 * Export break-glass events without pagination (capped at 10,000 rows).
+	 */
+	async exportBreakGlassEvents(filter: BreakGlassExportFilterInput) {
+		const { facilityId, reviewStatus, clinicianStaffId, patientId, dateFrom, dateTo } = filter
+
+		const conditions = [eq(breakGlassEvents.facilityId, facilityId)]
+
+		if (reviewStatus) {
+			conditions.push(eq(breakGlassEvents.reviewStatus, reviewStatus))
+		}
+		if (clinicianStaffId) {
+			conditions.push(eq(breakGlassEvents.clinicianStaffId, clinicianStaffId))
+		}
+		if (patientId) {
+			conditions.push(eq(breakGlassEvents.patientId, patientId))
+		}
+		if (dateFrom) {
+			conditions.push(gte(breakGlassEvents.accessGrantedAt, new Date(dateFrom)))
+		}
+		if (dateTo) {
+			conditions.push(lte(breakGlassEvents.accessGrantedAt, new Date(dateTo)))
+		}
+
+		const data = await db
+			.select()
+			.from(breakGlassEvents)
+			.where(and(...conditions))
+			.orderBy(desc(breakGlassEvents.createdAt))
+			.limit(10000)
+
+		return {
+			data,
+			total: data.length,
+			page: 1,
+			limit: data.length,
+			totalPages: 1,
 		}
 	}
 
@@ -326,6 +426,159 @@ export class AuditService {
 
 		if (!event) throw new NotFoundException(`Break-glass event ${input.id} not found`)
 		return event
+	}
+
+	/**
+	 * Get break-glass event pattern analysis for a facility (AD-005).
+	 * Aggregates repeat access patterns to surface potential privacy violations.
+	 */
+	async getBreakGlassPatterns(filter: BreakGlassPatternsInput) {
+		const facilityId = String(filter.facilityId)
+		const days = Number(filter.days) || 30
+		const topN = Number(filter.topN) || 10
+		const windowStart = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+
+		const eventsInWindow = await db
+			.select({
+				id: breakGlassEvents.id,
+				clinicianStaffId: breakGlassEvents.clinicianStaffId,
+				patientId: breakGlassEvents.patientId,
+				reviewStatus: breakGlassEvents.reviewStatus,
+			})
+			.from(breakGlassEvents)
+			.where(
+				and(
+					eq(breakGlassEvents.facilityId, facilityId),
+					gte(breakGlassEvents.accessGrantedAt, windowStart)
+				)
+			)
+
+		const totalEventsInWindow = eventsInWindow.length
+		const pendingReviewCount = eventsInWindow.filter(e => e.reviewStatus === "pending").length
+		const flaggedCount = eventsInWindow.filter(e => e.reviewStatus === "flagged").length
+
+		// Aggregate by clinician
+		const byClinicianMap = new Map<string, { eventCount: number; pendingReviewCount: number; flaggedCount: number; patientIds: Set<string> }>()
+		for (const e of eventsInWindow) {
+			const key = e.clinicianStaffId
+			const existing = byClinicianMap.get(key) ?? { eventCount: 0, pendingReviewCount: 0, flaggedCount: 0, patientIds: new Set() }
+			existing.eventCount++
+			if (e.reviewStatus === "pending") existing.pendingReviewCount++
+			if (e.reviewStatus === "flagged") existing.flaggedCount++
+			existing.patientIds.add(e.patientId)
+			byClinicianMap.set(key, existing)
+		}
+
+		const topRepeatRequesters = Array.from(byClinicianMap.entries())
+			.map(([clinicianStaffId, stats]) => ({
+				clinicianStaffId,
+				eventCount: stats.eventCount,
+				pendingReviewCount: stats.pendingReviewCount,
+				flaggedCount: stats.flaggedCount,
+				distinctPatients: stats.patientIds.size,
+			}))
+			.sort((a, b) => b.eventCount - a.eventCount)
+			.slice(0, topN)
+
+		// Aggregate by patient
+		const byPatientMap = new Map<string, { eventCount: number; clinicianIds: Set<string>; flaggedCount: number }>()
+		for (const e of eventsInWindow) {
+			const key = e.patientId
+			const existing = byPatientMap.get(key) ?? { eventCount: 0, clinicianIds: new Set(), flaggedCount: 0 }
+			existing.eventCount++
+			existing.clinicianIds.add(e.clinicianStaffId)
+			if (e.reviewStatus === "flagged") existing.flaggedCount++
+			byPatientMap.set(key, existing)
+		}
+
+		const topRepeatPatients = Array.from(byPatientMap.entries())
+			.map(([patientId, stats]) => ({
+				patientId,
+				eventCount: stats.eventCount,
+				distinctClinicians: stats.clinicianIds.size,
+				flaggedCount: stats.flaggedCount,
+			}))
+			.sort((a, b) => b.eventCount - a.eventCount)
+			.slice(0, topN)
+
+		return {
+			totalEventsInWindow,
+			pendingReviewCount,
+			flaggedCount,
+			topRepeatRequesters,
+			topRepeatPatients,
+			daysAnalyzed: days,
+		}
+	}
+
+	/**
+	 * Get configuration change history for governance forensics (AD-006).
+	 * Returns audit log entries for config-related entity types.
+	 */
+	private static readonly CONFIG_ENTITY_TYPES = [
+		"feature_flag",
+		"feature_flag_target",
+		"system_setting",
+		"sla_config",
+		"integration",
+		"role_permission",
+		"user_role",
+		"facility_profile",
+	]
+
+	async getConfigHistory(filter: ConfigHistoryFilterInput) {
+		const { facilityId, entityType, dateFrom, dateTo } = filter
+		const page = Number(filter.page) || 1
+		const limit = Number(filter.limit) || 50
+
+		const entityTypes = entityType ? [entityType] : AuditService.CONFIG_ENTITY_TYPES
+
+		const conditions = [
+			eq(auditLogs.facilityId, facilityId),
+			sql`${auditLogs.entityType} = ANY(ARRAY[${sql.raw(entityTypes.map(t => `'${t}'`).join(","))}]::text[])`,
+		]
+
+		if (dateFrom) {
+			conditions.push(gte(auditLogs.createdAt, new Date(dateFrom)))
+		}
+		if (dateTo) {
+			conditions.push(lte(auditLogs.createdAt, new Date(dateTo)))
+		}
+
+		const whereClause = and(...conditions)
+		const offset = (page - 1) * limit
+
+		const [rows, totalResult] = await Promise.all([
+			db
+				.select()
+				.from(auditLogs)
+				.where(whereClause)
+				.orderBy(desc(auditLogs.createdAt))
+				.limit(limit)
+				.offset(offset),
+			db.select({ count: count() }).from(auditLogs).where(whereClause),
+		])
+
+		const total = totalResult[0]?.count ?? 0
+
+		const data = rows.map(row => ({
+			id: row.id,
+			entityType: row.entityType,
+			action: row.action,
+			description: `${row.action.toUpperCase()} ${row.entityType} (${row.entityId})`,
+			actor: row.userId,
+			beforeState: row.beforeState,
+			afterState: row.afterState,
+			at: row.createdAt,
+		}))
+
+		return {
+			data,
+			total,
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit),
+		}
 	}
 
 	/**

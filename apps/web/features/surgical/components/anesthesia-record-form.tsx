@@ -97,9 +97,10 @@ const BLANK_VITAL: IntraopVital = { time: "", bp: "", hr: 0, spo2: 100, etco2: u
 interface AnesthesiaRecordFormProps {
 	caseId: string
 	existing: AnesthesiaRecord | null | undefined
+	canEdit?: boolean
 }
 
-export function AnesthesiaRecordForm({ caseId, existing }: AnesthesiaRecordFormProps) {
+export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: AnesthesiaRecordFormProps) {
 	const [form, setForm] = useState<FormState>(() => buildInitialState(existing))
 	const save = useSaveAnesthesiaRecordMutation()
 
@@ -485,7 +486,7 @@ export function AnesthesiaRecordForm({ caseId, existing }: AnesthesiaRecordFormP
 			<Separator />
 
 			<div className="flex justify-end">
-				<Button onClick={handleSubmit} disabled={save.isPending}>
+				<Button onClick={handleSubmit} disabled={save.isPending || !canEdit}>
 					<Save className="mr-2 size-4" />
 					{save.isPending ? "Saving…" : "Save Anesthesia Record"}
 				</Button>

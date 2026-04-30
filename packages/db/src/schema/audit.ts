@@ -27,7 +27,7 @@ export const auditLogs = createTable(
 		action: t
 			.text("action")
 			.notNull()
-			.$type<"create" | "update" | "delete" | "sign" | "verify" | "override">(),
+			.$type<"create" | "read" | "update" | "delete" | "sign" | "verify" | "override">(),
 		entityType: t.text("entity_type").notNull(),
 		entityId: t.uuid("entity_id").notNull(),
 		beforeState: t.jsonb("before_state"),
@@ -113,5 +113,50 @@ export const notifications = createTable(
 		index("notifications_recipient_staff_id_idx").on(t.recipientStaffId),
 		index("notifications_is_read_idx").on(t.isRead),
 		index("notifications_created_at_idx").on(t.createdAt),
+	]
+)
+
+// ── Data Exports — DPA consent-gate evidence (AD-002) ─────────────────────────
+
+export const dataExports = createTable(
+	"data_exports",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		actorUserId: t
+			.text("actor_user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "restrict" }),
+		actorStaffId: t
+			.uuid("actor_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		entityType: t
+			.text("entity_type")
+			.notNull()
+			.$type<"patient_record" | "lab_result" | "imaging" | "encounter_summary" | "discharge_summary" | "billing" | "bulk_report">(),
+		entityId: t.uuid("entity_id"),
+		destination: t.text("destination"),             // "philhealth", "nhdr", "psa", "local_download", etc.
+		transmissionScope: t.text("transmission_scope"), // "individual" | "bulk"
+		consentGated: t.boolean("consent_gated").notNull().default(true),
+		consentOutcome: t
+			.text("consent_outcome")
+			.$type<"granted" | "denied" | "bypassed">(),
+		status: t
+			.text("status")
+			.notNull()
+			.default("completed")
+			.$type<"completed" | "failed" | "rejected">(),
+		rejectionReason: t.text("rejection_reason"),
+		exportedAt: t.timestamp("exported_at").notNull().defaultNow(),
+		ipAddress: t.text("ip_address"),
+	}),
+	t => [
+		index("data_exports_facility_id_idx").on(t.facilityId),
+		index("data_exports_actor_user_id_idx").on(t.actorUserId),
+		index("data_exports_exported_at_idx").on(t.exportedAt),
+		index("data_exports_entity_type_idx").on(t.entityType),
 	]
 )

@@ -179,6 +179,16 @@ export const encounters = createTable(
 		konsultaTagged: t.boolean("konsulta_tagged").notNull().default(false),
 		// Scheduling: link to appointment that triggered this encounter
 		appointmentId: t.uuid("appointment_id"), // FK added in relations; avoid circular import
+		// OPD queue number — auto-generated per clinic per day for outpatient encounters (PS-002)
+		queueNumber: t.integer("queue_number"),
+		// PS-002: Clinic that the OPD encounter belongs to (for per-clinic queue numbering)
+		clinicianStaffId: t
+			.uuid("clinician_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		// PS-003: Walk-in OPD queue status on the clinic queue board
+		queueStatus: t
+			.text("queue_status")
+			.$type<"waiting" | "in_progress" | "completed">(),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 	}),
@@ -187,6 +197,52 @@ export const encounters = createTable(
 		index("encounters_patient_id_idx").on(t.patientId),
 		index("encounters_status_idx").on(t.status),
 		index("encounters_admission_datetime_idx").on(t.admissionDatetime),
+	]
+)
+
+// PS-002: OPD Triage Intake — patientId is nullable to support triage-before-registration workflow
+export const opdTriageIntakes = createTable(
+	"opd_triage_intakes",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		// Nullable: pre-registration triage starts without an existing patient record
+		patientId: t
+			.uuid("patient_id")
+			.references(() => patients.id, { onDelete: "restrict" }),
+		arrivalTime: t.timestamp("arrival_time").notNull().defaultNow(),
+		chiefComplaint: t.text("chief_complaint").notNull(),
+		systolicBp: t.integer("systolic_bp"),
+		diastolicBp: t.integer("diastolic_bp"),
+		temperatureCelsius: t.real("temperature_celsius"),
+		heartRateBpm: t.integer("heart_rate_bpm"),
+		respiratoryRate: t.integer("respiratory_rate"),
+		oxygenSatPct: t.real("oxygen_sat_pct"),
+		heightCm: t.real("height_cm"),
+		weightKg: t.real("weight_kg"),
+		triageNurseStaffId: t
+			.uuid("triage_nurse_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		clinicianStaffId: t
+			.uuid("clinician_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		status: t
+			.text("status")
+			.notNull()
+			.default("pending_registration")
+			.$type<"pending_registration" | "registered">(),
+		// Set when registrar converts triage intake into a full encounter
+		encounterId: t.uuid("encounter_id"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("opd_triage_intakes_facility_id_idx").on(t.facilityId),
+		index("opd_triage_intakes_patient_id_idx").on(t.patientId),
+		index("opd_triage_intakes_status_idx").on(t.status),
 	]
 )
 

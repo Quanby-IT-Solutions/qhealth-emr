@@ -17,6 +17,7 @@ import {
 } from "@/core/components/ui/table"
 import { ConsentRecordsTab } from "@/features/clinical-docs/components/consent-records-tab"
 import { DocumentationTab } from "@/features/clinical-docs/components/documentation-tab"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useEncounterDetailQuery } from "@/features/encounters/api/encounters.hooks"
 import { BillingTab } from "@/features/billing/components/billing-tab"
 import { CewsEligibilityBadge } from "@/features/billing/components/cews-eligibility-badge"
@@ -58,6 +59,9 @@ interface EncounterDetailProps {
 
 export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps) {
 	const { data: encounter, isLoading, isError, error } = useEncounterDetailQuery(encounterId)
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	const canWriteNursing = permissions.some(p => p.module === "nursing" && p.action === "create")
 
 	if (isLoading) {
 		return (
@@ -201,6 +205,7 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 					<ProblemsAllergiesTab
 						patientId={patientId}
 						facilityId={encounter.facilityId}
+						canWrite={false}
 					/>
 				</TabsContent>
 
@@ -228,6 +233,7 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 						encounterId={encounterId}
 						facilityId={encounter.facilityId}
 						patientId={patientId}
+						readOnly={!canWriteNursing}
 					/>
 				</TabsContent>
 
@@ -246,6 +252,7 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 						encounterId={encounterId}
 						facilityId={encounter.facilityId}
 						patientId={patientId}
+						canManageConsents={false}
 					/>
 				</TabsContent>
 

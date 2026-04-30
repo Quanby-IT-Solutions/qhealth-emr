@@ -1,20 +1,49 @@
-import { Suspense } from "react"
+"use client"
+
 import Link from "next/link"
 
 import { Button } from "@/core/components/ui/button"
+import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { FormularyManager } from "@/features/formulary/components/formulary-manager"
 
-// TODO: Replace with actual facility context from session/RBAC
-const PLACEHOLDER_FACILITY_ID = "00000000-0000-0000-0000-000000000000"
+function usePermissionSet() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+}
+
+function can(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
+}
 
 export default function FormularyPage() {
+	const facilityId = useActiveFacilityId()
+	const permSet = usePermissionSet()
+
+	if (!can(permSet, "admin", "view")) {
+		return (
+			<div className="flex items-center justify-center p-8 text-muted-foreground">
+				You do not have permission to access this page.
+			</div>
+		)
+	}
+
+	if (!can(permSet, "formulary", "view")) {
+		return (
+			<div className="flex items-center justify-center p-8 text-muted-foreground">
+				You do not have permission to access the formulary.
+			</div>
+		)
+	}
+
 	return (
 		<div className="w-full max-w-7xl space-y-6 p-4">
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-2xl font-bold">Facility Formulary</h1>
 					<p className="text-muted-foreground">
-						Manage approved drugs for this facility. Add, remove, and annotate formulary items.
+						Manage approved drugs for this facility. Add, remove, and update master-data records.
 					</p>
 				</div>
 				<Button variant="outline" nativeButton={false} render={<Link href="/admin/formulary/code-sets" />}>
@@ -22,9 +51,16 @@ export default function FormularyPage() {
 				</Button>
 			</div>
 
-			<Suspense fallback={<p>Loading formulary...</p>}>
-				<FormularyManager facilityId={PLACEHOLDER_FACILITY_ID} />
-			</Suspense>
+			{facilityId ? (
+				<FormularyManager
+					facilityId={facilityId}
+					canEdit={false}
+					canDelete={false}
+					canEditFlags={false}
+				/>
+			) : (
+				<p className="text-muted-foreground">Loading facility context...</p>
+			)}
 		</div>
 	)
 }

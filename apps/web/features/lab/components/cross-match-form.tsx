@@ -113,9 +113,11 @@ function compatibilityIcon(result: CrossMatchRequest["compatibilityResult"]) {
 function NewCrossMatchForm({
 	facilityId,
 	onSuccess,
+	canCreate,
 }: {
 	facilityId: string
 	onSuccess: () => void
+	canCreate: boolean
 }) {
 	const [patientId, setPatientId] = useState("")
 	const [bloodType, setBloodType] = useState<BloodType | "">("")
@@ -153,6 +155,7 @@ function NewCrossMatchForm({
 	}
 
 	const canSubmit =
+		canCreate &&
 		patientId.trim() &&
 		componentType &&
 		Number(unitsRequested) > 0 &&
@@ -266,10 +269,12 @@ function CrossMatchTable({
 	requests,
 	isLoading,
 	onApprove,
+	canApprove,
 }: {
 	requests: CrossMatchRequest[]
 	isLoading: boolean
 	onApprove: (req: CrossMatchRequest) => void
+	canApprove: boolean
 }) {
 	if (isLoading) {
 		return (
@@ -331,7 +336,7 @@ function CrossMatchTable({
 						</TableCell>
 						<TableCell>{statusBadge(req.status)}</TableCell>
 						<TableCell>
-							{req.status === "cross_matched" && (
+							{req.status === "cross_matched" && canApprove && (
 								<Button
 									variant="outline"
 									size="sm"
@@ -454,6 +459,10 @@ function ApproveDialog({
 export function CrossMatchForm() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+	const permissions = profile?.activeRole?.permissions ?? []
+	const permSet = new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	const canCreate = permSet.has("laboratory:create")
+	const canApprove = permSet.has("laboratory:edit")
 
 	const [approveTarget, setApproveTarget] = useState<CrossMatchRequest | null>(null)
 	const [approveOpen, setApproveOpen] = useState(false)
@@ -545,6 +554,7 @@ export function CrossMatchForm() {
 									requests={pendingQuery.data?.data ?? []}
 									isLoading={pendingQuery.isLoading}
 									onApprove={handleApprove}
+									canApprove={canApprove}
 								/>
 							</TabsContent>
 							<TabsContent value="cross_matched">
@@ -552,6 +562,7 @@ export function CrossMatchForm() {
 									requests={activeQuery.data?.data ?? []}
 									isLoading={activeQuery.isLoading}
 									onApprove={handleApprove}
+									canApprove={canApprove}
 								/>
 							</TabsContent>
 							<TabsContent value="approved">
@@ -559,6 +570,7 @@ export function CrossMatchForm() {
 									requests={approvedQuery.data?.data ?? []}
 									isLoading={approvedQuery.isLoading}
 									onApprove={handleApprove}
+									canApprove={canApprove}
 								/>
 							</TabsContent>
 						</Tabs>

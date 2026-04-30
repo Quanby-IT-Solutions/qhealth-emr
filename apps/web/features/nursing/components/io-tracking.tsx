@@ -41,9 +41,10 @@ function formatDateTime(dateStr: string | null | undefined) {
 interface IoTrackingProps {
 	encounterId: string
 	facilityId: string
+	readOnly?: boolean
 }
 
-export function IoTracking({ encounterId, facilityId }: IoTrackingProps) {
+export function IoTracking({ encounterId, facilityId, readOnly }: IoTrackingProps) {
 	const [createOpen, setCreateOpen] = useState(false)
 
 	const ioEntries = useIoEntriesQuery({ encounterId, facilityId })
@@ -179,9 +180,11 @@ export function IoTracking({ encounterId, facilityId }: IoTrackingProps) {
 			{/* Entries table */}
 			<div className="flex items-center justify-between">
 				<h3 className="font-semibold">Entries</h3>
-				<Button size="sm" onClick={() => setCreateOpen(true)}>
-					Record I/O
-				</Button>
+				{!readOnly && (
+					<Button size="sm" onClick={() => setCreateOpen(true)}>
+						Record I/O
+					</Button>
+				)}
 			</div>
 
 			{ioEntries.isLoading ? (

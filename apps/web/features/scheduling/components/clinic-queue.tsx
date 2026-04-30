@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -15,26 +16,30 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
+import { VitalsEntryForm } from "@/features/nursing/components/vitals-entry-form"
 import {
-	type AppointmentStatus,
+	type UnifiedQueueEntry,
 	useClinicQueueQuery,
 	useUpdateAppointmentStatusMutation,
+	useUpdateEncounterQueueStatusMutation,
 } from "@/features/scheduling/api/scheduling.hooks"
 
 function todayIso() {
 	return new Date().toISOString().slice(0, 10)
 }
 
-function formatTime(time: string) {
-	const [h, m] = time.split(":").map(Number)
+function formatTime(time: string | null | undefined) {
+	if (!time) return "—"
+	const parts = time.includes("T") ? time.slice(11, 16) : time.slice(0, 5)
+	const [h, m] = parts.split(":").map(Number)
 	const period = (h ?? 0) >= 12 ? "PM" : "AM"
 	const hour = ((h ?? 0) % 12 || 12).toString()
 	return `${hour}:${(m ?? 0).toString().padStart(2, "0")} ${period}`
 }
 
-function queueStatusBadge(status: AppointmentStatus) {
+function queueStatusBadge(status: string) {
 	switch (status) {
-		case "checked_in":
+		case "waiting":
 			return <Badge variant="default">Waiting</Badge>
 		case "in_progress":
 			return (
@@ -55,39 +60,58 @@ function queueStatusBadge(status: AppointmentStatus) {
 
 interface ClinicQueueProps {
 	facilityId: string
+	clinicianStaffId?: string
 }
 
-export function ClinicQueue({ facilityId }: ClinicQueueProps) {
+export function ClinicQueue({ facilityId, clinicianStaffId }: ClinicQueueProps) {
 	const [date, setDate] = useState(todayIso())
+	const [vitalsEntry, setVitalsEntry] = useState<{
+		encounterId: string
+		patientName: string
+	} | null>(null)
 
 	const queueQuery = useClinicQueueQuery(
-		{ facilityId, date },
+		{ facilityId, clinicianStaffId, date },
 		{ refetchInterval: 20_000 }
 	)
 
-	const statusMut = useUpdateAppointmentStatusMutation()
+	const apptStatusMut = useUpdateAppointmentStatusMutation()
+	const encounterQueueStatusMut = useUpdateEncounterQueueStatusMutation()
+
+	const isPending = apptStatusMut.isPending || encounterQueueStatusMut.isPending
 
 	const entries = queueQuery.data?.entries ?? []
-	const waitingCount = entries.filter((e) => e.status === "checked_in").length
+	const waitingEntries = entries.filter((e) => e.status === "waiting")
 	const inProgressEntry = entries.find((e) => e.status === "in_progress")
 
 	function callNext() {
-		const nextWaiting = entries
-			.filter((e) => e.status === "checked_in")
-			.sort((a, b) => a.position - b.position)[0]
-		if (nextWaiting) {
-			statusMut.mutate({
+		const nextWaiting = waitingEntries.sort(
+			(a, b) => (a.queueNumber ?? 9999) - (b.queueNumber ?? 9999)
+		)[0]
+		if (!nextWaiting) return
+
+		if (nextWaiting.entryType === "appointment" && nextWaiting.appointmentId) {
+			apptStatusMut.mutate({
 				appointmentId: nextWaiting.appointmentId,
+				status: "in_progress",
+			})
+		} else if (nextWaiting.entryType === "walk_in" && nextWaiting.encounterId) {
+			encounterQueueStatusMut.mutate({
+				id: nextWaiting.encounterId,
 				status: "in_progress",
 			})
 		}
 	}
 
-	function markCompleted(appointmentId: string) {
-		statusMut.mutate({ appointmentId, status: "completed" })
+	function markCompleted(entry: UnifiedQueueEntry) {
+		if (entry.entryType === "appointment" && entry.appointmentId) {
+			apptStatusMut.mutate({ appointmentId: entry.appointmentId, status: "completed" })
+		}
+		// Walk-in encounters must be finalized through the chart disposition panel (PS-016 TOR Flow 1 Step 5)
 	}
 
 	return (
+		<>
 		<div className="space-y-4">
 			{/* Date Selector */}
 			<Card>
@@ -120,7 +144,7 @@ export function ClinicQueue({ facilityId }: ClinicQueueProps) {
 				<Card>
 					<CardContent className="pt-4">
 						<div className="text-muted-foreground text-xs">Waiting</div>
-						<div className="text-3xl font-bold">{waitingCount}</div>
+						<div className="text-3xl font-bold">{queueQuery.data?.stats.waiting ?? 0}</div>
 					</CardContent>
 				</Card>
 				<Card>
@@ -135,7 +159,7 @@ export function ClinicQueue({ facilityId }: ClinicQueueProps) {
 					<CardContent className="pt-4">
 						<div className="text-muted-foreground text-xs">Completed</div>
 						<div className="text-3xl font-bold">
-							{entries.filter((e) => e.status === "completed").length}
+							{queueQuery.data?.stats.completed ?? 0}
 						</div>
 					</CardContent>
 				</Card>
@@ -143,10 +167,10 @@ export function ClinicQueue({ facilityId }: ClinicQueueProps) {
 					<CardContent className="flex items-center pt-4">
 						<Button
 							className="w-full"
-							disabled={waitingCount === 0 || !!inProgressEntry || statusMut.isPending}
+							disabled={waitingEntries.length === 0 || !!inProgressEntry || isPending}
 							onClick={callNext}
 						>
-							{statusMut.isPending ? "Calling…" : "Call Next Patient"}
+							{isPending ? "Calling…" : "Call Next Patient"}
 						</Button>
 					</CardContent>
 				</Card>
@@ -167,36 +191,137 @@ export function ClinicQueue({ facilityId }: ClinicQueueProps) {
 							No patients in queue.
 						</p>
 					) : (
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead className="w-16">#</TableHead>
-											<TableHead>Patient</TableHead>
-											<TableHead>Scheduled</TableHead>
-											<TableHead>Check-in Time</TableHead>
-											<TableHead>Status</TableHead>
-											<TableHead />
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead className="w-16">#</TableHead>
+									<TableHead>Patient</TableHead>
+									<TableHead>Type</TableHead>
+									<TableHead>Scheduled</TableHead>
+									<TableHead>Check-in Time</TableHead>
+									<TableHead>Status</TableHead>
+									<TableHead />
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{entries
+									.filter(
+										(e) =>
+											e.status === "waiting" ||
+											e.status === "in_progress"
+									)
+									.sort((a, b) => (a.queueNumber ?? 9999) - (b.queueNumber ?? 9999))
+									.map((entry) => (
+										<TableRow
+											key={entry.id}
+											className={
+												entry.status === "in_progress"
+													? "bg-blue-50 dark:bg-blue-950/20"
+													: ""
+											}
+										>
+											<TableCell className="text-center font-bold text-lg">
+												{entry.queueNumber ?? "—"}
+											</TableCell>
+											<TableCell>
+												<div className="font-medium">{entry.patientName}</div>
+												<div className="text-muted-foreground text-xs">
+													{entry.patientMrn}
+												</div>
+											</TableCell>
+											<TableCell>
+												<Badge variant="outline" className="text-xs">
+													{entry.entryType === "walk_in" ? "Walk-in" : "Appointment"}
+												</Badge>
+											</TableCell>
+											<TableCell>
+												{entry.slotTime ? formatTime(entry.slotTime) : "—"}
+											</TableCell>
+											<TableCell>
+												{entry.checkInTime ? formatTime(entry.checkInTime) : "—"}
+											</TableCell>
+											<TableCell>{queueStatusBadge(entry.status)}</TableCell>
+											<TableCell>
+												{entry.status === "in_progress" && (
+													<div className="flex gap-2">
+														{entry.entryType === "walk_in" && entry.encounterId && (
+															<>
+																<Button
+																	size="sm"
+																	variant="outline"
+																	nativeButton={false}
+																	render={
+																		<Link href={`/patients/${entry.patientId}/encounters/${entry.encounterId}`} />
+																	}
+																>
+																	Open Chart
+																</Button>
+																<Button
+																	size="sm"
+																	variant="outline"
+																	onClick={() =>
+																		setVitalsEntry({
+																			encounterId: entry.encounterId!,
+																			patientName: entry.patientName ?? "",
+																		})
+																	}
+																>
+																	Vitals
+																</Button>
+															</>
+														)}
+														{entry.entryType === "appointment" && (
+															<Button
+																size="sm"
+																disabled={isPending}
+																onClick={() => markCompleted(entry)}
+															>
+																Mark Done
+															</Button>
+														)}
+													</div>
+												)}
+												{entry.status === "waiting" &&
+													entry.entryType === "walk_in" &&
+													entry.encounterId && (
+														<Button
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																setVitalsEntry({
+																	encounterId: entry.encounterId!,
+																	patientName: entry.patientName ?? "",
+																})
+															}
+														>
+															Vitals
+														</Button>
+													)}
+											</TableCell>
 										</TableRow>
-									</TableHeader>
-									<TableBody>
+									))}
+
+								{/* Completed section separator */}
+								{entries.filter((e) => e.status === "completed").length > 0 && (
+									<>
+										<TableRow>
+											<TableCell
+												colSpan={7}
+												className="bg-muted/30 py-1 text-center text-xs font-medium text-muted-foreground"
+											>
+												Completed Today
+											</TableCell>
+										</TableRow>
 										{entries
-											.filter(
-												(e) =>
-													e.status === "checked_in" ||
-													e.status === "in_progress"
-											)
-											.sort((a, b) => a.position - b.position)
+											.filter((e) => e.status === "completed")
+											.reverse()
 											.map((entry) => (
 												<TableRow
-													key={entry.appointmentId}
-													className={
-														entry.status === "in_progress"
-															? "bg-blue-50 dark:bg-blue-950/20"
-															: ""
-													}
+													key={entry.id}
+													className="opacity-60"
 												>
-													<TableCell className="text-center font-bold text-lg">
-														{entry.position}
+													<TableCell className="text-center text-muted-foreground">
+														✓
 													</TableCell>
 													<TableCell>
 														<div className="font-medium">{entry.patientName}</div>
@@ -204,68 +329,38 @@ export function ClinicQueue({ facilityId }: ClinicQueueProps) {
 															{entry.patientMrn}
 														</div>
 													</TableCell>
-													<TableCell>{formatTime(entry.slotTime)}</TableCell>
 													<TableCell>
-														{entry.checkInTime
-															? formatTime(entry.checkInTime.slice(11, 16))
-															: "—"}
+														<Badge variant="outline" className="text-xs">
+															{entry.entryType === "walk_in" ? "Walk-in" : "Appointment"}
+														</Badge>
 													</TableCell>
+													<TableCell>
+														{entry.slotTime ? formatTime(entry.slotTime) : "—"}
+													</TableCell>
+													<TableCell>—</TableCell>
 													<TableCell>{queueStatusBadge(entry.status)}</TableCell>
-													<TableCell>
-														{entry.status === "in_progress" && (
-															<Button
-																size="sm"
-																disabled={statusMut.isPending}
-																onClick={() => markCompleted(entry.appointmentId)}
-															>
-																Mark Done
-															</Button>
-														)}
-													</TableCell>
+													<TableCell />
 												</TableRow>
 											))}
+									</>
+								)}
+							</TableBody>
+						</Table>
+					)}
+				</CardContent>
+			</Card>
+		</div>
 
-										{/* Completed section separator */}
-										{entries.filter((e) => e.status === "completed").length > 0 && (
-											<>
-												<TableRow>
-													<TableCell
-														colSpan={6}
-														className="bg-muted/30 py-1 text-center text-xs font-medium text-muted-foreground"
-													>
-														Completed Today
-													</TableCell>
-												</TableRow>
-												{entries
-													.filter((e) => e.status === "completed")
-													.reverse()
-													.map((entry) => (
-														<TableRow
-															key={entry.appointmentId}
-															className="opacity-60"
-														>
-															<TableCell className="text-center text-muted-foreground">
-																✓
-															</TableCell>
-															<TableCell>
-																<div className="font-medium">{entry.patientName}</div>
-																<div className="text-muted-foreground text-xs">
-																	{entry.patientMrn}
-																</div>
-															</TableCell>
-															<TableCell>{formatTime(entry.slotTime)}</TableCell>
-															<TableCell>—</TableCell>
-															<TableCell>{queueStatusBadge(entry.status)}</TableCell>
-															<TableCell />
-														</TableRow>
-													))}
-											</>
-										)}
-									</TableBody>
-								</Table>
-							)}
-						</CardContent>
-					</Card>
-				</div>
-			)
+		{vitalsEntry && (
+			<VitalsEntryForm
+				encounterId={vitalsEntry.encounterId}
+				facilityId={facilityId}
+				open={!!vitalsEntry}
+				onOpenChange={open => {
+					if (!open) setVitalsEntry(null)
+				}}
+			/>
+		)}
+		</>
+	)
 }

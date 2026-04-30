@@ -374,14 +374,6 @@ export interface HaiCaseListResponse {
 	cases: HaiCaseDetail[]
 }
 
-// Report Export Types
-export interface ExportReportResponse {
-	success: boolean
-	message: string
-	downloadUrl?: string
-	fileName?: string
-}
-
 export function useHaiReportQuery(params: {
 	facilityId: string
 	year: number
@@ -412,23 +404,5 @@ export function useHaiCasesQuery(params: {
 				`${API_BASE}/hai/cases${buildQueryString(params)}`
 			),
 		enabled: enabled && !!params.facilityId,
-	})
-}
-
-export function useExportReportMutation() {
-	return useMutation({
-		mutationFn: (data: {
-			facilityId: string
-			reportType: "ahsr" | "pidsr" | "hai"
-			format: "csv" | "pdf" | "xml"
-			year: number
-			month?: number
-			dateFrom?: string
-			dateTo?: string
-		}) =>
-			fetchJson<ExportReportResponse>(`${API_BASE}/export`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
 	})
 }

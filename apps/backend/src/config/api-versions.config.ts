@@ -1,5 +1,7 @@
 import { v1Contract } from "@repo/contracts"
 
+type V1ContractType = typeof v1Contract
+
 // ── Versioned Contracts ──────────────────────────────────────────────
 // Imported by controllers: @Implement(v1.todo.list)
 
@@ -11,7 +13,7 @@ export { v1Contract as v1 }
 // ── Version Registry ─────────────────────────────────────────────────
 // Used by swagger and auth config
 
-export const API_VERSIONS = {
+export const API_VERSIONS: { v1: { contract: V1ContractType } } = {
 	v1: { contract: v1Contract },
 	// v2: { contract: v2Contract },
 } as const
@@ -28,6 +30,6 @@ export function getVersionKeys(): VersionKey[] {
 /**
  * Get the versioned contract for a specific version
  */
-export function getVersionContract(version: string) {
+export function getVersionContract(version: string): V1ContractType | undefined {
 	return API_VERSIONS[version as VersionKey]?.contract
 }

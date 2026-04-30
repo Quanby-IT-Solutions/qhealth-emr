@@ -6,12 +6,23 @@ import {
 	ActiveOrdersSchema,
 	CdsEvaluateInputSchema,
 	CdsEvaluateResponseSchema,
+	CounselingLogListResponseSchema,
+	CounselingLogListSchema,
+	CounselingLogSchema,
+	CreateHighAlertVerificationSchema,
 	CreateImagingOrderSchema,
 	CreateLabOrderSchema,
 	CreateMedOrderSchema,
 	CreatePrescriptionSchema,
 	CreateTranchedOrdersSchema,
 	DiscontinueMedOrderSchema,
+	DispenseLogIdSchema,
+	DispenseLogListResponseSchema,
+	DispenseLogListSchema,
+	DispenseLogSchema,
+	DispenseOrderInputSchema,
+	GetHighAlertVerificationSchema,
+	HighAlertVerificationSchema,
 	ImagingOrderIdSchema,
 	ImagingOrderListResponseSchema,
 	ImagingOrderListSchema,
@@ -24,6 +35,12 @@ import {
 	MedOrderListResponseSchema,
 	MedOrderListSchema,
 	MedOrderSchema,
+	OpdDispenseHistoryResponseSchema,
+	OpdDispenseHistorySchema,
+	OpdDispenseInputSchema,
+	OpdDispenseRecordSchema,
+	OpdPrescriptionSchema,
+	OpdPrescriptionSearchSchema,
 	ParentOrderIdSchema,
 	PdeaLicenseCheckSchema,
 	PdeaLicenseStatusSchema,
@@ -31,10 +48,13 @@ import {
 	PrescriptionListResponseSchema,
 	PrescriptionListSchema,
 	PrescriptionSchema,
+	SaveCounselingLogInputSchema,
 	SignPrescriptionSchema,
 	TranchedOrdersResponseSchema,
 	TranchePreviewInputSchema,
 	TranchePreviewResponseSchema,
+	UpdateImagingOrderSchema,
+	UpdateLabOrderSchema,
 	UpdateMedOrderSchema,
 	VerificationQueueResponseSchema,
 	VerificationQueueSchema,
@@ -145,6 +165,17 @@ export const ordersContract = {
 		.input(CreateLabOrderSchema)
 		.output(LabOrderSchema),
 
+	// SLA-016: update lab order status and persist authoritative checkpoints
+	updateLabOrder: oc
+		.route({
+			method: "PUT",
+			path: "/labs/{id}",
+			summary: "Update a lab order (status transitions persist SLA-016 checkpoints)",
+			tags: ["Orders — Labs"],
+		})
+		.input(UpdateLabOrderSchema)
+		.output(LabOrderSchema),
+
 	// ========================================================================
 	// Imaging Orders
 	// ========================================================================
@@ -179,6 +210,17 @@ export const ordersContract = {
 		.input(CreateImagingOrderSchema)
 		.output(ImagingOrderSchema),
 
+	// SLA-016: update imaging order status and persist authoritative checkpoints
+	updateImagingOrder: oc
+		.route({
+			method: "PUT",
+			path: "/imaging/{id}",
+			summary: "Update an imaging order (status transitions persist SLA-016 checkpoints)",
+			tags: ["Orders — Imaging"],
+		})
+		.input(UpdateImagingOrderSchema)
+		.output(ImagingOrderSchema),
+
 	// ========================================================================
 	// Pharmacy Verification
 	// ========================================================================
@@ -202,6 +244,26 @@ export const ordersContract = {
 		})
 		.input(VerifyOrderSchema)
 		.output(VerificationSchema),
+
+	createHighAlertVerification: oc
+		.route({
+			method: "POST",
+			path: "/medications/{medicationOrderId}/high-alert-verify",
+			summary: "Create a dual-clinician verification record for a high-alert medication order",
+			tags: ["Orders â€” Medications"],
+		})
+		.input(CreateHighAlertVerificationSchema)
+		.output(HighAlertVerificationSchema),
+
+	getHighAlertVerification: oc
+		.route({
+			method: "GET",
+			path: "/medications/{medicationOrderId}/high-alert-verify",
+			summary: "Get the dual-clinician verification record for a high-alert medication order",
+			tags: ["Orders â€” Medications"],
+		})
+		.input(GetHighAlertVerificationSchema)
+		.output(HighAlertVerificationSchema.nullable()),
 
 	// ========================================================================
 	// Prescriptions
@@ -308,4 +370,96 @@ export const ordersContract = {
 		})
 		.input(ParentOrderIdSchema)
 		.output(z.array(MedOrderSchema)),
+
+	// ========================================================================
+	// Dispense (Inpatient)
+	// ========================================================================
+
+	dispenseOrder: oc
+		.route({
+			method: "POST",
+			path: "/pharmacy/dispense",
+			summary: "Dispense a verified medication order to inpatient",
+			tags: ["Orders — Pharmacy"],
+		})
+		.input(DispenseOrderInputSchema)
+		.output(DispenseLogSchema),
+
+	listDispenseLogs: oc
+		.route({
+			method: "GET",
+			path: "/pharmacy/dispense",
+			summary: "List inpatient dispense records",
+			tags: ["Orders — Pharmacy"],
+		})
+		.input(DispenseLogListSchema)
+		.output(DispenseLogListResponseSchema),
+
+	getDispenseLog: oc
+		.route({
+			method: "GET",
+			path: "/pharmacy/dispense/{id}",
+			summary: "Get a dispense log by ID",
+			tags: ["Orders — Pharmacy"],
+		})
+		.input(DispenseLogIdSchema)
+		.output(DispenseLogSchema),
+
+	// ========================================================================
+	// OPD Dispensing
+	// ========================================================================
+
+	searchOpdPrescription: oc
+		.route({
+			method: "GET",
+			path: "/pharmacy/opd/prescription",
+			summary: "Search for a signed OPD prescription by patient MRN or name",
+			tags: ["Orders — OPD Dispensing"],
+		})
+		.input(OpdPrescriptionSearchSchema)
+		.output(OpdPrescriptionSchema),
+
+	opdDispense: oc
+		.route({
+			method: "POST",
+			path: "/pharmacy/opd/dispense",
+			summary: "Dispense OPD prescription items and log the transaction",
+			tags: ["Orders — OPD Dispensing"],
+		})
+		.input(OpdDispenseInputSchema)
+		.output(OpdDispenseRecordSchema),
+
+	listOpdDispenseHistory: oc
+		.route({
+			method: "GET",
+			path: "/pharmacy/opd/history",
+			summary: "List OPD dispense history for a facility",
+			tags: ["Orders — OPD Dispensing"],
+		})
+		.input(OpdDispenseHistorySchema)
+		.output(OpdDispenseHistoryResponseSchema),
+
+	// ========================================================================
+	// Patient Counseling
+	// ========================================================================
+
+	saveCounselingLog: oc
+		.route({
+			method: "POST",
+			path: "/pharmacy/counseling",
+			summary: "Save a patient counseling log after dispensing",
+			tags: ["Orders — Pharmacy"],
+		})
+		.input(SaveCounselingLogInputSchema)
+		.output(CounselingLogSchema),
+
+	listCounselingLogs: oc
+		.route({
+			method: "GET",
+			path: "/pharmacy/counseling",
+			summary: "List patient counseling logs",
+			tags: ["Orders — Pharmacy"],
+		})
+		.input(CounselingLogListSchema)
+		.output(CounselingLogListResponseSchema),
 }

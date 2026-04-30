@@ -71,9 +71,10 @@ interface ConsentHistoryProps {
 	facilityId: string
 	/** When provided the DPA capture button will know which encounter to attach it to */
 	currentEncounterId?: string
+	canManageConsents?: boolean
 }
 
-export function ConsentHistory({ patientId, facilityId, currentEncounterId }: ConsentHistoryProps) {
+export function ConsentHistory({ patientId, facilityId, currentEncounterId, canManageConsents }: ConsentHistoryProps) {
 	const { data, isLoading } = usePatientConsentsQuery({ patientId })
 	const [dpaModalOpen, setDpaModalOpen] = useState(false)
 	const [revokeTarget, setRevokeTarget] = useState<ConsentRecord | null>(null)
@@ -88,7 +89,7 @@ export function ConsentHistory({ patientId, facilityId, currentEncounterId }: Co
 						<FileText className="size-4 text-muted-foreground" />
 						<CardTitle>Consent History</CardTitle>
 					</div>
-					{currentEncounterId && (
+					{currentEncounterId && canManageConsents && (
 						<Button size="sm" onClick={() => setDpaModalOpen(true)}>
 							DPA Consent
 						</Button>
@@ -136,7 +137,7 @@ export function ConsentHistory({ patientId, facilityId, currentEncounterId }: Co
 											)}
 										</TableCell>
 										<TableCell>
-											{!consent.revokedAt && (
+											{!consent.revokedAt && canManageConsents && (
 												<Button
 													variant="outline"
 													size="sm"

@@ -282,9 +282,10 @@ export function VitalsEntryForm({
 interface VitalsPanelProps {
 	encounterId: string
 	facilityId: string
+	readOnly?: boolean
 }
 
-export function VitalsPanel({ encounterId, facilityId }: VitalsPanelProps) {
+export function VitalsPanel({ encounterId, facilityId, readOnly }: VitalsPanelProps) {
 	const [open, setOpen] = useState(false)
 	const vitals = useVitalsQuery({ encounterId, facilityId })
 
@@ -292,17 +293,21 @@ export function VitalsPanel({ encounterId, facilityId }: VitalsPanelProps) {
 		<div className="space-y-4">
 			<div className="flex items-center justify-between">
 				<h3 className="text-lg font-semibold">Vital Signs</h3>
-				<Button size="sm" onClick={() => setOpen(true)}>
-					Record Vitals
-				</Button>
+				{!readOnly && (
+					<Button size="sm" onClick={() => setOpen(true)}>
+						Record Vitals
+					</Button>
+				)}
 			</div>
 
-			<VitalsEntryForm
-				encounterId={encounterId}
-				facilityId={facilityId}
-				open={open}
-				onOpenChange={setOpen}
-			/>
+			{!readOnly && (
+				<VitalsEntryForm
+					encounterId={encounterId}
+					facilityId={facilityId}
+					open={open}
+					onOpenChange={setOpen}
+				/>
+			)}
 
 			{vitals.isLoading ? (
 				<div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>

@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { AuthService } from "@thallesp/nestjs-better-auth"
 import { and, count, eq, ilike, inArray, or } from "drizzle-orm"
 
@@ -12,6 +12,7 @@ import {
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
+import { AuditService, type DBTransaction } from "@/modules/v1/audit/audit.service"
 import type { V1Outputs } from "@/config/contract-types"
 
 interface ListStaffInput {
@@ -79,6 +80,59 @@ interface ResetPasswordInput {
 	userId: string
 }
 
+interface ActorContext {
+	userId: string
+	staffProfileId: string | null
+	facilityId: string
+	ipAddress: string | null
+	userAgent: string | null
+}
+
+interface FacilityMembershipEntry {
+	facilityId: string
+	roleIds: string[]
+	isPrimary: boolean
+}
+
+interface CreateUserWithFacilitiesInput {
+	name: string
+	email: string
+	password: string
+	employeeNumber?: string
+	prcLicenseNumber?: string
+	prcExpiry?: string
+	ptrNumber?: string
+	ptrExpiry?: string
+	pdeaS2License?: string
+	pdeaS2Expiry?: string
+	facilities: FacilityMembershipEntry[]
+}
+
+interface ReEnableUserInput {
+	staffProfileId: string
+}
+
+interface AddFacilityMembershipInput {
+	userId: string
+	facilityId: string
+	roleIds: string[]
+	isPrimary: boolean
+}
+
+interface RemoveFacilityMembershipInput {
+	staffProfileId: string
+}
+
+interface AddRoleAssignmentInput {
+	staffProfileId: string
+	roleId: string
+}
+
+interface RemoveRoleAssignmentInput {
+	staffProfileId: string
+	roleId: string
+}
+
 type MyProfileResponse = V1Outputs["rbac"]["me"]
 type PermissionEntry = MyProfileResponse["activeRole"] extends infer T
 	? T extends { permissions: infer P }
@@ -92,7 +146,10 @@ type PermissionEntry = MyProfileResponse["activeRole"] extends infer T
 export class RbacService {
 	private readonly logger = new Logger(RbacService.name)
 
-	constructor(private readonly authService: AuthService) {}
+	constructor(
+		private readonly authService: AuthService,
+		private readonly auditService: AuditService,
+	) {}
 
 	async getMyProfile(userId: string, overrideRoleId?: string) {
 		// 1. Get user info
@@ -421,7 +478,7 @@ export class RbacService {
 		const roleRows = await db
 			.select()
 			.from(roles)
-			.where(eq(roles.facilityId, input.facilityId))
+			.where(and(eq(roles.facilityId, input.facilityId), eq(roles.isArchived, false)))
 
 		if (roleRows.length === 0) return []
 
@@ -521,6 +578,39 @@ export class RbacService {
 		return { ...role, permissions: newPerms }
 	}
 
+	async archiveRole(id: string) {
+		const [role] = await db.select().from(roles).where(eq(roles.id, id))
+		if (!role) throw new NotFoundException("Role not found")
+
+		if (role.isSystemDefault) {
+			throw new ForbiddenException("System default roles cannot be archived")
+		}
+
+		if (role.isArchived) {
+			throw new BadRequestException("Role is already archived")
+		}
+
+		// Count active users currently assigned this role
+		const [assignmentRow] = await db
+			.select({ assignedCount: count() })
+			.from(userRoles)
+			.where(eq(userRoles.roleId, id))
+
+		const assignedUserCount = assignmentRow?.assignedCount ?? 0
+
+		if (assignedUserCount > 0) {
+			// Return conflict instead of throwing so the UI can guide remediation
+			return { success: false, conflict: { assignedUserCount } }
+		}
+
+		await db
+			.update(roles)
+			.set({ isArchived: true, archivedAt: new Date() })
+			.where(eq(roles.id, id))
+
+		return { success: true }
+	}
+
 	// ── User-Role Assignment ─────────────────────────────────────────────────
 
 	async assignUserRoles(input: AssignUserRolesInput) {
@@ -594,6 +684,386 @@ export class RbacService {
 
 		await this.authService.api.requestPasswordReset({
 			body: { email: user.email, redirectTo: "/" },
+		})
+
+		return { success: true }
+	}
+
+	// ── Access Governance — Multi-facility user creation ────────────────────
+
+	/**
+	 * Creates a user account + N staff profiles + N×M user_roles in one transaction.
+	 * Better Auth signup happens OUTSIDE the transaction; on DB failure the orphan
+	 * userId is logged for manual cleanup.
+	 */
+	async createUser(input: CreateUserWithFacilitiesInput, actor: ActorContext) {
+		const {
+			name, email, password, employeeNumber,
+			prcLicenseNumber, prcExpiry, ptrNumber, ptrExpiry, pdeaS2License, pdeaS2Expiry,
+			facilities: facilityEntries,
+		} = input
+
+		// Server-side: every roleId must belong to its facilityId
+		if (facilityEntries.length > 0) {
+			const allRoleIds = facilityEntries.flatMap(f => f.roleIds)
+			const roleRows = await db
+				.select({ id: roles.id, facilityId: roles.facilityId })
+				.from(roles)
+				.where(inArray(roles.id, allRoleIds))
+
+			const roleFacilityMap = new Map(roleRows.map(r => [r.id, r.facilityId]))
+			for (const entry of facilityEntries) {
+				for (const roleId of entry.roleIds) {
+					const roleFacility = roleFacilityMap.get(roleId)
+					if (roleFacility !== entry.facilityId) {
+						throw new BadRequestException(
+							`Role ${roleId} does not belong to facility ${entry.facilityId}`
+						)
+					}
+				}
+			}
+		}
+
+		// Create Better Auth user (external, outside DB transaction)
+		const ctx = await this.authService.api.signUpEmail({
+			body: { name, email, password },
+		})
+		if (!ctx?.user) {
+			throw new Error("Failed to create user account")
+		}
+		const userId = ctx.user.id
+
+		try {
+			const staffProfileIds = await db.transaction(async (tx: DBTransaction) => {
+				const createdProfileIds: string[] = []
+
+				for (const entry of facilityEntries) {
+					const [profile] = await tx
+						.insert(staffProfiles)
+						.values({
+							userId,
+							facilityId: entry.facilityId,
+							employeeNumber: employeeNumber ?? null,
+							prcLicenseNumber: prcLicenseNumber ?? null,
+							prcExpiry: prcExpiry ?? null,
+							ptrNumber: ptrNumber ?? null,
+							ptrExpiry: ptrExpiry ?? null,
+							pdeaS2License: pdeaS2License ?? null,
+							pdeaS2Expiry: pdeaS2Expiry ?? null,
+						})
+						.returning()
+
+					if (!profile) throw new Error("Failed to create staff profile")
+					createdProfileIds.push(profile.id)
+
+					if (entry.roleIds.length > 0) {
+						await tx.insert(userRoles).values(
+							entry.roleIds.map((roleId, idx) => ({
+								staffProfileId: profile.id,
+								roleId,
+								isPrimary: entry.isPrimary && idx === 0,
+							}))
+						)
+					}
+
+					await this.auditService.log(
+						{
+							facilityId: actor.facilityId,
+							userId: actor.userId,
+							staffProfileId: actor.staffProfileId,
+							action: "create",
+							entityType: "staff_profile",
+							entityId: profile.id,
+							beforeState: null,
+							afterState: {
+								userId,
+								facilityId: entry.facilityId,
+								isPrimary: entry.isPrimary,
+								roleIds: entry.roleIds,
+							},
+							ipAddress: actor.ipAddress,
+							userAgent: actor.userAgent,
+							metadata: null,
+						},
+						{ tx }
+					)
+				}
+
+				return createdProfileIds
+			})
+
+			return { userId, staffProfileIds }
+		} catch (err) {
+			this.logger.error(
+				`DB setup failed after Better Auth user creation. Orphaned userId=${userId}`,
+				err
+			)
+			throw err
+		}
+	}
+
+	// ── Access Governance — Re-enable user ─────────────────────────────────
+
+	async reEnableUser(input: ReEnableUserInput, actor: ActorContext) {
+		const [profile] = await db
+			.select()
+			.from(staffProfiles)
+			.where(eq(staffProfiles.id, input.staffProfileId))
+
+		if (!profile) throw new NotFoundException("Staff profile not found")
+		if (profile.isActive) return { success: true }
+
+		await db.transaction(async (tx: DBTransaction) => {
+			await tx
+				.update(staffProfiles)
+				.set({ isActive: true, updatedAt: new Date() })
+				.where(eq(staffProfiles.id, input.staffProfileId))
+
+			await this.auditService.log(
+				{
+					facilityId: actor.facilityId,
+					userId: actor.userId,
+					staffProfileId: actor.staffProfileId,
+					action: "update",
+					entityType: "staff_profile",
+					entityId: input.staffProfileId,
+					beforeState: { isActive: false },
+					afterState: { isActive: true },
+					ipAddress: actor.ipAddress,
+					userAgent: actor.userAgent,
+					metadata: { changes: [{ path: "isActive", before: false, after: true }] },
+				},
+				{ tx }
+			)
+		})
+
+		return { success: true }
+	}
+
+	// ── Access Governance — Facility membership ─────────────────────────────
+
+	async addStaffFacility(input: AddFacilityMembershipInput, actor: ActorContext) {
+		const { userId, facilityId, roleIds, isPrimary } = input
+
+		// Verify the user exists
+		const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId))
+		if (!user) throw new NotFoundException("User not found")
+
+		// Server-side: every roleId must belong to the facilityId
+		if (roleIds.length > 0) {
+			const roleRows = await db
+				.select({ id: roles.id, facilityId: roles.facilityId })
+				.from(roles)
+				.where(inArray(roles.id, roleIds))
+
+			for (const roleId of roleIds) {
+				const row = roleRows.find(r => r.id === roleId)
+				if (!row || row.facilityId !== facilityId) {
+					throw new BadRequestException(
+						`Role ${roleId} does not belong to facility ${facilityId}`
+					)
+				}
+			}
+		}
+
+		const staffProfileId = await db.transaction(async (tx: DBTransaction) => {
+			const [profile] = await tx
+				.insert(staffProfiles)
+				.values({ userId, facilityId })
+				.returning()
+
+			if (!profile) throw new Error("Failed to create staff profile")
+
+			if (roleIds.length > 0) {
+				await tx.insert(userRoles).values(
+					roleIds.map((roleId, idx) => ({
+						staffProfileId: profile.id,
+						roleId,
+						isPrimary: isPrimary && idx === 0,
+					}))
+				)
+			}
+
+			await this.auditService.log(
+				{
+					facilityId: actor.facilityId,
+					userId: actor.userId,
+					staffProfileId: actor.staffProfileId,
+					action: "create",
+					entityType: "staff_profile",
+					entityId: profile.id,
+					beforeState: null,
+					afterState: { userId, facilityId, isPrimary, roleIds },
+					ipAddress: actor.ipAddress,
+					userAgent: actor.userAgent,
+					metadata: null,
+				},
+				{ tx }
+			)
+
+			return profile.id
+		})
+
+		return { staffProfileId }
+	}
+
+	async removeStaffFacility(input: RemoveFacilityMembershipInput, actor: ActorContext) {
+		const [profile] = await db
+			.select()
+			.from(staffProfiles)
+			.where(eq(staffProfiles.id, input.staffProfileId))
+
+		if (!profile) throw new NotFoundException("Staff profile not found")
+
+		// Invariant: user must always retain ≥1 active profile
+		const activeCount = await db
+			.select({ total: count() })
+			.from(staffProfiles)
+			.where(and(eq(staffProfiles.userId, profile.userId), eq(staffProfiles.isActive, true)))
+
+		const activeTotal = activeCount[0]?.total ?? 0
+		if (activeTotal <= 1) {
+			throw new BadRequestException(
+				"Cannot remove the last active facility membership — user would lose access"
+			)
+		}
+
+		await db.transaction(async (tx: DBTransaction) => {
+			await tx
+				.update(staffProfiles)
+				.set({ isActive: false, updatedAt: new Date() })
+				.where(eq(staffProfiles.id, input.staffProfileId))
+
+			await this.auditService.log(
+				{
+					facilityId: actor.facilityId,
+					userId: actor.userId,
+					staffProfileId: actor.staffProfileId,
+					action: "delete",
+					entityType: "staff_profile",
+					entityId: input.staffProfileId,
+					beforeState: { isActive: true },
+					afterState: { isActive: false },
+					ipAddress: actor.ipAddress,
+					userAgent: actor.userAgent,
+					metadata: null,
+				},
+				{ tx }
+			)
+		})
+
+		return { success: true }
+	}
+
+	// ── Access Governance — Role assignment ─────────────────────────────────
+
+	async addUserRole(input: AddRoleAssignmentInput, actor: ActorContext) {
+		const { staffProfileId, roleId } = input
+
+		const [profile] = await db
+			.select()
+			.from(staffProfiles)
+			.where(eq(staffProfiles.id, staffProfileId))
+
+		if (!profile) throw new NotFoundException("Staff profile not found")
+
+		// Role must belong to the same facility as the profile
+		const [role] = await db.select().from(roles).where(eq(roles.id, roleId))
+		if (!role) throw new NotFoundException("Role not found")
+		if (role.facilityId !== profile.facilityId) {
+			throw new BadRequestException("Role does not belong to the same facility as the staff profile")
+		}
+
+		// Check if already assigned
+		const [existing] = await db
+			.select()
+			.from(userRoles)
+			.where(and(eq(userRoles.staffProfileId, staffProfileId), eq(userRoles.roleId, roleId)))
+
+		if (existing) return { success: true }
+
+		// Determine if this should be primary (first role for this profile)
+		const existingRoles = await db
+			.select()
+			.from(userRoles)
+			.where(eq(userRoles.staffProfileId, staffProfileId))
+
+		const isPrimary = existingRoles.length === 0
+
+		await db.transaction(async (tx: DBTransaction) => {
+			await tx.insert(userRoles).values({ staffProfileId, roleId, isPrimary })
+
+			await this.auditService.log(
+				{
+					facilityId: actor.facilityId,
+					userId: actor.userId,
+					staffProfileId: actor.staffProfileId,
+					action: "create",
+					entityType: "user_role_assignment",
+					entityId: `${staffProfileId}:${roleId}`,
+					beforeState: null,
+					afterState: { staffProfileId, roleId, isPrimary },
+					ipAddress: actor.ipAddress,
+					userAgent: actor.userAgent,
+					metadata: null,
+				},
+				{ tx }
+			)
+		})
+
+		return { success: true }
+	}
+
+	async removeUserRole(input: RemoveRoleAssignmentInput, actor: ActorContext) {
+		const { staffProfileId, roleId } = input
+
+		const [existing] = await db
+			.select()
+			.from(userRoles)
+			.where(and(eq(userRoles.staffProfileId, staffProfileId), eq(userRoles.roleId, roleId)))
+
+		if (!existing) throw new NotFoundException("Role assignment not found")
+
+		await db.transaction(async (tx: DBTransaction) => {
+			await tx
+				.delete(userRoles)
+				.where(and(eq(userRoles.staffProfileId, staffProfileId), eq(userRoles.roleId, roleId)))
+
+			// If we removed the primary role, promote the next role
+			if (existing.isPrimary) {
+				const remaining = await tx
+					.select()
+					.from(userRoles)
+					.where(eq(userRoles.staffProfileId, staffProfileId))
+					.limit(1)
+
+				if (remaining[0]) {
+					await tx
+						.update(userRoles)
+						.set({ isPrimary: true })
+						.where(and(
+							eq(userRoles.staffProfileId, staffProfileId),
+							eq(userRoles.roleId, remaining[0].roleId)
+						))
+				}
+			}
+
+			await this.auditService.log(
+				{
+					facilityId: actor.facilityId,
+					userId: actor.userId,
+					staffProfileId: actor.staffProfileId,
+					action: "delete",
+					entityType: "user_role_assignment",
+					entityId: `${staffProfileId}:${roleId}`,
+					beforeState: { staffProfileId, roleId },
+					afterState: null,
+					ipAddress: actor.ipAddress,
+					userAgent: actor.userAgent,
+					metadata: null,
+				},
+				{ tx }
+			)
 		})
 
 		return { success: true }

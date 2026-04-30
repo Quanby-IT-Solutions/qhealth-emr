@@ -61,6 +61,10 @@ export function useAuditLogExportMutation() {
 export function useBreakGlassEventsQuery(filter: {
 	facilityId: string
 	reviewStatus?: string
+	clinicianStaffId?: string
+	patientId?: string
+	dateFrom?: string
+	dateTo?: string
 	page?: number
 	limit?: number
 }) {
@@ -69,6 +73,10 @@ export function useBreakGlassEventsQuery(filter: {
 			input: {
 				facilityId: filter.facilityId,
 				reviewStatus: filter.reviewStatus as BreakGlassEvent["reviewStatus"] | undefined,
+				clinicianStaffId: filter.clinicianStaffId,
+				patientId: filter.patientId,
+				dateFrom: filter.dateFrom,
+				dateTo: filter.dateTo,
 				page: filter.page ?? 1,
 				limit: filter.limit ?? 50,
 			},
@@ -77,7 +85,16 @@ export function useBreakGlassEventsQuery(filter: {
 }
 
 export function useCreateBreakGlassMutation() {
-	return useMutation(orpc.audit.breakGlass.create.mutationOptions())
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.audit.breakGlass.create.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({
+					queryKey: orpc.audit.breakGlass.list.key(),
+				}),
+		})
+	)
 }
 
 export function useBreakGlassEventDetailQuery(id: string | null) {
@@ -105,6 +122,50 @@ export function usePatientBreakGlassEventsQuery(params: {
 	)
 }
 
+export function useBreakGlassExportMutation() {
+	return useMutation(
+		orpc.audit.breakGlass.exportCsv.mutationOptions({
+			onSuccess: (data) => {
+				if (data.data.length === 0) return
+
+				const headers = [
+					"id",
+					"clinicianStaffId",
+					"patientId",
+					"reasonCategory",
+					"justification",
+					"accessGrantedAt",
+					"accessExpiresAt",
+					"reviewStatus",
+					"reviewedByStaffId",
+					"reviewNotes",
+					"reviewedAt",
+					"createdAt",
+				]
+				const rows = data.data.map(event =>
+					headers
+						.map(h => {
+							const val = event[h as keyof typeof event]
+							if (val == null) return ""
+							const str = val instanceof Date ? val.toISOString() : String(val)
+							return `"${str.replace(/"/g, '""')}"`
+						})
+						.join(",")
+				)
+
+				const csv = [headers.join(","), ...rows].join("\n")
+				const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+				const url = URL.createObjectURL(blob)
+				const a = document.createElement("a")
+				a.href = url
+				a.download = `break-glass-events-${new Date().toISOString().slice(0, 10)}.csv`
+				a.click()
+				URL.revokeObjectURL(url)
+			},
+		})
+	)
+}
+
 export function useReviewBreakGlassMutation() {
 	const queryClient = useQueryClient()
 
@@ -114,6 +175,44 @@ export function useReviewBreakGlassMutation() {
 				queryClient.invalidateQueries({
 					queryKey: orpc.audit.breakGlass.list.key(),
 				}),
+		})
+	)
+}
+
+export function useBreakGlassPatternsQuery(params: {
+	facilityId: string
+	days?: number
+	topN?: number
+}) {
+	return useQuery(
+		orpc.audit.breakGlass.patterns.queryOptions({
+			input: {
+				facilityId: params.facilityId,
+				days: params.days ?? 30,
+				topN: params.topN ?? 10,
+			},
+		})
+	)
+}
+
+export function useConfigHistoryQuery(filter: {
+	facilityId: string
+	entityType?: string
+	dateFrom?: string
+	dateTo?: string
+	page?: number
+	limit?: number
+}) {
+	return useQuery(
+		orpc.audit.log.configHistory.queryOptions({
+			input: {
+				facilityId: filter.facilityId,
+				entityType: filter.entityType,
+				dateFrom: filter.dateFrom,
+				dateTo: filter.dateTo,
+				page: filter.page ?? 1,
+				limit: filter.limit ?? 50,
+			},
 		})
 	)
 }

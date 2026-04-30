@@ -47,6 +47,22 @@ export const env = createEnv({
 		PHILHEALTH_MOCK_EXPIRY_DATE: z.string().default("2026-12-31"),
 		PHILHEALTH_MOCK_REMAINING_BENEFIT: z.coerce.number().default(45000),
 		PHILHEALTH_MOCK_ERROR_MESSAGE: z.string().default("Mock PhilHealth error response."),
+
+		// NHDR (National Health Data Repository) integration
+		NHDR_MODE: z.enum(["mock", "real"]).default("mock"),
+		NHDR_BASE_URL: z.string().url().optional(),
+		NHDR_API_KEY: z.string().optional(),
+
+		// Additional integration credential env-vars
+		FHIR_API_KEY: z.string().optional(),
+		CIVIL_REGISTRY_API_KEY: z.string().optional(),
+		HAI_API_KEY: z.string().optional(),
+		ERP_API_KEY: z.string().optional(),
+		LIS_API_KEY: z.string().optional(),
+		PACS_API_KEY: z.string().optional(),
+		TELEMEDICINE_API_KEY: z.string().optional(),
+		PIDSR_API_KEY: z.string().optional(),
+		CUSTOM_INTEGRATION_API_KEY: z.string().optional(),
 	},
 	runtimeEnv: process.env,
 	skipValidation: !!process.env.CI || process.env.npm_lifecycle_event === "lint",

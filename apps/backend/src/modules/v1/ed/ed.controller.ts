@@ -4,6 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
+import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { EdService } from "./ed.service"
 
@@ -13,6 +14,7 @@ export class EdController {
 
 	// Pre-Encounter CRUD
 
+	@RequirePermission("ed", "create")
 	@Implement(v1.ed.createPreEncounter)
 	async createPreEncounter(@Session() session: UserSession) {
 		return implement(v1.ed.createPreEncounter).handler(async ({ input }) => {
@@ -20,6 +22,7 @@ export class EdController {
 		})
 	}
 
+	@RequirePermission("ed", "view")
 	@Implement(v1.ed.getPreEncounter)
 	async getPreEncounter() {
 		return implement(v1.ed.getPreEncounter).handler(async ({ input }) => {
@@ -27,6 +30,7 @@ export class EdController {
 		})
 	}
 
+	@RequirePermission("ed", "edit")
 	@Implement(v1.ed.updatePreEncounter)
 	async updatePreEncounter(@Session() session: UserSession) {
 		return implement(v1.ed.updatePreEncounter).handler(async ({ input }) => {
@@ -34,6 +38,7 @@ export class EdController {
 		})
 	}
 
+	@RequirePermission("ed", "view")
 	@Implement(v1.ed.listPreEncounters)
 	async listPreEncounters() {
 		return implement(v1.ed.listPreEncounters).handler(async ({ input }) => {
@@ -43,6 +48,7 @@ export class EdController {
 
 	// Chart Merge
 
+	@RequirePermission("ed", "view")
 	@Implement(v1.ed.mergePreview)
 	async mergePreview() {
 		return implement(v1.ed.mergePreview).handler(async ({ input }) => {
@@ -50,6 +56,7 @@ export class EdController {
 		})
 	}
 
+	@RequirePermission("ed", "edit")
 	@Implement(v1.ed.merge)
 	async merge(@Session() session: UserSession) {
 		return implement(v1.ed.merge).handler(async ({ input }) => {
@@ -59,6 +66,7 @@ export class EdController {
 
 	// ED Queue
 
+	@RequirePermission("ed", "view")
 	@Implement(v1.ed.getQueue)
 	async getQueue() {
 		return implement(v1.ed.getQueue).handler(async ({ input }) => {
@@ -66,6 +74,7 @@ export class EdController {
 		})
 	}
 
+	@RequirePermission("ed", "edit")
 	@Implement(v1.ed.updateQueueStatus)
 	async updateQueueStatus(@Session() session: UserSession) {
 		return implement(v1.ed.updateQueueStatus).handler(async ({ input }) => {
@@ -75,6 +84,7 @@ export class EdController {
 
 	// Disposition
 
+	@RequirePermission("ed", "edit")
 	@Implement(v1.ed.dispose)
 	async dispose(@Session() session: UserSession) {
 		return implement(v1.ed.dispose).handler(async ({ input }) => {

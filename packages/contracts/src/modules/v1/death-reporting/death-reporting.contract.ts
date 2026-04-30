@@ -12,6 +12,10 @@ import {
 	GetDeathReportStatusInputSchema,
 	GetFmdrfInputSchema,
 	GetFndrfInputSchema,
+	MarkDeathReportPaidInputSchema,
+	MarkDeathReportPaidResponseSchema,
+	MarkDeathReportReleasedInputSchema,
+	MarkDeathReportReleasedResponseSchema,
 	UpdateFmdrfInputSchema,
 	UpdateFndrfInputSchema,
 } from "./death-reporting.schema.js"
@@ -89,4 +93,26 @@ export const deathReportingContract = {
 		})
 		.input(UpdateFndrfInputSchema)
 		.output(FndrfReportSchema),
+
+	// SLA-017: payment checkpoint for death certificates
+	markDeathReportPaid: oc
+		.route({
+			method: "POST",
+			path: "/death-reporting/{id}/mark-paid",
+			summary: "Record payment receipt for a death certificate (SLA-017 Flow 7 Step 2)",
+			tags: ["Death Reporting"],
+		})
+		.input(MarkDeathReportPaidInputSchema)
+		.output(MarkDeathReportPaidResponseSchema),
+
+	// SLA-021: release audit checkpoint for death certificates
+	markDeathReportReleased: oc
+		.route({
+			method: "POST",
+			path: "/death-reporting/{id}/mark-released",
+			summary: "Record release of a death certificate to the family (SLA-021 Flow 7 Step 3)",
+			tags: ["Death Reporting"],
+		})
+		.input(MarkDeathReportReleasedInputSchema)
+		.output(MarkDeathReportReleasedResponseSchema),
 }

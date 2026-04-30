@@ -4,6 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
+import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { SchedulingService } from "./scheduling.service"
 
@@ -15,6 +16,7 @@ export class SchedulingController {
 	// Clinic Templates
 	// ========================================================================
 
+	@RequirePermission("scheduling", "view")
 	@Implement(v1.scheduling.listClinicTemplates)
 	async listClinicTemplates() {
 		return implement(v1.scheduling.listClinicTemplates).handler(
@@ -24,6 +26,7 @@ export class SchedulingController {
 		)
 	}
 
+	@RequirePermission("scheduling", "create")
 	@Implement(v1.scheduling.createClinicTemplate)
 	async createClinicTemplate(@Session() session: UserSession) {
 		return implement(v1.scheduling.createClinicTemplate).handler(
@@ -34,6 +37,7 @@ export class SchedulingController {
 		)
 	}
 
+	@RequirePermission("scheduling", "edit")
 	@Implement(v1.scheduling.updateClinicTemplate)
 	async updateClinicTemplate(@Session() session: UserSession) {
 		return implement(v1.scheduling.updateClinicTemplate).handler(
@@ -48,6 +52,7 @@ export class SchedulingController {
 	// Appointments
 	// ========================================================================
 
+	@RequirePermission("scheduling", "view")
 	@Implement(v1.scheduling.listAppointments)
 	async listAppointments() {
 		return implement(v1.scheduling.listAppointments).handler(
@@ -57,6 +62,7 @@ export class SchedulingController {
 		)
 	}
 
+	@RequirePermission("scheduling", "view")
 	@Implement(v1.scheduling.getAppointment)
 	async getAppointment() {
 		return implement(v1.scheduling.getAppointment).handler(
@@ -66,6 +72,7 @@ export class SchedulingController {
 		)
 	}
 
+	@RequirePermission("scheduling", "create")
 	@Implement(v1.scheduling.createAppointment)
 	async createAppointment(@Session() session: UserSession) {
 		return implement(v1.scheduling.createAppointment).handler(
@@ -75,6 +82,7 @@ export class SchedulingController {
 		)
 	}
 
+	@RequirePermission("scheduling", "create")
 	@Implement(v1.scheduling.checkInAppointment)
 	async checkInAppointment(@Session() session: UserSession) {
 		return implement(v1.scheduling.checkInAppointment).handler(
@@ -85,6 +93,7 @@ export class SchedulingController {
 		)
 	}
 
+	@RequirePermission("scheduling", "edit")
 	@Implement(v1.scheduling.updateAppointmentStatus)
 	async updateAppointmentStatus(@Session() session: UserSession) {
 		return implement(v1.scheduling.updateAppointmentStatus).handler(
@@ -99,6 +108,7 @@ export class SchedulingController {
 	// Availability & Queue
 	// ========================================================================
 
+	@RequirePermission("scheduling", "view")
 	@Implement(v1.scheduling.getAvailableSlots)
 	async getAvailableSlots() {
 		return implement(v1.scheduling.getAvailableSlots).handler(
@@ -108,11 +118,24 @@ export class SchedulingController {
 		)
 	}
 
+	@RequirePermission("scheduling", "view")
 	@Implement(v1.scheduling.getClinicQueue)
 	async getClinicQueue() {
 		return implement(v1.scheduling.getClinicQueue).handler(
 			async ({ input }) => {
 				return this.schedulingService.getClinicQueue(input)
+			}
+		)
+	}
+
+	// PS-003: Update walk-in encounter queue status
+	// PS-006: Only Schedulers (scheduling:edit) may advance the clinic queue
+	@RequirePermission("scheduling", "edit")
+	@Implement(v1.scheduling.updateEncounterQueueStatus)
+	async updateEncounterQueueStatus() {
+		return implement(v1.scheduling.updateEncounterQueueStatus).handler(
+			async ({ input }) => {
+				return this.schedulingService.updateEncounterQueueStatus(input)
 			}
 		)
 	}

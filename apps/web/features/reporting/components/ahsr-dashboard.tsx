@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 
@@ -43,9 +43,11 @@ function formatDate(d: string | null | undefined) {
 
 interface AhsrDashboardProps {
 	facilityId: string
+	canEdit?: boolean
+	canExport?: boolean
 }
 
-export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
+export function AhsrDashboard({ facilityId, canEdit = true, canExport = true }: AhsrDashboardProps) {
 	const currentYear = new Date().getFullYear()
 	const [year, setYear] = useState(currentYear)
 	const [month, setMonth] = useState<string>("all")
@@ -149,9 +151,11 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 									))}
 								</SelectContent>
 							</Select>
-							<Button variant="outline" onClick={handleExport} disabled={exportMut.isPending}>
-								{exportMut.isPending ? "Exporting…" : "Export Snapshot"}
-							</Button>
+							{canExport && (
+								<Button variant="outline" onClick={handleExport} disabled={exportMut.isPending}>
+									{exportMut.isPending ? "Exporting…" : "Export Snapshot"}
+								</Button>
+							)}
 						</div>
 					</div>
 				</CardHeader>
@@ -168,17 +172,17 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 						<MetricCard
 							title="Admissions"
 							value={metrics.totalAdmissions}
-							onClick={() => openDrilldown("admissions")}
+							onClick={canEdit ? () => openDrilldown("admissions") : undefined}
 						/>
 						<MetricCard
 							title="Discharges"
 							value={metrics.totalDischarges}
-							onClick={() => openDrilldown("discharges")}
+							onClick={canEdit ? () => openDrilldown("discharges") : undefined}
 						/>
 						<MetricCard
 							title="Deaths"
 							value={metrics.totalDeaths}
-							onClick={() => openDrilldown("deaths")}
+							onClick={canEdit ? () => openDrilldown("deaths") : undefined}
 						/>
 						<MetricCard
 							title="Bed Occupancy Rate"
@@ -237,7 +241,7 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 											<TableHead>ICD-10</TableHead>
 											<TableHead className="text-right">Count</TableHead>
 											<TableHead className="text-right">%</TableHead>
-											<TableHead />
+											{canEdit && <TableHead />}
 										</TableRow>
 									</TableHeader>
 									<TableBody>
@@ -251,13 +255,15 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 													{m.percentage.toFixed(1)}%
 												</TableCell>
 												<TableCell className="text-right">
-													<Button
-														size="sm"
-														variant="ghost"
-														onClick={() => openDrilldown("morbidity", m.icdCode)}
-													>
-														Drilldown
-													</Button>
+													{canEdit && (
+														<Button
+															size="sm"
+															variant="ghost"
+															onClick={() => openDrilldown("morbidity", m.icdCode)}
+														>
+															Drilldown
+														</Button>
+													)}  
 												</TableCell>
 											</TableRow>
 										))}
@@ -284,7 +290,7 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 											<TableHead>ICD-10</TableHead>
 											<TableHead className="text-right">Count</TableHead>
 											<TableHead className="text-right">%</TableHead>
-											<TableHead />
+											{canEdit && <TableHead />}
 										</TableRow>
 									</TableHeader>
 									<TableBody>
@@ -298,13 +304,15 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 													{m.percentage.toFixed(1)}%
 												</TableCell>
 												<TableCell className="text-right">
-													<Button
-														size="sm"
-														variant="ghost"
-														onClick={() => openDrilldown("mortality", m.icdCode)}
-													>
-														Drilldown
-													</Button>
+													{canEdit && (
+														<Button
+															size="sm"
+															variant="ghost"
+															onClick={() => openDrilldown("mortality", m.icdCode)}
+														>
+															Drilldown
+														</Button>
+													)}  
 												</TableCell>
 											</TableRow>
 										))}
@@ -329,7 +337,7 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 											<TableHead>HAI Type</TableHead>
 											<TableHead className="text-right">Count</TableHead>
 											<TableHead className="text-right">Rate / 1000 Admissions</TableHead>
-											<TableHead />
+											{canEdit && <TableHead />}
 										</TableRow>
 									</TableHeader>
 									<TableBody>
@@ -341,13 +349,15 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 												<TableCell className="text-right">{h.count}</TableCell>
 												<TableCell className="text-right">{h.rate.toFixed(2)}</TableCell>
 												<TableCell className="text-right">
-													<Button
-														size="sm"
-														variant="ghost"
-														onClick={() => openDrilldown("hai", undefined, h.haiType)}
-													>
-														Drilldown
-													</Button>
+													{canEdit && (
+														<Button
+															size="sm"
+															variant="ghost"
+															onClick={() => openDrilldown("hai", undefined, h.haiType)}
+														>
+															Drilldown
+														</Button>
+													)}  
 												</TableCell>
 											</TableRow>
 										))}

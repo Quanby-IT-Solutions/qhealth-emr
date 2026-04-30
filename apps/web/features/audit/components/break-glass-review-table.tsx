@@ -12,9 +12,15 @@ import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import { Skeleton } from "@/core/components/ui/skeleton"
 
 import type { BreakGlassEvent } from "@/features/audit/api/audit.hooks"
-import { useBreakGlassEventsQuery, useReviewBreakGlassMutation } from "@/features/audit/api/audit.hooks"
+import {
+	useBreakGlassEventsQuery,
+	useBreakGlassExportMutation,
+	useBreakGlassPatternsQuery,
+	useReviewBreakGlassMutation,
+} from "@/features/audit/api/audit.hooks"
 
 const STATUS_COLORS: Record<string, string> = {
 	pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
@@ -100,14 +106,108 @@ interface BreakGlassReviewTableProps {
 	facilityId: string
 }
 
+// ============================================================================
+// Patterns Panel (AD-005)
+// ============================================================================
+
+function PatternsPanel({ facilityId, days }: { facilityId: string; days: number }) {
+	const { data, isLoading } = useBreakGlassPatternsQuery({ facilityId, days })
+
+	if (isLoading) {
+		return (
+			<div className="space-y-2">
+				<Skeleton className="h-4 w-48" />
+				<Skeleton className="h-24 w-full" />
+			</div>
+		)
+	}
+
+	if (!data) return null
+
+	return (
+		<div className="rounded-md border bg-muted/30 p-4 space-y-4">
+			<div className="flex items-center justify-between">
+				<h3 className="text-sm font-semibold">Pattern Analysis ({days}d window)</h3>
+				<div className="flex gap-3 text-xs text-muted-foreground">
+					<span>Total: <strong>{data.totalEventsInWindow}</strong></span>
+					<span>Pending: <strong className={data.pendingReviewCount > 0 ? "text-yellow-600" : ""}>{data.pendingReviewCount}</strong></span>
+					<span>Flagged: <strong className={data.flaggedCount > 0 ? "text-destructive" : ""}>{data.flaggedCount}</strong></span>
+				</div>
+			</div>
+
+			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+				<div>
+					<p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+						Top Repeat Requesters
+					</p>
+					{data.topRepeatRequesters.length === 0 ? (
+						<p className="text-xs text-muted-foreground italic">No repeated access in this period</p>
+					) : (
+						<ul className="space-y-1.5">
+							{data.topRepeatRequesters.slice(0, 5).map(r => (
+								<li key={r.clinicianStaffId} className="flex items-start justify-between gap-2 text-xs">
+									<span className="font-mono text-[10px] truncate max-w-[140px]" title={r.clinicianStaffId}>
+										{r.clinicianStaffId.slice(0, 8)}…
+									</span>
+									<div className="flex gap-1.5 text-[10px]">
+										<span>{r.eventCount} events</span>
+										<span className="text-muted-foreground">· {r.distinctPatients} patient(s)</span>
+										{r.flaggedCount > 0 && (
+											<span className="text-destructive">· {r.flaggedCount} flagged</span>
+										)}
+									</div>
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+
+				<div>
+					<p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+						Most Accessed Patients
+					</p>
+					{data.topRepeatPatients.length === 0 ? (
+						<p className="text-xs text-muted-foreground italic">No repeated access in this period</p>
+					) : (
+						<ul className="space-y-1.5">
+							{data.topRepeatPatients.slice(0, 5).map(p => (
+								<li key={p.patientId} className="flex items-start justify-between gap-2 text-xs">
+									<span className="font-mono text-[10px] truncate max-w-[140px]" title={p.patientId}>
+										{p.patientId.slice(0, 8)}…
+									</span>
+									<div className="flex gap-1.5 text-[10px]">
+										<span>{p.eventCount} accesses</span>
+										<span className="text-muted-foreground">· {p.distinctClinicians} clinician(s)</span>
+										{p.flaggedCount > 0 && (
+											<span className="text-destructive">· {p.flaggedCount} flagged</span>
+										)}
+									</div>
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+			</div>
+		</div>
+	)
+}
+
 export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps) {
 	const [statusFilter, setStatusFilter] = useState<string>("pending")
+	const [dateFrom, setDateFrom] = useState<string>("")
+	const [dateTo, setDateTo] = useState<string>("")
+	const [showPatterns, setShowPatterns] = useState(false)
+	const [patternsDays, setPatternsDays] = useState(30)
 	const [page, setPage] = useState(1)
 	const { data, isLoading: loading, error } = useBreakGlassEventsQuery({
 		facilityId,
 		reviewStatus: statusFilter === "all" ? undefined : statusFilter,
+		dateFrom: dateFrom || undefined,
+		dateTo: dateTo || undefined,
 		page,
 	})
+
+	const exportMutation = useBreakGlassExportMutation()
 
 	const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -156,19 +256,101 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 		<>
 			<Card>
 				<CardHeader>
-					<div className="flex items-center justify-between">
-						<CardTitle>Break-Glass Event Review</CardTitle>
-						<Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-							<SelectTrigger className="w-40">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="all">All</SelectItem>
-								<SelectItem value="pending">Pending</SelectItem>
-								<SelectItem value="appropriate">Appropriate</SelectItem>
-								<SelectItem value="flagged">Flagged</SelectItem>
-							</SelectContent>
-						</Select>
+					<div className="flex flex-col gap-3">
+						<div className="flex items-center justify-between">
+							<CardTitle>Break-Glass Event Review</CardTitle>
+							<div className="flex items-center gap-2">
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={exportMutation.isPending}
+									onClick={() =>
+										exportMutation.mutate({
+											facilityId,
+											reviewStatus: statusFilter === "all" ? undefined : (statusFilter as "pending" | "appropriate" | "flagged"),
+											dateFrom: dateFrom || undefined,
+											dateTo: dateTo || undefined,
+										})
+									}
+								>
+									{exportMutation.isPending ? "Exporting…" : "Export CSV"}
+								</Button>
+								<Button
+									variant={showPatterns ? "secondary" : "outline"}
+									size="sm"
+									onClick={() => setShowPatterns(v => !v)}
+								>
+									{showPatterns ? "Hide" : "Show"} Pattern Analysis
+								</Button>
+							</div>
+						</div>
+
+						{showPatterns && (
+							<div className="mb-1">
+								<div className="mb-2 flex items-center gap-2">
+									<span className="text-xs text-muted-foreground">Analysis window:</span>
+									{[7, 14, 30, 60, 90].map(d => (
+										<button
+											key={d}
+											onClick={() => setPatternsDays(d)}
+											className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+												patternsDays === d
+													? "bg-primary text-primary-foreground"
+													: "bg-muted text-muted-foreground hover:bg-muted/80"
+											}`}
+										>
+											{d}d
+										</button>
+									))}
+								</div>
+								<PatternsPanel facilityId={facilityId} days={patternsDays} />
+							</div>
+						)}
+
+						<div className="flex flex-wrap items-end gap-3">
+							<div className="flex flex-col gap-1">
+								<Label className="text-xs">Status</Label>
+								<Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+									<SelectTrigger className="w-36">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="all">All</SelectItem>
+										<SelectItem value="pending">Pending</SelectItem>
+										<SelectItem value="appropriate">Appropriate</SelectItem>
+										<SelectItem value="flagged">Flagged</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+							<div className="flex flex-col gap-1">
+								<Label className="text-xs">From</Label>
+								<Input
+									type="date"
+									className="w-36 text-xs h-9"
+									value={dateFrom}
+									onChange={e => { setDateFrom(e.target.value); setPage(1) }}
+								/>
+							</div>
+							<div className="flex flex-col gap-1">
+								<Label className="text-xs">To</Label>
+								<Input
+									type="date"
+									className="w-36 text-xs h-9"
+									value={dateTo}
+									onChange={e => { setDateTo(e.target.value); setPage(1) }}
+								/>
+							</div>
+							{(dateFrom || dateTo) && (
+								<Button
+									variant="ghost"
+									size="sm"
+									className="text-xs"
+									onClick={() => { setDateFrom(""); setDateTo(""); setPage(1) }}
+								>
+									Clear dates
+								</Button>
+							)}
+						</div>
 					</div>
 				</CardHeader>
 				<CardContent>

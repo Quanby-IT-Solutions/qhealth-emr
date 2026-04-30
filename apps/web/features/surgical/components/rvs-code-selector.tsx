@@ -43,27 +43,30 @@ interface SearchResultRowProps {
 	code: RvsCode
 	onSuggest: (code: string) => void
 	isSuggesting: boolean
+	canSuggest?: boolean
 }
 
-function SearchResultRow({ code, onSuggest, isSuggesting }: SearchResultRowProps) {
+function SearchResultRow({ code, onSuggest, isSuggesting, canSuggest = true }: SearchResultRowProps) {
 	return (
 		<TableRow>
 			<TableCell className="font-mono text-sm">{code.code}</TableCell>
 			<TableCell className="text-sm">{code.description}</TableCell>
 			<TableCell className="text-right">
-				<Button
-					size="sm"
-					variant="outline"
-					disabled={isSuggesting}
-					onClick={() => onSuggest(code.code)}
-				>
-					{isSuggesting ? (
-						<Loader2 className="size-3.5 animate-spin" />
-					) : (
-						<Plus className="size-3.5" />
-					)}
-					Suggest
-				</Button>
+				{canSuggest && (
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={isSuggesting}
+						onClick={() => onSuggest(code.code)}
+					>
+						{isSuggesting ? (
+							<Loader2 className="size-3.5 animate-spin" />
+						) : (
+							<Plus className="size-3.5" />
+						)}
+						Suggest
+					</Button>
+				)}
 			</TableCell>
 		</TableRow>
 	)
@@ -75,6 +78,7 @@ interface AssignmentRowProps {
 	assignment: RvsAssignment
 	canValidate: boolean
 	canFinalize: boolean
+	canEdit?: boolean
 	onUpdateStatus: (id: string, status: RvsCodeStatus) => void
 	onRemove: (id: string) => void
 	isUpdating: boolean
@@ -85,6 +89,7 @@ function AssignmentRow({
 	assignment,
 	canValidate,
 	canFinalize,
+	canEdit = true,
 	onUpdateStatus,
 	onRemove,
 	isUpdating,
@@ -120,7 +125,7 @@ function AssignmentRow({
 							Finalize
 						</Button>
 					)}
-					{assignment.status !== "finalized" && (
+					{assignment.status !== "finalized" && canEdit && (
 						<Button
 							size="sm"
 							variant="ghost"
@@ -140,9 +145,10 @@ function AssignmentRow({
 
 interface SearchPanelProps {
 	caseId: string
+	canEdit?: boolean
 }
 
-function SearchPanel({ caseId }: SearchPanelProps) {
+function SearchPanel({ caseId, canEdit = true }: SearchPanelProps) {
 	const [query, setQuery] = useState("")
 	const debouncedQuery = useDebounce(query, 300)
 	const search = useRvsCodeSearchQuery(debouncedQuery.length >= 2 ? debouncedQuery : "")
@@ -189,6 +195,7 @@ function SearchPanel({ caseId }: SearchPanelProps) {
 										key={code.code}
 										code={code}
 										onSuggest={handleSuggest}
+										canSuggest={canEdit}
 										isSuggesting={suggest.isPending && suggest.variables?.code === code.code}
 									/>
 								))}
@@ -220,11 +227,12 @@ function useDebounce<T>(value: T, delayMs: number): T {
 
 interface RvsCodeSelectorProps {
 	caseId: string
+	canEdit?: boolean
 	canValidate: boolean
 	canFinalize: boolean
 }
 
-export function RvsCodeSelector({ caseId, canValidate, canFinalize }: RvsCodeSelectorProps) {
+export function RvsCodeSelector({ caseId, canEdit = true, canValidate, canFinalize }: RvsCodeSelectorProps) {
 	const assignments = useRvsAssignmentsQuery(caseId)
 	const updateStatus = useUpdateRvsStatusMutation()
 	const remove = useRemoveRvsAssignmentMutation()
@@ -257,7 +265,7 @@ export function RvsCodeSelector({ caseId, canValidate, canFinalize }: RvsCodeSel
 					</div>
 				</CardHeader>
 				<CardContent>
-					<SearchPanel caseId={caseId} />
+					<SearchPanel caseId={caseId} canEdit={canEdit} />
 				</CardContent>
 			</Card>
 
@@ -293,6 +301,7 @@ export function RvsCodeSelector({ caseId, canValidate, canFinalize }: RvsCodeSel
 										<AssignmentRow
 											key={assignment.id}
 											assignment={assignment}
+											canEdit={canEdit}
 											canValidate={canValidate}
 											canFinalize={canFinalize}
 											onUpdateStatus={handleUpdateStatus}

@@ -62,6 +62,8 @@ export const roles = createTable(
 		name: t.text("name").notNull(),
 		description: t.text("description"),
 		isSystemDefault: t.boolean("is_system_default").notNull().default(false),
+		isArchived: t.boolean("is_archived").notNull().default(false),
+		archivedAt: t.timestamp("archived_at"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [index("roles_facility_id_idx").on(t.facilityId)]
@@ -86,6 +88,7 @@ export const rolePermissions = createTable(
 				| "billing"
 				| "formulary"
 				| "reporting"
+				| "notifications"
 				| "audit"
 				| "admin"
 				| "surgical"
@@ -101,11 +104,18 @@ export const rolePermissions = createTable(
 				| "death_reporting"
 				| "ed"
 				| "telemedicine"
+				| "feature_flags"
+				| "system_settings"
+				| "facility_profile"
+				| "integration_registry"
+				| "civil_registry"
+				| "medical_records"
+				| "patients"
 			>(),
 		action: t
 			.text("action")
 			.notNull()
-			.$type<"view" | "create" | "edit" | "sign" | "delete" | "verify" | "export">(),
+			.$type<"view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "manage_catalog" | "clinical_policy" | "terminology_admin">(),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [index("role_permissions_role_id_idx").on(t.roleId), uniqueIndex("role_permissions_role_module_action_unique").on(t.roleId, t.module, t.action)]

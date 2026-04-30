@@ -15,6 +15,20 @@ interface AuditedOptions {
 	getUserId?: (...args: unknown[]) => string
 	/** Function to extract facilityId from method arguments. */
 	getFacilityId?: (...args: unknown[]) => string
+	/**
+	 * When provided, called with (beforeState, afterState) after the method returns.
+	 * The returned array of field-level diffs is stored in `metadata.changes`.
+	 * Existing call sites that omit this option are unaffected.
+	 *
+	 * @example
+	 * ```typescript
+	 * extractChanges: (before, after) => diffFields(before, after)
+	 * ```
+	 */
+	extractChanges?: (
+		before: unknown,
+		after: unknown
+	) => Array<{ path: string; before: unknown; after: unknown }>
 }
 
 const AUDIT_SERVICE_KEY = "AUDIT_SERVICE"
@@ -93,6 +107,10 @@ export function Audited(options: AuditedOptions): MethodDecorator {
 							`Ensure getUserId and getFacilityId are provided in @Audited options.`
 					)
 				} else {
+					const changes = options.extractChanges
+						? options.extractChanges(beforeState, afterState)
+						: undefined
+
 					auditService
 						.log({
 							facilityId,
@@ -105,7 +123,7 @@ export function Audited(options: AuditedOptions): MethodDecorator {
 							afterState: afterState as Record<string, unknown> | null,
 							ipAddress: null,
 							userAgent: null,
-							metadata: null,
+							metadata: changes && changes.length > 0 ? { changes } : null,
 						})
 						.catch(error => {
 							logger.error(`Failed to write audit log for ${options.entityType}:${entityId}: ${error}`)

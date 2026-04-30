@@ -7,6 +7,7 @@ import {
 	FhirExportSchema,
 	FhirExportsQuerySchema,
 	FhirExportsResponseSchema,
+	FhirSystemStatusSchema,
 	FhirValidationReportSchema,
 	NhdrSubmissionSchema,
 	NhdrSubmissionsQuerySchema,
@@ -81,4 +82,32 @@ export const fhirContract = {
 		})
 		.input(NhdrSubmissionsQuerySchema)
 		.output(z.array(NhdrSubmissionSchema)),
+
+	// ========================================================================
+	// Bundle download
+	// ========================================================================
+
+	downloadBundle: oc
+		.route({
+			method: "GET",
+			path: "/exports/{exportId}/bundle",
+			summary: "Download the FHIR NDJSON bundle for an export",
+			tags: ["FHIR"],
+		})
+		.input(FhirExportByIdParamsSchema)
+		.output(z.object({ ndjson: z.string(), filename: z.string() })),
+
+	// ========================================================================
+	// System status
+	// ========================================================================
+
+	getSystemStatus: oc
+		.route({
+			method: "GET",
+			path: "/system-status",
+			summary: "Get FHIR/NHDR integration system status",
+			tags: ["FHIR"],
+		})
+		.input(z.object({ facilityId: z.string() }))
+		.output(FhirSystemStatusSchema),
 }
