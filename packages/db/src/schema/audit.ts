@@ -35,6 +35,17 @@ export const auditLogs = createTable(
 		ipAddress: t.text("ip_address"),
 		userAgent: t.text("user_agent"),
 		metadata: t.jsonb("metadata"),
+		severity: t
+			.text("severity")
+			.notNull()
+			.default("info")
+			.$type<"info" | "warning" | "critical">(),
+		sessionId: t.text("session_id"),
+		outcome: t
+			.text("outcome")
+			.notNull()
+			.default("success")
+			.$type<"success" | "failure">(),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [
@@ -42,6 +53,8 @@ export const auditLogs = createTable(
 		index("audit_logs_user_id_idx").on(t.userId),
 		index("audit_logs_entity_type_id_idx").on(t.entityType, t.entityId),
 		index("audit_logs_created_at_idx").on(t.createdAt),
+		index("audit_logs_session_id_idx").on(t.sessionId),
+		index("audit_logs_severity_idx").on(t.severity),
 	]
 )
 
@@ -113,6 +126,64 @@ export const notifications = createTable(
 		index("notifications_recipient_staff_id_idx").on(t.recipientStaffId),
 		index("notifications_is_read_idx").on(t.isRead),
 		index("notifications_created_at_idx").on(t.createdAt),
+	]
+)
+
+// ── Break-Glass Reviews — immutable review history per event ──────────────────
+
+export const breakGlassReviews = createTable(
+	"break_glass_reviews",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		breakGlassEventId: t
+			.uuid("break_glass_event_id")
+			.notNull()
+			.references(() => breakGlassEvents.id, { onDelete: "restrict" }),
+		reviewerStaffId: t
+			.uuid("reviewer_staff_id")
+			.notNull()
+			.references(() => staffProfiles.id, { onDelete: "restrict" }),
+		action: t
+			.text("action")
+			.notNull()
+			.$type<"approve" | "flag" | "note">(),
+		reason: t.text("reason").notNull(),
+		decidedAt: t.timestamp("decided_at").notNull().defaultNow(),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("break_glass_reviews_event_id_idx").on(t.breakGlassEventId),
+		index("break_glass_reviews_reviewer_staff_id_idx").on(t.reviewerStaffId),
+		index("break_glass_reviews_created_at_idx").on(t.createdAt),
+	]
+)
+
+// ── Audit Exports — content-hashed export records for DPA authenticity ─────────
+
+export const auditExports = createTable(
+	"audit_exports",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		exporterStaffId: t
+			.uuid("exporter_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		exportFormat: t
+			.text("export_format")
+			.notNull()
+			.$type<"csv" | "pdf">(),
+		filterSnapshot: t.jsonb("filter_snapshot"),
+		contentHash: t.text("content_hash"),
+		exportedAt: t.timestamp("exported_at").notNull().defaultNow(),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("audit_exports_facility_id_idx").on(t.facilityId),
+		index("audit_exports_exporter_staff_id_idx").on(t.exporterStaffId),
+		index("audit_exports_exported_at_idx").on(t.exportedAt),
 	]
 )
 

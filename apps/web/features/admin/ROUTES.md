@@ -39,7 +39,7 @@ Implementation owned by **AUTH-FE-01** — shared shell, NOT placed under the `(
 | URL | Story | Flow | Wireframe Page |
 |-----|-------|------|----------------|
 | `/admin/feature-flags` | 1.3 | B5 | Feature Flag Dashboard |
-| `/admin/feature-flags/[flagId]` | 1.3 | B5 | Module Config |
+| `/admin/feature-flags/[moduleId]` | 1.3 | B5 | Module Config |
 | `/admin/bor` | 2.5 | B1 | BOR Dashboard |
 | `/admin/bor/census` | 2.5 | B1 | Daily Census Report |
 

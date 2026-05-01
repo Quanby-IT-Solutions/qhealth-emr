@@ -16,8 +16,8 @@ function can(permSet: Set<string>, module: string, action: string) {
 }
 
 export default function FeatureFlagDetailPage() {
-	const params = useParams<{ flagId: string }>()
-	const { flagId } = params
+	const params = useParams<{ moduleId: string }>()
+	const { moduleId } = params
 	const permSet = usePermissionSet()
 
 	if (!can(permSet, "admin", "view") || !can(permSet, "feature_flags", "view")) {
@@ -28,5 +28,5 @@ export default function FeatureFlagDetailPage() {
 		)
 	}
 
-	return <FeatureFlagDetail flagId={flagId} canEdit={can(permSet, "feature_flags", "edit")} />
+	return <FeatureFlagDetail flagId={moduleId} canEdit={can(permSet, "feature_flags", "edit")} />
 }

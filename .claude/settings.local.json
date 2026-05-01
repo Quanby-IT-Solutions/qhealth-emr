@@ -100,7 +100,27 @@
       "Bash(awk '{print $NF}')",
       "Bash([ -f \"D:/PROJECTS/qhealth-emr/$path\" ])",
       "Bash(pnpm db:push *)",
-      "PowerShell(pnpm typecheck *)"
+      "PowerShell(pnpm typecheck *)",
+      "Bash(Get-ChildItem *)",
+      "Bash(Select-Object FullName, PSIsContainer)",
+      "Bash(Select-Object FullName)",
+      "Bash(findstr *)",
+      "PowerShell(pnpm exec *)",
+      "PowerShell(Test-Path C:\\\\temp\\\\tsc-backend.txt; if \\(Test-Path C:\\\\temp\\\\tsc-backend.txt\\) { \\(Get-Item C:\\\\temp\\\\tsc-backend.txt\\).Length })",
+      "PowerShell($c = Get-Content C:\\\\temp\\\\tsc-output.txt; $c | Where-Object { $_ -match \"error TS\" } | Measure-Object | Select-Object -ExpandProperty Count)",
+      "PowerShell($c = Get-Content C:\\\\temp\\\\tsc-output.txt; $c | Where-Object { $_ -match \"error TS\" -and $_ -notmatch \"auditor|break-glass\" } | Select-Object -First 5)",
+      "PowerShell($c = Get-Content C:\\\\temp\\\\tsc-output2.txt; $c | Where-Object { $_ -match \"auditor|break-glass|audit-log|export-modal|break-glass-export|audit-log-page-client|break-glass-inbox-page\" })",
+      "PowerShell($c = Get-Content C:\\\\temp\\\\tsc-output2.txt; $c | Where-Object { $_ -match \"error TS\" } | Where-Object { $_ -match \"auditor|break.glass|audit.log|react.virtual|infiniteOptions|nextCursor|cursor\" })",
+      "PowerShell($c = Get-Content C:\\\\temp\\\\tsc-web3.txt; $c | Where-Object { $_ -match \"auditor|break.glass|audit.log|react.virtual|nextCursor|cursor|infiniteOptions|AuditLogPageClient|BreakGlassInboxPageClient|break-glass-export\" } | Select-Object -First 30)",
+      "Bash(Get-Content \"D:\\\\PROJECTS\\\\qhealth-emr\\\\docs\\\\tickets\\\\admin\\\\frontend\\\\ADM-FE-01-architecture-and-route-map.md\")",
+      "Bash(Out-String)",
+      "Bash(Select-Object -Property FullName)",
+      "Bash(ConvertTo-Csv)",
+      "Bash(Select-Object -Skip 1)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\app\\\\\\(site\\)\\\\admin\" -Recurse -Force | ForEach-Object { $_.FullName.Replace\\('D:\\\\PROJECTS\\\\qhealth-emr\\\\', ''\\) })",
+      "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\admin\" -Recurse -Force | ForEach-Object { $_.FullName.Replace\\('D:\\\\PROJECTS\\\\qhealth-emr\\\\', ''\\) })",
+      "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\admin\\\\feature-flags\\\\components\" -Force | ForEach-Object { $_.Name })"
     ]
   }
 }

@@ -559,7 +559,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 	},
 	{
 		title: "Audit Trail",
-		href: "/audit",
+		href: "/auditor/audit-log",
 		iconName: "audit",
 		requiredPermissions: [{ module: "audit", action: "view" }],
 		isSecondary: true,

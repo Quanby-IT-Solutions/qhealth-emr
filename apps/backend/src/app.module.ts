@@ -8,6 +8,7 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from "nestjs-zod"
 
 import { getAuth } from "@repo/auth"
 
+import { CommonAuditModule } from "@/common/audit/audit.module"
 import { HttpExceptionFilter } from "@/common/filters/http-exception.filter"
 import { RbacGuard } from "@/modules/v1/rbac/rbac.guard"
 import { V1Module } from "@/modules/v1/v1.module"
@@ -29,6 +30,8 @@ import { env } from "./config/env.config"
 		ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }]),
 		// Authentication (controllers disabled - we register versioned routes in setupBetterAuth)
 		AuthModule.forRoot({ auth: getAuth(), disableControllers: true }),
+		// Shared write-side audit module (global)
+		CommonAuditModule,
 		// oRPC setup
 		ORPCCommonModule,
 		// Versioned modules

@@ -38,6 +38,7 @@ import { DepartmentsModule } from "./departments/departments.module"
 import { FhirEndpointsModule } from "./fhir-endpoints/fhir-endpoints.module"
 import { TerminologyModule } from "./terminology/terminology.module"
 import { MasterDataModule } from "./master-data/master-data.module"
+import { AuditorModule } from "./auditor/auditor.module"
 
 @Module({
 	imports: [
@@ -86,6 +87,8 @@ import { MasterDataModule } from "./master-data/master-data.module"
 		TerminologyModule,
 		// ADM-BE-11 master data
 		MasterDataModule,
+		// AUD-BE-01: Auditor module (read-side query API + break-glass review)
+		AuditorModule,
 	],
 })
 export class V1Module {}

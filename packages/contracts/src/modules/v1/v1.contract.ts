@@ -41,6 +41,7 @@ import { v1Departments } from "./departments/v1.departments.js"
 import { v1FhirEndpoints } from "./fhir-endpoints/v1.fhir-endpoints.js"
 import { v1Terminology } from "./terminology/v1.terminology.js"
 import { v1MasterData } from "./master-data/v1.master-data.js"
+import { v1Auditor } from "./auditor/v1.auditor.js"
 
 /**
  * V1 contract router
@@ -50,6 +51,7 @@ export const v1Contract = oc.prefix("/v1").router(
 	oc.router({
 		health: healthContract,
 		audit: v1Audit,
+		auditor: v1Auditor,
 		adminDashboard: v1AdminDashboard,
 		notification: v1Notification,
 		formulary: v1Formulary,

@@ -51,6 +51,9 @@ export type { EncounterDetail } from "./modules/v1/encounters/encounters.schema.
 // Audit schemas (enums, types) for use in frontend and backend
 export * from "./modules/v1/audit/audit.schema.js"
 
+// Auditor schemas — auditor-role read API types
+export * from "./modules/v1/auditor/auditor.schema.js"
+
 // Scheduling schemas — exported for frontend validation and types
 export {
 	AppointmentStatusEnum,
