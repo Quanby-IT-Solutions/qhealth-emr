@@ -33,6 +33,11 @@ import { IntegrationRegistryModule } from "./integration-registry/integration-re
 import { OpdTriageModule } from "./opd-triage/opd-triage.module"
 import { CivilRegistryModule } from "./civil-registry/civil-registry.module"
 import { MedicalRecordsModule } from "./medical-records/medical-records.module"
+import { ClinicianLicensesModule } from "./clinician-licenses/clinician-licenses.module"
+import { DepartmentsModule } from "./departments/departments.module"
+import { FhirEndpointsModule } from "./fhir-endpoints/fhir-endpoints.module"
+import { TerminologyModule } from "./terminology/terminology.module"
+import { MasterDataModule } from "./master-data/master-data.module"
 
 @Module({
 	imports: [
@@ -71,6 +76,16 @@ import { MedicalRecordsModule } from "./medical-records/medical-records.module"
 		CivilRegistryModule,
 		// SLA-017: medical records requests + payment
 		MedicalRecordsModule,
+		// ADM-BE-05: clinician license management
+		ClinicianLicensesModule,
+		// ADM-BE-11: departments CRUD
+		DepartmentsModule,
+		// ADM-BE-07: FHIR endpoint management
+		FhirEndpointsModule,
+		// ADM-BE-08: terminology service
+		TerminologyModule,
+		// ADM-BE-11 master data
+		MasterDataModule,
 	],
 })
 export class V1Module {}

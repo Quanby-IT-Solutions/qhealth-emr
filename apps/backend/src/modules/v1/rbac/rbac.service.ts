@@ -6,6 +6,7 @@ import {
 	facilities,
 	rolePermissions,
 	roles,
+	sessions,
 	staffProfiles,
 	userRoles,
 	users,
@@ -400,6 +401,7 @@ export class RbacService {
 					)
 				}
 
+				this.logger.log(`audit.staff.create userId=${userId} facilityId=${facilityId}`)
 				return { userId, staffProfileId: profile.id }
 			})
 		} catch (err) {
@@ -423,6 +425,7 @@ export class RbacService {
 			.returning()
 
 		if (!updated) throw new NotFoundException("Staff profile not found")
+		this.logger.log(`audit.staff.update staffProfileId=${id}`)
 		return updated
 	}
 
@@ -434,6 +437,7 @@ export class RbacService {
 			.returning()
 
 		if (!updated) throw new NotFoundException("Staff profile not found")
+		this.logger.log(`audit.staff.deactivate staffProfileId=${input.id}`)
 		return { success: true }
 	}
 
@@ -509,6 +513,7 @@ export class RbacService {
 			.returning()
 
 		if (!role) throw new Error("Failed to create role")
+		this.logger.log(`audit.role.create roleId=${role.id} facilityId=${input.facilityId}`)
 		return role
 	}
 
@@ -608,6 +613,7 @@ export class RbacService {
 			.set({ isArchived: true, archivedAt: new Date() })
 			.where(eq(roles.id, id))
 
+		this.logger.log(`audit.role.archive roleId=${id}`)
 		return { success: true }
 	}
 
@@ -637,6 +643,7 @@ export class RbacService {
 			)
 		}
 
+		this.logger.log(`audit.user.role-change staffProfileId=${staffProfileId} roleIds=${roleIds.join(",")}`)
 		return { success: true }
 	}
 
@@ -682,6 +689,12 @@ export class RbacService {
 
 		if (!user) throw new NotFoundException("User not found")
 
+		// Revoke all active sessions for this user before sending the reset email.
+		// This prevents a compromised session from remaining valid after a forced reset.
+		await db.delete(sessions).where(eq(sessions.userId, input.userId))
+
+		// Anti-enumeration: requestPasswordReset returns 200 regardless of whether
+		// the email exists in Better Auth — do not branch on the result.
 		await this.authService.api.requestPasswordReset({
 			body: { email: user.email, redirectTo: "/" },
 		})
@@ -1012,6 +1025,62 @@ export class RbacService {
 		})
 
 		return { success: true }
+	}
+
+	// ── Resend Activation ────────────────────────────────────────────────────
+
+	async resendActivation(input: IdInput) {
+		const [user] = await db
+			.select({ id: users.id, email: users.email })
+			.from(users)
+			.where(eq(users.id, input.id))
+
+		if (!user) throw new NotFoundException("User not found")
+
+		// Anti-enumeration: same 200 response whether or not email is found
+		await this.authService.api.requestPasswordReset({
+			body: { email: user.email, redirectTo: "/" },
+		})
+
+		this.logger.log(`audit.user.activation-resent userId=${input.id}`)
+
+		return { success: true }
+	}
+
+	// ── Get Single Role ──────────────────────────────────────────────────────
+
+	async getRole(input: IdInput) {
+		const [role] = await db.select().from(roles).where(eq(roles.id, input.id))
+		if (!role) throw new NotFoundException("Role not found")
+
+		const perms = await db
+			.select()
+			.from(rolePermissions)
+			.where(eq(rolePermissions.roleId, input.id))
+
+		return { ...role, permissions: perms }
+	}
+
+	// ── List All Permissions ─────────────────────────────────────────────────
+
+	listPermissions() {
+		const MODULES = [
+			"adt", "clinical_docs", "orders", "nursing", "billing", "formulary",
+			"reporting", "notifications", "audit", "admin", "surgical", "opd",
+			"nutrition", "laboratory", "radiology", "scheduling", "nbs", "consent",
+			"fhir", "msw", "telemedicine", "ed", "death_reporting", "feature_flags",
+			"system_settings", "facility_profile", "integration_registry",
+			"civil_registry", "medical_records", "patients",
+		] as const
+
+		const ACTIONS = [
+			"view", "create", "edit", "sign", "delete", "verify", "export",
+			"manage_catalog", "clinical_policy", "terminology_admin",
+		] as const
+
+		return MODULES.flatMap(module =>
+			ACTIONS.map(action => ({ module, action }))
+		)
 	}
 
 	async removeUserRole(input: RemoveRoleAssignmentInput, actor: ActorContext) {

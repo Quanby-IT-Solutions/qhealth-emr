@@ -78,4 +78,29 @@ export class BedsController {
 			return this.bedsService.getDashboard(input)
 		})
 	}
+
+	@RequirePermission("admin", "view")
+	@Implement(v1.bed.borTrend)
+	async borTrend() {
+		return implement(v1.bed.borTrend).handler(async ({ input }) => {
+			return this.bedsService.getBorTrend(input)
+		})
+	}
+
+	@RequirePermission("admin", "view")
+	@Implement(v1.bed.exportAhsr)
+	async exportAhsr() {
+		return implement(v1.bed.exportAhsr).handler(async ({ input }) => {
+			return this.bedsService.exportAhsr(input)
+		})
+	}
+
+	@RequirePermission("adt", "delete")
+	@Implement(v1.bed.deleteWard)
+	async deleteWard(@Session() session: UserSession) {
+		return implement(v1.bed.deleteWard).handler(async ({ input }) => {
+			void session
+			return this.bedsService.deleteWard(input)
+		})
+	}
 }

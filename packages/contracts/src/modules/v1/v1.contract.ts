@@ -36,6 +36,11 @@ import { v1IntegrationRegistry } from "./integration-registry/v1.integration-reg
 import { v1OpdTriage } from "./opd-triage/v1.opd-triage.js"
 import { v1CivilRegistry } from "./civil-registry/v1.civil-registry.js"
 import { v1MedicalRecords } from "./medical-records/v1.medical-records.js"
+import { v1ClinicianLicenses } from "./clinician-licenses/v1.clinician-licenses.js"
+import { v1Departments } from "./departments/v1.departments.js"
+import { v1FhirEndpoints } from "./fhir-endpoints/v1.fhir-endpoints.js"
+import { v1Terminology } from "./terminology/v1.terminology.js"
+import { v1MasterData } from "./master-data/v1.master-data.js"
 
 /**
  * V1 contract router
@@ -82,5 +87,15 @@ export const v1Contract = oc.prefix("/v1").router(
 		civilRegistry: v1CivilRegistry,
 		// SLA-017: medical records requests + payment
 		medicalRecords: v1MedicalRecords,
+		// ADM-BE-05: clinician license management
+		clinicianLicenses: v1ClinicianLicenses,
+		// ADM-BE-11: departments CRUD
+		departments: v1Departments,
+		// ADM-BE-07: FHIR endpoint management
+		fhirEndpoints: v1FhirEndpoints,
+		// ADM-BE-08: terminology service
+		terminology: v1Terminology,
+		// ADM-BE-11 master data
+		masterData: v1MasterData,
 	})
 )

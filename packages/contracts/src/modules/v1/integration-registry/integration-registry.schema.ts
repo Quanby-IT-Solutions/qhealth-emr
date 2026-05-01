@@ -137,4 +137,99 @@ export const ConnectivityTestResultSchema = z.object({
 
 export type ConnectivityTestResult = z.infer<typeof ConnectivityTestResultSchema>
 
+// ============================================================================
+// API Key management
+// ============================================================================
+
+export const ApiKeySchema = z.object({
+	id: z.string().uuid(),
+	integrationId: z.string().uuid(),
+	label: z.string(),
+	keyPrefix: z.string(),
+	createdBy: z.string(),
+	createdAt: z.union([z.date(), z.string()]).transform(v => (typeof v === "string" ? new Date(v) : v)),
+	revokedAt: z.union([z.date(), z.string()]).transform(v => (typeof v === "string" ? new Date(v) : v)).nullable(),
+})
+
+export type ApiKey = z.infer<typeof ApiKeySchema>
+
+export const GenerateApiKeySchema = z.object({
+	integrationId: z.string().uuid(),
+	label: z.string().min(1).max(100),
+})
+
+export type GenerateApiKeyInput = z.infer<typeof GenerateApiKeySchema>
+
+export const GeneratedApiKeyResponseSchema = ApiKeySchema.extend({
+	rawKey: z.string(),
+})
+
+export type GeneratedApiKeyResponse = z.infer<typeof GeneratedApiKeyResponseSchema>
+
+export const RevokeApiKeySchema = z.object({
+	id: z.string().uuid(),
+})
+
+export type RevokeApiKeyInput = z.infer<typeof RevokeApiKeySchema>
+
+export const ListApiKeysSchema = z.object({
+	integrationId: z.string().uuid(),
+})
+
 export type CredentialRefs = z.infer<typeof CredentialRefsSchema>
+
+// ============================================================================
+// API Key Rotation (ADM-BE-12)
+// ============================================================================
+
+export const RotateApiKeySchema = z.object({
+	id: z.string().uuid(),
+	graceHours: z.number().int().min(0).max(168).default(24),
+})
+
+export type RotateApiKeyInput = z.infer<typeof RotateApiKeySchema>
+
+export const RotatedApiKeyResponseSchema = ApiKeySchema.extend({
+	rawKey: z.string(),
+	oldKeyRevokedAt: z
+		.union([z.date(), z.string()])
+		.transform(v => (typeof v === "string" ? new Date(v) : v)),
+})
+
+export type RotatedApiKeyResponse = z.infer<typeof RotatedApiKeyResponseSchema>
+
+// ============================================================================
+// Webhook endpoint management
+// ============================================================================
+
+export const WebhookEndpointSchema = z.object({
+	id: z.string(),
+	integrationId: z.string(),
+	url: z.string().url(),
+	events: z.array(z.string()),
+	isActive: z.boolean(),
+	createdAt: z.union([z.date(), z.string()]),
+	updatedAt: z.union([z.date(), z.string()]),
+	// signingSecretHash NOT returned — security
+})
+
+export type WebhookEndpoint = z.infer<typeof WebhookEndpointSchema>
+
+export const CreateWebhookSchema = z.object({
+	integrationId: z.string(),
+	url: z.string().url(),
+	events: z.array(z.string()).min(1),
+})
+
+export type CreateWebhookInput = z.infer<typeof CreateWebhookSchema>
+
+export const UpdateWebhookSchema = z.object({
+	id: z.string(),
+	url: z.string().url().optional(),
+	events: z.array(z.string()).optional(),
+	isActive: z.boolean().optional(),
+})
+
+export type UpdateWebhookInput = z.infer<typeof UpdateWebhookSchema>
+
+export const WebhookIdSchema = z.object({ id: z.string() })

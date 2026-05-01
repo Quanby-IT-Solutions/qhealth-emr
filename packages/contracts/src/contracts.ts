@@ -113,6 +113,10 @@ export {
 	type SlaStepConfigsResponse,
 	type CreateSlaStepConfig,
 	type UpdateSlaStepConfig,
+	SlaKpiTileSchema,
+	SlaDashboardResponseSchema,
+	type SlaKpiTile,
+	type SlaDashboardResponse,
 } from "./modules/v1/sla/sla.schema.js"
 
 // OPD Triage schemas — exported for frontend validation and types
@@ -320,3 +324,36 @@ export type {
 	SystemSettings,
 	TriggerOfflineCacheJobResult,
 } from "./modules/v1/system-settings/system-settings.schema.js"
+
+// FHIR Endpoints schemas (ADM-BE-07)
+export type {
+	FhirEndpoint,
+	FhirExchangeLogEntry,
+	TestConnectionResult,
+	UpsertFhirEndpointInput,
+	ListExchangeLogInput,
+	ExchangeLogResponse,
+} from "./modules/v1/fhir-endpoints/fhir-endpoints.schema.js"
+
+// Terminology schemas (ADM-BE-08)
+export type {
+	CodeSystem,
+	Code,
+	SearchCodesInput,
+	SearchCodesResponse,
+	DeprecateCodeInput,
+	ImportCodesInput,
+	ImportResult as TerminologyImportResult,
+} from "./modules/v1/terminology/terminology.schema.js"
+
+// Master Data schemas (ADM-BE-11 master data)
+export type {
+	MasterDataCatalog,
+	MasterDataItem,
+	ListItemsInput,
+	ItemsResponse,
+	UpsertItemInput,
+	DeprecateItemInput,
+	ImportItemsInput,
+	ImportResult as MasterDataImportResult,
+} from "./modules/v1/master-data/master-data.schema.js"

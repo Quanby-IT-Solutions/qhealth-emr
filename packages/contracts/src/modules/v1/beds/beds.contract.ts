@@ -2,6 +2,8 @@ import { oc } from "@orpc/contract"
 import { z } from "zod"
 
 import {
+	AhsrExportQuerySchema,
+	AhsrExportResponseSchema,
 	BedCensusQuerySchema,
 	BedCensusResponseSchema,
 	BedListResponseSchema,
@@ -9,10 +11,13 @@ import {
 	BedSchema,
 	BedSuggestionQuerySchema,
 	BedSuggestionResponseSchema,
+	BorTrendQuerySchema,
+	BorTrendResponseSchema,
 	CensusDashboardQuerySchema,
 	CensusDashboardResponseSchema,
 	CreateBedSchema,
 	CreateWardSchema,
+	DeleteWardSchema,
 	UpdateBedStatusSchema,
 	WardListSchema,
 	WardSchema,
@@ -98,4 +103,34 @@ export const bedContract = {
 		})
 		.input(CensusDashboardQuerySchema)
 		.output(CensusDashboardResponseSchema),
+
+	borTrend: oc
+		.route({
+			method: "GET",
+			path: "/beds/bor/trend",
+			summary: "BOR trend by period (7d/30d/90d/1y)",
+			tags: ["Beds"],
+		})
+		.input(BorTrendQuerySchema)
+		.output(BorTrendResponseSchema),
+
+	exportAhsr: oc
+		.route({
+			method: "GET",
+			path: "/beds/bor/export",
+			summary: "Export AHSR-format census data (DOH columns)",
+			tags: ["Beds"],
+		})
+		.input(AhsrExportQuerySchema)
+		.output(AhsrExportResponseSchema),
+
+	deleteWard: oc
+		.route({
+			method: "DELETE",
+			path: "/beds/wards/{wardId}",
+			summary: "Delete a ward (blocked if occupied beds exist)",
+			tags: ["Beds"],
+		})
+		.input(DeleteWardSchema)
+		.output(z.object({ success: z.boolean() })),
 }

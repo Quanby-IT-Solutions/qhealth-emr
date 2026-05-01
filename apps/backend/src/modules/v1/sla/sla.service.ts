@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common"
+import { Injectable, Logger, NotFoundException, OnModuleInit } from "@nestjs/common"
 import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, sql } from "drizzle-orm"
 
-import { birthRegistrations, deathReports, encounterStatusEvents, encounters, imagingOrders, invoices, labOrders, medicalRecordsRequests, operationRecords, patients, slaConfigs, slaStepConfigs } from "@repo/db/schema"
-import type { SlaWorkflowType } from "@repo/db/schema"
+import { birthRegistrations, deathReports, encounterStatusEvents, encounters, facilities, imagingOrders, invoices, labOrders, medicalRecordsRequests, operationRecords, patients, slaConfigs, slaStepConfigs, workflowStatusLog } from "@repo/db/schema"
+import type { SlaStepType, SlaWorkflowType } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 
@@ -91,15 +91,52 @@ type WorkflowMetrics = {
 	stepMetrics?: SlaStepMetric[]
 }
 
+// ARTA default SLA workflow configs (Philippine DOH ARTA requirements)
+const ARTA_DEFAULT_CONFIGS: Array<{ workflowType: SlaWorkflowType; targetMinutes: number; hardCapMinutes: number; description: string }> = [
+	{ workflowType: "opd_consultation", targetMinutes: 30, hardCapMinutes: 60, description: "ARTA Flow 1: OPD Consultation" },
+	{ workflowType: "admission", targetMinutes: 60, hardCapMinutes: 120, description: "ARTA Flow 4: Admission Routing" },
+	{ workflowType: "lab_result", targetMinutes: 60, hardCapMinutes: 120, description: "ARTA Flow 3: Laboratory Result" },
+	{ workflowType: "radiology_result", targetMinutes: 60, hardCapMinutes: 120, description: "ARTA Flow 3: Radiology Result" },
+	{ workflowType: "medication_dispensing", targetMinutes: 15, hardCapMinutes: 30, description: "ARTA Flow 6: Pharmacy Dispensing" },
+	{ workflowType: "medical_records", targetMinutes: 1440, hardCapMinutes: 2880, description: "ARTA Flow 7: Medical Records Release" },
+	{ workflowType: "emergency_triage", targetMinutes: 5, hardCapMinutes: 10, description: "ARTA Flow 2: Emergency Triage" },
+]
+
 @Injectable()
-export class SlaService {
+export class SlaService implements OnModuleInit {
+	private readonly logger = new Logger(SlaService.name)
+
+	async onModuleInit() {
+		// ADM-BE-09 AC1: Seed ARTA default SLA configs for all existing facilities
+		try {
+			const allFacilities = await db.select({ id: facilities.id }).from(facilities)
+			for (const facility of allFacilities) {
+				await db
+					.insert(slaConfigs)
+					.values(
+						ARTA_DEFAULT_CONFIGS.map(cfg => ({
+							facilityId: facility.id,
+							workflowType: cfg.workflowType,
+							targetMinutes: cfg.targetMinutes,
+							hardCapMinutes: cfg.hardCapMinutes,
+							warningThresholdPct: 80,
+							description: cfg.description,
+						}))
+					)
+					.onConflictDoNothing()
+			}
+		} catch (err) {
+			this.logger.warn("ARTA default SLA config seed failed (non-fatal)", err)
+		}
+	}
+
 	// ========================================================================
 	// SLA Events
 	// ========================================================================
 
 	async listEvents(query: SlaEventsQuery): Promise<SlaEventsResponse> {
 		const page = query.page ?? 1
-		const limit = query.limit ?? 50
+		const limit = Math.min(query.limit ?? 50, 200)
 		const offset = (page - 1) * limit
 
 		// SLA-001: no workflow filter → unified active-work view across all sources
@@ -2226,5 +2263,347 @@ export class SlaService {
 			.returning({ id: slaStepConfigs.id })
 		if (!row) throw new NotFoundException(`SLA step config with id ${id} not found`)
 		return { success: true }
+	}
+
+	// ========================================================================
+	// Workflow Status Log (ADM-BE-09)
+	// Idempotent on (encounterId, workflow, step, startedAt)
+	// ========================================================================
+
+	async appendStatusLog(input: {
+		facilityId: string
+		encounterId: string
+		workflow: string
+		step: string
+		startedAt: string
+		endedAt?: string
+		durationMinutes?: number
+		isBreached?: boolean
+		isHardCapBreached?: boolean
+	}) {
+		const [existing] = await db
+			.select()
+			.from(workflowStatusLog)
+			.where(
+				and(
+					eq(workflowStatusLog.encounterId, input.encounterId),
+					eq(workflowStatusLog.workflow, input.workflow as SlaWorkflowType),
+					eq(workflowStatusLog.step, input.step as SlaStepType),
+					eq(workflowStatusLog.startedAt, new Date(input.startedAt))
+				)
+			)
+
+		if (existing) return existing
+
+		// ADM-BE-09 AC5: auto-detect breach from sla_step_configs when endedAt + durationMinutes are provided
+		let isBreached = input.isBreached ?? false
+		let isHardCapBreached = input.isHardCapBreached ?? false
+
+		if (input.endedAt && input.durationMinutes != null) {
+			const [stepConfig] = await db
+				.select()
+				.from(slaStepConfigs)
+				.where(
+					and(
+						eq(slaStepConfigs.facilityId, input.facilityId),
+						eq(slaStepConfigs.stepType, input.step as SlaStepType),
+						eq(slaStepConfigs.isActive, true)
+					)
+				)
+				.limit(1)
+
+			if (stepConfig) {
+				isBreached = input.durationMinutes > stepConfig.targetMinutes
+				isHardCapBreached = stepConfig.hardCapMinutes != null && input.durationMinutes > stepConfig.hardCapMinutes
+
+				if (isHardCapBreached) {
+					this.logger.warn(
+						`audit.sla.hard-cap-breach facilityId=${input.facilityId} encounterId=${input.encounterId} workflow=${input.workflow} step=${input.step} durationMinutes=${input.durationMinutes} hardCapMinutes=${stepConfig.hardCapMinutes}`
+					)
+				}
+			}
+		}
+
+		const [row] = await db
+			.insert(workflowStatusLog)
+			.values({
+				facilityId: input.facilityId,
+				encounterId: input.encounterId,
+				workflow: input.workflow as SlaWorkflowType,
+				step: input.step as SlaStepType,
+				startedAt: new Date(input.startedAt),
+				endedAt: input.endedAt ? new Date(input.endedAt) : null,
+				durationMinutes: input.durationMinutes ?? null,
+				isBreached,
+				isHardCapBreached,
+			})
+			.returning()
+
+		return row!
+	}
+
+	// ========================================================================
+	// SLA Analytics (ADM-BE-10)
+	// ========================================================================
+
+	async getSlaDashboard(facilityId: string) {
+		const now = new Date()
+		const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+		// Get all workflow types from workflowStatusLog for this facility this month
+		const allRows = await db
+			.select({
+				workflow: workflowStatusLog.workflow,
+				isBreached: workflowStatusLog.isBreached,
+				durationMinutes: workflowStatusLog.durationMinutes,
+			})
+			.from(workflowStatusLog)
+			.where(
+				and(
+					eq(workflowStatusLog.facilityId, facilityId),
+					gte(workflowStatusLog.startedAt, monthStart),
+					isNotNull(workflowStatusLog.durationMinutes)
+				)
+			)
+
+		type RowStats = { total: number; breachCount: number; totalDuration: number }
+		const byWorkflow: Record<string, RowStats> = {}
+
+		for (const row of allRows) {
+			if (!byWorkflow[row.workflow]) {
+				byWorkflow[row.workflow] = { total: 0, breachCount: 0, totalDuration: 0 }
+			}
+			const stats = byWorkflow[row.workflow]!
+			stats.total++
+			if (row.isBreached) stats.breachCount++
+			if (row.durationMinutes) stats.totalDuration += row.durationMinutes
+		}
+
+		const tiles = Object.entries(byWorkflow).map(([workflow, stats]) => {
+			const withinSLAPct = stats.total > 0
+				? ((stats.total - stats.breachCount) / stats.total) * 100
+				: 100
+			const avgTatMinutes = stats.total > 0 ? stats.totalDuration / stats.total : 0
+			const statusColor: 'green' | 'amber' | 'red' =
+				withinSLAPct >= 95 ? 'green' : withinSLAPct >= 85 ? 'amber' : 'red'
+
+			return {
+				workflowType: workflow,
+				workflowLabel: workflow.replace(/_/g, ' ').replace(/w/g, c => c.toUpperCase()),
+				totalCases: stats.total,
+				withinSLAPct: Math.round(withinSLAPct * 100) / 100,
+				breachCount: stats.breachCount,
+				avgTatMinutes: Math.round(avgTatMinutes * 100) / 100,
+				statusColor,
+			}
+		})
+
+		const totalCases = tiles.reduce((s, t) => s + t.totalCases, 0)
+		const totalBreaches = tiles.reduce((s, t) => s + t.breachCount, 0)
+		const overallCompliancePct = totalCases > 0
+			? ((totalCases - totalBreaches) / totalCases) * 100
+			: 100
+
+		return {
+			tiles,
+			overallCompliancePct: Math.round(overallCompliancePct * 100) / 100,
+		}
+	}
+
+	async getTurnaround(input: {
+		facilityId: string
+		workflowType: string
+		startDate: string
+		endDate: string
+		compareStartDate?: string
+		compareEndDate?: string
+	}) {
+		const primary = await this.aggregateTurnaroundByDay(
+			input.facilityId,
+			input.workflowType,
+			input.startDate,
+			input.endDate
+		)
+
+		let comparison = null
+		if (input.compareStartDate && input.compareEndDate) {
+			comparison = await this.aggregateTurnaroundByDay(
+				input.facilityId,
+				input.workflowType,
+				input.compareStartDate,
+				input.compareEndDate
+			)
+		}
+
+		return { primary, comparison }
+	}
+
+	private async aggregateTurnaroundByDay(
+		facilityId: string,
+		workflowType: string,
+		startDate: string,
+		endDate: string
+	) {
+		const rows = await db
+			.select({
+				durationMinutes: workflowStatusLog.durationMinutes,
+				isBreached: workflowStatusLog.isBreached,
+				startedAt: workflowStatusLog.startedAt,
+			})
+			.from(workflowStatusLog)
+			.where(
+				and(
+					eq(workflowStatusLog.facilityId, facilityId),
+					eq(workflowStatusLog.workflow, workflowType as SlaWorkflowType),
+					gte(workflowStatusLog.startedAt, new Date(startDate)),
+					lte(workflowStatusLog.startedAt, new Date(endDate + 'T23:59:59Z')),
+					isNotNull(workflowStatusLog.durationMinutes)
+				)
+			)
+
+		type DayAgg = { durations: number[]; breachCount: number }
+		const byDay: Record<string, DayAgg> = {}
+
+		for (const row of rows) {
+			const dateKey = row.startedAt.toISOString().slice(0, 10)
+			if (!byDay[dateKey]) byDay[dateKey] = { durations: [], breachCount: 0 }
+			const day = byDay[dateKey]!
+			if (row.durationMinutes) day.durations.push(row.durationMinutes)
+			if (row.isBreached) day.breachCount++
+		}
+
+		return Object.entries(byDay)
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(([date, agg]) => {
+				const sorted = [...agg.durations].sort((a, b) => a - b)
+				const mid = Math.floor(sorted.length / 2)
+				const medianTAT = sorted.length % 2 === 0
+					? ((sorted[mid - 1]! + sorted[mid]!) / 2)
+					: sorted[mid]!
+				const p95Idx = Math.floor(sorted.length * 0.95)
+				const p95TAT = sorted[Math.min(p95Idx, sorted.length - 1)]!
+				const withinSLAPct = sorted.length > 0
+					? ((sorted.length - agg.breachCount) / sorted.length) * 100
+					: 100
+
+				return {
+					date,
+					cases: sorted.length,
+					medianTAT: Math.round(medianTAT * 100) / 100,
+					p95TAT: Math.round(p95TAT * 100) / 100,
+					withinSLAPct: Math.round(withinSLAPct * 100) / 100,
+					breachCount: agg.breachCount,
+				}
+			})
+	}
+
+	async getBottleneck(input: {
+		facilityId: string
+		workflowType: string
+		startDate: string
+		endDate: string
+	}) {
+		const rows = await db
+			.select({
+				step: workflowStatusLog.step,
+				durationMinutes: workflowStatusLog.durationMinutes,
+				encounterId: workflowStatusLog.encounterId,
+			})
+			.from(workflowStatusLog)
+			.where(
+				and(
+					eq(workflowStatusLog.facilityId, input.facilityId),
+					eq(workflowStatusLog.workflow, input.workflowType as SlaWorkflowType),
+					gte(workflowStatusLog.startedAt, new Date(input.startDate)),
+					lte(workflowStatusLog.startedAt, new Date(input.endDate + 'T23:59:59Z')),
+					isNotNull(workflowStatusLog.durationMinutes)
+				)
+			)
+
+		type StepAgg = { durations: number[]; encounterIds: string[] }
+		const byStep: Record<string, StepAgg> = {}
+
+		for (const row of rows) {
+			if (!byStep[row.step]) byStep[row.step] = { durations: [], encounterIds: [] }
+			const agg = byStep[row.step]!
+			if (row.durationMinutes) agg.durations.push(row.durationMinutes)
+			agg.encounterIds.push(row.encounterId)
+		}
+
+		const steps = Object.entries(byStep).map(([step, agg]) => {
+			const sorted = [...agg.durations].sort((a, b) => a - b)
+			const mid = Math.floor(sorted.length / 2)
+			const medianMinutes = sorted.length % 2 === 0
+				? ((sorted[mid - 1]! + sorted[mid]!) / 2)
+				: (sorted[mid] ?? 0)
+			const p95Idx = Math.floor(sorted.length * 0.95)
+			const p95Minutes = sorted[Math.min(p95Idx, sorted.length - 1)] ?? 0
+
+			// Outliers: duration > p95
+			const outlierEncounterIds = agg.durations
+				.map((d, i) => ({ d, id: agg.encounterIds[i]! }))
+				.filter(({ d }) => d > p95Minutes)
+				.map(({ id }) => id)
+
+			return {
+				stepType: step,
+				stepLabel: step.replace(/_/g, ' ').replace(/w/g, c => c.toUpperCase()),
+				medianMinutes: Math.round(medianMinutes * 100) / 100,
+				p95Minutes: Math.round(p95Minutes * 100) / 100,
+				outlierEncounterIds,
+			}
+		})
+
+		return { steps }
+	}
+
+	// ========================================================================
+	// SLA Export (ADM-BE-09 AC3)
+	// ========================================================================
+
+	async exportCompliance(input: { workflowType: string; dateFrom: string; dateTo: string; facilityId: string }) {
+		const [facilityRow] = await db
+			.select({ name: facilities.name })
+			.from(facilities)
+			.where(eq(facilities.id, input.facilityId))
+			.limit(1)
+
+		const rows = await db
+			.select({
+				encounterId: workflowStatusLog.encounterId,
+				workflow: workflowStatusLog.workflow,
+				step: workflowStatusLog.step,
+				startedAt: workflowStatusLog.startedAt,
+				endedAt: workflowStatusLog.endedAt,
+				durationMinutes: workflowStatusLog.durationMinutes,
+				isBreached: workflowStatusLog.isBreached,
+				isHardCapBreached: workflowStatusLog.isHardCapBreached,
+			})
+			.from(workflowStatusLog)
+			.where(
+				and(
+					eq(workflowStatusLog.facilityId, input.facilityId),
+					eq(workflowStatusLog.workflow, input.workflowType as SlaWorkflowType),
+					gte(workflowStatusLog.startedAt, new Date(input.dateFrom)),
+					lte(workflowStatusLog.startedAt, new Date(input.dateTo + "T23:59:59Z"))
+				)
+			)
+			.orderBy(asc(workflowStatusLog.startedAt))
+
+		return {
+			facilityName: facilityRow?.name ?? input.facilityId,
+			reportPeriod: `${input.dateFrom} to ${input.dateTo}`,
+			generatedAt: new Date().toISOString(),
+			rows: rows.map(r => ({
+				encounterId: r.encounterId,
+				workflow: r.workflow,
+				step: r.step,
+				startedAt: r.startedAt.toISOString(),
+				endedAt: r.endedAt ? r.endedAt.toISOString() : null,
+				durationMinutes: r.durationMinutes,
+				isBreached: r.isBreached,
+				isHardCapBreached: r.isHardCapBreached,
+			})),
+		}
 	}
 }

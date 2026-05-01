@@ -32,8 +32,8 @@ function ComplianceRow({
 	description: string
 	pct: number
 	threshold: number
-	count: number
-	total: number
+	count?: number
+	total?: number
 }) {
 	const isCompliant = pct >= threshold
 	return (
@@ -56,7 +56,7 @@ function ComplianceRow({
 			</div>
 			<Progress value={pct} className="h-1.5" />
 			<p className="text-xs text-muted-foreground">
-				{count} of {total} · {description} · Target: ≥{threshold}%
+				{count !== undefined ? `${count} of ${total} · ` : ""}{description} · Target: ≥{threshold}%
 			</p>
 		</div>
 	)

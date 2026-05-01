@@ -1,316 +1,288 @@
 "use client"
 
-import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useForm } from "@tanstack/react-form"
+import { z } from "zod"
+import { toast } from "sonner"
 
 import { Button } from "@/core/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Badge } from "@/core/components/ui/badge"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { useListRolesQuery } from "@/features/admin/api/admin.hooks"
-import { useCreateUserMutation } from "@/features/admin/api/admin.hooks"
+import { useCreateUserMutation, useListRolesQuery } from "@/features/admin/api/admin.hooks"
+import { MultiStepWizard } from "./multi-step-wizard"
+import { PermissionMatrix } from "./permission-matrix"
+import { useState } from "react"
 
-interface FacilityEntry {
-	facilityId: string
-	facilityName: string
-	roleIds: string[]
-	isPrimary: boolean
-}
+const STEPS = ["Profile", "Role", "Permissions"]
+
+// Colocated schemas
+const ProfileSchema = z.object({
+	name: z.string().min(1, "Full name is required"),
+	email: z.string().email("Invalid email address"),
+	password: z.string().min(8, "Password must be at least 8 characters"),
+	employeeNumber: z.string(),
+})
+
+const RoleSchema = z.object({
+	selectedRoleId: z.string().min(1, "Select a role to continue"),
+})
 
 export function CreateUserForm() {
 	const router = useRouter()
 	const { data: profile } = useMyProfile()
 	const activeFacilityId = profile?.staffProfiles[0]?.facilityId ?? ""
-	const activeFacilityName =
-		profile?.staffProfiles[0]?.facility?.name ?? "Current Facility"
-
 	const { data: rolesData } = useListRolesQuery(activeFacilityId)
 	const createUserMutation = useCreateUserMutation()
 
-	// Identity fields
-	const [name, setName] = useState("")
-	const [email, setEmail] = useState("")
-	const [employeeNumber, setEmployeeNumber] = useState("")
-	const [password, setPassword] = useState("")
+	const [step, setStep] = useState(0)
+	const [showConfirm, setShowConfirm] = useState(false)
+	const [createdUserId, setCreatedUserId] = useState<string | null>(null)
+	const [submitError, setSubmitError] = useState<string | null>(null)
 
-	// License fields
-	const [prcLicenseNumber, setPrcLicenseNumber] = useState("")
-	const [prcExpiry, setPrcExpiry] = useState("")
-	const [ptrNumber, setPtrNumber] = useState("")
-	const [ptrExpiry, setPtrExpiry] = useState("")
-	const [pdeaS2License, setPdeaS2License] = useState("")
-	const [pdeaS2Expiry, setPdeaS2Expiry] = useState("")
-
-	// Facility + role entries (start with the active facility)
-	const [facilities, setFacilities] = useState<FacilityEntry[]>([
-		{
-			facilityId: activeFacilityId,
-			facilityName: activeFacilityName,
-			roleIds: [],
-			isPrimary: true,
+	// Step 1 form
+	const profileForm = useForm({
+		defaultValues: {
+			name: "",
+			email: "",
+			password: "",
+			employeeNumber: "",
 		},
-	])
+		validators: {
+			onSubmit: ProfileSchema,
+		},
+		onSubmit: async () => {
+			setStep(1)
+		},
+	})
 
-	const [error, setError] = useState<string | null>(null)
+	// Step 2 form
+	const roleForm = useForm({
+		defaultValues: {
+			selectedRoleId: "",
+		},
+		validators: {
+			onSubmit: RoleSchema,
+		},
+		onSubmit: async () => {
+			setStep(2)
+		},
+	})
 
-	const toggleRole = (facilityIdx: number, roleId: string) => {
-		setFacilities(prev =>
-			prev.map((f, i) => {
-				if (i !== facilityIdx) return f
-				const hasRole = f.roleIds.includes(roleId)
-				return {
-					...f,
-					roleIds: hasRole ? f.roleIds.filter(id => id !== roleId) : [...f.roleIds, roleId],
-				}
-			})
-		)
-	}
+	async function handleNext() {
+		setSubmitError(null)
 
-	const setPrimary = (facilityIdx: number) => {
-		setFacilities(prev =>
-			prev.map((f, i) => ({ ...f, isPrimary: i === facilityIdx }))
-		)
-	}
-
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault()
-		setError(null)
-
-		if (!name.trim() || !email.trim() || !password) {
-			setError("Name, email, and password are required.")
-			return
-		}
-		if (facilities.some(f => f.roleIds.length === 0)) {
-			setError("Each facility must have at least one role assigned.")
-			return
-		}
-		if (!facilities.some(f => f.isPrimary)) {
-			setError("One facility must be marked as primary.")
+		if (step === 0) {
+			await profileForm.handleSubmit()
+			if (!profileForm.state.isValid) return
+			setStep(1)
 			return
 		}
 
+		if (step === 1) {
+			if (!roleForm.state.values.selectedRoleId) {
+				setSubmitError("Select a role to continue.")
+				return
+			}
+			setStep(2)
+			return
+		}
+
+		// Final step — submit
+		const { name, email, password, employeeNumber } = profileForm.state.values
+		const { selectedRoleId } = roleForm.state.values
 		try {
 			const result = await createUserMutation.mutateAsync({
 				name: name.trim(),
 				email: email.trim(),
 				password,
 				employeeNumber: employeeNumber || undefined,
-				prcLicenseNumber: prcLicenseNumber || undefined,
-				prcExpiry: prcExpiry || undefined,
-				ptrNumber: ptrNumber || undefined,
-				ptrExpiry: ptrExpiry || undefined,
-				pdeaS2License: pdeaS2License || undefined,
-				pdeaS2Expiry: pdeaS2Expiry || undefined,
-				facilities: facilities.map(f => ({
-					facilityId: f.facilityId,
-					roleIds: f.roleIds,
-					isPrimary: f.isPrimary,
-				})),
+				facilities: [
+					{
+						facilityId: activeFacilityId,
+						roleIds: selectedRoleId ? [selectedRoleId] : [],
+						isPrimary: true,
+					},
+				],
 			})
-			router.push(`/admin/users/${result.userId}`)
+			setCreatedUserId(result.userId)
+			setShowConfirm(true)
 		} catch (err: unknown) {
-			const message = err instanceof Error ? err.message : "Failed to create user"
-			setError(message)
+			setSubmitError(err instanceof Error ? err.message : "Failed to create user.")
 		}
 	}
 
 	return (
-		<form onSubmit={handleSubmit} className="space-y-6">
-			{/* Identity */}
-			<Card>
-				<CardHeader>
-					<CardTitle>Identity</CardTitle>
-				</CardHeader>
-				<CardContent className="space-y-4">
-					<div className="grid grid-cols-2 gap-4">
-						<div className="space-y-1">
-							<Label htmlFor="name">Full Name *</Label>
-							<Input
-								id="name"
-								value={name}
-								onChange={e => setName(e.target.value)}
-								required
-							/>
-						</div>
-						<div className="space-y-1">
-							<Label htmlFor="employeeNumber">Employee Number</Label>
-							<Input
-								id="employeeNumber"
-								value={employeeNumber}
-								onChange={e => setEmployeeNumber(e.target.value)}
-							/>
-						</div>
-					</div>
-					<div className="space-y-1">
-						<Label htmlFor="email">Email Address *</Label>
-						<Input
-							id="email"
-							type="email"
-							value={email}
-							onChange={e => setEmail(e.target.value)}
-							required
-						/>
-					</div>
-				</CardContent>
-			</Card>
+		<>
+			<MultiStepWizard
+				steps={STEPS}
+				currentStep={step}
+				onNext={handleNext}
+				onBack={() => { setStep(s => Math.max(0, s - 1)); setSubmitError(null) }}
+				isNextDisabled={step === 1 && !roleForm.state.values.selectedRoleId}
+				isSubmitting={createUserMutation.isPending}
+				submitLabel="Create User"
+			>
+				<div className="space-y-4">
+					{submitError && <p className="text-destructive text-sm">{submitError}</p>}
 
-			{/* Credentials */}
-			<Card>
-				<CardHeader>
-					<CardTitle>Initial Password</CardTitle>
-				</CardHeader>
-				<CardContent>
-					<div className="space-y-1">
-						<Label htmlFor="password">Password *</Label>
-						<Input
-							id="password"
-							type="password"
-							value={password}
-							onChange={e => setPassword(e.target.value)}
-							required
-							minLength={8}
-						/>
-						<p className="text-muted-foreground text-xs">Minimum 8 characters</p>
-					</div>
-				</CardContent>
-			</Card>
-
-			{/* Facility Memberships */}
-			<Card>
-				<CardHeader>
-					<CardTitle>Facility Memberships & Roles</CardTitle>
-				</CardHeader>
-				<CardContent className="space-y-4">
-					{facilities.map((entry, idx) => (
-						<div key={entry.facilityId} className="rounded-md border p-4 space-y-3">
-							<div className="flex items-center justify-between">
-								<p className="font-medium text-sm">{entry.facilityName}</p>
-								<div className="flex items-center gap-2">
-									{entry.isPrimary ? (
-										<Badge variant="secondary">Primary</Badge>
-									) : (
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											onClick={() => setPrimary(idx)}
-										>
-											Set as Primary
-										</Button>
+					{step === 0 && (
+						<div className="space-y-4">
+							<div className="grid grid-cols-2 gap-4">
+								<profileForm.Field
+									name="name"
+									validators={{ onChange: z.string().min(1, "Required") }}
+								>
+									{field => (
+										<div className="space-y-1.5">
+											<Label htmlFor="name">Full Name *</Label>
+											<Input
+												id="name"
+												value={field.state.value}
+												onChange={e => field.handleChange(e.target.value)}
+												onBlur={field.handleBlur}
+											/>
+											{field.state.meta.errors?.map((e, i) => (
+												<p key={i} className="text-xs text-destructive">{String(e)}</p>
+											))}
+										</div>
 									)}
-								</div>
+								</profileForm.Field>
+
+								<profileForm.Field name="employeeNumber">
+									{field => (
+										<div className="space-y-1.5">
+											<Label htmlFor="employeeNumber">Employee Number</Label>
+											<Input
+												id="employeeNumber"
+												value={field.state.value}
+												onChange={e => field.handleChange(e.target.value)}
+												onBlur={field.handleBlur}
+											/>
+										</div>
+									)}
+								</profileForm.Field>
 							</div>
-							<div>
-								<p className="text-muted-foreground text-xs mb-2">Roles (select at least one)</p>
-								<div className="flex flex-wrap gap-2">
-									{rolesData?.map(role => (
-										<button
-											key={role.id}
-											type="button"
-											onClick={() => toggleRole(idx, role.id)}
-											className={`rounded-full px-3 py-1 text-xs border transition-colors ${
-												entry.roleIds.includes(role.id)
-													? "bg-primary text-primary-foreground border-primary"
-													: "bg-background text-foreground border-border hover:bg-muted"
-											}`}
-										>
-											{role.name}
-										</button>
-									))}
-								</div>
+
+							<profileForm.Field
+								name="email"
+								validators={{ onChange: z.string().email("Invalid email") }}
+							>
+								{field => (
+									<div className="space-y-1.5">
+										<Label htmlFor="email">Email Address *</Label>
+										<Input
+											id="email"
+											type="email"
+											value={field.state.value}
+											onChange={e => field.handleChange(e.target.value)}
+											onBlur={field.handleBlur}
+										/>
+										{field.state.meta.errors?.map((e, i) => (
+											<p key={i} className="text-xs text-destructive">{String(e)}</p>
+										))}
+									</div>
+								)}
+							</profileForm.Field>
+
+							<profileForm.Field
+								name="password"
+								validators={{ onChange: z.string().min(8, "Minimum 8 characters") }}
+							>
+								{field => (
+									<div className="space-y-1.5">
+										<Label htmlFor="password">Initial Password *</Label>
+										<Input
+											id="password"
+											type="password"
+											value={field.state.value}
+											onChange={e => field.handleChange(e.target.value)}
+											onBlur={field.handleBlur}
+											minLength={8}
+										/>
+										{field.state.meta.errors?.map((e, i) => (
+											<p key={i} className="text-xs text-destructive">{String(e)}</p>
+										))}
+										<p className="text-muted-foreground text-xs">Minimum 8 characters</p>
+									</div>
+								)}
+							</profileForm.Field>
+						</div>
+					)}
+
+					{step === 1 && (
+						<div className="space-y-2">
+							<p className="text-muted-foreground text-sm">
+								Select the role for this user at{" "}
+								<span className="text-foreground font-medium">
+									{profile?.staffProfiles[0]?.facility?.name ?? "this facility"}
+								</span>.
+							</p>
+							<div className="grid gap-2">
+								{rolesData?.map(role => (
+									<button
+										key={role.id}
+										type="button"
+										onClick={() => roleForm.setFieldValue("selectedRoleId", role.id)}
+										className={`rounded-md border px-4 py-3 text-left transition-colors ${
+											roleForm.state.values.selectedRoleId === role.id
+												? "border-primary bg-primary/5"
+												: "border-border hover:bg-muted"
+										}`}
+									>
+										<p className="text-sm font-medium">{role.name}</p>
+										{role.description && (
+											<p className="text-muted-foreground text-xs">{role.description}</p>
+										)}
+									</button>
+								))}
+								{!rolesData?.length && (
+									<p className="text-muted-foreground text-sm">No roles found for this facility.</p>
+								)}
 							</div>
 						</div>
-					))}
-				</CardContent>
-			</Card>
+					)}
 
-			{/* License Fields */}
-			<Card>
-				<CardHeader>
-					<CardTitle>Professional Licenses</CardTitle>
-				</CardHeader>
-				<CardContent className="space-y-4">
-					<div className="grid grid-cols-2 gap-4">
-						<div className="space-y-1">
-							<Label htmlFor="prcLicenseNumber">PRC License Number</Label>
-							<Input
-								id="prcLicenseNumber"
-								value={prcLicenseNumber}
-								onChange={e => setPrcLicenseNumber(e.target.value)}
-							/>
+					{step === 2 && (
+						<div className="space-y-3">
+							<p className="text-sm text-muted-foreground">
+								Review and adjust permissions for the selected role. Changes here are saved to the role and affect all users assigned to it.
+							</p>
+							<PermissionMatrix />
 						</div>
-						<div className="space-y-1">
-							<Label htmlFor="prcExpiry">PRC Expiry Date</Label>
-							<Input
-								id="prcExpiry"
-								type="date"
-								value={prcExpiry}
-								onChange={e => setPrcExpiry(e.target.value)}
-							/>
-						</div>
-					</div>
-					<div className="grid grid-cols-2 gap-4">
-						<div className="space-y-1">
-							<Label htmlFor="ptrNumber">PTR Number</Label>
-							<Input
-								id="ptrNumber"
-								value={ptrNumber}
-								onChange={e => setPtrNumber(e.target.value)}
-							/>
-						</div>
-						<div className="space-y-1">
-							<Label htmlFor="ptrExpiry">PTR Expiry Date</Label>
-							<Input
-								id="ptrExpiry"
-								type="date"
-								value={ptrExpiry}
-								onChange={e => setPtrExpiry(e.target.value)}
-							/>
-						</div>
-					</div>
-					<div className="grid grid-cols-2 gap-4">
-						<div className="space-y-1">
-							<Label htmlFor="pdeaS2License">PDEA S2 License</Label>
-							<Input
-								id="pdeaS2License"
-								value={pdeaS2License}
-								onChange={e => setPdeaS2License(e.target.value)}
-							/>
-						</div>
-						<div className="space-y-1">
-							<Label htmlFor="pdeaS2Expiry">PDEA S2 Expiry Date</Label>
-							<Input
-								id="pdeaS2Expiry"
-								type="date"
-								value={pdeaS2Expiry}
-								onChange={e => setPdeaS2Expiry(e.target.value)}
-							/>
-						</div>
-					</div>
-				</CardContent>
-			</Card>
+					)}
+				</div>
+			</MultiStepWizard>
 
-			{error && (
-				<p className="text-sm text-destructive rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
-					{error}
-				</p>
-			)}
-
-			<div className="flex items-center gap-3">
-				<Button type="submit" disabled={createUserMutation.isPending}>
-					{createUserMutation.isPending ? "Creating…" : "Create User"}
-				</Button>
-				<Button
-					type="button"
-					variant="outline"
-					onClick={() => router.back()}
-					disabled={createUserMutation.isPending}
-				>
-					Cancel
-				</Button>
-			</div>
-		</form>
+			{/* Activation confirmation modal */}
+			<Dialog open={showConfirm} onOpenChange={open => { if (!open) router.push("/admin/users") }}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>User Created</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-3 text-sm">
+						<p>
+							The account for <span className="font-semibold">{profileForm.state.values.email}</span> has been created.
+						</p>
+						<p className="text-muted-foreground">
+							An activation link has been queued. The user can sign in with the temporary
+							password you set once the account is active.
+						</p>
+					</div>
+					<div className="flex justify-end gap-2 pt-2">
+						<Button
+							variant="outline"
+							onClick={() => { setShowConfirm(false); router.push("/admin/users/new") }}
+						>
+							Create Another
+						</Button>
+						<Button onClick={() => router.push(`/admin/users/${createdUserId}`)}>
+							View User
+						</Button>
+					</div>
+				</DialogContent>
+			</Dialog>
+		</>
 	)
 }

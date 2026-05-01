@@ -305,4 +305,47 @@ export const rbacContract = {
 		})
 		.input(RemoveRoleAssignmentSchema)
 		.output(z.object({ success: z.boolean() })),
+
+	// ── Resend Activation ────────────────────────────────────────────────
+
+	resendActivation: oc
+		.route({
+			method: "POST",
+			path: "/staff/{id}/resend-activation",
+			summary: "Resend activation / password reset email for a user (admin only)",
+			tags: ["RBAC"],
+		})
+		.input(UserIdSchema)
+		.output(z.object({ success: z.boolean() })),
+
+	// ── Get Single Role ──────────────────────────────────────────────────
+
+	getRole: oc
+		.route({
+			method: "GET",
+			path: "/roles/{id}",
+			summary: "Get a single role with its permissions (admin only)",
+			tags: ["RBAC"],
+		})
+		.input(RoleIdSchema)
+		.output(RoleWithPermissionsSchema),
+
+	// ── List All Permissions ─────────────────────────────────────────────
+
+	listPermissions: oc
+		.route({
+			method: "GET",
+			path: "/permissions",
+			summary: "List all available permission tokens in the system",
+			tags: ["RBAC"],
+		})
+		.output(
+			z.array(
+				z.object({
+					module: RbacModuleEnum,
+					action: RbacActionEnum,
+					description: z.string().optional(),
+				})
+			)
+		),
 }

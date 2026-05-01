@@ -4,7 +4,7 @@ import { z } from "zod"
 // Shared enums
 // ============================================================================
 
-export const FeatureFlagGroupEnum = z.enum(["platform-control", "compliance", "integration"])
+export const FeatureFlagGroupEnum = z.enum(["platform-control", "financial", "compliance", "integration"])
 export const FeatureFlagRiskLevelEnum = z.enum(["low", "moderate", "high"])
 export const FeatureFlagEnvironmentEnum = z.enum(["dev", "staging", "prod"])
 

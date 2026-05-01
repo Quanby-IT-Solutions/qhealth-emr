@@ -32,6 +32,7 @@ export const AUDIT_ENTITY_TYPES = {
 	DEPRECATED_CODE_MAPPING: "deprecated_code_mapping",
 	CATALOG_ENTRY: "catalog_entry",
 	CATALOG_VERSION: "catalog_version",
+	SLA_WORKFLOW_LOG: "sla_workflow_log",
 } as const
 
 /** Union of all known admin audit entity type strings. */

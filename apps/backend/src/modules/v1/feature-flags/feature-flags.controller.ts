@@ -126,4 +126,18 @@ export class FeatureFlagsController {
 			})
 		})
 	}
+
+	// ── History ───────────────────────────────────────────────────────────────
+
+	@RequirePermissions([{ module: "feature_flags", action: "view" }])
+	@Implement(v1.featureFlags.history)
+	async history() {
+		return implement(v1.featureFlags.history).handler(async ({ input }) => {
+			return this.featureFlagsService.getHistory(
+				input.flagId,
+				input.page ?? 1,
+				input.limit ?? 20
+			)
+		})
+	}
 }

@@ -306,6 +306,38 @@ export const bedCensusSnapshots = createTable(
 )
 
 // ============================================================================
+// BED STATUS HISTORY — audit trail for individual bed status changes
+// ============================================================================
+
+export const bedStatusHistory = createTable(
+	"bed_status_history",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		bedId: t
+			.uuid("bed_id")
+			.notNull()
+			.references(() => beds.id, { onDelete: "cascade" }),
+		previousStatus: t
+			.text("previous_status")
+			.$type<"available" | "occupied" | "reserved" | "cleaning" | "out_of_service">(),
+		newStatus: t
+			.text("new_status")
+			.notNull()
+			.$type<"available" | "occupied" | "reserved" | "cleaning" | "out_of_service">(),
+		changedAt: t.timestamp("changed_at").notNull().defaultNow(),
+		changedBy: t
+			.uuid("changed_by")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+	}),
+	t => [
+		index("bed_status_history_bed_id_idx").on(t.bedId),
+		index("bed_status_history_changed_at_idx").on(t.changedAt),
+	]
+)
+
+export type BedStatusHistoryRow = typeof bedStatusHistory.$inferSelect
+
+// ============================================================================
 // SLA TRACKING — Event-sourced encounter status transitions
 // ============================================================================
 

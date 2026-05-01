@@ -1,38 +1,21 @@
-"use client"
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query"
 
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { UsersTable } from "@/features/admin/components/users-table"
+import { createQueryClient } from "@/services/tanstack-query/query-client"
+import { orpc } from "@/services/orpc/client"
+import "@/services/orpc/orpc-server"
+import { UsersPageClient } from "@/features/admin/components/users-page-client"
 
-function usePermissionSet() {
-	const { data: profile } = useMyProfile()
-	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
-}
-
-function can(permSet: Set<string>, module: string, action: string) {
-	return permSet.has(`${module}:${action}`)
-}
-
-export default function AdminUsersPage() {
-	const permSet = usePermissionSet()
-
-	if (!can(permSet, "admin", "view")) {
-		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
-				You do not have permission to access user management.
-			</div>
-		)
-	}
+export default async function AdminUsersPage() {
+	const queryClient = createQueryClient()
+	await queryClient.prefetchQuery(
+		orpc.rbac.listStaff.queryOptions({
+			input: { page: 1, limit: 20 },
+		})
+	)
 
 	return (
-		<div className="space-y-6">
-			<div>
-				<h1 className="text-2xl font-bold tracking-tight">User Management</h1>
-				<p className="text-muted-foreground text-sm">
-					Create, search, and manage staff accounts and profiles
-				</p>
-			</div>
-			<UsersTable />
-		</div>
+		<HydrationBoundary state={dehydrate(queryClient)}>
+			<UsersPageClient />
+		</HydrationBoundary>
 	)
 }

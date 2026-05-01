@@ -63,6 +63,8 @@ interface RequiredPermission {
 	action: string
 }
 
+export type AdminNavGroup = "Identity & Access" | "Clinical Configuration" | "Reporting & Compliance" | "System Settings"
+
 interface NavItemConfig {
 	title: string
 	href: string
@@ -87,6 +89,8 @@ interface NavItemConfig {
 	 */
 	requireAllPermissions?: RequiredPermission[]
 	isSecondary?: boolean
+	/** Groups admin-only items into the 4 TOR admin sidebar categories. */
+	adminGroup?: AdminNavGroup
 }
 
 /**
@@ -344,21 +348,28 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		isSecondary: true,
 	},
 	{
-		title: "FHIR Export",
-		href: "/admin/fhir",
-		iconName: "report",
+		title: "User Management",
+		href: "/admin/users",
+		iconName: "patient",
 		requiredPermissions: [{ module: "admin", action: "view" }],
-		// Also require fhir:view — the page itself enforces both permissions,
-		// so the nav link should only appear when the user can actually access it.
-		requireAllPermissions: [{ module: "fhir", action: "view" }],
 		isSecondary: true,
+		adminGroup: "Identity & Access",
 	},
 	{
-		title: "ARTA / SLA",
-		href: "/admin/sla",
-		iconName: "sla",
+		title: "Roles & Permissions",
+		href: "/admin/roles",
+		iconName: "audit",
 		requiredPermissions: [{ module: "admin", action: "view" }],
 		isSecondary: true,
+		adminGroup: "Identity & Access",
+	},
+	{
+		title: "Clinician Licenses",
+		href: "/admin/clinician-licenses",
+		iconName: "stethoscope",
+		requiredPermissions: [{ module: "admin", action: "view" }],
+		isSecondary: true,
+		adminGroup: "Identity & Access",
 	},
 	{
 		title: "Feature Flags",
@@ -369,6 +380,57 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 			{ module: "feature_flags", action: "view" },
 		],
 		isSecondary: true,
+		adminGroup: "Clinical Configuration",
+	},
+	{
+		title: "BOR & Census",
+		href: "/admin/bor",
+		iconName: "bed",
+		requiredPermissions: [{ module: "admin", action: "view" }],
+		isSecondary: true,
+		adminGroup: "Clinical Configuration",
+	},
+	{
+		title: "ARTA / SLA",
+		href: "/admin/sla",
+		iconName: "sla",
+		requiredPermissions: [{ module: "admin", action: "view" }],
+		isSecondary: true,
+		adminGroup: "Reporting & Compliance",
+	},
+	{
+		title: "FHIR Export",
+		href: "/admin/fhir",
+		iconName: "report",
+		requiredPermissions: [{ module: "admin", action: "view" }],
+		requireAllPermissions: [{ module: "fhir", action: "view" }],
+		isSecondary: true,
+		adminGroup: "Reporting & Compliance",
+	},
+	{
+		title: "FHIR Endpoints",
+		href: "/admin/fhir-endpoints",
+		iconName: "report",
+		requiredPermissions: [{ module: "admin", action: "view" }],
+		isSecondary: true,
+		adminGroup: "Reporting & Compliance",
+	},
+	{
+		title: "Terminology",
+		href: "/admin/terminology",
+		iconName: "formulary",
+		requiredPermissions: [{ module: "admin", action: "view" }],
+		isSecondary: true,
+		adminGroup: "Reporting & Compliance",
+	},
+	{
+		title: "Facility Profile",
+		href: "/admin/facility-profile",
+		iconName: "settings",
+		requiredPermissions: [{ module: "admin", action: "view" }],
+		requireAllPermissions: [{ module: "facility_profile", action: "view" }],
+		isSecondary: true,
+		adminGroup: "System Settings",
 	},
 	{
 		title: "System Settings",
@@ -379,16 +441,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 			{ module: "system_settings", action: "view" },
 		],
 		isSecondary: true,
-	},
-	{
-		title: "Facility Profile",
-		href: "/admin/facility-profile",
-		iconName: "settings",
-		requiredPermissions: [{ module: "admin", action: "view" }],
-		// Also require facility_profile:view — the page and API enforce this permission,
-		// so the nav link must only appear when the user can actually access it.
-		requireAllPermissions: [{ module: "facility_profile", action: "view" }],
-		isSecondary: true,
+		adminGroup: "System Settings",
 	},
 	{
 		title: "Integration Registry",
@@ -401,6 +454,15 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 			{ module: "admin", action: "view" },
 		],
 		isSecondary: true,
+		adminGroup: "System Settings",
+	},
+	{
+		title: "Master Data",
+		href: "/admin/master-data",
+		iconName: "formulary",
+		requiredPermissions: [{ module: "admin", action: "view" }],
+		isSecondary: true,
+		adminGroup: "System Settings",
 	},
 	{
 		title: "Social Work (MSW)",

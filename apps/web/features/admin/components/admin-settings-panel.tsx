@@ -215,7 +215,7 @@ Facility-wide scheduling, retention, and data defaults.
 {canEdit ? (
 <Select
 value={draft.timezone}
-onValueChange={v => setField("timezone", v)}
+onValueChange={v => setField("timezone", v ?? "")}
 >
 <SelectTrigger id="timezone">
 <SelectValue />
@@ -271,7 +271,7 @@ Required by TOR
 {canEdit ? (
 <Select
 value={draft.offlineModePolicy}
-onValueChange={v => setField("offlineModePolicy", v)}
+onValueChange={v => setField("offlineModePolicy", v ?? "")}
 disabled
 >
 <SelectTrigger id="offline-mode">
@@ -290,7 +290,7 @@ disabled
 {canEdit ? (
 <Select
 value={draft.exportDefaultWindow}
-onValueChange={v => setField("exportDefaultWindow", v)}
+onValueChange={v => setField("exportDefaultWindow", v ?? "")}
 >
 <SelectTrigger id="export-window">
 <SelectValue />

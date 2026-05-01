@@ -121,4 +121,48 @@ export class SlaController {
 			return this.slaService.deleteStepConfig(input.id)
 		})
 	}
+
+	@RequirePermission("admin", "edit")
+	@Implement(v1.sla.appendStatusLog)
+	async appendStatusLog() {
+		return implement(v1.sla.appendStatusLog).handler(async ({ input }) => {
+			return this.slaService.appendStatusLog(input)
+		})
+	}
+
+	// ========================================================================
+	// SLA Analytics (ADM-BE-10)
+	// ========================================================================
+
+	@RequirePermission('admin', 'view')
+	@Implement(v1.sla.dashboard)
+	async slaDashboard() {
+		return implement(v1.sla.dashboard).handler(async ({ input }) => {
+			return this.slaService.getSlaDashboard(input.facilityId)
+		})
+	}
+
+	@RequirePermission('admin', 'view')
+	@Implement(v1.sla.turnaround)
+	async slaTurnaround() {
+		return implement(v1.sla.turnaround).handler(async ({ input }) => {
+			return this.slaService.getTurnaround(input)
+		})
+	}
+
+	@RequirePermission('admin', 'view')
+	@Implement(v1.sla.bottleneck)
+	async slaBottleneck() {
+		return implement(v1.sla.bottleneck).handler(async ({ input }) => {
+			return this.slaService.getBottleneck(input)
+		})
+	}
+
+	@RequirePermission('admin', 'view')
+	@Implement(v1.sla.exportCompliance)
+	async exportCompliance() {
+		return implement(v1.sla.exportCompliance).handler(async ({ input }) => {
+			return this.slaService.exportCompliance(input)
+		})
+	}
 }

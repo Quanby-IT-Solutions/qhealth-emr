@@ -22,14 +22,19 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/core/components/ui/tooltip"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
-	type SlaEvent,
 	type SlaStatus,
 	type SlaWorkflowType,
 	WORKFLOW_LABELS,
-	useSlaEventsQuery,
 } from "@/features/sla/api/sla.hooks"
+import { useSlaEventsOrpcQuery, useSlaDashboardQuery } from "@/features/sla/api/sla-orpc.hooks"
+import type { SlaEvent, SlaKpiTile } from "@repo/contracts"
 
 // ============================================================================
 // Helpers
@@ -71,7 +76,7 @@ function formatCurrentStep(step: string | null | undefined): string {
 	return MONITORING_STEP_LABELS[step] ?? step.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
 }
 
-function formatDateTime(val: string | null | undefined): string {
+function formatDateTime(val: Date | string | null | undefined): string {
 	if (!val) return "—"
 	return new Date(val).toLocaleString("en-PH", {
 		month: "short",
@@ -175,6 +180,48 @@ function SummaryCards({ events }: { events: SlaEvent[] }) {
 }
 
 // ============================================================================
+// ARTA Flow KPI Tiles (ADM-FE-10)
+// ============================================================================
+
+function FlowKpiTiles({ tiles }: { tiles: SlaKpiTile[] }) {
+	if (tiles.length === 0) return null
+	return (
+		<div>
+			<p className="text-sm font-medium mb-2 text-muted-foreground">ARTA Flows (30-day window)</p>
+			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+				{tiles.map(tile => {
+					const colorClass =
+						tile.statusColor === "red"
+							? "text-red-600"
+							: tile.statusColor === "amber"
+								? "text-amber-600"
+								: "text-green-600"
+					return (
+						<Card key={tile.workflowType}>
+							<CardContent className="pt-4 pb-3">
+								<p className="text-xs font-medium text-muted-foreground truncate">{tile.workflowLabel}</p>
+								<p className={`text-2xl font-bold tabular-nums ${colorClass}`}>
+									{tile.withinSLAPct.toFixed(0)}%
+								</p>
+								<div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+									<span>{tile.totalCases} cases</span>
+									{tile.breachCount > 0 && (
+										<span className="text-red-500">{tile.breachCount} breaches</span>
+									)}
+								</div>
+								<p className="mt-0.5 text-xs text-muted-foreground">
+									Avg TAT: {tile.avgTatMinutes}m
+								</p>
+							</CardContent>
+						</Card>
+					)
+				})}
+			</div>
+		</div>
+	)
+}
+
+// ============================================================================
 // Main Dashboard
 // ============================================================================
 
@@ -184,21 +231,27 @@ export function SlaDashboard() {
 	const [statusFilter, setStatusFilter] = useState<SlaStatus | "all">("all")
 	const [workflowFilter, setWorkflowFilter] = useState<SlaWorkflowType | "all">("all")
 	const [page, setPage] = useState(1)
+	const [isPaused, setIsPaused] = useState(false)
 
-	const { data, isLoading, error } = useSlaEventsQuery({
-		facilityId,
-		status: statusFilter,
-		workflowType: workflowFilter !== "all" ? workflowFilter : undefined,
-		page,
-	})
+	const { data: dashboardData } = useSlaDashboardQuery(facilityId, !!facilityId)
 
-	const handleStatusFilter = useCallback((val: string) => {
-		setStatusFilter(val as SlaStatus | "all")
+	const { data, isLoading, error, refetch, isFetching } = useSlaEventsOrpcQuery(
+		{
+			facilityId,
+			status: statusFilter !== "all" ? statusFilter : undefined,
+			workflowType: workflowFilter !== "all" ? workflowFilter : undefined,
+			page,
+		},
+		!isPaused
+	)
+
+	const handleStatusFilter = useCallback((val: string | null) => {
+		if (val) setStatusFilter(val as SlaStatus | "all")
 		setPage(1)
 	}, [])
 
-	const handleWorkflowFilter = useCallback((val: string) => {
-		setWorkflowFilter(val as SlaWorkflowType | "all")
+	const handleWorkflowFilter = useCallback((val: string | null) => {
+		if (val) setWorkflowFilter(val as SlaWorkflowType | "all")
 		setPage(1)
 	}, [])
 
@@ -214,16 +267,41 @@ export function SlaDashboard() {
 						Active work items across all workflows — auto-refreshes every 30s
 					</p>
 				</div>
-				<div className="flex items-center gap-3">
-					<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-						<span className="inline-block size-2 animate-pulse rounded-full bg-green-500" />
-						Live
-					</div>
-					<Button asChild size="sm" variant="outline">
-						<Link href="/admin/sla">Compliance Report</Link>
+				<div className="flex items-center gap-2">
+					{!isPaused && (
+						<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+							<span className="inline-block size-2 animate-pulse rounded-full bg-green-500" />
+							Live
+						</div>
+					)}
+					<Button
+						size="sm"
+						variant="outline"
+						onClick={() => refetch()}
+						disabled={isFetching}
+					>
+						Refresh
 					</Button>
+					<Button
+						size="sm"
+						variant={isPaused ? "default" : "outline"}
+						onClick={() => setIsPaused(p => !p)}
+					>
+						{isPaused ? "Resume" : "Pause"}
+					</Button>
+					<Link
+						href="/admin/sla"
+						className="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 h-9 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+					>
+						Compliance Report
+					</Link>
 				</div>
 			</div>
+
+			{/* ARTA Flow KPI Tiles */}
+			{dashboardData?.tiles && dashboardData.tiles.length > 0 && (
+				<FlowKpiTiles tiles={dashboardData.tiles} />
+			)}
 
 			{/* Summary */}
 			{!isLoading && <SummaryCards events={events} />}
@@ -232,7 +310,7 @@ export function SlaDashboard() {
 			<div className="flex flex-wrap gap-3">
 				<Select value={statusFilter} onValueChange={handleStatusFilter}>
 					<SelectTrigger className="w-40">
-						<SelectValue placeholder="All Statuses" />
+						<SelectValue />
 					</SelectTrigger>
 					<SelectContent>
 						<SelectItem value="all">All Statuses</SelectItem>
@@ -244,7 +322,7 @@ export function SlaDashboard() {
 
 				<Select value={workflowFilter} onValueChange={handleWorkflowFilter}>
 					<SelectTrigger className="w-52">
-						<SelectValue placeholder="All Workflows" />
+						<SelectValue />
 					</SelectTrigger>
 					<SelectContent>
 						<SelectItem value="all">All Workflows</SelectItem>
@@ -332,7 +410,18 @@ export function SlaDashboard() {
 											/>
 										</TableCell>
 										<TableCell>
-											<SlaStatusBadge status={event.status} />
+											{event.status === "exceeded" ? (
+												<Tooltip>
+													<TooltipTrigger>
+														<SlaStatusBadge status={event.status} />
+													</TooltipTrigger>
+													<TooltipContent>
+														+{formatMinutes(event.elapsedMinutes - event.targetMinutes)} over target
+													</TooltipContent>
+												</Tooltip>
+											) : (
+												<SlaStatusBadge status={event.status} />
+											)}
 										</TableCell>
 										<TableCell className="text-xs">
 											{event.escalatedAt ? (

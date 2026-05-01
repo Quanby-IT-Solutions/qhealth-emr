@@ -126,4 +126,80 @@ export class IntegrationRegistryController {
 			return this.integrationRegistryService.testConnectivity(actor.facilityId, input.id, actor)
 		})
 	}
+
+	// ── API Key Management (ADM-BE-12) ─────────────────────────────────────────
+
+	@RequirePermissions([{ module: "admin", action: "view" }])
+	@Implement(v1.integrationRegistry.listApiKeys)
+	async listApiKeys() {
+		return implement(v1.integrationRegistry.listApiKeys).handler(async ({ input }) => {
+			return this.integrationRegistryService.listApiKeys(input.integrationId)
+		})
+	}
+
+	@RequirePermissions([{ module: "admin", action: "edit" }])
+	@Implement(v1.integrationRegistry.generateApiKey)
+	async generateApiKey(@Session() session: UserSession) {
+		return implement(v1.integrationRegistry.generateApiKey).handler(async ({ input }) => {
+			return this.integrationRegistryService.generateApiKey(
+				input.integrationId,
+				input.label,
+				session.user.id
+			)
+		})
+	}
+
+	@RequirePermissions([{ module: "admin", action: "delete" }])
+	@Implement(v1.integrationRegistry.revokeApiKey)
+	async revokeApiKey(@Session() session: UserSession) {
+		return implement(v1.integrationRegistry.revokeApiKey).handler(async ({ input }) => {
+			return this.integrationRegistryService.revokeApiKey(input.id, session.user.id)
+		})
+	}
+
+	@RequirePermissions([{ module: 'admin', action: 'edit' }])
+	@Implement(v1.integrationRegistry.rotateApiKey)
+	async rotateApiKey(@Session() session: UserSession) {
+		return implement(v1.integrationRegistry.rotateApiKey).handler(async ({ input }) => {
+			return this.integrationRegistryService.rotateApiKey(
+				input.id,
+				input.graceHours,
+				session.user.id
+			)
+		})
+	}
+
+	// ── Webhook Endpoints (ADM-BE-12) ──────────────────────────────────────────
+
+	@RequirePermissions([{ module: "admin", action: "view" }])
+	@Implement(v1.integrationRegistry.listWebhooks)
+	async listWebhooks() {
+		return implement(v1.integrationRegistry.listWebhooks).handler(async ({ input }) => {
+			return this.integrationRegistryService.listWebhooks(input.integrationId)
+		})
+	}
+
+	@RequirePermissions([{ module: "admin", action: "edit" }])
+	@Implement(v1.integrationRegistry.createWebhook)
+	async createWebhook() {
+		return implement(v1.integrationRegistry.createWebhook).handler(async ({ input }) => {
+			return this.integrationRegistryService.createWebhook(input)
+		})
+	}
+
+	@RequirePermissions([{ module: "admin", action: "edit" }])
+	@Implement(v1.integrationRegistry.updateWebhook)
+	async updateWebhook() {
+		return implement(v1.integrationRegistry.updateWebhook).handler(async ({ input }) => {
+			return this.integrationRegistryService.updateWebhook(input.id, input)
+		})
+	}
+
+	@RequirePermissions([{ module: "admin", action: "delete" }])
+	@Implement(v1.integrationRegistry.deleteWebhook)
+	async deleteWebhook() {
+		return implement(v1.integrationRegistry.deleteWebhook).handler(async ({ input }) => {
+			return this.integrationRegistryService.deleteWebhook(input.id)
+		})
+	}
 }

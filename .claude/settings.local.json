@@ -88,7 +88,19 @@
       "Bash(git -C \"D:/PROJECTS/qhealth-emr\" status)",
       "Bash(git -C \"D:/PROJECTS/qhealth-emr\" diff .claude/settings.local.json)",
       "Bash(git *)",
-      "Bash(pnpm run *)"
+      "Bash(pnpm run *)",
+      "Bash(pnpm db:generate)",
+      "Bash(python3 *)",
+      "Bash(PowerShell *)",
+      "Bash(mkdir -p \"D:/PROJECTS/qhealth-emr/apps/web/app/\\(site\\)/admin/sla/turnaround/[workflowId]\")",
+      "Bash(mkdir -p \"D:/PROJECTS/qhealth-emr/apps/web/app/\\(site\\)/admin/sla/bottleneck/[workflowId]\")",
+      "Bash(mkdir -p \"D:/PROJECTS/qhealth-emr/apps/web/app/\\(site\\)/admin/master-data/[catalogId]\")",
+      "Bash(mkdir -p \"D:/PROJECTS/qhealth-emr/apps/web/app/\\(site\\)/admin/integrations/[integrationId]/keys\")",
+      "Bash(grep -v \"^$\")",
+      "Bash(awk '{print $NF}')",
+      "Bash([ -f \"D:/PROJECTS/qhealth-emr/$path\" ])",
+      "Bash(pnpm db:push *)",
+      "PowerShell(pnpm typecheck *)"
     ]
   }
 }

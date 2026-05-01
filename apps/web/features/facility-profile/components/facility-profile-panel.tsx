@@ -6,6 +6,14 @@ import { Save, X } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import {
@@ -93,6 +101,7 @@ export function FacilityProfilePanel({ canEdit }: FacilityProfilePanelProps) {
 
 	const [draft, setDraft] = useState<DraftState | null>(null)
 	const [isDirty, setIsDirty] = useState(false)
+	const [confirmOpen, setConfirmOpen] = useState(false)
 
 	// Sync draft from server data on first load
 	useEffect(() => {
@@ -147,9 +156,11 @@ export function FacilityProfilePanel({ canEdit }: FacilityProfilePanelProps) {
 
 		await updateMutation.mutateAsync(payload as Parameters<typeof updateMutation.mutateAsync>[0])
 		setIsDirty(false)
+		setConfirmOpen(false)
 	}
 
 	return (
+		<>
 		<div className="space-y-4">
 			{/* Unsaved changes banner */}
 			{hasChanges && canEdit && (
@@ -165,7 +176,7 @@ export function FacilityProfilePanel({ canEdit }: FacilityProfilePanelProps) {
 						</Button>
 						<Button
 							size="sm"
-							onClick={handleSave}
+							onClick={() => setConfirmOpen(true)}
 							disabled={updateMutation.isPending}
 						>
 							<Save className="mr-1.5 size-4" />
@@ -399,5 +410,25 @@ export function FacilityProfilePanel({ canEdit }: FacilityProfilePanelProps) {
 				</div>
 			</div>
 		</div>
+
+		<Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+			<DialogContent>
+				<DialogHeader>
+					<DialogTitle>Save facility settings?</DialogTitle>
+					<DialogDescription>
+						This affects every audit log entry — confirm?
+					</DialogDescription>
+				</DialogHeader>
+				<DialogFooter>
+					<Button variant="outline" onClick={() => setConfirmOpen(false)}>
+						Cancel
+					</Button>
+					<Button onClick={handleSave} disabled={updateMutation.isPending}>
+						{updateMutation.isPending ? "Saving…" : "Confirm"}
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+		</>
 	)
 }

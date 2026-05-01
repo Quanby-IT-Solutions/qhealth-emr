@@ -19,7 +19,7 @@ export function useHimOpsQuery() {
 export function useExportComplianceQuery(params?: { page?: number; limit?: number }) {
 	return useQuery(
 		orpc.adminDashboard.exportCompliance.queryOptions({
-			input: params,
+			input: params ?? {},
 			staleTime: 30 * 1000,
 		})
 	)

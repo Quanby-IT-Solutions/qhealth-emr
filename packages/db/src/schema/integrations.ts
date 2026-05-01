@@ -61,6 +61,47 @@ export type IntegrationRow = typeof integrations.$inferSelect
 // Only the first 8 characters (prefix) and SHA-256 hash are persisted.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// webhook_endpoints — outbound webhook delivery targets for integrations
+// ---------------------------------------------------------------------------
+
+export type WebhookEventType =
+	| "patient.created"
+	| "patient.updated"
+	| "encounter.admitted"
+	| "encounter.discharged"
+	| "lab.result_ready"
+	| "medication.dispensed"
+	| "billing.invoice_created"
+
+export const webhookEndpoints = createTable(
+	"webhook_endpoints",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		integrationId: t
+			.uuid("integration_id")
+			.notNull()
+			.references(() => integrations.id, { onDelete: "cascade" }),
+		targetUrl: t.text("target_url").notNull(),
+		// Stored as SHA-256 hash reference — plaintext secret never persisted
+		signingSecretHash: t.text("signing_secret_hash").notNull(),
+		// JSONB array of WebhookEventType strings
+		subscribedEvents: t.jsonb("subscribed_events").notNull().default([]),
+		isActive: t.boolean("is_active").notNull().default(true),
+		// Retry state
+		consecutiveFailures: t.integer("consecutive_failures").notNull().default(0),
+		lastDeliveryAt: t.timestamp("last_delivery_at"),
+		lastDeliveryStatus: t.text("last_delivery_status").$type<"success" | "failed">(),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("webhook_endpoints_integration_id_idx").on(t.integrationId),
+	]
+)
+
+export type WebhookEndpointRow = typeof webhookEndpoints.$inferSelect
+
 export const integrationApiKeys = createTable(
 	"integration_api_keys",
 	t => ({

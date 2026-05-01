@@ -1,7 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
+import { createHash, createHmac, randomBytes } from "crypto"
+
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, eq } from "drizzle-orm"
 
-import { integrations } from "@repo/db/schema"
+import { integrationApiKeys, integrations, webhookEndpoints } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import { INTEGRATION_CREDENTIAL_ENV_VARS } from "@/config/app.config"
@@ -87,6 +89,8 @@ function diffFields(
 
 @Injectable()
 export class IntegrationRegistryService {
+	private readonly logger = new Logger(IntegrationRegistryService.name)
+
 	constructor(private readonly auditService: AuditService) {}
 
 	/**
@@ -924,6 +928,284 @@ export class IntegrationRegistryService {
 			throw new BadRequestException(
 				`credentialsRef "${credentialsRef}" is not in the allowed whitelist`
 			)
+		}
+	}
+
+	// ============================================================================
+	// API Key Management (ADM-BE-12)
+	// ============================================================================
+
+	async listApiKeys(integrationId: string) {
+		return db
+			.select({
+				id: integrationApiKeys.id,
+				integrationId: integrationApiKeys.integrationId,
+				label: integrationApiKeys.label,
+				keyPrefix: integrationApiKeys.keyPrefix,
+				createdBy: integrationApiKeys.createdBy,
+				createdAt: integrationApiKeys.createdAt,
+				revokedAt: integrationApiKeys.revokedAt,
+			})
+			.from(integrationApiKeys)
+			.where(eq(integrationApiKeys.integrationId, integrationId))
+	}
+
+	async generateApiKey(integrationId: string, label: string, createdBy: string) {
+		const [integration] = await db
+			.select({ id: integrations.id, facilityId: integrations.facilityId })
+			.from(integrations)
+			.where(eq(integrations.id, integrationId))
+		if (!integration) throw new NotFoundException("Integration not found")
+
+		// Generate a cryptographically random 32-byte key and encode as hex
+		const rawKey = `qhk_${randomBytes(24).toString("hex")}`
+		const keyTail = rawKey.slice(-4)
+		const keyHash = createHash("sha256").update(rawKey).digest("hex")
+
+		const [created] = await db
+			.insert(integrationApiKeys)
+			.values({ integrationId, label, keyPrefix: keyTail, keyHash, createdBy })
+			.returning()
+
+		await this.auditService.log({
+			facilityId: integration.facilityId,
+			userId: createdBy,
+			staffProfileId: null,
+			action: "create",
+			entityType: AUDIT_ENTITY_TYPES.INTEGRATION,
+			entityId: integrationId,
+			beforeState: null,
+			afterState: { keyId: created!.id, label, keyPrefix: keyTail },
+			ipAddress: null,
+			userAgent: null,
+			metadata: { operation: "api_key_generated" },
+		})
+
+		return { ...created!, rawKey }
+	}
+
+	async revokeApiKey(id: string, actorId: string) {
+		const [existing] = await db
+			.select()
+			.from(integrationApiKeys)
+			.where(eq(integrationApiKeys.id, id))
+		if (!existing) throw new NotFoundException("API key not found")
+		if (existing.revokedAt) throw new BadRequestException("API key already revoked")
+
+		const [updated] = await db
+			.update(integrationApiKeys)
+			.set({ revokedAt: new Date() })
+			.where(eq(integrationApiKeys.id, id))
+			.returning()
+
+		const [integration] = await db
+			.select({ facilityId: integrations.facilityId })
+			.from(integrations)
+			.where(eq(integrations.id, existing.integrationId))
+
+		await this.auditService.log({
+			facilityId: integration?.facilityId ?? "",
+			userId: actorId,
+			staffProfileId: null,
+			action: "delete",
+			entityType: AUDIT_ENTITY_TYPES.INTEGRATION,
+			entityId: existing.integrationId,
+			beforeState: { keyId: id, label: existing.label, keyPrefix: existing.keyPrefix },
+			afterState: { revokedAt: updated!.revokedAt },
+			ipAddress: null,
+			userAgent: null,
+			metadata: { operation: "api_key_revoked" },
+		})
+
+		return updated!
+	}
+
+	async rotateApiKey(id: string, graceHours: number, actorId: string) {
+		const [existing] = await db
+			.select()
+			.from(integrationApiKeys)
+			.where(eq(integrationApiKeys.id, id))
+
+		if (!existing) throw new NotFoundException('API key not found')
+		if (existing.revokedAt) throw new BadRequestException('API key is already revoked')
+
+		const rawKey = `qhk_${randomBytes(24).toString("hex")}`
+		const keyTail = rawKey.slice(-4)
+		const keyHash = createHash('sha256').update(rawKey).digest('hex')
+
+		const oldKeyRevokedAt = new Date(Date.now() + graceHours * 3_600_000)
+
+		const [integration] = await db
+			.select({ id: integrations.id, facilityId: integrations.facilityId })
+			.from(integrations)
+			.where(eq(integrations.id, existing.integrationId))
+
+		if (!integration) throw new NotFoundException('Integration not found')
+
+		const newKey = await db.transaction(async (tx) => {
+			// Set grace-period revocation on old key
+			await tx
+				.update(integrationApiKeys)
+				.set({ revokedAt: oldKeyRevokedAt })
+				.where(eq(integrationApiKeys.id, id))
+
+			// Insert new key
+			const [created] = await tx
+				.insert(integrationApiKeys)
+				.values({
+					integrationId: existing.integrationId,
+					label: existing.label + ' (rotated)',
+					keyPrefix: keyTail,
+					keyHash,
+					createdBy: actorId,
+				})
+				.returning()
+
+			await this.auditService.log(
+				{
+					facilityId: integration.facilityId,
+					userId: actorId,
+					staffProfileId: null,
+					action: 'update',
+					entityType: AUDIT_ENTITY_TYPES.INTEGRATION,
+					entityId: existing.integrationId,
+					beforeState: { keyId: id, label: existing.label },
+					afterState: { newKeyId: created!.id, oldKeyRevokedAt },
+					ipAddress: null,
+					userAgent: null,
+					metadata: { operation: 'api_key_rotated', graceHours },
+				},
+				{ tx }
+			)
+
+			return { ...created!, rawKey, oldKeyRevokedAt }
+		})
+
+		return newKey
+	}
+
+	// ============================================================================
+	// Webhook Endpoint Management (ADM-BE-12)
+	// ============================================================================
+
+	private toWebhookResponse(row: typeof webhookEndpoints.$inferSelect) {
+		const { signingSecretHash: _, ...rest } = row
+		return {
+			id: rest.id,
+			integrationId: rest.integrationId,
+			url: rest.targetUrl,
+			events: rest.subscribedEvents as string[],
+			isActive: rest.isActive,
+			createdAt: rest.createdAt,
+			updatedAt: rest.updatedAt,
+		}
+	}
+
+	async listWebhooks(integrationId: string) {
+		const rows = await db
+			.select()
+			.from(webhookEndpoints)
+			.where(eq(webhookEndpoints.integrationId, integrationId))
+		return rows.map(row => this.toWebhookResponse(row))
+	}
+
+	async createWebhook(input: { integrationId: string; url: string; events: string[] }) {
+		const signingSecretPlain = randomBytes(32).toString("hex")
+		const signingSecretHash = createHash("sha256").update(signingSecretPlain).digest("hex")
+
+		const [created] = await db
+			.insert(webhookEndpoints)
+			.values({
+				integrationId: input.integrationId,
+				targetUrl: input.url,
+				signingSecretHash,
+				subscribedEvents: input.events,
+			})
+			.returning()
+
+		return this.toWebhookResponse(created!)
+	}
+
+	async updateWebhook(id: string, input: { url?: string; events?: string[]; isActive?: boolean }) {
+		const updateValues: Partial<typeof webhookEndpoints.$inferInsert> & { updatedAt: Date } = {
+			updatedAt: new Date(),
+		}
+		if (input.url !== undefined) updateValues.targetUrl = input.url
+		if (input.events !== undefined) updateValues.subscribedEvents = input.events
+		if (input.isActive !== undefined) updateValues.isActive = input.isActive
+
+		const [updated] = await db
+			.update(webhookEndpoints)
+			.set(updateValues)
+			.where(eq(webhookEndpoints.id, id))
+			.returning()
+
+		if (!updated) throw new NotFoundException("Webhook not found")
+		return this.toWebhookResponse(updated)
+	}
+
+	async deleteWebhook(id: string) {
+		const [deleted] = await db
+			.delete(webhookEndpoints)
+			.where(eq(webhookEndpoints.id, id))
+			.returning()
+
+		if (!deleted) throw new NotFoundException("Webhook not found")
+		return this.toWebhookResponse(deleted)
+	}
+
+	async deliverWebhook(
+		integrationId: string,
+		event: string,
+		payload: Record<string, unknown>
+	): Promise<void> {
+		const endpoints = await db
+			.select()
+			.from(webhookEndpoints)
+			.where(
+				and(
+					eq(webhookEndpoints.integrationId, integrationId),
+					eq(webhookEndpoints.isActive, true),
+				)
+			)
+
+		const relevant = endpoints.filter(ep => {
+			const events = ep.subscribedEvents as string[]
+			return events.length === 0 || events.includes(event)
+		})
+
+		await Promise.allSettled(relevant.map(ep => this.deliverWithRetry(ep, event, payload)))
+	}
+
+	private async deliverWithRetry(
+		ep: typeof webhookEndpoints.$inferSelect,
+		event: string,
+		payload: Record<string, unknown>,
+		attempt = 0
+	): Promise<void> {
+		const MAX_ATTEMPTS = 5
+		const body = JSON.stringify({ event, data: payload, timestamp: new Date().toISOString() })
+		const sig = createHmac("sha256", ep.signingSecretHash).update(body).digest("hex")
+
+		try {
+			const res = await fetch(ep.targetUrl, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"X-Webhook-Signature": `sha256=${sig}`,
+					"X-Webhook-Event": event,
+				},
+				body,
+				signal: AbortSignal.timeout(10_000),
+			})
+			if (!res.ok) throw new Error(`HTTP ${res.status}`)
+		} catch (err) {
+			if (attempt < MAX_ATTEMPTS - 1) {
+				const delay = Math.pow(2, attempt) * 1000
+				await new Promise(resolve => setTimeout(resolve, delay))
+				return this.deliverWithRetry(ep, event, payload, attempt + 1)
+			}
+			this.logger.warn(`Webhook delivery failed after ${MAX_ATTEMPTS} attempts: ${ep.targetUrl} — ${String(err)}`)
 		}
 	}
 }

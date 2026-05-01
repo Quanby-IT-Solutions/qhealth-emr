@@ -169,6 +169,7 @@ export function useSlaEventsQuery(params: {
 	workflowType?: SlaWorkflowType
 	page?: number
 	limit?: number
+	paused?: boolean
 }) {
 	return useQuery<SlaEventListResponse>({
 		queryKey: [...slaKeys.events(params.facilityId), params.status, params.workflowType, params.page],
@@ -184,7 +185,7 @@ export function useSlaEventsQuery(params: {
 						limit: params.limit ?? 50,
 					})
 			),
-		refetchInterval: 30_000,
+		refetchInterval: params.paused ? false : 30_000,
 		staleTime: 25_000,
 	})
 }

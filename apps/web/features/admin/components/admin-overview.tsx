@@ -147,7 +147,7 @@ export function AdminOverview() {
 											</p>
 											<p className="text-muted-foreground text-sm">{page.description}</p>
 										</div>
-										{page.status ? <Badge>{page.status}</Badge> : null}
+										{"status" in page && page.status ? <Badge>{page.status as string}</Badge> : null}
 									</div>
 								</Link>
 							))}

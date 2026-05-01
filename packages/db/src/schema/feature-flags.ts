@@ -1,7 +1,7 @@
 import { index, uniqueIndex } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
-import { facilities, roles } from "./rbac.js"
+import { facilities, roles, staffProfiles } from "./rbac.js"
 
 // ============================================================================
 // Feature Flags — definitions and per-dimension targeting overrides
@@ -17,7 +17,7 @@ export const featureFlags = createTable(
 		group: t
 			.text("group")
 			.notNull()
-			.$type<"platform-control" | "compliance" | "integration">(),
+			.$type<"platform-control" | "financial" | "compliance" | "integration">(),
 		riskLevel: t
 			.text("risk_level")
 			.notNull()
@@ -63,5 +63,31 @@ export const featureFlagTargets = createTable(
 			t.facilityId,
 			t.roleId
 		),
+	]
+)
+
+// ============================================================================
+// Feature Flag History — audit diff log per flag change
+// ============================================================================
+
+export const featureFlagHistory = createTable(
+	"feature_flag_history",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		flagId: t
+			.uuid("flag_id")
+			.notNull()
+			.references(() => featureFlags.id, { onDelete: "cascade" }),
+		previousValue: t.boolean("previous_value"),
+		newValue: t.boolean("new_value").notNull(),
+		changedBy: t
+			.uuid("changed_by")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		changedAt: t.timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
+		reason: t.text("reason"),
+	}),
+	t => [
+		index("ffh_flag_id_idx").on(t.flagId),
+		index("ffh_changed_at_idx").on(t.changedAt),
 	]
 )

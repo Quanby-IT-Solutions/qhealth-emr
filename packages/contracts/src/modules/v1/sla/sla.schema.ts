@@ -188,6 +188,7 @@ export const SlaConfigSchema = z.object({
 	facilityId: z.string().uuid(),
 	workflowType: SlaWorkflowTypeEnum,
 	targetMinutes: z.number().int().positive(),
+	hardCapMinutes: z.number().int().positive().nullable().optional(),
 	warningThresholdPct: z.number().int().min(1).max(99), // e.g. 80 = warn at 80% of target
 	isActive: z.boolean(),
 	description: z.string(),
@@ -280,6 +281,7 @@ export const CreateSlaConfigSchema = z.object({
 	facilityId: z.string().uuid(),
 	workflowType: SlaWorkflowTypeEnum,
 	targetMinutes: z.number().int().positive(),
+	hardCapMinutes: z.number().int().positive().optional(),
 	warningThresholdPct: z.number().int().min(1).max(99),
 	description: z.string().max(500),
 })
@@ -295,6 +297,7 @@ export const UpdateSlaConfigSchema = z.object({
 	facilityId: z.string().uuid().optional(),
 	workflowType: SlaWorkflowTypeEnum.optional(),
 	targetMinutes: z.number().int().positive().optional(),
+	hardCapMinutes: z.number().int().positive().nullable().optional(),
 	warningThresholdPct: z.number().int().min(1).max(99).optional(),
 	description: z.string().max(500).optional(),
 	isActive: z.boolean().optional(),
@@ -389,6 +392,7 @@ export const SlaStepConfigSchema = z.object({
 	facilityId: z.string().uuid(),
 	stepType: SlaStepTypeEnum,
 	targetMinutes: z.number().int().positive(),
+	hardCapMinutes: z.number().int().positive().nullable().optional(),
 	warningThresholdPct: z.number().int().min(1).max(99),
 	isActive: z.boolean(),
 	description: z.string(),
@@ -421,6 +425,7 @@ export const CreateSlaStepConfigSchema = z.object({
 	facilityId: z.string().uuid(),
 	stepType: SlaStepTypeEnum,
 	targetMinutes: z.number().int().positive(),
+	hardCapMinutes: z.number().int().positive().optional(),
 	warningThresholdPct: z.number().int().min(1).max(99),
 	description: z.string().max(500),
 })
@@ -434,6 +439,7 @@ export const UpdateSlaStepConfigParamsSchema = z.object({
 export const UpdateSlaStepConfigSchema = z.object({
 	id: z.string().uuid(),
 	targetMinutes: z.number().int().positive().optional(),
+	hardCapMinutes: z.number().int().positive().nullable().optional(),
 	warningThresholdPct: z.number().int().min(1).max(99).optional(),
 	description: z.string().max(500).optional(),
 	isActive: z.boolean().optional(),
@@ -443,4 +449,147 @@ export type UpdateSlaStepConfig = z.infer<typeof UpdateSlaStepConfigSchema>
 
 export const DeleteSlaStepConfigParamsSchema = z.object({
 	id: z.string().uuid(),
+})
+
+// ============================================================================
+// Workflow Status Log (ADM-BE-09)
+// ============================================================================
+
+export const WorkflowStatusLogEntrySchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	workflow: z.string(),
+	step: z.string(),
+	startedAt: dateOrString,
+	endedAt: dateOrString.nullable(),
+	durationMinutes: z.number().int().nullable(),
+	isBreached: z.boolean(),
+	isHardCapBreached: z.boolean(),
+	createdAt: dateOrString,
+})
+
+export const AppendWorkflowStatusSchema = z.object({
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	workflow: z.string(),
+	step: z.string(),
+	startedAt: z.string(),
+	endedAt: z.string().optional(),
+	durationMinutes: z.number().int().positive().optional(),
+	isBreached: z.boolean().optional(),
+	isHardCapBreached: z.boolean().optional(),
+})
+
+export type WorkflowStatusLogEntry = z.infer<typeof WorkflowStatusLogEntrySchema>
+export type AppendWorkflowStatus = z.infer<typeof AppendWorkflowStatusSchema>
+
+// ============================================================================
+// SLA Analytics (ADM-BE-10)
+// ============================================================================
+
+export const SlaKpiTileSchema = z.object({
+	workflowType: z.string(),
+	workflowLabel: z.string(),
+	totalCases: z.number(),
+	withinSLAPct: z.number(),
+	breachCount: z.number(),
+	avgTatMinutes: z.number(),
+	statusColor: z.enum(["green", "amber", "red"]),
+})
+
+export type SlaKpiTile = z.infer<typeof SlaKpiTileSchema>
+
+export const SlaDashboardQuerySchema = z.object({ facilityId: z.string().uuid() })
+
+export const SlaDashboardResponseSchema = z.object({
+	tiles: z.array(SlaKpiTileSchema),
+	overallCompliancePct: z.number(),
+})
+
+export type SlaDashboardResponse = z.infer<typeof SlaDashboardResponseSchema>
+
+export const TurnaroundDaySchema = z.object({
+	date: z.string(),
+	cases: z.number(),
+	medianTAT: z.number(),
+	p95TAT: z.number(),
+	withinSLAPct: z.number(),
+	breachCount: z.number(),
+})
+
+export type TurnaroundDay = z.infer<typeof TurnaroundDaySchema>
+
+export const TurnaroundQuerySchema = z.object({
+	facilityId: z.string().uuid(),
+	workflowType: z.string(),
+	startDate: z.string(),
+	endDate: z.string(),
+	compareStartDate: z.string().optional(),
+	compareEndDate: z.string().optional(),
+})
+
+export type TurnaroundQuery = z.infer<typeof TurnaroundQuerySchema>
+
+export const TurnaroundResponseSchema = z.object({
+	primary: z.array(TurnaroundDaySchema),
+	comparison: z.array(TurnaroundDaySchema).nullable(),
+})
+
+export type TurnaroundResponse = z.infer<typeof TurnaroundResponseSchema>
+
+export const BottleneckStepSchema = z.object({
+	stepType: z.string(),
+	stepLabel: z.string(),
+	medianMinutes: z.number(),
+	p95Minutes: z.number(),
+	outlierEncounterIds: z.array(z.string().uuid()),
+})
+
+export type BottleneckStep = z.infer<typeof BottleneckStepSchema>
+
+export const BottleneckQuerySchema = z.object({
+	facilityId: z.string().uuid(),
+	workflowType: z.string(),
+	startDate: z.string(),
+	endDate: z.string(),
+})
+
+export type BottleneckQuery = z.infer<typeof BottleneckQuerySchema>
+
+export const BottleneckResponseSchema = z.object({
+	steps: z.array(BottleneckStepSchema),
+})
+
+export type BottleneckResponse = z.infer<typeof BottleneckResponseSchema>
+
+// ============================================================================
+// SLA Export (ADM-BE-09 AC3)
+// ============================================================================
+
+export const SlaExportQuerySchema = z.object({
+	workflowType: z.string(),
+	dateFrom: z.string(),
+	dateTo: z.string(),
+	facilityId: z.string().uuid(),
+})
+
+export type SlaExportQuery = z.infer<typeof SlaExportQuerySchema>
+
+export const SlaExportRowSchema = z.object({
+	encounterId: z.string().uuid(),
+	workflow: z.string(),
+	step: z.string(),
+	startedAt: z.string(),
+	endedAt: z.string().nullable(),
+	durationMinutes: z.number().nullable(),
+	isBreached: z.boolean(),
+	isHardCapBreached: z.boolean(),
+})
+
+export const SlaExportResponseSchema = z.object({
+	facilityName: z.string(),
+	reportPeriod: z.string(),
+	generatedAt: z.string(),
+	rows: z.array(SlaExportRowSchema),
 })

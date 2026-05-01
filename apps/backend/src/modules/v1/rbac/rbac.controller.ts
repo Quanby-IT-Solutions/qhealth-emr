@@ -222,4 +222,34 @@ export class RbacController {
 			return this.rbacService.removeUserRole(input, actor)
 		})
 	}
+
+	// ── Resend Activation ────────────────────────────────────────────────
+
+	@RequirePermission("admin", "edit")
+	@Implement(v1.rbac.resendActivation)
+	async resendActivation() {
+		return implement(v1.rbac.resendActivation).handler(async ({ input }) => {
+			return this.rbacService.resendActivation(input)
+		})
+	}
+
+	// ── Get Single Role ──────────────────────────────────────────────────
+
+	@RequirePermission("admin", "view")
+	@Implement(v1.rbac.getRole)
+	async getRole() {
+		return implement(v1.rbac.getRole).handler(async ({ input }) => {
+			return this.rbacService.getRole(input)
+		})
+	}
+
+	// ── List All Permissions ─────────────────────────────────────────────
+
+	@RequirePermission("admin", "view")
+	@Implement(v1.rbac.listPermissions)
+	async listPermissions() {
+		return implement(v1.rbac.listPermissions).handler(async () => {
+			return this.rbacService.listPermissions()
+		})
+	}
 }

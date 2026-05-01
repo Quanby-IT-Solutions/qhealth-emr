@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { orpc } from "@/services/orpc/client"
 
 export function useIntegrationsListQuery() {
-	return useQuery(orpc.integrationRegistry.list.queryOptions())
+	return useQuery(orpc.integrationRegistry.list.queryOptions({ refetchInterval: 60_000 }))
 }
 
 export function useIntegrationDetailQuery(integrationId: string) {

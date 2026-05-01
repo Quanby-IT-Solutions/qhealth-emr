@@ -41,6 +41,7 @@ export const staffProfiles = createTable(
 		ptrExpiry: t.date("ptr_expiry"),
 		pdeaS2License: t.text("pdea_s2_license"),
 		pdeaS2Expiry: t.date("pdea_s2_expiry"),
+		s2VerifiedUntil: t.timestamp("s2_verified_until"),
 		isActive: t.boolean("is_active").notNull().default(true),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),

@@ -19,10 +19,10 @@ import {
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
 	WORKFLOW_LABELS,
-	useSlaComplianceReportQuery,
-	type SlaComplianceMetric,
-	type SlaStepMetric,
+	type SlaWorkflowType,
 } from "@/features/sla/api/sla.hooks"
+import { useSlaComplianceReportOrpcQuery } from "@/features/sla/api/sla-orpc.hooks"
+import type { SlaComplianceMetric, SlaStepMetric } from "@repo/contracts"
 
 // ============================================================================
 // Helpers
@@ -46,14 +46,14 @@ function thirtyDaysAgo(): string {
 }
 
 function ComplianceBadge({ pct }: { pct: number }) {
-	if (pct >= 90) {
+	if (pct >= 95) {
 		return (
 			<Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
 				{pct.toFixed(1)}%
 			</Badge>
 		)
 	}
-	if (pct >= 70) {
+	if (pct >= 85) {
 		return (
 			<Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
 				{pct.toFixed(1)}%
@@ -75,11 +75,11 @@ interface ComplianceGaugesProps {
 
 function ComplianceGauges({ authoritativePct, authoritativeCount, operationalPct }: ComplianceGaugesProps) {
 	const authColor =
-		authoritativePct >= 90 ? "bg-green-500" : authoritativePct >= 70 ? "bg-amber-500" : "bg-red-500"
+		authoritativePct >= 95 ? "bg-green-500" : authoritativePct >= 85 ? "bg-amber-500" : "bg-red-500"
 	const authLabel =
-		authoritativePct >= 90 ? "Compliant" : authoritativePct >= 70 ? "Needs Improvement" : "Non-Compliant"
+		authoritativePct >= 95 ? "Compliant" : authoritativePct >= 85 ? "Needs Improvement" : "Non-Compliant"
 	const opColor =
-		operationalPct >= 90 ? "bg-green-500" : operationalPct >= 70 ? "bg-amber-500" : "bg-red-500"
+		operationalPct >= 95 ? "bg-green-500" : operationalPct >= 85 ? "bg-amber-500" : "bg-red-500"
 
 	return (
 		<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -96,13 +96,13 @@ function ComplianceGauges({ authoritativePct, authoritativeCount, operationalPct
 						<p className="text-5xl font-bold">{authoritativePct.toFixed(1)}%</p>
 						<Badge
 							className={
-								authoritativePct >= 90
+								authoritativePct >= 95
 									? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-									: authoritativePct >= 70
+									: authoritativePct >= 85
 										? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
 										: ""
 							}
-							variant={authoritativePct < 70 ? "destructive" : "secondary"}
+							variant={authoritativePct < 85 ? "destructive" : "secondary"}
 						>
 							{authLabel}
 						</Badge>
@@ -252,6 +252,85 @@ function MetricRow({ metric }: { metric: SlaComplianceMetric }) {
 }
 
 // ============================================================================
+// Export HTML utility
+// ============================================================================
+
+function exportHtml(
+	data: SlaComplianceMetric[],
+	facilityName: string,
+	periodStart: string,
+	periodEnd: string,
+	authoritativeCompliancePct: number,
+	overallCompliancePct: number,
+) {
+	const rows = data.map(m => `
+		<tr>
+			<td>${WORKFLOW_LABELS[m.workflowType as SlaWorkflowType]}</td>
+			<td>${m.totalCount}</td>
+			<td>${m.onTimeCount}</td>
+			<td>${m.approachingCount}</td>
+			<td>${m.exceededCount}</td>
+			<td>${m.compliancePct.toFixed(1)}%</td>
+			<td>${formatMinutes(m.avgElapsedMinutes)} / ${formatMinutes(m.avgTargetMinutes)}</td>
+		</tr>`).join("")
+
+	const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>SLA Compliance Report</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 32px; color: #111; }
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  .meta { color: #555; font-size: 12px; margin-bottom: 20px; }
+  .summary { margin-bottom: 16px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+  th { background: #f0f0f0; font-weight: 600; }
+  .signature { margin-top: 48px; }
+  .signature-line { display: inline-block; border-bottom: 1px solid #333; width: 240px; }
+</style>
+</head>
+<body>
+<h1>Citizen's Charter Compliance Report</h1>
+<div class="meta">
+  Facility: <strong>${facilityName}</strong> &nbsp;&middot;&nbsp;
+  Period: <strong>${periodStart}</strong> to <strong>${periodEnd}</strong>
+</div>
+<div class="summary">
+  <strong>ARTA-Authoritative Compliance:</strong> ${authoritativeCompliancePct.toFixed(1)}% &nbsp;&nbsp;
+  <strong>Operational SLA Score:</strong> ${overallCompliancePct.toFixed(1)}%
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>Workflow</th>
+      <th>Total</th>
+      <th>On Time</th>
+      <th>Approaching</th>
+      <th>Exceeded</th>
+      <th>Compliance %</th>
+      <th>Avg Elapsed / Target</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="signature">
+  <p>Authorized by: <span class="signature-line"></span> &nbsp;&nbsp; Date: <span class="signature-line"></span></p>
+</div>
+</body>
+</html>`
+
+	const blob = new Blob([html], { type: "text/html;charset=utf-8;" })
+	const url = URL.createObjectURL(blob)
+	const a = document.createElement("a")
+	a.href = url
+	a.download = `sla-export-${periodStart}.html`
+	a.click()
+	URL.revokeObjectURL(url)
+}
+
+// ============================================================================
 // Export CSV utility
 // ============================================================================
 
@@ -344,17 +423,65 @@ function exportCsv(
 }
 
 // ============================================================================
+// ARTA Flow KPI Tiles
+// ============================================================================
+
+const ARTA_FLOW_WORKFLOWS: { label: string; workflows: string[] }[] = [
+	{ label: "Flow 1 — OPD", workflows: ["opd_consultation"] },
+	{ label: "Flow 2 — Emergency", workflows: ["emergency_triage"] },
+	{ label: "Flow 3 — Ancillary", workflows: ["lab_result", "radiology_result"] },
+	{ label: "Flow 4 — Admission", workflows: ["admission"] },
+	{ label: "Flow 5 — Discharge", workflows: ["discharge", "billing_processing"] },
+	{ label: "Flow 6 — Pharmacy", workflows: ["medication_dispensing"] },
+	{ label: "Flow 7 — Records", workflows: ["medical_records", "certificate_issuance"] },
+]
+
+function ArtaFlowTiles({ metrics }: { metrics: SlaComplianceMetric[] }) {
+	const byWorkflow = new Map(metrics.map(m => [m.workflowType, m.compliancePct]))
+
+	return (
+		<div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+			{ARTA_FLOW_WORKFLOWS.map(flow => {
+				const pcts = flow.workflows.map(w => byWorkflow.get(w as SlaWorkflowType)).filter((p): p is number => p != null)
+				const avgPct = pcts.length > 0 ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null
+
+				const colorClass =
+					avgPct == null
+						? "text-muted-foreground"
+						: avgPct >= 95
+							? "text-green-600"
+							: avgPct >= 85
+								? "text-amber-600"
+								: "text-red-600"
+
+				return (
+					<Card key={flow.label}>
+						<CardContent className="pt-4 pb-3">
+							<p className="text-xs text-muted-foreground leading-tight">{flow.label}</p>
+							<p className={`text-xl font-bold tabular-nums mt-1 ${colorClass}`}>
+								{avgPct != null ? `${avgPct.toFixed(1)}%` : "—"}
+							</p>
+						</CardContent>
+					</Card>
+				)
+			})}
+		</div>
+	)
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
 export function SlaComplianceReport() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles[0]?.facilityId ?? ""
+	const facilityName = profile?.staffProfiles[0]?.facility?.name ?? "QHealth EMR"
 
 	const [periodStart, setPeriodStart] = useState(thirtyDaysAgo())
 	const [periodEnd, setPeriodEnd] = useState(today())
 
-	const { data, isLoading, error } = useSlaComplianceReportQuery({
+	const { data, isLoading, error } = useSlaComplianceReportOrpcQuery({
 		facilityId,
 		periodStart,
 		periodEnd,
@@ -371,21 +498,38 @@ export function SlaComplianceReport() {
 					</p>
 				</div>
 				{data && (
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => exportCsv(
-							data.metrics,
-							facilityId,
-							periodStart,
-							periodEnd,
-							data.authoritativeCompliancePct,
-							data.overallCompliancePct,
-						)}
-					>
-						<Download className="mr-1 size-4" />
-						Export CSV
-					</Button>
+					<div className="flex gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => exportCsv(
+								data.metrics,
+								facilityId,
+								periodStart,
+								periodEnd,
+								data.authoritativeCompliancePct,
+								data.overallCompliancePct,
+							)}
+						>
+							<Download className="mr-1 size-4" />
+							Export CSV
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => exportHtml(
+								data.metrics,
+								facilityName,
+								periodStart,
+								periodEnd,
+								data.authoritativeCompliancePct,
+								data.overallCompliancePct,
+							)}
+						>
+							<Download className="mr-1 size-4" />
+							Export PDF
+						</Button>
+					</div>
 				)}
 			</div>
 
@@ -433,6 +577,9 @@ export function SlaComplianceReport() {
 					operationalPct={data.overallCompliancePct}
 				/>
 			)}
+
+			{/* 7 ARTA Flow KPI tiles */}
+			{data && <ArtaFlowTiles metrics={data.metrics} />}
 
 			{/* Metrics table */}
 			<Card>
