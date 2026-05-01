@@ -15,7 +15,15 @@ interface CacheEntry {
 const EVALUATE_CACHE = new Map<string, CacheEntry>()
 const CACHE_TTL_MS = 30_000
 
+function isTestEnvironment() {
+	return process.env.NODE_ENV === "test"
+}
+
 function cacheGet(key: string): boolean | undefined {
+	if (isTestEnvironment()) {
+		return undefined
+	}
+
 	const entry = EVALUATE_CACHE.get(key)
 	if (!entry || Date.now() > entry.expiresAt) {
 		EVALUATE_CACHE.delete(key)
@@ -25,6 +33,10 @@ function cacheGet(key: string): boolean | undefined {
 }
 
 function cacheSet(key: string, value: boolean) {
+	if (isTestEnvironment()) {
+		return
+	}
+
 	EVALUATE_CACHE.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS })
 }
 
