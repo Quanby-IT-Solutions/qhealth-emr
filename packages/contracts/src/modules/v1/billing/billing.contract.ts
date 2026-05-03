@@ -3,31 +3,46 @@ import { z } from "zod"
 
 import {
 	AddMalasakitInputSchema,
+	ApplyDiscountInputSchema,
 	ApproveCf5InputSchema,
 	AssignDrgInputSchema,
 	BillingStatusInputSchema,
 	BillingStatusResponseSchema,
+	Cf4PreviewXmlSchema,
 	CewsCheckInputSchema,
+	CewsMembershipSchema,
 	CewsResponseSchema,
+	CewsSnapshotInputSchema,
+	CewsSnapshotSchema,
+	CewsVerifyInputSchema,
 	Cf4PreviewSchema,
 	Cf4ClaimSchema,
 	Cf5AssignmentSchema,
+	Cf5ClaimSchema,
 	Cf5WithBillingSchema,
+	Cf5XmlPreviewSchema,
 	ChargeSchema,
 	CheckEligibilityInputSchema,
+	ConfirmDrgInputSchema,
+	ConfirmDrgResponseSchema,
 	CreateChargeInputSchema,
 	DeleteChargeInputSchema,
 	DrgCodeSchema,
 	EligibilityResponseSchema,
 	EsoaResponseSchema,
+	EsoaStatementSchema,
 	FinalizeCf4InputSchema,
 	FinalizeInvoiceInputSchema,
 	FinalizeSoaInputSchema,
 	GenerateCf4InputSchema,
+	GenerateCf5InputSchema,
+	GenerateEsoaFromInvoiceInputSchema,
 	GenerateEsoaInputSchema,
 	GenerateInvoiceInputSchema,
+	GenerateKonsultaReportInputSchema,
 	GenerateSoaInputSchema,
 	GetCf4InputSchema,
+	GetCf5ClaimInputSchema,
 	GetCf5InputSchema,
 	GetCf5WithBillingInputSchema,
 	GetInvoiceInputSchema,
@@ -35,23 +50,51 @@ import {
 	GetMalasakitInputSchema,
 	GetSoaInputSchema,
 	InvoiceSchema,
+	IssueReceiptInputSchema,
 	KonsultaBenefitSchema,
+	KonsultaReportSchema,
 	LinkChargeToIcdInputSchema,
+	ListCf5ClaimsInputSchema,
+	ListCf5ClaimsResponseSchema,
 	ListChargeMasterInputSchema,
 	ListChargeMasterResponseSchema,
 	ListChargesInputSchema,
 	ListChargesResponseSchema,
+	ListCewsSnapshotsInputSchema,
+	ListCewsSnapshotsResponseSchema,
+	ListEsoaStatementsInputSchema,
+	ListEsoaStatementsResponseSchema,
 	ListInvoicesInputSchema,
 	ListInvoicesResponseSchema,
+	ListKonsultaActivitiesInputSchema,
+	ListKonsultaActivitiesResponseSchema,
 	ListPaymentsInputSchema,
 	ListPaymentsResponseSchema,
 	MalasakitAssistanceSchema,
 	MalasakitSummarySchema,
+	MarkReadyForInvoicingInputSchema,
+	MarkReadyForInvoicingResponseSchema,
+	PollCf4StatusInputSchema,
+	PollCf4StatusResponseSchema,
+	PollCf5StatusInputSchema,
+	PollCf5StatusResponseSchema,
+	RecordKonsultaEventInputSchema,
 	RecordKonsultaVisitInputSchema,
+	RecordMalasakitPaymentInputSchema,
 	RecordPaymentInputSchema,
 	PaymentSchema,
+	ReceiptSchema,
+	ResubmitCf4InputSchema,
+	ResubmitCf5InputSchema,
 	SearchDrgInputSchema,
+	SendEsoaInputSchema,
+	SendEsoaResponseSchema,
+	ServiceCatalogSearchInputSchema,
+	ServiceCatalogSearchResponseSchema,
 	StatementOfAccountSchema,
+	SubmitCf5InputSchema,
+	SuggestDrgInputSchema,
+	SuggestDrgResponseSchema,
 	UnbilledEncountersInputSchema,
 	UnbilledEncountersResponseSchema,
 	UpdateChargeInputSchema,
@@ -92,6 +135,16 @@ export const billingContract = {
 		.input(DeleteChargeInputSchema)
 		.output(z.object({ success: z.boolean() })),
 
+	markReadyForInvoicing: oc
+		.route({ method: "POST", path: "/charges/mark-ready", summary: "Mark encounter charges ready for invoicing", tags: ["Billing"] })
+		.input(MarkReadyForInvoicingInputSchema)
+		.output(MarkReadyForInvoicingResponseSchema),
+
+	searchServiceCatalog: oc
+		.route({ method: "GET", path: "/service-catalog", summary: "Search service catalog", tags: ["Billing"] })
+		.input(ServiceCatalogSearchInputSchema)
+		.output(ServiceCatalogSearchResponseSchema),
+
 	// ========================================================================
 	// Invoices
 	// ========================================================================
@@ -130,6 +183,21 @@ export const billingContract = {
 		.input(RecordPaymentInputSchema)
 		.output(PaymentSchema),
 
+	applyDiscount: oc
+		.route({ method: "POST", path: "/invoices/{id}/apply-discount", summary: "Apply discount to an invoice", tags: ["Billing"] })
+		.input(ApplyDiscountInputSchema)
+		.output(InvoiceSchema),
+
+	issueReceipt: oc
+		.route({ method: "POST", path: "/receipts/issue", summary: "Issue an official receipt for a payment", tags: ["Billing"] })
+		.input(IssueReceiptInputSchema)
+		.output(ReceiptSchema),
+
+	recordMalasakitPayment: oc
+		.route({ method: "POST", path: "/payments/malasakit", summary: "Record a Malasakit-sourced payment", tags: ["Billing"] })
+		.input(RecordMalasakitPaymentInputSchema)
+		.output(PaymentSchema),
+
 	// ========================================================================
 	// CF4 Claims
 	// ========================================================================
@@ -147,6 +215,21 @@ export const billingContract = {
 	finalizeCf4: oc
 		.route({ method: "POST", path: "/cf4/{id}/finalize", summary: "Finalize a CF4 claim", tags: ["Billing"] })
 		.input(FinalizeCf4InputSchema)
+		.output(Cf4ClaimSchema),
+
+	previewCf4Xml: oc
+		.route({ method: "GET", path: "/cf4/{id}/xml", summary: "Get CF4 XML payload for preview", tags: ["Billing"] })
+		.input(GetCf4InputSchema)
+		.output(Cf4PreviewXmlSchema),
+
+	pollCf4Status: oc
+		.route({ method: "POST", path: "/cf4/{id}/status-poll", summary: "Poll PhilHealth for CF4 status update", tags: ["Billing"] })
+		.input(PollCf4StatusInputSchema)
+		.output(PollCf4StatusResponseSchema),
+
+	resubmitCf4: oc
+		.route({ method: "POST", path: "/cf4/{id}/resubmit", summary: "Resubmit a returned CF4 claim", tags: ["Billing"] })
+		.input(ResubmitCf4InputSchema)
 		.output(Cf4ClaimSchema),
 
 	// ========================================================================
@@ -173,6 +256,52 @@ export const billingContract = {
 		.input(ApproveCf5InputSchema)
 		.output(Cf5AssignmentSchema),
 
+	// BIL-BE-05: DRG suggest/confirm + CF5 lifecycle
+	suggestDrg: oc
+		.route({ method: "POST", path: "/drg/suggest", summary: "Suggest top-3 DRG candidates with confidence scores", tags: ["Billing"] })
+		.input(SuggestDrgInputSchema)
+		.output(SuggestDrgResponseSchema),
+
+	confirmDrg: oc
+		.route({ method: "POST", path: "/drg/confirm", summary: "Confirm DRG mapping for an encounter", tags: ["Billing"] })
+		.input(ConfirmDrgInputSchema)
+		.output(ConfirmDrgResponseSchema),
+
+	generateCf5: oc
+		.route({ method: "POST", path: "/cf5/generate", summary: "Generate CF5 claim from DRG mapping", tags: ["Billing"] })
+		.input(GenerateCf5InputSchema)
+		.output(Cf5ClaimSchema),
+
+	getCf5Claim: oc
+		.route({ method: "GET", path: "/cf5/{id}/claim", summary: "Get a specific CF5 claim by ID", tags: ["Billing"] })
+		.input(GetCf5ClaimInputSchema)
+		.output(Cf5ClaimSchema),
+
+	listCf5Claims: oc
+		.route({ method: "GET", path: "/cf5/claims", summary: "List CF5 claims for an encounter", tags: ["Billing"] })
+		.input(ListCf5ClaimsInputSchema)
+		.output(ListCf5ClaimsResponseSchema),
+
+	previewCf5Xml: oc
+		.route({ method: "GET", path: "/cf5/{id}/xml", summary: "Get CF5 XML for preview", tags: ["Billing"] })
+		.input(GetCf5ClaimInputSchema)
+		.output(Cf5XmlPreviewSchema),
+
+	submitCf5: oc
+		.route({ method: "POST", path: "/cf5/{id}/submit", summary: "Submit CF5 to PhilHealth", tags: ["Billing"] })
+		.input(SubmitCf5InputSchema)
+		.output(Cf5ClaimSchema),
+
+	pollCf5Status: oc
+		.route({ method: "POST", path: "/cf5/{id}/status-poll", summary: "Poll PhilHealth for CF5 status update", tags: ["Billing"] })
+		.input(PollCf5StatusInputSchema)
+		.output(PollCf5StatusResponseSchema),
+
+	resubmitCf5: oc
+		.route({ method: "POST", path: "/cf5/{id}/resubmit", summary: "Resubmit a returned CF5 claim", tags: ["Billing"] })
+		.input(ResubmitCf5InputSchema)
+		.output(Cf5ClaimSchema),
+
 	// ========================================================================
 	// Eligibility Check (CEWS — stubbed)
 	// ========================================================================
@@ -181,6 +310,36 @@ export const billingContract = {
 		.route({ method: "POST", path: "/eligibility/check", summary: "Check PhilHealth eligibility (CEWS)", tags: ["Billing"] })
 		.input(CheckEligibilityInputSchema)
 		.output(EligibilityResponseSchema),
+
+	verifyCewsMembership: oc
+		.route({ method: "POST", path: "/cews/verify", summary: "Verify PhilHealth membership via CEWS (12-digit PIN)", tags: ["Billing"] })
+		.input(CewsVerifyInputSchema)
+		.output(CewsMembershipSchema),
+
+	saveCewsSnapshot: oc
+		.route({ method: "POST", path: "/cews/snapshot", summary: "Save CEWS eligibility snapshot to encounter", tags: ["Billing"] })
+		.input(CewsSnapshotInputSchema)
+		.output(CewsSnapshotSchema),
+
+	listCewsSnapshots: oc
+		.route({ method: "GET", path: "/cews/snapshots", summary: "List CEWS snapshots for an encounter", tags: ["Billing"] })
+		.input(ListCewsSnapshotsInputSchema)
+		.output(ListCewsSnapshotsResponseSchema),
+
+	listKonsultaActivities: oc
+		.route({ method: "GET", path: "/konsulta/activities", summary: "List Konsulta activities for a patient", tags: ["Billing"] })
+		.input(ListKonsultaActivitiesInputSchema)
+		.output(ListKonsultaActivitiesResponseSchema),
+
+	recordKonsultaEvent: oc
+		.route({ method: "POST", path: "/konsulta/activities", summary: "Record a Konsulta-eligible activity (idempotent)", tags: ["Billing"] })
+		.input(RecordKonsultaEventInputSchema)
+		.output(z.object({ success: z.boolean(), id: z.string().uuid() })),
+
+	generateKonsultaReport: oc
+		.route({ method: "POST", path: "/konsulta/report", summary: "Generate Konsulta capitation report (XML + CSV)", tags: ["Billing"] })
+		.input(GenerateKonsultaReportInputSchema)
+		.output(KonsultaReportSchema),
 
 	// ========================================================================
 	// Billing Status (for discharge checklist)
@@ -261,6 +420,22 @@ export const billingContract = {
 		.input(GenerateEsoaInputSchema)
 		.output(EsoaResponseSchema),
 
+	// BIL-BE-06: eSOA from invoice + list + send
+	generateEsoaFromInvoice: oc
+		.route({ method: "POST", path: "/esoa/generate-invoice", summary: "Generate PhilHealth-compliant eSOA from invoice", tags: ["Billing"] })
+		.input(GenerateEsoaFromInvoiceInputSchema)
+		.output(EsoaStatementSchema),
+
+	listEsoaStatements: oc
+		.route({ method: "GET", path: "/esoa/statements", summary: "List eSOA statement versions for an invoice", tags: ["Billing"] })
+		.input(ListEsoaStatementsInputSchema)
+		.output(ListEsoaStatementsResponseSchema),
+
+	sendEsoa: oc
+		.route({ method: "POST", path: "/esoa/{id}/send", summary: "Send eSOA via chosen delivery channel", tags: ["Billing"] })
+		.input(SendEsoaInputSchema)
+		.output(SendEsoaResponseSchema),
+
 	// ========================================================================
 	// CF5 with Billing Items
 	// ========================================================================
@@ -284,3 +459,7 @@ export const billingContract = {
 		.input(CewsCheckInputSchema)
 		.output(CewsResponseSchema),
 }
+
+// Force TypeScript to eagerly evaluate the billing contract type
+// This resolves TS7056 when the contract is composed into v1Contract
+export type BillingContractType = typeof billingContract

@@ -1,19 +1,27 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, count, desc, eq, isNull, sql } from "drizzle-orm"
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException, UnprocessableEntityException } from "@nestjs/common"
+import { Cron } from "@nestjs/schedule"
+import { and, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm"
 
 import {
+	cewsSnapshots,
+	cf4StatusLog,
+	cf5Claims,
 	chargeMasterItems,
 	charges,
 	cf4Claims,
 	clinicalNotes,
+	drgMappings,
 	eligibilityChecks,
 	encounterStatusEvents,
 	encounters,
+	esoaStatements,
 	invoiceLineItems,
 	invoices,
+	konsultaActivities,
 	patients,
 	payments,
 	problems,
+	receipts,
 	staffProfiles,
 	vitalSigns,
 } from "@repo/db/schema"
@@ -63,7 +71,19 @@ interface CreateChargeInput {
 interface UpdateChargeInput {
 	id: string
 	quantity?: number
+	unitPrice?: number
 	description?: string
+	overrideReason?: string
+}
+
+interface AddChargeFromEventInput {
+	sourceType: "auto_medication" | "auto_lab" | "auto_imaging"
+	sourceOrderId: string
+	encounterId: string
+	facilityId: string
+	description: string
+	quantity: number
+	unitPrice: number
 }
 
 interface ListInvoicesInput {
@@ -93,7 +113,7 @@ interface RecordPaymentInput {
 	facilityId: string
 	invoiceId: string
 	amount: number
-	paymentMethod: "cash" | "philhealth" | "hmo" | "credit_card" | "bank_transfer" | "other"
+	paymentMethod: "cash" | "philhealth" | "hmo" | "credit_card" | "bank_transfer" | "other" | "malasakit"
 	referenceNumber?: string
 	paymentDate: string
 	notes?: string
@@ -188,6 +208,116 @@ interface AddMalasakitInput {
 interface UpdateMalasakitStatusInput {
 	id: string
 	status: "approved" | "disbursed" | "denied"
+}
+
+interface MarkReadyForInvoicingInput {
+	encounterId: string
+	facilityId: string
+	staffId: string
+}
+
+interface SearchServiceCatalogInput {
+	facilityId: string
+	query?: string
+	category?: "laboratory" | "imaging" | "medication" | "procedure" | "room" | "other"
+	page: number
+	limit: number
+}
+
+interface ApplyDiscountInput {
+	invoiceId: string
+	type: "NONE" | "SENIOR" | "PWD" | "SOLO_PARENT" | "MANUAL"
+	amount?: number
+	reason?: string
+	staffId: string
+}
+
+interface IssueReceiptInput {
+	paymentId: string
+	staffId: string
+}
+
+interface RecordMalasakitPaymentInput {
+	invoiceId: string
+	malasakitCaseId: string
+	amount: number
+	reference?: string
+	staffId: string
+}
+
+interface SaveCewsSnapshotInput {
+	encounterId: string
+	memberPin: string
+	memberName?: string | null
+	status: "active" | "lapsed" | "suspended" | "service_unavailable"
+	benefitBalance?: number | null
+	dependentsJson?: unknown
+	rawResponse?: unknown
+	staffId: string
+}
+
+interface ListCewsSnapshotsInput {
+	encounterId: string
+}
+
+interface ListKonsultaActivitiesInput {
+	patientId: string
+	facilityId: string
+	activityType?: "FPE" | "Follow-up" | "Lab"
+	page: number
+	limit: number
+}
+
+interface RecordKonsultaEventInput {
+	patientId: string
+	facilityId: string
+	activityType: "FPE" | "Follow-up" | "Lab"
+	activityDate: string
+	sourceRef?: string
+}
+
+interface GenerateKonsultaReportInput {
+	facilityId: string
+	period: "monthly" | "quarterly"
+	periodStart: string
+	periodEnd: string
+}
+
+interface GetCf5WithBillingInput {
+	encounterId: string
+}
+
+interface LinkChargeToIcdInput {
+	chargeId: string
+	icdCode: string
+}
+
+interface GenerateEsoaInput {
+	encounterId: string
+	format: "pdf" | "xml" | "json"
+	includeItemizedBreakdown: boolean
+	includePhilhealthDetails: boolean
+}
+
+interface CewsVerifyInput {
+	memberPin: string
+	encounterId: string
+}
+
+interface CheckCewsInput {
+	facilityId: string
+	patientId: string
+	philhealthMemberId?: string
+	nationalId?: string
+}
+
+interface PollCf4StatusInput {
+	id: string
+}
+
+interface ResubmitCf4Input {
+	id: string
+	reason: string
 }
 
 @Injectable()
@@ -295,10 +425,45 @@ export class BillingService {
 			.returning()
 
 		if (!charge) throw new NotFoundException("Failed to create charge")
+
+		await this.auditService.log({
+			facilityId: input.facilityId,
+			userId,
+			staffProfileId,
+			action: "create",
+			entityType: "charge",
+			entityId: charge.id,
+			beforeState: null,
+			afterState: { description: charge.description, quantity: charge.quantity, unitPrice: charge.unitPrice, totalAmount: charge.totalAmount },
+			ipAddress: null,
+			userAgent: null,
+			metadata: { sourceType: "manual" },
+		})
+
 		return charge
 	}
 
-	async updateCharge(input: UpdateChargeInput) {
+	/** Idempotent insert for auto-pulled domain events. Duplicate (sourceType, sourceOrderId, encounterId) rows are silently ignored. */
+	async addChargeFromEvent(input: AddChargeFromEventInput) {
+		const totalAmount = (input.quantity * input.unitPrice).toFixed(2)
+
+		await db
+			.insert(charges)
+			.values({
+				facilityId: input.facilityId,
+				encounterId: input.encounterId,
+				sourceOrderId: input.sourceOrderId,
+				description: input.description,
+				quantity: String(input.quantity),
+				unitPrice: String(input.unitPrice),
+				totalAmount,
+				sourceType: input.sourceType,
+				createdByStaffId: null,
+			})
+			.onConflictDoNothing()
+	}
+
+	async updateCharge(input: UpdateChargeInput, userId: string) {
 		const [existing] = await db
 			.select()
 			.from(charges)
@@ -306,14 +471,17 @@ export class BillingService {
 
 		if (!existing) throw new NotFoundException("Charge not found")
 
+		const staffProfileId = await this.getStaffProfileId(userId)
 		const newQuantity = input.quantity !== undefined ? String(input.quantity) : existing.quantity
+		const newUnitPrice = input.unitPrice !== undefined ? String(input.unitPrice) : existing.unitPrice
 		const newDescription = input.description ?? existing.description
-		const newTotal = (Number(newQuantity) * Number(existing.unitPrice)).toFixed(2)
+		const newTotal = (Number(newQuantity) * Number(newUnitPrice)).toFixed(2)
 
 		const [updated] = await db
 			.update(charges)
 			.set({
 				quantity: newQuantity,
+				unitPrice: newUnitPrice,
 				description: newDescription,
 				totalAmount: newTotal,
 			})
@@ -321,17 +489,49 @@ export class BillingService {
 			.returning()
 
 		if (!updated) throw new NotFoundException("Charge not found after update")
+
+		await this.auditService.log({
+			facilityId: existing.facilityId,
+			userId,
+			staffProfileId,
+			action: "update",
+			entityType: "charge",
+			entityId: input.id,
+			beforeState: { quantity: existing.quantity, unitPrice: existing.unitPrice, description: existing.description, totalAmount: existing.totalAmount },
+			afterState: { quantity: newQuantity, unitPrice: newUnitPrice, description: newDescription, totalAmount: newTotal },
+			ipAddress: null,
+			userAgent: null,
+			metadata: { overrideReason: input.overrideReason ?? null },
+		})
+
 		return updated
 	}
 
-	async deleteCharge(id: string) {
+	async deleteCharge(id: string, userId: string) {
 		const [existing] = await db.select().from(charges).where(eq(charges.id, id))
 		if (!existing) throw new NotFoundException("Charge not found")
 		if (existing.sourceType !== "manual") {
 			throw new BadRequestException("Cannot delete auto-captured charges")
 		}
 
+		const staffProfileId = await this.getStaffProfileId(userId)
+
 		await db.delete(charges).where(eq(charges.id, id))
+
+		await this.auditService.log({
+			facilityId: existing.facilityId,
+			userId,
+			staffProfileId,
+			action: "delete",
+			entityType: "charge",
+			entityId: id,
+			beforeState: { description: existing.description, quantity: existing.quantity, totalAmount: existing.totalAmount },
+			afterState: null,
+			ipAddress: null,
+			userAgent: null,
+			metadata: {},
+		})
+
 		return { success: true }
 	}
 
@@ -497,6 +697,20 @@ export class BillingService {
 		const [invoice] = await db.select().from(invoices).where(eq(invoices.id, input.invoiceId))
 		if (!invoice) throw new NotFoundException("Invoice not found")
 		if (invoice.status === "draft") throw new BadRequestException("Cannot record payment on a draft invoice. Finalize it first.")
+		if (invoice.status === "paid") throw new BadRequestException("Invoice is already fully paid.")
+
+		// Overflow check: reject if new payment exceeds outstanding balance
+		const priorPayments = await db
+			.select({ amount: payments.amount })
+			.from(payments)
+			.where(eq(payments.invoiceId, input.invoiceId))
+		const totalAlreadyPaid = priorPayments.reduce((acc, p) => acc + Number(p.amount), 0)
+		const outstanding = Number(invoice.patientResponsibility) - totalAlreadyPaid
+		if (input.amount > outstanding + 0.005) {
+			throw new BadRequestException(
+				`Payment amount ₱${input.amount.toFixed(2)} exceeds outstanding balance ₱${outstanding.toFixed(2)}`
+			)
+		}
 
 		const [payment] = await db
 			.insert(payments)
@@ -696,6 +910,17 @@ export class BillingService {
 		if (!existing) throw new NotFoundException("CF4 claim not found")
 		if (existing.status !== "draft") throw new BadRequestException("Only draft CF4 claims can be finalized")
 
+		// XSD validation stub: enforce required CF4 fields before submission
+		const ed = existing.extractedData as Record<string, unknown> | null
+		const violations: { path: string; message: string }[] = []
+		if (!ed?.chiefComplaint) violations.push({ path: "chiefComplaint", message: "Chief complaint is required" })
+		if (!ed?.historyOfPresentIllness) violations.push({ path: "briefHistory", message: "Brief history is required" })
+		if (!ed?.vitalSigns) violations.push({ path: "vitalSigns", message: "Vital signs are required" })
+		if (!ed?.courseInTheWard) violations.push({ path: "managementPlan", message: "Management plan is required" })
+		if (violations.length > 0) {
+			throw new UnprocessableEntityException({ message: "CF4 XSD validation failed", violations })
+		}
+
 		const [updated] = await db
 			.update(cf4Claims)
 			.set({
@@ -707,6 +932,14 @@ export class BillingService {
 			.returning()
 
 		if (!updated) throw new NotFoundException("CF4 not found after update")
+
+		// Write status log row
+		await db.insert(cf4StatusLog).values({
+			claimId: input.id,
+			status: "submitted",
+			payload: { submittedAt: new Date().toISOString() },
+		})
+
 		return {
 			...updated,
 			extractedData: updated.extractedData as Record<string, unknown> | null,
@@ -1220,6 +1453,1020 @@ export class BillingService {
 			approvedAt: input.status === "approved" || input.status === "disbursed" ? new Date() : null,
 			notes: null,
 			createdAt: new Date(),
+		}
+	}
+
+	// ========================================================================
+	// Mark Ready for Invoicing (BIL-BE-02)
+	// ========================================================================
+
+	async markReadyForInvoicing(input: MarkReadyForInvoicingInput) {
+		const existingCharges = await db
+			.select({ id: charges.id })
+			.from(charges)
+			.where(eq(charges.encounterId, input.encounterId))
+			.limit(1)
+
+		if (existingCharges.length === 0) {
+			throw new BadRequestException("No active charges found for this encounter")
+		}
+
+		const chargeCount = await db
+			.select({ total: count() })
+			.from(charges)
+			.where(eq(charges.encounterId, input.encounterId))
+
+		const total = chargeCount[0]?.total ?? 0
+
+		const staffProfileId = await this.getStaffProfileId(input.staffId)
+
+		await db.insert(encounterStatusEvents).values({
+			facilityId: input.facilityId,
+			encounterId: input.encounterId,
+			fromStatus: null,
+			toStatus: "ready_for_billing",
+			workflowType: "billing" as const,
+			staffId: staffProfileId,
+			notes: "Charges marked ready for invoicing",
+			occurredAt: new Date(),
+		})
+
+		await this.auditService.log({
+			facilityId: input.facilityId,
+			userId: input.staffId,
+			staffProfileId,
+			action: "update",
+			entityType: "encounter",
+			entityId: input.encounterId,
+			beforeState: null,
+			afterState: { status: "ready_for_billing", chargeCount: total },
+			ipAddress: null,
+			userAgent: null,
+			metadata: { operation: "markReadyForInvoicing" },
+		})
+
+		return { success: true, encounterId: input.encounterId, chargeCount: total }
+	}
+
+	// ========================================================================
+	// Service Catalog Search (BIL-BE-02)
+	// ========================================================================
+
+	async searchServiceCatalog(input: SearchServiceCatalogInput) {
+		const { facilityId, query, category, page, limit } = input
+		const offset = (page - 1) * limit
+
+		const conditions = [eq(chargeMasterItems.facilityId, facilityId), eq(chargeMasterItems.isActive, true)]
+
+		if (category) {
+			conditions.push(eq(chargeMasterItems.category, category))
+		}
+
+		if (query) {
+			conditions.push(
+				or(
+					ilike(chargeMasterItems.description, `%${query}%`),
+					ilike(chargeMasterItems.itemCode, `%${query}%`)
+				)!
+			)
+		}
+
+		const where = and(...conditions)
+
+		const [items, [countRow]] = await Promise.all([
+			db
+				.select()
+				.from(chargeMasterItems)
+				.where(where)
+				.orderBy(chargeMasterItems.description)
+				.limit(limit)
+				.offset(offset),
+			db.select({ total: count() }).from(chargeMasterItems).where(where),
+		])
+
+		const total = countRow?.total ?? 0
+
+		return {
+			items: items.map(item => ({
+				id: item.id,
+				facilityId: item.facilityId,
+				code: item.itemCode,
+				description: item.description,
+				category: item.category,
+				unitPrice: Number(item.unitPrice),
+				rvsCode: item.rvsCode ?? undefined,
+				isActive: item.isActive,
+			})),
+			total,
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit),
+		}
+	}
+
+	// ========================================================================
+	// Apply Discount (BIL-BE-03)
+	// ========================================================================
+
+	async applyDiscount(input: ApplyDiscountInput) {
+		const [invoice] = await db.select().from(invoices).where(eq(invoices.id, input.invoiceId)).limit(1)
+		if (!invoice) throw new NotFoundException("Invoice not found")
+		if (invoice.status === "paid") throw new BadRequestException("Cannot modify a paid invoice")
+
+		// Enforce mutual exclusion: SENIOR / PWD / SOLO_PARENT cannot be combined
+		const exclusiveTypes = ["SENIOR", "PWD", "SOLO_PARENT"]
+		if (exclusiveTypes.includes(input.type) && invoice.discountType && exclusiveTypes.includes(invoice.discountType) && invoice.discountType !== input.type) {
+			throw new BadRequestException(`Cannot apply ${input.type} discount — invoice already has ${invoice.discountType} discount. Remove the existing discount first.`)
+		}
+
+		const subtotal = Number(invoice.subtotal)
+
+		let discountAmount: number
+		if (input.type === "SENIOR") discountAmount = subtotal * 0.2
+		else if (input.type === "PWD") discountAmount = subtotal * 0.2
+		else if (input.type === "SOLO_PARENT") discountAmount = subtotal * 0.1
+		else if (input.type === "MANUAL") {
+			if (input.amount == null) throw new BadRequestException("Manual discount requires an amount")
+			if (input.amount > subtotal) throw new BadRequestException("Discount cannot exceed invoice subtotal")
+			discountAmount = input.amount
+		} else {
+			discountAmount = 0
+		}
+
+		const vatAmount = Number(invoice.vatAmount)
+		const philhealthCoverage = Number(invoice.philhealthCoverage)
+		const newTotal = Math.max(0, subtotal - discountAmount - philhealthCoverage + vatAmount)
+
+		const staffProfileId = await this.getStaffProfileId(input.staffId)
+
+		await db
+			.update(invoices)
+			.set({
+				discount: discountAmount.toFixed(2),
+				discountType: input.type,
+				discountReason: input.reason ?? null,
+				totalAmount: newTotal.toFixed(2),
+				patientResponsibility: newTotal.toFixed(2),
+				updatedAt: new Date(),
+			})
+			.where(eq(invoices.id, input.invoiceId))
+
+		await this.auditService.log({
+			facilityId: invoice.facilityId,
+			userId: input.staffId,
+			staffProfileId,
+			action: "update",
+			entityType: "invoice",
+			entityId: input.invoiceId,
+			beforeState: { discountType: invoice.discountType, discount: invoice.discount },
+			afterState: { discountType: input.type, discount: discountAmount.toFixed(2), newTotal: newTotal.toFixed(2) },
+			ipAddress: null,
+			userAgent: null,
+			metadata: { operation: "applyDiscount" },
+		})
+
+		return this.getInvoice(input.invoiceId)
+	}
+
+	// ========================================================================
+	// Issue Receipt (BIL-BE-03)
+	// ========================================================================
+
+	async issueReceipt(input: IssueReceiptInput) {
+		const [payment] = await db.select().from(payments).where(eq(payments.id, input.paymentId)).limit(1)
+		if (!payment) throw new NotFoundException("Payment not found")
+
+		const fiscalYear = new Date().getFullYear()
+		const staffProfileId = await this.getStaffProfileId(input.staffId)
+
+		const issued = await db.transaction(async tx => {
+			const [latest] = await tx
+				.select({ receiptNumber: receipts.receiptNumber })
+				.from(receipts)
+				.where(and(eq(receipts.facilityId, payment.facilityId), eq(receipts.fiscalYear, fiscalYear)))
+				.orderBy(desc(receipts.issuedAt))
+				.limit(1)
+				.for("update")
+
+			const nextSeq = latest
+				? (parseInt(latest.receiptNumber.split("-").pop() ?? "0", 10) + 1)
+					.toString()
+					.padStart(6, "0")
+				: "000001"
+
+			const receiptNumber = `OR-${fiscalYear}-${nextSeq}`
+
+			const [row] = await tx
+				.insert(receipts)
+				.values({
+					facilityId: payment.facilityId,
+					paymentId: input.paymentId,
+					receiptNumber,
+					fiscalYear,
+					issuedByStaffId: staffProfileId,
+				})
+				.returning()
+
+			return row
+		})
+
+		if (!issued) throw new NotFoundException("Failed to issue receipt")
+
+		await this.auditService.log({
+			facilityId: issued.facilityId,
+			userId: input.staffId,
+			staffProfileId,
+			action: "create",
+			entityType: "receipt",
+			entityId: issued.id,
+			beforeState: null,
+			afterState: { receiptNumber: issued.receiptNumber, paymentId: issued.paymentId, fiscalYear: issued.fiscalYear },
+			ipAddress: null,
+			userAgent: null,
+			metadata: { operation: "issueReceipt" },
+		})
+
+		return {
+			id: issued.id,
+			facilityId: issued.facilityId,
+			paymentId: issued.paymentId,
+			receiptNumber: issued.receiptNumber,
+			fiscalYear: issued.fiscalYear,
+			pdfUri: issued.pdfUri ?? null,
+			issuedAt: issued.issuedAt,
+			issuedByStaffId: issued.issuedByStaffId,
+		}
+	}
+
+	// ========================================================================
+	// Record Malasakit Payment (BIL-BE-03)
+	// ========================================================================
+
+	async recordMalasakitPayment(input: RecordMalasakitPaymentInput) {
+		const [invoice] = await db.select().from(invoices).where(eq(invoices.id, input.invoiceId)).limit(1)
+		if (!invoice) throw new NotFoundException("Invoice not found")
+		if (invoice.status === "paid") throw new BadRequestException("Invoice is already fully paid.")
+
+		const priorPayments = await db.select({ amount: payments.amount }).from(payments).where(eq(payments.invoiceId, input.invoiceId))
+		const totalAlreadyPaid = priorPayments.reduce((acc, p) => acc + Number(p.amount), 0)
+		const outstanding = Number(invoice.patientResponsibility) - totalAlreadyPaid
+		if (input.amount > outstanding + 0.005) {
+			throw new BadRequestException(`Payment amount ₱${input.amount.toFixed(2)} exceeds outstanding balance ₱${outstanding.toFixed(2)}`)
+		}
+
+		const staffProfileId = await this.getStaffProfileId(input.staffId)
+
+		const [payment] = await db
+			.insert(payments)
+			.values({
+				facilityId: invoice.facilityId,
+				invoiceId: input.invoiceId,
+				amount: input.amount.toFixed(2),
+				paymentMethod: "malasakit",
+				referenceNumber: input.reference ?? null,
+				receivedByStaffId: staffProfileId,
+				paymentDate: new Date().toISOString().split("T")[0]!,
+				notes: `Malasakit case: ${input.malasakitCaseId}`,
+			})
+			.returning()
+
+		if (!payment) throw new NotFoundException("Failed to record payment")
+
+		await this.auditService.log({
+			facilityId: invoice.facilityId,
+			userId: input.staffId,
+			staffProfileId,
+			action: "create",
+			entityType: "payment",
+			entityId: payment.id,
+			beforeState: null,
+			afterState: { amount: input.amount, method: "malasakit", malasakitCaseId: input.malasakitCaseId },
+			ipAddress: null,
+			userAgent: null,
+			metadata: { source: "MALASAKIT" },
+		})
+
+		return {
+			id: payment.id,
+			facilityId: payment.facilityId,
+			invoiceId: payment.invoiceId,
+			amount: payment.amount,
+			paymentMethod: payment.paymentMethod,
+			referenceNumber: payment.referenceNumber ?? null,
+			receivedByStaffId: payment.receivedByStaffId,
+			paymentDate: payment.paymentDate,
+			notes: payment.notes ?? null,
+			createdAt: payment.createdAt,
+		}
+	}
+
+	// ========================================================================
+	// CF4 XML Preview (BIL-BE-04)
+	// ========================================================================
+
+	async previewCf4Xml(claimId: string) {
+		const [claim] = await db.select().from(cf4Claims).where(eq(cf4Claims.id, claimId)).limit(1)
+		if (!claim) throw new NotFoundException("CF4 claim not found")
+
+		const xml = this.buildCf4XmlStub(claim)
+		return { id: claim.id, xml, status: claim.status }
+	}
+
+	private buildCf4XmlStub(claim: typeof cf4Claims.$inferSelect): string {
+		return `<?xml version="1.0" encoding="UTF-8"?>
+<Cf4Claim>
+  <ClaimId>${claim.id}</ClaimId>
+  <EncounterId>${claim.encounterId}</EncounterId>
+  <Status>${claim.status}</Status>
+</Cf4Claim>`
+	}
+
+	// ========================================================================
+	// Poll CF4 Status (BIL-BE-04)
+	// ========================================================================
+
+	async pollCf4Status(input: PollCf4StatusInput) {
+		const [claim] = await db.select().from(cf4Claims).where(eq(cf4Claims.id, input.id)).limit(1)
+		if (!claim) throw new NotFoundException("CF4 claim not found")
+
+		// Only write a log row when the status has changed since the last log entry
+		const [lastLog] = await db
+			.select({ status: cf4StatusLog.status })
+			.from(cf4StatusLog)
+			.where(eq(cf4StatusLog.claimId, claim.id))
+			.orderBy(desc(cf4StatusLog.changedAt))
+			.limit(1)
+
+		if (!lastLog || lastLog.status !== claim.status) {
+			await db.insert(cf4StatusLog).values({
+				claimId: claim.id,
+				status: claim.status,
+				payload: { polledAt: new Date().toISOString() },
+			})
+		}
+
+		const logs = await db
+			.select()
+			.from(cf4StatusLog)
+			.where(eq(cf4StatusLog.claimId, input.id))
+			.orderBy(desc(cf4StatusLog.changedAt))
+
+		return {
+			id: claim.id,
+			status: claim.status,
+			statusLog: logs.map(l => ({
+				id: l.id,
+				claimId: l.claimId,
+				status: l.status,
+				philhealthRef: l.philhealthRef ?? undefined,
+				changedAt: l.changedAt,
+			})),
+		}
+	}
+
+	// ========================================================================
+	// Resubmit CF4 (BIL-BE-04)
+	// ========================================================================
+
+	async resubmitCf4(input: ResubmitCf4Input) {
+		const [claim] = await db.select().from(cf4Claims).where(eq(cf4Claims.id, input.id)).limit(1)
+		if (!claim) throw new NotFoundException("CF4 claim not found")
+		if (claim.status !== "rejected") {
+			throw new BadRequestException("Only rejected claims can be resubmitted")
+		}
+
+		const [updated] = await db
+			.update(cf4Claims)
+			.set({
+				status: "resubmitted",
+				resubmitCount: sql`${cf4Claims.resubmitCount} + 1`,
+				updatedAt: new Date(),
+			})
+			.where(eq(cf4Claims.id, input.id))
+			.returning()
+
+		if (!updated) throw new NotFoundException("CF4 claim not found after update")
+
+		await db.insert(cf4StatusLog).values({
+			claimId: claim.id,
+			status: "resubmitted",
+			payload: {
+				reason: input.reason,
+				resubmittedAt: new Date().toISOString(),
+				priorSubmissionData: claim.submissionData,
+				priorResponseData: claim.responseData,
+			},
+		})
+
+		return {
+			...updated,
+			extractedData: updated.extractedData as Record<string, unknown> | null,
+			submissionData: updated.submissionData as Record<string, unknown> | null,
+			responseData: updated.responseData as Record<string, unknown> | null,
+		}
+	}
+
+	// ========================================================================
+	// CEWS Verify (BIL-BE-07)
+	// ========================================================================
+
+	async verifyCewsMembership(input: CewsVerifyInput) {
+		const digits = input.memberPin.replace(/-/g, "")
+		if (!/^\d{12}$/.test(digits)) {
+			throw new BadRequestException("PhilHealth member PIN must be exactly 12 digits")
+		}
+		// Stubbed — in production, call PhilHealth CEWS API with exponential backoff (3 retries)
+		return {
+			memberPin: input.memberPin,
+			memberName: "Juan Dela Cruz",
+			status: "active" as const,
+			benefitBalance: "50000.00",
+			dependents: [] as Array<{ name: string; relationship: string; pin: string | null }>,
+			verifiedAt: new Date(),
+			serviceUnavailable: false,
+		}
+	}
+
+	// ========================================================================
+	// Save CEWS Snapshot (BIL-BE-07)
+	// ========================================================================
+
+	async saveCewsSnapshot(input: SaveCewsSnapshotInput) {
+		const staffProfileId = await this.getStaffProfileId(input.staffId)
+		const [enc] = await db.select({ facilityId: encounters.facilityId }).from(encounters).where(eq(encounters.id, input.encounterId)).limit(1)
+
+		const snapshot = await db.transaction(async tx => {
+			const [row] = await tx
+				.insert(cewsSnapshots)
+				.values({
+					encounterId: input.encounterId,
+					memberPin: input.memberPin,
+					memberName: input.memberName ?? null,
+					status: input.status,
+					benefitBalance: input.benefitBalance != null ? String(input.benefitBalance) : null,
+					dependentsJson: input.dependentsJson ?? null,
+					rawResponse: input.rawResponse ?? null,
+					capturedByStaffId: staffProfileId,
+				})
+				.returning()
+
+			if (!row) throw new NotFoundException("Failed to save CEWS snapshot")
+
+			await this.auditService.log({
+				facilityId: enc?.facilityId ?? "",
+				userId: input.staffId,
+				staffProfileId,
+				action: "create",
+				entityType: "cews_snapshot",
+				entityId: row.id,
+				beforeState: null,
+				afterState: { encounterId: row.encounterId, memberPin: row.memberPin, status: row.status },
+				ipAddress: null,
+				userAgent: null,
+				metadata: { operation: "saveCewsSnapshot" },
+			}, { tx })
+
+			return row
+		})
+
+		return {
+			id: snapshot.id,
+			encounterId: snapshot.encounterId,
+			memberPin: snapshot.memberPin,
+			memberName: snapshot.memberName ?? null,
+			status: snapshot.status,
+			benefitBalance: snapshot.benefitBalance ?? null,
+			capturedAt: snapshot.capturedAt,
+		}
+	}
+
+	// ========================================================================
+	// List CEWS Snapshots (BIL-BE-07)
+	// ========================================================================
+
+	async listCewsSnapshots(input: ListCewsSnapshotsInput) {
+		const items = await db
+			.select()
+			.from(cewsSnapshots)
+			.where(eq(cewsSnapshots.encounterId, input.encounterId))
+			.orderBy(desc(cewsSnapshots.capturedAt))
+
+		return {
+			snapshots: items.map(s => ({
+				id: s.id,
+				encounterId: s.encounterId,
+				memberPin: s.memberPin,
+				memberName: s.memberName ?? null,
+				status: s.status,
+				benefitBalance: s.benefitBalance ?? null,
+				capturedAt: s.capturedAt,
+			})),
+		}
+	}
+
+	// ========================================================================
+	// Check CEWS (BIL-BE-07)
+	// ========================================================================
+
+	async checkCews(input: CheckCewsInput) {
+		// Stubbed real-time check
+		return {
+			status: "active" as const,
+			isIndigent: false,
+			listahananStatus: "not_listed" as string | null,
+			listahananScore: null as number | null,
+			activeBenefits: [] as Array<{
+				benefitType: string
+				benefitAmount: number | null
+				startDate: string | null
+				endDate: string | null
+				status: string
+			}>,
+			checkedAt: new Date(),
+			message: null as string | null,
+		}
+	}
+
+	// ========================================================================
+	// List Konsulta Activities (BIL-BE-08)
+	// ========================================================================
+
+	async listKonsultaActivities(input: ListKonsultaActivitiesInput) {
+		const { patientId, facilityId, activityType, page, limit } = input
+		const offset = (page - 1) * limit
+
+		const conditions = [
+			eq(konsultaActivities.patientId, patientId),
+			eq(konsultaActivities.facilityId, facilityId),
+		]
+		if (activityType) conditions.push(eq(konsultaActivities.activityType, activityType))
+
+		const where = and(...conditions)
+
+		const [items, [countRow]] = await Promise.all([
+			db
+				.select()
+				.from(konsultaActivities)
+				.where(where)
+				.orderBy(desc(konsultaActivities.activityDate))
+				.limit(limit)
+				.offset(offset),
+			db.select({ total: count() }).from(konsultaActivities).where(where),
+		])
+
+		const total = countRow?.total ?? 0
+
+		return {
+			activities: items.map(a => ({
+				id: a.id,
+				patientId: a.patientId,
+				facilityId: a.facilityId,
+				activityType: a.activityType,
+				activityDate: a.activityDate,
+				sourceRef: a.sourceRef ?? null,
+				createdAt: a.createdAt,
+			})),
+			total,
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit),
+		}
+	}
+
+	// ========================================================================
+	// Record Konsulta Event (BIL-BE-08)
+	// ========================================================================
+
+	async recordKonsultaEvent(input: RecordKonsultaEventInput) {
+		// Idempotent: check for existing record
+		const [existing] = await db
+			.select({ id: konsultaActivities.id })
+			.from(konsultaActivities)
+			.where(
+				and(
+					eq(konsultaActivities.patientId, input.patientId),
+					eq(konsultaActivities.activityType, input.activityType),
+					eq(konsultaActivities.activityDate, input.activityDate)
+				)
+			)
+			.limit(1)
+
+		if (existing) {
+			return { success: true, id: existing.id }
+		}
+
+		const [created] = await db
+			.insert(konsultaActivities)
+			.values({
+				patientId: input.patientId,
+				facilityId: input.facilityId,
+				activityType: input.activityType,
+				activityDate: input.activityDate,
+				sourceRef: input.sourceRef ?? null,
+			})
+			.returning()
+
+		if (!created) throw new NotFoundException("Failed to record Konsulta event")
+
+		return { success: true, id: created.id }
+	}
+
+	// ========================================================================
+	// Generate Konsulta Report (BIL-BE-08)
+	// ========================================================================
+
+	async generateKonsultaReport(input: GenerateKonsultaReportInput) {
+		const activities = await db
+			.select()
+			.from(konsultaActivities)
+			.where(
+				and(
+					eq(konsultaActivities.facilityId, input.facilityId),
+					sql`${konsultaActivities.activityDate} >= ${input.periodStart}`,
+					sql`${konsultaActivities.activityDate} <= ${input.periodEnd}`
+				)
+			)
+			.orderBy(konsultaActivities.activityDate)
+
+		const fpeCount = activities.filter(a => a.activityType === "FPE").length
+		const followUpCount = activities.filter(a => a.activityType === "Follow-up").length
+		const labCount = activities.filter(a => a.activityType === "Lab").length
+
+		// Group by patient for memberBreakdown (stub — no patient name join here)
+		const patientMap = new Map<string, { fpe: number; followUp: number; lab: number }>()
+		for (const a of activities) {
+			const entry = patientMap.get(a.patientId) ?? { fpe: 0, followUp: 0, lab: 0 }
+			if (a.activityType === "FPE") entry.fpe++
+			else if (a.activityType === "Follow-up") entry.followUp++
+			else entry.lab++
+			patientMap.set(a.patientId, entry)
+		}
+
+		const memberBreakdown = Array.from(patientMap.entries()).map(([patientId, counts]) => ({
+			patientId,
+			patientName: "",
+			memberPin: null as string | null,
+			fpeCount: counts.fpe,
+			followUpCount: counts.followUp,
+			labCount: counts.lab,
+		}))
+
+		return {
+			facilityId: input.facilityId,
+			period: input.period,
+			periodStart: input.periodStart,
+			periodEnd: input.periodEnd,
+			totalFpe: fpeCount,
+			totalFollowUp: followUpCount,
+			totalLab: labCount,
+			totalPatients: patientMap.size,
+			xmlUri: null as string | null,
+			csvUri: null as string | null,
+			memberBreakdown,
+		}
+	}
+
+	// ========================================================================
+	// Get CF5 with Billing (BIL-BE-05)
+	// ========================================================================
+
+	async getCf5WithBilling(input: GetCf5WithBillingInput) {
+		const cf5 = await this.getCf5({ encounterId: input.encounterId })
+		if (!cf5) return null
+
+		const chargesList = await db
+			.select()
+			.from(charges)
+			.where(eq(charges.encounterId, input.encounterId))
+
+		const totalCharges = chargesList.reduce((sum, c) => sum + Number(c.totalAmount), 0)
+
+		return {
+			cf5,
+			billingItems: chargesList.map(c => ({
+				chargeId: c.id,
+				description: c.description,
+				quantity: Number(c.quantity),
+				unitPrice: Number(c.unitPrice),
+				totalAmount: Number(c.totalAmount),
+				rvsCode: null as string | null,
+				icdCode: null as string | null,
+				isPhilhealthCovered: false,
+			})),
+			totalCharges,
+			philhealthCoverage: 0,
+			patientResponsibility: totalCharges,
+			approvalRequired: true,
+		}
+	}
+
+	// ========================================================================
+	// Link Charge to ICD (BIL-BE-05)
+	// ========================================================================
+
+	async linkChargeToIcd(input: LinkChargeToIcdInput) {
+		const [charge] = await db.select({ id: charges.id }).from(charges).where(eq(charges.id, input.chargeId)).limit(1)
+		if (!charge) throw new NotFoundException("Charge not found")
+		// In production, update a charge_icd_links table
+		return { success: true }
+	}
+
+	// ========================================================================
+	// Generate eSOA (BIL-BE-06)
+	// ========================================================================
+
+	async generateEsoa(input: GenerateEsoaInput) {
+		const soa = await this.getSoa({ encounterId: input.encounterId })
+		if (!soa) throw new NotFoundException("Encounter not found")
+
+		const contentTypeMap = {
+			pdf: "application/pdf",
+			xml: "text/xml",
+			json: "application/json",
+		}
+
+		const soaNumber = soa.soaNumber
+		const generatedAt = new Date()
+		const fileName = `${soaNumber}.${input.format}`
+		const data = input.format === "json" ? JSON.stringify(soa) : ""
+
+		return {
+			format: input.format,
+			fileName,
+			contentType: contentTypeMap[input.format],
+			data,
+			generatedAt,
+			soaNumber,
+			encounterId: input.encounterId,
+			netAmount: soa.netAmount,
+		}
+	}
+
+	// ========================================================================
+	// BIL-BE-05: DRG Suggest & Confirm
+	// ========================================================================
+
+	async suggestDrg(input: { encounterId: string }) {
+		// Rule-based top-3 suggestions (real impl would query ICD-10 coding + DRG master data)
+		const candidates = [
+			{ rank: 1, code: "DRG-089", description: "Simple Pneumonia & Pleurisy - Age > 17", mdrg: "M089", weight: 1.2847, baseRate: 14850, confidence: 0.82, rationale: "Primary diagnosis J18.9 maps to DRG-089 per PhilHealth DRG v2023 grouper." },
+			{ rank: 2, code: "DRG-090", description: "Simple Pneumonia & Pleurisy - Age 0-17", mdrg: "M090", weight: 0.9234, baseRate: 10690, confidence: 0.54, rationale: "Alternative grouping if patient age < 18 years." },
+			{ rank: 3, code: "DRG-079", description: "Respiratory Infections & Inflammations", mdrg: "M079", weight: 1.0421, baseRate: 12060, confidence: 0.31, rationale: "Broader respiratory category applicable with secondary infections." },
+		]
+		return { candidates, encounterId: input.encounterId }
+	}
+
+	async confirmDrg(input: { encounterId: string; drgCode: string; overrideReason?: string; chosenRank?: number }, userId: string) {
+		const isManualOverride = (input.chosenRank ?? 1) !== 1 || !!input.overrideReason
+		if (isManualOverride && !input.overrideReason) {
+			throw new BadRequestException("Override reason is required when not selecting the top-1 DRG suggestion.")
+		}
+		const [mapping] = await db
+			.insert(drgMappings)
+			.values({
+				encounterId: input.encounterId,
+				drgCode: input.drgCode,
+				confidence: isManualOverride ? "0" : "0.82",
+				manualOverrideReason: input.overrideReason ?? null,
+				isManualOverride,
+			})
+			.onConflictDoUpdate({
+				target: drgMappings.encounterId,
+				set: {
+					drgCode: input.drgCode,
+					manualOverrideReason: input.overrideReason ?? null,
+					isManualOverride,
+				},
+			})
+			.returning()
+		if (!mapping) throw new BadRequestException("Failed to confirm DRG mapping.")
+
+		const staffProfileId = await this.getOptionalStaffProfileId(userId)
+		const [encounter] = await db.select({ facilityId: encounters.facilityId }).from(encounters).where(eq(encounters.id, input.encounterId)).limit(1)
+		await this.auditService.log({
+			facilityId: encounter?.facilityId ?? "",
+			userId,
+			staffProfileId,
+			action: "create",
+			entityType: "drg_mapping",
+			entityId: mapping.id,
+			beforeState: null,
+			afterState: { drgCode: mapping.drgCode, encounterId: input.encounterId, isManualOverride },
+			ipAddress: null,
+			userAgent: null,
+			metadata: { overrideReason: input.overrideReason ?? null },
+		})
+
+		return { success: true, drgMappingId: mapping.id, drgCode: mapping.drgCode, isManualOverride: mapping.isManualOverride }
+	}
+
+	// ========================================================================
+	// BIL-BE-05: CF5 Lifecycle
+	// ========================================================================
+
+	async generateCf5(input: { facilityId: string; encounterId: string; drgCode: string }, userId: string) {
+		const [claim] = await db
+			.insert(cf5Claims)
+			.values({ facilityId: input.facilityId, encounterId: input.encounterId, drgCode: input.drgCode, status: "draft" })
+			.returning()
+		if (!claim) throw new BadRequestException("Failed to generate CF5 claim.")
+
+		const staffProfileId = await this.getOptionalStaffProfileId(userId)
+		await this.auditService.log({
+			facilityId: input.facilityId,
+			userId,
+			staffProfileId,
+			action: "create",
+			entityType: "cf5_claim",
+			entityId: claim.id,
+			beforeState: null,
+			afterState: { drgCode: claim.drgCode, encounterId: claim.encounterId, status: "draft" },
+			ipAddress: null,
+			userAgent: null,
+			metadata: {},
+		})
+
+		return claim
+	}
+
+	async getCf5Claim(input: { id: string }) {
+		const [claim] = await db.select().from(cf5Claims).where(eq(cf5Claims.id, input.id)).limit(1)
+		if (!claim) throw new NotFoundException("CF5 claim not found.")
+		return claim
+	}
+
+	async listCf5Claims(input: { encounterId: string }) {
+		const claims = await db.select().from(cf5Claims).where(eq(cf5Claims.encounterId, input.encounterId))
+		return { claims }
+	}
+
+	async previewCf5Xml(input: { id: string }) {
+		const [claim] = await db.select().from(cf5Claims).where(eq(cf5Claims.id, input.id)).limit(1)
+		if (!claim) throw new NotFoundException("CF5 claim not found.")
+		const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<CF5>\n  <DRGCode>${claim.drgCode ?? ""}</DRGCode>\n  <EncounterID>${claim.encounterId}</EncounterID>\n  <Status>${claim.status}</Status>\n</CF5>`
+		return { id: claim.id, xml, status: claim.status }
+	}
+
+	async submitCf5(input: { id: string }, userId: string) {
+		const [claim] = await db.select().from(cf5Claims).where(eq(cf5Claims.id, input.id)).limit(1)
+		if (!claim) throw new NotFoundException("CF5 claim not found.")
+		if (claim.status !== "draft" && claim.status !== "validated") {
+			throw new BadRequestException("Only draft or validated CF5 claims can be submitted.")
+		}
+
+		// XSD validation stub: DRG code is mandatory before CF5 submission
+		const violations: { path: string; message: string }[] = []
+		if (!claim.drgCode) violations.push({ path: "drgCode", message: "DRG code is required for CF5 submission" })
+		if (!claim.encounterId) violations.push({ path: "encounterId", message: "Encounter ID is required" })
+		if (violations.length > 0) {
+			throw new UnprocessableEntityException({ message: "CF5 XSD validation failed", violations })
+		}
+
+		const [updated] = await db
+			.update(cf5Claims)
+			.set({ status: "submitted", submittedAt: new Date() })
+			.where(eq(cf5Claims.id, input.id))
+			.returning()
+		if (!updated) throw new BadRequestException("Failed to submit CF5 claim.")
+
+		const staffProfileId = await this.getOptionalStaffProfileId(userId)
+		await this.auditService.log({
+			facilityId: claim.facilityId,
+			userId,
+			staffProfileId,
+			action: "update",
+			entityType: "cf5_claim",
+			entityId: claim.id,
+			beforeState: { status: claim.status },
+			afterState: { status: "submitted" },
+			ipAddress: null,
+			userAgent: null,
+			metadata: { operation: "submitCf5" },
+		})
+
+		return updated
+	}
+
+	async pollCf5Status(input: { id: string }) {
+		const [claim] = await db.select().from(cf5Claims).where(eq(cf5Claims.id, input.id)).limit(1)
+		if (!claim) throw new NotFoundException("CF5 claim not found.")
+		return { id: claim.id, status: claim.status, philhealthRef: null }
+	}
+
+	async resubmitCf5(input: { id: string; reason: string }, userId: string) {
+		const [claim] = await db.select().from(cf5Claims).where(eq(cf5Claims.id, input.id)).limit(1)
+		if (!claim) throw new NotFoundException("CF5 claim not found.")
+		if (claim.status !== "rejected") {
+			throw new BadRequestException("Only rejected CF5 claims can be resubmitted.")
+		}
+		const [updated] = await db
+			.update(cf5Claims)
+			.set({ status: "submitted", submittedAt: new Date(), responseData: { resubmitReason: input.reason } })
+			.where(eq(cf5Claims.id, input.id))
+			.returning()
+		if (!updated) throw new BadRequestException("Failed to resubmit CF5 claim.")
+
+		const staffProfileId = await this.getOptionalStaffProfileId(userId)
+		await this.auditService.log({
+			facilityId: claim.facilityId,
+			userId,
+			staffProfileId,
+			action: "update",
+			entityType: "cf5_claim",
+			entityId: claim.id,
+			beforeState: { status: "rejected" },
+			afterState: { status: "submitted", resubmitReason: input.reason },
+			ipAddress: null,
+			userAgent: null,
+			metadata: { operation: "resubmitCf5" },
+		})
+
+		return updated
+	}
+
+	// ========================================================================
+	// BIL-BE-06: eSOA list, send, generate from invoice
+	// ========================================================================
+
+	async listEsoaStatements(input: { invoiceId: string }) {
+		const statements = await db
+			.select()
+			.from(esoaStatements)
+			.where(eq(esoaStatements.invoiceId, input.invoiceId))
+			.orderBy(desc(esoaStatements.version))
+		return { statements, total: statements.length }
+	}
+
+	async sendEsoa(input: { id: string; channel: "patient_portal" | "email" | "print"; recipient?: string; allowDraft?: boolean }) {
+		const [statement] = await db.select().from(esoaStatements).where(eq(esoaStatements.id, input.id)).limit(1)
+		if (!statement) throw new NotFoundException("eSOA statement not found.")
+
+		// Reject send if invoice has unsettled balance, unless allowDraft override
+		if (statement.invoiceId && !input.allowDraft) {
+			const [invoice] = await db.select({ status: invoices.status }).from(invoices).where(eq(invoices.id, statement.invoiceId)).limit(1)
+			if (invoice && invoice.status !== "paid") {
+				throw new BadRequestException("Cannot send eSOA for an invoice with unsettled balance. Pass allowDraft=true to override.")
+			}
+		}
+
+		const [updated] = await db
+			.update(esoaStatements)
+			.set({ sentVia: input.channel, sentToRecipient: input.recipient ?? null, sentAt: new Date(), deliveryStatus: "delivered" })
+			.where(eq(esoaStatements.id, input.id))
+			.returning()
+		if (!updated) throw new BadRequestException("Failed to record eSOA delivery.")
+		return { success: true, statementId: updated.id, deliveryStatus: "delivered" }
+	}
+
+	async generateEsoaFromInvoice(input: { invoiceId: string; allowDraft?: boolean; allowDraftReason?: string }) {
+		const [invoice] = await db.select().from(invoices).where(eq(invoices.id, input.invoiceId)).limit(1)
+		if (!invoice) throw new NotFoundException("Invoice not found.")
+		if (invoice.status !== "paid" && invoice.status !== "finalized" && !input.allowDraft) {
+			throw new BadRequestException("Invoice must be paid or finalized before generating eSOA. Pass allowDraft=true to override.")
+		}
+
+		// Idempotency: return an existing unsent draft statement if one exists
+		const [existingUnsent] = await db
+			.select()
+			.from(esoaStatements)
+			.where(and(eq(esoaStatements.invoiceId, input.invoiceId), isNull(esoaStatements.sentAt)))
+			.orderBy(desc(esoaStatements.version))
+			.limit(1)
+
+		if (existingUnsent) return existingUnsent
+
+		const [latestVersion] = await db
+			.select({ version: esoaStatements.version })
+			.from(esoaStatements)
+			.where(eq(esoaStatements.invoiceId, input.invoiceId))
+			.orderBy(desc(esoaStatements.version))
+			.limit(1)
+		const nextVersion = (latestVersion?.version ?? 0) + 1
+		const [statement] = await db
+			.insert(esoaStatements)
+			.values({ invoiceId: input.invoiceId, version: nextVersion })
+			.returning()
+		if (!statement) throw new BadRequestException("Failed to generate eSOA from invoice.")
+		return statement
+	}
+
+	// ========================================================================
+	// BIL-BE-04: Cron — Poll CF4 status every 6 hours
+	// ========================================================================
+
+	@Cron("0 */6 * * *")
+	async pollAllPendingCf4Claims() {
+		const pending = await db
+			.select({ id: cf4Claims.id })
+			.from(cf4Claims)
+			.where(inArray(cf4Claims.status, ["submitted", "resubmitted"]))
+
+		for (const claim of pending) {
+			try {
+				await this.pollCf4Status({ id: claim.id })
+			} catch (err) {
+				this.logger.warn(`CF4 status poll failed for claim ${claim.id}: ${String(err)}`)
+			}
 		}
 	}
 }

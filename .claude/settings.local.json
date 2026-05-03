@@ -120,7 +120,18 @@
       "PowerShell(Get-ChildItem *)",
       "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\app\\\\\\(site\\)\\\\admin\" -Recurse -Force | ForEach-Object { $_.FullName.Replace\\('D:\\\\PROJECTS\\\\qhealth-emr\\\\', ''\\) })",
       "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\admin\" -Recurse -Force | ForEach-Object { $_.FullName.Replace\\('D:\\\\PROJECTS\\\\qhealth-emr\\\\', ''\\) })",
-      "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\admin\\\\feature-flags\\\\components\" -Force | ForEach-Object { $_.Name })"
+      "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\admin\\\\feature-flags\\\\components\" -Force | ForEach-Object { $_.Name })",
+      "Bash(Select-Object Name)",
+      "PowerShell(Set-Location \"D:\\\\PROJECTS\\\\qhealth-emr\"; npx tsc --noEmit -p apps/backend/tsconfig.json 2>&1 | Where-Object { $_ -match \"billing\" } | Select-Object -First 20)",
+      "PowerShell(pnpm *)",
+      "Bash(Remove-Item -Force)",
+      "Bash(Write-Output \"Cleaned\")",
+      "Bash(Select-String -Path \"D:/PROJECTS/qhealth-emr/packages/contracts/dist/contracts.d.ts\" -Pattern \"billingContract\")",
+      "Bash(Select-Object -First 5)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\backend\\\\src\\\\modules\\\\v1\\\\billing\" | ForEach-Object { $_.Name })",
+      "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\packages\\\\contracts\\\\src\\\\modules\\\\v1\\\\billing\" | ForEach-Object { Write-Host $_.Name })",
+      "PowerShell(Test-Path *)"
     ]
   }
 }

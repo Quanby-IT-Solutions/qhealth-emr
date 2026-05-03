@@ -6,6 +6,10 @@
 // V1 contracts (routers)
 export { v1Contract } from "./modules/v1/v1.contract.js"
 
+// Billing contract — exported directly so backend controller can reference typed procedures
+// (v1Billing uses `as any` cast to avoid TS7056; billingContract retains full types)
+export { billingContract } from "./modules/v1/billing/billing.contract.js"
+
 // Admin dashboard schemas — exported for frontend and backend consumption
 export type {
 	AdminDashboardSummary,

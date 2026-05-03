@@ -3,9 +3,10 @@ import type { ContractRouterClient } from "@orpc/contract"
 import { OpenAPILink } from "@orpc/openapi-client/fetch"
 import { createTanstackQueryUtils } from "@orpc/tanstack-query"
 
-import { v1Contract } from "@repo/contracts"
+import { billingContract, v1Contract } from "@repo/contracts"
 
 type V1Contract = typeof v1Contract
+type BillingContract = typeof billingContract
 
 import { env } from "@/env"
 
@@ -43,3 +44,17 @@ const baseOrpc = createORPCClient(link) as unknown as ContractRouterClient<V1Con
  *   useQuery(orpc.rbac.me.queryOptions())
  */
 export const orpc = createTanstackQueryUtils(baseOrpc, { path: ["orpc"] })
+
+/**
+ * Typed billing oRPC utils — uses billingContract directly for full type inference.
+ * The underlying client is the same runtime object as orpc.billing but with
+ * explicit type information from billingContract (bypasses the `as any` cast in v1.billing.ts).
+ *
+ * Usage:
+ *   import { billingOrpc } from "@/services/orpc/client"
+ *   useQuery(billingOrpc.listCharges.queryOptions({ input: { encounterId } }))
+ */
+export const billingOrpc = createTanstackQueryUtils(
+	(baseOrpc as unknown as { billing: ContractRouterClient<BillingContract> }).billing,
+	{ path: ["orpc", "billing"] }
+)
