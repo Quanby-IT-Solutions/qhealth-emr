@@ -184,7 +184,7 @@ export const billingContract = {
 		.output(PaymentSchema),
 
 	applyDiscount: oc
-		.route({ method: "POST", path: "/invoices/{id}/apply-discount", summary: "Apply discount to an invoice", tags: ["Billing"] })
+		.route({ method: "POST", path: "/invoices/{invoiceId}/apply-discount", summary: "Apply discount to an invoice", tags: ["Billing"] })
 		.input(ApplyDiscountInputSchema)
 		.output(InvoiceSchema),
 

@@ -466,6 +466,8 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 	],
 }
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
 async function postAuth(path: string, data: unknown) {
 	return fetch(new URL(path, AUTH_API), {
 		method: "POST",
@@ -478,27 +480,23 @@ async function postAuth(path: string, data: unknown) {
 }
 
 async function ensureAuthUser(user: DemoUser) {
-	let response = await postAuth("sign-in/email", {
+	const [existing] = await db.select().from(users).where(eq(users.email, user.email))
+	if (existing) return existing
+
+	const response = await postAuth("sign-up/email", {
 		email: user.email,
 		password: DEFAULT_PASSWORD,
+		name: user.name,
 	})
 
 	if (!response.ok) {
-		response = await postAuth("sign-up/email", {
-			email: user.email,
-			password: DEFAULT_PASSWORD,
-			name: user.name,
-		})
-
-		if (!response.ok) {
-			const body = await response.text()
-			throw new Error(`Failed to create auth user ${user.email}: ${response.status} ${body}`)
-		}
+		const body = await response.text()
+		throw new Error(`Failed to create auth user ${user.email}: ${response.status} ${body}`)
 	}
 
 	const [dbUser] = await db.select().from(users).where(eq(users.email, user.email))
 	if (!dbUser) {
-		throw new Error(`Auth user ${user.email} was not found after sign-up/sign-in`)
+		throw new Error(`Auth user ${user.email} was not found after sign-up`)
 	}
 	return dbUser
 }
@@ -1943,6 +1941,7 @@ async function main() {
 	for (const user of demoUsers) {
 		const dbUser = await ensureAuthUser(user)
 		authUsers.set(user.email, dbUser.id)
+		await sleep(300)
 	}
 
 	const staffMap = new Map<string, string>()
