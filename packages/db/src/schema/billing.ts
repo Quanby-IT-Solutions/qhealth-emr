@@ -61,8 +61,7 @@ export const charges = createTable(
 		sourceOrderId: t.uuid("source_order_id"),
 		createdByStaffId: t
 			.uuid("created_by_staff_id")
-			.notNull()
-			.references(() => staffProfiles.id, { onDelete: "restrict" }),
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [
