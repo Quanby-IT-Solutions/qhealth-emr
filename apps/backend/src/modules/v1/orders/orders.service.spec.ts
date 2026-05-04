@@ -42,9 +42,11 @@ jest.mock("@repo/db/schema", () => {
 
 	return {
 		encounters: createTable(),
+		encounterStatusEvents: createTable(),
 		formularyItems: createTable(),
 		imagingOrders: createTable(),
 		labOrders: createTable(),
+		marEntries: createTable(),
 		medicationOrders: createTable(),
 		orderVerifications: createTable(),
 		patients: createTable(),
@@ -55,18 +57,26 @@ jest.mock("@repo/db/schema", () => {
 	}
 })
 
+type SelectBuilderOptions = {
+	withOrderBy?: boolean
+	withPagination?: boolean
+	withLimit?: boolean
+}
+
 type MockDb = {
 	select: jest.Mock
 	insert: jest.Mock
 	update: jest.Mock
 }
 
-function createSelectBuilder(result: unknown, options?: { withOrderBy?: boolean; withPagination?: boolean }) {
+function createSelectBuilder(result: unknown, options?: SelectBuilderOptions) {
 	const builder = {
 		from: jest.fn().mockReturnThis(),
 		leftJoin: jest.fn().mockReturnThis(),
 		where: jest.fn().mockImplementation(() =>
-			options?.withOrderBy || options?.withPagination ? builder : Promise.resolve(result)
+			options?.withOrderBy || options?.withPagination || options?.withLimit
+				? builder
+				: Promise.resolve(result)
 		),
 	}
 
@@ -83,6 +93,12 @@ function createSelectBuilder(result: unknown, options?: { withOrderBy?: boolean;
 		})
 	}
 
+	if (options?.withLimit) {
+		Object.assign(builder, {
+			limit: jest.fn().mockResolvedValue(result),
+		})
+	}
+
 	return builder
 }
 
@@ -90,6 +106,7 @@ function createInsertBuilder(result: unknown) {
 	return {
 		values: jest.fn().mockReturnValue({
 			returning: jest.fn().mockResolvedValue(result),
+			onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
 		}),
 	}
 }
@@ -321,6 +338,9 @@ describe("OrdersService", () => {
 						updatedAt: createdAt,
 					},
 				])
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ encounterType: "inpatient" }], { withLimit: true })
 			)
 			.mockImplementationOnce(() =>
 				createSelectBuilder([

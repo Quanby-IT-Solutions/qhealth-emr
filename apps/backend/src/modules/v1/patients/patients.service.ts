@@ -174,7 +174,7 @@ export class PatientsService {
 
 		return {
 			data: data.map(row => ({
-				...row,
+				...this.serializePatient(row),
 				lastEncounterDate: row.lastEncounterDate ?? null,
 				hasDirectAccess: filter.clinicianStaffId ? hasDirectAccessSet.has(row.id) : true,
 			})),
@@ -241,7 +241,7 @@ export class PatientsService {
 			.orderBy(desc(encounters.admissionDatetime))
 
 		return {
-			...patient,
+			...this.serializePatient(patient),
 			encounters: patientEncounters,
 		}
 	}
@@ -283,7 +283,7 @@ export class PatientsService {
 				this.logger.log(
 					`Registered patient: ${created!.lastName}, ${created!.firstName} (MRN: ${mrn})`
 				)
-				return created!
+				return this.serializePatient(created!)
 			} catch (err) {
 				if (this.isUniqueMrnViolation(err) && attempt < MAX_RETRIES - 1) {
 					this.logger.warn(`MRN collision on ${mrn}, retrying (attempt ${attempt + 1})`)
@@ -314,7 +314,7 @@ export class PatientsService {
 		}
 
 		this.logger.log(`Updated patient: ${id}`)
-		return updated
+		return this.serializePatient(updated)
 	}
 
 	// ========================================================================
@@ -564,6 +564,29 @@ export class PatientsService {
 	/** Escape special ILIKE pattern characters: %, _, \ */
 	private escapeLike(str: string): string {
 		return str.replace(/[%_\\]/g, "\\$&")
+	}
+
+	/**
+	 * Convert Postgres DATE values into stable YYYY-MM-DD strings that match the
+	 * shared contract without shifting the calendar day across timezones.
+	 */
+	private formatDateOnly(value: Date | string): string {
+		if (typeof value === "string") return value
+
+		const year = value.getFullYear().toString()
+		const month = (value.getMonth() + 1).toString().padStart(2, "0")
+		const day = value.getDate().toString().padStart(2, "0")
+
+		return `${year}-${month}-${day}`
+	}
+
+	private serializePatient<T extends { dateOfBirth: Date | string }>(
+		patient: T
+	): Omit<T, "dateOfBirth"> & { dateOfBirth: string } {
+		return {
+			...patient,
+			dateOfBirth: this.formatDateOnly(patient.dateOfBirth),
+		}
 	}
 
 	private tokenizeSearch(search: string): string[] {

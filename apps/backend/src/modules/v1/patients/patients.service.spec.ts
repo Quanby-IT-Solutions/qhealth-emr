@@ -161,4 +161,35 @@ describe("PatientsService", () => {
 
 		expect(tokenAndCall).toBeDefined()
 	})
+
+	it("serializes patient date of birth values as YYYY-MM-DD strings in search results", async () => {
+		mockDb.select
+			.mockImplementationOnce(() => createSubqueryBuilder())
+			.mockImplementationOnce(() =>
+				createListBuilder([
+					{
+						id: "550e8400-e29b-41d4-a716-446655440000",
+						mrn: "MRN-20260504-0001",
+						firstName: "Juan",
+						lastName: "Dela Cruz",
+						middleName: null,
+						dateOfBirth: new Date(1985, 0, 15),
+						sex: "male",
+						philhealthMemberId: null,
+						isActive: true,
+						lastEncounterDate: new Date(2026, 4, 4),
+					},
+				])
+			)
+			.mockImplementationOnce(() => createCountBuilder([{ count: 1 }]))
+
+		const result = await service.search({
+			facilityId: "550e8400-e29b-41d4-a716-446655440000",
+			page: 1,
+			limit: 50,
+			isActive: true,
+		})
+
+		expect(result.data[0]?.dateOfBirth).toBe("1985-01-15")
+	})
 })

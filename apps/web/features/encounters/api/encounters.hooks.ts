@@ -4,6 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { orpc } from "@/services/orpc/client"
 
+function shouldRetryDetailQuery(error: unknown, failureCount: number) {
+	const candidate = error as { status?: number } | null
+	if (candidate?.status === 403 || candidate?.status === 404) {
+		return false
+	}
+
+	return failureCount < 3
+}
+
 export function useEncounterListQuery(
 	params: {
 		facilityId: string
@@ -28,6 +37,7 @@ export function useEncounterDetailQuery(encounterId: string, options?: { enabled
 		orpc.encounter.get.queryOptions({
 			input: { id: encounterId },
 			enabled: (options?.enabled ?? true) && !!encounterId,
+			retry: (failureCount, error) => shouldRetryDetailQuery(error, failureCount),
 		})
 	)
 }

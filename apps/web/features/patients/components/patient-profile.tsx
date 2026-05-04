@@ -188,6 +188,24 @@ interface PatientProfileProps {
 
 const BREAK_GLASS_REQUIRED_MESSAGE = "Break-glass required for this patient chart."
 
+function isBreakGlassRequiredError(error: unknown) {
+	if (!error || typeof error !== "object") return false
+
+	const candidate = error as {
+		status?: number
+		message?: string
+		data?: {
+			backendCode?: string | null
+		} | null
+	}
+
+	const hasBreakGlassMessage =
+		candidate.message?.includes(BREAK_GLASS_REQUIRED_MESSAGE) === true ||
+		String(error).includes(BREAK_GLASS_REQUIRED_MESSAGE)
+
+	return hasBreakGlassMessage
+}
+
 function getActiveStaffProfile(
 	profile:
 		| {
@@ -240,14 +258,13 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 	const activeStaffProfile = getActiveStaffProfile(profile)
 	const activeFacilityId = activeStaffProfile?.facilityId
 	const canBreakGlass = can(permSet, "audit", "create")
-	const breakGlassRequired =
-		error?.message?.includes(BREAK_GLASS_REQUIRED_MESSAGE) ||
-		String(error).includes(BREAK_GLASS_REQUIRED_MESSAGE)
+	const canViewAudit = can(permSet, "audit", "view")
+	const breakGlassRequired = isBreakGlassRequiredError(error)
 	const { data: activeBreakGlass } = useMyActiveBreakGlassQuery({
 		facilityId: activeFacilityId,
 		patientId,
 		staffId: activeStaffProfile?.id,
-		enabled: canBreakGlass,
+		enabled: canBreakGlass && canViewAudit,
 	})
 	const { data: summary } = usePatientSummaryQuery(patient ? patientId : "")
 
