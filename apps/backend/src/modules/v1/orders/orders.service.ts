@@ -399,6 +399,7 @@ export class OrdersService {
 					doseForm: medicationOrders.doseForm,
 					route: medicationOrders.route,
 					frequency: medicationOrders.frequency,
+					firstDoseAt: medicationOrders.firstDoseAt,
 					durationDays: medicationOrders.durationDays,
 					specialInstructions: medicationOrders.specialInstructions,
 					isPrn: medicationOrders.isPrn,
@@ -468,6 +469,7 @@ export class OrdersService {
 				doseForm: medicationOrders.doseForm,
 				route: medicationOrders.route,
 				frequency: medicationOrders.frequency,
+				firstDoseAt: medicationOrders.firstDoseAt,
 				durationDays: medicationOrders.durationDays,
 				specialInstructions: medicationOrders.specialInstructions,
 				isPrn: medicationOrders.isPrn,
@@ -520,6 +522,33 @@ export class OrdersService {
 		const [staff] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId))
 		if (!staff) throw new NotFoundException("Staff profile not found for user")
 
+		const repeatingFrequencies = ["q4h", "q6h", "q8h", "q12h", "daily", "bid", "tid", "qid"]
+		if (repeatingFrequencies.includes(input.frequency) && !input.durationDays) {
+			throw new BadRequestException(
+				`durationDays is required for repeating frequency "${input.frequency}"`
+			)
+		}
+
+		const isPrn = input.frequency === "prn" ? true : (input.isPrn ?? false)
+
+		if (input.encounterId) {
+			const [encounter] = await db
+				.select({ encounterType: encounters.encounterType })
+				.from(encounters)
+				.where(eq(encounters.id, input.encounterId))
+				.limit(1)
+
+			if (
+				encounter &&
+				(encounter.encounterType === "inpatient" || encounter.encounterType === "emergency") &&
+				!input.firstDoseAt
+			) {
+				throw new BadRequestException(
+					"firstDoseAt is required for inpatient and emergency encounter orders"
+				)
+			}
+		}
+
 		const [created] = await db
 			.insert(medicationOrders)
 			.values({
@@ -535,9 +564,10 @@ export class OrdersService {
 				doseForm: input.doseForm,
 				route: input.route,
 				frequency: input.frequency,
+				firstDoseAt: input.firstDoseAt ? new Date(input.firstDoseAt) : null,
 				durationDays: input.durationDays ?? null,
 				specialInstructions: input.specialInstructions ?? null,
-				isPrn: input.isPrn ?? false,
+				isPrn,
 				prnReason: input.prnReason ?? null,
 				isControlledSubstance: input.isControlledSubstance ?? false,
 				pdeaSchedule: input.pdeaSchedule ?? null,
@@ -576,6 +606,7 @@ export class OrdersService {
 		if (input.doseForm !== undefined) updateValues.doseForm = input.doseForm
 		if (input.route !== undefined) updateValues.route = input.route
 		if (input.frequency !== undefined) updateValues.frequency = input.frequency
+		if (input.firstDoseAt !== undefined) updateValues.firstDoseAt = new Date(input.firstDoseAt)
 		if (input.durationDays !== undefined) updateValues.durationDays = input.durationDays
 		if (input.specialInstructions !== undefined)
 			updateValues.specialInstructions = input.specialInstructions
@@ -1011,6 +1042,7 @@ export class OrdersService {
 					doseForm: medicationOrders.doseForm,
 					route: medicationOrders.route,
 					frequency: medicationOrders.frequency,
+					firstDoseAt: medicationOrders.firstDoseAt,
 					durationDays: medicationOrders.durationDays,
 					specialInstructions: medicationOrders.specialInstructions,
 					isPrn: medicationOrders.isPrn,
@@ -1409,6 +1441,7 @@ export class OrdersService {
 					doseForm: medicationOrders.doseForm,
 					route: medicationOrders.route,
 					frequency: medicationOrders.frequency,
+					firstDoseAt: medicationOrders.firstDoseAt,
 					durationDays: medicationOrders.durationDays,
 					specialInstructions: medicationOrders.specialInstructions,
 					isPrn: medicationOrders.isPrn,
@@ -1790,6 +1823,7 @@ export class OrdersService {
 				doseForm: medicationOrders.doseForm,
 				route: medicationOrders.route,
 				frequency: medicationOrders.frequency,
+				firstDoseAt: medicationOrders.firstDoseAt,
 				durationDays: medicationOrders.durationDays,
 				specialInstructions: medicationOrders.specialInstructions,
 				isPrn: medicationOrders.isPrn,

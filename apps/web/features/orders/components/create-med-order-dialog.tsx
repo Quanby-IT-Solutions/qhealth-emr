@@ -15,6 +15,13 @@ import {
 } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
@@ -42,6 +49,31 @@ const TRANCHE_THRESHOLD_DAYS = 30
 
 type CdsResult = CdsEvaluateResponse
 
+const FREQUENCY_OPTIONS = [
+	{ value: "stat", label: "STAT (immediately)" },
+	{ value: "once", label: "Once" },
+	{ value: "q4h", label: "Every 4 hours (q4h)" },
+	{ value: "q6h", label: "Every 6 hours (q6h)" },
+	{ value: "q8h", label: "Every 8 hours (q8h)" },
+	{ value: "q12h", label: "Every 12 hours (q12h)" },
+	{ value: "daily", label: "Daily" },
+	{ value: "bid", label: "Twice daily (BID)" },
+	{ value: "tid", label: "Three times daily (TID)" },
+	{ value: "qid", label: "Four times daily (QID)" },
+	{ value: "prn", label: "PRN (as needed)" },
+] as const
+
+type FrequencyValue = (typeof FREQUENCY_OPTIONS)[number]["value"]
+
+const REPEATING_FREQUENCIES: FrequencyValue[] = ["q4h", "q6h", "q8h", "q12h", "daily", "bid", "tid", "qid"]
+
+function getNextHour(): string {
+	const d = new Date()
+	d.setMinutes(0, 0, 0)
+	d.setHours(d.getHours() + 1)
+	return d.toISOString().slice(0, 16)
+}
+
 interface CreateMedOrderDialogProps {
 	open: boolean
 	onOpenChange: (open: boolean) => void
@@ -49,6 +81,7 @@ interface CreateMedOrderDialogProps {
 	facilityId: string
 	patientId: string
 	orderingStaffId: string
+	encounterType?: "inpatient" | "outpatient" | "emergency" | "telemedicine"
 }
 
 interface PendingSubmitOptions {
@@ -75,6 +108,7 @@ export function CreateMedOrderDialog({
 	facilityId,
 	patientId,
 	orderingStaffId,
+	encounterType,
 }: CreateMedOrderDialogProps) {
 	// ── Drug fields ──────────────────────────────────────────────────────────
 	const [genericName, setGenericName] = useState("")
@@ -84,7 +118,8 @@ export function CreateMedOrderDialog({
 	const [doseUnit, setDoseUnit] = useState("")
 	const [doseForm, setDoseForm] = useState("")
 	const [route, setRoute] = useState("")
-	const [frequency, setFrequency] = useState("")
+	const [frequency, setFrequency] = useState<FrequencyValue | "">("")
+	const [firstDoseAt, setFirstDoseAt] = useState(getNextHour())
 	const [durationDays, setDurationDays] = useState("")
 	const [specialInstructions, setSpecialInstructions] = useState("")
 	const [isPrn, setIsPrn] = useState(false)
@@ -100,6 +135,9 @@ export function CreateMedOrderDialog({
 	// ── Allergy state ────────────────────────────────────────────────────────
 	const [allergyOverrideReasons, setAllergyOverrideReasons] = useState<Record<string, string>>({})
 	const [allergyOverriddenAlerts, setAllergyOverriddenAlerts] = useState<Set<string>>(new Set())
+
+	// ── Submit error ─────────────────────────────────────────────────────────
+	const [submitError, setSubmitError] = useState<string | null>(null)
 
 	// ── S-2 validation gate ──────────────────────────────────────────────────
 	const [s2ValidationOpen, setS2ValidationOpen] = useState(false)
@@ -192,6 +230,13 @@ export function CreateMedOrderDialog({
 	const durationNum = durationDays ? Number(durationDays) : 0
 	const needsTranching = isControlledSubstance && durationNum > TRANCHE_THRESHOLD_DAYS
 
+	// ── Schedule anchor helpers ──────────────────────────────────────────────
+	const isRepeatingFrequency = frequency !== "" && REPEATING_FREQUENCIES.includes(frequency as FrequencyValue)
+	const needsInpatientFields =
+		encounterType === "inpatient" || encounterType === "emergency"
+	const durationRequired = isRepeatingFrequency
+	const firstDoseRequired = needsInpatientFields
+
 	// ── Submission readiness ─────────────────────────────────────────────────
 	const requiresDoubleVerification = cdsResult?.requiresDoubleVerification ?? false
 	const canProceedToSubmit =
@@ -200,7 +245,9 @@ export function CreateMedOrderDialog({
 		!!doseUnit.trim() &&
 		!!doseForm.trim() &&
 		!!route.trim() &&
-		!!frequency.trim() &&
+		!!frequency &&
+		(!durationRequired || !!durationDays) &&
+		(!firstDoseRequired || !!firstDoseAt) &&
 		(!isControlledSubstance || !!pdeaSchedule.trim()) &&
 		!hasHardBlock &&
 		allSoftBlocksOverridden &&
@@ -222,6 +269,7 @@ export function CreateMedOrderDialog({
 		setPendingHighAlertVerification(null)
 		setPendingSubmitOptions(null)
 		setHighAlertVerificationError(null)
+		setSubmitError(null)
 	}
 
 	function resetForm() {
@@ -233,6 +281,7 @@ export function CreateMedOrderDialog({
 		setDoseForm("")
 		setRoute("")
 		setFrequency("")
+		setFirstDoseAt(getNextHour())
 		setDurationDays("")
 		setSpecialInstructions("")
 		setIsPrn(false)
@@ -250,6 +299,7 @@ export function CreateMedOrderDialog({
 		setPendingHighAlertVerification(null)
 		setPendingSubmitOptions(null)
 		setHighAlertVerificationError(null)
+		setSubmitError(null)
 	}
 
 	function handleOpenChange(next: boolean) {
@@ -338,6 +388,7 @@ export function CreateMedOrderDialog({
 					}
 				: undefined
 
+		setSubmitError(null)
 		createMedOrder.mutate(
 			{
 				facilityId,
@@ -349,7 +400,8 @@ export function CreateMedOrderDialog({
 				doseUnit: doseUnit.trim(),
 				doseForm: doseForm.trim(),
 				route: route.trim(),
-				frequency: frequency.trim(),
+				frequency: frequency as FrequencyValue,
+				firstDoseAt: firstDoseAt ? new Date(firstDoseAt).toISOString() : undefined,
 				durationDays: trancheDays ?? (durationDays ? Number(durationDays) : undefined),
 				specialInstructions: specialInstructions.trim() || undefined,
 				isPrn,
@@ -363,6 +415,7 @@ export function CreateMedOrderDialog({
 			},
 			{
 				onSuccess: order => handleOrderCreated(order.id),
+				onError: err => setSubmitError(err instanceof Error ? err.message : "Failed to create order"),
 			}
 		)
 	}
@@ -390,7 +443,8 @@ export function CreateMedOrderDialog({
 				doseUnit: doseUnit.trim(),
 				doseForm: doseForm.trim(),
 				route: route.trim(),
-				frequency: frequency.trim(),
+				frequency: frequency as FrequencyValue,
+				firstDoseAt: firstDoseAt ? new Date(firstDoseAt).toISOString() : undefined,
 				durationDays: durationNum,
 				specialInstructions: specialInstructions.trim() || undefined,
 				isPrn,
@@ -402,6 +456,7 @@ export function CreateMedOrderDialog({
 			},
 			{
 				onSuccess: result => handleOrderCreated(result.parentOrder.id),
+				onError: err => setSubmitError(err instanceof Error ? err.message : "Failed to create order"),
 			}
 		)
 	}
@@ -585,6 +640,13 @@ export function CreateMedOrderDialog({
 							</div>
 						)}
 
+						{submitError && (
+							<div className="border-destructive/30 bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+								<AlertCircle className="size-4 shrink-0" />
+								<span>{submitError}</span>
+							</div>
+						)}
+
 						{normalizedAllergyAlerts.length > 0 && (
 							<AllergyAlertBanner
 								alerts={normalizedAllergyAlerts}
@@ -650,25 +712,56 @@ export function CreateMedOrderDialog({
 								<Label htmlFor="frequency">
 									Frequency <span className="text-destructive">*</span>
 								</Label>
-								<Input
-									id="frequency"
-									value={frequency}
-									onChange={e => setFrequency(e.target.value)}
-									placeholder="e.g., q8h"
-								/>
+								<Select value={frequency} onValueChange={v => setFrequency(v as FrequencyValue)}>
+									<SelectTrigger id="frequency" className="w-full">
+										<SelectValue>
+											{frequency
+												? (FREQUENCY_OPTIONS.find(o => o.value === frequency)?.label ?? frequency)
+												: "Select frequency…"}
+										</SelectValue>
+									</SelectTrigger>
+									<SelectContent>
+										{FREQUENCY_OPTIONS.map(opt => (
+											<SelectItem key={opt.value} value={opt.value}>
+												{opt.label}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
 							</div>
 							<div className="space-y-2">
-								<Label htmlFor="durationDays">Duration (days)</Label>
+								<Label htmlFor="durationDays">
+									Duration (days){" "}
+									{durationRequired && <span className="text-destructive">*</span>}
+								</Label>
 								<Input
 									id="durationDays"
 									type="number"
 									min={1}
 									value={durationDays}
 									onChange={e => setDurationDays(e.target.value)}
-									placeholder="Optional"
+									placeholder={durationRequired ? "Required" : "Optional"}
 								/>
 							</div>
 						</div>
+
+						{/* ── First Dose At (inpatient/emergency only) ─── */}
+						{needsInpatientFields && (
+							<div className="space-y-2">
+								<Label htmlFor="firstDoseAt">
+									First Dose At <span className="text-destructive">*</span>
+								</Label>
+								<Input
+									id="firstDoseAt"
+									type="datetime-local"
+									value={firstDoseAt}
+									onChange={e => setFirstDoseAt(e.target.value)}
+								/>
+								<p className="text-muted-foreground text-xs">
+									Required for {encounterType} orders. MAR rows generated on pharmacy approval.
+								</p>
+							</div>
+						)}
 
 						{/* ── Tranche preview hint ─────────────────────── */}
 						{needsTranching && (
