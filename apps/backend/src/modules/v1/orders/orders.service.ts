@@ -12,6 +12,7 @@ import {
 	highAlertVerifications,
 	imagingOrders,
 	labOrders,
+	marEntries,
 	medicationOrders,
 	orderVerifications,
 	patients,
@@ -1168,6 +1169,16 @@ export class OrdersService {
 			})
 		}
 
+		if (input.action === "approved" && medOrder.encounterId && !medOrder.isPrn) {
+			try {
+				await this.generateMarEntries(medOrder)
+			} catch (err) {
+				this.logger.error(
+					`MAR generation failed for order ${input.medicationOrderId}: ${err}`,
+				)
+			}
+		}
+
 		// Return verification with pharmacist name
 		const [result] = await db
 			.select({
@@ -2249,5 +2260,86 @@ export class OrdersService {
 			limit,
 			totalPages: Math.ceil(total / limit),
 		}
+	}
+
+	private async generateMarEntries(medOrder: Awaited<ReturnType<typeof this.findMedOrder>>) {
+		if (!medOrder.encounterId) return
+
+		const [encounter] = await db
+			.select({ encounterType: encounters.encounterType })
+			.from(encounters)
+			.where(eq(encounters.id, medOrder.encounterId))
+			.limit(1)
+
+		if (
+			!encounter ||
+			(encounter.encounterType !== "inpatient" && encounter.encounterType !== "emergency")
+		) {
+			return
+		}
+
+		const { frequency, firstDoseAt, durationDays } = medOrder
+
+		if (frequency === "prn") return
+
+		if (!firstDoseAt) {
+			this.logger.warn(`firstDoseAt null for order ${medOrder.id}, skipping MAR generation`)
+			return
+		}
+
+		const intervalHoursMap: Record<string, number | null> = {
+			stat: null,
+			once: null,
+			q4h: 4,
+			q6h: 6,
+			q8h: 8,
+			q12h: 12,
+			daily: 24,
+			bid: 12,
+			tid: 8,
+			qid: 6,
+		}
+
+		if (!(frequency in intervalHoursMap)) {
+			this.logger.warn(`Unknown frequency "${frequency}" for order ${medOrder.id}, skipping MAR generation`)
+			return
+		}
+
+		const scheduledTimes: Date[] = []
+
+		if (frequency === "stat" || frequency === "once") {
+			scheduledTimes.push(new Date(firstDoseAt))
+		} else {
+			if (!durationDays) {
+				this.logger.warn(`durationDays null for order ${medOrder.id} (${frequency}), skipping MAR generation`)
+				return
+			}
+			const intervalMs = intervalHoursMap[frequency]! * 60 * 60 * 1000
+			const start = new Date(firstDoseAt).getTime()
+			const end = start + durationDays * 24 * 60 * 60 * 1000
+			for (let t = start; t < end; t += intervalMs) {
+				scheduledTimes.push(new Date(t))
+			}
+		}
+
+		if (scheduledTimes.length === 0) return
+
+		const rows = scheduledTimes.map(scheduledTime => ({
+			facilityId: medOrder.facilityId,
+			encounterId: medOrder.encounterId!,
+			preEncounterId: null as string | null,
+			medicationOrderId: medOrder.id,
+			scheduledTime,
+			status: "due" as const,
+			administeredDose: null as string | null,
+			administeredRoute: null as string | null,
+			prnReason: null as string | null,
+			administeredByStaffId: null as string | null,
+			administeredAt: null as Date | null,
+			notes: null as string | null,
+		}))
+
+		await db.insert(marEntries).values(rows).onConflictDoNothing()
+		this.logger.log(`Generated ${rows.length} MAR entries for order ${medOrder.id} (${frequency})`)
 	}
 }

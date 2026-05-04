@@ -84,11 +84,12 @@ export default function EncounterChartLayout({
 	const [breakGlassOpen, setBreakGlassOpen] = useState(false)
 	// Clinicians with audit:create can invoke break-glass
 	const canInvokeBreakGlass = can(permSet, "audit", "create")
+	const canViewAudit = can(permSet, "audit", "view")
 	const { data: activeBreakGlass } = useMyActiveBreakGlassQuery({
 		facilityId: encounter?.facilityId ?? activeFacilityId,
 		patientId: encounter?.patientId ?? patientId,
 		staffId: activeStaffProfile?.id,
-		enabled: canInvokeBreakGlass,
+		enabled: canInvokeBreakGlass && canViewAudit,
 	})
 
 	const base = `/patients/${patientId}/encounters/${encounterId}`
