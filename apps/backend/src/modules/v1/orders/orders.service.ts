@@ -128,6 +128,91 @@ export class OrdersService {
 		return false
 	}
 
+	private getCdsOverrideEntries(cdsOverrides: unknown) {
+		if (!cdsOverrides || typeof cdsOverrides !== "object") {
+			return []
+		}
+
+		const overrides = (cdsOverrides as { overrides?: unknown }).overrides
+		if (!Array.isArray(overrides)) {
+			return []
+		}
+
+		return overrides.filter(
+			(entry): entry is { alertId?: string; reason?: string } =>
+				!!entry &&
+				typeof entry === "object" &&
+				typeof (entry as { reason?: unknown }).reason === "string" &&
+				(entry as { reason: string }).reason.trim().length > 0
+		)
+	}
+
+	private async resolveMedicationOrderPatientId(input: {
+		patientId?: string
+		encounterId?: string
+	}) {
+		if (input.patientId) {
+			return input.patientId
+		}
+
+		if (!input.encounterId) {
+			throw new BadRequestException(
+				"patientId or encounterId is required to run medication safety checks."
+			)
+		}
+
+		const [encounter] = await db
+			.select({ patientId: encounters.patientId })
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+			.limit(1)
+
+		if (!encounter?.patientId) {
+			throw new NotFoundException("Encounter patient not found for medication safety checks")
+		}
+
+		return encounter.patientId
+	}
+
+	private async validateMedicationOrderCds(input: {
+		patientId?: string
+		encounterId?: string
+		facilityId: string
+		formularyItemId?: string
+		genericName: string
+		isControlledSubstance?: boolean
+		orderingStaffId: string
+		cdsOverrides?: unknown
+	}) {
+		const patientId = await this.resolveMedicationOrderPatientId(input)
+		const cdsResult = await this.evaluateCds({
+			patientId,
+			facilityId: input.facilityId,
+			formularyItemId: input.formularyItemId,
+			genericName: input.genericName,
+			isControlledSubstance: input.isControlledSubstance,
+			orderingStaffId: input.orderingStaffId,
+		})
+
+		const hardBlock = cdsResult.alerts.find(alert => alert.severity === "hard_block")
+		if (hardBlock) {
+			throw new BadRequestException(hardBlock.message)
+		}
+
+		const requiredOverrideCount = cdsResult.alerts.filter(
+			alert => alert.severity === "soft_block"
+		).length
+		const providedOverrideCount = this.getCdsOverrideEntries(input.cdsOverrides).length
+
+		if (requiredOverrideCount > providedOverrideCount) {
+			throw new BadRequestException(
+				"Provide clinical override justification for each CDS soft block before submitting the medication order."
+			)
+		}
+
+		return cdsResult.alerts
+	}
+
 	private hasHighAlertAlert(cdsAlerts: unknown) {
 		if (!Array.isArray(cdsAlerts)) {
 			return false
@@ -196,6 +281,7 @@ export class OrdersService {
 							allergenName: allergy.allergenName,
 							allergenType: allergy.allergenType,
 							severity: allergy.severity,
+							reactionType: allergy.reactionType ?? null,
 						},
 					})
 				} else {
@@ -207,6 +293,7 @@ export class OrdersService {
 							allergenName: allergy.allergenName,
 							allergenType: allergy.allergenType,
 							severity: allergy.severity,
+							reactionType: allergy.reactionType ?? null,
 						},
 					})
 				}
@@ -550,6 +637,23 @@ export class OrdersService {
 			}
 		}
 
+		if (!Array.isArray(input.cdsAlerts)) {
+			throw new BadRequestException(
+				"Run the CDS safety check before submitting the medication order."
+			)
+		}
+
+		const evaluatedCdsAlerts = await this.validateMedicationOrderCds({
+			patientId: input.patientId,
+			encounterId: input.encounterId,
+			facilityId: input.facilityId,
+			formularyItemId: input.formularyItemId,
+			genericName: input.genericName,
+			isControlledSubstance: input.isControlledSubstance,
+			orderingStaffId: staff.id,
+			cdsOverrides: input.cdsOverrides,
+		})
+
 		const [created] = await db
 			.insert(medicationOrders)
 			.values({
@@ -576,7 +680,7 @@ export class OrdersService {
 				pdeaTrancheTotal: input.pdeaTrancheTotal ?? null,
 				status: "pending_verification",
 				orderingStaffId: staff.id,
-				cdsAlerts: input.cdsAlerts ?? null,
+				cdsAlerts: evaluatedCdsAlerts,
 				cdsOverrides: input.cdsOverrides ?? null,
 			})
 			.returning()
@@ -1692,6 +1796,23 @@ export class OrdersService {
 		const [staff] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId))
 		if (!staff) throw new NotFoundException("Staff profile not found for user")
 
+		if (!Array.isArray(input.cdsAlerts)) {
+			throw new BadRequestException(
+				"Run the CDS safety check before submitting the medication order."
+			)
+		}
+
+		const evaluatedCdsAlerts = await this.validateMedicationOrderCds({
+			patientId: input.patientId,
+			encounterId: input.encounterId,
+			facilityId: input.facilityId,
+			formularyItemId: input.formularyItemId,
+			genericName: input.genericName,
+			isControlledSubstance: true,
+			orderingStaffId: staff.id,
+			cdsOverrides: input.cdsOverrides,
+		})
+
 		const preview = await this.previewTranches({
 			facilityId: input.facilityId,
 			genericName: input.genericName,
@@ -1704,25 +1825,10 @@ export class OrdersService {
 
 		const totalTranches = preview.tranches.length
 		const buildTrancheCdsAlerts = (dispenseDate: string) => {
-			if (
-				input.cdsAlerts &&
-				typeof input.cdsAlerts === "object" &&
-				!Array.isArray(input.cdsAlerts)
-			) {
-				return {
-					...(input.cdsAlerts as Record<string, unknown>),
-					pdeaDispenseDate: dispenseDate,
-				}
+			return {
+				alerts: evaluatedCdsAlerts,
+				pdeaDispenseDate: dispenseDate,
 			}
-
-			if (input.cdsAlerts != null) {
-				return {
-					alerts: input.cdsAlerts,
-					pdeaDispenseDate: dispenseDate,
-				}
-			}
-
-			return { pdeaDispenseDate: dispenseDate }
 		}
 
 		// Create parent order (represents the full course; not dispensed directly)
@@ -1753,7 +1859,7 @@ export class OrdersService {
 				parentOrderId: null,
 				status: "pending_verification",
 				orderingStaffId: staff.id,
-				cdsAlerts: input.cdsAlerts ?? null,
+				cdsAlerts: evaluatedCdsAlerts,
 				cdsOverrides: input.cdsOverrides ?? null,
 			})
 			.returning()
