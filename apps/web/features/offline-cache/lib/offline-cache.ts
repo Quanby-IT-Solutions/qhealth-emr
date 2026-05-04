@@ -7,12 +7,13 @@
  */
 
 const CACHE_KEY_PREFIX = "qhealth_offline_patients_"
-const CACHE_VERSION = 1
+const CACHE_VERSION = 2
 
 export interface OfflinePatientSummary {
 	id: string
 	mrn: string
 	firstName: string
+	middleName: string | null
 	lastName: string
 	dateOfBirth: string
 	sex: string
