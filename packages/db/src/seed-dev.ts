@@ -52,7 +52,7 @@ import {
 } from "./schema/index.js"
 
 const DATABASE_URL = process.env.DATABASE_URL
-const AUTH_API = process.env.SEED_AUTH_API_URL ?? "http://localhost:3000/api/v1/auth/"
+const AUTH_API = process.env.SEED_AUTH_API_URL
 const WEB_ORIGIN = process.env.SEED_WEB_ORIGIN ?? "http://localhost:3001"
 const DEFAULT_PASSWORD = process.env.SEED_DEFAULT_PASSWORD ?? "Password123"
 
@@ -62,6 +62,8 @@ if (!DATABASE_URL) {
 }
 
 const db = createDBClient(DATABASE_URL)
+let authModulePromise: Promise<{ getAuth: () => { api: { signUpEmail: (input: { body: unknown }) => Promise<unknown> } } }> | null =
+	null
 
 async function assertSeedSchemaReady() {
 	const result = await db.execute(
@@ -469,6 +471,17 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 async function postAuth(path: string, data: unknown) {
+	if (!AUTH_API) {
+		process.env.BETTER_AUTH_SECRET ??= "seed-dev-secret-not-for-production"
+		process.env.BETTER_AUTH_TRUSTED_ORIGINS ??= `${WEB_ORIGIN},http://localhost:3000`
+		authModulePromise ??= import(new URL("../../auth/src/index.ts", import.meta.url).href) as Promise<{
+			getAuth: () => { api: { signUpEmail: (input: { body: unknown }) => Promise<unknown> } }
+		}>
+		const { getAuth } = await authModulePromise
+		await getAuth().api.signUpEmail({ body: data })
+		return { ok: true, status: 200, text: async () => "" }
+	}
+
 	return fetch(new URL(path, AUTH_API), {
 		method: "POST",
 		headers: {

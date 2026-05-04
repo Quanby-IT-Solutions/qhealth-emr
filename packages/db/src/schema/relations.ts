@@ -1,6 +1,6 @@
 import { defineRelations } from "drizzle-orm"
 
-import { accounts, sessions, users, verifications } from "./auth.js"
+import { accounts, sessions, twoFactors, users, verifications } from "./auth.js"
 import { auditLogs, breakGlassEvents, notifications } from "./audit.js"
 import {
 	charges,
@@ -51,6 +51,7 @@ export const relations = defineRelations(
 		sessions,
 		accounts,
 		verifications,
+		twoFactors,
 		// RBAC
 		facilities,
 		staffProfiles,
@@ -137,6 +138,7 @@ export const relations = defineRelations(
 		users: {
 			sessions: r.many.sessions(),
 			accounts: r.many.accounts(),
+			twoFactors: r.many.twoFactors(),
 			staffProfiles: r.many.staffProfiles(),
 			auditLogs: r.many.auditLogs(),
 		},
@@ -149,6 +151,12 @@ export const relations = defineRelations(
 		accounts: {
 			user: r.one.users({
 				from: r.accounts.userId,
+				to: r.users.id,
+			}),
+		},
+		twoFactors: {
+			user: r.one.users({
+				from: r.twoFactors.userId,
 				to: r.users.id,
 			}),
 		},

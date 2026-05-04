@@ -5,7 +5,7 @@ import { openAPI, twoFactor } from "better-auth/plugins"
 import { z } from "zod"
 
 import { createDBClient } from "@repo/db/client"
-import { accounts, sessions, users, verifications } from "@repo/db/schema"
+import { accounts, sessions, twoFactors, users, verifications } from "@repo/db/schema"
 
 /**
  * Type-safe environment variable validation for Auth package
@@ -57,6 +57,7 @@ export function createAuth(): ReturnType<typeof betterAuth> {
 				sessions,
 				accounts,
 				verifications,
+				twoFactors,
 			},
 			usePlural: true,
 		}),
