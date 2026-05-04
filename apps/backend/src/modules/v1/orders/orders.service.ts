@@ -2279,8 +2279,13 @@ export class OrdersService {
 		}
 
 		const { frequency, firstDoseAt, durationDays } = medOrder
+		const normalizedFrequency = frequency.trim().toLowerCase()
+		const frequencyAliasMap: Record<string, string> = {
+			od: "daily",
+		}
+		const marFrequency = frequencyAliasMap[normalizedFrequency] ?? normalizedFrequency
 
-		if (frequency === "prn") return
+		if (marFrequency === "prn") return
 
 		if (!firstDoseAt) {
 			this.logger.warn(`firstDoseAt null for order ${medOrder.id}, skipping MAR generation`)
@@ -2300,21 +2305,21 @@ export class OrdersService {
 			qid: 6,
 		}
 
-		if (!(frequency in intervalHoursMap)) {
+		if (!(marFrequency in intervalHoursMap)) {
 			this.logger.warn(`Unknown frequency "${frequency}" for order ${medOrder.id}, skipping MAR generation`)
 			return
 		}
 
 		const scheduledTimes: Date[] = []
 
-		if (frequency === "stat" || frequency === "once") {
+		if (marFrequency === "stat" || marFrequency === "once") {
 			scheduledTimes.push(new Date(firstDoseAt))
 		} else {
 			if (!durationDays) {
 				this.logger.warn(`durationDays null for order ${medOrder.id} (${frequency}), skipping MAR generation`)
 				return
 			}
-			const intervalMs = intervalHoursMap[frequency]! * 60 * 60 * 1000
+			const intervalMs = intervalHoursMap[marFrequency]! * 60 * 60 * 1000
 			const start = new Date(firstDoseAt).getTime()
 			const end = start + durationDays * 24 * 60 * 60 * 1000
 			for (let t = start; t < end; t += intervalMs) {
@@ -2340,6 +2345,6 @@ export class OrdersService {
 		}))
 
 		await db.insert(marEntries).values(rows).onConflictDoNothing()
-		this.logger.log(`Generated ${rows.length} MAR entries for order ${medOrder.id} (${frequency})`)
+		this.logger.log(`Generated ${rows.length} MAR entries for order ${medOrder.id} (${marFrequency})`)
 	}
 }
