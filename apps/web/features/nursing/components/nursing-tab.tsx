@@ -10,6 +10,7 @@ import { IoTracking } from "./io-tracking"
 import { MarScreen } from "./mar-screen"
 import { ShiftHandoffForm } from "./shift-handoff-form"
 import { TarScreen } from "./tar-screen"
+import { TransfusionVerification } from "./transfusion-verification"
 import { VitalsPanel } from "./vitals-entry-form"
 
 // ============================================================================
@@ -36,6 +37,7 @@ export function NursingTab({ encounterId, facilityId, patientId, patientDateOfBi
 				<TabsTrigger value="flowsheets">Flowsheets</TabsTrigger>
 				<TabsTrigger value="handoff">Handoff</TabsTrigger>
 				<TabsTrigger value="hai">HAI Tags</TabsTrigger>
+				<TabsTrigger value="transfusion">Transfusion</TabsTrigger>
 				{patientDateOfBirth && isNewborn(patientDateOfBirth) && (
 					<TabsTrigger value="nbs">NBS</TabsTrigger>
 				)}
@@ -61,6 +63,9 @@ export function NursingTab({ encounterId, facilityId, patientId, patientDateOfBi
 			</TabsContent>
 			<TabsContent value="hai">
 				<HaiTagForm encounterId={encounterId} facilityId={facilityId} readOnly={readOnly} />
+			</TabsContent>
+			<TabsContent value="transfusion">
+				<TransfusionVerification encounterId={encounterId} />
 			</TabsContent>
 			{patientDateOfBirth && isNewborn(patientDateOfBirth) && (
 				<TabsContent value="nbs">

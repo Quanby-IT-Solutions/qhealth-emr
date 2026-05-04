@@ -69,6 +69,37 @@ function formatPatientName({
 	return [firstName, middleName, lastName].filter(Boolean).join(" ")
 }
 
+function normalizeSearchTokens(search: string) {
+	return search
+		.trim()
+		.replaceAll(",", " ")
+		.split(/\s+/)
+		.map(token => token.trim().toLowerCase())
+		.filter(Boolean)
+}
+
+function matchesPatientNameSearch(
+	patient: {
+		firstName: string
+		middleName?: string | null
+		lastName: string
+		mrn: string
+	},
+	search: string
+) {
+	const tokens = normalizeSearchTokens(search)
+
+	if (tokens.length === 0) {
+		return true
+	}
+
+	const fields = [patient.firstName, patient.middleName ?? "", patient.lastName, patient.mrn].map(
+		value => value.toLowerCase()
+	)
+
+	return tokens.every(token => fields.some(field => field.includes(token)))
+}
+
 function buildRegisterHref({ pendingTriageId, mode }: { pendingTriageId?: string; mode?: "new" }) {
 	const params = new URLSearchParams()
 
@@ -192,11 +223,9 @@ export function PatientRegisterPageContent() {
 	const hasNameFilter = trimmedNameFilter.length > 0
 	const hasBirthdateFilter = birthdateFilter.length > 0
 	const hasPhilhealthFilter = trimmedPhilhealthFilter.length > 0
-	const hasNameDobSearch = hasNameFilter && hasBirthdateFilter
-	const hasPartialNameDob = (hasNameFilter || hasBirthdateFilter) && !hasNameDobSearch
 	const hasSearchInput = hasNameFilter || hasBirthdateFilter || hasPhilhealthFilter
-	const canRunSearch =
-		!!facilityId && canSearchPatients && (hasPhilhealthFilter || hasNameDobSearch)
+	const hasBirthdateOnly = hasBirthdateFilter && !hasNameFilter && !hasPhilhealthFilter
+	const canRunSearch = !!facilityId && canSearchPatients && (hasPhilhealthFilter || hasNameFilter)
 
 	const createEncounter = useCreateEncounterMutation()
 	const { isOnline, offlinePatients, cachedAt } = useOfflinePatients()
@@ -230,11 +259,7 @@ export function PatientRegisterPageContent() {
 		const dateOfBirth = committedParams.dateOfBirth
 
 		return offlinePatients.filter(patient => {
-			const fullName = `${patient.firstName} ${patient.lastName}`.toLowerCase()
-			const nameMatch =
-				!searchTerm ||
-				fullName.includes(searchTerm) ||
-				patient.mrn.toLowerCase().includes(searchTerm)
+			const nameMatch = matchesPatientNameSearch(patient, searchTerm)
 			const dobMatch = !dateOfBirth || patient.dateOfBirth === dateOfBirth
 			return patient.isActive && nameMatch && dobMatch
 		})
@@ -247,8 +272,8 @@ export function PatientRegisterPageContent() {
 			return
 		}
 
-		if (!hasPhilhealthFilter && !hasNameDobSearch) {
-			toast.error("Search with both the full name and date of birth, or use a PhilHealth number.")
+		if (!hasPhilhealthFilter && !hasNameFilter) {
+			toast.error("Enter a patient name or PhilHealth number to search. Date of birth is optional.")
 			return
 		}
 
@@ -329,8 +354,8 @@ export function PatientRegisterPageContent() {
 	const subtitle = pendingTriageId
 		? "Search for an existing patient to reconcile this walk-in triage intake, or continue to new-patient registration when no record exists."
 		: canOpenRegistrationWorkflow
-			? "Search by full name plus date of birth, or use a PhilHealth number to avoid duplicate charts before issuing a new MRN."
-			: "Search by full name plus date of birth, or use a PhilHealth number to open an existing patient record."
+			? "Search by patient name, optionally add date of birth to narrow the results, or use a PhilHealth number to avoid duplicate charts before issuing a new MRN."
+			: "Search by patient name, optionally add date of birth to narrow the results, or use a PhilHealth number to open an existing patient record."
 	const helperCopy = pendingTriageId
 		? "Search for the patient who already has a chart, or continue with new-patient registration if this is the first visit."
 		: canOpenRegistrationWorkflow
@@ -387,10 +412,10 @@ export function PatientRegisterPageContent() {
 					<form onSubmit={handleSearch} className="space-y-6">
 						<div className="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_auto_minmax(0,1fr)]">
 							<div className="grid gap-4 md:grid-cols-2">
-								<SearchField htmlFor="patient-name" label="Full name" icon={UserRound}>
+								<SearchField htmlFor="patient-name" label="Patient name" icon={UserRound}>
 									<Input
 										id="patient-name"
-										placeholder="Enter the patient’s full name"
+										placeholder="Enter first, middle, or last name"
 										value={nameFilter}
 										className="border-border/60 bg-background h-11 rounded-xl"
 										onChange={e => setNameFilter(e.target.value)}
@@ -445,11 +470,11 @@ export function PatientRegisterPageContent() {
 
 						<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 							<div className="text-muted-foreground text-sm">
-								{hasPartialNameDob && !hasPhilhealthFilter
-									? "Full name and date of birth must be used together when searching by demographics."
+								{hasBirthdateOnly
+									? "Add a patient name or PhilHealth number. Date of birth only narrows the results."
 									: !canSearchPatients
 										? "Search is unavailable for your current role."
-										: "Use either the demographics pair or a PhilHealth number to search."}
+										: "Search by patient name, optionally add date of birth, or use a PhilHealth number."}
 							</div>
 
 							<div className="flex justify-end gap-3">

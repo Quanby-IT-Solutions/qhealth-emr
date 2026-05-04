@@ -161,6 +161,7 @@ DONE TEST - KARL
   - **So that** PhilHealth Konsulta capitation requirements are fulfilled
   - **Pages**: FPE Template Page, FPE Submission Page
 
+DONE - KARL
 - **Story 4.4 – Electronic Consent Capture**
   - **As a** Nurse
   - **I want to** capture electronic patient consent before sensitive data transmission or procedures
@@ -218,14 +219,14 @@ DONE - KARL
   - **So that** the 24–48 hour screening window mandated by NBS protocols is enforced
   - **Pages**: NBS Logbook Page, NBS Specimen Capture Page
 
-STILL NOT YET TEST
+DONE - KARL
 - **Story 6.2 – Parental Consent / Waiver Capture**
   - **As a** Nurse
   - **I want to** capture electronic parental consent or waiver for newborn screening
   - **So that** statutory consent obligations are met and auditable
   - **Pages**: NBS Consent Page, Waiver Page
 
-STILL NOT YET TEST
+DONE - KARL
 - **Story 6.3 – NBS Positive Result Referral Tracking**
   - **As a** Nurse
   - **I want to** track referral pathways for newborns with positive screening results
@@ -312,7 +313,7 @@ DONE TEST - KARL
   - **So that** transfusion authorization is tracked end-to-end
   - **Pages**: Cross-Match Approval Page, Blood Product Inventory Page
 
-NOT YET IMPLEMENTED -KARL 
+DONE - KARL
 - **Story 8.4 – Bedside Transfusion Verification**
   - **As a** Nurse
   - **I want to** scan barcodes for patient, blood product, and CPOE order before transfusion

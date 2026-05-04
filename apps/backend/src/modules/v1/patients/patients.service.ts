@@ -1,16 +1,20 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, gte, ilike, inArray, lt, max, or, sql } from "drizzle-orm"
 
-import { encounterStatusEvents, encounters, opdTriageIntakes, patients, staffProfiles, users } from "@repo/db/schema"
+import {
+	encounters,
+	encounterStatusEvents,
+	opdTriageIntakes,
+	patients,
+	staffProfiles,
+	users,
+} from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
-import { resolveStepTarget } from "@/utils/sla-step-target"
 import type { V1Inputs } from "@/config/contract-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
-import {
-	type ChartAccessActor,
-	ChartAccessService,
-} from "@/modules/v1/audit/chart-access.service"
+import { ChartAccessService, type ChartAccessActor } from "@/modules/v1/audit/chart-access.service"
+import { resolveStepTarget } from "@/utils/sla-step-target"
 
 type PatientSearchInput = V1Inputs["patient"]["search"]
 type CreatePatientInput = V1Inputs["patient"]["create"]
@@ -52,12 +56,7 @@ export class PatientsService {
 			})
 			.from(staffProfiles)
 			.innerJoin(users, eq(staffProfiles.userId, users.id))
-			.where(
-				and(
-					eq(staffProfiles.facilityId, input.facilityId),
-					eq(staffProfiles.isActive, true)
-				)
-			)
+			.where(and(eq(staffProfiles.facilityId, input.facilityId), eq(staffProfiles.isActive, true)))
 			.orderBy(users.name)
 
 		return {
@@ -89,14 +88,13 @@ export class PatientsService {
 		conditions.push(eq(patients.isActive, isActive))
 
 		if (filter.search) {
-			const s = this.escapeLike(filter.search)
-			conditions.push(
-				or(
-					ilike(patients.firstName, `%${s}%`),
-					ilike(patients.lastName, `%${s}%`),
-					ilike(patients.mrn, `%${s}%`)
-				)!
-			)
+			const searchTokens = this.tokenizeSearch(filter.search)
+
+			if (searchTokens.length > 0) {
+				conditions.push(
+					and(...searchTokens.map(token => this.buildPatientSearchTokenCondition(token)))!
+				)
+			}
 		}
 
 		if (filter.mrn) {
@@ -178,9 +176,7 @@ export class PatientsService {
 			data: data.map(row => ({
 				...row,
 				lastEncounterDate: row.lastEncounterDate ?? null,
-				hasDirectAccess: filter.clinicianStaffId
-					? hasDirectAccessSet.has(row.id)
-					: true,
+				hasDirectAccess: filter.clinicianStaffId ? hasDirectAccessSet.has(row.id) : true,
 			})),
 			total,
 			page,
@@ -373,16 +369,13 @@ export class PatientsService {
 						.from(opdTriageIntakes)
 						.where(eq(opdTriageIntakes.id, input.pendingTriageId))
 					if (!intake) {
-						throw new NotFoundException(
-							`Triage intake ${input.pendingTriageId} not found`
-						)
+						throw new NotFoundException(`Triage intake ${input.pendingTriageId} not found`)
 					}
 					if (intake.facilityId !== input.facilityId) {
-						throw new BadRequestException(
-							`Triage intake does not belong to this facility`
-						)
+						throw new BadRequestException(`Triage intake does not belong to this facility`)
 					}
-					if (intake.status !== "pending_registration") { // PS-043
+					if (intake.status !== "pending_registration") {
+						// PS-043
 						throw new BadRequestException(
 							`Triage intake is no longer eligible for registration (status: ${intake.status})`
 						)
@@ -573,6 +566,26 @@ export class PatientsService {
 		return str.replace(/[%_\\]/g, "\\$&")
 	}
 
+	private tokenizeSearch(search: string): string[] {
+		return search
+			.trim()
+			.replaceAll(",", " ")
+			.split(/\s+/)
+			.map(token => token.trim())
+			.filter(Boolean)
+	}
+
+	private buildPatientSearchTokenCondition(token: string) {
+		const escapedToken = this.escapeLike(token)
+
+		return or(
+			ilike(patients.firstName, `%${escapedToken}%`),
+			ilike(patients.middleName, `%${escapedToken}%`),
+			ilike(patients.lastName, `%${escapedToken}%`),
+			ilike(patients.mrn, `%${escapedToken}%`)
+		)!
+	}
+
 	/** Detect a PostgreSQL unique-constraint violation (SQLSTATE 23505). */
 	private isUniqueMrnViolation(err: unknown): boolean {
 		return (
@@ -596,12 +609,7 @@ export class PatientsService {
 		const [result] = await db
 			.select({ count: count() })
 			.from(patients)
-			.where(
-				and(
-					eq(patients.facilityId, facilityId),
-					ilike(patients.mrn, `${prefix}%`)
-				)
-			)
+			.where(and(eq(patients.facilityId, facilityId), ilike(patients.mrn, `${prefix}%`)))
 
 		const sequence = (result?.count ?? 0) + 1
 		return `${prefix}${sequence.toString().padStart(4, "0")}`
