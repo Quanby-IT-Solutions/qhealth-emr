@@ -322,9 +322,10 @@ interface OrdersTabProps {
 	encounterId: string
 	facilityId: string
 	patientId: string
+	encounterType?: "inpatient" | "outpatient" | "emergency" | "telemedicine"
 }
 
-export function OrdersTab({ encounterId, facilityId, patientId }: OrdersTabProps) {
+export function OrdersTab({ encounterId, facilityId, patientId, encounterType }: OrdersTabProps) {
 	const [createMedOpen, setCreateMedOpen] = useState(false)
 	const [createLabOpen, setCreateLabOpen] = useState(false)
 	const [createImagingOpen, setCreateImagingOpen] = useState(false)
@@ -681,6 +682,7 @@ export function OrdersTab({ encounterId, facilityId, patientId }: OrdersTabProps
 				facilityId={facilityId}
 				patientId={patientId}
 				orderingStaffId={orderingStaffId}
+				encounterType={encounterType}
 			/>
 			<CreateLabOrderDialog
 				open={createLabOpen}

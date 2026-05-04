@@ -224,6 +224,7 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 						encounterId={encounterId}
 						facilityId={encounter.facilityId}
 						patientId={patientId}
+						encounterType={encounter.encounterType}
 					/>
 				</TabsContent>
 

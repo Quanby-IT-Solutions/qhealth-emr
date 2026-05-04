@@ -24,6 +24,20 @@ const PaginatedResponseSchema = z.object({
 // Enums
 // ============================================================================
 
+export const MedOrderFrequencyEnum = z.enum([
+	"stat",
+	"once",
+	"q4h",
+	"q6h",
+	"q8h",
+	"q12h",
+	"daily",
+	"bid",
+	"tid",
+	"qid",
+	"prn",
+])
+
 export const MedOrderStatusEnum = z.enum([
 	"pending_verification",
 	"verified",
@@ -149,6 +163,7 @@ export const MedOrderSchema = z.object({
 	doseForm: z.string(),
 	route: z.string(),
 	frequency: z.string(),
+	firstDoseAt: dateOrString.nullable(),
 	durationDays: z.number().nullable(),
 	specialInstructions: z.string().nullable(),
 	isPrn: z.boolean(),
@@ -193,7 +208,8 @@ export const CreateMedOrderSchema = z.object({
 	doseUnit: z.string().min(1),
 	doseForm: z.string().min(1),
 	route: z.string().min(1),
-	frequency: z.string().min(1),
+	frequency: MedOrderFrequencyEnum,
+	firstDoseAt: z.string().datetime().optional(),
 	durationDays: z.number().int().positive().optional(),
 	specialInstructions: z.string().optional(),
 	isPrn: z.boolean().optional(),
@@ -212,7 +228,8 @@ export const UpdateMedOrderSchema = z.object({
 	doseUnit: z.string().optional(),
 	doseForm: z.string().optional(),
 	route: z.string().optional(),
-	frequency: z.string().optional(),
+	frequency: MedOrderFrequencyEnum.optional(),
+	firstDoseAt: z.string().datetime().optional(),
 	durationDays: z.number().int().positive().optional(),
 	specialInstructions: z.string().optional(),
 	isPrn: z.boolean().optional(),
@@ -560,7 +577,8 @@ export const CreateTranchedOrdersSchema = z.object({
 	doseUnit: z.string().min(1),
 	doseForm: z.string().min(1),
 	route: z.string().min(1),
-	frequency: z.string().min(1),
+	frequency: MedOrderFrequencyEnum,
+	firstDoseAt: z.string().datetime().optional(),
 	durationDays: z.number().int().positive(),
 	specialInstructions: z.string().optional(),
 	isPrn: z.boolean().optional(),

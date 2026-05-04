@@ -104,6 +104,7 @@ export const medicationOrders = createTable(
 		doseForm: t.text("dose_form").notNull(),
 		route: t.text("route").notNull(),
 		frequency: t.text("frequency").notNull(),
+		firstDoseAt: t.timestamp("first_dose_at"),
 		durationDays: t.integer("duration_days"),
 		specialInstructions: t.text("special_instructions"),
 		isPrn: t.boolean("is_prn").notNull().default(false),
