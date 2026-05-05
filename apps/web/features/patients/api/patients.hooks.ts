@@ -4,6 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { orpc } from "@/services/orpc/client"
 
+function shouldRetryDetailQuery(error: unknown, failureCount: number) {
+	const candidate = error as { status?: number } | null
+	if (candidate?.status === 403 || candidate?.status === 404) {
+		return false
+	}
+
+	return failureCount < 3
+}
+
 // ============================================================================
 // Search
 // ============================================================================
@@ -52,6 +61,7 @@ export function usePatientProfileQuery(patientId: string) {
 		orpc.patient.get.queryOptions({
 			input: { id: patientId },
 			enabled: !!patientId,
+			retry: (failureCount, error) => shouldRetryDetailQuery(error, failureCount),
 		})
 	)
 }

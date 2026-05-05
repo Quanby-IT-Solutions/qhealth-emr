@@ -119,7 +119,7 @@ function SingleAlert({
 								disabled={!overrideReason?.trim()}
 								onClick={() => {
 									if (overrideReason?.trim()) {
-										onOverride(overrideReason.trim())
+										onOverride?.(overrideReason.trim())
 										setShowOverride(false)
 									}
 								}}

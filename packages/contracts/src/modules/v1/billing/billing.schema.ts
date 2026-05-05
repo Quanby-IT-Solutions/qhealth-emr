@@ -614,6 +614,21 @@ export const Cf5BillingItemSchema = z.object({
 	isPhilhealthCovered: z.boolean(),
 })
 
+export const Cf5SurgicalProcedureReadinessSchema = z.object({
+	operationRecordId: z.string().uuid(),
+	procedureLabel: z.string(),
+	operationRecordSigned: z.boolean(),
+	primaryCodeCount: z.number().int(),
+	adjunctCodeCount: z.number().int(),
+	isReady: z.boolean(),
+})
+
+export const Cf5SurgicalReadinessSchema = z.object({
+	isReady: z.boolean(),
+	missingProcedureLabels: z.array(z.string()),
+	procedures: z.array(Cf5SurgicalProcedureReadinessSchema),
+})
+
 export const Cf5WithBillingSchema = z.object({
 	cf5: Cf5AssignmentSchema,
 	billingItems: z.array(Cf5BillingItemSchema),
@@ -621,6 +636,7 @@ export const Cf5WithBillingSchema = z.object({
 	philhealthCoverage: z.number(),
 	patientResponsibility: z.number(),
 	approvalRequired: z.boolean(),
+	surgicalReadiness: Cf5SurgicalReadinessSchema,
 })
 
 export const GetCf5WithBillingInputSchema = z.object({

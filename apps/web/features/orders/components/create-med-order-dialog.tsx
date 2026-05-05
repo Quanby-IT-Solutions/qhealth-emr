@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { AlertCircle, Eye, ShieldAlert } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -34,7 +34,6 @@ import {
 	type CdsEvaluateResponse,
 } from "@/features/orders/api/orders.hooks"
 import { DrugSearchCombobox } from "@/features/orders/components/drug-search-combobox"
-import { useActiveAllergiesQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
 
 import { AllergyAlertBanner, type AllergyAlertItem } from "./allergy-alert-banner"
 import { CdsAlertBanner, type CdsAlertItem } from "./cds-alert-banner"
@@ -129,6 +128,7 @@ export function CreateMedOrderDialog({
 
 	// ── CDS state ────────────────────────────────────────────────────────────
 	const [cdsResult, setCdsResult] = useState<CdsResult | null>(null)
+	const [lastCdsCheckSignature, setLastCdsCheckSignature] = useState<string | null>(null)
 	const [overrideReasons, setOverrideReasons] = useState<Record<string, string>>({})
 	const [overriddenAlerts, setOverriddenAlerts] = useState<Set<string>>(new Set())
 
@@ -156,7 +156,6 @@ export function CreateMedOrderDialog({
 
 	// ── Hooks ────────────────────────────────────────────────────────────────
 	const { data: profile } = useMyProfile()
-	const { data: activeAllergies } = useActiveAllergiesQuery(patientId)
 	const evaluateCds = useEvaluateCdsMutation()
 	const createHighAlertVerification = useCreateHighAlertVerificationMutation()
 	const createMedOrder = useCreateMedOrderMutation()
@@ -195,13 +194,36 @@ export function CreateMedOrderDialog({
 		setIsControlledSubstance(true)
 	}
 
+	const cdsCheckSignature = useMemo(
+		() =>
+			JSON.stringify({
+				patientId,
+				facilityId,
+				orderingStaffId,
+				formularyItemId: formularyItemId ?? null,
+				genericName: genericName.trim().toLowerCase(),
+				isControlledSubstance,
+			}),
+		[
+			patientId,
+			facilityId,
+			orderingStaffId,
+			formularyItemId,
+			genericName,
+			isControlledSubstance,
+		]
+	)
+	const hasFreshCdsCheck = cdsResult !== null && lastCdsCheckSignature === cdsCheckSignature
+	const freshCdsAlerts = hasFreshCdsCheck ? (cdsResult?.alerts ?? []) : []
+
 	// ── CDS helpers ──────────────────────────────────────────────────────────
-	const normalizedAlerts: CdsAlertItem[] =
-		cdsResult?.alerts.map((a, i) => ({
-			id: String(i),
+	const normalizedAlerts: CdsAlertItem[] = freshCdsAlerts
+		.filter(a => a.type !== "allergy_hard_block" && a.type !== "allergy_soft_block")
+		.map((a, i) => ({
+			id: `cds-${i}`,
 			severity: a.type === "high_alert" ? "high_alert" : (a.severity as CdsAlertItem["severity"]),
 			message: a.message,
-		})) ?? []
+		}))
 
 	const hasHardBlock = normalizedAlerts.some(a => a.severity === "hard_block")
 	const unoverriddenSoftBlocks = normalizedAlerts.filter(
@@ -210,15 +232,23 @@ export function CreateMedOrderDialog({
 	const allSoftBlocksOverridden = unoverriddenSoftBlocks.length === 0
 
 	// ── Allergy helpers ──────────────────────────────────────────────────────
-	const normalizedAllergyAlerts: AllergyAlertItem[] = (activeAllergies?.allergies ?? [])
-		.filter(a => a.allergenType === "medication")
-		.map((a, i) => ({
-			id: `allergy-${i}`,
-			blockType: a.severity === "severe" ? "hard_block" : "soft_block",
-			allergenName: a.allergenName,
-			severity: a.severity,
-			reactionType: a.reactionType,
-		}))
+	const normalizedAllergyAlerts: AllergyAlertItem[] = freshCdsAlerts
+		.filter(a => a.type === "allergy_hard_block" || a.type === "allergy_soft_block")
+		.map((a, i) => {
+			const details = (a.details ?? {}) as {
+				allergenName?: string
+				severity?: string
+				reactionType?: string | null
+			}
+
+			return {
+				id: `allergy-${i}`,
+				blockType: a.severity === "hard_block" ? "hard_block" : "soft_block",
+				allergenName: details.allergenName ?? genericName.trim(),
+				severity: details.severity ?? "unknown",
+				reactionType: details.reactionType ?? null,
+			}
+		})
 
 	const hasAllergyHardBlock = normalizedAllergyAlerts.some(a => a.blockType === "hard_block")
 	const unoverriddenAllergySoftBlocks = normalizedAllergyAlerts.filter(
@@ -238,7 +268,9 @@ export function CreateMedOrderDialog({
 	const firstDoseRequired = needsInpatientFields
 
 	// ── Submission readiness ─────────────────────────────────────────────────
-	const requiresDoubleVerification = cdsResult?.requiresDoubleVerification ?? false
+	const requiresDoubleVerification = hasFreshCdsCheck
+		? (cdsResult?.requiresDoubleVerification ?? false)
+		: false
 	const canProceedToSubmit =
 		!!genericName.trim() &&
 		!!dose.trim() &&
@@ -246,6 +278,7 @@ export function CreateMedOrderDialog({
 		!!doseForm.trim() &&
 		!!route.trim() &&
 		!!frequency &&
+		hasFreshCdsCheck &&
 		(!durationRequired || !!durationDays) &&
 		(!firstDoseRequired || !!firstDoseAt) &&
 		(!isControlledSubstance || !!pdeaSchedule.trim()) &&
@@ -261,8 +294,11 @@ export function CreateMedOrderDialog({
 	function resetDrugSelectionState() {
 		setBrandName("")
 		setCdsResult(null)
+		setLastCdsCheckSignature(null)
 		setOverrideReasons({})
 		setOverriddenAlerts(new Set())
+		setAllergyOverrideReasons({})
+		setAllergyOverriddenAlerts(new Set())
 		setHighAlertVerified(false)
 		setHighAlertVerifyOpen(false)
 		setPendingHighAlertOrderId(null)
@@ -289,6 +325,7 @@ export function CreateMedOrderDialog({
 		setIsControlledSubstance(false)
 		setPdeaSchedule("")
 		setCdsResult(null)
+		setLastCdsCheckSignature(null)
 		setOverrideReasons({})
 		setOverriddenAlerts(new Set())
 		setAllergyOverrideReasons({})
@@ -309,6 +346,19 @@ export function CreateMedOrderDialog({
 
 	function handleCheckCds() {
 		if (!genericName.trim() || !orderingStaffId) return
+		const nextSignature = cdsCheckSignature
+		setCdsResult(null)
+		setLastCdsCheckSignature(null)
+		setOverrideReasons({})
+		setOverriddenAlerts(new Set())
+		setAllergyOverrideReasons({})
+		setAllergyOverriddenAlerts(new Set())
+		setHighAlertVerified(false)
+		setPendingHighAlertOrderId(null)
+		setPendingHighAlertVerification(null)
+		setPendingSubmitOptions(null)
+		setHighAlertVerificationError(null)
+		setSubmitError(null)
 		evaluateCds.mutate(
 			{
 				patientId,
@@ -321,6 +371,7 @@ export function CreateMedOrderDialog({
 			{
 				onSuccess: data => {
 					setCdsResult(data)
+					setLastCdsCheckSignature(nextSignature)
 					setHighAlertVerified(false)
 					setPendingHighAlertVerification(null)
 					setPendingSubmitOptions(null)
@@ -376,23 +427,32 @@ export function CreateMedOrderDialog({
 		handleOpenChange(false)
 	}
 
+	function buildCdsOverrides() {
+		const overrides = [
+			...[...overriddenAlerts].map(id => ({
+				alertId: id,
+				reason: overrideReasons[id] ?? "",
+				overriddenAt: new Date().toISOString(),
+			})),
+			...[...allergyOverriddenAlerts].map(id => ({
+				alertId: id,
+				reason: allergyOverrideReasons[id] ?? "",
+				overriddenAt: new Date().toISOString(),
+			})),
+		].filter(entry => entry.reason.trim().length > 0)
+
+		return overrides.length > 0 ? { overrides } : undefined
+	}
+
 	function doSubmit(trancheNumber?: number, trancheTotal?: number, trancheDays?: number) {
-		const cdsOverrides =
-			overriddenAlerts.size > 0
-				? {
-						overrides: [...overriddenAlerts].map(id => ({
-							alertId: id,
-							reason: overrideReasons[id] ?? "",
-							overriddenAt: new Date().toISOString(),
-						})),
-					}
-				: undefined
+		const cdsOverrides = buildCdsOverrides()
 
 		setSubmitError(null)
 		createMedOrder.mutate(
 			{
 				facilityId,
 				encounterId,
+				patientId,
 				formularyItemId,
 				genericName: genericName.trim(),
 				brandName: brandName.trim() || undefined,
@@ -410,7 +470,7 @@ export function CreateMedOrderDialog({
 				pdeaSchedule: isControlledSubstance ? pdeaSchedule.trim() || undefined : undefined,
 				pdeaTrancheNumber: trancheNumber,
 				pdeaTrancheTotal: trancheTotal,
-				cdsAlerts: cdsResult?.alerts ?? undefined,
+				cdsAlerts: freshCdsAlerts,
 				cdsOverrides,
 			},
 			{
@@ -421,21 +481,13 @@ export function CreateMedOrderDialog({
 	}
 
 	function submitTranchedOrder(startDate?: string) {
-		const cdsOverrides =
-			overriddenAlerts.size > 0
-				? {
-						overrides: [...overriddenAlerts].map(id => ({
-							alertId: id,
-							reason: overrideReasons[id] ?? "",
-							overriddenAt: new Date().toISOString(),
-						})),
-					}
-				: undefined
+		const cdsOverrides = buildCdsOverrides()
 
 		createTranchedOrders.mutate(
 			{
 				facilityId,
 				encounterId,
+				patientId,
 				formularyItemId,
 				genericName: genericName.trim(),
 				brandName: brandName.trim() || undefined,
@@ -451,7 +503,7 @@ export function CreateMedOrderDialog({
 				prnReason: isPrn ? prnReason.trim() || undefined : undefined,
 				pdeaSchedule: pdeaSchedule.trim(),
 				startDate,
-				cdsAlerts: cdsResult?.alerts ?? undefined,
+				cdsAlerts: freshCdsAlerts,
 				cdsOverrides,
 			},
 			{
@@ -530,7 +582,7 @@ export function CreateMedOrderDialog({
 	return (
 		<>
 			<Dialog open={open} onOpenChange={handleOpenChange}>
-				<DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+				<DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl lg:max-w-4xl">
 					<DialogHeader>
 						<DialogTitle>New Medication Order</DialogTitle>
 						<DialogDescription>
@@ -591,22 +643,33 @@ export function CreateMedOrderDialog({
 						)}
 
 						{/* ── CDS Check ────────────────────────────────── */}
-						<div className="flex items-center gap-2">
+						<div className="bg-muted/30 space-y-2 rounded-lg border p-3">
 							<Button
 								type="button"
-								variant="secondary"
-								size="sm"
+								className="w-full justify-center font-semibold"
+								size="lg"
 								disabled={!genericName.trim() || !orderingStaffId || evaluateCds.isPending}
 								onClick={handleCheckCds}
 							>
-								{evaluateCds.isPending ? "Checking…" : "Check Drug Safety"}
+								<ShieldAlert className="size-4" />
+								{evaluateCds.isPending
+									? "Checking…"
+									: hasFreshCdsCheck
+										? "Re-run Drug Safety Check"
+										: "Run Drug Safety Check"}
 							</Button>
-							{cdsResult && (
-								<span className="text-muted-foreground text-xs">
-									{cdsResult.alerts.length === 0
-										? "✓ No alerts"
-										: `${cdsResult.alerts.length} alert(s) found`}
-								</span>
+							{cdsResult ? (
+								<p className="text-muted-foreground text-xs">
+									{hasFreshCdsCheck
+										? cdsResult.alerts.length === 0
+											? "✓ Safety check complete - no alerts"
+											: `${cdsResult.alerts.length} alert(s) found`
+										: "Safety check out of date - re-run before creating the order"}
+								</p>
+							) : (
+								<p className="text-muted-foreground text-xs">
+									Run the safety check before creating the order.
+								</p>
 							)}
 						</div>
 

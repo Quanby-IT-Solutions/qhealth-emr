@@ -41,10 +41,17 @@ jest.mock("@repo/db/schema", () => {
 		)
 
 	return {
+		auditLogs: createTable(),
+		counselingLogs: createTable(),
+		dispenseLogs: createTable(),
+		drugGenerics: createTable(),
 		encounters: createTable(),
+		encounterStatusEvents: createTable(),
 		formularyItems: createTable(),
+		highAlertVerifications: createTable(),
 		imagingOrders: createTable(),
 		labOrders: createTable(),
+		marEntries: createTable(),
 		medicationOrders: createTable(),
 		orderVerifications: createTable(),
 		patients: createTable(),
@@ -55,18 +62,27 @@ jest.mock("@repo/db/schema", () => {
 	}
 })
 
+type SelectBuilderOptions = {
+	withOrderBy?: boolean
+	withPagination?: boolean
+	withLimit?: boolean
+}
+
 type MockDb = {
 	select: jest.Mock
 	insert: jest.Mock
 	update: jest.Mock
 }
 
-function createSelectBuilder(result: unknown, options?: { withOrderBy?: boolean; withPagination?: boolean }) {
+function createSelectBuilder(result: unknown, options?: SelectBuilderOptions) {
 	const builder = {
 		from: jest.fn().mockReturnThis(),
+		innerJoin: jest.fn().mockReturnThis(),
 		leftJoin: jest.fn().mockReturnThis(),
 		where: jest.fn().mockImplementation(() =>
-			options?.withOrderBy || options?.withPagination ? builder : Promise.resolve(result)
+			options?.withOrderBy || options?.withPagination || options?.withLimit
+				? builder
+				: Promise.resolve(result)
 		),
 	}
 
@@ -83,6 +99,12 @@ function createSelectBuilder(result: unknown, options?: { withOrderBy?: boolean;
 		})
 	}
 
+	if (options?.withLimit) {
+		Object.assign(builder, {
+			limit: jest.fn().mockResolvedValue(result),
+		})
+	}
+
 	return builder
 }
 
@@ -90,6 +112,7 @@ function createInsertBuilder(result: unknown) {
 	return {
 		values: jest.fn().mockReturnValue({
 			returning: jest.fn().mockResolvedValue(result),
+			onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
 		}),
 	}
 }
@@ -105,13 +128,15 @@ function createUpdateBuilder() {
 describe("OrdersService", () => {
 	let service: OrdersService
 	let mockDb: MockDb
+	let problemsAllergiesMock: { getActiveAllergies: jest.Mock }
 
 	beforeEach(() => {
 		jest.clearAllMocks()
 		mockDb = db as unknown as MockDb
-		service = new OrdersService({
+		problemsAllergiesMock = {
 			getActiveAllergies: jest.fn(),
-		} as unknown as ProblemsAllergiesService)
+		}
+		service = new OrdersService(problemsAllergiesMock as unknown as ProblemsAllergiesService)
 	})
 
 	it("enriches the verification queue with patient context and alert counts", async () => {
@@ -323,6 +348,9 @@ describe("OrdersService", () => {
 				])
 			)
 			.mockImplementationOnce(() =>
+				createSelectBuilder([{ encounterType: "inpatient" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
 				createSelectBuilder([
 					{
 						id: "verification-1",
@@ -382,5 +410,163 @@ describe("OrdersService", () => {
 			)
 		).rejects.toBeInstanceOf(NotFoundException)
 		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
+	it("requires a completed CDS check before creating a medication order", async () => {
+		mockDb.select.mockImplementationOnce(() =>
+			createSelectBuilder([{ id: "staff-1", userId: "user-1" }])
+		)
+
+		await expect(
+			service.createMedOrder(
+				{
+					facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+					patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+					formularyItemId: "3f6a0f4f-761d-4fd1-b76f-95e6692eb001",
+					genericName: "Amoxicillin",
+					dose: "500",
+					doseUnit: "mg",
+					doseForm: "capsule",
+					route: "PO",
+					frequency: "once",
+				},
+				"user-1"
+			)
+		).rejects.toThrow("Run the CDS safety check before submitting the medication order.")
+	})
+
+	it("requires override reasons for CDS soft blocks before creating a medication order", async () => {
+		problemsAllergiesMock.getActiveAllergies.mockResolvedValue({
+			allergies: [
+				{
+					allergenName: "Amoxicillin",
+					allergenType: "medication",
+					severity: "moderate",
+					reactionType: "rash",
+				},
+			],
+		})
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "staff-1", userId: "user-1" }])
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "3f6a0f4f-761d-4fd1-b76f-95e6692eb001",
+							isActive: true,
+							isRestricted: false,
+							isHighAlert: false,
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+
+		await expect(
+			service.createMedOrder(
+				{
+					facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+					patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+					formularyItemId: "3f6a0f4f-761d-4fd1-b76f-95e6692eb001",
+					genericName: "Amoxicillin",
+					dose: "500",
+					doseUnit: "mg",
+					doseForm: "capsule",
+					route: "PO",
+					frequency: "once",
+					cdsAlerts: [],
+				},
+				"user-1"
+			)
+		).rejects.toThrow(
+			"Provide clinical override justification for each CDS soft block before submitting the medication order."
+		)
+	})
+
+	it("persists server-evaluated CDS alerts when creating a medication order", async () => {
+		const createdAt = new Date("2025-04-16T12:00:00.000Z")
+		problemsAllergiesMock.getActiveAllergies.mockResolvedValue({
+			allergies: [
+				{
+					allergenName: "Amoxicillin",
+					allergenType: "medication",
+					severity: "moderate",
+					reactionType: "rash",
+				},
+			],
+		})
+		jest.spyOn(service, "findMedOrder").mockResolvedValue({ id: "order-created" } as never)
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "staff-1", userId: "user-1" }])
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "3f6a0f4f-761d-4fd1-b76f-95e6692eb001",
+							isActive: true,
+							isRestricted: false,
+							isHighAlert: false,
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+
+		const insertBuilder = createInsertBuilder([
+			{
+				id: "order-created",
+				createdAt,
+				updatedAt: createdAt,
+			},
+		])
+		mockDb.insert.mockImplementationOnce(() => insertBuilder)
+		mockDb.insert.mockImplementation(() => createInsertBuilder([]))
+
+		await service.createMedOrder(
+			{
+				facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+				patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+				formularyItemId: "3f6a0f4f-761d-4fd1-b76f-95e6692eb001",
+				genericName: "Amoxicillin",
+				dose: "500",
+				doseUnit: "mg",
+				doseForm: "capsule",
+				route: "PO",
+				frequency: "once",
+				cdsAlerts: [],
+				cdsOverrides: {
+					overrides: [
+						{
+							alertId: "allergy-0",
+							reason: "Benefit outweighs risk",
+							overriddenAt: createdAt.toISOString(),
+						},
+					],
+				},
+			},
+			"user-1"
+		)
+
+		expect(insertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				cdsAlerts: [
+					expect.objectContaining({
+						type: "allergy_soft_block",
+						severity: "soft_block",
+						details: expect.objectContaining({
+							allergenName: "Amoxicillin",
+							reactionType: "rash",
+						}),
+					}),
+				],
+				status: "pending_verification",
+			})
+		)
 	})
 })

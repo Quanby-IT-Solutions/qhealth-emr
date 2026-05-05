@@ -19,10 +19,12 @@ import {
 	invoiceLineItems,
 	invoices,
 	konsultaActivities,
+	operationRecords,
 	patients,
 	payments,
 	problems,
 	receipts,
+	surgicalRvsAssignments,
 	staffProfiles,
 	vitalSigns,
 } from "@repo/db/schema"
@@ -39,6 +41,8 @@ import { AuditService } from "../audit/audit.service"
 import { closeOpenSlaStep } from "@/utils/sla-events"
 import { resolveStepTarget } from "@/utils/sla-step-target"
 import { ACTIVE_DRG_CODES, findDrgCode } from "./drg-master-codes"
+
+import { evaluateProcedureCoverage } from "../surgical/surgical-procedure-utils"
 
 // ============================================================================
 // Input Types (explicit — avoids TypeScript depth limit with InferContractRouterInputs)
@@ -354,6 +358,155 @@ export class BillingService {
 		} catch {
 			return null
 		}
+	}
+
+	private getSuggestedDrgCandidates() {
+		return [
+			{
+				rank: 1,
+				code: "DRG-089",
+				description: "Simple Pneumonia & Pleurisy - Age > 17",
+				mdrg: "M089",
+				weight: 1.2847,
+				baseRate: 14850,
+				confidence: 0.82,
+				rationale:
+					"Primary diagnosis J18.9 maps to DRG-089 per PhilHealth DRG v2023 grouper.",
+			},
+			{
+				rank: 2,
+				code: "DRG-090",
+				description: "Simple Pneumonia & Pleurisy - Age 0-17",
+				mdrg: "M090",
+				weight: 0.9234,
+				baseRate: 10690,
+				confidence: 0.54,
+				rationale: "Alternative grouping if patient age < 18 years.",
+			},
+			{
+				rank: 3,
+				code: "DRG-079",
+				description: "Respiratory Infections & Inflammations",
+				mdrg: "M079",
+				weight: 1.0421,
+				baseRate: 12060,
+				confidence: 0.31,
+				rationale:
+					"Broader respiratory category applicable with secondary infections.",
+			},
+		]
+	}
+
+	private async buildSurgicalReadiness(encounterId: string) {
+		const operationRows = await db
+			.select({
+				id: operationRecords.id,
+				procedurePerformed: operationRecords.procedurePerformed,
+				status: operationRecords.status,
+			})
+			.from(operationRecords)
+			.where(eq(operationRecords.encounterId, encounterId))
+
+		if (operationRows.length === 0) {
+			return {
+				isReady: true,
+				missingProcedureLabels: [] as string[],
+				procedures: [] as Array<{
+					operationRecordId: string
+					procedureLabel: string
+					operationRecordSigned: boolean
+					primaryCodeCount: number
+					adjunctCodeCount: number
+					isReady: boolean
+				}>,
+			}
+		}
+
+		const operationRecordIds = operationRows.map(row => row.id)
+		const assignmentRows =
+			operationRecordIds.length > 0
+				? await db
+					.select({
+						operationRecordId: surgicalRvsAssignments.operationRecordId,
+						procedureLabel: surgicalRvsAssignments.procedureLabel,
+						assignmentType: surgicalRvsAssignments.assignmentType,
+						status: surgicalRvsAssignments.status,
+					})
+					.from(surgicalRvsAssignments)
+					.where(inArray(surgicalRvsAssignments.operationRecordId, operationRecordIds))
+				: []
+
+		const assignmentsByOperationRecord = new Map<string, typeof assignmentRows>()
+		for (const assignment of assignmentRows) {
+			if (!assignment.operationRecordId) {
+				continue
+			}
+
+			const currentAssignments =
+				assignmentsByOperationRecord.get(assignment.operationRecordId) ?? []
+			currentAssignments.push(assignment)
+			assignmentsByOperationRecord.set(assignment.operationRecordId, currentAssignments)
+		}
+
+		const procedures = operationRows.flatMap(operationRecord => {
+			const coverage = evaluateProcedureCoverage({
+				procedurePerformed: operationRecord.procedurePerformed,
+				operationRecordSigned: operationRecord.status === "signed",
+				assignments:
+					assignmentsByOperationRecord.get(operationRecord.id)?.map(assignment => ({
+						procedureLabel: assignment.procedureLabel,
+						assignmentType: assignment.assignmentType,
+						status: assignment.status,
+					})) ?? [],
+			})
+
+			return coverage.procedures.map(procedure => ({
+				operationRecordId: operationRecord.id,
+				procedureLabel: procedure.label,
+				operationRecordSigned: procedure.operationRecordSigned,
+				primaryCodeCount: procedure.primaryCodeCount,
+				adjunctCodeCount: procedure.adjunctCodeCount,
+				isReady: procedure.isReady,
+			}))
+		})
+
+		return {
+			isReady: procedures.every(procedure => procedure.isReady),
+			missingProcedureLabels: procedures
+				.filter(procedure => !procedure.isReady)
+				.map(procedure => procedure.procedureLabel),
+			procedures,
+		}
+	}
+
+	private async assertSurgicalReadiness(encounterId: string) {
+		const readiness = await this.buildSurgicalReadiness(encounterId)
+		if (readiness.isReady) {
+			return readiness
+		}
+
+		const unsignedProcedureLabels = readiness.procedures
+			.filter(procedure => !procedure.operationRecordSigned)
+			.map(procedure => procedure.procedureLabel)
+		const missingPrimaryLabels = readiness.procedures
+			.filter(procedure => procedure.operationRecordSigned && procedure.primaryCodeCount === 0)
+			.map(procedure => procedure.procedureLabel)
+
+		const failureMessages: string[] = []
+		if (unsignedProcedureLabels.length > 0) {
+			failureMessages.push(
+				`Unsigned operative records remain for: ${unsignedProcedureLabels.join(", ")}`
+			)
+		}
+		if (missingPrimaryLabels.length > 0) {
+			failureMessages.push(
+				`Missing primary RVS code for: ${missingPrimaryLabels.join(", ")}`
+			)
+		}
+
+		throw new BadRequestException(
+			`Surgical claim readiness incomplete. ${failureMessages.join(". ")}.`
+		)
 	}
 
 	// ========================================================================
@@ -1296,9 +1449,47 @@ export class BillingService {
 	// ========================================================================
 
 	async getCf5(input: GetCf5Input) {
-		// In production, this would query a cf5_assignments table
-		// For now, return null (no assignment yet)
-		return null
+		const [mapping] = await db
+			.select()
+			.from(drgMappings)
+			.where(eq(drgMappings.encounterId, input.encounterId))
+			.limit(1)
+
+		if (!mapping) {
+			return null
+		}
+
+		const [encounter] = await db
+			.select({
+				facilityId: encounters.facilityId,
+				patientId: encounters.patientId,
+			})
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+			.limit(1)
+
+		if (!encounter) {
+			return null
+		}
+
+		const drgDetails = this.getSuggestedDrgCandidates().find(candidate => candidate.code === mapping.drgCode)
+
+		return {
+			id: mapping.id,
+			facilityId: encounter.facilityId,
+			encounterId: input.encounterId,
+			patientId: encounter.patientId,
+			drgCode: mapping.drgCode,
+			drgDescription: mapping.drgDescription ?? drgDetails?.description ?? mapping.drgCode,
+			mdrg: drgDetails?.mdrg ?? "UNKNOWN",
+			drgWeight: drgDetails?.weight ?? Number(mapping.confidence),
+			computedRate: drgDetails ? drgDetails.weight * drgDetails.baseRate : 0,
+			status: "draft" as const,
+			approvedBy: mapping.confirmedByStaffId ?? null,
+			approvedAt: mapping.confirmedAt ?? null,
+			createdAt: mapping.createdAt,
+			updatedAt: mapping.confirmedAt ?? mapping.createdAt,
+		}
 	}
 
 	async searchDrgCodes(input: SearchDrgInput) {
@@ -2371,6 +2562,7 @@ ${procedures.map(proc => `    <Procedure>${esc(proc)}</Procedure>`).join("\n")}
 		const cf5 = await this.getCf5({ encounterId: input.encounterId })
 		if (!cf5) return null
 
+		const surgicalReadiness = await this.buildSurgicalReadiness(input.encounterId)
 		const chargesList = await db
 			.select()
 			.from(charges)
@@ -2394,6 +2586,7 @@ ${procedures.map(proc => `    <Procedure>${esc(proc)}</Procedure>`).join("\n")}
 			philhealthCoverage: 0,
 			patientResponsibility: totalCharges,
 			approvalRequired: true,
+			surgicalReadiness,
 		}
 	}
 
@@ -2565,31 +2758,41 @@ ${rows}
 	}
 
 	async confirmDrg(input: { encounterId: string; drgCode: string; overrideReason?: string; chosenRank?: number }, userId: string) {
+		const selectedCandidate = this.getSuggestedDrgCandidates().find(
+			candidate => candidate.code === input.drgCode
+		)
 		const isManualOverride = (input.chosenRank ?? 1) !== 1 || !!input.overrideReason
 		if (isManualOverride && !input.overrideReason) {
 			throw new BadRequestException("Override reason is required when not selecting the top-1 DRG suggestion.")
 		}
+		const staffProfileId = await this.getOptionalStaffProfileId(userId)
+		const confirmedAt = new Date()
 		const [mapping] = await db
 			.insert(drgMappings)
 			.values({
 				encounterId: input.encounterId,
 				drgCode: input.drgCode,
+				drgDescription: selectedCandidate?.description ?? input.drgCode,
 				confidence: isManualOverride ? "0" : "0.82",
 				manualOverrideReason: input.overrideReason ?? null,
 				isManualOverride,
+				confirmedByStaffId: staffProfileId,
+				confirmedAt,
 			})
 			.onConflictDoUpdate({
 				target: drgMappings.encounterId,
 				set: {
 					drgCode: input.drgCode,
+					drgDescription: selectedCandidate?.description ?? input.drgCode,
 					manualOverrideReason: input.overrideReason ?? null,
 					isManualOverride,
+					confirmedByStaffId: staffProfileId,
+					confirmedAt,
 				},
 			})
 			.returning()
 		if (!mapping) throw new BadRequestException("Failed to confirm DRG mapping.")
 
-		const staffProfileId = await this.getOptionalStaffProfileId(userId)
 		const [encounter] = await db.select({ facilityId: encounters.facilityId }).from(encounters).where(eq(encounters.id, input.encounterId)).limit(1)
 		await this.auditService.log({
 			facilityId: encounter?.facilityId ?? "",
@@ -2613,6 +2816,8 @@ ${rows}
 	// ========================================================================
 
 	async generateCf5(input: { facilityId: string; encounterId: string; drgCode: string }, userId: string) {
+		await this.assertSurgicalReadiness(input.encounterId)
+
 		const [claim] = await db
 			.insert(cf5Claims)
 			.values({ facilityId: input.facilityId, encounterId: input.encounterId, drgCode: input.drgCode, status: "draft" })
@@ -2661,6 +2866,8 @@ ${rows}
 		if (claim.status !== "draft" && claim.status !== "validated") {
 			throw new BadRequestException("Only draft or validated CF5 claims can be submitted.")
 		}
+
+		await this.assertSurgicalReadiness(claim.encounterId)
 
 		// XSD validation stub: DRG code is mandatory before CF5 submission
 		const violations: { path: string; message: string }[] = []

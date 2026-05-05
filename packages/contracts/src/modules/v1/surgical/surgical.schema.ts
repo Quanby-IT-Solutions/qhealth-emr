@@ -43,6 +43,8 @@ export const AirwayTypeEnum = z.enum([
 ])
 
 export const RvsCodeStatusEnum = z.enum(["suggested", "validated", "finalized"])
+export const RvsAssignmentTypeEnum = z.enum(["primary", "adjunct"])
+export const OperationRecordStatusEnum = z.enum(["draft", "signed"])
 
 // ============================================================================
 // Surgical Case Schema
@@ -83,6 +85,7 @@ export const OperationRecordSchema = z.object({
 	preOpDiagnosis: z.string(),
 	postOpDiagnosis: z.string().nullable(),
 	procedurePerformed: z.string(),
+	procedureDescription: z.string().nullable(),
 	operativeTechnique: z.string().nullable(),
 	findings: z.string().nullable(),
 	specimens: z.string().nullable(),
@@ -96,9 +99,14 @@ export const OperationRecordSchema = z.object({
 	secondAssistantStaffId: z.string().uuid().nullable(),
 	scrubNurseStaffId: z.string().uuid().nullable(),
 	circulatingNurseStaffId: z.string().uuid().nullable(),
+	anesthesiologistStaffId: z.string().uuid().nullable(),
 	instrumentCountCorrect: z.boolean(),
 	swabCountCorrect: z.boolean(),
 	complications: z.string().nullable(),
+	status: OperationRecordStatusEnum,
+	signedAt: z.string().nullable(),
+	signedByStaffId: z.string().uuid().nullable(),
+	signedByName: z.string().nullable(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 })
@@ -194,8 +202,10 @@ export const RvsAssignmentSchema = z.object({
 	id: z.string().uuid(),
 	surgicalCaseId: z.string().uuid(),
 	rvsCodeId: z.string().uuid(),
+	procedureLabel: z.string().nullable(),
 	code: z.string(),
 	description: z.string(),
+	assignmentType: RvsAssignmentTypeEnum,
 	status: RvsCodeStatusEnum,
 	suggestedByName: z.string().nullable(),
 	validatedByName: z.string().nullable(),
@@ -284,6 +294,7 @@ export const SaveOperationRecordSchema = z.object({
 	preOpDiagnosis: z.string().min(1),
 	postOpDiagnosis: z.string().optional(),
 	procedurePerformed: z.string().min(1),
+	procedureDescription: z.string().optional(),
 	operativeTechnique: z.string().optional(),
 	findings: z.string().optional(),
 	specimens: z.string().optional(),
@@ -297,9 +308,14 @@ export const SaveOperationRecordSchema = z.object({
 	secondAssistantStaffId: z.string().uuid().optional(),
 	scrubNurseStaffId: z.string().uuid().optional(),
 	circulatingNurseStaffId: z.string().uuid().optional(),
+	anesthesiologistStaffId: z.string().uuid().nullable().optional(),
 	instrumentCountCorrect: z.boolean(),
 	swabCountCorrect: z.boolean(),
 	complications: z.string().optional(),
+})
+
+export const SignOperationRecordSchema = z.object({
+	caseId: z.string().uuid(),
 })
 
 // ============================================================================
@@ -354,6 +370,8 @@ export const RvsCodesResponseSchema = PaginatedResponseSchema.extend({
 export const SuggestRvsCodeSchema = z.object({
 	caseId: z.string().uuid(),
 	rvsCodeId: z.string().uuid(),
+	procedureLabel: z.string().min(1),
+	assignmentType: RvsAssignmentTypeEnum.default("primary"),
 	modifier: z.string().optional(),
 	units: z.number().int().positive().default(1),
 })

@@ -2,6 +2,8 @@ import { Module } from "@nestjs/common"
 import { ORPCModule } from "@orpc/nest"
 import { type Request, type Response } from "express"
 
+import { nestHttpExceptionInterceptor } from "./orpc-http-exception"
+
 declare module "@orpc/nest" {
 	interface ORPCGlobalContext {
 		request: Request
@@ -20,6 +22,7 @@ declare module "@orpc/nest" {
 						response: ctx.res,
 					}
 				},
+				interceptors: [nestHttpExceptionInterceptor],
 			}),
 		}),
 	],

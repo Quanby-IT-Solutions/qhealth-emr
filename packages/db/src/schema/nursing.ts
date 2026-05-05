@@ -1,4 +1,4 @@
-import { index } from "drizzle-orm/pg-core"
+import { index, uniqueIndex } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
 import { encounters, preEncounters } from "./core.js"
@@ -117,6 +117,7 @@ export const marEntries = createTable(
 		index("mar_entries_encounter_id_idx").on(t.encounterId),
 		index("mar_entries_medication_order_id_idx").on(t.medicationOrderId),
 		index("mar_entries_scheduled_time_idx").on(t.scheduledTime),
+		uniqueIndex("mar_entries_order_scheduled_time_uniq").on(t.medicationOrderId, t.scheduledTime),
 	]
 )
 
