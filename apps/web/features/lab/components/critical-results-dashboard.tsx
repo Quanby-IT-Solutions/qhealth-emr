@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, type ReactElement } from "react"
+import { useMemo, useState, type ReactElement } from "react"
 import { Bell, PhoneCall, Send, Siren, TriangleAlert } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -292,6 +292,255 @@ function CriticalActionModal({ item, action, children }: CriticalActionModalProp
 	)
 }
 
+function FlagCriticalModal() {
+	const [open, setOpen] = useState(false)
+	const [form, setForm] = useState({
+		patientName: "",
+		mrn: "",
+		ward: "",
+		accession: "",
+		analyte: "",
+		value: "",
+		unit: "",
+		severity: "critical",
+		refLow: "",
+		refHigh: "",
+		physician: "",
+		channel: "inbox",
+		notes: "",
+	})
+	const [errors, setErrors] = useState<Record<string, string>>({})
+
+	const validate = () => {
+		const newErrors: Record<string, string> = {}
+		if (!form.patientName.trim()) newErrors.patientName = "Required"
+		if (!form.mrn.trim()) newErrors.mrn = "Required"
+		if (!form.analyte.trim()) newErrors.analyte = "Required"
+		if (!form.value.trim()) newErrors.value = "Required"
+		if (!form.unit.trim()) newErrors.unit = "Required"
+		if (!form.physician.trim()) newErrors.physician = "Required"
+		setErrors(newErrors)
+		return Object.keys(newErrors).length === 0
+	}
+
+	const handleSubmit = () => {
+		if (!validate()) return
+		// Submit logic here
+		setOpen(false)
+		setForm({
+			patientName: "",
+			mrn: "",
+			ward: "",
+			accession: "",
+			analyte: "",
+			value: "",
+			unit: "",
+			severity: "critical",
+			refLow: "",
+			refHigh: "",
+			physician: "",
+			channel: "inbox",
+			notes: "",
+		})
+		setErrors({})
+	}
+
+	return (
+		<Dialog open={open} onOpenChange={setOpen}>
+			<DialogTrigger>
+				<Button size="sm" className="gap-2">
+					<TriangleAlert className="size-4" />
+					Flag new critical
+				</Button>
+			</DialogTrigger>
+
+			<DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+				<DialogHeader className="flex-shrink-0">
+					<DialogTitle>Flag new critical result</DialogTitle>
+					<DialogDescription>
+						Manually escalate a life-threatening value to the ordering physician.
+					</DialogDescription>
+				</DialogHeader>
+
+				<div className="overflow-y-auto flex-1 -mr-4 pr-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+					<div className="space-y-4">
+						<div className="grid grid-cols-2 gap-4">
+							<div>
+								<label className="text-muted-foreground text-xs">
+									Patient name <span className="text-rose-600">*</span>
+								</label>
+								<Input
+									placeholder="Last, First"
+									value={form.patientName}
+									onChange={e => setForm({ ...form, patientName: e.target.value })}
+									className={errors.patientName ? "border-rose-500" : ""}
+								/>
+								{errors.patientName && (
+									<p className="text-rose-600 text-xs mt-1">{errors.patientName}</p>
+								)}
+							</div>
+							<div>
+								<label className="text-muted-foreground text-xs">
+									MRN <span className="text-rose-600">*</span>
+								</label>
+								<Input
+									placeholder="000000"
+									value={form.mrn}
+									onChange={e => setForm({ ...form, mrn: e.target.value })}
+									className={errors.mrn ? "border-rose-500" : ""}
+								/>
+								{errors.mrn && <p className="text-rose-600 text-xs mt-1">{errors.mrn}</p>}
+							</div>
+						</div>
+
+						<div className="grid grid-cols-2 gap-4">
+							<div>
+								<label className="text-muted-foreground text-xs">Ward / location</label>
+								<Input
+									placeholder="ICU-3"
+									value={form.ward}
+									onChange={e => setForm({ ...form, ward: e.target.value })}
+								/>
+							</div>
+							<div>
+								<label className="text-muted-foreground text-xs">Accession #</label>
+								<Input
+									placeholder="LAB-..."
+									value={form.accession}
+									onChange={e => setForm({ ...form, accession: e.target.value })}
+								/>
+							</div>
+						</div>
+
+						<div className="grid grid-cols-4 gap-4">
+							<div>
+								<label className="text-muted-foreground text-xs">
+									Analyte <span className="text-rose-600">*</span>
+								</label>
+								<Input
+									placeholder="K+"
+									value={form.analyte}
+									onChange={e => setForm({ ...form, analyte: e.target.value })}
+									className={errors.analyte ? "border-rose-500" : ""}
+								/>
+								{errors.analyte && <p className="text-rose-600 text-xs mt-1">{errors.analyte}</p>}
+							</div>
+							<div>
+								<label className="text-muted-foreground text-xs">
+									Value <span className="text-rose-600">*</span>
+								</label>
+								<Input
+									placeholder="6.8"
+									value={form.value}
+									onChange={e => setForm({ ...form, value: e.target.value })}
+									className={errors.value ? "border-rose-500" : ""}
+								/>
+								{errors.value && <p className="text-rose-600 text-xs mt-1">{errors.value}</p>}
+							</div>
+							<div>
+								<label className="text-muted-foreground text-xs">
+									Unit <span className="text-rose-600">*</span>
+								</label>
+								<Input
+									placeholder="mmol/L"
+									value={form.unit}
+									onChange={e => setForm({ ...form, unit: e.target.value })}
+									className={errors.unit ? "border-rose-500" : ""}
+								/>
+								{errors.unit && <p className="text-rose-600 text-xs mt-1">{errors.unit}</p>}
+							</div>
+							<div>
+								<label className="text-muted-foreground text-xs">Severity</label>
+								<Select value={form.severity} onValueChange={v => setForm({ ...form, severity: v })}>
+									<SelectTrigger className="w-full">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="critical">Critical</SelectItem>
+										<SelectItem value="urgent">Urgent</SelectItem>
+										<SelectItem value="warning">Warning</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+						</div>
+
+						<div className="grid grid-cols-2 gap-4">
+							<div>
+								<label className="text-muted-foreground text-xs">Ref low</label>
+								<Input
+									placeholder="3.5"
+									value={form.refLow}
+									onChange={e => setForm({ ...form, refLow: e.target.value })}
+								/>
+							</div>
+							<div>
+								<label className="text-muted-foreground text-xs">Ref high</label>
+								<Input
+									placeholder="5.1"
+									value={form.refHigh}
+									onChange={e => setForm({ ...form, refHigh: e.target.value })}
+								/>
+							</div>
+						</div>
+
+						<div className="grid grid-cols-2 gap-4">
+							<div>
+								<label className="text-muted-foreground text-xs">
+									Ordering physician <span className="text-rose-600">*</span>
+								</label>
+								<Input
+									placeholder="Dr. Hassan"
+									value={form.physician}
+									onChange={e => setForm({ ...form, physician: e.target.value })}
+									className={errors.physician ? "border-rose-500" : ""}
+								/>
+								{errors.physician && (
+									<p className="text-rose-600 text-xs mt-1">{errors.physician}</p>
+								)}
+							</div>
+							<div>
+								<label className="text-muted-foreground text-xs">Initial channel</label>
+								<Select value={form.channel} onValueChange={v => setForm({ ...form, channel: v })}>
+									<SelectTrigger className="w-full">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="inbox">Inbox alert</SelectItem>
+										<SelectItem value="sms">SMS</SelectItem>
+										<SelectItem value="call">Phone call</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+						</div>
+
+						<div>
+							<label className="text-muted-foreground text-xs">Lab tech notes</label>
+							<Textarea
+								placeholder="Repeat draw confirmed; specimen non-hemolyzed."
+								value={form.notes}
+								onChange={e => setForm({ ...form, notes: e.target.value })}
+							/>
+						</div>
+					</div>
+				</div>
+
+				<DialogFooter className="flex-shrink-0 pt-2">
+					<div className="flex w-full items-center justify-between">
+						<span className="text-muted-foreground text-xs">All actions are audit-logged.</span>
+						<div className="flex gap-2">
+							<DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
+							<Button onClick={handleSubmit} className="bg-rose-600 text-white hover:bg-rose-700">
+								<Send className="mr-2 size-4" />
+								Flag & notify
+							</Button>
+						</div>
+					</div>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	)
+}
+
 export function CriticalResultsDashboard() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
@@ -363,128 +612,7 @@ export function CriticalResultsDashboard() {
 						Life-threatening values routed directly to the ordering physician
 					</p>
 				</div>
-				<Dialog>
-					<DialogTrigger>
-						<Button size="sm" className="gap-2">
-							<TriangleAlert className="size-4" />
-							Flag new critical
-						</Button>
-					</DialogTrigger>
-
-					<DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-						<DialogHeader className="flex-shrink-0">
-							<DialogTitle>Flag new critical result</DialogTitle>
-							<DialogDescription>
-								Manually escalate a life-threatening value to the ordering physician.
-							</DialogDescription>
-						</DialogHeader>
-
-						<div className="overflow-y-auto flex-1 -mr-4 pr-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-							<form className="space-y-4">
-							<div className="grid grid-cols-2 gap-4">
-								<div>
-									<label className="text-muted-foreground text-xs">Patient name</label>
-									<Input placeholder="Last, First" />
-								</div>
-								<div>
-									<label className="text-muted-foreground text-xs">MRN</label>
-									<Input placeholder="000000" />
-								</div>
-							</div>
-
-							<div className="grid grid-cols-2 gap-4">
-								<div>
-									<label className="text-muted-foreground text-xs">Ward / location</label>
-									<Input placeholder="ICU-3" />
-								</div>
-								<div>
-									<label className="text-muted-foreground text-xs">Accession #</label>
-									<Input placeholder="LAB-..." />
-								</div>
-							</div>
-
-							<div className="grid grid-cols-4 gap-4">
-								<div>
-									<label className="text-muted-foreground text-xs">Analyte</label>
-									<Input placeholder="K+" />
-								</div>
-								<div>
-									<label className="text-muted-foreground text-xs">Value</label>
-									<Input placeholder="6.8" />
-								</div>
-								<div>
-									<label className="text-muted-foreground text-xs">Unit</label>
-									<Input placeholder="mmol/L" />
-								</div>
-								<div>
-									<label className="text-muted-foreground text-xs">Severity</label>
-									<Select>
-										<SelectTrigger className="w-full">
-											<SelectValue>Critical</SelectValue>
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="critical">Critical</SelectItem>
-											<SelectItem value="urgent">Urgent</SelectItem>
-											<SelectItem value="warning">Warning</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
-							</div>
-
-							<div className="grid grid-cols-2 gap-4">
-								<div>
-									<label className="text-muted-foreground text-xs">Ref low</label>
-									<Input placeholder="3.5" />
-								</div>
-								<div>
-									<label className="text-muted-foreground text-xs">Ref high</label>
-									<Input placeholder="5.1" />
-								</div>
-							</div>
-
-							<div className="grid grid-cols-2 gap-4">
-								<div>
-									<label className="text-muted-foreground text-xs">Ordering physician</label>
-									<Input placeholder="Dr. Hassan" />
-								</div>
-								<div>
-									<label className="text-muted-foreground text-xs">Initial channel</label>
-									<Select>
-										<SelectTrigger className="w-full">
-											<SelectValue>Inbox alert</SelectValue>
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="inbox">Inbox alert</SelectItem>
-											<SelectItem value="sms">SMS</SelectItem>
-											<SelectItem value="call">Phone call</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
-							</div>
-
-								<div>
-									<label className="text-muted-foreground text-xs">Lab tech notes</label>
-									<Textarea placeholder="Repeat draw confirmed; specimen non-hemolyzed." />
-								</div>
-							</form>
-						</div>
-
-						<DialogFooter className="flex-shrink-0 pt-2">
-								<div className="flex w-full items-center justify-between">
-									<span className="text-muted-foreground text-xs">
-										All actions are audit-logged.
-									</span>
-									<div className="flex gap-2">
-										<DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
-										<Button className="bg-rose-600 text-white hover:bg-rose-700">
-											<Send className="mr-2 size-4" />
-											Flag & notify
-										</Button>
-									</div>
-								</div>
-							</DialogFooter>
-					</DialogContent>
-				</Dialog>
+				<FlagCriticalModal />
 			</div>
 
 			<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

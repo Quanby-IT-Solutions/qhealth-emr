@@ -28,6 +28,7 @@ import {
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { type LabOrder, useLabDashboardQuery } from "@/features/lab/api/lab.hooks"
+import { useWardsQuery } from "@/features/beds/api/beds.hooks"
 import { env } from "@/env"
 
 import { LabResultDetail } from "./lab-result-detail"
@@ -306,8 +307,64 @@ export function LabDashboard() {
 		{ value: "routine", label: "Routine" },
 	]
 
+	const [manualEntryOpen, setManualEntryOpen] = useState(false)
 	const [sex, setSex] = useState<"F" | "M">("F")
 	const [priority, setPriority] = useState<"STAT" | "Urgent" | "Routine">("Routine")
+	const [manualForm, setManualForm] = useState({
+		accession: "",
+		collectedTime: "",
+		patientName: "",
+		mrn: "",
+		age: "0",
+		wardId: "",
+		panel: "CBC",
+		physician: "",
+		notes: "",
+	})
+	const [manualErrors, setManualErrors] = useState<Record<string, string>>({})
+
+	const validateManualEntry = () => {
+		const errors: Record<string, string> = {}
+		if (!manualForm.accession.trim()) errors.accession = "Required"
+		if (!manualForm.collectedTime.trim()) errors.collectedTime = "Required"
+		if (!manualForm.patientName.trim()) errors.patientName = "Required"
+		if (!manualForm.mrn.trim()) errors.mrn = "Required"
+		if (!manualForm.age.trim() || parseInt(manualForm.age) < 0) errors.age = "Valid age required"
+		if (!manualForm.wardId.trim()) errors.wardId = "Required"
+		if (!manualForm.physician.trim()) errors.physician = "Required"
+		setManualErrors(errors)
+		return Object.keys(errors).length === 0
+	}
+
+	const generateAccession = () => {
+		const prefix = "L"
+		const year = new Date().getFullYear().toString()
+		const random = Math.random().toString(36).substring(2, 6).toUpperCase()
+		const sequence = Math.floor(Math.random() * 10000).toString().padStart(4, "0").slice(-1)
+		setManualForm({ ...manualForm, accession: `${prefix}-${year}-${sequence}${random}` })
+	}
+
+	const handleManualSubmit = () => {
+		if (!validateManualEntry()) return
+		// Submit logic here
+		setManualEntryOpen(false)
+		setManualForm({
+			accession: "",
+			collectedTime: "",
+			patientName: "",
+			mrn: "",
+			age: "0",
+			wardId: "",
+			panel: "CBC",
+			physician: "",
+			notes: "",
+		})
+		setManualErrors({})
+		setSex("F")
+		setPriority("Routine")
+	}
+
+	const { data: wardsData } = useWardsQuery(facilityId)
 
 	return (
 		<div className="space-y-5">
@@ -324,7 +381,7 @@ export function LabDashboard() {
 						Filters
 					</Button>
 
-					<Dialog>
+					<Dialog open={manualEntryOpen} onOpenChange={setManualEntryOpen}>
 						<DialogTrigger>
 							<Button size="sm">New manual entry</Button>
 						</DialogTrigger>
@@ -343,24 +400,52 @@ export function LabDashboard() {
 								</div>
 							</DialogHeader>
 
-							<form className="space-y-3 pt-1">
+							<div className="space-y-3 pt-1">
 
 								{/* SPECIMEN */}
 								<div>
 									<p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase mb-1.5">Specimen</p>
 									<div className="grid grid-cols-2 gap-2">
 										<div className="space-y-1">
-											<label className="text-xs text-muted-foreground">Accession #</label>
+											<label className="text-xs text-muted-foreground">
+												Accession # <span className="text-rose-600">*</span>
+											</label>
 											<div className="flex gap-1.5">
-												<Input defaultValue="L-2451-XXXX" className="flex-1 h-8 text-xs" />
-												<Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs shrink-0">
+												<div className="flex-1">
+													<Input
+														value={manualForm.accession}
+														onChange={e => setManualForm({ ...manualForm, accession: e.target.value })}
+														className={cn("h-8 text-xs", manualErrors.accession && "border-rose-500")}
+														placeholder="L-2543-XXXXX"
+													/>
+													{manualErrors.accession && (
+														<p className="text-rose-600 text-xs mt-0.5">{manualErrors.accession}</p>
+													)}
+												</div>
+												<Button
+													type="button"
+													variant="outline"
+													size="sm"
+													onClick={generateAccession}
+													className="h-8 px-2.5 text-xs shrink-0"
+												>
 													Auto
 												</Button>
 											</div>
 										</div>
 										<div className="space-y-1">
-											<label className="text-xs text-muted-foreground">Collected (time)</label>
-											<Input type="time" className="h-8 text-xs" />
+											<label className="text-xs text-muted-foreground">
+												Collected (time) <span className="text-rose-600">*</span>
+											</label>
+											<Input
+												type="time"
+												value={manualForm.collectedTime}
+												onChange={e => setManualForm({ ...manualForm, collectedTime: e.target.value })}
+												className={cn("h-8 text-xs", manualErrors.collectedTime && "border-rose-500")}
+											/>
+											{manualErrors.collectedTime && (
+												<p className="text-rose-600 text-xs mt-0.5">{manualErrors.collectedTime}</p>
+											)}
 										</div>
 									</div>
 								</div>
@@ -371,18 +456,48 @@ export function LabDashboard() {
 									<div className="space-y-2">
 										<div className="grid grid-cols-2 gap-2">
 											<div className="space-y-1">
-												<label className="text-xs text-muted-foreground">Patient name</label>
-												<Input placeholder="Family, Given" className="h-8 text-xs" />
+												<label className="text-xs text-muted-foreground">
+													Patient name <span className="text-rose-600">*</span>
+												</label>
+												<Input
+													placeholder="Family, Given"
+													value={manualForm.patientName}
+													onChange={e => setManualForm({ ...manualForm, patientName: e.target.value })}
+													className={cn("h-8 text-xs", manualErrors.patientName && "border-rose-500")}
+												/>
+												{manualErrors.patientName && (
+													<p className="text-rose-600 text-xs mt-0.5">{manualErrors.patientName}</p>
+												)}
 											</div>
 											<div className="space-y-1">
-												<label className="text-xs text-muted-foreground">MRN</label>
-												<Input placeholder="MRN 000000" className="h-8 text-xs" />
+												<label className="text-xs text-muted-foreground">
+													MRN <span className="text-rose-600">*</span>
+												</label>
+												<Input
+													placeholder="MRN 000000"
+													value={manualForm.mrn}
+													onChange={e => setManualForm({ ...manualForm, mrn: e.target.value })}
+													className={cn("h-8 text-xs", manualErrors.mrn && "border-rose-500")}
+												/>
+												{manualErrors.mrn && (
+													<p className="text-rose-600 text-xs mt-0.5">{manualErrors.mrn}</p>
+												)}
 											</div>
 										</div>
 										<div className="grid grid-cols-[72px_120px_1fr] gap-2 items-end">
 											<div className="space-y-1">
-												<label className="text-xs text-muted-foreground">Age</label>
-												<Input defaultValue="0" type="number" className="h-8 text-xs" />
+												<label className="text-xs text-muted-foreground">
+													Age <span className="text-rose-600">*</span>
+												</label>
+												<Input
+													value={manualForm.age}
+													onChange={e => setManualForm({ ...manualForm, age: e.target.value })}
+													type="number"
+													className={cn("h-8 text-xs", manualErrors.age && "border-rose-500")}
+												/>
+												{manualErrors.age && (
+													<p className="text-rose-600 text-xs mt-0.5">{manualErrors.age}</p>
+												)}
 											</div>
 											<div className="space-y-1">
 													<label className="text-xs text-muted-foreground">Sex</label>
@@ -404,8 +519,24 @@ export function LabDashboard() {
 													</div>
 												</div>
 											<div className="space-y-1">
-												<label className="text-xs text-muted-foreground">Ward / Location</label>
-												<Input placeholder="e.g. ICU-3, ER-2, OPD" className="h-8 text-xs" />
+												<label className="text-xs text-muted-foreground">
+													Ward / Location <span className="text-rose-600">*</span>
+												</label>
+												<Select value={manualForm.wardId} onValueChange={v => setManualForm({ ...manualForm, wardId: v })}>
+													<SelectTrigger className={cn("h-8 text-xs w-full", manualErrors.wardId && "border-rose-500")}>
+														<SelectValue placeholder="Select ward" />
+													</SelectTrigger>
+													<SelectContent>
+														{wardsData?.filter(w => w.isActive).map(ward => (
+															<SelectItem key={ward.id} value={ward.id}>
+																{ward.name}
+															</SelectItem>
+														))}
+													</SelectContent>
+												</Select>
+												{manualErrors.wardId && (
+													<p className="text-rose-600 text-xs mt-0.5">{manualErrors.wardId}</p>
+												)}
 											</div>
 										</div>
 									</div>
@@ -418,9 +549,9 @@ export function LabDashboard() {
 										<div className="grid grid-cols-2 gap-2">
 											<div className="space-y-1">
 												<label className="text-xs text-muted-foreground">Panel / Test</label>
-												<Select>
+												<Select value={manualForm.panel} onValueChange={v => setManualForm({ ...manualForm, panel: v })}>
 													<SelectTrigger className="h-8 text-xs w-full">
-														<SelectValue>CBC + Differential</SelectValue>
+														<SelectValue />
 													</SelectTrigger>
 													<SelectContent>
 														<SelectItem value="CBC">CBC + Differential</SelectItem>
@@ -431,8 +562,18 @@ export function LabDashboard() {
 												</Select>
 											</div>
 											<div className="space-y-1">
-												<label className="text-xs text-muted-foreground">Ordering physician</label>
-												<Input placeholder="Dr. ___" className="h-8 text-xs" />
+												<label className="text-xs text-muted-foreground">
+													Ordering physician <span className="text-rose-600">*</span>
+												</label>
+												<Input
+													placeholder="Dr. ___"
+													value={manualForm.physician}
+													onChange={e => setManualForm({ ...manualForm, physician: e.target.value })}
+													className={cn("h-8 text-xs", manualErrors.physician && "border-rose-500")}
+												/>
+												{manualErrors.physician && (
+													<p className="text-rose-600 text-xs mt-0.5">{manualErrors.physician}</p>
+												)}
 											</div>
 										</div>
 										<div className="space-y-1">
@@ -481,6 +622,8 @@ export function LabDashboard() {
 									<label className="text-xs text-muted-foreground">Notes (optional)</label>
 									<Textarea
 										placeholder="Specimen condition, hemolysis, special instructions..."
+										value={manualForm.notes}
+										onChange={e => setManualForm({ ...manualForm, notes: e.target.value })}
 										className="resize-none h-14 text-xs"
 									/>
 								</div>
@@ -495,14 +638,14 @@ export function LabDashboard() {
 											<DialogClose render={<Button variant="outline" size="sm" className="h-8 text-xs" />}>
 												✕ Cancel
 											</DialogClose>
-											<Button size="sm" className="h-8 text-xs gap-1.5">
+											<Button onClick={handleManualSubmit} size="sm" className="h-8 text-xs gap-1.5">
 												<ArrowRight className="w-3.5 h-3.5" />
 												Create & enter results
 											</Button>
 										</div>
 									</div>
 								</DialogFooter>
-							</form>
+							</div>
 						</DialogContent>
 					</Dialog>
 				</div>
