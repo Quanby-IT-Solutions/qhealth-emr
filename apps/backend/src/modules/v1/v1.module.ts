@@ -39,8 +39,6 @@ import { SurgicalModule } from "./surgical/surgical.module"
 import { SystemSettingsModule } from "./system-settings/system-settings.module"
 import { TelemedicineModule } from "./telemedicine/telemedicine.module"
 import { TerminologyModule } from "./terminology/terminology.module"
-import { MasterDataModule } from "./master-data/master-data.module"
-import { AuditorModule } from "./auditor/auditor.module"
 import { HimModule } from "./him/him.module"
 
 @Module({
