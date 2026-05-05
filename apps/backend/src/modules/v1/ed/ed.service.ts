@@ -1,17 +1,11 @@
-import {
-	BadRequestException,
-	Inject,
-	Injectable,
-	Logger,
-	NotFoundException,
-} from "@nestjs/common"
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, isNull, like } from "drizzle-orm"
 
 import {
 	beds,
 	clinicalNotes,
-	encounterStatusEvents,
 	encounters,
+	encounterStatusEvents,
 	imagingOrders,
 	ioEntries,
 	labOrders,
@@ -30,6 +24,7 @@ import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { closeOpenSlaStep } from "@/utils/sla-events"
 import { resolveStepTarget } from "@/utils/sla-step-target"
+
 import { NotificationService } from "../notifications/notification.service"
 
 type CreatePreEncounterInput = V1Inputs["ed"]["createPreEncounter"]
@@ -89,7 +84,11 @@ export class EdService {
 					.returning()
 
 				this.logger.log(`Created pre-encounter ${created!.id} with alias ${traumaAlias}`)
-				this.notificationService.broadcast("ed_queue", "ED Queue Updated", "New triage pre-encounter created")
+				this.notificationService.broadcast(
+					"ed_queue",
+					"ED Queue Updated",
+					"New triage pre-encounter created"
+				)
 
 				return created!
 			} catch (err: unknown) {
@@ -138,10 +137,7 @@ export class EdService {
 	}
 
 	async updatePreEncounter(input: UpdatePreEncounterInput) {
-		const [existing] = await db
-			.select()
-			.from(preEncounters)
-			.where(eq(preEncounters.id, input.id))
+		const [existing] = await db.select().from(preEncounters).where(eq(preEncounters.id, input.id))
 
 		if (!existing) {
 			throw new NotFoundException(`Pre-encounter ${input.id} not found`)
@@ -153,8 +149,10 @@ export class EdService {
 
 		const updateData: Record<string, unknown> = { updatedAt: new Date() }
 		if (input.chiefComplaint !== undefined) updateData.chiefComplaint = input.chiefComplaint
-		if (input.triageAcuityScale !== undefined) updateData.triageAcuityScale = input.triageAcuityScale
-		if (input.triageAcuityLevel !== undefined) updateData.triageAcuityLevel = input.triageAcuityLevel
+		if (input.triageAcuityScale !== undefined)
+			updateData.triageAcuityScale = input.triageAcuityScale
+		if (input.triageAcuityLevel !== undefined)
+			updateData.triageAcuityLevel = input.triageAcuityLevel
 
 		const [updated] = await db
 			.update(preEncounters)
@@ -524,7 +522,11 @@ export class EdService {
 		this.logger.log(
 			`Merged pre-encounter ${input.preEncounterId} → encounter ${result.encounterId} for patient ${input.patientId}`
 		)
-		this.notificationService.broadcast("ed_queue", "ED Queue Updated", "Pre-encounter merged into patient chart")
+		this.notificationService.broadcast(
+			"ed_queue",
+			"ED Queue Updated",
+			"Pre-encounter merged into patient chart"
+		)
 
 		return result
 	}
@@ -546,10 +548,7 @@ export class EdService {
 			})
 			.from(preEncounters)
 			.where(
-				and(
-					eq(preEncounters.facilityId, input.facilityId),
-					eq(preEncounters.status, "active")
-				)
+				and(eq(preEncounters.facilityId, input.facilityId), eq(preEncounters.status, "active"))
 			)
 			.orderBy(preEncounters.createdAt)
 
@@ -611,8 +610,9 @@ export class EdService {
 		// Build queue items from encounters — all data is already joined
 		const encItems = encRows.map(enc => {
 			// Determine queue status based on state
-			const queueStatus: "waiting" | "triage" | "being_seen" | "disposition" =
-				enc.attendingStaffId ? "being_seen" : "waiting"
+			const queueStatus: "waiting" | "triage" | "being_seen" | "disposition" = enc.attendingStaffId
+				? "being_seen"
+				: "waiting"
 
 			const rawScale = enc.mergedAcuityScale
 			const acuityScale: "esi" | "ats" | "ctas" | null =
@@ -808,8 +808,7 @@ export class EdService {
 								: input.disposition === "transfer"
 									? "transfer"
 									: "deceased",
-					oecbEligible:
-						input.disposition === "discharge" ? (input.oecbEligible ?? false) : false,
+					oecbEligible: input.disposition === "discharge" ? (input.oecbEligible ?? false) : false,
 					dischargeDatetime: dispositionNow,
 					updatedAt: dispositionNow,
 				})
@@ -823,8 +822,8 @@ export class EdService {
 					and(
 						eq(encounterStatusEvents.encounterId, input.encounterId),
 						eq(encounterStatusEvents.workflowType, "ed" as const),
-						isNull(encounterStatusEvents.actualMinutes),
-					),
+						isNull(encounterStatusEvents.actualMinutes)
+					)
 				)
 				.orderBy(desc(encounterStatusEvents.occurredAt))
 				.limit(1)
@@ -832,7 +831,7 @@ export class EdService {
 			if (openEdStep) {
 				const mins = Math.max(
 					1,
-					Math.ceil((dispositionNow.getTime() - openEdStep.occurredAt.getTime()) / 60_000),
+					Math.ceil((dispositionNow.getTime() - openEdStep.occurredAt.getTime()) / 60_000)
 				)
 				await tx
 					.update(encounterStatusEvents)
@@ -879,7 +878,11 @@ export class EdService {
 		this.logger.log(
 			`ED Disposition: encounter ${input.encounterId} → ${input.disposition}${input.oecbEligible ? " (OECB tagged)" : ""}`
 		)
-		this.notificationService.broadcast("ed_queue", "ED Queue Updated", `Patient disposition: ${input.disposition}`)
+		this.notificationService.broadcast(
+			"ed_queue",
+			"ED Queue Updated",
+			`Patient disposition: ${input.disposition}`
+		)
 
 		return result
 	}

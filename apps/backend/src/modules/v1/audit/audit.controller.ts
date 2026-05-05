@@ -6,8 +6,8 @@ import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 import { v1 } from "@/config/api-versions.config"
 import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
-import { AuditService } from "./audit.service"
 import { NotificationService } from "../notifications/notification.service"
+import { AuditService } from "./audit.service"
 
 @Controller()
 export class AuditController {

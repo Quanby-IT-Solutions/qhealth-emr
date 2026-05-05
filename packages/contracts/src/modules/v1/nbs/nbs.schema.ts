@@ -40,20 +40,11 @@ export const NbsStatusEnum = z.enum([
 	"negative",
 ])
 
-export const NbsSpecimenTypeEnum = z.enum([
-	"dried_blood_spot",
-	"cord_blood",
-	"heel_prick",
-])
+export const NbsSpecimenTypeEnum = z.enum(["dried_blood_spot", "cord_blood", "heel_prick"])
 
 export const NbsConsentTypeEnum = z.enum(["consent", "waiver"])
 
-export const NbsReferralStatusEnum = z.enum([
-	"pending",
-	"accepted",
-	"completed",
-	"declined",
-])
+export const NbsReferralStatusEnum = z.enum(["pending", "accepted", "completed", "declined"])
 
 export const NbsResultEnum = z.enum(["positive", "negative", "borderline"])
 

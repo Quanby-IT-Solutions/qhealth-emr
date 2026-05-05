@@ -79,11 +79,13 @@ function createSelectBuilder(result: unknown, options?: SelectBuilderOptions) {
 		from: jest.fn().mockReturnThis(),
 		innerJoin: jest.fn().mockReturnThis(),
 		leftJoin: jest.fn().mockReturnThis(),
-		where: jest.fn().mockImplementation(() =>
-			options?.withOrderBy || options?.withPagination || options?.withLimit
-				? builder
-				: Promise.resolve(result)
-		),
+		where: jest
+			.fn()
+			.mockImplementation(() =>
+				options?.withOrderBy || options?.withPagination || options?.withLimit
+					? builder
+					: Promise.resolve(result)
+			),
 	}
 
 	if (options?.withOrderBy) {
@@ -143,9 +145,7 @@ describe("OrdersService", () => {
 		const createdAt = new Date("2025-04-16T10:00:00.000Z")
 
 		mockDb.select
-			.mockImplementationOnce(() =>
-				createSelectBuilder([{ count: 1 }])
-			)
+			.mockImplementationOnce(() => createSelectBuilder([{ count: 1 }]))
 			.mockImplementationOnce(() =>
 				createSelectBuilder(
 					[
@@ -366,9 +366,7 @@ describe("OrdersService", () => {
 				])
 			)
 
-		mockDb.insert.mockImplementationOnce(() =>
-			createInsertBuilder([{ id: "verification-1" }])
-		)
+		mockDb.insert.mockImplementationOnce(() => createInsertBuilder([{ id: "verification-1" }]))
 		// Subsequent insert calls (e.g. encounterStatusEvents for SLA tracking)
 		// — return a no-op chainable builder.
 		mockDb.insert.mockImplementation(() => createInsertBuilder([]))
@@ -384,10 +382,10 @@ describe("OrdersService", () => {
 
 		expect(mockDb.insert).toHaveBeenCalled()
 		expect(mockDb.update).toHaveBeenCalledTimes(1)
-		const updateBuilder = mockDb.update.mock.results[0]?.value as ReturnType<typeof createUpdateBuilder>
-		expect(updateBuilder.set).toHaveBeenCalledWith(
-			expect.objectContaining({ status: "active" })
-		)
+		const updateBuilder = mockDb.update.mock.results[0]?.value as ReturnType<
+			typeof createUpdateBuilder
+		>
+		expect(updateBuilder.set).toHaveBeenCalledWith(expect.objectContaining({ status: "active" }))
 		expect(result).toEqual(
 			expect.objectContaining({
 				id: "verification-1",
@@ -448,9 +446,7 @@ describe("OrdersService", () => {
 		})
 
 		mockDb.select
-			.mockImplementationOnce(() =>
-				createSelectBuilder([{ id: "staff-1", userId: "user-1" }])
-			)
+			.mockImplementationOnce(() => createSelectBuilder([{ id: "staff-1", userId: "user-1" }]))
 			.mockImplementationOnce(() =>
 				createSelectBuilder(
 					[
@@ -501,9 +497,7 @@ describe("OrdersService", () => {
 		jest.spyOn(service, "findMedOrder").mockResolvedValue({ id: "order-created" } as never)
 
 		mockDb.select
-			.mockImplementationOnce(() =>
-				createSelectBuilder([{ id: "staff-1", userId: "user-1" }])
-			)
+			.mockImplementationOnce(() => createSelectBuilder([{ id: "staff-1", userId: "user-1" }]))
 			.mockImplementationOnce(() =>
 				createSelectBuilder(
 					[

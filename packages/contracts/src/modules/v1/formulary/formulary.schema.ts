@@ -41,9 +41,7 @@ export type DrugGeneric = z.infer<typeof DrugGenericSchema>
 
 export const DrugGenericSearchSchema = PaginationInputSchema.extend({
 	search: z.string().optional(),
-	isActive: z
-		.union([z.boolean(), z.string().transform(v => v === "true")])
-		.optional(),
+	isActive: z.union([z.boolean(), z.string().transform(v => v === "true")]).optional(),
 })
 
 export const DrugGenericListResponseSchema = PaginatedResponseSchema.extend({
@@ -82,9 +80,7 @@ export type DrugBrand = z.infer<typeof DrugBrandSchema>
 export const DrugBrandSearchSchema = PaginationInputSchema.extend({
 	search: z.string().optional(),
 	drugGenericId: z.string().uuid().optional(),
-	isActive: z
-		.union([z.boolean(), z.string().transform(v => v === "true")])
-		.optional(),
+	isActive: z.union([z.boolean(), z.string().transform(v => v === "true")]).optional(),
 })
 
 export const DrugBrandListResponseSchema = PaginatedResponseSchema.extend({
@@ -133,15 +129,9 @@ export const FormularyItemFilterSchema = PaginationInputSchema.extend({
 	facilityId: z.string().uuid(),
 	search: z.string().optional(),
 	drugGenericId: z.string().uuid().optional(),
-	isActive: z
-		.union([z.boolean(), z.string().transform(v => v === "true")])
-		.optional(),
-	isHighAlert: z
-		.union([z.boolean(), z.string().transform(v => v === "true")])
-		.optional(),
-	isRestricted: z
-		.union([z.boolean(), z.string().transform(v => v === "true")])
-		.optional(),
+	isActive: z.union([z.boolean(), z.string().transform(v => v === "true")]).optional(),
+	isHighAlert: z.union([z.boolean(), z.string().transform(v => v === "true")]).optional(),
+	isRestricted: z.union([z.boolean(), z.string().transform(v => v === "true")]).optional(),
 })
 
 export const FormularyItemListResponseSchema = PaginatedResponseSchema.extend({
@@ -364,9 +354,7 @@ export type DeprecatedCodeMapping = z.infer<typeof DeprecatedCodeMappingSchema>
 export const DeprecatedCodeMappingFilterSchema = PaginationInputSchema.extend({
 	catalogType: CatalogTypeSchema.optional(),
 	fromCode: z.string().optional(),
-	isActive: z
-		.union([z.boolean(), z.string().transform(v => v === "true")])
-		.optional(),
+	isActive: z.union([z.boolean(), z.string().transform(v => v === "true")]).optional(),
 })
 
 export const DeprecatedCodeMappingListResponseSchema = PaginatedResponseSchema.extend({
@@ -450,9 +438,7 @@ export const CatalogEntryListResponseSchema = PaginatedResponseSchema.extend({
 export const AdminCatalogSearchSchema = PaginationInputSchema.extend({
 	catalogType: CatalogTypeSchema,
 	search: z.string().optional(),
-	isActive: z
-		.union([z.boolean(), z.string().transform(v => v === "true")])
-		.optional(),
+	isActive: z.union([z.boolean(), z.string().transform(v => v === "true")]).optional(),
 })
 
 // Per-type create schemas

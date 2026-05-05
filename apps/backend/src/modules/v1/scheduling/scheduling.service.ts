@@ -1,13 +1,16 @@
-import {
-	ConflictException,
-	Injectable,
-	Logger,
-	NotFoundException,
-} from "@nestjs/common"
-import { and, count, desc, eq, gte, isNotNull, lt, or, sql, type SQL } from "drizzle-orm"
+import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import type { UserSession } from "@thallesp/nestjs-better-auth"
+import { and, count, desc, eq, gte, isNotNull, lt, or, sql, type SQL } from "drizzle-orm"
 
-import { appointments, clinicTemplates, encounterStatusEvents, encounters, patients, staffProfiles, users } from "@repo/db/schema"
+import {
+	appointments,
+	clinicTemplates,
+	encounters,
+	encounterStatusEvents,
+	patients,
+	staffProfiles,
+	users,
+} from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
@@ -327,19 +330,14 @@ export class SchedulingService {
 	}
 
 	async checkInAppointment(input: CheckInAppointmentInput) {
-		const [existing] = await db
-			.select()
-			.from(appointments)
-			.where(eq(appointments.id, input.id))
+		const [existing] = await db.select().from(appointments).where(eq(appointments.id, input.id))
 
 		if (!existing) {
 			throw new NotFoundException(`Appointment ${input.id} not found`)
 		}
 
 		if (existing.status !== "booked") {
-			throw new ConflictException(
-				`Cannot check in appointment with status "${existing.status}"`
-			)
+			throw new ConflictException(`Cannot check in appointment with status "${existing.status}"`)
 		}
 
 		// Get next queue number if not already assigned
@@ -380,10 +378,7 @@ export class SchedulingService {
 	}
 
 	async updateAppointmentStatus(input: UpdateAppointmentStatusInput) {
-		const [existing] = await db
-			.select()
-			.from(appointments)
-			.where(eq(appointments.id, input.id))
+		const [existing] = await db.select().from(appointments).where(eq(appointments.id, input.id))
 
 		if (!existing) {
 			throw new NotFoundException(`Appointment ${input.id} not found`)

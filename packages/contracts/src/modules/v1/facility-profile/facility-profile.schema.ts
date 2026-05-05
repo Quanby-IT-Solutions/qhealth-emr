@@ -62,7 +62,10 @@ export const UpdateFacilityProfileSchema = z.object({
 	// Auxiliary operational fields (written to facility_profiles table)
 	facilityCode: z
 		.string()
-		.regex(facilityCodeRegex, "Facility code must be 3–20 uppercase alphanumeric characters with hyphens (e.g. QH-MAIN)")
+		.regex(
+			facilityCodeRegex,
+			"Facility code must be 3–20 uppercase alphanumeric characters with hyphens (e.g. QH-MAIN)"
+		)
 		.optional(),
 	governingAuthority: z.string().nullable().optional(),
 	addressLine1: z.string().nullable().optional(),

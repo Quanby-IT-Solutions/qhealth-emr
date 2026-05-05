@@ -334,14 +334,14 @@ export const CreateUserWithFacilitiesSchema = z
 		pdeaS2License: z.string().optional(),
 		pdeaS2Expiry: z.string().date().optional(),
 	})
-	.refine(
-		data => data.facilities.filter(f => f.isPrimary).length === 1,
-		{ message: "Exactly one facility must be marked as primary", path: ["facilities"] }
-	)
-	.refine(
-		data => new Set(data.facilities.map(f => f.facilityId)).size === data.facilities.length,
-		{ message: "Duplicate facilityId values are not allowed", path: ["facilities"] }
-	)
+	.refine(data => data.facilities.filter(f => f.isPrimary).length === 1, {
+		message: "Exactly one facility must be marked as primary",
+		path: ["facilities"],
+	})
+	.refine(data => new Set(data.facilities.map(f => f.facilityId)).size === data.facilities.length, {
+		message: "Duplicate facilityId values are not allowed",
+		path: ["facilities"],
+	})
 
 export const CreateUserWithFacilitiesResponseSchema = z.object({
 	userId: z.string(),
@@ -394,10 +394,7 @@ export const RemoveRoleAssignmentSchema = z.object({
  * Also accepts actual booleans for JSON transport.
  */
 const queryBoolean = z
-	.union([
-		z.boolean(),
-		z.enum(["true", "false"]).transform((v) => v === "true"),
-	])
+	.union([z.boolean(), z.enum(["true", "false"]).transform(v => v === "true")])
 	.optional()
 
 // ============================================================================

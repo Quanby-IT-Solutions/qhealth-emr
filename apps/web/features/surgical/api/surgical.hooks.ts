@@ -50,6 +50,9 @@ function buildQueryString(params: Record<string, string | number | boolean | und
 export type SurgeryStatus = "scheduled" | "in_progress" | "completed" | "cancelled" | "postponed"
 export type AsaClass = "ASA I" | "ASA II" | "ASA III" | "ASA IV" | "ASA V" | "ASA VI"
 export type AirwayType = "oral_ett" | "nasal_ett" | "lma" | "awake_fiber_optic" | "tracheostomy"
+export type AnesthesiaType = "general" | "regional" | "local" | "sedation"
+export type IntubationGrade = "CL1" | "CL2" | "CL3" | "CL4" | "not_applicable"
+export type AnesthesiaRecordStatus = "draft" | "signed"
 export type RvsCodeStatus = "suggested" | "validated" | "finalized"
 export type RvsAssignmentType = "primary" | "adjunct"
 export type OperationRecordStatus = "draft" | "signed"
@@ -116,27 +119,65 @@ export interface AnesthesiaAgent {
 	time: string
 }
 
+export interface InductionAgent {
+	agent: string
+	dose: string
+	time?: string
+}
+
+export interface MaintenanceAgent {
+	agent: string
+	dose: string
+	time?: string
+}
+
+export interface MuscleRelaxant {
+	agent: string
+	dose: string
+	time?: string
+}
+
+export interface IntraopMedication {
+	name: string
+	dose: string
+	route: string
+	time: string
+	indication?: string
+}
+
 export interface IntraopVital {
 	time: string
 	bp: string
 	hr: number
 	spo2: number
 	etco2?: number
+	temp?: number
 }
 
 export interface AnesthesiaRecord {
 	id: string
 	surgicalCaseId: string
-	asaClass: AsaClass
-	airwayType: AirwayType
-	intubationAttempts: number
-	agents: AnesthesiaAgent[]
-	intraopVitals: IntraopVital[]
+	asaClass: AsaClass | null
+	anesthesiaType: AnesthesiaType | null
+	airwayType: AirwayType | null
+	airwayManagement: string | null
+	intubationAttempts: number | null
+	intubationGrade: IntubationGrade | null
+	difficultAirway: boolean
+	agents: AnesthesiaAgent[] | null
+	inductionAgents: InductionAgent[] | null
+	maintenanceAgents: MaintenanceAgent[] | null
+	muscleRelaxants: MuscleRelaxant[] | null
+	intraopMedications: IntraopMedication[] | null
+	intraopVitals: IntraopVital[] | null
 	reversalAgent: string | null
 	totalAnesthesiaMinutes: number | null
-	emergenceSmooth: boolean
+	emergenceSmooth: boolean | null
 	complications: string | null
 	postAnesthesiaCareNotes: string | null
+	status: AnesthesiaRecordStatus
+	signedAt: string | null
+	signedByStaffId: string | null
 	createdAt: string
 	updatedAt: string
 }
@@ -386,14 +427,22 @@ export function useAnesthesiaRecordQuery(caseId: string | undefined) {
 
 interface SaveAnesthesiaRecordData {
 	caseId: string
-	asaClass: AsaClass
-	airwayType: AirwayType
-	intubationAttempts: number
-	agents: AnesthesiaAgent[]
-	intraopVitals: IntraopVital[]
+	asaClass?: AsaClass
+	anesthesiaType?: AnesthesiaType
+	airwayType?: AirwayType
+	airwayManagement?: string
+	intubationAttempts?: number
+	intubationGrade?: IntubationGrade
+	difficultAirway?: boolean
+	agents?: AnesthesiaAgent[]
+	inductionAgents?: InductionAgent[]
+	maintenanceAgents?: MaintenanceAgent[]
+	muscleRelaxants?: MuscleRelaxant[]
+	intraopMedications?: IntraopMedication[]
+	intraopVitals?: IntraopVital[]
 	reversalAgent?: string
 	totalAnesthesiaMinutes?: number
-	emergenceSmooth: boolean
+	emergenceSmooth?: boolean
 	complications?: string
 	postAnesthesiaCareNotes?: string
 }
@@ -408,6 +457,21 @@ export function useSaveAnesthesiaRecordMutation() {
 			}),
 		onSuccess: (_data, variables) => {
 			queryClient.invalidateQueries({ queryKey: surgicalKeys.anesthesiaRecord(variables.caseId) })
+		},
+	})
+}
+
+export function useSignAnesthesiaRecordMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: ({ caseId }: { caseId: string }) =>
+			fetchJson<AnesthesiaRecord>(`${API_BASE}/cases/${caseId}/anesthesia-record/sign`, {
+				method: "PUT",
+				body: JSON.stringify({ caseId }),
+			}),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.anesthesiaRecord(variables.caseId) })
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.all })
 		},
 	})
 }

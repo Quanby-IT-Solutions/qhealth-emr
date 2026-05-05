@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
 import { and, count, eq, ilike, or } from "drizzle-orm"
 
-import { codeSystems, codeSetVersions, codes } from "@repo/db/schema"
+import { codes, codeSetVersions, codeSystems } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 
@@ -84,10 +84,7 @@ export class TerminologyService {
 
 		const conditions = [
 			eq(codes.codeSystemId, codeSystemId),
-			or(
-				ilike(codes.code, `%${query}%`),
-				ilike(codes.displayName, `%${query}%`)
-			),
+			or(ilike(codes.code, `%${query}%`), ilike(codes.displayName, `%${query}%`)),
 		]
 
 		if (!includeDeprecated) {
@@ -97,12 +94,7 @@ export class TerminologyService {
 		const where = and(...conditions)
 
 		const [rows, [countRow]] = await Promise.all([
-			db
-				.select()
-				.from(codes)
-				.where(where)
-				.limit(limit)
-				.offset(offset),
+			db.select().from(codes).where(where).limit(limit).offset(offset),
 			db.select({ total: count() }).from(codes).where(where),
 		])
 
@@ -130,7 +122,9 @@ export class TerminologyService {
 		const replacement = await this.getCode(input.replacedByCodeId)
 
 		if (replacement.isDeprecated) {
-			throw new BadRequestException(`Replacement code ${input.replacedByCodeId} is itself deprecated`)
+			throw new BadRequestException(
+				`Replacement code ${input.replacedByCodeId} is itself deprecated`
+			)
 		}
 
 		const [updated] = await db
@@ -144,8 +138,18 @@ export class TerminologyService {
 
 	async diffVersions(input: { codeSystemId: string; fromVersionId: string; toVersionId: string }) {
 		const [fromCodes, toCodes] = await Promise.all([
-			db.select().from(codes).where(and(eq(codes.codeSystemId, input.codeSystemId), eq(codes.versionId, input.fromVersionId))),
-			db.select().from(codes).where(and(eq(codes.codeSystemId, input.codeSystemId), eq(codes.versionId, input.toVersionId))),
+			db
+				.select()
+				.from(codes)
+				.where(
+					and(eq(codes.codeSystemId, input.codeSystemId), eq(codes.versionId, input.fromVersionId))
+				),
+			db
+				.select()
+				.from(codes)
+				.where(
+					and(eq(codes.codeSystemId, input.codeSystemId), eq(codes.versionId, input.toVersionId))
+				),
 		])
 
 		const fromMap = new Map(fromCodes.map(c => [c.code, c]))
@@ -192,7 +196,8 @@ export class TerminologyService {
 				)
 			)
 
-		if (!version) throw new NotFoundException(`Version ${input.versionId} not found for this code system`)
+		if (!version)
+			throw new NotFoundException(`Version ${input.versionId} not found for this code system`)
 
 		const lines = input.csv
 			.split("\n")

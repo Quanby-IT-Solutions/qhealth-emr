@@ -1277,9 +1277,7 @@ export class OrdersService {
 			try {
 				await this.generateMarEntries(medOrder)
 			} catch (err) {
-				this.logger.error(
-					`MAR generation failed for order ${input.medicationOrderId}: ${err}`,
-				)
+				this.logger.error(`MAR generation failed for order ${input.medicationOrderId}: ${err}`)
 			}
 		}
 
@@ -2412,7 +2410,9 @@ export class OrdersService {
 		}
 
 		if (!(marFrequency in intervalHoursMap)) {
-			this.logger.warn(`Unknown frequency "${frequency}" for order ${medOrder.id}, skipping MAR generation`)
+			this.logger.warn(
+				`Unknown frequency "${frequency}" for order ${medOrder.id}, skipping MAR generation`
+			)
 			return
 		}
 
@@ -2422,7 +2422,9 @@ export class OrdersService {
 			scheduledTimes.push(new Date(firstDoseAt))
 		} else {
 			if (!durationDays) {
-				this.logger.warn(`durationDays null for order ${medOrder.id} (${frequency}), skipping MAR generation`)
+				this.logger.warn(
+					`durationDays null for order ${medOrder.id} (${frequency}), skipping MAR generation`
+				)
 				return
 			}
 			const intervalMs = intervalHoursMap[marFrequency]! * 60 * 60 * 1000
@@ -2451,6 +2453,8 @@ export class OrdersService {
 		}))
 
 		await db.insert(marEntries).values(rows).onConflictDoNothing()
-		this.logger.log(`Generated ${rows.length} MAR entries for order ${medOrder.id} (${marFrequency})`)
+		this.logger.log(
+			`Generated ${rows.length} MAR entries for order ${medOrder.id} (${marFrequency})`
+		)
 	}
 }

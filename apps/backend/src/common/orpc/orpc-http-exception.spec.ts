@@ -1,5 +1,7 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common"
 
+import { toORPCError } from "./orpc-http-exception"
+
 jest.mock("@orpc/server", () => {
 	class MockORPCError extends Error {
 		readonly code: string
@@ -17,11 +19,11 @@ jest.mock("@orpc/server", () => {
 	return { ORPCError: MockORPCError }
 })
 
-import { toORPCError } from "./orpc-http-exception"
-
 describe("toORPCError", () => {
 	it("maps Nest forbidden exceptions to ORPC forbidden errors", () => {
-		const error = toORPCError(new ForbiddenException("Break-glass required for this patient chart."))
+		const error = toORPCError(
+			new ForbiddenException("Break-glass required for this patient chart.")
+		)
 
 		expect(error.code).toBe("FORBIDDEN")
 		expect(error.status).toBe(403)

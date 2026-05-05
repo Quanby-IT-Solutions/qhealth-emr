@@ -15,18 +15,20 @@ export const systemSettings = createTable("system_settings", t => ({
 	supportMailbox: t.text("support_mailbox"),
 	serviceDeskHotline: t.text("service_desk_hotline"),
 	breakGlassRequiresReason: t.boolean("break_glass_requires_reason").notNull().default(true),
-	autoFreezeChargesOnDischarge: t.boolean("auto_freeze_charges_on_discharge").notNull().default(true),
-	requireDpaConsentBeforeExport: t.boolean("require_dpa_consent_before_export").notNull().default(true),
+	autoFreezeChargesOnDischarge: t
+		.boolean("auto_freeze_charges_on_discharge")
+		.notNull()
+		.default(true),
+	requireDpaConsentBeforeExport: t
+		.boolean("require_dpa_consent_before_export")
+		.notNull()
+		.default(true),
 	// TOR §4.2: offline capability is mandatory — default must be true so new rows are provisioned compliantly
 	enableOfflineSummaryCache: t.boolean("enable_offline_summary_cache").notNull().default(true),
 
 	// ── JSONB policy sections ─────────────────────────────────────────────────
 	// Shape: { artaSla: {...}, exportDefaults: {...}, offlineMode: {...}, privacyConsent: {...} }
-	policySections: t
-		.jsonb("policy_sections")
-		.$type<PolicySections>()
-		.notNull()
-		.default({}),
+	policySections: t.jsonb("policy_sections").$type<PolicySections>().notNull().default({}),
 
 	updatedAt: t.timestamp("updated_at"),
 }))
@@ -74,10 +76,7 @@ export const offlineCacheJobs = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "cascade" }),
-		status: t
-			.text("status")
-			.notNull()
-			.$type<"running" | "completed" | "failed">(),
+		status: t.text("status").notNull().$type<"running" | "completed" | "failed">(),
 		startedAt: t.timestamp("started_at").notNull().defaultNow(),
 		completedAt: t.timestamp("completed_at"),
 		cachedPatientCount: t.integer("cached_patient_count"),

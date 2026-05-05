@@ -1,4 +1,4 @@
-{
+﻿{
   "permissions": {
     "allow": [
       "Bash(pnpm build:*)",
@@ -144,7 +144,16 @@
       "Bash(ls \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\coding\\\\lib\")",
       "Bash(ls \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\components\")",
       "Bash(ls \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\app\\\\\\(site\\)\\\\him\")",
-      "Bash(grep -r \"him\\\\\\\\.deficiencies\\\\\\\\.read\\\\|him\\\\\\\\.coding\\\\\\\\.read\\\\|him\\\\\\\\.records\\\\\\\\.read\\\\|him\\\\\\\\.hai\\\\\\\\.read\" --include=\"*.ts\")"
+      "Bash(grep -r \"him\\\\\\\\.deficiencies\\\\\\\\.read\\\\|him\\\\\\\\.coding\\\\\\\\.read\\\\|him\\\\\\\\.records\\\\\\\\.read\\\\|him\\\\\\\\.hai\\\\\\\\.read\" --include=\"*.ts\")",      "PowerShell(head *)",
+      "Bash(mkdir -p /c/Users/USER/.traycer/yolo_artifacts)",
+      "Bash(echo '{}')",
+      "Bash(pnpm format *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('scripts',{}\\).get\\('format',''\\)\\)\")",
+      "Bash(dir *)",
+      "Bash(mkdir -p ~/.traycer/yolo_artifacts)",
+      "Bash(New-Item -ItemType Directory -Force -Path '__TRACKED_VAR__\\\\.traycer\\\\yolo_artifacts')",
+      "Bash(Out-Null)",
+      "Bash(Set-Content -Path '__TRACKED_VAR__\\\\.traycer\\\\yolo_artifacts\\\\undefined.json' -Value '{}')"
     ]
   }
 }

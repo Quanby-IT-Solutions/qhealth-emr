@@ -26,7 +26,7 @@ type ConfigHistoryFilterInput = V1Inputs["audit"]["log"]["configHistory"]
  * handle here to make the audit insert participate in the caller's transaction
  * (so the audit row rolls back if the outer transaction rolls back).
  */
-export type DBTransaction = Parameters<Parameters<typeof db["transaction"]>[0]>[0]
+export type DBTransaction = Parameters<Parameters<(typeof db)["transaction"]>[0]>[0]
 
 interface LogAuditEntry {
 	facilityId: string
@@ -123,7 +123,8 @@ export class AuditService {
 	 * Query audit logs with filtering and pagination.
 	 */
 	async findAll(filter: AuditLogFilterInput) {
-		const { facilityId, startDate, endDate, userId, action, entityType, entityId, patientMrn } = filter
+		const { facilityId, startDate, endDate, userId, action, entityType, entityId, patientMrn } =
+			filter
 		const page = Number(filter.page) || 1
 		const limit = Number(filter.limit) || 50
 
@@ -169,10 +170,7 @@ export class AuditService {
 				.orderBy(desc(auditLogs.createdAt))
 				.limit(limit)
 				.offset(offset),
-			db
-				.select({ count: count() })
-				.from(auditLogs)
-				.where(whereClause),
+			db.select({ count: count() }).from(auditLogs).where(whereClause),
 		])
 
 		const total = totalResult[0]?.count ?? 0
@@ -190,10 +188,7 @@ export class AuditService {
 	 * Get a single audit log by ID.
 	 */
 	async findOne(id: string) {
-		const [log] = await db
-			.select()
-			.from(auditLogs)
-			.where(eq(auditLogs.id, id))
+		const [log] = await db.select().from(auditLogs).where(eq(auditLogs.id, id))
 
 		if (!log) throw new NotFoundException(`Audit log ${id} not found`)
 		return log
@@ -203,7 +198,8 @@ export class AuditService {
 	 * Export audit logs (no pagination, respects filters).
 	 */
 	async exportLogs(filter: Omit<AuditLogFilterInput, "page" | "limit">) {
-		const { facilityId, startDate, endDate, userId, action, entityType, entityId, patientMrn } = filter
+		const { facilityId, startDate, endDate, userId, action, entityType, entityId, patientMrn } =
+			filter
 
 		const conditions = [eq(auditLogs.facilityId, facilityId)]
 
@@ -259,7 +255,9 @@ export class AuditService {
 	/**
 	 * Create a break-glass emergency access event.
 	 */
-	async createBreakGlass(input: CreateBreakGlassInput & { clinicianStaffId: string; userId: string }) {
+	async createBreakGlass(
+		input: CreateBreakGlassInput & { clinicianStaffId: string; userId: string }
+	) {
 		const accessGrantedAt = new Date()
 		const accessExpiresAt = new Date(
 			accessGrantedAt.getTime() + (input.durationHours ?? 4) * 60 * 60 * 1000
@@ -339,10 +337,7 @@ export class AuditService {
 				.orderBy(desc(breakGlassEvents.createdAt))
 				.limit(limit)
 				.offset(offset),
-			db
-				.select({ count: count() })
-				.from(breakGlassEvents)
-				.where(whereClause),
+			db.select({ count: count() }).from(breakGlassEvents).where(whereClause),
 		])
 
 		const total = totalResult[0]?.count ?? 0
@@ -400,10 +395,7 @@ export class AuditService {
 	 * Get a single break-glass event by ID.
 	 */
 	async findBreakGlassEvent(id: string) {
-		const [event] = await db
-			.select()
-			.from(breakGlassEvents)
-			.where(eq(breakGlassEvents.id, id))
+		const [event] = await db.select().from(breakGlassEvents).where(eq(breakGlassEvents.id, id))
 
 		if (!event) throw new NotFoundException(`Break-glass event ${id} not found`)
 		return event
@@ -458,10 +450,23 @@ export class AuditService {
 		const flaggedCount = eventsInWindow.filter(e => e.reviewStatus === "flagged").length
 
 		// Aggregate by clinician
-		const byClinicianMap = new Map<string, { eventCount: number; pendingReviewCount: number; flaggedCount: number; patientIds: Set<string> }>()
+		const byClinicianMap = new Map<
+			string,
+			{
+				eventCount: number
+				pendingReviewCount: number
+				flaggedCount: number
+				patientIds: Set<string>
+			}
+		>()
 		for (const e of eventsInWindow) {
 			const key = e.clinicianStaffId
-			const existing = byClinicianMap.get(key) ?? { eventCount: 0, pendingReviewCount: 0, flaggedCount: 0, patientIds: new Set() }
+			const existing = byClinicianMap.get(key) ?? {
+				eventCount: 0,
+				pendingReviewCount: 0,
+				flaggedCount: 0,
+				patientIds: new Set(),
+			}
 			existing.eventCount++
 			if (e.reviewStatus === "pending") existing.pendingReviewCount++
 			if (e.reviewStatus === "flagged") existing.flaggedCount++
@@ -481,10 +486,17 @@ export class AuditService {
 			.slice(0, topN)
 
 		// Aggregate by patient
-		const byPatientMap = new Map<string, { eventCount: number; clinicianIds: Set<string>; flaggedCount: number }>()
+		const byPatientMap = new Map<
+			string,
+			{ eventCount: number; clinicianIds: Set<string>; flaggedCount: number }
+		>()
 		for (const e of eventsInWindow) {
 			const key = e.patientId
-			const existing = byPatientMap.get(key) ?? { eventCount: 0, clinicianIds: new Set(), flaggedCount: 0 }
+			const existing = byPatientMap.get(key) ?? {
+				eventCount: 0,
+				clinicianIds: new Set(),
+				flaggedCount: 0,
+			}
 			existing.eventCount++
 			existing.clinicianIds.add(e.clinicianStaffId)
 			if (e.reviewStatus === "flagged") existing.flaggedCount++

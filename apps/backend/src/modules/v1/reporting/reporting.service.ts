@@ -1,12 +1,11 @@
-import { createHash } from "node:crypto"
-
 import { Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { createHash } from "node:crypto"
 import { and, avg, count, desc, eq, gte, ilike, isNotNull, lte, or, sql } from "drizzle-orm"
 
 import {
 	ahsrSnapshots,
-	beds,
 	bedCensusSnapshots,
+	beds,
 	clinicalNotes,
 	encounters,
 	haiTags,
@@ -176,13 +175,17 @@ export class ReportingService {
 	 */
 	private async _autoTransmitPidsrCase(caseId: string, facilityId: string): Promise<void> {
 		const [pidsrIntegration] = await db
-			.select({ id: integrations.id, endpointUrl: integrations.endpointUrl, credentialsRef: integrations.credentialsRef })
+			.select({
+				id: integrations.id,
+				endpointUrl: integrations.endpointUrl,
+				credentialsRef: integrations.credentialsRef,
+			})
 			.from(integrations)
 			.where(
 				and(
 					eq(integrations.facilityId, facilityId),
 					eq(integrations.kind, "pidsr"),
-					eq(integrations.enabled, true),
+					eq(integrations.enabled, true)
 				)
 			)
 			.limit(1)
@@ -203,7 +206,7 @@ export class ReportingService {
 		try {
 			const headers: Record<string, string> = {
 				"Content-Type": "application/json",
-				Accept: "application/json",
+				"Accept": "application/json",
 			}
 			if (apiKey) headers["X-API-Key"] = apiKey
 
@@ -281,22 +284,33 @@ export class ReportingService {
 		const notes = await db
 			.select({ id: clinicalNotes.id, content: clinicalNotes.content })
 			.from(clinicalNotes)
-			.where(and(eq(clinicalNotes.encounterId, input.encounterId), eq(clinicalNotes.status, "signed")))
+			.where(
+				and(eq(clinicalNotes.encounterId, input.encounterId), eq(clinicalNotes.status, "signed"))
+			)
 
-		const diseaseMatches = new Map<string, {
-			diseaseCode: string
-			diseaseName: string
-			category: "category_1" | "category_2"
-			confidence: "high" | "medium" | "low"
-			matchedOn: Array<{ type: "icd_code" | "keyword" | "lab_result"; value: string; source: string }>
-		}>()
+		const diseaseMatches = new Map<
+			string,
+			{
+				diseaseCode: string
+				diseaseName: string
+				category: "category_1" | "category_2"
+				confidence: "high" | "medium" | "low"
+				matchedOn: Array<{
+					type: "icd_code" | "keyword" | "lab_result"
+					value: string
+					source: string
+				}>
+			}
+		>()
 
 		for (const problem of patientProblems) {
 			if (!problem.icd10Code) continue
 			const matched = ALL_NOTIFIABLE.find(d => problem.icd10Code!.toUpperCase().startsWith(d.code))
 			if (!matched) continue
 
-			const category = CATEGORY_1_DISEASES.some(d => d.code === matched.code) ? "category_1" : "category_2"
+			const category = CATEGORY_1_DISEASES.some(d => d.code === matched.code)
+				? "category_1"
+				: "category_2"
 			const existing = diseaseMatches.get(matched.code) ?? {
 				diseaseCode: matched.code,
 				diseaseName: matched.name,
@@ -319,7 +333,9 @@ export class ReportingService {
 				const keyword = disease.keywords.find(value => content.includes(value.toLowerCase()))
 				if (!keyword) continue
 
-				const category = CATEGORY_1_DISEASES.some(d => d.code === disease.code) ? "category_1" : "category_2"
+				const category = CATEGORY_1_DISEASES.some(d => d.code === disease.code)
+					? "category_1"
+					: "category_2"
 				const existing = diseaseMatches.get(disease.code) ?? {
 					diseaseCode: disease.code,
 					diseaseName: disease.name,
@@ -342,7 +358,10 @@ export class ReportingService {
 		return Array.from(diseaseMatches.values())
 	}
 
-	private async persistDetectionFlags(input: RunAutoDetectionInput, matches: Awaited<ReturnType<ReportingService["collectDetectionMatches"]>>) {
+	private async persistDetectionFlags(
+		input: RunAutoDetectionInput,
+		matches: Awaited<ReturnType<ReportingService["collectDetectionMatches"]>>
+	) {
 		const existingFlags = await db
 			.select({ triggerValue: surveillanceFlags.triggerValue })
 			.from(surveillanceFlags)
@@ -354,14 +373,19 @@ export class ReportingService {
 		for (const match of matches) {
 			if (existingValues.has(match.diseaseCode)) continue
 
-			const [row] = await db.insert(surveillanceFlags).values({
-				facilityId: input.facilityId,
-				encounterId: input.encounterId,
-				noteId: match.matchedOn.find(item => item.type === "keyword")?.source ?? null,
-				flagType: match.matchedOn.some(item => item.type === "icd_code") ? "icd10_match" : "syndromic_keyword",
-				triggeredBy: match.matchedOn.map(item => `${item.type}:${item.value}`).join(", "),
-				triggerValue: match.diseaseCode,
-			}).returning({ id: surveillanceFlags.id })
+			const [row] = await db
+				.insert(surveillanceFlags)
+				.values({
+					facilityId: input.facilityId,
+					encounterId: input.encounterId,
+					noteId: match.matchedOn.find(item => item.type === "keyword")?.source ?? null,
+					flagType: match.matchedOn.some(item => item.type === "icd_code")
+						? "icd10_match"
+						: "syndromic_keyword",
+					triggeredBy: match.matchedOn.map(item => `${item.type}:${item.value}`).join(", "),
+					triggerValue: match.diseaseCode,
+				})
+				.returning({ id: surveillanceFlags.id })
 
 			if (row) {
 				flagsCreated += 1
@@ -406,7 +430,9 @@ export class ReportingService {
 				reviewedByStaffId: surveillanceFlags.reviewedByStaffId,
 				reviewedAt: surveillanceFlags.reviewedAt,
 				createdAt: surveillanceFlags.createdAt,
-				patientName: sql<string | null>`CASE WHEN ${patients.firstName} IS NOT NULL THEN ${patients.firstName} || ' ' || ${patients.lastName} ELSE NULL END`,
+				patientName: sql<
+					string | null
+				>`CASE WHEN ${patients.firstName} IS NOT NULL THEN ${patients.firstName} || ' ' || ${patients.lastName} ELSE NULL END`,
 				patientMrn: patients.mrn,
 				encounterType: encounters.encounterType,
 			})
@@ -420,8 +446,12 @@ export class ReportingService {
 
 		// Derive category and diseaseName from triggerValue
 		const flags = rows.map(r => {
-			const matched = ALL_NOTIFIABLE.find(d => d.code === r.triggerValue || d.name.toLowerCase() === r.triggerValue.toLowerCase())
-			const isCategory1 = CATEGORY_1_DISEASES.some(d => d.code === r.triggerValue || d.name.toLowerCase() === r.triggerValue.toLowerCase())
+			const matched = ALL_NOTIFIABLE.find(
+				d => d.code === r.triggerValue || d.name.toLowerCase() === r.triggerValue.toLowerCase()
+			)
+			const isCategory1 = CATEGORY_1_DISEASES.some(
+				d => d.code === r.triggerValue || d.name.toLowerCase() === r.triggerValue.toLowerCase()
+			)
 
 			return {
 				...r,
@@ -433,9 +463,7 @@ export class ReportingService {
 		})
 
 		// Optional category filter (post-query since category is derived)
-		const filtered = input.category
-			? flags.filter(f => f.category === input.category)
-			: flags
+		const filtered = input.category ? flags.filter(f => f.category === input.category) : flags
 
 		return {
 			flags: filtered,
@@ -481,7 +509,10 @@ export class ReportingService {
 				.limit(1)
 
 			if (enc) {
-				const matched = ALL_NOTIFIABLE.find(d => d.code === flag.triggerValue || d.name.toLowerCase() === flag.triggerValue.toLowerCase())
+				const matched = ALL_NOTIFIABLE.find(
+					d =>
+						d.code === flag.triggerValue || d.name.toLowerCase() === flag.triggerValue.toLowerCase()
+				)
 
 				const [newCase] = await db
 					.insert(pidsrCases)
@@ -522,7 +553,9 @@ export class ReportingService {
 
 		const flags = matches.map(match => ({
 			id: this.getDetectionRuleId(`${input.encounterId}:${match.diseaseCode}`),
-			flagType: match.matchedOn.some(item => item.type === "icd_code") ? "icd10_match" : "syndromic_keyword",
+			flagType: match.matchedOn.some(item => item.type === "icd_code")
+				? "icd10_match"
+				: "syndromic_keyword",
 			triggeredBy: match.matchedOn.map(item => `${item.type}:${item.value}`).join(", "),
 			triggerValue: match.diseaseCode,
 		}))
@@ -552,22 +585,23 @@ export class ReportingService {
 
 	async listDetectionRules(input: ListDetectionRulesInput) {
 		void input.facilityId
-		const rules = ALL_NOTIFIABLE
-			.map(disease => {
-				const category: "category_1" | "category_2" = CATEGORY_1_DISEASES.some(item => item.code === disease.code)
-					? "category_1"
-					: "category_2"
-				return {
-					id: this.getDetectionRuleId(disease.code),
-					diseaseCode: disease.code,
-					diseaseName: disease.name,
-					category,
-					icdCodes: [disease.code],
-					keywords: disease.keywords,
-					labTestCodes: [],
-					isActive: true,
-				}
-			})
+		const rules = ALL_NOTIFIABLE.map(disease => {
+			const category: "category_1" | "category_2" = CATEGORY_1_DISEASES.some(
+				item => item.code === disease.code
+			)
+				? "category_1"
+				: "category_2"
+			return {
+				id: this.getDetectionRuleId(disease.code),
+				diseaseCode: disease.code,
+				diseaseName: disease.name,
+				category,
+				icdCodes: [disease.code],
+				keywords: disease.keywords,
+				labTestCodes: [],
+				isActive: true,
+			}
+		})
 			.filter(rule => (input.category ? rule.category === input.category : true))
 			.filter(rule => (input.isActive !== undefined ? rule.isActive === input.isActive : true))
 
@@ -605,12 +639,11 @@ export class ReportingService {
 
 		// Filter by category
 		if (input.category) {
-			const codes = input.category === "category_1"
-				? CATEGORY_1_DISEASES.map(d => d.code)
-				: CATEGORY_2_DISEASES.map(d => d.code)
-			conditions.push(
-				sql`${pidsrCases.diseaseCode} = ANY(${codes})`
-			)
+			const codes =
+				input.category === "category_1"
+					? CATEGORY_1_DISEASES.map(d => d.code)
+					: CATEGORY_2_DISEASES.map(d => d.code)
+			conditions.push(sql`${pidsrCases.diseaseCode} = ANY(${codes})`)
 		}
 
 		const [totalRow] = await db
@@ -685,7 +718,9 @@ export class ReportingService {
 				patientMrn: patients.mrn,
 				encounterType: encounters.encounterType,
 				chiefComplaint: encounters.chiefComplaint,
-				attendingPhysician: sql<string | null>`(SELECT sp."display_name" FROM "qemr_staff_profiles" sp WHERE sp."id" = ${encounters.attendingStaffId})`,
+				attendingPhysician: sql<
+					string | null
+				>`(SELECT sp."display_name" FROM "qemr_staff_profiles" sp WHERE sp."id" = ${encounters.attendingStaffId})`,
 			})
 			.from(pidsrCases)
 			.leftJoin(patients, eq(pidsrCases.patientId, patients.id))
@@ -707,7 +742,11 @@ export class ReportingService {
 
 	async submitPidsrCase(input: SubmitPidsrCaseInput) {
 		const [existing] = await db
-			.select({ id: pidsrCases.id, reportStatus: pidsrCases.reportStatus, facilityId: pidsrCases.facilityId })
+			.select({
+				id: pidsrCases.id,
+				reportStatus: pidsrCases.reportStatus,
+				facilityId: pidsrCases.facilityId,
+			})
 			.from(pidsrCases)
 			.where(eq(pidsrCases.id, input.id))
 			.limit(1)
@@ -716,13 +755,17 @@ export class ReportingService {
 
 		// Resolve active, enabled PIDSR integration for this case's facility
 		const [pidsrIntegration] = await db
-			.select({ id: integrations.id, endpointUrl: integrations.endpointUrl, credentialsRef: integrations.credentialsRef })
+			.select({
+				id: integrations.id,
+				endpointUrl: integrations.endpointUrl,
+				credentialsRef: integrations.credentialsRef,
+			})
 			.from(integrations)
 			.where(
 				and(
 					eq(integrations.facilityId, existing.facilityId),
 					eq(integrations.kind, "pidsr"),
-					eq(integrations.enabled, true),
+					eq(integrations.enabled, true)
 				)
 			)
 			.limit(1)
@@ -763,7 +806,7 @@ export class ReportingService {
 		try {
 			const headers: Record<string, string> = {
 				"Content-Type": "application/json",
-				Accept: "application/json",
+				"Accept": "application/json",
 			}
 			if (apiKey) {
 				headers["X-API-Key"] = apiKey
@@ -890,13 +933,17 @@ export class ReportingService {
 		// INTREG-013: Attempt automatic transmission of the weekly report when an
 		// enabled PIDSR integration is configured for this facility.
 		const [pidsrIntegration] = await db
-			.select({ id: integrations.id, endpointUrl: integrations.endpointUrl, credentialsRef: integrations.credentialsRef })
+			.select({
+				id: integrations.id,
+				endpointUrl: integrations.endpointUrl,
+				credentialsRef: integrations.credentialsRef,
+			})
 			.from(integrations)
 			.where(
 				and(
 					eq(integrations.facilityId, input.facilityId),
 					eq(integrations.kind, "pidsr"),
-					eq(integrations.enabled, true),
+					eq(integrations.enabled, true)
 				)
 			)
 			.limit(1)
@@ -906,7 +953,8 @@ export class ReportingService {
 			return {
 				...reportPayload,
 				status: "generated" as const,
-				transmissionNote: "No enabled PIDSR integration is configured for this facility. Configure one in Admin → Integration Registry.",
+				transmissionNote:
+					"No enabled PIDSR integration is configured for this facility. Configure one in Admin → Integration Registry.",
 			}
 		}
 
@@ -918,14 +966,18 @@ export class ReportingService {
 		try {
 			const headers: Record<string, string> = {
 				"Content-Type": "application/json",
-				Accept: "application/json",
+				"Accept": "application/json",
 			}
 			if (apiKey) headers["X-API-Key"] = apiKey
 
 			const response = await fetch(pidsrIntegration.endpointUrl, {
 				method: "POST",
 				headers,
-				body: JSON.stringify({ type: "weekly_report", ...reportPayload, submittedAt: now.toISOString() }),
+				body: JSON.stringify({
+					type: "weekly_report",
+					...reportPayload,
+					submittedAt: now.toISOString(),
+				}),
 			})
 
 			const syncStatus: "ok" | "error" = response.ok ? "ok" : "error"
@@ -1073,14 +1125,17 @@ export class ReportingService {
 				count: count(),
 			})
 			.from(problems)
-			.innerJoin(encounters, and(
-				eq(problems.encounterId, encounters.id),
-				eq(encounters.facilityId, input.facilityId),
-				gte(encounters.admissionDatetime, new Date(dateStart)),
-				input.month
-					? lte(encounters.admissionDatetime, new Date(dateEnd))
-					: lte(encounters.admissionDatetime, new Date(`${input.year + 1}-01-01`))
-			))
+			.innerJoin(
+				encounters,
+				and(
+					eq(problems.encounterId, encounters.id),
+					eq(encounters.facilityId, input.facilityId),
+					gte(encounters.admissionDatetime, new Date(dateStart)),
+					input.month
+						? lte(encounters.admissionDatetime, new Date(dateEnd))
+						: lte(encounters.admissionDatetime, new Date(`${input.year + 1}-01-01`))
+				)
+			)
 			.where(isNotNull(problems.icd10Code))
 			.groupBy(problems.icd10Code, problems.icd10Display)
 			.orderBy(desc(count()))
@@ -1105,16 +1160,19 @@ export class ReportingService {
 				count: count(),
 			})
 			.from(problems)
-			.innerJoin(encounters, and(
-				eq(problems.encounterId, encounters.id),
-				eq(encounters.facilityId, input.facilityId),
-				eq(encounters.disposition, "deceased"),
-				isNotNull(encounters.dischargeDatetime),
-				gte(encounters.dischargeDatetime, new Date(dateStart)),
-				input.month
-					? lte(encounters.dischargeDatetime, new Date(dateEnd))
-					: lte(encounters.dischargeDatetime, new Date(`${input.year + 1}-01-01`))
-			))
+			.innerJoin(
+				encounters,
+				and(
+					eq(problems.encounterId, encounters.id),
+					eq(encounters.facilityId, input.facilityId),
+					eq(encounters.disposition, "deceased"),
+					isNotNull(encounters.dischargeDatetime),
+					gte(encounters.dischargeDatetime, new Date(dateStart)),
+					input.month
+						? lte(encounters.dischargeDatetime, new Date(dateEnd))
+						: lte(encounters.dischargeDatetime, new Date(`${input.year + 1}-01-01`))
+				)
+			)
 			.where(isNotNull(problems.icd10Code))
 			.groupBy(problems.icd10Code, problems.icd10Display)
 			.orderBy(desc(count()))
@@ -1136,14 +1194,17 @@ export class ReportingService {
 				count: count(),
 			})
 			.from(haiTags)
-			.innerJoin(encounters, and(
-				eq(haiTags.encounterId, encounters.id),
-				eq(encounters.facilityId, input.facilityId),
-				gte(encounters.admissionDatetime, new Date(dateStart)),
-				input.month
-					? lte(encounters.admissionDatetime, new Date(dateEnd))
-					: lte(encounters.admissionDatetime, new Date(`${input.year + 1}-01-01`))
-			))
+			.innerJoin(
+				encounters,
+				and(
+					eq(haiTags.encounterId, encounters.id),
+					eq(encounters.facilityId, input.facilityId),
+					gte(encounters.admissionDatetime, new Date(dateStart)),
+					input.month
+						? lte(encounters.admissionDatetime, new Date(dateEnd))
+						: lte(encounters.admissionDatetime, new Date(`${input.year + 1}-01-01`))
+				)
+			)
 			.groupBy(haiTags.haiType)
 			.orderBy(desc(count()))
 
@@ -1181,15 +1242,13 @@ export class ReportingService {
 			: `${input.year}-01-01`
 		const dateEnd = input.month
 			? (() => {
-				const nm = input.month === 12 ? 1 : input.month + 1
-				const ny = input.month === 12 ? input.year + 1 : input.year
-				return `${ny}-${nm.toString().padStart(2, "0")}-01`
-			})()
+					const nm = input.month === 12 ? 1 : input.month + 1
+					const ny = input.month === 12 ? input.year + 1 : input.year
+					return `${ny}-${nm.toString().padStart(2, "0")}-01`
+				})()
 			: `${input.year + 1}-01-01`
 
-		const baseConditions = [
-			eq(encounters.facilityId, input.facilityId),
-		]
+		const baseConditions = [eq(encounters.facilityId, input.facilityId)]
 
 		// Metric-specific filters
 		if (input.metric === "admissions") {
@@ -1265,12 +1324,7 @@ export class ReportingService {
 				})
 				.from(problems)
 				.innerJoin(encounters, eq(problems.patientId, encounters.patientId))
-				.where(
-					and(
-						sql`${encounters.id} = ANY(${encounterIds})`,
-						isNotNull(problems.icd10Code)
-					)
-				)
+				.where(and(sql`${encounters.id} = ANY(${encounterIds})`, isNotNull(problems.icd10Code)))
 
 			for (const dr of diagRows) {
 				const existing = diagnosesMap.get(dr.encounterId) ?? []
@@ -1301,7 +1355,14 @@ export class ReportingService {
 		const todayStart = new Date()
 		todayStart.setHours(0, 0, 0, 0)
 
-		const [bedCounts, admissionsToday, dischargesToday, deathsToday, pendingAlerts, activeEncounterRows] = await Promise.all([
+		const [
+			bedCounts,
+			admissionsToday,
+			dischargesToday,
+			deathsToday,
+			pendingAlerts,
+			activeEncounterRows,
+		] = await Promise.all([
 			db
 				.select({
 					totalBeds: count(),
@@ -1310,10 +1371,45 @@ export class ReportingService {
 				})
 				.from(beds)
 				.where(eq(beds.facilityId, input.facilityId)),
-			db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), gte(encounters.admissionDatetime, todayStart))),
-			db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), isNotNull(encounters.dischargeDatetime), gte(encounters.dischargeDatetime, todayStart))),
-			db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), eq(encounters.disposition, "deceased"), isNotNull(encounters.dischargeDatetime), gte(encounters.dischargeDatetime, todayStart))),
-			db.select({ count: count() }).from(surveillanceFlags).where(and(eq(surveillanceFlags.facilityId, input.facilityId), eq(surveillanceFlags.isReviewed, false))),
+			db
+				.select({ count: count() })
+				.from(encounters)
+				.where(
+					and(
+						eq(encounters.facilityId, input.facilityId),
+						gte(encounters.admissionDatetime, todayStart)
+					)
+				),
+			db
+				.select({ count: count() })
+				.from(encounters)
+				.where(
+					and(
+						eq(encounters.facilityId, input.facilityId),
+						isNotNull(encounters.dischargeDatetime),
+						gte(encounters.dischargeDatetime, todayStart)
+					)
+				),
+			db
+				.select({ count: count() })
+				.from(encounters)
+				.where(
+					and(
+						eq(encounters.facilityId, input.facilityId),
+						eq(encounters.disposition, "deceased"),
+						isNotNull(encounters.dischargeDatetime),
+						gte(encounters.dischargeDatetime, todayStart)
+					)
+				),
+			db
+				.select({ count: count() })
+				.from(surveillanceFlags)
+				.where(
+					and(
+						eq(surveillanceFlags.facilityId, input.facilityId),
+						eq(surveillanceFlags.isReviewed, false)
+					)
+				),
 			db
 				.select({ encounterType: encounters.encounterType, activeCount: count() })
 				.from(encounters)
@@ -1321,7 +1417,12 @@ export class ReportingService {
 				.groupBy(encounters.encounterType),
 		])
 
-		const weeklyTrend: Array<{ date: string; admissions: number; discharges: number; deaths: number }> = []
+		const weeklyTrend: Array<{
+			date: string
+			admissions: number
+			discharges: number
+			deaths: number
+		}> = []
 		for (let index = 6; index >= 0; index -= 1) {
 			const dayStart = new Date(todayStart)
 			dayStart.setDate(todayStart.getDate() - index)
@@ -1329,9 +1430,39 @@ export class ReportingService {
 			dayEnd.setDate(dayStart.getDate() + 1)
 
 			const [admissions, discharges, deaths] = await Promise.all([
-				db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), gte(encounters.admissionDatetime, dayStart), lte(encounters.admissionDatetime, dayEnd))),
-				db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), isNotNull(encounters.dischargeDatetime), gte(encounters.dischargeDatetime, dayStart), lte(encounters.dischargeDatetime, dayEnd))),
-				db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), eq(encounters.disposition, "deceased"), isNotNull(encounters.dischargeDatetime), gte(encounters.dischargeDatetime, dayStart), lte(encounters.dischargeDatetime, dayEnd))),
+				db
+					.select({ count: count() })
+					.from(encounters)
+					.where(
+						and(
+							eq(encounters.facilityId, input.facilityId),
+							gte(encounters.admissionDatetime, dayStart),
+							lte(encounters.admissionDatetime, dayEnd)
+						)
+					),
+				db
+					.select({ count: count() })
+					.from(encounters)
+					.where(
+						and(
+							eq(encounters.facilityId, input.facilityId),
+							isNotNull(encounters.dischargeDatetime),
+							gte(encounters.dischargeDatetime, dayStart),
+							lte(encounters.dischargeDatetime, dayEnd)
+						)
+					),
+				db
+					.select({ count: count() })
+					.from(encounters)
+					.where(
+						and(
+							eq(encounters.facilityId, input.facilityId),
+							eq(encounters.disposition, "deceased"),
+							isNotNull(encounters.dischargeDatetime),
+							gte(encounters.dischargeDatetime, dayStart),
+							lte(encounters.dischargeDatetime, dayEnd)
+						)
+					),
 			])
 
 			weeklyTrend.push({
@@ -1351,7 +1482,14 @@ export class ReportingService {
 				totalBeds: census.totalBeds ?? 0,
 				occupiedBeds: Number(census.occupiedBeds ?? 0),
 				availableBeds: Number(census.availableBeds ?? 0),
-				borPercentage: (census.totalBeds ?? 0) > 0 ? Number(((Number(census.occupiedBeds ?? 0) / Number(census.totalBeds ?? 0)) * 100).toFixed(2)) : 0,
+				borPercentage:
+					(census.totalBeds ?? 0) > 0
+						? Number(
+								((Number(census.occupiedBeds ?? 0) / Number(census.totalBeds ?? 0)) * 100).toFixed(
+									2
+								)
+							)
+						: 0,
 			},
 			todayActivity: {
 				admissions: admissionsToday[0]?.count ?? 0,
@@ -1392,7 +1530,8 @@ export class ReportingService {
 
 		return {
 			success: true,
-			message: "Integration pending — AHSR export is stubbed. Snapshot saved for future submission.",
+			message:
+				"Integration pending — AHSR export is stubbed. Snapshot saved for future submission.",
 			snapshotId: snapshot?.id ?? null,
 		}
 	}

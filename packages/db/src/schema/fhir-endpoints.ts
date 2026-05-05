@@ -23,11 +23,7 @@ export const fhirEndpoints = createTable(
 			.notNull()
 			.default("R4")
 			.$type<"DSTU2" | "STU3" | "R4" | "R5">(),
-		authMethod: t
-			.text("auth_method")
-			.notNull()
-			.default("none")
-			.$type<FhirAuthMethod>(),
+		authMethod: t.text("auth_method").notNull().default("none").$type<FhirAuthMethod>(),
 		// Stored as encrypted env-var reference or JSON blob (never plaintext secrets)
 		authCredentialsRef: t.text("auth_credentials_ref"),
 		// FHIR resource types included in sync (jsonb array of strings)
@@ -40,9 +36,7 @@ export const fhirEndpoints = createTable(
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 	}),
-	t => [
-		index("fhir_endpoints_facility_id_idx").on(t.facilityId),
-	]
+	t => [index("fhir_endpoints_facility_id_idx").on(t.facilityId)]
 )
 
 export type FhirEndpointRow = typeof fhirEndpoints.$inferSelect

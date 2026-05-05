@@ -16,21 +16,14 @@ export const nutritionAssessments = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
 		patientId: t
 			.uuid("patient_id")
 			.notNull()
 			.references(() => patients.id, { onDelete: "restrict" }),
-		screeningTool: t
-			.text("screening_tool")
-			.notNull()
-			.$type<"nrs_2002" | "sga" | "must" | "mna">(),
+		screeningTool: t.text("screening_tool").notNull().$type<"nrs_2002" | "sga" | "must" | "mna">(),
 		screeningScore: t.integer("screening_score"),
-		malnutritionRisk: t
-			.text("malnutrition_risk")
-			.$type<"low" | "moderate" | "high">(),
+		malnutritionRisk: t.text("malnutrition_risk").$type<"low" | "moderate" | "high">(),
 		fullAssessmentData: t.jsonb("full_assessment_data").$type<{
 			dietaryHistory?: {
 				usualIntake?: string

@@ -10,10 +10,7 @@ import { users } from "./auth.js"
 export const facilities = createTable("facilities", t => ({
 	id: t.uuid("id").primaryKey().defaultRandom(),
 	name: t.text("name").notNull(),
-	facilityType: t
-		.text("facility_type")
-		.notNull()
-		.$type<"community" | "district" | "tertiary">(),
+	facilityType: t.text("facility_type").notNull().$type<"community" | "district" | "tertiary">(),
 	address: t.text("address"),
 	dohLicenseNumber: t.text("doh_license_number"),
 	philhealthAccreditationId: t.text("philhealth_accreditation_id"),
@@ -140,10 +137,13 @@ export const rolePermissions = createTable(
 		action: t
 			.text("action")
 			.notNull()
-			.$type<"view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "read" | "write" | "manage_catalog" | "clinical_policy" | "terminology_admin">(),
+			.$type<"view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "read" | "write" | "manage_catalog" | "clinical_policy" | "terminology_admin">()
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
-	t => [index("role_permissions_role_id_idx").on(t.roleId), uniqueIndex("role_permissions_role_module_action_unique").on(t.roleId, t.module, t.action)]
+	t => [
+		index("role_permissions_role_id_idx").on(t.roleId),
+		uniqueIndex("role_permissions_role_module_action_unique").on(t.roleId, t.module, t.action),
+	]
 )
 
 export const userRoles = createTable(

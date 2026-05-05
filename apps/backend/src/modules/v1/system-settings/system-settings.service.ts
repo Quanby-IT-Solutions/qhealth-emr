@@ -5,7 +5,7 @@ import { systemSettings } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import { AUDIT_ENTITY_TYPES } from "@/modules/v1/audit/audit-entity-types"
-import { type DBTransaction, AuditService } from "@/modules/v1/audit/audit.service"
+import { AuditService, type DBTransaction } from "@/modules/v1/audit/audit.service"
 
 type SystemSettingsRow = typeof systemSettings.$inferSelect
 
@@ -126,7 +126,13 @@ export class SystemSettingsService {
 			enableOfflineSummaryCache?: boolean
 			policySections?: Record<string, unknown>
 		},
-		actor: { userId: string; facilityId: string; staffProfileId: string | null; ipAddress: string | null; userAgent: string | null }
+		actor: {
+			userId: string
+			facilityId: string
+			staffProfileId: string | null
+			ipAddress: string | null
+			userAgent: string | null
+		}
 	): Promise<SystemSettingsRow> {
 		return db.transaction(async (tx: DBTransaction) => {
 			// 1. Auto-provision if missing, then fetch current state

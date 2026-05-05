@@ -136,6 +136,7 @@ export default function SurgicalPage() {
 							caseId={caseId}
 							existing={anesthesiaRecord}
 							canEdit={canEditSurgical}
+							canSign={canSignSurgical}
 						/>
 					)}
 				</TabsContent>

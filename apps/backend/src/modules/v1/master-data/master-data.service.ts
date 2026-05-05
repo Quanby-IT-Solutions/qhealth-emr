@@ -84,16 +84,14 @@ export class MasterDataService {
 
 		const whereBase = and(...conditions)
 		const where = search
-			? and(whereBase, or(ilike(masterDataItems.code, `%${search}%`), ilike(masterDataItems.name, `%${search}%`)))
+			? and(
+					whereBase,
+					or(ilike(masterDataItems.code, `%${search}%`), ilike(masterDataItems.name, `%${search}%`))
+				)
 			: whereBase
 
 		const [rows, [countRow]] = await Promise.all([
-			db
-				.select()
-				.from(masterDataItems)
-				.where(where)
-				.limit(limit)
-				.offset(offset),
+			db.select().from(masterDataItems).where(where).limit(limit).offset(offset),
 			db.select({ total: count() }).from(masterDataItems).where(where),
 		])
 
@@ -106,10 +104,7 @@ export class MasterDataService {
 	}
 
 	async getItem(id: string): Promise<ItemRow> {
-		const [row] = await db
-			.select()
-			.from(masterDataItems)
-			.where(eq(masterDataItems.id, id))
+		const [row] = await db.select().from(masterDataItems).where(eq(masterDataItems.id, id))
 
 		if (!row) throw new NotFoundException(`Master data item ${id} not found`)
 		return coerceItem(row)
@@ -120,7 +115,9 @@ export class MasterDataService {
 			const [existing] = await db
 				.select()
 				.from(masterDataItems)
-				.where(and(eq(masterDataItems.id, input.id), eq(masterDataItems.catalogId, input.catalogId)))
+				.where(
+					and(eq(masterDataItems.id, input.id), eq(masterDataItems.catalogId, input.catalogId))
+				)
 
 			if (!existing) throw new NotFoundException(`Master data item ${input.id} not found`)
 
@@ -184,7 +181,10 @@ export class MasterDataService {
 		return coerceItem(created!)
 	}
 
-	async deprecateItem(input: { id: string; replacedByItemId: string }, actorId: string): Promise<ItemRow> {
+	async deprecateItem(
+		input: { id: string; replacedByItemId: string },
+		actorId: string
+	): Promise<ItemRow> {
 		const item = await this.getItem(input.id)
 
 		if (item.isDeprecated) {
@@ -194,7 +194,9 @@ export class MasterDataService {
 		const replacement = await this.getItem(input.replacedByItemId)
 
 		if (replacement.isDeprecated) {
-			throw new BadRequestException(`Replacement item ${input.replacedByItemId} is itself deprecated`)
+			throw new BadRequestException(
+				`Replacement item ${input.replacedByItemId} is itself deprecated`
+			)
 		}
 
 		const [updated] = await db

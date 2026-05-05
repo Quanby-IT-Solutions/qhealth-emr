@@ -32,8 +32,9 @@ describe("ArtaSlaSchema", () => {
 
 describe("ExportDefaultsSchema", () => {
 	it("accepts valid scheduleWindow and defaultFormat", () => {
-		expect(ExportDefaultsSchema.parse({ scheduleWindow: "daily-02:00", defaultFormat: "ndjson" }))
-			.toEqual({ scheduleWindow: "daily-02:00", defaultFormat: "ndjson" })
+		expect(
+			ExportDefaultsSchema.parse({ scheduleWindow: "daily-02:00", defaultFormat: "ndjson" })
+		).toEqual({ scheduleWindow: "daily-02:00", defaultFormat: "ndjson" })
 	})
 
 	it("rejects unknown defaultFormat value", () => {
@@ -43,8 +44,10 @@ describe("ExportDefaultsSchema", () => {
 
 describe("OfflineModeSchema", () => {
 	it("accepts cacheActivePatients and maxOfflineDays", () => {
-		expect(OfflineModeSchema.parse({ cacheActivePatients: true, maxOfflineDays: 7 }))
-			.toEqual({ cacheActivePatients: true, maxOfflineDays: 7 })
+		expect(OfflineModeSchema.parse({ cacheActivePatients: true, maxOfflineDays: 7 })).toEqual({
+			cacheActivePatients: true,
+			maxOfflineDays: 7,
+		})
 	})
 
 	it("rejects maxOfflineDays > 30", () => {
@@ -58,8 +61,10 @@ describe("OfflineModeSchema", () => {
 
 describe("PrivacyConsentSchema", () => {
 	it("accepts valid shape", () => {
-		expect(PrivacyConsentSchema.parse({ consentVersion: "v1.0", enforceOnLogin: true }))
-			.toEqual({ consentVersion: "v1.0", enforceOnLogin: true })
+		expect(PrivacyConsentSchema.parse({ consentVersion: "v1.0", enforceOnLogin: true })).toEqual({
+			consentVersion: "v1.0",
+			enforceOnLogin: true,
+		})
 	})
 })
 
@@ -79,9 +84,7 @@ describe("PolicySectionsSchema (strict — rejects unknown top-level keys)", () 
 	})
 
 	it("rejects unknown top-level key", () => {
-		expect(() =>
-			PolicySectionsSchema.parse({ unknownSection: { foo: true } })
-		).toThrow()
+		expect(() => PolicySectionsSchema.parse({ unknownSection: { foo: true } })).toThrow()
 	})
 
 	it("rejects nested invalid shape in artaSla", () => {
@@ -123,9 +126,7 @@ describe("UpdateSystemSettingsSchema", () => {
 	})
 
 	it("rejects invalid email in supportMailbox", () => {
-		expect(() =>
-			UpdateSystemSettingsSchema.parse({ supportMailbox: "not-an-email" })
-		).toThrow()
+		expect(() => UpdateSystemSettingsSchema.parse({ supportMailbox: "not-an-email" })).toThrow()
 	})
 
 	it("rejects unknown top-level field in policySections", () => {

@@ -27,7 +27,14 @@ const PaginatedResponseSchema = z.object({
 export const MswStatusEnum = z.enum(["pending", "in_progress", "completed", "cancelled"])
 export type MswStatus = z.infer<typeof MswStatusEnum>
 
-export const CoeProgramEnum = z.enum(["malasakit", "pcso", "dswd", "doh_map", "philhealth_zbenefit", "other"])
+export const CoeProgramEnum = z.enum([
+	"malasakit",
+	"pcso",
+	"dswd",
+	"doh_map",
+	"philhealth_zbenefit",
+	"other",
+])
 export type CoeProgram = z.infer<typeof CoeProgramEnum>
 
 export const FinancialClassEnum = z.enum(["a", "b", "c1", "c2", "c3", "d"])
@@ -86,7 +93,9 @@ export const EvaluationFindingsSchema = z.object({
 	familyComposition: z.array(FamilyMemberSchema).optional(),
 
 	// Assets
-	homeOwnership: z.enum(["owned", "rented", "informal_settler", "with_relatives", "other"]).optional(),
+	homeOwnership: z
+		.enum(["owned", "rented", "informal_settler", "with_relatives", "other"])
+		.optional(),
 	otherAssets: z.string().optional(),
 
 	// Liabilities

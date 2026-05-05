@@ -18,10 +18,7 @@ export const featureFlags = createTable(
 			.text("group")
 			.notNull()
 			.$type<"platform-control" | "financial" | "compliance" | "integration">(),
-		riskLevel: t
-			.text("risk_level")
-			.notNull()
-			.$type<"low" | "moderate" | "high">(),
+		riskLevel: t.text("risk_level").notNull().$type<"low" | "moderate" | "high">(),
 		ownerTeam: t.text("owner_team"),
 		defaultEnabled: t.boolean("default_enabled").notNull().default(false),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
@@ -39,15 +36,9 @@ export const featureFlagTargets = createTable(
 			.notNull()
 			.references(() => featureFlags.id, { onDelete: "cascade" }),
 		// NULL = wildcard (applies to all values of this dimension)
-		environment: t
-			.text("environment")
-			.$type<"dev" | "staging" | "prod">(),
-		facilityId: t
-			.uuid("facility_id")
-			.references(() => facilities.id, { onDelete: "cascade" }),
-		roleId: t
-			.uuid("role_id")
-			.references(() => roles.id, { onDelete: "cascade" }),
+		environment: t.text("environment").$type<"dev" | "staging" | "prod">(),
+		facilityId: t.uuid("facility_id").references(() => facilities.id, { onDelete: "cascade" }),
+		roleId: t.uuid("role_id").references(() => roles.id, { onDelete: "cascade" }),
 		enabled: t.boolean("enabled").notNull(),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
@@ -80,14 +71,9 @@ export const featureFlagHistory = createTable(
 			.references(() => featureFlags.id, { onDelete: "cascade" }),
 		previousValue: t.boolean("previous_value"),
 		newValue: t.boolean("new_value").notNull(),
-		changedBy: t
-			.uuid("changed_by")
-			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		changedBy: t.uuid("changed_by").references(() => staffProfiles.id, { onDelete: "set null" }),
 		changedAt: t.timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
 		reason: t.text("reason"),
 	}),
-	t => [
-		index("ffh_flag_id_idx").on(t.flagId),
-		index("ffh_changed_at_idx").on(t.changedAt),
-	]
+	t => [index("ffh_flag_id_idx").on(t.flagId), index("ffh_changed_at_idx").on(t.changedAt)]
 )

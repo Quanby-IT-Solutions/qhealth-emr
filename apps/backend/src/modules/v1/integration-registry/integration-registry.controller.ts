@@ -17,12 +17,14 @@ type RbacProfile = {
 function extractActor(session: UserSession, req: Request) {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
 	const activeProfile =
-		profile?.staffProfiles?.find(p =>
-			p.roles.some(r => r.id === profile?.activeRole?.id)
-		) ?? profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
 
 	const forwarded = req.headers["x-forwarded-for"] as string | undefined
-	const ipAddress = forwarded?.split(",")[0]?.trim() ?? (req.socket as { remoteAddress?: string } | undefined)?.remoteAddress ?? null
+	const ipAddress =
+		forwarded?.split(",")[0]?.trim() ??
+		(req.socket as { remoteAddress?: string } | undefined)?.remoteAddress ??
+		null
 	const userAgent = req.headers["user-agent"] ?? null
 
 	return {
@@ -37,9 +39,8 @@ function extractActor(session: UserSession, req: Request) {
 function getActiveFacilityId(req: Request): string {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
 	const activeProfile =
-		profile?.staffProfiles?.find(p =>
-			p.roles.some(r => r.id === profile?.activeRole?.id)
-		) ?? profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
 
 	return activeProfile?.facilityId ?? ""
 }
@@ -185,7 +186,7 @@ export class IntegrationRegistryController {
 		})
 	}
 
-	@RequirePermissions([{ module: 'admin', action: 'edit' }])
+	@RequirePermissions([{ module: "admin", action: "edit" }])
 	@Implement(v1.integrationRegistry.rotateApiKey)
 	async rotateApiKey(@Session() session: UserSession) {
 		return implement(v1.integrationRegistry.rotateApiKey).handler(async ({ input }) => {

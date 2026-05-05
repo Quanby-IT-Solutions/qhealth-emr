@@ -16,8 +16,8 @@ import {
 	clinicalNotes,
 	consentRecords,
 	deathReports,
-	encounterStatusEvents,
 	encounters,
+	encounterStatusEvents,
 	encounterTransfers,
 	flowsheetEntries,
 	medicationOrders,
@@ -32,10 +32,7 @@ import {
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
-import {
-	type ChartAccessActor,
-	ChartAccessService,
-} from "@/modules/v1/audit/chart-access.service"
+import { ChartAccessService, type ChartAccessActor } from "@/modules/v1/audit/chart-access.service"
 import { resolveStepTarget } from "@/utils/sla-step-target"
 
 type WorkflowType = "opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing"
@@ -130,7 +127,7 @@ export class EncountersService {
 					eq(encounters.facilityId, facilityId),
 					eq(encounters.clinicianStaffId, clinicianStaffId),
 					gte(encounters.admissionDatetime, todayStart),
-					lt(encounters.admissionDatetime, tomorrowStart),
+					lt(encounters.admissionDatetime, tomorrowStart)
 				)
 			)
 
@@ -284,22 +281,13 @@ export class EncountersService {
 		}
 
 		// Single JOIN query for transfers — eliminates N+1 (5 queries per transfer → 1 total)
-		const fromWardsSq = db
-			.select({ id: wards.id, name: wards.name })
-			.from(wards)
-			.as("from_wards")
-		const toWardsSq = db
-			.select({ id: wards.id, name: wards.name })
-			.from(wards)
-			.as("to_wards")
+		const fromWardsSq = db.select({ id: wards.id, name: wards.name }).from(wards).as("from_wards")
+		const toWardsSq = db.select({ id: wards.id, name: wards.name }).from(wards).as("to_wards")
 		const fromBedsSq = db
 			.select({ id: beds.id, bedNumber: beds.bedNumber })
 			.from(beds)
 			.as("from_beds")
-		const toBedsSq = db
-			.select({ id: beds.id, bedNumber: beds.bedNumber })
-			.from(beds)
-			.as("to_beds")
+		const toBedsSq = db.select({ id: beds.id, bedNumber: beds.bedNumber }).from(beds).as("to_beds")
 		const orderingStaffSq = db
 			.select({ id: staffProfiles.id, name: users.name })
 			.from(staffProfiles)
@@ -405,7 +393,9 @@ export class EncountersService {
 
 	async create(input: CreateEncounterInput, userId?: string) {
 		if (!input.consentCaptured) {
-			throw new UnprocessableEntityException('Patient consent must be captured before creating an encounter')
+			throw new UnprocessableEntityException(
+				"Patient consent must be captured before creating an encounter"
+			)
 		}
 
 		// Verify patient exists
@@ -428,15 +418,19 @@ export class EncountersService {
 					eq(consentRecords.facilityId, input.facilityId),
 					eq(consentRecords.consentType, "dpa"),
 					eq(consentRecords.isActive, true),
-					isNull(consentRecords.revokedAt),
+					isNull(consentRecords.revokedAt)
 				)
 			)
 			.limit(1)
 
 		if (!dpaConsent) {
 			throw new HttpException(
-				{ statusCode: 422, message: "DPA consent is required before creating an encounter.", error: "CONSENT_REQUIRED" },
-				HttpStatus.UNPROCESSABLE_ENTITY,
+				{
+					statusCode: 422,
+					message: "DPA consent is required before creating an encounter.",
+					error: "CONSENT_REQUIRED",
+				},
+				HttpStatus.UNPROCESSABLE_ENTITY
 			)
 		}
 
@@ -465,15 +459,10 @@ export class EncountersService {
 		// condition (two concurrent requests both see 'available' before either commits).
 		const created = await db.transaction(async tx => {
 			if (input.bedId) {
-				const [bed] = await tx
-					.select()
-					.from(beds)
-					.where(eq(beds.id, input.bedId))
+				const [bed] = await tx.select().from(beds).where(eq(beds.id, input.bedId))
 				// Re-check inside the transaction — serialized against concurrent bed assignments
 				if (!bed || bed.status !== "available") {
-					throw new ConflictException(
-						`Bed ${input.bedId} is not available`
-					)
+					throw new ConflictException(`Bed ${input.bedId} is not available`)
 				}
 			}
 
@@ -499,16 +488,13 @@ export class EncountersService {
 					.from(opdTriageIntakes)
 					.where(eq(opdTriageIntakes.id, input.triageIntakeId))
 				if (!intake) {
-					throw new NotFoundException(
-						`Triage intake ${input.triageIntakeId} not found`
-					)
+					throw new NotFoundException(`Triage intake ${input.triageIntakeId} not found`)
 				}
 				if (intake.facilityId !== input.facilityId) {
-					throw new BadRequestException(
-						`Triage intake does not belong to this facility`
-					)
+					throw new BadRequestException(`Triage intake does not belong to this facility`)
 				}
-				if (intake.status !== "pending_registration") { // PS-043
+				if (intake.status !== "pending_registration") {
+					// PS-043
 					throw new BadRequestException(
 						`Triage intake is no longer eligible for registration (status: ${intake.status})`
 					)
@@ -598,7 +584,10 @@ export class EncountersService {
 						ipAddress: null,
 						userAgent: null,
 						metadata: {
-							workflow: input.encounterType === "outpatient" ? "opd_triage_reconciliation" : "encounter_creation",
+							workflow:
+								input.encounterType === "outpatient"
+									? "opd_triage_reconciliation"
+									: "encounter_creation",
 							triageIntakeId: input.triageIntakeId ?? null,
 						},
 					},
@@ -711,8 +700,7 @@ export class EncountersService {
 						triage.weightKg != null
 
 					if (hasVitals) {
-						const recordedByStaffId =
-							triage.triageNurseStaffId ?? input.admittingStaffId
+						const recordedByStaffId = triage.triageNurseStaffId ?? input.admittingStaffId
 						const recordedAt = triage.arrivalTime ?? new Date()
 
 						await db.insert(vitalSigns).values({
@@ -909,9 +897,7 @@ export class EncountersService {
 			.set({
 				status: "discharged",
 				disposition: input.disposition,
-				dischargeDatetime: input.dischargeDatetime
-					? new Date(input.dischargeDatetime)
-					: new Date(),
+				dischargeDatetime: input.dischargeDatetime ? new Date(input.dischargeDatetime) : new Date(),
 				updatedAt: new Date(),
 			})
 			.where(eq(encounters.id, input.encounterId))
@@ -936,9 +922,7 @@ export class EncountersService {
 					encounterId: encounter.id,
 					patientId: encounter.patientId,
 					reportType: "fmdrf", // Default to FMDRF, can be changed during review
-					deathDatetime: input.dischargeDatetime
-						? new Date(input.dischargeDatetime)
-						: new Date(),
+					deathDatetime: input.dischargeDatetime ? new Date(input.dischargeDatetime) : new Date(),
 					causeOfDeath: "Pending determination", // Placeholder
 					status: "draft",
 				})
@@ -1045,10 +1029,7 @@ export class EncountersService {
 	// ========================================================================
 
 	async getDischargeChecklist(input: EncounterIdInput) {
-		const [encounter] = await db
-			.select()
-			.from(encounters)
-			.where(eq(encounters.id, input.id))
+		const [encounter] = await db.select().from(encounters).where(eq(encounters.id, input.id))
 
 		if (!encounter) {
 			throw new NotFoundException(`Encounter ${input.id} not found`)
@@ -1167,35 +1148,31 @@ export class EncountersService {
 						status: "not_applicable" as ChecklistStatus,
 						responsibleRole: "Biller",
 					},
-				{
-					key: "orders_finalized",
-					label: "Orders/prescriptions finalized",
-					category: "clinical" as ChecklistCategory,
-					// PS-018: check real medication orders — blocks close if pending orders exist
-					status: await (async (): Promise<ChecklistStatus> => {
-						const [totalRow] = await db
-							.select({ n: count() })
-							.from(medicationOrders)
-							.where(eq(medicationOrders.encounterId, encounter.id))
-						if ((totalRow?.n ?? 0) === 0) return "not_applicable" // no orders
-						const [pendingRow] = await db
-							.select({ n: count() })
-							.from(medicationOrders)
-							.where(
-								and(
-									eq(medicationOrders.encounterId, encounter.id),
-									inArray(medicationOrders.status, [
-										"pending_verification",
-										"verified",
-										"active",
-									])
+					{
+						key: "orders_finalized",
+						label: "Orders/prescriptions finalized",
+						category: "clinical" as ChecklistCategory,
+						// PS-018: check real medication orders — blocks close if pending orders exist
+						status: await (async (): Promise<ChecklistStatus> => {
+							const [totalRow] = await db
+								.select({ n: count() })
+								.from(medicationOrders)
+								.where(eq(medicationOrders.encounterId, encounter.id))
+							if ((totalRow?.n ?? 0) === 0) return "not_applicable" // no orders
+							const [pendingRow] = await db
+								.select({ n: count() })
+								.from(medicationOrders)
+								.where(
+									and(
+										eq(medicationOrders.encounterId, encounter.id),
+										inArray(medicationOrders.status, ["pending_verification", "verified", "active"])
+									)
 								)
-							)
-						return (pendingRow?.n ?? 0) === 0 ? "complete" : "incomplete"
-					})(),
-					responsibleRole: "Clinician",
-				},
-			]
+							return (pendingRow?.n ?? 0) === 0 ? "complete" : "incomplete"
+						})(),
+						responsibleRole: "Clinician",
+					},
+				]
 
 		return {
 			encounterId: encounter.id,

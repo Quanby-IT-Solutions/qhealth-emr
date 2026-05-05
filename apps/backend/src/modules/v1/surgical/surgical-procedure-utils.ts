@@ -6,11 +6,7 @@ const BULLET_PREFIX_PATTERN = /^\s*(?:[-*•]+|\d+[\.\)\-]?|[A-Za-z][\.\)\-])\s*
 const MULTISPACE_PATTERN = /\s+/g
 
 function sanitizeProcedureLabel(value: string) {
-	return value
-		.trim()
-		.replace(BULLET_PREFIX_PATTERN, "")
-		.replace(MULTISPACE_PATTERN, " ")
-		.trim()
+	return value.trim().replace(BULLET_PREFIX_PATTERN, "").replace(MULTISPACE_PATTERN, " ").trim()
 }
 
 export function normalizeProcedureLabel(value: string) {

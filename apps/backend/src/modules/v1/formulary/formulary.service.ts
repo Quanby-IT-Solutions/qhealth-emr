@@ -85,7 +85,6 @@ export class FormularyService {
 	// Drug Generics
 	// ========================================================================
 
-
 	async findDrugGenerics(filter: DrugGenericSearchInput) {
 		const page = Number(filter.page) || 1
 		const limit = Number(filter.limit) || 50
@@ -186,10 +185,7 @@ export class FormularyService {
 			}
 		}
 
-		const [before] = await db
-			.select()
-			.from(drugGenerics)
-			.where(eq(drugGenerics.id, id))
+		const [before] = await db.select().from(drugGenerics).where(eq(drugGenerics.id, id))
 
 		const [updated] = await db
 			.update(drugGenerics)
@@ -297,10 +293,7 @@ export class FormularyService {
 	async updateDrugBrand(input: UpdateDrugBrandInput, actor: FormularyActor) {
 		const { id, ...updates } = input
 
-		const [before] = await db
-			.select()
-			.from(drugBrands)
-			.where(eq(drugBrands.id, id))
+		const [before] = await db.select().from(drugBrands).where(eq(drugBrands.id, id))
 
 		const [updated] = await db
 			.update(drugBrands)
@@ -494,18 +487,26 @@ export class FormularyService {
 		return full
 	}
 
-	async updateFormularyClinicalPolicy(input: UpdateFormularyClinicalPolicyInput, actor: FormularyActor) {
+	async updateFormularyClinicalPolicy(
+		input: UpdateFormularyClinicalPolicyInput,
+		actor: FormularyActor
+	) {
 		const { id, ...clinicalUpdates } = input
 
 		const before = await this.findFormularyItem(id)
 
 		// Only pharmacist-owned clinical policy fields are accepted here
 		const policyUpdates: Record<string, unknown> = {}
-		if (clinicalUpdates.isHighAlert !== undefined) policyUpdates.isHighAlert = clinicalUpdates.isHighAlert
-		if ("highAlertNotes" in clinicalUpdates) policyUpdates.highAlertNotes = clinicalUpdates.highAlertNotes
-		if (clinicalUpdates.isRestricted !== undefined) policyUpdates.isRestricted = clinicalUpdates.isRestricted
-		if ("restrictionNotes" in clinicalUpdates) policyUpdates.restrictionNotes = clinicalUpdates.restrictionNotes
-		if ("formularyNotes" in clinicalUpdates) policyUpdates.formularyNotes = clinicalUpdates.formularyNotes
+		if (clinicalUpdates.isHighAlert !== undefined)
+			policyUpdates.isHighAlert = clinicalUpdates.isHighAlert
+		if ("highAlertNotes" in clinicalUpdates)
+			policyUpdates.highAlertNotes = clinicalUpdates.highAlertNotes
+		if (clinicalUpdates.isRestricted !== undefined)
+			policyUpdates.isRestricted = clinicalUpdates.isRestricted
+		if ("restrictionNotes" in clinicalUpdates)
+			policyUpdates.restrictionNotes = clinicalUpdates.restrictionNotes
+		if ("formularyNotes" in clinicalUpdates)
+			policyUpdates.formularyNotes = clinicalUpdates.formularyNotes
 
 		const [updated] = await db
 			.update(formularyItems)
@@ -572,10 +573,7 @@ export class FormularyService {
 		if (filter.search) {
 			const escaped = this.escapeLikePattern(filter.search)
 			conditions.push(
-				or(
-					ilike(icd10Codes.code, `%${escaped}%`),
-					ilike(icd10Codes.description, `%${escaped}%`)
-				)
+				or(ilike(icd10Codes.code, `%${escaped}%`), ilike(icd10Codes.description, `%${escaped}%`))
 			)
 		}
 
@@ -659,10 +657,7 @@ export class FormularyService {
 		if (filter.search) {
 			const escaped = this.escapeLikePattern(filter.search)
 			conditions.push(
-				or(
-					ilike(rxnormCodes.rxcui, `%${escaped}%`),
-					ilike(rxnormCodes.name, `%${escaped}%`)
-				)
+				or(ilike(rxnormCodes.rxcui, `%${escaped}%`), ilike(rxnormCodes.name, `%${escaped}%`))
 			)
 		}
 
@@ -700,10 +695,7 @@ export class FormularyService {
 		if (filter.search) {
 			const escaped = this.escapeLikePattern(filter.search)
 			conditions.push(
-				or(
-					ilike(rvsCodes.rvsCode, `%${escaped}%`),
-					ilike(rvsCodes.procedureName, `%${escaped}%`)
-				)
+				or(ilike(rvsCodes.rvsCode, `%${escaped}%`), ilike(rvsCodes.procedureName, `%${escaped}%`))
 			)
 		}
 
@@ -939,7 +931,11 @@ export class FormularyService {
 			entityType: AUDIT_ENTITY_TYPES.CODE_SET_UPLOAD,
 			entityId: input.codeId,
 			beforeState: null,
-			afterState: { catalogType: input.catalogType, codeId: input.codeId, isActive: input.isActive },
+			afterState: {
+				catalogType: input.catalogType,
+				codeId: input.codeId,
+				isActive: input.isActive,
+			},
 			ipAddress: actor.ipAddress,
 			userAgent: actor.userAgent,
 			metadata: { catalogType: input.catalogType, action: "setCodeActive" },
@@ -1094,7 +1090,14 @@ export class FormularyService {
 
 	/** Map a catalog type string to its Drizzle table */
 	private getCatalogTable(catalogType: CatalogType) {
-		const tableMap: Record<CatalogType, typeof icd10Codes | typeof loincCodes | typeof rxnormCodes | typeof rvsCodes | typeof snomedCtCodes> = {
+		const tableMap: Record<
+			CatalogType,
+			| typeof icd10Codes
+			| typeof loincCodes
+			| typeof rxnormCodes
+			| typeof rvsCodes
+			| typeof snomedCtCodes
+		> = {
 			icd10: icd10Codes,
 			loinc: loincCodes,
 			rxnorm: rxnormCodes,
@@ -1111,7 +1114,7 @@ export class FormularyService {
 		return {
 			id: row["id"] as string,
 			catalogType,
-			isActive: row["isActive"] as boolean ?? true,
+			isActive: (row["isActive"] as boolean) ?? true,
 			createdAt: row["createdAt"] as Date,
 			// ICD-10
 			code: (row["code"] ?? null) as string | null,
@@ -1165,7 +1168,9 @@ export class FormularyService {
 				conditions.push(or(ilike(t.code, searchPattern), ilike(t.description, searchPattern)))
 			} else if (filter.catalogType === "loinc") {
 				const t = table as typeof loincCodes
-				conditions.push(or(ilike(t.loincNum, searchPattern), ilike(t.longCommonName, searchPattern)))
+				conditions.push(
+					or(ilike(t.loincNum, searchPattern), ilike(t.longCommonName, searchPattern))
+				)
 			} else if (filter.catalogType === "rxnorm") {
 				const t = table as typeof rxnormCodes
 				conditions.push(or(ilike(t.rxcui, searchPattern), ilike(t.name, searchPattern)))
@@ -1174,25 +1179,41 @@ export class FormularyService {
 				conditions.push(or(ilike(t.rvsCode, searchPattern), ilike(t.procedureName, searchPattern)))
 			} else if (filter.catalogType === "snomed_ct") {
 				const t = table as typeof snomedCtCodes
-				conditions.push(or(ilike(t.conceptId, searchPattern), ilike(t.fsn, searchPattern), ilike(t.preferredTerm, searchPattern)))
+				conditions.push(
+					or(
+						ilike(t.conceptId, searchPattern),
+						ilike(t.fsn, searchPattern),
+						ilike(t.preferredTerm, searchPattern)
+					)
+				)
 			}
 		}
 
 		const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 
 		const [rows, totalResult] = await Promise.all([
-			db.select().from(table).where(whereClause).orderBy(desc(table.createdAt)).limit(limit).offset(offset),
+			db
+				.select()
+				.from(table)
+				.where(whereClause)
+				.orderBy(desc(table.createdAt))
+				.limit(limit)
+				.offset(offset),
 			db.select({ count: count() }).from(table).where(whereClause),
 		])
 
 		const total = totalResult[0]?.count ?? 0
-		const data = rows.map(r => this.projectCatalogRow(r as Record<string, unknown>, filter.catalogType))
+		const data = rows.map(r =>
+			this.projectCatalogRow(r as Record<string, unknown>, filter.catalogType)
+		)
 
 		return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
 	}
 
 	async createCatalogEntry(input: CreateCatalogEntryInput, actor: FormularyActor) {
-		const { catalogType, ...fields } = input as Record<string, unknown> & { catalogType: CatalogType }
+		const { catalogType, ...fields } = input as Record<string, unknown> & {
+			catalogType: CatalogType
+		}
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const table: any = this.getCatalogTable(catalogType)
@@ -1233,9 +1254,7 @@ export class FormularyService {
 		}
 
 		// Remove undefined fields — only pass truly provided fields to update
-		const setFields = Object.fromEntries(
-			Object.entries(updates).filter(([, v]) => v !== undefined)
-		)
+		const setFields = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined))
 
 		const [updated] = await db
 			.update(table)
