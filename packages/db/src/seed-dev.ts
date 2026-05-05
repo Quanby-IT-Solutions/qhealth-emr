@@ -385,7 +385,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
 		["orders", ["view", "create", "sign"]],
-		["surgical", ["view", "create", "edit"]], // Surgical tab visibility + create/save operation/anesthesia records
+		["surgical", ["view", "create", "edit", "sign"]], // Surgical tab visibility + create/save/sign operation records for OR workflows
 		["formulary", ["view"]],
 		["opd", ["view"]], // OPD dashboard access (per TOR)
 		["death_reporting", ["view", "create", "edit"]], // Surgeon may author FMDRF/FNDRF for surgical cases
@@ -396,8 +396,8 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["adt", ["view"]],
 		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
-		["orders", ["view", "create"]],
-		["surgical", ["view", "edit"]], // Surgical tab visibility + save anesthesia records
+		["orders", ["view", "create", "sign"]], // TOR: anesthesiologists place/sign orders and compliant e-prescriptions
+		["surgical", ["view", "edit", "sign"]], // Surgical tab visibility + save/sign anesthesia records
 		["formulary", ["view"]],
 		["audit", ["create"]], // Break-glass emergency access invocation
 		["notifications", ["view"]], // All staff receive system notifications

@@ -38,7 +38,7 @@ interface ImagingOrderItem {
 interface ImagingDashboardProps {
 	orders: ImagingOrderItem[]
 	isLoading: boolean
-	onNewOrder: () => void
+	onNewOrder?: () => void
 }
 
 type StatusTab = "pending" | "in_progress" | "completed"
@@ -119,9 +119,11 @@ export function ImagingDashboard({ orders, isLoading, onNewOrder }: ImagingDashb
 		<Card>
 			<CardHeader className="flex flex-row items-center justify-between">
 				<CardTitle>Imaging Orders</CardTitle>
-				<Button size="sm" onClick={onNewOrder}>
-					New Imaging Order
-				</Button>
+				{onNewOrder ? (
+					<Button size="sm" onClick={onNewOrder}>
+						New Imaging Order
+					</Button>
+				) : null}
 			</CardHeader>
 			<CardContent className="p-0">
 				{/* Status tabs */}
