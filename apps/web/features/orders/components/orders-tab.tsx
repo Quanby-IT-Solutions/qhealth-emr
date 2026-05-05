@@ -36,6 +36,16 @@ import { ImagingDashboard } from "./imaging-dashboard"
 import { OrderGroupRow } from "./order-group-row"
 import { PrescriptionPrintDialog } from "./prescription-print-dialog"
 
+function usePermissionSet() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+}
+
+function can(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
+}
+
 function formatDateTime(dateStr: string | null | undefined) {
 	if (!dateStr) return "--"
 	return new Date(dateStr).toLocaleString("en-PH", {
@@ -225,8 +235,8 @@ interface MedOrdersViewProps {
 	facilityId: string
 	encounterId: string
 	patientId: string
-	onDiscontinue: (id: string) => void
-	onGenerateRx: (id: string) => void
+	onDiscontinue?: (id: string) => void
+	onGenerateRx?: (id: string) => void
 	discontinuePending: boolean
 	createRxPending: boolean
 	prescriberHasValidLicense: boolean
@@ -333,6 +343,7 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 	const [rxPrintOpen, setRxPrintOpen] = useState(false)
 	const [showLicenseAlert, setShowLicenseAlert] = useState(true)
 
+	const permSet = usePermissionSet()
 	const { data: profile } = useMyProfile()
 	const medOrders = useMedOrderListQuery({ encounterId })
 	const labOrders = useLabOrderListQuery({ encounterId })
@@ -342,6 +353,10 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 	const discontinueMed = useDiscontinueMedOrderMutation()
 	const createPrescription = useCreatePrescriptionMutation()
 	const signPrescription = useSignPrescriptionMutation()
+	const canCreateOrders = can(permSet, "orders", "create")
+	const canEditOrders = can(permSet, "orders", "edit")
+	const canSignOrders = can(permSet, "orders", "sign")
+	const canPrescribe = canCreateOrders && canSignOrders
 	const orderingStaffProfile =
 		profile?.staffProfiles?.find(staffProfile => staffProfile.facilityId === facilityId) ??
 		profile?.staffProfiles?.[0]
@@ -360,6 +375,7 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 	const hasExpiredLicenseWarning =
 		Boolean(orderingStaffProfile?.prcExpiry && isPastDate(orderingStaffProfile.prcExpiry)) ||
 		Boolean(orderingStaffProfile?.ptrExpiry && isPastDate(orderingStaffProfile.ptrExpiry))
+	const showPrescriberLicenseWarning = canPrescribe
 	const controlledMedicationOrderIds = new Set(
 		(medOrders.data?.data ?? []).filter(order => order.isControlledSubstance).map(order => order.id)
 	)
@@ -395,7 +411,7 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 
 	return (
 		<>
-			{showLicenseAlert && licenseWarningMessages.length > 0 && (
+			{showPrescriberLicenseWarning && showLicenseAlert && licenseWarningMessages.length > 0 && (
 				<Alert variant={hasExpiredLicenseWarning ? "destructive" : "default"} className="mb-4">
 					<AlertTriangle className="size-4" />
 					<AlertTitle>Prescription License Warning</AlertTitle>
@@ -430,9 +446,11 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 					<Card>
 						<CardHeader className="flex flex-row items-center justify-between">
 							<CardTitle>All Orders</CardTitle>
-							<Button variant="outline" size="sm" onClick={() => setCreateOrderSetOpen(true)}>
-								Order Set
-							</Button>
+							{canCreateOrders ? (
+								<Button variant="outline" size="sm" onClick={() => setCreateOrderSetOpen(true)}>
+									Order Set
+								</Button>
+							) : null}
 						</CardHeader>
 						<CardContent className="p-0">
 							{medOrders.isLoading || labOrders.isLoading || imagingOrders.isLoading ? (
@@ -481,9 +499,11 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 					<Card>
 						<CardHeader className="flex flex-row items-center justify-between">
 							<CardTitle>Medication Orders</CardTitle>
-							<Button size="sm" onClick={() => setCreateMedOpen(true)}>
-								New Medication Order
-							</Button>
+							{canCreateOrders ? (
+								<Button size="sm" onClick={() => setCreateMedOpen(true)}>
+									New Medication Order
+								</Button>
+							) : null}
 						</CardHeader>
 						<CardContent className="p-0">
 							{medOrders.isLoading ? (
@@ -498,14 +518,19 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 									facilityId={facilityId}
 									encounterId={encounterId}
 									patientId={patientId}
-									onDiscontinue={id => discontinueMed.mutate(id)}
-									onGenerateRx={id =>
-										createPrescription.mutate({
-											facilityId,
-											encounterId,
-											medicationOrderId: id,
-											patientId,
-										})
+									onDiscontinue={
+										canEditOrders ? id => discontinueMed.mutate(id) : undefined
+									}
+									onGenerateRx={
+										canPrescribe
+											? id =>
+												createPrescription.mutate({
+													facilityId,
+													encounterId,
+													medicationOrderId: id,
+													patientId,
+												})
+											: undefined
 									}
 									discontinuePending={discontinueMed.isPending}
 									createRxPending={createPrescription.isPending}
@@ -520,14 +545,16 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 					<Card>
 						<CardHeader className="flex flex-row items-center justify-between">
 							<CardTitle>Lab Orders</CardTitle>
-							<div className="flex items-center gap-2">
-								<Button variant="outline" size="sm" onClick={() => setCreateOrderSetOpen(true)}>
-									Order Set
-								</Button>
-								<Button size="sm" onClick={() => setCreateLabOpen(true)}>
-									New Lab Order
-								</Button>
-							</div>
+							{canCreateOrders ? (
+								<div className="flex items-center gap-2">
+									<Button variant="outline" size="sm" onClick={() => setCreateOrderSetOpen(true)}>
+										Order Set
+									</Button>
+									<Button size="sm" onClick={() => setCreateLabOpen(true)}>
+										New Lab Order
+									</Button>
+								</div>
+							) : null}
 						</CardHeader>
 						<CardContent className="p-0">
 							{labOrders.isLoading ? (
@@ -584,7 +611,7 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 					<ImagingDashboard
 						orders={imagingOrders.data?.data ?? []}
 						isLoading={imagingOrders.isLoading}
-						onNewOrder={() => setCreateImagingOpen(true)}
+						onNewOrder={canCreateOrders ? () => setCreateImagingOpen(true) : undefined}
 					/>
 				</TabsContent>
 
@@ -643,7 +670,7 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 													<TableCell>{rx.prescriberStaffName ?? "--"}</TableCell>
 													<TableCell>{formatDateTime(rx.createdAt)}</TableCell>
 													<TableCell className="text-right">
-														{rx.status === "draft" && (
+														{rx.status === "draft" && canSignOrders && (
 															<Button
 																variant="outline"
 																size="sm"
@@ -653,7 +680,7 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 																Sign
 															</Button>
 														)}
-														{rx.status === "signed" && (
+														{rx.status === "signed" && canSignOrders && (
 															<Button
 																variant="outline"
 																size="sm"

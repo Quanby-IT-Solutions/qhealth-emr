@@ -95,6 +95,16 @@ function parseContent(raw: unknown): PrescriptionContent {
 	return raw as PrescriptionContent
 }
 
+function usePermissionSet() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+}
+
+function can(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
+}
+
 // ============================================================================
 // License Status Badge
 // ============================================================================
@@ -323,6 +333,7 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 	const [rxPrintOpen, setRxPrintOpen] = useState(false)
 	const [showLicenseAlert, setShowLicenseAlert] = useState(true)
 
+	const permSet = usePermissionSet()
 	const { data: profile } = useMyProfile()
 	const { data: encounter } = useEncounterDetailQuery(encounterId)
 	const medOrdersQuery = useMedOrderListQuery({ encounterId })
@@ -330,8 +341,10 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 
 	const createPrescription = useCreatePrescriptionMutation()
 	const signPrescription = useSignPrescriptionMutation()
+	const canCreateOrders = can(permSet, "orders", "create")
+	const canSignOrders = can(permSet, "orders", "sign")
 
-	// Physician's license from their staff profile for this facility
+	// Prescriber's license from their staff profile for this facility
 	const staffProfile =
 		profile?.staffProfiles?.find(sp => sp.facilityId === facilityId) ??
 		profile?.staffProfiles?.[0]
@@ -382,14 +395,17 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 	)
 
 	function handleGenerateRx(medicationOrderId: string) {
+		if (!canCreateOrders) return
 		createPrescription.mutate({ facilityId, encounterId, medicationOrderId, patientId })
 	}
 
 	function handleSign(id: string) {
+		if (!canSignOrders) return
 		signPrescription.mutate(id)
 	}
 
 	function handleSignAll() {
+		if (!canSignOrders) return
 		for (const rx of draftPrescriptions) {
 			signPrescription.mutate(rx.id)
 		}
@@ -397,11 +413,24 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 
 	const isLoading = medOrdersQuery.isLoading || prescriptionsQuery.isLoading
 
+	if (!canSignOrders) {
+		return (
+			<div className="p-8 text-center">
+				<p className="text-muted-foreground text-sm">
+					You do not have permission to access e-Prescription.
+				</p>
+				<p className="text-muted-foreground mt-1 text-xs">
+					This workspace is limited to clinicians who can sign prescriptions.
+				</p>
+			</div>
+		)
+	}
+
 	return (
 		<>
 			<div className="space-y-6">
 				{/* License Warnings */}
-				{showLicenseAlert && licenseAlertMessages.length > 0 && (
+				{showLicenseAlert && canCreateOrders && licenseAlertMessages.length > 0 && (
 					<Alert variant={prcExpired || ptrExpired ? "destructive" : "default"}>
 						<AlertTriangle className="size-4" />
 						<AlertTitle>Prescription License Warning</AlertTitle>
@@ -542,7 +571,7 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 									<Button
 										size="sm"
 										variant="outline"
-										disabled={!hasValidLicense || createPrescription.isPending}
+										disabled={!canCreateOrders || !hasValidLicense || createPrescription.isPending}
 										onClick={() => handleGenerateRx(order.id)}
 									>
 										Generate Rx
@@ -578,7 +607,7 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 								<PrescriptionCard
 									key={rx.id}
 									rx={rx}
-									onSign={handleSign}
+									onSign={canSignOrders ? handleSign : undefined}
 									signPending={signPrescription.isPending}
 								/>
 							))}
