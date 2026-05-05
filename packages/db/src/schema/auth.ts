@@ -85,15 +85,12 @@ export const twoFactors = createTable(
 )
 
 // Account lockout tracking for failed sign-in attempts (ADM-BE-02)
-export const authLockout = createTable(
-	"auth_lockout",
-	t => ({
-		id: t.uuid("id").primaryKey().defaultRandom(),
-		identifier: t.text("identifier").notNull().unique(),
-		failedAttempts: t.integer("failed_attempts").notNull().default(0),
-		lastFailedAt: t.timestamp("last_failed_at"),
-		lockedUntil: t.timestamp("locked_until"),
-		createdAt: t.timestamp("created_at").notNull().defaultNow(),
-		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
-	})
-)
+export const authLockout = createTable("auth_lockout", t => ({
+	id: t.uuid("id").primaryKey().defaultRandom(),
+	identifier: t.text("identifier").notNull().unique(),
+	failedAttempts: t.integer("failed_attempts").notNull().default(0),
+	lastFailedAt: t.timestamp("last_failed_at"),
+	lockedUntil: t.timestamp("locked_until"),
+	createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+}))

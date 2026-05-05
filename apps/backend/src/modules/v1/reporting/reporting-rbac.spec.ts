@@ -1,3 +1,5 @@
+import { ReportingController } from "./reporting.controller"
+
 /**
  * Reporting RBAC Guard Tests (REPORT-001, REPORT-002)
  *
@@ -56,17 +58,15 @@ jest.mock("./reporting.service", () => ({
 jest.mock("@/modules/v1/rbac/rbac.guard", () => ({
 	RBAC_PERMISSION_KEY: "rbac",
 	RBAC_PERMISSIONS_KEY: "rbac_all",
-	RequirePermission: (module: string, action: string) =>
-		(target: object, key: string | symbol) => {
-			Reflect.defineMetadata("rbac", { module, action }, target, key)
-		},
-	RequirePermissions: (permissions: Array<{ module: string; action: string }>) =>
+	RequirePermission: (module: string, action: string) => (target: object, key: string | symbol) => {
+		Reflect.defineMetadata("rbac", { module, action }, target, key)
+	},
+	RequirePermissions:
+		(permissions: Array<{ module: string; action: string }>) =>
 		(target: object, key: string | symbol) => {
 			Reflect.defineMetadata("rbac_all", permissions, target, key)
 		},
 }))
-
-import { ReportingController } from "./reporting.controller"
 
 type PermEntry = { module: string; action: string }
 
@@ -89,7 +89,7 @@ describe("ReportingController — RBAC guard metadata (REPORT-001, REPORT-002)",
 
 		it.each(editHandlers)(
 			"%s requires reporting:edit so Administrator cannot satisfy it",
-			(methodName) => {
+			methodName => {
 				const perm = getSinglePermission(methodName)
 				expect(perm).toEqual({ module: "reporting", action: "edit" })
 			}
@@ -106,7 +106,7 @@ describe("ReportingController — RBAC guard metadata (REPORT-001, REPORT-002)",
 
 		it.each(pidsrHandlers)(
 			"%s requires reporting:edit so Administrator cannot satisfy it",
-			(methodName) => {
+			methodName => {
 				const perm = getSinglePermission(methodName)
 				expect(perm).toEqual({ module: "reporting", action: "edit" })
 			}
@@ -165,7 +165,7 @@ describe("ReportingController — RBAC guard metadata (REPORT-001, REPORT-002)",
 			"exportAhsr",
 		]
 
-		it.each(allHandlers)("%s has a @RequirePermission decorator", (methodName) => {
+		it.each(allHandlers)("%s has a @RequirePermission decorator", methodName => {
 			const perm = getSinglePermission(methodName)
 			expect(perm).toBeDefined()
 			expect(perm).toHaveProperty("module", "reporting")

@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from "@nestjs/common"
+import {
+	BadRequestException,
+	Injectable,
+	Logger,
+	NotFoundException,
+	OnApplicationBootstrap,
+} from "@nestjs/common"
 import { and, between, count, eq, sql } from "drizzle-orm"
 
 import { bedCensusDaily, beds, encounters, patients, wards } from "@repo/db/schema"
@@ -116,10 +122,7 @@ export class BedsService implements OnApplicationBootstrap {
 	// ========================================================================
 
 	async listBeds(input: BedListInput) {
-		const wardConditions = [
-			eq(wards.facilityId, input.facilityId),
-			eq(wards.isActive, true),
-		]
+		const wardConditions = [eq(wards.facilityId, input.facilityId), eq(wards.isActive, true)]
 
 		if (input.wardId) {
 			wardConditions.push(eq(wards.id, input.wardId))
@@ -153,10 +156,7 @@ export class BedsService implements OnApplicationBootstrap {
 						patientMrn: patients.mrn,
 					})
 					.from(beds)
-					.leftJoin(
-						encounters,
-						eq(beds.currentEncounterId, encounters.id)
-					)
+					.leftJoin(encounters, eq(beds.currentEncounterId, encounters.id))
 					.leftJoin(patients, eq(encounters.patientId, patients.id))
 					.where(and(...bedConditions))
 					.orderBy(beds.bedNumber)
@@ -172,9 +172,7 @@ export class BedsService implements OnApplicationBootstrap {
 					updatedAt: b.updatedAt,
 					wardName: ward.name,
 					wardType: ward.wardType,
-					patientName: b.patientFirstName
-						? `${b.patientLastName}, ${b.patientFirstName}`
-						: null,
+					patientName: b.patientFirstName ? `${b.patientLastName}, ${b.patientFirstName}` : null,
 					patientMrn: b.patientMrn ?? null,
 				}))
 
@@ -232,9 +230,7 @@ export class BedsService implements OnApplicationBootstrap {
 			.set({
 				status: input.status,
 				currentEncounterId:
-					input.status === "available" || input.status === "out_of_service"
-						? null
-						: undefined,
+					input.status === "available" || input.status === "out_of_service" ? null : undefined,
 				updatedAt: new Date(),
 			})
 			.where(eq(beds.id, input.id))
@@ -270,8 +266,8 @@ export class BedsService implements OnApplicationBootstrap {
 				and(
 					eq(beds.facilityId, input.facilityId),
 					eq(wards.isActive, true),
-					eq(beds.status, "available"),
-				),
+					eq(beds.status, "available")
+				)
 			)
 			.orderBy(wards.name, beds.bedNumber)
 
@@ -296,7 +292,9 @@ export class BedsService implements OnApplicationBootstrap {
 				}
 
 				if (input.genderPreference && input.genderPreference !== "any") {
-					warnings.push(`Gender preference ${input.genderPreference} requires ward-level validation`)
+					warnings.push(
+						`Gender preference ${input.genderPreference} requires ward-level validation`
+					)
 					matchScore -= 5
 				}
 
@@ -416,14 +414,17 @@ export class BedsService implements OnApplicationBootstrap {
 			.leftJoin(beds, eq(beds.wardId, wards.id))
 			.where(and(eq(wards.facilityId, input.facilityId), eq(wards.isActive, true)))
 
-		const byWardMap = new Map<string, {
-			wardId: string
-			wardName: string
-			wardType: WardType
-			totalBeds: number
-			occupiedBeds: number
-			availableBeds: number
-		}>()
+		const byWardMap = new Map<
+			string,
+			{
+				wardId: string
+				wardName: string
+				wardType: WardType
+				totalBeds: number
+				occupiedBeds: number
+				availableBeds: number
+			}
+		>()
 
 		let totalBeds = 0
 		let occupiedBeds = 0
@@ -472,15 +473,19 @@ export class BedsService implements OnApplicationBootstrap {
 
 		const byWard = Array.from(byWardMap.values()).map(ward => ({
 			...ward,
-			borPercentage: ward.totalBeds > 0 ? Number(((ward.occupiedBeds / ward.totalBeds) * 100).toFixed(2)) : 0,
+			borPercentage:
+				ward.totalBeds > 0 ? Number(((ward.occupiedBeds / ward.totalBeds) * 100).toFixed(2)) : 0,
 		}))
 
-		const byWardTypeMap = new Map<WardType, {
-			wardType: WardType
-			totalBeds: number
-			occupiedBeds: number
-			availableBeds: number
-		}>()
+		const byWardTypeMap = new Map<
+			WardType,
+			{
+				wardType: WardType
+				totalBeds: number
+				occupiedBeds: number
+				availableBeds: number
+			}
+		>()
 		for (const ward of byWard) {
 			const existing = byWardTypeMap.get(ward.wardType) ?? {
 				wardType: ward.wardType,
@@ -496,13 +501,30 @@ export class BedsService implements OnApplicationBootstrap {
 
 		const byWardType = Array.from(byWardTypeMap.values()).map(item => ({
 			...item,
-			borPercentage: item.totalBeds > 0 ? Number(((item.occupiedBeds / item.totalBeds) * 100).toFixed(2)) : 0,
+			borPercentage:
+				item.totalBeds > 0 ? Number(((item.occupiedBeds / item.totalBeds) * 100).toFixed(2)) : 0,
 		}))
 
 		const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
 		const [recentAdmissions, recentDischarges] = await Promise.all([
-			db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), sql`${encounters.admissionDatetime} >= ${since}`)),
-			db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), sql`${encounters.dischargeDatetime} >= ${since}`)),
+			db
+				.select({ count: count() })
+				.from(encounters)
+				.where(
+					and(
+						eq(encounters.facilityId, input.facilityId),
+						sql`${encounters.admissionDatetime} >= ${since}`
+					)
+				),
+			db
+				.select({ count: count() })
+				.from(encounters)
+				.where(
+					and(
+						eq(encounters.facilityId, input.facilityId),
+						sql`${encounters.dischargeDatetime} >= ${since}`
+					)
+				),
 		])
 
 		return {
@@ -639,9 +661,21 @@ export class BedsService implements OnApplicationBootstrap {
 		}
 
 		if (input.format === "csv") {
-			const header = "Census Date,Midnight Census,Admissions,Discharges,Available Beds,Deaths <48h,Deaths >48h,Gross Death Rate,Net Death Rate,BOR %"
+			const header =
+				"Census Date,Midnight Census,Admissions,Discharges,Available Beds,Deaths <48h,Deaths >48h,Gross Death Rate,Net Death Rate,BOR %"
 			const csvLines = ahsrRows.map(r =>
-				[r.censusDate, r.midnightCensus, r.admissions, r.discharges, r.availableBeds, r.deathsWithin48h, r.deathsAfter48h, r.grossDeathRate, r.netDeathRate, r.borPercentage].join(",")
+				[
+					r.censusDate,
+					r.midnightCensus,
+					r.admissions,
+					r.discharges,
+					r.availableBeds,
+					r.deathsWithin48h,
+					r.deathsAfter48h,
+					r.grossDeathRate,
+					r.netDeathRate,
+					r.borPercentage,
+				].join(",")
 			)
 			response.csvContent = [header, ...csvLines].join("\n")
 		}

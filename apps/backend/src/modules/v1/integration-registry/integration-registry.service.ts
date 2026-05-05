@@ -1,6 +1,5 @@
-import { createHash, createHmac, randomBytes } from "crypto"
-
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { createHash, createHmac, randomBytes } from "crypto"
 import { and, eq } from "drizzle-orm"
 
 import { integrationApiKeys, integrations, webhookEndpoints } from "@repo/db/schema"
@@ -8,7 +7,7 @@ import { integrationApiKeys, integrations, webhookEndpoints } from "@repo/db/sch
 import { db } from "@/common/database/database.client"
 import { INTEGRATION_CREDENTIAL_ENV_VARS } from "@/config/app.config"
 import { AUDIT_ENTITY_TYPES } from "@/modules/v1/audit/audit-entity-types"
-import { type DBTransaction, AuditService } from "@/modules/v1/audit/audit.service"
+import { AuditService, type DBTransaction } from "@/modules/v1/audit/audit.service"
 
 type IntegrationRow = typeof integrations.$inferSelect
 type CredentialStatus = "ok" | "missing_in_env" | "not_in_whitelist" | "unset"
@@ -69,10 +68,7 @@ const CONNECTIVITY_INVALIDATING_COLS = ["endpointUrl", "credentialsRef", "kind"]
 
 type UpdateableField = (typeof UPDATE_COLS)[number]
 
-function diffFields(
-	before: IntegrationRow,
-	after: Partial<IntegrationRow>
-): FieldChange[] {
+function diffFields(before: IntegrationRow, after: Partial<IntegrationRow>): FieldChange[] {
 	const changes: FieldChange[] = []
 
 	for (const col of UPDATE_COLS) {
@@ -99,12 +95,15 @@ export class IntegrationRegistryService {
 	 */
 	async list(
 		facilityId: string,
-		actor: { userId: string; facilityId: string; staffProfileId: string | null; ipAddress: string | null; userAgent: string | null }
+		actor: {
+			userId: string
+			facilityId: string
+			staffProfileId: string | null
+			ipAddress: string | null
+			userAgent: string | null
+		}
 	): Promise<IntegrationWithStatus[]> {
-		const rows = await db
-			.select()
-			.from(integrations)
-			.where(eq(integrations.facilityId, facilityId))
+		const rows = await db.select().from(integrations).where(eq(integrations.facilityId, facilityId))
 
 		const result = rows.map(withStatus)
 
@@ -133,7 +132,13 @@ export class IntegrationRegistryService {
 	async get(
 		facilityId: string,
 		id: string,
-		actor?: { userId: string; facilityId: string; staffProfileId: string | null; ipAddress: string | null; userAgent: string | null }
+		actor?: {
+			userId: string
+			facilityId: string
+			staffProfileId: string | null
+			ipAddress: string | null
+			userAgent: string | null
+		}
 	): Promise<IntegrationWithStatus> {
 		const [row] = await db
 			.select()
@@ -177,7 +182,13 @@ export class IntegrationRegistryService {
 			enabled?: boolean
 			notes?: string | null
 		},
-		actor: { userId: string; facilityId: string; staffProfileId: string | null; ipAddress: string | null; userAgent: string | null }
+		actor: {
+			userId: string
+			facilityId: string
+			staffProfileId: string | null
+			ipAddress: string | null
+			userAgent: string | null
+		}
 	): Promise<IntegrationWithStatus> {
 		this.validateCredentialsRef(input.credentialsRef)
 
@@ -186,7 +197,7 @@ export class IntegrationRegistryService {
 		if (input.enabled === true) {
 			throw new BadRequestException(
 				"A new integration cannot be created in an enabled state. " +
-				"Save it first, run the connectivity test, then enable it."
+					"Save it first, run the connectivity test, then enable it."
 			)
 		}
 
@@ -241,7 +252,13 @@ export class IntegrationRegistryService {
 			enabled?: boolean
 			notes?: string | null
 		},
-		actor: { userId: string; facilityId: string; staffProfileId: string | null; ipAddress: string | null; userAgent: string | null }
+		actor: {
+			userId: string
+			facilityId: string
+			staffProfileId: string | null
+			ipAddress: string | null
+			userAgent: string | null
+		}
 	): Promise<IntegrationWithStatus> {
 		this.validateCredentialsRef(input.credentialsRef)
 
@@ -276,8 +293,7 @@ export class IntegrationRegistryService {
 						? "Run the connectivity test first and ensure it reaches activation-grade readiness."
 						: "Run the connectivity test first and ensure it passes (transport-grade proof is sufficient for this kind)."
 					throw new BadRequestException(
-						"Integration cannot be enabled without a recent successful connectivity test. " +
-						hint
+						"Integration cannot be enabled without a recent successful connectivity test. " + hint
 					)
 				}
 			}
@@ -292,7 +308,7 @@ export class IntegrationRegistryService {
 			if (connectionChanged && current.enabled) {
 				throw new BadRequestException(
 					"Cannot change endpoint, credential, or kind on a live integration. " +
-					"Disable the integration first, then update the connection settings and re-run the connectivity test."
+						"Disable the integration first, then update the connection settings and re-run the connectivity test."
 				)
 			}
 
@@ -327,8 +343,8 @@ export class IntegrationRegistryService {
 						entityId: input.id,
 						beforeState: current as unknown as Record<string, unknown>,
 						afterState: updated as unknown as Record<string, unknown>,
-					ipAddress: actor.ipAddress,
-					userAgent: actor.userAgent,
+						ipAddress: actor.ipAddress,
+						userAgent: actor.userAgent,
 						metadata: { changes },
 					},
 					{ tx }
@@ -345,7 +361,13 @@ export class IntegrationRegistryService {
 	async delete(
 		facilityId: string,
 		id: string,
-		actor: { userId: string; facilityId: string; staffProfileId: string | null; ipAddress: string | null; userAgent: string | null }
+		actor: {
+			userId: string
+			facilityId: string
+			staffProfileId: string | null
+			ipAddress: string | null
+			userAgent: string | null
+		}
 	): Promise<IntegrationWithStatus> {
 		return db.transaction(async (tx: DBTransaction) => {
 			const [current] = await tx
@@ -384,9 +406,13 @@ export class IntegrationRegistryService {
 	 * a sensitive reconnaissance action (an attacker could use it to probe which
 	 * env vars are in scope).
 	 */
-	async listCredentialRefs(
-		actor: { userId: string; facilityId: string; staffProfileId: string | null; ipAddress: string | null; userAgent: string | null }
-	): Promise<string[]> {
+	async listCredentialRefs(actor: {
+		userId: string
+		facilityId: string
+		staffProfileId: string | null
+		ipAddress: string | null
+		userAgent: string | null
+	}): Promise<string[]> {
 		await this.auditService.log({
 			facilityId: actor.facilityId,
 			userId: actor.userId,
@@ -427,7 +453,13 @@ export class IntegrationRegistryService {
 	async testConnectivity(
 		facilityId: string,
 		id: string,
-		actor: { userId: string; facilityId: string; staffProfileId: string | null; ipAddress: string | null; userAgent: string | null }
+		actor: {
+			userId: string
+			facilityId: string
+			staffProfileId: string | null
+			ipAddress: string | null
+			userAgent: string | null
+		}
 	): Promise<ConnectivityResult> {
 		const integration = await this.get(facilityId, id)
 
@@ -545,7 +577,11 @@ export class IntegrationRegistryService {
 			const checks: ProbeCheck[] = []
 
 			if (nhdrProbe.kind === "network_error") {
-				checks.push({ name: "nhdr-submissions-endpoint", status: "fail", detail: nhdrProbe.message })
+				checks.push({
+					name: "nhdr-submissions-endpoint",
+					status: "fail",
+					detail: nhdrProbe.message,
+				})
 				const result: ConnectivityResult = {
 					status: "error",
 					readinessLevel: "none",
@@ -599,8 +635,8 @@ export class IntegrationRegistryService {
 					detail: isSuccess
 						? `Credentials accepted — /submissions returned ${httpStatus}`
 						: isAuthFailure
-						? `Configured credentials were rejected (HTTP ${httpStatus})`
-						: `HTTP ${httpStatus} — credential status indeterminate (non-auth endpoint error)`,
+							? `Configured credentials were rejected (HTTP ${httpStatus})`
+							: `HTTP ${httpStatus} — credential status indeterminate (non-auth endpoint error)`,
 				})
 			}
 			const result: ConnectivityResult = {
@@ -672,7 +708,8 @@ export class IntegrationRegistryService {
 			checks.push({
 				name: "auth-acceptance",
 				status: "skipped",
-				detail: "No credential configured — configure a credential to reach activation-grade readiness",
+				detail:
+					"No credential configured — configure a credential to reach activation-grade readiness",
 			})
 			const result: ConnectivityResult = {
 				status: "error",
@@ -877,7 +914,13 @@ export class IntegrationRegistryService {
 	private async persistAndAuditConnectivity(
 		facilityId: string,
 		id: string,
-		actor: { userId: string; facilityId: string; staffProfileId: string | null; ipAddress: string | null; userAgent: string | null },
+		actor: {
+			userId: string
+			facilityId: string
+			staffProfileId: string | null
+			ipAddress: string | null
+			userAgent: string | null
+		},
 		result: ConnectivityResult
 	): Promise<void> {
 		await db.transaction(async (tx: DBTransaction) => {
@@ -1026,12 +1069,12 @@ export class IntegrationRegistryService {
 			.from(integrationApiKeys)
 			.where(eq(integrationApiKeys.id, id))
 
-		if (!existing) throw new NotFoundException('API key not found')
-		if (existing.revokedAt) throw new BadRequestException('API key is already revoked')
+		if (!existing) throw new NotFoundException("API key not found")
+		if (existing.revokedAt) throw new BadRequestException("API key is already revoked")
 
 		const rawKey = `qhk_${randomBytes(24).toString("hex")}`
 		const keyTail = rawKey.slice(-4)
-		const keyHash = createHash('sha256').update(rawKey).digest('hex')
+		const keyHash = createHash("sha256").update(rawKey).digest("hex")
 
 		const oldKeyRevokedAt = new Date(Date.now() + graceHours * 3_600_000)
 
@@ -1040,9 +1083,9 @@ export class IntegrationRegistryService {
 			.from(integrations)
 			.where(eq(integrations.id, existing.integrationId))
 
-		if (!integration) throw new NotFoundException('Integration not found')
+		if (!integration) throw new NotFoundException("Integration not found")
 
-		const newKey = await db.transaction(async (tx) => {
+		const newKey = await db.transaction(async tx => {
 			// Set grace-period revocation on old key
 			await tx
 				.update(integrationApiKeys)
@@ -1054,7 +1097,7 @@ export class IntegrationRegistryService {
 				.insert(integrationApiKeys)
 				.values({
 					integrationId: existing.integrationId,
-					label: existing.label + ' (rotated)',
+					label: existing.label + " (rotated)",
 					keyPrefix: keyTail,
 					keyHash,
 					createdBy: actorId,
@@ -1066,14 +1109,14 @@ export class IntegrationRegistryService {
 					facilityId: integration.facilityId,
 					userId: actorId,
 					staffProfileId: null,
-					action: 'update',
+					action: "update",
 					entityType: AUDIT_ENTITY_TYPES.INTEGRATION,
 					entityId: existing.integrationId,
 					beforeState: { keyId: id, label: existing.label },
 					afterState: { newKeyId: created!.id, oldKeyRevokedAt },
 					ipAddress: null,
 					userAgent: null,
-					metadata: { operation: 'api_key_rotated', graceHours },
+					metadata: { operation: "api_key_rotated", graceHours },
 				},
 				{ tx }
 			)
@@ -1163,10 +1206,7 @@ export class IntegrationRegistryService {
 			.select()
 			.from(webhookEndpoints)
 			.where(
-				and(
-					eq(webhookEndpoints.integrationId, integrationId),
-					eq(webhookEndpoints.isActive, true),
-				)
+				and(eq(webhookEndpoints.integrationId, integrationId), eq(webhookEndpoints.isActive, true))
 			)
 
 		const relevant = endpoints.filter(ep => {
@@ -1205,7 +1245,9 @@ export class IntegrationRegistryService {
 				await new Promise(resolve => setTimeout(resolve, delay))
 				return this.deliverWithRetry(ep, event, payload, attempt + 1)
 			}
-			this.logger.warn(`Webhook delivery failed after ${MAX_ATTEMPTS} attempts: ${ep.targetUrl} — ${String(err)}`)
+			this.logger.warn(
+				`Webhook delivery failed after ${MAX_ATTEMPTS} attempts: ${ep.targetUrl} — ${String(err)}`
+			)
 		}
 	}
 }

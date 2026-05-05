@@ -40,10 +40,7 @@ export class ClinicianLicensesService {
 			.update(clinicianLicenses)
 			.set({ status: "expired", updatedAt: new Date() })
 			.where(
-				and(
-					eq(clinicianLicenses.status, "verified"),
-					lte(clinicianLicenses.expiryDate, today)
-				)
+				and(eq(clinicianLicenses.status, "verified"), lte(clinicianLicenses.expiryDate, today))
 			)
 	}
 
@@ -55,7 +52,11 @@ export class ClinicianLicensesService {
 		if (facilityId) profileConditions.push(eq(staffProfiles.facilityId, facilityId))
 
 		const profileQuery = db
-			.select({ id: staffProfiles.id, userId: staffProfiles.userId, facilityId: staffProfiles.facilityId })
+			.select({
+				id: staffProfiles.id,
+				userId: staffProfiles.userId,
+				facilityId: staffProfiles.facilityId,
+			})
 			.from(staffProfiles)
 			.where(profileConditions.length ? and(...profileConditions) : undefined)
 
@@ -68,13 +69,7 @@ export class ClinicianLicensesService {
 		const userRows = await db
 			.select({ id: users.id, name: users.name })
 			.from(users)
-			.where(
-				search
-					? and(
-							or(ilike(users.name, `%${search}%`))!,
-						)
-					: undefined
-			)
+			.where(search ? and(or(ilike(users.name, `%${search}%`))!) : undefined)
 
 		const matchingUserIds = search
 			? userRows.filter(u => userIds.includes(u.id)).map(u => u.id)
@@ -95,10 +90,7 @@ export class ClinicianLicensesService {
 			.from(clinicianLicenses)
 			.where(
 				status
-					? and(
-							or(...licenseConditions.map(c => c))!,
-							eq(clinicianLicenses.status, status)
-						)
+					? and(or(...licenseConditions.map(c => c))!, eq(clinicianLicenses.status, status))
 					: or(...licenseConditions.map(c => c))!
 			)
 			.orderBy(desc(clinicianLicenses.updatedAt))
@@ -117,7 +109,7 @@ export class ClinicianLicensesService {
 			.map(p => {
 				const licenses = licensesByProfileId.get(p.id) ?? []
 				const expiryDates = licenses
-					.map(l => l.expiryDate ? new Date(l.expiryDate).getTime() : null)
+					.map(l => (l.expiryDate ? new Date(l.expiryDate).getTime() : null))
 					.filter(Boolean) as number[]
 				const nextExpiry = expiryDates.length ? Math.min(...expiryDates) : null
 				const daysUntilNextExpiry = nextExpiry
@@ -139,7 +131,11 @@ export class ClinicianLicensesService {
 
 	async get(staffProfileId: string) {
 		const [profile] = await db
-			.select({ id: staffProfiles.id, userId: staffProfiles.userId, facilityId: staffProfiles.facilityId })
+			.select({
+				id: staffProfiles.id,
+				userId: staffProfiles.userId,
+				facilityId: staffProfiles.facilityId,
+			})
 			.from(staffProfiles)
 			.where(eq(staffProfiles.id, staffProfileId))
 
@@ -157,7 +153,7 @@ export class ClinicianLicensesService {
 			.orderBy(desc(clinicianLicenses.updatedAt))
 
 		const expiryDates = licenses
-			.map(l => l.expiryDate ? new Date(l.expiryDate).getTime() : null)
+			.map(l => (l.expiryDate ? new Date(l.expiryDate).getTime() : null))
 			.filter(Boolean) as number[]
 		const nextExpiry = expiryDates.length ? Math.min(...expiryDates) : null
 		const daysUntilNextExpiry = nextExpiry
@@ -228,10 +224,7 @@ export class ClinicianLicensesService {
 	}
 
 	async markPending(id: string) {
-		const [license] = await db
-			.select()
-			.from(clinicianLicenses)
-			.where(eq(clinicianLicenses.id, id))
+		const [license] = await db.select().from(clinicianLicenses).where(eq(clinicianLicenses.id, id))
 
 		if (!license) throw new NotFoundException("License not found")
 
@@ -245,15 +238,11 @@ export class ClinicianLicensesService {
 	}
 
 	async deleteLicense(id: string) {
-		const [license] = await db
-			.select()
-			.from(clinicianLicenses)
-			.where(eq(clinicianLicenses.id, id))
+		const [license] = await db.select().from(clinicianLicenses).where(eq(clinicianLicenses.id, id))
 
 		if (!license) throw new NotFoundException("License not found")
 
 		await db.delete(clinicianLicenses).where(eq(clinicianLicenses.id, id))
 		return { success: true }
 	}
-
 }

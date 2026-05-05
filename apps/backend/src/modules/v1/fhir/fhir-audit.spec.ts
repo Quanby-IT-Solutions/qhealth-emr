@@ -23,8 +23,8 @@ import { db } from "@/common/database/database.client"
 
 import { FhirBundleBuilderService } from "./fhir-bundle-builder.service"
 import { FhirCanonicalValidatorService } from "./fhir-canonical-validator.service"
-import { FhirService } from "./fhir.service"
 import { FhirValidatorService } from "./fhir-validator.service"
+import { FhirService } from "./fhir.service"
 import { NhdrAdapterService } from "./nhdr-adapter.service"
 
 // ---------------------------------------------------------------------------
@@ -41,11 +41,7 @@ jest.mock("@/common/database/database.client", () => ({
 }))
 
 jest.mock("@repo/db/schema", () => {
-	const proxy = () =>
-		new Proxy(
-			{},
-			{ get: (_t, p) => String(p) }
-		)
+	const proxy = () => new Proxy({}, { get: (_t, p) => String(p) })
 	return {
 		fhirExports: proxy(),
 		staffProfiles: proxy(),
@@ -154,7 +150,10 @@ describe("FhirService — audit trails (FHIR-001)", () => {
 				FhirService,
 				{ provide: FhirBundleBuilderService, useValue: bundleBuilder },
 				{ provide: FhirValidatorService, useValue: validator },
-				{ provide: FhirCanonicalValidatorService, useValue: { validateCanonical: jest.fn().mockResolvedValue([]) } },
+				{
+					provide: FhirCanonicalValidatorService,
+					useValue: { validateCanonical: jest.fn().mockResolvedValue([]) },
+				},
 				{ provide: NhdrAdapterService, useValue: nhdrAdapter },
 			],
 		}).compile()
@@ -300,7 +299,9 @@ describe("FhirService — audit trails (FHIR-001)", () => {
 		it("does not write audit records when the export is not found", async () => {
 			mockDb.select.mockReturnValue(makeLimitBuilder([]))
 
-			await expect(service.submitToNhdr(EXPORT_ID, USER_ID, "Test User")).rejects.toThrow(NotFoundException)
+			await expect(service.submitToNhdr(EXPORT_ID, USER_ID, "Test User")).rejects.toThrow(
+				NotFoundException
+			)
 			expect(mockDb.insert).not.toHaveBeenCalled()
 		})
 	})

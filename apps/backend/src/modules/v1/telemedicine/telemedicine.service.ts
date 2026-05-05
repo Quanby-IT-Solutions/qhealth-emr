@@ -42,10 +42,16 @@ export class TelemedicineService {
 
 	private buildAppointmentRow(
 		appt: typeof telemedicineAppointments.$inferSelect,
-		patientRow: { firstName: string; lastName: string; mrn: string; phone: string | null; email: string | null },
+		patientRow: {
+			firstName: string
+			lastName: string
+			mrn: string
+			phone: string | null
+			email: string | null
+		},
 		clinicianName: string,
 		clinicianSpecialty: string,
-		createdByName: string,
+		createdByName: string
 	) {
 		return {
 			id: appt.id,
@@ -133,13 +139,13 @@ export class TelemedicineService {
 				.leftJoin(clinicianStaff, eq(telemedicineAppointments.clinicianStaffId, clinicianStaff.id))
 				.leftJoin(createdByStaff, eq(telemedicineAppointments.createdByStaffId, createdByStaff.id))
 				.where(whereClause)
-				.orderBy(desc(telemedicineAppointments.scheduledDate), desc(telemedicineAppointments.scheduledTime))
+				.orderBy(
+					desc(telemedicineAppointments.scheduledDate),
+					desc(telemedicineAppointments.scheduledTime)
+				)
 				.limit(limit)
 				.offset(offset),
-			db
-				.select({ count: count() })
-				.from(telemedicineAppointments)
-				.where(whereClause),
+			db.select({ count: count() }).from(telemedicineAppointments).where(whereClause),
 		])
 
 		const total = totalResult[0]?.count ?? 0
@@ -441,7 +447,9 @@ export class TelemedicineService {
 			.set({ status: "in-progress", updatedAt: new Date() })
 			.where(eq(telemedicineAppointments.id, input.appointmentId))
 
-		this.logger.log(`Created telemedicine encounter: ${created.id} for appointment: ${input.appointmentId}`)
+		this.logger.log(
+			`Created telemedicine encounter: ${created.id} for appointment: ${input.appointmentId}`
+		)
 		void staffId
 		return this.getEncounter({ id: created.id })
 	}
@@ -481,10 +489,7 @@ export class TelemedicineService {
 				telemedicineAppointments,
 				eq(telemedicinePrescriptions.appointmentId, telemedicineAppointments.id)
 			)
-			.innerJoin(
-				staffProfiles,
-				eq(telemedicineEncounters.clinicianStaffId, staffProfiles.id)
-			)
+			.innerJoin(staffProfiles, eq(telemedicineEncounters.clinicianStaffId, staffProfiles.id))
 			.innerJoin(users, eq(staffProfiles.userId, users.id))
 			.innerJoin(facilities, eq(telemedicineAppointments.facilityId, facilities.id))
 			.where(eq(telemedicinePrescriptions.id, input.id))
@@ -618,7 +623,11 @@ export class TelemedicineService {
 
 	async getAbstract(input: GetAbstractInput) {
 		const clinicianStaff = db
-			.select({ id: staffProfiles.id, name: users.name, prcLicenseNumber: staffProfiles.prcLicenseNumber })
+			.select({
+				id: staffProfiles.id,
+				name: users.name,
+				prcLicenseNumber: staffProfiles.prcLicenseNumber,
+			})
 			.from(staffProfiles)
 			.innerJoin(users, eq(staffProfiles.userId, users.id))
 			.as("clinician_staff")
@@ -655,9 +664,15 @@ export class TelemedicineService {
 				signedByName: signedByStaff.name,
 			})
 			.from(telemedicineAbstracts)
-			.innerJoin(telemedicineEncounters, eq(telemedicineAbstracts.encounterId, telemedicineEncounters.id))
+			.innerJoin(
+				telemedicineEncounters,
+				eq(telemedicineAbstracts.encounterId, telemedicineEncounters.id)
+			)
 			.innerJoin(patients, eq(telemedicineAbstracts.patientId, patients.id))
-			.innerJoin(telemedicineAppointments, eq(telemedicineAbstracts.appointmentId, telemedicineAppointments.id))
+			.innerJoin(
+				telemedicineAppointments,
+				eq(telemedicineAbstracts.appointmentId, telemedicineAppointments.id)
+			)
 			.innerJoin(clinicianStaff, eq(telemedicineEncounters.clinicianStaffId, clinicianStaff.id))
 			.innerJoin(facilities, eq(telemedicineAppointments.facilityId, facilities.id))
 			.leftJoin(signedByStaff, eq(telemedicineAbstracts.signedByStaffId, signedByStaff.id))

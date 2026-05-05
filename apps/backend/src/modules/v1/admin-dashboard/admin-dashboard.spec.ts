@@ -1,3 +1,8 @@
+import { ReportingService } from "../reporting/reporting.service"
+import { SlaService } from "../sla/sla.service"
+import { AdminDashboardController } from "./admin-dashboard.controller"
+import { AdminDashboardService } from "./admin-dashboard.service"
+
 /**
  * Admin Dashboard — FHIR telemetry permission boundary tests (FHIR-009)
  *
@@ -33,10 +38,6 @@ jest.mock("../sla/sla.service", () => ({
 jest.mock("../reporting/reporting.service", () => ({
 	ReportingService: class ReportingService {},
 }))
-
-import { SlaService } from "../sla/sla.service"
-import { ReportingService } from "../reporting/reporting.service"
-import { AdminDashboardService } from "./admin-dashboard.service"
 
 // ── Minimal typed stubs returned by private fetcher methods ───────────────────
 
@@ -98,16 +99,17 @@ function stubService(fhirFailures: number, consentEnforced = false) {
 	// Stub all private async fetchers via spyOn
 	jest.spyOn(service as never, "getAccessGovernance").mockResolvedValue(EMPTY_GOVERNANCE as never)
 	jest.spyOn(service as never, "getPlatformControl").mockResolvedValue(EMPTY_PLATFORM as never)
-	jest.spyOn(service as never, "getIntegrationHealth").mockResolvedValue(
-		makeIntegrationHealth(fhirFailures) as never
-	)
+	jest
+		.spyOn(service as never, "getIntegrationHealth")
+		.mockResolvedValue(makeIntegrationHealth(fhirFailures) as never)
 	jest.spyOn(service as never, "getAuditSummary").mockResolvedValue({
 		...EMPTY_AUDIT_BASE,
 		consentEnforced,
 	} as never)
-	jest.spyOn(service as never, "withMissingSchemaFallback").mockImplementation(
-		(async (...args: unknown[]) => (args[2] as () => Promise<unknown>)()) as never
-	)
+	jest
+		.spyOn(service as never, "withMissingSchemaFallback")
+		.mockImplementation((async (...args: unknown[]) =>
+			(args[2] as () => Promise<unknown>)()) as never)
 	jest.spyOn(service as never, "getArtaSla").mockResolvedValue(EMPTY_ARTA as never)
 	jest.spyOn(service as never, "getOfflineReadiness").mockResolvedValue(EMPTY_OFFLINE as never)
 
@@ -212,17 +214,15 @@ jest.mock("@/config/api-versions.config", () => ({
 jest.mock("@/modules/v1/rbac/rbac.guard", () => ({
 	RBAC_PERMISSION_KEY: "rbac",
 	RBAC_PERMISSIONS_KEY: "rbac_all",
-	RequirePermission: (module: string, action: string) =>
-		(target: object, key: string | symbol) => {
-			Reflect.defineMetadata("rbac", { module, action }, target, key)
-		},
-	RequirePermissions: (permissions: Array<{ module: string; action: string }>) =>
+	RequirePermission: (module: string, action: string) => (target: object, key: string | symbol) => {
+		Reflect.defineMetadata("rbac", { module, action }, target, key)
+	},
+	RequirePermissions:
+		(permissions: Array<{ module: string; action: string }>) =>
 		(target: object, key: string | symbol) => {
 			Reflect.defineMetadata("rbac_all", permissions, target, key)
 		},
 }))
-
-import { AdminDashboardController } from "./admin-dashboard.controller"
 
 type PermEntry = { module: string; action: string }
 
@@ -256,4 +256,3 @@ describe("AdminDashboardController — RBAC guard metadata (ADMIN-003)", () => {
 		expect(perm).toEqual({ module: "formulary", action: "clinical_policy" })
 	})
 })
-

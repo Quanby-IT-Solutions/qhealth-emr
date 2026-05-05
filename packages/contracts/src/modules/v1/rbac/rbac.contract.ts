@@ -9,22 +9,22 @@ import {
 	CreateRoleSchema,
 	CreateStaffProfileSchema,
 	CreateUserSchema,
-	CreateUserWithFacilitiesSchema,
 	CreateUserWithFacilitiesResponseSchema,
+	CreateUserWithFacilitiesSchema,
 	FacilitySchema,
 	InitiatePasswordResetSchema,
 	LicenseStatusSchema,
 	ListRolesQuerySchema,
 	ListUsersQuerySchema,
 	PaginatedUsersSchema,
+	RbacActionEnum,
+	RbacModuleEnum,
 	ReEnableUserSchema,
 	RemoveFacilityMembershipSchema,
 	RemoveRoleAssignmentSchema,
 	RoleIdSchema,
 	RoleSchema,
 	RoleWithPermissionsSchema,
-	RbacActionEnum,
-	RbacModuleEnum,
 	SetRolePermissionsSchema,
 	StaffProfileIdSchema,
 	StaffProfileSchema,
@@ -236,7 +236,9 @@ export const rbacContract = {
 			tags: ["RBAC"],
 		})
 		.input(UserIdSchema)
-		.output(z.object({ user: UserSummarySchema, staffProfiles: z.array(StaffProfileWithRolesSchema) })),
+		.output(
+			z.object({ user: UserSummarySchema, staffProfiles: z.array(StaffProfileWithRolesSchema) })
+		),
 
 	// ── Access Governance — Multi-facility user creation ────────────────
 

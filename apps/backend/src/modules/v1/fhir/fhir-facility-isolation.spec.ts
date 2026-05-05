@@ -23,8 +23,8 @@ import { db } from "@/common/database/database.client"
 
 import { FhirBundleBuilderService } from "./fhir-bundle-builder.service"
 import { FhirCanonicalValidatorService } from "./fhir-canonical-validator.service"
-import { FhirService } from "./fhir.service"
 import { FhirValidatorService } from "./fhir-validator.service"
+import { FhirService } from "./fhir.service"
 import { NhdrAdapterService } from "./nhdr-adapter.service"
 
 // ---------------------------------------------------------------------------
@@ -40,11 +40,7 @@ jest.mock("@/common/database/database.client", () => ({
 }))
 
 jest.mock("@repo/db/schema", () => {
-	const proxy = () =>
-		new Proxy(
-			{},
-			{ get: (_t, p) => String(p) }
-		)
+	const proxy = () => new Proxy({}, { get: (_t, p) => String(p) })
 	return {
 		fhirExports: proxy(),
 		staffProfiles: proxy(),
@@ -244,9 +240,9 @@ describe("FhirService — facility isolation (FHIR-002)", () => {
 			const builder = makeSelectBuilder([])
 			mockDb.select.mockReturnValue(builder)
 
-			await expect(
-				service.submitToNhdr(EXPORT_ID, "user-id", "User Name")
-			).rejects.toThrow(NotFoundException)
+			await expect(service.submitToNhdr(EXPORT_ID, "user-id", "User Name")).rejects.toThrow(
+				NotFoundException
+			)
 		})
 	})
 

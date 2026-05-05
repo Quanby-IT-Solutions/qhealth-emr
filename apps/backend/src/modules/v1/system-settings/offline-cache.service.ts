@@ -90,16 +90,15 @@ export class OfflineCacheService implements OnModuleInit, OnModuleDestroy {
 
 			return { jobId, status: "completed", cachedPatientCount, errorMessage: null }
 		} catch (err) {
-			const errorMessage = err instanceof Error ? err.message : "Unknown error during cache preparation"
+			const errorMessage =
+				err instanceof Error ? err.message : "Unknown error during cache preparation"
 
 			await db
 				.update(offlineCacheJobs)
 				.set({ status: "failed", completedAt: new Date(), errorMessage })
 				.where(eq(offlineCacheJobs.id, jobId))
 
-			this.logger.error(
-				`Offline cache job failed for facility ${facilityId}: ${errorMessage}`
-			)
+			this.logger.error(`Offline cache job failed for facility ${facilityId}: ${errorMessage}`)
 
 			return { jobId, status: "failed", cachedPatientCount: null, errorMessage }
 		}
@@ -115,7 +114,9 @@ export class OfflineCacheService implements OnModuleInit, OnModuleDestroy {
 				.from(systemSettings)
 				.where(eq(systemSettings.enableOfflineSummaryCache, true))
 		} catch (err) {
-			this.logger.error(`Scheduled offline cache run failed to query enabled facilities: ${String(err)}`)
+			this.logger.error(
+				`Scheduled offline cache run failed to query enabled facilities: ${String(err)}`
+			)
 			return
 		}
 

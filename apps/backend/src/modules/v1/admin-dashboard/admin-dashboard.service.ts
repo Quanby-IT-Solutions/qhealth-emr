@@ -1,6 +1,37 @@
 import { Injectable, Logger } from "@nestjs/common"
-import { and, count, countDistinct, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm"
+import {
+	and,
+	count,
+	countDistinct,
+	desc,
+	eq,
+	gt,
+	gte,
+	inArray,
+	isNotNull,
+	isNull,
+	lt,
+	or,
+	sql,
+} from "drizzle-orm"
 
+import type {
+	AccessGovernanceSection,
+	AdminDashboardAlert,
+	AdminDashboardSummary,
+	AdminSummaryCard,
+	ArtaSlaSection,
+	AuditSummarySection,
+	CivilRegistryOpsSection,
+	ExportComplianceList,
+	ExportComplianceQuery,
+	HimOpsSection,
+	IntegrationHealthSection,
+	MedicationComplianceSection,
+	OfflineReadinessSection,
+	PlatformControlSection,
+	RecentChange,
+} from "@repo/contracts"
 import {
 	ahsrSnapshots,
 	auditLogs,
@@ -10,8 +41,8 @@ import {
 	clinicalNotes,
 	dataExports,
 	deathReports,
-	encounterStatusEvents,
 	encounters,
+	encounterStatusEvents,
 	facilityProfiles,
 	featureFlags,
 	featureFlagTargets,
@@ -35,26 +66,9 @@ import {
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
+
 import { ReportingService } from "../reporting/reporting.service"
 import { SlaService } from "../sla/sla.service"
-
-import type {
-	AdminDashboardAlert,
-	AdminDashboardSummary,
-	AdminSummaryCard,
-	ArtaSlaSection,
-	AccessGovernanceSection,
-	AuditSummarySection,
-	CivilRegistryOpsSection,
-	ExportComplianceList,
-	ExportComplianceQuery,
-	HimOpsSection,
-	IntegrationHealthSection,
-	MedicationComplianceSection,
-	OfflineReadinessSection,
-	PlatformControlSection,
-	RecentChange,
-} from "@repo/contracts"
 
 function isMissingDatabaseObjectError(error: unknown): boolean {
 	if (!error || typeof error !== "object") return false
@@ -93,20 +107,22 @@ export class AdminDashboardService {
 
 	constructor(
 		private readonly slaService: SlaService,
-		private readonly reportingService: ReportingService,
+		private readonly reportingService: ReportingService
 	) {}
 
 	private async withMissingSchemaFallback<T>(
 		sectionName: string,
 		facilityId: string,
 		action: () => Promise<T>,
-		fallback: T,
+		fallback: T
 	): Promise<T> {
 		try {
 			return await action()
 		} catch (error) {
 			if (isMissingDatabaseObjectError(error)) {
-				this.logger.warn(`${sectionName} data unavailable for facility ${facilityId}: database schema is behind the current code`)
+				this.logger.warn(
+					`${sectionName} data unavailable for facility ${facilityId}: database schema is behind the current code`
+				)
 				return fallback
 			}
 
@@ -126,8 +142,18 @@ export class AdminDashboardService {
 		])
 
 		const [artaSla, offlineReadiness] = await Promise.all([
-			this.withMissingSchemaFallback("ARTA/SLA", facilityId, () => this.getArtaSla(facilityId), EMPTY_ARTA_SLA),
-			this.withMissingSchemaFallback("offline readiness", facilityId, () => this.getOfflineReadiness(facilityId), EMPTY_OFFLINE_READINESS),
+			this.withMissingSchemaFallback(
+				"ARTA/SLA",
+				facilityId,
+				() => this.getArtaSla(facilityId),
+				EMPTY_ARTA_SLA
+			),
+			this.withMissingSchemaFallback(
+				"offline readiness",
+				facilityId,
+				() => this.getOfflineReadiness(facilityId),
+				EMPTY_OFFLINE_READINESS
+			),
 		])
 
 		// Strip FHIR-specific telemetry when the caller lacks fhir:view — TOR §4.2 least-privilege
@@ -135,8 +161,20 @@ export class AdminDashboardService {
 			? integrationHealth
 			: { ...integrationHealth, fhirFailures: 0 }
 
-		const alerts = this.buildAlerts(governance, platform, effectiveIntegrationHealth, audit, artaSla, offlineReadiness)
-		const summaryCards = this.buildSummaryCards(governance, effectiveIntegrationHealth, audit, artaSla)
+		const alerts = this.buildAlerts(
+			governance,
+			platform,
+			effectiveIntegrationHealth,
+			audit,
+			artaSla,
+			offlineReadiness
+		)
+		const summaryCards = this.buildSummaryCards(
+			governance,
+			effectiveIntegrationHealth,
+			audit,
+			artaSla
+		)
 		const recentChanges = [
 			...governance.recentRoleChanges,
 			...platform.recentFlagChanges,
@@ -380,7 +418,7 @@ export class AdminDashboardService {
 					gte(auditLogs.createdAt, sevenDaysAgo),
 					or(
 						eq(auditLogs.entityType, "feature_flag"),
-					eq(auditLogs.entityType, "system_setting"),
+						eq(auditLogs.entityType, "system_setting"),
 						eq(auditLogs.entityType, "integration")
 					)
 				)
@@ -437,12 +475,7 @@ export class AdminDashboardService {
 		const [eventsRow] = await db
 			.select({ totalRecentEvents: count() })
 			.from(auditLogs)
-			.where(
-				and(
-					eq(auditLogs.facilityId, facilityId),
-					gte(auditLogs.createdAt, sevenDaysAgo)
-				)
-			)
+			.where(and(eq(auditLogs.facilityId, facilityId), gte(auditLogs.createdAt, sevenDaysAgo)))
 
 		// Total count of all privileged changes in last 7d (for anomaly detection, AD-006)
 		const [privilegedCountRow] = await db
@@ -493,7 +526,13 @@ export class AdminDashboardService {
 
 			if (activeConfigs.length === 0) {
 				// No SLA targets configured yet — keep the "data unavailable" state
-				return { activeBreaches: 0, overdueQueues: 0, topBreachedWorkflows: [], queueBreakdown: [], dataAvailable: false }
+				return {
+					activeBreaches: 0,
+					overdueQueues: 0,
+					topBreachedWorkflows: [],
+					queueBreakdown: [],
+					dataAvailable: false,
+				}
 			}
 
 			// Use full status breakdown (AD-004: populate real onTime/approaching counts)
@@ -542,7 +581,9 @@ export class AdminDashboardService {
 				if (!openStepsByWorkflow.has(row.workflowType)) {
 					openStepsByWorkflow.set(row.workflowType, [])
 				}
-				openStepsByWorkflow.get(row.workflowType)!.push({ step: row.toStatus, count: Number(row.n) })
+				openStepsByWorkflow
+					.get(row.workflowType)!
+					.push({ step: row.toStatus, count: Number(row.n) })
 			}
 
 			// AD-001 + AD-014: Build per-queue breakdown for ALL configured workflows.
@@ -586,7 +627,9 @@ export class AdminDashboardService {
 			}
 		} catch (error) {
 			if (isMissingDatabaseObjectError(error)) {
-				this.logger.warn(`SLA dashboard data unavailable for facility ${facilityId}: database schema is behind the current code`)
+				this.logger.warn(
+					`SLA dashboard data unavailable for facility ${facilityId}: database schema is behind the current code`
+				)
 				return {
 					activeBreaches: 0,
 					overdueQueues: 0,
@@ -608,7 +651,7 @@ export class AdminDashboardService {
 		integrationHealth: IntegrationHealthSection,
 		audit: AuditSummarySection,
 		artaSla: ArtaSlaSection,
-		offlineReadiness: OfflineReadinessSection,
+		offlineReadiness: OfflineReadinessSection
 	): AdminDashboardAlert[] {
 		const alerts: AdminDashboardAlert[] = []
 
@@ -706,7 +749,8 @@ export class AdminDashboardService {
 				severity: "critical",
 				category: "audit",
 				title: `${audit.flaggedBreakGlassEvents} break-glass event(s) flagged in the last 7 days`,
-				description: "Flagged emergency access may indicate a policy violation. Immediate review required.",
+				description:
+					"Flagged emergency access may indicate a policy violation. Immediate review required.",
 				link: "/audit/break-glass",
 			})
 		}
@@ -717,7 +761,8 @@ export class AdminDashboardService {
 				severity: "warning",
 				category: "audit",
 				title: "DPA consent enforcement is disabled",
-				description: "Patient data exports are not gated by consent. Review your privacy policy settings.",
+				description:
+					"Patient data exports are not gated by consent. Review your privacy policy settings.",
 				link: "/admin/settings",
 			})
 		}
@@ -728,7 +773,8 @@ export class AdminDashboardService {
 				severity: "warning",
 				category: "platform",
 				title: "Offline continuity mode is disabled",
-				description: "Patients cannot be served without network connectivity. Enable offline summary cache in System Settings.",
+				description:
+					"Patients cannot be served without network connectivity. Enable offline summary cache in System Settings.",
 				link: "/admin/offline",
 			})
 		}
@@ -739,7 +785,8 @@ export class AdminDashboardService {
 				severity: "warning",
 				category: "platform",
 				title: "Offline summary cache is stale",
-				description: "The offline readiness cache has not been refreshed recently. Continuity may be impaired.",
+				description:
+					"The offline readiness cache has not been refreshed recently. Continuity may be impaired.",
 				link: "/admin/offline",
 			})
 		}
@@ -765,7 +812,8 @@ export class AdminDashboardService {
 				severity: "warning",
 				category: "anomaly",
 				title: `Unusual privileged change volume: ${audit.privilegedChangeCount7d} changes in 7 days`,
-				description: "A high number of role, flag, settings, or integration changes were made this week. Review for unauthorized activity.",
+				description:
+					"A high number of role, flag, settings, or integration changes were made this week. Review for unauthorized activity.",
 				link: "/audit",
 			})
 		}
@@ -776,7 +824,8 @@ export class AdminDashboardService {
 				severity: "critical",
 				category: "anomaly",
 				title: `Break-glass volume spike: ${audit.breakGlassEventCount} events in 7 days`,
-				description: "Unusually high emergency access volume may indicate a privacy or security incident. Immediate review required.",
+				description:
+					"Unusually high emergency access volume may indicate a privacy or security incident. Immediate review required.",
 				link: "/audit/break-glass",
 			})
 		}
@@ -787,7 +836,8 @@ export class AdminDashboardService {
 				severity: "critical",
 				category: "anomaly",
 				title: "FHIR export failures with consent enforcement disabled",
-				description: "Export failures are occurring while DPA consent is not enforced. Data governance risk is elevated.",
+				description:
+					"Export failures are occurring while DPA consent is not enforced. Data governance risk is elevated.",
 				link: "/admin/fhir",
 			})
 		}
@@ -798,7 +848,8 @@ export class AdminDashboardService {
 				severity: "warning",
 				category: "anomaly",
 				title: `${governance.multiFacilityUsers} users have cross-facility access`,
-				description: "A large number of users are active across multiple facilities. Verify these assignments are intentional.",
+				description:
+					"A large number of users are active across multiple facilities. Verify these assignments are intentional.",
 				link: "/admin/users",
 			})
 		}
@@ -832,17 +883,16 @@ export class AdminDashboardService {
 			.where(
 				and(
 					eq(offlineCacheJobs.facilityId, facilityId),
-					or(
-						eq(offlineCacheJobs.status, "completed"),
-						eq(offlineCacheJobs.status, "failed")
-					)
+					or(eq(offlineCacheJobs.status, "completed"), eq(offlineCacheJobs.status, "failed"))
 				)
 			)
 			.orderBy(desc(offlineCacheJobs.startedAt))
 			.limit(1)
 
-		const lastCachePreparedAt = lastJob?.status === "completed" ? (lastJob.completedAt ?? lastJob.startedAt) : null
-		const activePatientsCount = lastJob?.status === "completed" ? (lastJob.cachedPatientCount ?? 0) : 0
+		const lastCachePreparedAt =
+			lastJob?.status === "completed" ? (lastJob.completedAt ?? lastJob.startedAt) : null
+		const activePatientsCount =
+			lastJob?.status === "completed" ? (lastJob.cachedPatientCount ?? 0) : 0
 
 		let status: OfflineReadinessSection["status"]
 		if (!enabled) {
@@ -996,7 +1046,10 @@ export class AdminDashboardService {
 
 	// ── Export Compliance (AD-002) ─────────────────────────────────────────────
 
-	async getExportCompliance(facilityId: string, query: ExportComplianceQuery): Promise<ExportComplianceList> {
+	async getExportCompliance(
+		facilityId: string,
+		query: ExportComplianceQuery
+	): Promise<ExportComplianceList> {
 		const page = query.page ?? 1
 		const limit = query.limit ?? 50
 		const offset = (page - 1) * limit
@@ -1043,7 +1096,11 @@ export class AdminDashboardService {
 
 	async getCivilRegistryOps(facilityId: string): Promise<CivilRegistryOpsSection> {
 		const rows = await db
-			.select({ reportType: deathReports.reportType, status: deathReports.status, submittedAt: deathReports.submittedAt })
+			.select({
+				reportType: deathReports.reportType,
+				status: deathReports.status,
+				submittedAt: deathReports.submittedAt,
+			})
 			.from(deathReports)
 			.where(eq(deathReports.facilityId, facilityId))
 
@@ -1096,13 +1153,13 @@ export class AdminDashboardService {
 		const pendingScreeningCount = nbsRows.filter(r => r.status === "pending").length
 		const screenedCount = nbsRows.filter(r => r.status !== "pending").length
 		const lastScreeningAt =
-			nbsRows
-				.map(r => r.birthDatetime)
-				.sort((a, b) => b.getTime() - a.getTime())[0] ?? null
+			nbsRows.map(r => r.birthDatetime).sort((a, b) => b.getTime() - a.getTime())[0] ?? null
 
 		// AD-012: Timing-window compliance — RA 9288 mandates screening within 24–48h post-birth.
 		const screenedRows = nbsRows.filter(r => r.status !== "pending" && r.hoursElapsed !== null)
-		const onTimeCount = screenedRows.filter(r => r.hoursElapsed! >= 24 && r.hoursElapsed! <= 48).length
+		const onTimeCount = screenedRows.filter(
+			r => r.hoursElapsed! >= 24 && r.hoursElapsed! <= 48
+		).length
 		const earlyCount = screenedRows.filter(r => r.hoursElapsed! < 24).length
 		const lateScreenedCount = screenedRows.filter(r => r.hoursElapsed! > 48).length
 		const overdueCount = nbsRows.filter(
@@ -1194,7 +1251,8 @@ export class AdminDashboardService {
 		// Generics Act compliance: orders prescribed without a brand name (generic-only)
 		const genericsPrescribedCount = orders.filter(o => !o.brandName).length
 		const brandsPrescribedCount = orders.filter(o => !!o.brandName).length
-		const genericsPrescribedPct = total > 0 ? Math.round((genericsPrescribedCount / total) * 100) : 100
+		const genericsPrescribedPct =
+			total > 0 ? Math.round((genericsPrescribedCount / total) * 100) : 100
 
 		// PDEA S-2 (controlled substance) tranche compliance
 		const controlledSubstancesCount = orders.filter(o => o.isControlledSubstance).length
@@ -1207,7 +1265,8 @@ export class AdminDashboardService {
 
 		// CDS alert verification rate
 		const ordersWithCdsAlerts = orders.filter(
-			o => o.cdsAlerts !== null && Array.isArray(o.cdsAlerts) && (o.cdsAlerts as unknown[]).length > 0
+			o =>
+				o.cdsAlerts !== null && Array.isArray(o.cdsAlerts) && (o.cdsAlerts as unknown[]).length > 0
 		).length
 		const cdsAlertsVerifiedCount = orders.filter(
 			o =>
@@ -1230,10 +1289,7 @@ export class AdminDashboardService {
 			})
 			.from(prescriptions)
 			.where(
-				and(
-					eq(prescriptions.facilityId, facilityId),
-					gte(prescriptions.createdAt, thirtyDaysAgo)
-				)
+				and(eq(prescriptions.facilityId, facilityId), gte(prescriptions.createdAt, thirtyDaysAgo))
 			)
 
 		const prescriptionsLast30d = prescriptionRows.length
@@ -1282,10 +1338,7 @@ export class AdminDashboardService {
 			.from(prescriptions)
 			.innerJoin(staffProfiles, eq(prescriptions.prescriberStaffId, staffProfiles.id))
 			.where(
-				and(
-					eq(prescriptions.facilityId, facilityId),
-					gte(prescriptions.createdAt, thirtyDaysAgo)
-				)
+				and(eq(prescriptions.facilityId, facilityId), gte(prescriptions.createdAt, thirtyDaysAgo))
 			)
 
 		// Helper: check if a date string (or null) represents an active credential at given time
@@ -1322,10 +1375,11 @@ export class AdminDashboardService {
 				: 100
 
 		// Count prescriptions where any credential was expired at time of signing
-		const expiredCredentialPrescriptionCount = validityRows.filter(r =>
-			!isActive(r.prcExpiry, r.createdAt) ||
-			!isActive(r.ptrExpiry, r.createdAt) ||
-			(!!r.pdeaS2License?.trim() && !isActive(r.pdeaS2Expiry, r.createdAt))
+		const expiredCredentialPrescriptionCount = validityRows.filter(
+			r =>
+				!isActive(r.prcExpiry, r.createdAt) ||
+				!isActive(r.ptrExpiry, r.createdAt) ||
+				(!!r.pdeaS2License?.trim() && !isActive(r.pdeaS2Expiry, r.createdAt))
 		).length
 
 		// AD-003: High-alert medication safeguards.

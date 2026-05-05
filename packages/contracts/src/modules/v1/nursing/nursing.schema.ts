@@ -296,7 +296,9 @@ export const GenerateHandoffSchema = z.object({
 
 export const GeneratedHandoffResponseSchema = z.object({
 	activeProblems: z.array(z.object({ description: z.string(), icd10Code: z.string().nullable() })),
-	currentMedications: z.array(z.object({ genericName: z.string(), dose: z.string(), frequency: z.string() })),
+	currentMedications: z.array(
+		z.object({ genericName: z.string(), dose: z.string(), frequency: z.string() })
+	),
 	recentVitals: VitalSignSchema.nullable(),
 	newsScore: z.number().int().nullable(),
 	newsRiskLevel: NewsRiskLevelEnum.nullable(),

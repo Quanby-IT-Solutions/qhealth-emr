@@ -85,11 +85,12 @@ export function toORPCError(error: unknown): ORPCError<ORPCErrorCode, unknown> {
 	})
 }
 
-export const nestHttpExceptionInterceptor: NonNullable<ORPCModuleConfig["interceptors"]>[number] =
-	async ({ next }) => {
-		try {
-			return await next()
-		} catch (error) {
-			throw toORPCError(error)
-		}
+export const nestHttpExceptionInterceptor: NonNullable<
+	ORPCModuleConfig["interceptors"]
+>[number] = async ({ next }) => {
+	try {
+		return await next()
+	} catch (error) {
+		throw toORPCError(error)
 	}
+}

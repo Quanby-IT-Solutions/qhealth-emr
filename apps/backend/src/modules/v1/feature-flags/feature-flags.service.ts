@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { count, desc, eq, inArray } from "drizzle-orm"
 
-import { featureFlags, featureFlagHistory, featureFlagTargets } from "@repo/db/schema"
+import { featureFlagHistory, featureFlags, featureFlagTargets } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import { AUDIT_ENTITY_TYPES } from "@/modules/v1/audit/audit-entity-types"
@@ -100,9 +100,7 @@ function resolveFlag(flag: FeatureFlagRow, targets: TargetRow[], ctx: Resolution
 
 	// Compute specificity (number of non-null dimensions)
 	const specificity = (t: TargetRow) =>
-		(t.environment !== null ? 1 : 0) +
-		(t.facilityId !== null ? 1 : 0) +
-		(t.roleId !== null ? 1 : 0)
+		(t.environment !== null ? 1 : 0) + (t.facilityId !== null ? 1 : 0) + (t.roleId !== null ? 1 : 0)
 
 	const maxSpec = Math.max(...matching.map(specificity))
 	const topTier = matching.filter(t => specificity(t) === maxSpec)
@@ -257,10 +255,7 @@ export class FeatureFlagsService {
 		actor: { userId: string; facilityId: string; staffProfileId: string | null }
 	) {
 		return db.transaction(async tx => {
-			const [before] = await tx
-				.select()
-				.from(featureFlags)
-				.where(eq(featureFlags.id, input.id))
+			const [before] = await tx.select().from(featureFlags).where(eq(featureFlags.id, input.id))
 			if (!before) throw new NotFoundException(`Feature flag ${input.id} not found`)
 
 			const updates: Partial<FeatureFlagRow> = {}
@@ -325,17 +320,11 @@ export class FeatureFlagsService {
 		actor: { userId: string; facilityId: string; staffProfileId: string | null }
 	) {
 		return db.transaction(async tx => {
-			const [flag] = await tx
-				.select()
-				.from(featureFlags)
-				.where(eq(featureFlags.id, id))
+			const [flag] = await tx.select().from(featureFlags).where(eq(featureFlags.id, id))
 			if (!flag) throw new NotFoundException(`Feature flag ${id} not found`)
 
 			await tx.delete(featureFlagTargets).where(eq(featureFlagTargets.flagId, id))
-			const [deleted] = await tx
-				.delete(featureFlags)
-				.where(eq(featureFlags.id, id))
-				.returning()
+			const [deleted] = await tx.delete(featureFlags).where(eq(featureFlags.id, id)).returning()
 
 			cacheInvalidate(id)
 
@@ -369,10 +358,7 @@ export class FeatureFlagsService {
 		actor: { userId: string; facilityId: string; staffProfileId: string | null }
 	) {
 		return db.transaction(async tx => {
-			const [flag] = await tx
-				.select()
-				.from(featureFlags)
-				.where(eq(featureFlags.id, input.flagId))
+			const [flag] = await tx.select().from(featureFlags).where(eq(featureFlags.id, input.flagId))
 			if (!flag) throw new NotFoundException(`Feature flag ${input.flagId} not found`)
 
 			const beforeTargets = await tx
@@ -381,9 +367,7 @@ export class FeatureFlagsService {
 				.where(eq(featureFlagTargets.flagId, input.flagId))
 
 			// Full replace: delete all then re-insert
-			await tx
-				.delete(featureFlagTargets)
-				.where(eq(featureFlagTargets.flagId, input.flagId))
+			await tx.delete(featureFlagTargets).where(eq(featureFlagTargets.flagId, input.flagId))
 
 			let afterTargets: TargetRow[] = []
 			if (input.targets.length > 0) {
@@ -521,8 +505,13 @@ export class FeatureFlagsService {
 		const offset = (page - 1) * limit
 
 		const [totalRow, rows] = await Promise.all([
-			db.select({ total: count() }).from(featureFlagHistory).where(eq(featureFlagHistory.flagId, flagId)),
-			db.select().from(featureFlagHistory)
+			db
+				.select({ total: count() })
+				.from(featureFlagHistory)
+				.where(eq(featureFlagHistory.flagId, flagId)),
+			db
+				.select()
+				.from(featureFlagHistory)
 				.where(eq(featureFlagHistory.flagId, flagId))
 				.orderBy(desc(featureFlagHistory.changedAt))
 				.limit(limit)

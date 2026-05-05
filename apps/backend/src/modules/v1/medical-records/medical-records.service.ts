@@ -9,7 +9,11 @@ interface ListMedicalRecordsRequestsInput {
 	facilityId: string
 	patientId?: string
 	encounterId?: string
-	requestType?: "chart_release" | "medical_certificate" | "discharge_summary_copy" | "laboratory_results"
+	requestType?:
+		| "chart_release"
+		| "medical_certificate"
+		| "discharge_summary_copy"
+		| "laboratory_results"
 	status?: "pending" | "processing" | "completed" | "rejected"
 	page: number
 	limit: number
@@ -19,7 +23,11 @@ interface CreateMedicalRecordsRequestInput {
 	facilityId: string
 	patientId: string
 	encounterId?: string
-	requestType: "chart_release" | "medical_certificate" | "discharge_summary_copy" | "laboratory_results"
+	requestType:
+		| "chart_release"
+		| "medical_certificate"
+		| "discharge_summary_copy"
+		| "laboratory_results"
 	requestedByName: string
 	requestedByRelationship?: "self" | "parent" | "guardian" | "legal_representative" | "other"
 	purpose?: string
@@ -46,8 +54,10 @@ export class MedicalRecordsService {
 
 		const conditions = [eq(medicalRecordsRequests.facilityId, input.facilityId)]
 		if (input.patientId) conditions.push(eq(medicalRecordsRequests.patientId, input.patientId))
-		if (input.encounterId) conditions.push(eq(medicalRecordsRequests.encounterId, input.encounterId))
-		if (input.requestType) conditions.push(eq(medicalRecordsRequests.requestType, input.requestType))
+		if (input.encounterId)
+			conditions.push(eq(medicalRecordsRequests.encounterId, input.encounterId))
+		if (input.requestType)
+			conditions.push(eq(medicalRecordsRequests.requestType, input.requestType))
 		if (input.status) conditions.push(eq(medicalRecordsRequests.status, input.status))
 
 		const whereClause = and(...conditions)
@@ -94,7 +104,14 @@ export class MedicalRecordsService {
 				encounterId: input.encounterId ?? null,
 				requestType: input.requestType,
 				requestedByName: input.requestedByName,
-				requestedByRelationship: (input.requestedByRelationship as "self" | "parent" | "guardian" | "legal_representative" | "other" | undefined) ?? null,
+				requestedByRelationship:
+					(input.requestedByRelationship as
+						| "self"
+						| "parent"
+						| "guardian"
+						| "legal_representative"
+						| "other"
+						| undefined) ?? null,
 				purpose: input.purpose ?? null,
 				status: "pending",
 				// SLA-020: persist identity/DPA evidence at point of receipt
@@ -119,10 +136,14 @@ export class MedicalRecordsService {
 			updateData.status = input.status
 			if (input.status === "completed") updateData.completedAt = new Date()
 		}
-		if (input.processedByStaffId !== undefined) updateData.processedByStaffId = input.processedByStaffId
+		if (input.processedByStaffId !== undefined)
+			updateData.processedByStaffId = input.processedByStaffId
 		if (input.rejectionReason !== undefined) updateData.rejectionReason = input.rejectionReason
 
-		await db.update(medicalRecordsRequests).set(updateData).where(eq(medicalRecordsRequests.id, input.id))
+		await db
+			.update(medicalRecordsRequests)
+			.set(updateData)
+			.where(eq(medicalRecordsRequests.id, input.id))
 
 		return this.getMedicalRecordsRequest(input.id)
 	}
@@ -151,7 +172,11 @@ export class MedicalRecordsService {
 	 * SLA-020: Mark medical records as released to the requestor.
 	 * Sets releasedByStaffId and releasedAt to provide authoritative Flow 7 Step 3 evidence.
 	 */
-	async markMedicalRecordsReleased(input: { id: string; releasedByStaffId: string; releasedAt?: Date }) {
+	async markMedicalRecordsReleased(input: {
+		id: string
+		releasedByStaffId: string
+		releasedAt?: Date
+	}) {
 		const releasedAt = input.releasedAt ?? new Date()
 
 		const [updated] = await db

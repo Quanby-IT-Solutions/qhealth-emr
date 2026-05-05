@@ -5,10 +5,6 @@ import {
 	AppendWorkflowStatusSchema,
 	BottleneckQuerySchema,
 	BottleneckResponseSchema,
-	SlaDashboardQuerySchema,
-	SlaDashboardResponseSchema,
-	TurnaroundQuerySchema,
-	TurnaroundResponseSchema,
 	CreateSlaConfigSchema,
 	CreateSlaStepConfigSchema,
 	DeleteSlaConfigParamsSchema,
@@ -18,6 +14,8 @@ import {
 	SlaConfigSchema,
 	SlaConfigsQuerySchema,
 	SlaConfigsResponseSchema,
+	SlaDashboardQuerySchema,
+	SlaDashboardResponseSchema,
 	SlaEventsByEncounterParamsSchema,
 	SlaEventSchema,
 	SlaEventsQuerySchema,
@@ -27,6 +25,8 @@ import {
 	SlaStepConfigSchema,
 	SlaStepConfigsQuerySchema,
 	SlaStepConfigsResponseSchema,
+	TurnaroundQuerySchema,
+	TurnaroundResponseSchema,
 	UpdateSlaConfigParamsSchema,
 	UpdateSlaConfigSchema,
 	UpdateSlaStepConfigParamsSchema,
@@ -169,7 +169,8 @@ export const slaContract = {
 		.route({
 			method: "POST",
 			path: "/status-log",
-			summary: "Append a workflow status log entry (idempotent on encounterId+workflow+step+startedAt)",
+			summary:
+				"Append a workflow status log entry (idempotent on encounterId+workflow+step+startedAt)",
 			tags: ["SLA"],
 		})
 		.input(AppendWorkflowStatusSchema)

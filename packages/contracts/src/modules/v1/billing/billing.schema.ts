@@ -40,12 +40,7 @@ export const ChargeMasterCategoryEnum = z.enum([
 	"other",
 ])
 
-export const InvoiceStatusEnum = z.enum([
-	"draft",
-	"finalized",
-	"paid",
-	"partially_paid",
-])
+export const InvoiceStatusEnum = z.enum(["draft", "finalized", "paid", "partially_paid"])
 
 export const PaymentMethodEnum = z.enum([
 	"cash",
@@ -57,20 +52,9 @@ export const PaymentMethodEnum = z.enum([
 	"other",
 ])
 
-export const Cf4StatusEnum = z.enum([
-	"draft",
-	"submitted",
-	"approved",
-	"rejected",
-	"resubmitted",
-])
+export const Cf4StatusEnum = z.enum(["draft", "submitted", "approved", "rejected", "resubmitted"])
 
-export const EligibilityCheckStatusEnum = z.enum([
-	"pending",
-	"eligible",
-	"ineligible",
-	"error",
-])
+export const EligibilityCheckStatusEnum = z.enum(["pending", "eligible", "ineligible", "error"])
 
 // ============================================================================
 // Charge Master Items
@@ -291,14 +275,18 @@ export const Cf4PreviewSchema = z.object({
 		chiefComplaint: z.string().nullable(),
 		briefHistory: z.string().nullable(),
 		vitalSigns: z.record(z.string(), z.unknown()).nullable(),
-		diagnoses: z.array(z.object({
-			code: z.string(),
-			displayName: z.string(),
-		})),
-		procedures: z.array(z.object({
-			rvsCode: z.string().nullable(),
-			description: z.string(),
-		})),
+		diagnoses: z.array(
+			z.object({
+				code: z.string(),
+				displayName: z.string(),
+			})
+		),
+		procedures: z.array(
+			z.object({
+				rvsCode: z.string().nullable(),
+				description: z.string(),
+			})
+		),
 		managementPlan: z.string().nullable(),
 	}),
 	missingFields: z.array(z.string()),

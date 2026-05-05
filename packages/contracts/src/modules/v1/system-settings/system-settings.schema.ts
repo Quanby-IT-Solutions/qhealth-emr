@@ -89,7 +89,8 @@ export const UpdateSystemSettingsSchema = z.object({
 	autoFreezeChargesOnDischarge: z
 		.boolean()
 		.refine(v => v !== false, {
-			message: "TOR Flow 5: Automatic charge freeze on discharge is mandatory and cannot be disabled.",
+			message:
+				"TOR Flow 5: Automatic charge freeze on discharge is mandatory and cannot be disabled.",
 		})
 		.optional(),
 	// TOR §6: DPA consent before export is mandatory — reject false

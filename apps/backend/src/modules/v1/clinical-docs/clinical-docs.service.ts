@@ -24,9 +24,9 @@ import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
 import {
+	ChartAccessService,
 	type ChartAccessActor,
 	type ChartAccessRecord,
-	ChartAccessService,
 } from "@/modules/v1/audit/chart-access.service"
 
 type ListTemplatesInput = V1Inputs["clinicalDocs"]["listTemplates"]
@@ -100,12 +100,20 @@ export class ClinicalDocsService {
 		}
 	) {
 		if (input.encounterId) {
-			await this.chartAccessService.ensureEncounterChartReadAccess(actor, input.encounterId, input.record)
+			await this.chartAccessService.ensureEncounterChartReadAccess(
+				actor,
+				input.encounterId,
+				input.record
+			)
 			return
 		}
 
 		if (input.patientId) {
-			await this.chartAccessService.ensurePatientChartReadAccess(actor, input.patientId, input.record)
+			await this.chartAccessService.ensurePatientChartReadAccess(
+				actor,
+				input.patientId,
+				input.record
+			)
 		}
 	}
 
@@ -595,7 +603,9 @@ export class ClinicalDocsService {
 				? (d.vitalSigns as Record<string, unknown>)
 				: {}
 		const pd =
-			d.primaryDiagnosis && typeof d.primaryDiagnosis === "object" && !Array.isArray(d.primaryDiagnosis)
+			d.primaryDiagnosis &&
+			typeof d.primaryDiagnosis === "object" &&
+			!Array.isArray(d.primaryDiagnosis)
 				? (d.primaryDiagnosis as Record<string, unknown>)
 				: {}
 

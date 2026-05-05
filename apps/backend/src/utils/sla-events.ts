@@ -22,7 +22,7 @@ export async function closeOpenSlaStep(
 	client: DbClient,
 	encounterId: string,
 	workflowType: "opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing",
-	closedAt: Date = new Date(),
+	closedAt: Date = new Date()
 ): Promise<void> {
 	const [openStep] = await client
 		.select({ id: encounterStatusEvents.id, occurredAt: encounterStatusEvents.occurredAt })
@@ -31,8 +31,8 @@ export async function closeOpenSlaStep(
 			and(
 				eq(encounterStatusEvents.encounterId, encounterId),
 				eq(encounterStatusEvents.workflowType, workflowType),
-				isNull(encounterStatusEvents.actualMinutes),
-			),
+				isNull(encounterStatusEvents.actualMinutes)
+			)
 		)
 		.orderBy(desc(encounterStatusEvents.occurredAt))
 		.limit(1)
@@ -41,7 +41,7 @@ export async function closeOpenSlaStep(
 
 	const actualMinutes = Math.max(
 		1,
-		Math.ceil((closedAt.getTime() - openStep.occurredAt.getTime()) / 60_000),
+		Math.ceil((closedAt.getTime() - openStep.occurredAt.getTime()) / 60_000)
 	)
 
 	await client

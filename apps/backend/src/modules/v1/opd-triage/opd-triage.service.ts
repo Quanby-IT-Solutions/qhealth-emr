@@ -121,9 +121,7 @@ export class OpdTriageService {
 	}
 
 	async listPending(input: ListPendingTriageInput) {
-		const conditions = [
-			eq(opdTriageIntakes.facilityId, input.facilityId),
-		]
+		const conditions = [eq(opdTriageIntakes.facilityId, input.facilityId)]
 
 		if (input.status) {
 			conditions.push(eq(opdTriageIntakes.status, input.status))
@@ -199,7 +197,11 @@ export class OpdTriageService {
 	async linkToPatient(input: LinkOpdTriageToPatientInput) {
 		// Validate the triage intake exists and is still in pre-registration state
 		const [existing] = await db
-			.select({ id: opdTriageIntakes.id, patientId: opdTriageIntakes.patientId, status: opdTriageIntakes.status })
+			.select({
+				id: opdTriageIntakes.id,
+				patientId: opdTriageIntakes.patientId,
+				status: opdTriageIntakes.status,
+			})
 			.from(opdTriageIntakes)
 			.where(eq(opdTriageIntakes.id, input.id))
 

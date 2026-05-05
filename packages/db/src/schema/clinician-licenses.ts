@@ -19,11 +19,7 @@ export const clinicianLicenses = createTable(
 		issueDate: t.date("issue_date"),
 		expiryDate: t.date("expiry_date"),
 		documentUri: t.text("document_uri"),
-		status: t
-			.text("status")
-			.notNull()
-			.default("pending")
-			.$type<LicenseStatus>(),
+		status: t.text("status").notNull().default("pending").$type<LicenseStatus>(),
 		verificationProof: t.jsonb("verification_proof"),
 		verifiedAt: t.timestamp("verified_at", { withTimezone: true }),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),

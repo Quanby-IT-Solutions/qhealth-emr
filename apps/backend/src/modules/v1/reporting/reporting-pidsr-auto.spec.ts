@@ -43,11 +43,7 @@ jest.mock("@/common/database/database.client", () => ({
 
 // Proxy-based schema mock — every property resolves to its own name string
 jest.mock("@repo/db/schema", () => {
-	const proxy = () =>
-		new Proxy(
-			{},
-			{ get: (_t, p) => String(p) }
-		)
+	const proxy = () => new Proxy({}, { get: (_t, p) => String(p) })
 	return {
 		pidsrCases: proxy(),
 		integrations: proxy(),
@@ -210,7 +206,10 @@ describe("ReportingService — INTREG-013 auto-transmission & INTREG-014 sync wr
 
 			expect(result.status).toBe("submitted")
 			expect(global.fetch).toHaveBeenCalledTimes(1)
-			expect(global.fetch).toHaveBeenCalledWith(ENDPOINT_URL, expect.objectContaining({ method: "POST" }))
+			expect(global.fetch).toHaveBeenCalledWith(
+				ENDPOINT_URL,
+				expect.objectContaining({ method: "POST" })
+			)
 		})
 
 		it("returns status='failed' when integration exists but HTTP POST returns error status (INTREG-013)", async () => {
@@ -225,7 +224,9 @@ describe("ReportingService — INTREG-013 auto-transmission & INTREG-014 sync wr
 			const result = await service.generateWeeklyReport(weeklyInput)
 
 			expect(result.status).toBe("failed")
-			expect((result as { transmissionNote?: string }).transmissionNote).toMatch(/Transmission failed/)
+			expect((result as { transmissionNote?: string }).transmissionNote).toMatch(
+				/Transmission failed/
+			)
 		})
 
 		it("returns status='failed' when fetch throws a network error (INTREG-013)", async () => {
@@ -369,7 +370,9 @@ describe("ReportingService — INTREG-013 auto-transmission & INTREG-014 sync wr
 
 	describe("_autoTransmitPidsrCase (internal auto-transmission helper)", () => {
 		// Access the private method via type cast
-		type WithPrivate = { _autoTransmitPidsrCase: (caseId: string, facilityId: string) => Promise<void> }
+		type WithPrivate = {
+			_autoTransmitPidsrCase: (caseId: string, facilityId: string) => Promise<void>
+		}
 
 		it("returns early without calling fetch or db.update when no integration is configured (INTREG-013)", async () => {
 			mockDb.select.mockReturnValueOnce(selectTerminalAtLimit([]))

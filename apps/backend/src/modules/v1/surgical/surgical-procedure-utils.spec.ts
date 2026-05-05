@@ -15,10 +15,7 @@ describe("surgical-procedure-utils", () => {
 
 	it("resolves a suggested mapping label back to the canonical operative record label", () => {
 		expect(
-			resolveProcedureLabel(
-				"adhesiolysis",
-				"1. Laparoscopic cholecystectomy\n2. Adhesiolysis"
-			)
+			resolveProcedureLabel("adhesiolysis", "1. Laparoscopic cholecystectomy\n2. Adhesiolysis")
 		).toBe("Adhesiolysis")
 	})
 

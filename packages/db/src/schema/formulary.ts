@@ -54,9 +54,7 @@ export const formularyItems = createTable(
 			.uuid("drug_generic_id")
 			.notNull()
 			.references(() => drugGenerics.id, { onDelete: "restrict" }),
-		drugBrandId: t
-			.uuid("drug_brand_id")
-			.references(() => drugBrands.id, { onDelete: "set null" }),
+		drugBrandId: t.uuid("drug_brand_id").references(() => drugBrands.id, { onDelete: "set null" }),
 		doseForm: t.text("dose_form").notNull(),
 		strength: t.text("strength").notNull(),
 		route: t.text("route").notNull(),
@@ -122,10 +120,7 @@ export const rxnormCodes = createTable(
 		isActive: t.boolean("is_active").notNull().default(true),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
-	t => [
-		index("rxnorm_codes_rxcui_idx").on(t.rxcui),
-		index("rxnorm_codes_name_idx").on(t.name),
-	]
+	t => [index("rxnorm_codes_rxcui_idx").on(t.rxcui), index("rxnorm_codes_name_idx").on(t.name)]
 )
 
 export const rvsCodes = createTable(
@@ -150,10 +145,10 @@ export const snomedCtCodes = createTable(
 	"snomed_ct_codes",
 	t => ({
 		id: t.uuid("id").primaryKey().defaultRandom(),
-		conceptId: t.text("concept_id").notNull().unique(),   // SNOMED concept identifier (e.g. "73211009")
-		fsn: t.text("fsn").notNull(),                         // Fully Specified Name
-		preferredTerm: t.text("preferred_term").notNull(),    // Preferred display term
-		semanticTag: t.text("semantic_tag"),                  // Semantic type extracted from FSN brackets (e.g. "disorder", "finding")
+		conceptId: t.text("concept_id").notNull().unique(), // SNOMED concept identifier (e.g. "73211009")
+		fsn: t.text("fsn").notNull(), // Fully Specified Name
+		preferredTerm: t.text("preferred_term").notNull(), // Preferred display term
+		semanticTag: t.text("semantic_tag"), // Semantic type extracted from FSN brackets (e.g. "disorder", "finding")
 		isActive: t.boolean("is_active").notNull().default(true),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),

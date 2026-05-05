@@ -17,9 +17,7 @@ export const pidsrCases = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
 		patientId: t
 			.uuid("patient_id")
 			.notNull()
@@ -27,9 +25,7 @@ export const pidsrCases = createTable(
 		diseaseCode: t.text("disease_code").notNull(),
 		diseaseName: t.text("disease_name").notNull(),
 		// PIDSR Category: Category 1 = immediate (within 24 hrs), Category 2 = weekly
-		category: t
-			.text("category")
-			.$type<"category_1" | "category_2">(),
+		category: t.text("category").$type<"category_1" | "category_2">(),
 		caseClassification: t
 			.text("case_classification")
 			.notNull()
@@ -66,12 +62,8 @@ export const surveillanceFlags = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
-		noteId: t
-			.uuid("note_id")
-			.references(() => clinicalNotes.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
+		noteId: t.uuid("note_id").references(() => clinicalNotes.id, { onDelete: "set null" }),
 		flagType: t.text("flag_type").notNull(),
 		triggeredBy: t.text("triggered_by").notNull(),
 		triggerValue: t.text("trigger_value").notNull(),
@@ -138,7 +130,11 @@ export const fhirExports = createTable(
 			warnings?: Array<{ resourceType: string; resourceId: string; warning: string }>
 			summary?: Record<string, { total: number; valid: number; invalid: number }>
 		}>(),
-		exportFormat: t.text("export_format").notNull().default("ndjson").$type<"ndjson" | "json_bundle">(),
+		exportFormat: t
+			.text("export_format")
+			.notNull()
+			.default("ndjson")
+			.$type<"ndjson" | "json_bundle">(),
 		exportFileUrl: t.text("export_file_url"),
 		/** NDJSON or JSON bundle content stored in-database pending file-storage migration. */
 		bundleData: t.text("bundle_data"),

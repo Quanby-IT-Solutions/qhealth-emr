@@ -16,9 +16,7 @@ export const mswEvaluations = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
 		patientId: t
 			.uuid("patient_id")
 			.notNull()
@@ -46,11 +44,13 @@ export const mswEvaluations = createTable(
 			.text("coe_program")
 			.$type<"malasakit" | "pcso" | "dswd" | "philhealth_point_of_service" | "other">(),
 		malasakitAmount: t.numeric("malasakit_amount", { precision: 14, scale: 2 }),
-		malasakitSource: t.jsonb("malasakit_source").$type<Array<{
-			source: string
-			amount: number
-			referenceNumber?: string
-		}>>(),
+		malasakitSource: t.jsonb("malasakit_source").$type<
+			Array<{
+				source: string
+				amount: number
+				referenceNumber?: string
+			}>
+		>(),
 		konsultaTagged: t.boolean("konsulta_tagged").notNull().default(false),
 		zBenefitsTagged: t.boolean("z_benefits_tagged").notNull().default(false),
 		fourPsBeneficiary: t.boolean("4ps_beneficiary").notNull().default(false),

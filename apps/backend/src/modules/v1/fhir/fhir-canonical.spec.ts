@@ -25,8 +25,8 @@ import { Test } from "@nestjs/testing"
 
 import { db } from "@/common/database/database.client"
 
-import { FhirCanonicalValidatorService } from "./fhir-canonical-validator.service"
 import type { FhirBundle } from "./fhir-bundle-builder.service"
+import { FhirCanonicalValidatorService } from "./fhir-canonical-validator.service"
 
 // ---------------------------------------------------------------------------
 // DB mock
@@ -39,8 +39,7 @@ jest.mock("@/common/database/database.client", () => ({
 }))
 
 jest.mock("@repo/db/schema", () => {
-	const proxy = () =>
-		new Proxy({}, { get: (_t, p) => String(p) })
+	const proxy = () => new Proxy({}, { get: (_t, p) => String(p) })
 	return {
 		icd10Codes: proxy(),
 		loincCodes: proxy(),
@@ -119,9 +118,7 @@ function makeObservationBundle(loincCode: string): FhirBundle {
 					resourceType: "Observation",
 					id: "obs-1",
 					code: {
-						coding: [
-							{ system: "http://loinc.org", code: loincCode, display: "Test obs" },
-						],
+						coding: [{ system: "http://loinc.org", code: loincCode, display: "Test obs" }],
 					},
 				},
 			},
@@ -144,7 +141,11 @@ function makeMedicationRequestBundle(rxcui: string): FhirBundle {
 					id: "med-1",
 					medicationCodeableConcept: {
 						coding: [
-							{ system: "http://www.nlm.nih.gov/research/umls/rxnorm", code: rxcui, display: "Test med" },
+							{
+								system: "http://www.nlm.nih.gov/research/umls/rxnorm",
+								code: rxcui,
+								display: "Test med",
+							},
 						],
 					},
 				},
@@ -198,8 +199,8 @@ describe("FhirCanonicalValidatorService — canonical membership (FHIR-004)", ()
 		it("should pass when ICD-10 code is in the canonical table", async () => {
 			// Condition bundle → 2 DB calls: [icd10_result, snomed_result]
 			setupDbSequence(
-				[{ code: "J18.9" }],       // icd10 → canonical
-				[{ conceptId: "233604007" }], // snomed → canonical
+				[{ code: "J18.9" }], // icd10 → canonical
+				[{ conceptId: "233604007" }] // snomed → canonical
 			)
 			const bundle = makeConditionBundle("J18.9", "233604007")
 			const issues = await service.validateCanonical(bundle)
@@ -210,14 +211,12 @@ describe("FhirCanonicalValidatorService — canonical membership (FHIR-004)", ()
 		it("should error when ICD-10 code is NOT in the canonical table", async () => {
 			// icd10 lookup empty (not canonical), snomed present
 			setupDbSequence(
-				[],                           // icd10 → not found
-				[{ conceptId: "233604007" }], // snomed → canonical
+				[], // icd10 → not found
+				[{ conceptId: "233604007" }] // snomed → canonical
 			)
 			const bundle = makeConditionBundle("Z99.999", "233604007")
 			const issues = await service.validateCanonical(bundle)
-			const icd10Errors = issues.filter(
-				i => i.field.includes("icd-10") && i.severity === "error"
-			)
+			const icd10Errors = issues.filter(i => i.field.includes("icd-10") && i.severity === "error")
 			expect(icd10Errors).toHaveLength(1)
 			expect(icd10Errors[0]!.error).toContain("Z99.999")
 			expect(icd10Errors[0]!.error).toContain("canonical ICD-10")
@@ -226,8 +225,8 @@ describe("FhirCanonicalValidatorService — canonical membership (FHIR-004)", ()
 		it("should error when ICD-10 code exists but is inactive", async () => {
 			// WHERE clause includes isActive=true so inactive codes are not returned
 			setupDbSequence(
-				[],                           // icd10 → inactive, not returned
-				[{ conceptId: "233604007" }],
+				[], // icd10 → inactive, not returned
+				[{ conceptId: "233604007" }]
 			)
 			const bundle = makeConditionBundle("J18.9", "233604007")
 			const issues = await service.validateCanonical(bundle)
@@ -243,8 +242,8 @@ describe("FhirCanonicalValidatorService — canonical membership (FHIR-004)", ()
 		it("should pass when SNOMED CT concept is in the canonical table", async () => {
 			// Condition bundle → 2 DB calls: [icd10_result, snomed_result]
 			setupDbSequence(
-				[{ code: "J18.9" }],          // icd10 → canonical
-				[{ conceptId: "233604007" }], // snomed → canonical
+				[{ code: "J18.9" }], // icd10 → canonical
+				[{ conceptId: "233604007" }] // snomed → canonical
 			)
 			const bundle = makeConditionBundle("J18.9", "233604007")
 			const issues = await service.validateCanonical(bundle)
@@ -255,13 +254,11 @@ describe("FhirCanonicalValidatorService — canonical membership (FHIR-004)", ()
 		it("should error when SNOMED CT concept is NOT in the canonical table", async () => {
 			setupDbSequence(
 				[{ code: "J18.9" }], // icd10 → canonical
-				[],                  // snomed → not found
+				[] // snomed → not found
 			)
 			const bundle = makeConditionBundle("J18.9", "999999999999")
 			const issues = await service.validateCanonical(bundle)
-			const snomedErrors = issues.filter(
-				i => i.field.includes("snomed") && i.severity === "error"
-			)
+			const snomedErrors = issues.filter(i => i.field.includes("snomed") && i.severity === "error")
 			expect(snomedErrors).toHaveLength(1)
 			expect(snomedErrors[0]!.error).toContain("999999999999")
 			expect(snomedErrors[0]!.error).toContain("SNOMED CT")
@@ -284,9 +281,7 @@ describe("FhirCanonicalValidatorService — canonical membership (FHIR-004)", ()
 			setupDbSequence([]) // loinc lookup → empty
 			const bundle = makeObservationBundle("99999-9")
 			const issues = await service.validateCanonical(bundle)
-			const loincErrors = issues.filter(
-				i => i.field.includes("loinc") && i.severity === "error"
-			)
+			const loincErrors = issues.filter(i => i.field.includes("loinc") && i.severity === "error")
 			expect(loincErrors).toHaveLength(1)
 			expect(loincErrors[0]!.error).toContain("99999-9")
 			expect(loincErrors[0]!.error).toContain("canonical LOINC")
@@ -309,9 +304,7 @@ describe("FhirCanonicalValidatorService — canonical membership (FHIR-004)", ()
 			setupDbSequence([]) // rxnorm lookup → empty
 			const bundle = makeMedicationRequestBundle("9999999")
 			const issues = await service.validateCanonical(bundle)
-			const rxErrors = issues.filter(
-				i => i.field.includes("rxnorm") && i.severity === "error"
-			)
+			const rxErrors = issues.filter(i => i.field.includes("rxnorm") && i.severity === "error")
 			expect(rxErrors).toHaveLength(1)
 			expect(rxErrors[0]!.error).toContain("9999999")
 			expect(rxErrors[0]!.error).toContain("canonical RxNorm")
@@ -334,9 +327,7 @@ describe("FhirCanonicalValidatorService — canonical membership (FHIR-004)", ()
 			setupDbSequence([]) // rvs lookup → empty
 			const bundle = makeProcedureBundle("INVALID99")
 			const issues = await service.validateCanonical(bundle)
-			const rvsErrors = issues.filter(
-				i => i.field.includes("rvs") && i.severity === "error"
-			)
+			const rvsErrors = issues.filter(i => i.field.includes("rvs") && i.severity === "error")
 			expect(rvsErrors).toHaveLength(1)
 			expect(rvsErrors[0]!.error).toContain("INVALID99")
 			expect(rvsErrors[0]!.error).toContain("Philippine RVS")

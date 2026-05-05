@@ -35,17 +35,9 @@ export const auditLogs = createTable(
 		ipAddress: t.text("ip_address"),
 		userAgent: t.text("user_agent"),
 		metadata: t.jsonb("metadata"),
-		severity: t
-			.text("severity")
-			.notNull()
-			.default("info")
-			.$type<"info" | "warning" | "critical">(),
+		severity: t.text("severity").notNull().default("info").$type<"info" | "warning" | "critical">(),
 		sessionId: t.text("session_id"),
-		outcome: t
-			.text("outcome")
-			.notNull()
-			.default("success")
-			.$type<"success" | "failure">(),
+		outcome: t.text("outcome").notNull().default("success").$type<"success" | "failure">(),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [
@@ -114,7 +106,16 @@ export const notifications = createTable(
 		topic: t
 			.text("topic")
 			.notNull()
-			.$type<"pidsr" | "news" | "pharmacy" | "break_glass" | "system" | "ed_queue" | "sla_warning" | "sla_exceeded">(),
+			.$type<
+				| "pidsr"
+				| "news"
+				| "pharmacy"
+				| "break_glass"
+				| "system"
+				| "ed_queue"
+				| "sla_warning"
+				| "sla_exceeded"
+			>(),
 		title: t.text("title").notNull(),
 		body: t.text("body").notNull(),
 		data: t.jsonb("data"),
@@ -143,10 +144,7 @@ export const breakGlassReviews = createTable(
 			.uuid("reviewer_staff_id")
 			.notNull()
 			.references(() => staffProfiles.id, { onDelete: "restrict" }),
-		action: t
-			.text("action")
-			.notNull()
-			.$type<"approve" | "flag" | "note">(),
+		action: t.text("action").notNull().$type<"approve" | "flag" | "note">(),
 		reason: t.text("reason").notNull(),
 		decidedAt: t.timestamp("decided_at").notNull().defaultNow(),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
@@ -171,10 +169,7 @@ export const auditExports = createTable(
 		exporterStaffId: t
 			.uuid("exporter_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
-		exportFormat: t
-			.text("export_format")
-			.notNull()
-			.$type<"csv" | "pdf">(),
+		exportFormat: t.text("export_format").notNull().$type<"csv" | "pdf">(),
 		filterSnapshot: t.jsonb("filter_snapshot"),
 		contentHash: t.text("content_hash"),
 		exportedAt: t.timestamp("exported_at").notNull().defaultNow(),
@@ -207,14 +202,20 @@ export const dataExports = createTable(
 		entityType: t
 			.text("entity_type")
 			.notNull()
-			.$type<"patient_record" | "lab_result" | "imaging" | "encounter_summary" | "discharge_summary" | "billing" | "bulk_report">(),
+			.$type<
+				| "patient_record"
+				| "lab_result"
+				| "imaging"
+				| "encounter_summary"
+				| "discharge_summary"
+				| "billing"
+				| "bulk_report"
+			>(),
 		entityId: t.uuid("entity_id"),
-		destination: t.text("destination"),             // "philhealth", "nhdr", "psa", "local_download", etc.
+		destination: t.text("destination"), // "philhealth", "nhdr", "psa", "local_download", etc.
 		transmissionScope: t.text("transmission_scope"), // "individual" | "bulk"
 		consentGated: t.boolean("consent_gated").notNull().default(true),
-		consentOutcome: t
-			.text("consent_outcome")
-			.$type<"granted" | "denied" | "bypassed">(),
+		consentOutcome: t.text("consent_outcome").$type<"granted" | "denied" | "bypassed">(),
 		status: t
 			.text("status")
 			.notNull()

@@ -14,10 +14,7 @@ import {
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
-import {
-	type ChartAccessActor,
-	ChartAccessService,
-} from "@/modules/v1/audit/chart-access.service"
+import { ChartAccessService, type ChartAccessActor } from "@/modules/v1/audit/chart-access.service"
 
 type ListProblemsInput = V1Inputs["problemsAllergies"]["listProblems"]
 type CreateProblemInput = V1Inputs["problemsAllergies"]["createProblem"]

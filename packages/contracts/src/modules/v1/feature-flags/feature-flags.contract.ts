@@ -20,7 +20,9 @@ const FeatureFlagHistoryItemSchema = z.object({
 	previousValue: z.boolean().nullable(),
 	newValue: z.boolean(),
 	changedBy: z.string().uuid().nullable(),
-	changedAt: z.union([z.date(), z.string()]).transform(v => (typeof v === "string" ? new Date(v) : v)),
+	changedAt: z
+		.union([z.date(), z.string()])
+		.transform(v => (typeof v === "string" ? new Date(v) : v)),
 	reason: z.string().nullable(),
 })
 
@@ -134,10 +136,12 @@ export const featureFlagsContract = {
 			tags: ["Feature Flags"],
 		})
 		.input(FeatureFlagHistoryQuerySchema)
-		.output(z.object({
-			data: z.array(FeatureFlagHistoryItemSchema),
-			total: z.number().int(),
-			page: z.number().int(),
-			limit: z.number().int(),
-		})),
+		.output(
+			z.object({
+				data: z.array(FeatureFlagHistoryItemSchema),
+				total: z.number().int(),
+				page: z.number().int(),
+				limit: z.number().int(),
+			})
+		),
 }

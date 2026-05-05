@@ -1,7 +1,6 @@
-import { Module, forwardRef } from "@nestjs/common"
+import { forwardRef, Module } from "@nestjs/common"
 
 import { NotificationModule } from "../notifications/notification.module"
-
 import { AuditController } from "./audit.controller"
 import { AuditService } from "./audit.service"
 import { ChartAccessService } from "./chart-access.service"

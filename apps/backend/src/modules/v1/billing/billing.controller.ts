@@ -301,7 +301,10 @@ export class BillingController {
 	@Implement(billingContract.markReadyForInvoicing)
 	async markReadyForInvoicing(@Session() session: UserSession) {
 		return implement(billingContract.markReadyForInvoicing).handler(async ({ input }) => {
-			return this.billingService.markReadyForInvoicing({ ...input, staffId: session.user.id }) as never
+			return this.billingService.markReadyForInvoicing({
+				...input,
+				staffId: session.user.id,
+			}) as never
 		})
 	}
 
@@ -337,7 +340,10 @@ export class BillingController {
 	@Implement(billingContract.issueReceipt)
 	async issueReceipt(@Session() session: UserSession) {
 		return implement(billingContract.issueReceipt).handler(async ({ input }) => {
-			return this.billingService.issueReceipt({ paymentId: input.paymentId, staffId: session.user.id }) as never
+			return this.billingService.issueReceipt({
+				paymentId: input.paymentId,
+				staffId: session.user.id,
+			}) as never
 		})
 	}
 
@@ -349,7 +355,10 @@ export class BillingController {
 	@Implement(billingContract.recordMalasakitPayment)
 	async recordMalasakitPayment(@Session() session: UserSession) {
 		return implement(billingContract.recordMalasakitPayment).handler(async ({ input }) => {
-			return this.billingService.recordMalasakitPayment({ ...input, staffId: session.user.id }) as never
+			return this.billingService.recordMalasakitPayment({
+				...input,
+				staffId: session.user.id,
+			}) as never
 		})
 	}
 
