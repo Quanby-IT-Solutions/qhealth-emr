@@ -241,8 +241,14 @@ export const surgicalRvsAssignments = createTable(
 		rvsCodeId: t
 			.uuid("rvs_code_id")
 			.references((): AnyPgColumn => rvsCodes.id, { onDelete: "set null" }),
+		procedureLabel: t.text("procedure_label"),
 		rvsCode: t.text("rvs_code"),
 		rvsDescription: t.text("rvs_description"),
+		assignmentType: t
+			.text("assignment_type")
+			.notNull()
+			.default("primary")
+			.$type<"primary" | "adjunct">(),
 		modifier: t.text("modifier"),
 		units: t.integer("units").notNull().default(1),
 		suggestedByStaffId: t
@@ -269,6 +275,7 @@ export const surgicalRvsAssignments = createTable(
 		index("surgical_rvs_assignments_facility_id_idx").on(t.facilityId),
 		index("surgical_rvs_assignments_surgical_case_id_idx").on(t.surgicalCaseId),
 		index("surgical_rvs_assignments_operation_record_id_idx").on(t.operationRecordId),
+		index("surgical_rvs_assignments_procedure_label_idx").on(t.procedureLabel),
 		index("surgical_rvs_assignments_status_idx").on(t.status),
 	]
 )

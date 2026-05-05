@@ -14,6 +14,7 @@ import {
 	SaveAnesthesiaRecordSchema,
 	SaveOperationRecordSchema,
 	SavePreOpChecklistSchema,
+	SignOperationRecordSchema,
 	SuggestRvsCodeSchema,
 	SurgicalCaseListResponseSchema,
 	SurgicalCaseListSchema,
@@ -90,6 +91,16 @@ export const surgicalContract = {
 			tags: ["Surgical"],
 		})
 		.input(SaveOperationRecordSchema)
+		.output(OperationRecordSchema),
+
+	signOperationRecord: oc
+		.route({
+			method: "PUT",
+			path: "/cases/{caseId}/operation-record/sign",
+			summary: "Sign an operation record",
+			tags: ["Surgical"],
+		})
+		.input(SignOperationRecordSchema)
 		.output(OperationRecordSchema),
 
 	// ========================================================================

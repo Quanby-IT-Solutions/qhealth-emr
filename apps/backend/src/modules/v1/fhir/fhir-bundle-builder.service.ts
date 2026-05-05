@@ -927,6 +927,7 @@ export class FhirBundleBuilderService {
 				.select({
 					id: operationRecords.id,
 					encounterId: operationRecords.encounterId,
+					procedurePerformed: operationRecords.procedurePerformed,
 					procedureDescription: operationRecords.procedureDescription,
 					incisionTime: operationRecords.incisionTime,
 					closureTime: operationRecords.closureTime,
@@ -956,45 +957,85 @@ export class FhirBundleBuilderService {
 
 			// Batch-load RVS assignments for all operation records
 			const opIds = opRows.map(r => r.id)
-			const rvsMap = new Map<string, { rvsCode: string | null; rvsDescription: string | null }>()
+			const rvsMap = new Map<
+				string,
+				Array<{
+					rvsCode: string | null
+					rvsDescription: string | null
+					status: "suggested" | "validated" | "finalized"
+					assignmentType: "primary" | "adjunct"
+				}>
+			>()
 			if (opIds.length > 0) {
 				const rvsRows = await db
 					.select({
 						operationRecordId: surgicalRvsAssignments.operationRecordId,
 						rvsCode: surgicalRvsAssignments.rvsCode,
 						rvsDescription: surgicalRvsAssignments.rvsDescription,
+						assignmentType: surgicalRvsAssignments.assignmentType,
 						status: surgicalRvsAssignments.status,
 					})
 					.from(surgicalRvsAssignments)
-					.where(
-						and(
-							inArray(surgicalRvsAssignments.operationRecordId, opIds),
-							inArray(surgicalRvsAssignments.status, ["validated", "finalized"]),
-						),
-					)
-				// Keep the first validated/finalized RVS per operation record
+					.where(inArray(surgicalRvsAssignments.operationRecordId, opIds))
+
 				for (const r of rvsRows) {
-					if (!r.operationRecordId || rvsMap.has(r.operationRecordId)) {
+					if (!r.operationRecordId) {
 						continue
 					}
 
-					rvsMap.set(r.operationRecordId, { rvsCode: r.rvsCode, rvsDescription: r.rvsDescription })
+					const currentAssignments = rvsMap.get(r.operationRecordId) ?? []
+					currentAssignments.push({
+						rvsCode: r.rvsCode,
+						rvsDescription: r.rvsDescription,
+						status: r.status,
+						assignmentType: r.assignmentType,
+					})
+					rvsMap.set(r.operationRecordId, currentAssignments)
 				}
 			}
 
 			countByType["Procedure"] = opRows.length
 			for (const op of opRows) {
 				const patientId = op.encounterId ? (opEncPatientMap.get(op.encounterId) ?? "") : ""
-				const rvs = rvsMap.get(op.id)
+				const rvsAssignments =
+					(rvsMap.get(op.id) ?? [])
+						.slice()
+						.sort((left, right) => {
+							const statusOrder = { finalized: 0, validated: 1, suggested: 2 }
+							const assignmentTypeOrder = { primary: 0, adjunct: 1 }
+							return (
+								statusOrder[left.status] - statusOrder[right.status] ||
+								assignmentTypeOrder[left.assignmentType] - assignmentTypeOrder[right.assignmentType]
+							)
+						})
+				const codings: FhirCoding[] = []
+				const seenCodingKeys = new Set<string>()
+				for (const assignment of rvsAssignments) {
+					if (!assignment.rvsCode) {
+						continue
+					}
+
+					const codingKey = `${assignment.rvsCode}|${assignment.rvsDescription ?? ""}`
+					if (seenCodingKeys.has(codingKey)) {
+						continue
+					}
+
+					seenCodingKeys.add(codingKey)
+					codings.push({
+						system: "https://www.philhealth.gov.ph/rvs",
+						code: assignment.rvsCode,
+						display: assignment.rvsDescription ?? undefined,
+					})
+				}
 				const proc: FhirProcedure = {
 					resourceType: "Procedure",
 					id: op.id,
 					status: mapOperationRecordStatus(op.status),
 					code: {
-						coding: rvs?.rvsCode
-							? [{ system: "https://www.philhealth.gov.ph/rvs", code: rvs.rvsCode, display: rvs.rvsDescription ?? undefined }]
-							: [],
-						...(op.procedureDescription ? { text: op.procedureDescription } : {}),
+						coding: codings,
+						...(op.procedureDescription || op.procedurePerformed
+							? { text: op.procedureDescription ?? op.procedurePerformed ?? undefined }
+							: {}),
 					},
 					subject: ref("Patient", patientId),
 					...(op.encounterId ? { encounter: ref("Encounter", op.encounterId) } : {}),

@@ -1,4 +1,11 @@
-import { Injectable, InternalServerErrorException, Logger, NotFoundException } from "@nestjs/common"
+import {
+	BadRequestException,
+	ForbiddenException,
+	Injectable,
+	InternalServerErrorException,
+	Logger,
+	NotFoundException,
+} from "@nestjs/common"
 import { and, count, desc, eq, gte, ilike, lt, or, sql } from "drizzle-orm"
 import type { UserSession } from "@thallesp/nestjs-better-auth"
 
@@ -17,10 +24,16 @@ import {
 import { db } from "@/common/database/database.client"
 import type { V1Inputs, V1Outputs } from "@/config/contract-types"
 
+import {
+	detectProcedureLabels,
+	resolveProcedureLabel,
+} from "./surgical-procedure-utils"
+
 type ListCasesInput = V1Inputs["surgical"]["listCases"]
 type CreateCaseInput = V1Inputs["surgical"]["createCase"]
 type UpdateCaseInput = V1Inputs["surgical"]["updateCase"]
 type SaveOperationRecordInput = V1Inputs["surgical"]["saveOperationRecord"]
+type SignOperationRecordInput = V1Inputs["surgical"]["signOperationRecord"]
 type SaveAnesthesiaRecordInput = V1Inputs["surgical"]["saveAnesthesiaRecord"]
 type SavePreOpChecklistInput = V1Inputs["surgical"]["savePreOpChecklist"]
 type SearchRvsCodesInput = V1Inputs["surgical"]["searchRvsCodes"]
@@ -32,6 +45,11 @@ type SurgicalCaseOutput = V1Outputs["surgical"]["getCase"]
 type SurgicalCaseListOutput = V1Outputs["surgical"]["listCases"]
 type SurgicalStatus = SurgicalCaseOutput["status"]
 type AsaClass = SurgicalCaseOutput["asaClass"]
+type BillingPermissionContext = {
+	staffProfileId: string | null
+	canEditBilling: boolean
+	canSignBilling: boolean
+}
 
 @Injectable()
 export class SurgicalService {
@@ -137,12 +155,72 @@ export class SurgicalService {
 		return staff ?? null
 	}
 
+	private async getOperationRecordRow(caseId: string) {
+		const [record] = await db
+			.select()
+			.from(operationRecords)
+			.where(eq(operationRecords.surgicalCaseId, caseId))
+			.limit(1)
+
+		return record ?? null
+	}
+
+	private async getStaffName(staffId: string | null | undefined) {
+		if (!staffId) return null
+
+		const [staff] = await db
+			.select({ name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.where(eq(staffProfiles.id, staffId))
+			.limit(1)
+
+		return staff?.name ?? null
+	}
+
+	private async requireSignedOperationRecord(caseId: string) {
+		const record = await this.getOperationRecordRow(caseId)
+		if (!record || record.status !== "signed") {
+			throw new BadRequestException(
+				"Operation record must be signed before RVS codes can be assigned or updated."
+			)
+		}
+
+		return record
+	}
+
+	private getOperationRecordSignOffGaps(record: Awaited<ReturnType<typeof this.getOperationRecordRow>>) {
+		if (!record) {
+			return ["operation record"]
+		}
+
+		const missingFields: string[] = []
+
+		if (!record.preOpDiagnosis?.trim()) missingFields.push("pre-operative diagnosis")
+		if (!record.procedurePerformed?.trim()) missingFields.push("procedure performed")
+		if (!record.procedureDescription?.trim()) missingFields.push("procedure narrative")
+		if (!record.operativeTechnique?.trim()) missingFields.push("operative technique")
+		if (!record.incisionTime) missingFields.push("incision time")
+		if (!record.closureTime) missingFields.push("closure time")
+		if (!record.scrubNurseStaffId) missingFields.push("scrub nurse")
+		if (!record.circulatingNurseStaffId) missingFields.push("circulating nurse")
+		if (!record.anesthesiologistStaffId) missingFields.push("anesthesiologist")
+
+		if (record.incisionTime && record.closureTime && record.closureTime < record.incisionTime) {
+			missingFields.push("closure time after incision time")
+		}
+
+		return missingFields
+	}
+
 	private mapRvsRow(row: {
 		id: string
 		surgicalCaseId: string | null
 		rvsCodeId: string | null
+		procedureLabel: string | null
 		code: string | null
 		description: string | null
+		assignmentType: "primary" | "adjunct"
 		status: "suggested" | "validated" | "finalized"
 		suggestedByName: string | null
 		validatedByName: string | null
@@ -158,8 +236,10 @@ export class SurgicalService {
 			id: row.id,
 			surgicalCaseId: row.surgicalCaseId ?? caseId,
 			rvsCodeId: row.rvsCodeId ?? "",
+			procedureLabel: row.procedureLabel ?? null,
 			code: row.code ?? "",
 			description: row.description ?? "",
+			assignmentType: row.assignmentType,
 			status: row.status,
 			suggestedByName: row.suggestedByName ?? null,
 			validatedByName: row.validatedByName ?? null,
@@ -335,20 +415,19 @@ export class SurgicalService {
 	async getOperationRecord(caseId: string) {
 		this.logger.debug(`Getting operation record for case: ${caseId}`)
 
-		const [record] = await db
-			.select()
-			.from(operationRecords)
-			.where(eq(operationRecords.surgicalCaseId, caseId))
-			.limit(1)
+		const record = await this.getOperationRecordRow(caseId)
 
 		if (!record) return null
+
+		const signedByName = await this.getStaffName(record.signedByStaffId)
 
 		return {
 			id: record.id,
 			surgicalCaseId: caseId,
-			preOpDiagnosis: record.preOpDiagnosis ?? record.procedureDescription ?? "",
+			preOpDiagnosis: record.preOpDiagnosis ?? "",
 			postOpDiagnosis: record.postOpDiagnosis ?? null,
 			procedurePerformed: record.procedurePerformed ?? record.procedureDescription ?? "",
+			procedureDescription: record.procedureDescription ?? record.procedurePerformed ?? null,
 			operativeTechnique: record.operativeTechnique ?? null,
 			findings: record.findings ?? null,
 			specimens: record.specimens ?? null,
@@ -362,9 +441,14 @@ export class SurgicalService {
 			secondAssistantStaffId: record.secondAssistantStaffId ?? null,
 			scrubNurseStaffId: record.scrubNurseStaffId ?? null,
 			circulatingNurseStaffId: record.circulatingNurseStaffId ?? null,
+			anesthesiologistStaffId: record.anesthesiologistStaffId ?? null,
 			instrumentCountCorrect: record.instrumentCountCorrect,
 			swabCountCorrect: record.swabCountCorrect,
 			complications: record.complications ?? null,
+			status: record.status,
+			signedAt: record.signedAt?.toISOString() ?? null,
+			signedByStaffId: record.signedByStaffId ?? null,
+			signedByName,
 			createdAt: record.createdAt,
 			updatedAt: record.updatedAt,
 		}
@@ -375,12 +459,21 @@ export class SurgicalService {
 		void session
 
 		const [surgCase] = await db
-			.select({ facilityId: surgicalCases.facilityId, encounterId: surgicalCases.encounterId })
+			.select({
+				facilityId: surgicalCases.facilityId,
+				encounterId: surgicalCases.encounterId,
+				anesthesiologistStaffId: surgicalCases.anesthesiologistStaffId,
+			})
 			.from(surgicalCases)
 			.where(eq(surgicalCases.id, input.caseId))
 			.limit(1)
 
 		if (!surgCase) throw new NotFoundException(`Surgical case ${input.caseId} not found`)
+
+		const existing = await this.getOperationRecordRow(input.caseId)
+		if (existing?.status === "signed") {
+			throw new BadRequestException("Signed operation records cannot be edited.")
+		}
 
 		const values = {
 			facilityId: surgCase.facilityId,
@@ -389,7 +482,10 @@ export class SurgicalService {
 			preOpDiagnosis: input.preOpDiagnosis,
 			postOpDiagnosis: input.postOpDiagnosis ?? null,
 			procedurePerformed: input.procedurePerformed,
-			procedureDescription: input.procedurePerformed,
+			procedureDescription:
+				input.procedureDescription !== undefined
+					? input.procedureDescription || null
+					: (existing?.procedureDescription ?? null),
 			operativeTechnique: input.operativeTechnique ?? null,
 			findings: input.findings ?? null,
 			specimens: input.specimens ?? null,
@@ -403,17 +499,17 @@ export class SurgicalService {
 			secondAssistantStaffId: input.secondAssistantStaffId ?? null,
 			scrubNurseStaffId: input.scrubNurseStaffId ?? null,
 			circulatingNurseStaffId: input.circulatingNurseStaffId ?? null,
+			anesthesiologistStaffId:
+				input.anesthesiologistStaffId !== undefined
+					? input.anesthesiologistStaffId
+					: (existing?.anesthesiologistStaffId ??
+						surgCase.anesthesiologistStaffId ??
+						null),
 			instrumentCountCorrect: input.instrumentCountCorrect,
 			swabCountCorrect: input.swabCountCorrect,
 			complications: input.complications ?? null,
 			updatedAt: new Date(),
 		}
-
-		const [existing] = await db
-			.select({ id: operationRecords.id })
-			.from(operationRecords)
-			.where(eq(operationRecords.surgicalCaseId, input.caseId))
-			.limit(1)
 
 		if (existing) {
 			await db.update(operationRecords).set(values).where(eq(operationRecords.id, existing.id))
@@ -424,6 +520,48 @@ export class SurgicalService {
 		const record = await this.getOperationRecord(input.caseId)
 
 		return this.requireSavedRecord(record, `Operation record for case ${input.caseId} was not found after save`)
+	}
+
+	async signOperationRecord(input: SignOperationRecordInput, signedByStaffId: string | null) {
+		this.logger.log(`Signing operation record for case: ${input.caseId}`)
+
+		if (!signedByStaffId) {
+			throw new ForbiddenException("Active staff profile not found.")
+		}
+
+		const record = await this.getOperationRecordRow(input.caseId)
+		if (!record) {
+			throw new NotFoundException(`Operation record for case ${input.caseId} not found`)
+		}
+		if (record.status === "signed") {
+			throw new BadRequestException("Operation record is already signed.")
+		}
+		const signOffGaps = this.getOperationRecordSignOffGaps(record)
+		if (signOffGaps.length > 0) {
+			throw new BadRequestException(
+				`Operation record is incomplete. Add: ${signOffGaps.join(", ")}.`
+			)
+		}
+		if (record.surgeonStaffId !== signedByStaffId) {
+			throw new ForbiddenException("Only the assigned surgeon can sign this operation record.")
+		}
+
+		const signedAt = new Date()
+		await db
+			.update(operationRecords)
+			.set({
+				status: "signed",
+				signedAt,
+				signedByStaffId,
+				updatedAt: signedAt,
+			})
+			.where(eq(operationRecords.id, record.id))
+
+		const savedRecord = await this.getOperationRecord(input.caseId)
+		return this.requireSavedRecord(
+			savedRecord,
+			`Operation record for case ${input.caseId} was not found after signing`
+		)
 	}
 
 	// ========================================================================
@@ -680,8 +818,10 @@ export class SurgicalService {
 				id: surgicalRvsAssignments.id,
 				surgicalCaseId: surgicalRvsAssignments.surgicalCaseId,
 				rvsCodeId: surgicalRvsAssignments.rvsCodeId,
+				procedureLabel: surgicalRvsAssignments.procedureLabel,
 				code: surgicalRvsAssignments.rvsCode,
 				description: surgicalRvsAssignments.rvsDescription,
+				assignmentType: surgicalRvsAssignments.assignmentType,
 				status: surgicalRvsAssignments.status,
 				suggestedByName: suggestedBySq.name,
 				validatedByName: validatedBySq.name,
@@ -709,8 +849,10 @@ export class SurgicalService {
 				id: surgicalRvsAssignments.id,
 				surgicalCaseId: surgicalRvsAssignments.surgicalCaseId,
 				rvsCodeId: surgicalRvsAssignments.rvsCodeId,
+				procedureLabel: surgicalRvsAssignments.procedureLabel,
 				code: surgicalRvsAssignments.rvsCode,
 				description: surgicalRvsAssignments.rvsDescription,
+				assignmentType: surgicalRvsAssignments.assignmentType,
 				status: surgicalRvsAssignments.status,
 				suggestedByName: suggestedBySq.name,
 				validatedByName: validatedBySq.name,
@@ -726,10 +868,19 @@ export class SurgicalService {
 			.leftJoin(suggestedBySq, eq(surgicalRvsAssignments.suggestedByStaffId, suggestedBySq.id))
 			.leftJoin(validatedBySq, eq(surgicalRvsAssignments.validatedByStaffId, validatedBySq.id))
 			.leftJoin(finalizedBySq, eq(surgicalRvsAssignments.finalizedByStaffId, finalizedBySq.id))
-			.where(eq(surgicalRvsAssignments.id, assignmentId))
+			.where(
+				and(
+					eq(surgicalRvsAssignments.id, assignmentId),
+					eq(surgicalRvsAssignments.surgicalCaseId, caseId)
+				)
+			)
 			.limit(1)
 
-		if (!row) throw new NotFoundException(`RVS assignment ${assignmentId} not found`)
+		if (!row) {
+			throw new NotFoundException(
+				`RVS assignment ${assignmentId} not found for surgical case ${caseId}`
+			)
+		}
 		return this.mapRvsRow(row, caseId)
 	}
 
@@ -740,8 +891,46 @@ export class SurgicalService {
 		return rows.map(r => this.mapRvsRow(r, caseId))
 	}
 
-	async suggestRvsCode(input: SuggestRvsCodeInput, session: UserSession) {
+	async suggestRvsCode(input: SuggestRvsCodeInput, suggestedByStaffId: string | null) {
 		this.logger.log(`Suggesting RVS code for case: ${input.caseId}`)
+
+		const operationRecord = await this.requireSignedOperationRecord(input.caseId)
+		const availableProcedures = detectProcedureLabels(operationRecord.procedurePerformed)
+		const resolvedProcedureLabel = resolveProcedureLabel(
+			input.procedureLabel,
+			operationRecord.procedurePerformed
+		)
+		if (!resolvedProcedureLabel) {
+			const availableLabelText =
+				availableProcedures.length > 0
+					? ` Available procedures: ${availableProcedures.join(", ")}.`
+					: ""
+			throw new BadRequestException(
+				`Procedure mapping target is invalid.${availableLabelText}`
+			)
+		}
+
+		if (input.assignmentType === "primary") {
+			const existingAssignments = await this.queryRvsAssignments(input.caseId)
+			const hasPrimaryForProcedure = existingAssignments.some(
+				assignment =>
+					assignment.assignmentType === "primary" &&
+					(
+						(assignment.procedureLabel &&
+							resolveProcedureLabel(
+								assignment.procedureLabel,
+								operationRecord.procedurePerformed
+							) === resolvedProcedureLabel) ||
+						(!assignment.procedureLabel &&
+							availableProcedures.length === 1)
+					)
+			)
+			if (hasPrimaryForProcedure) {
+				throw new BadRequestException(
+					`A primary RVS code is already mapped to ${resolvedProcedureLabel}. Remove it before assigning a new primary code.`
+				)
+			}
+		}
 
 		const [rvsCode] = await db
 			.select({ rvsCode: rvsCodes.rvsCode, procedureName: rvsCodes.procedureName })
@@ -757,19 +946,20 @@ export class SurgicalService {
 
 		if (!surgCase) throw new NotFoundException(`Surgical case ${input.caseId} not found`)
 
-		const sessionStaff = await this.resolveStaffProfile(session.user.id)
-
 		const [inserted] = await db
 			.insert(surgicalRvsAssignments)
 			.values({
 				facilityId: surgCase.facilityId,
 				surgicalCaseId: input.caseId,
+				operationRecordId: operationRecord.id,
 				rvsCodeId: input.rvsCodeId,
+				procedureLabel: resolvedProcedureLabel,
 				rvsCode: rvsCode?.rvsCode ?? null,
 				rvsDescription: rvsCode?.procedureName ?? null,
+				assignmentType: input.assignmentType ?? "primary",
 				modifier: input.modifier ?? null,
 				units: input.units ?? 1,
-				suggestedByStaffId: sessionStaff?.id ?? null,
+				suggestedByStaffId,
 				status: "suggested",
 				suggestedAt: new Date(),
 			})
@@ -778,24 +968,39 @@ export class SurgicalService {
 		return this.queryRvsAssignmentById(inserted!.id, input.caseId)
 	}
 
-	async updateRvsStatus(input: UpdateRvsStatusInput, session: UserSession) {
+	async updateRvsStatus(input: UpdateRvsStatusInput, permissions: BillingPermissionContext) {
 		this.logger.log(`Updating RVS status: ${input.assignmentId} -> ${input.status}`)
 
-		const sessionStaff = await this.resolveStaffProfile(session.user.id)
+		await this.requireSignedOperationRecord(input.caseId)
+		await this.queryRvsAssignmentById(input.assignmentId, input.caseId)
+
+		if (input.status === "validated" && !(permissions.canEditBilling || permissions.canSignBilling)) {
+			throw new ForbiddenException("Billing edit or billing sign permission is required to validate RVS codes.")
+		}
+		if (input.status === "finalized" && !permissions.canSignBilling) {
+			throw new ForbiddenException("Billing sign permission is required to finalize RVS codes.")
+		}
+
+		const actorStaffId = permissions.staffProfileId
 
 		await db
 			.update(surgicalRvsAssignments)
 			.set({
 				status: input.status,
 				...(input.status === "validated" || input.status === "finalized"
-					? { validatedAt: new Date(), validatedByStaffId: sessionStaff?.id ?? null }
+					? { validatedAt: new Date(), validatedByStaffId: actorStaffId }
 					: {}),
 				...(input.status === "finalized"
-					? { finalizedAt: new Date(), finalizedByStaffId: sessionStaff?.id ?? null }
+					? { finalizedAt: new Date(), finalizedByStaffId: actorStaffId }
 					: {}),
 				updatedAt: new Date(),
 			})
-			.where(eq(surgicalRvsAssignments.id, input.assignmentId))
+			.where(
+				and(
+					eq(surgicalRvsAssignments.id, input.assignmentId),
+					eq(surgicalRvsAssignments.surgicalCaseId, input.caseId)
+				)
+			)
 
 		return this.queryRvsAssignmentById(input.assignmentId, input.caseId)
 	}
@@ -803,9 +1008,17 @@ export class SurgicalService {
 	async removeRvsAssignment(input: RemoveRvsAssignmentInput) {
 		this.logger.log(`Removing RVS assignment: ${input.assignmentId}`)
 
+		await this.requireSignedOperationRecord(input.caseId)
+		await this.queryRvsAssignmentById(input.assignmentId, input.caseId)
+
 		await db
 			.delete(surgicalRvsAssignments)
-			.where(eq(surgicalRvsAssignments.id, input.assignmentId))
+			.where(
+				and(
+					eq(surgicalRvsAssignments.id, input.assignmentId),
+					eq(surgicalRvsAssignments.surgicalCaseId, input.caseId)
+				)
+			)
 
 		return { success: true }
 	}
