@@ -3,7 +3,18 @@ import { index, uniqueIndex } from "drizzle-orm/pg-core"
 import { createTable } from "../utils/table.js"
 import { facilities } from "./rbac.js"
 
-export type IntegrationKind = "fhir" | "civil_registry" | "hai" | "philhealth" | "erp" | "lis" | "pacs" | "telemedicine" | "nhdr" | "pidsr" | "custom"
+export type IntegrationKind =
+	| "fhir"
+	| "civil_registry"
+	| "hai"
+	| "philhealth"
+	| "erp"
+	| "lis"
+	| "pacs"
+	| "telemedicine"
+	| "nhdr"
+	| "pidsr"
+	| "custom"
 export type SyncStatus = "ok" | "error"
 export type TestReadinessLevel = "activation" | "transport" | "none"
 
@@ -17,10 +28,7 @@ export const integrations = createTable(
 			.references(() => facilities.id, { onDelete: "cascade" }),
 
 		// Fixed set of integration kinds
-		kind: t
-			.text("kind")
-			.notNull()
-			.$type<IntegrationKind>(),
+		kind: t.text("kind").notNull().$type<IntegrationKind>(),
 
 		name: t.text("name").notNull(),
 		endpointUrl: t.text("endpoint_url").notNull(),
@@ -95,9 +103,7 @@ export const webhookEndpoints = createTable(
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 	}),
-	t => [
-		index("webhook_endpoints_integration_id_idx").on(t.integrationId),
-	]
+	t => [index("webhook_endpoints_integration_id_idx").on(t.integrationId)]
 )
 
 export type WebhookEndpointRow = typeof webhookEndpoints.$inferSelect
@@ -117,7 +123,5 @@ export const integrationApiKeys = createTable(
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		revokedAt: t.timestamp("revoked_at"),
 	}),
-	t => [
-		index("integration_api_keys_integration_id_idx").on(t.integrationId),
-	]
+	t => [index("integration_api_keys_integration_id_idx").on(t.integrationId)]
 )

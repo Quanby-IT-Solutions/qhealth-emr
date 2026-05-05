@@ -84,7 +84,7 @@ describe("FhirValidatorService — Condition terminology (TOR §4.1)", () => {
 		})
 		const result = validator.validate(bundle)
 		const snomedErrors = result.errors.filter(
-			e => e.resourceType === "Condition" && e.error.includes("SNOMED CT"),
+			e => e.resourceType === "Condition" && e.error.includes("SNOMED CT")
 		)
 		expect(snomedErrors.length).toBeGreaterThanOrEqual(1)
 		expect(result.isValid).toBe(false)
@@ -101,7 +101,7 @@ describe("FhirValidatorService — Condition terminology (TOR §4.1)", () => {
 		})
 		const result = validator.validate(bundle)
 		const icd10Errors = result.errors.filter(
-			e => e.resourceType === "Condition" && e.error.includes("ICD-10"),
+			e => e.resourceType === "Condition" && e.error.includes("ICD-10")
 		)
 		expect(icd10Errors.length).toBeGreaterThanOrEqual(1)
 		expect(result.isValid).toBe(false)
@@ -131,7 +131,7 @@ describe("FhirValidatorService — Condition terminology (TOR §4.1)", () => {
 		})
 		const result = validator.validate(bundle)
 		const formatErrors = result.errors.filter(
-			e => e.resourceType === "Condition" && e.error.includes("SNOMED CT concept ID"),
+			e => e.resourceType === "Condition" && e.error.includes("SNOMED CT concept ID")
 		)
 		expect(formatErrors.length).toBeGreaterThanOrEqual(1)
 	})
@@ -141,7 +141,11 @@ describe("FhirValidatorService — Condition terminology (TOR §4.1)", () => {
 			code: {
 				coding: [
 					{ system: "http://hl7.org/fhir/sid/icd-10", code: "A00.1" },
-					{ system: "http://snomed.info/sct", code: "111307005", display: "Cholera due to Vibrio cholerae 01, biovar El Tor" },
+					{
+						system: "http://snomed.info/sct",
+						code: "111307005",
+						display: "Cholera due to Vibrio cholerae 01, biovar El Tor",
+					},
 				],
 				text: "Cholera",
 			},
@@ -169,7 +173,11 @@ describe("FhirBundleBuilderService — Condition coding structure", () => {
 		const icd10Code = "J18.9"
 		const icd10Display = "Pneumonia"
 		if (icd10Code) {
-			codings.push({ system: "http://hl7.org/fhir/sid/icd-10", code: icd10Code, display: icd10Display })
+			codings.push({
+				system: "http://hl7.org/fhir/sid/icd-10",
+				code: icd10Code,
+				display: icd10Display,
+			})
 		}
 		const snomedCode: string | null = null
 		if (snomedCode) {
@@ -186,7 +194,11 @@ describe("FhirBundleBuilderService — Condition coding structure", () => {
 		const snomedCode = "233604007"
 		const snomedDisplay = "Pneumonia (disorder)"
 		if (icd10Code) {
-			codings.push({ system: "http://hl7.org/fhir/sid/icd-10", code: icd10Code, display: icd10Display })
+			codings.push({
+				system: "http://hl7.org/fhir/sid/icd-10",
+				code: icd10Code,
+				display: icd10Display,
+			})
 		}
 		if (snomedCode) {
 			codings.push({ system: "http://snomed.info/sct", code: snomedCode, display: snomedDisplay })
@@ -200,8 +212,14 @@ describe("FhirBundleBuilderService — Condition coding structure", () => {
 		const codings: Array<{ system: string; code: string; display: string | undefined }> = []
 		const icd10Code: string | null = null
 		const snomedCode: string | null = null
-		if (icd10Code) codings.push({ system: "http://hl7.org/fhir/sid/icd-10", code: icd10Code, display: undefined })
-		if (snomedCode) codings.push({ system: "http://snomed.info/sct", code: snomedCode, display: undefined })
+		if (icd10Code)
+			codings.push({
+				system: "http://hl7.org/fhir/sid/icd-10",
+				code: icd10Code,
+				display: undefined,
+			})
+		if (snomedCode)
+			codings.push({ system: "http://snomed.info/sct", code: snomedCode, display: undefined })
 		expect(codings).toHaveLength(0)
 	})
 

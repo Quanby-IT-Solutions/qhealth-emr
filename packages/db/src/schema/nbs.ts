@@ -17,9 +17,7 @@ export const nbsLogEntries = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
 		patientId: t
 			.uuid("patient_id")
 			.notNull()

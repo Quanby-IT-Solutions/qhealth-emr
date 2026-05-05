@@ -1,18 +1,25 @@
 import { defineRelations } from "drizzle-orm"
 
-import { accounts, sessions, twoFactors, users, verifications } from "./auth.js"
 import { auditLogs, breakGlassEvents, notifications } from "./audit.js"
+import { accounts, sessions, twoFactors, users, verifications } from "./auth.js"
 import {
-	charges,
-	chargeMasterItems,
 	cf4Claims,
 	cf5Claims,
+	chargeMasterItems,
+	charges,
 	eligibilityChecks,
 	invoiceLineItems,
 	invoices,
 	payments,
 } from "./billing.js"
-import { allergies, clinicalNotes, consentRecords, noteAddenda, noteTemplates, problems } from "./clinical.js"
+import {
+	allergies,
+	clinicalNotes,
+	consentRecords,
+	noteAddenda,
+	noteTemplates,
+	problems,
+} from "./clinical.js"
 import {
 	bedCensusSnapshots,
 	beds,
@@ -24,12 +31,34 @@ import {
 	wards,
 } from "./core.js"
 import { deathReports } from "./death-reporting.js"
-import { drugBrands, drugGenerics, formularyItems, icd10Codes, loincCodes, rxnormCodes, rvsCodes } from "./formulary.js"
+import {
+	drugBrands,
+	drugGenerics,
+	formularyItems,
+	icd10Codes,
+	loincCodes,
+	rvsCodes,
+	rxnormCodes,
+} from "./formulary.js"
 import { mswEvaluations } from "./msw.js"
 import { nbsLogEntries } from "./nbs.js"
-import { flowsheetEntries, haiTags, ioEntries, marEntries, shiftHandoffs, tarEntries, vitalSigns } from "./nursing.js"
+import {
+	flowsheetEntries,
+	haiTags,
+	ioEntries,
+	marEntries,
+	shiftHandoffs,
+	tarEntries,
+	vitalSigns,
+} from "./nursing.js"
 import { nutritionAssessments } from "./nutrition.js"
-import { imagingOrders, labOrders, medicationOrders, orderVerifications, prescriptions } from "./orders.js"
+import {
+	imagingOrders,
+	labOrders,
+	medicationOrders,
+	orderVerifications,
+	prescriptions,
+} from "./orders.js"
 import { facilities, rolePermissions, roles, staffProfiles, userRoles } from "./rbac.js"
 import { ahsrSnapshots, fhirExports, pidsrCases, surveillanceFlags } from "./reporting.js"
 import { appointments, clinicTemplates } from "./scheduling.js"

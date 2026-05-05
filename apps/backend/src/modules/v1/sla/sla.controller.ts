@@ -134,7 +134,7 @@ export class SlaController {
 	// SLA Analytics (ADM-BE-10)
 	// ========================================================================
 
-	@RequirePermission('admin', 'view')
+	@RequirePermission("admin", "view")
 	@Implement(v1.sla.dashboard)
 	async slaDashboard() {
 		return implement(v1.sla.dashboard).handler(async ({ input }) => {
@@ -142,7 +142,7 @@ export class SlaController {
 		})
 	}
 
-	@RequirePermission('admin', 'view')
+	@RequirePermission("admin", "view")
 	@Implement(v1.sla.turnaround)
 	async slaTurnaround() {
 		return implement(v1.sla.turnaround).handler(async ({ input }) => {
@@ -150,7 +150,7 @@ export class SlaController {
 		})
 	}
 
-	@RequirePermission('admin', 'view')
+	@RequirePermission("admin", "view")
 	@Implement(v1.sla.bottleneck)
 	async slaBottleneck() {
 		return implement(v1.sla.bottleneck).handler(async ({ input }) => {
@@ -158,7 +158,7 @@ export class SlaController {
 		})
 	}
 
-	@RequirePermission('admin', 'view')
+	@RequirePermission("admin", "view")
 	@Implement(v1.sla.exportCompliance)
 	async exportCompliance() {
 		return implement(v1.sla.exportCompliance).handler(async ({ input }) => {

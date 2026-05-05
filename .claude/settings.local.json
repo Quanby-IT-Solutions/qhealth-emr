@@ -131,7 +131,17 @@
       "Bash(Select-Object -ExpandProperty FullName)",
       "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\backend\\\\src\\\\modules\\\\v1\\\\billing\" | ForEach-Object { $_.Name })",
       "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\packages\\\\contracts\\\\src\\\\modules\\\\v1\\\\billing\" | ForEach-Object { Write-Host $_.Name })",
-      "PowerShell(Test-Path *)"
+      "PowerShell(Test-Path *)",
+      "PowerShell(head *)",
+      "Bash(mkdir -p /c/Users/USER/.traycer/yolo_artifacts)",
+      "Bash(echo '{}')",
+      "Bash(pnpm format *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('scripts',{}\\).get\\('format',''\\)\\)\")",
+      "Bash(dir *)",
+      "Bash(mkdir -p ~/.traycer/yolo_artifacts)",
+      "Bash(New-Item -ItemType Directory -Force -Path '__TRACKED_VAR__\\\\.traycer\\\\yolo_artifacts')",
+      "Bash(Out-Null)",
+      "Bash(Set-Content -Path '__TRACKED_VAR__\\\\.traycer\\\\yolo_artifacts\\\\undefined.json' -Value '{}')"
     ]
   }
 }

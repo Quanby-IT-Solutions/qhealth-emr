@@ -45,7 +45,8 @@ export const opdTriageContract = {
 		.route({
 			method: "PATCH",
 			path: "/opd-triage/{id}/link-patient",
-			summary: "Link a pre-registration triage intake to a registered patient (registrar reconciliation)",
+			summary:
+				"Link a pre-registration triage intake to a registered patient (registrar reconciliation)",
 			tags: ["OPD Triage"],
 		})
 		.input(LinkOpdTriageToPatientSchema)

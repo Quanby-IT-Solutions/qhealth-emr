@@ -1,11 +1,11 @@
 import { Injectable } from "@nestjs/common"
 import { eq } from "drizzle-orm"
 
-import { facilityProfiles, facilities } from "@repo/db/schema"
+import { facilities, facilityProfiles } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import { AUDIT_ENTITY_TYPES } from "@/modules/v1/audit/audit-entity-types"
-import { type DBTransaction, AuditService } from "@/modules/v1/audit/audit.service"
+import { AuditService, type DBTransaction } from "@/modules/v1/audit/audit.service"
 
 type FacilityProfileRow = typeof facilityProfiles.$inferSelect
 type FacilityRow = typeof facilities.$inferSelect
@@ -65,10 +65,7 @@ function diffProfileFields(
 	return changes
 }
 
-function diffFacilityFields(
-	before: FacilityRow,
-	after: Partial<FacilityRow>
-): FieldChange[] {
+function diffFacilityFields(before: FacilityRow, after: Partial<FacilityRow>): FieldChange[] {
 	const changes: FieldChange[] = []
 	for (const col of FACILITY_COLS) {
 		if (!(col in after)) continue
@@ -135,7 +132,9 @@ export class FacilityProfileService {
 	 */
 	async update(
 		facilityId: string,
-		input: Partial<Record<UpdateableProfileField | UpdateableFacilityField, string | null | undefined>>,
+		input: Partial<
+			Record<UpdateableProfileField | UpdateableFacilityField, string | null | undefined>
+		>,
 		actor: {
 			userId: string
 			facilityId: string

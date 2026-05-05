@@ -46,14 +46,17 @@ export function extractRbacProfile(req: Request): RbacProfileLike | undefined {
 	return (req as Request & { rbacProfile?: RbacProfileLike }).rbacProfile
 }
 
-export function buildChartAccessActor(session: { user: { id: string } }, req: Request): ChartAccessActor {
+export function buildChartAccessActor(
+	session: { user: { id: string } },
+	req: Request
+): ChartAccessActor {
 	const forwardedFor = req.headers["x-forwarded-for"]
 	const userAgent = req.headers["user-agent"]
 	return {
 		userId: session.user.id,
 		rbacProfile: extractRbacProfile(req),
-		ipAddress: Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor ?? req.ip ?? null,
-		userAgent: Array.isArray(userAgent) ? userAgent[0] : userAgent ?? null,
+		ipAddress: Array.isArray(forwardedFor) ? forwardedFor[0] : (forwardedFor ?? req.ip ?? null),
+		userAgent: Array.isArray(userAgent) ? userAgent[0] : (userAgent ?? null),
 	}
 }
 
@@ -66,9 +69,11 @@ export class ChartAccessService {
 		module: string,
 		action: string
 	): boolean {
-		return profile?.activeRole?.permissions.some(
-			permission => permission.module === module && permission.action === action
-		) ?? false
+		return (
+			profile?.activeRole?.permissions.some(
+				permission => permission.module === module && permission.action === action
+			) ?? false
+		)
 	}
 
 	private shouldEnforceBreakGlass(profile: RbacProfileLike | undefined): boolean {
@@ -92,7 +97,9 @@ export class ChartAccessService {
 			: null
 	}
 
-	private async resolveActiveStaffProfile(actor: ChartAccessActor): Promise<ActiveStaffProfile | null> {
+	private async resolveActiveStaffProfile(
+		actor: ChartAccessActor
+	): Promise<ActiveStaffProfile | null> {
 		const fromProfile = this.getActiveStaffProfile(actor.rbacProfile)
 		if (fromProfile) return fromProfile
 
@@ -135,7 +142,10 @@ export class ChartAccessService {
 		return event ?? null
 	}
 
-	private async hasRegularPatientAccess(clinicianStaffId: string, patientId: string): Promise<boolean> {
+	private async hasRegularPatientAccess(
+		clinicianStaffId: string,
+		patientId: string
+	): Promise<boolean> {
 		const [match] = await db
 			.select({ id: encounters.id })
 			.from(encounters)
@@ -155,7 +165,10 @@ export class ChartAccessService {
 		return !!match
 	}
 
-	private async trackBreakGlassRecordAccess(eventId: string, record: ChartAccessRecord): Promise<void> {
+	private async trackBreakGlassRecordAccess(
+		eventId: string,
+		record: ChartAccessRecord
+	): Promise<void> {
 		const [event] = await db
 			.select({ recordsAccessed: breakGlassEvents.recordsAccessed })
 			.from(breakGlassEvents)
@@ -220,7 +233,10 @@ export class ChartAccessService {
 			return { mode: "regular", staffProfileId: activeStaffProfile.id }
 		}
 
-		const activeBreakGlassEvent = await this.findActiveBreakGlassEvent(activeStaffProfile.id, patientId)
+		const activeBreakGlassEvent = await this.findActiveBreakGlassEvent(
+			activeStaffProfile.id,
+			patientId
+		)
 		if (activeBreakGlassEvent) {
 			if (record) {
 				await this.trackBreakGlassRecordAccess(activeBreakGlassEvent.id, record)

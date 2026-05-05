@@ -6,8 +6,8 @@ import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
 
-import { RbacService } from "./rbac.service"
 import { RequirePermission } from "./rbac.guard"
+import { RbacService } from "./rbac.service"
 
 type RbacProfile = {
 	staffProfiles: Array<{ id: string; facilityId: string; roles: Array<{ id: string }> }>

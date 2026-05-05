@@ -19,8 +19,8 @@ import { db } from "@/common/database/database.client"
 
 import { FhirBundleBuilderService } from "./fhir-bundle-builder.service"
 import { FhirCanonicalValidatorService } from "./fhir-canonical-validator.service"
-import { FhirService } from "./fhir.service"
 import { FhirValidatorService } from "./fhir-validator.service"
+import { FhirService } from "./fhir.service"
 import { NhdrAdapterService } from "./nhdr-adapter.service"
 
 // ---------------------------------------------------------------------------
@@ -37,11 +37,7 @@ jest.mock("@/common/database/database.client", () => ({
 }))
 
 jest.mock("@repo/db/schema", () => {
-	const proxy = () =>
-		new Proxy(
-			{},
-			{ get: (_t, p) => String(p) }
-		)
+	const proxy = () => new Proxy({}, { get: (_t, p) => String(p) })
 	return {
 		integrations: proxy(),
 		fhirExports: proxy(),
@@ -100,7 +96,10 @@ describe("FhirService.getSystemStatus — facility isolation (INTREG-015)", () =
 				FhirService,
 				{ provide: FhirBundleBuilderService, useValue: { buildBundle: jest.fn() } },
 				{ provide: FhirValidatorService, useValue: { validateBundle: jest.fn() } },
-				{ provide: FhirCanonicalValidatorService, useValue: { validateCanonical: jest.fn().mockResolvedValue([]) } },
+				{
+					provide: FhirCanonicalValidatorService,
+					useValue: { validateCanonical: jest.fn().mockResolvedValue([]) },
+				},
 				{ provide: NhdrAdapterService, useValue: { submit: jest.fn() } },
 			],
 		}).compile()
@@ -136,7 +135,9 @@ describe("FhirService.getSystemStatus — facility isolation (INTREG-015)", () =
 	it("includes an active-and-configured note when credentialsRef env var is present", async () => {
 		process.env.TEST_NHDR_KEY = "secret-token"
 		mockDb.select.mockReturnValue(
-			makeSelectChainTerminalAtLimit([{ endpointUrl: ENDPOINT_URL, credentialsRef: "TEST_NHDR_KEY" }])
+			makeSelectChainTerminalAtLimit([
+				{ endpointUrl: ENDPOINT_URL, credentialsRef: "TEST_NHDR_KEY" },
+			])
 		)
 
 		const status = await service.getSystemStatus(FACILITY_ID)

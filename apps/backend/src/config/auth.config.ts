@@ -95,7 +95,12 @@ function createAuthMiddleware(versionedAuthPaths: string[]) {
 				const ip = getClientIp(req)
 				if (isIpLocked(ip)) {
 					res.writeHead(423, { "Content-Type": "application/json" })
-					res.end(JSON.stringify({ message: "Account temporarily locked due to too many failed attempts. Try again later." }))
+					res.end(
+						JSON.stringify({
+							message:
+								"Account temporarily locked due to too many failed attempts. Try again later.",
+						})
+					)
 					return
 				}
 				let capturedStatus = 0
@@ -113,7 +118,9 @@ function createAuthMiddleware(versionedAuthPaths: string[]) {
 					else if (capturedStatus >= 200 && capturedStatus < 300) {
 						clearIpFailures(ip)
 						// ADM-BE-02: audit successful login (fire-and-forget)
-						logger.log(`auth.login.success ip=${ip} userAgent=${req.headers["user-agent"] ?? "unknown"}`)
+						logger.log(
+							`auth.login.success ip=${ip} userAgent=${req.headers["user-agent"] ?? "unknown"}`
+						)
 					}
 					// eslint-disable-next-line @typescript-eslint/no-explicit-any
 					return (origEnd as any)(...a)

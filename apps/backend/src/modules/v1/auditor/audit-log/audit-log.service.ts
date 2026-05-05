@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common"
-import { and, desc, eq, gte, lt, lte, or, sql } from "drizzle-orm"
 import { createHash } from "crypto"
+import { and, desc, eq, gte, lt, lte, or, sql } from "drizzle-orm"
 
 import { auditExports, auditLogs, staffProfiles } from "@repo/db/schema"
 
@@ -45,7 +45,10 @@ function encodeCursor(ts: Date, id: string): string {
 
 function decodeCursor(cursor: string): { ts: Date; id: string } | null {
 	try {
-		const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as { ts: string; id: string }
+		const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
+			ts: string
+			id: string
+		}
 		return { ts: new Date(parsed.ts), id: parsed.id }
 	} catch {
 		return null
@@ -106,20 +109,23 @@ export class AuditLogService {
 				.where(where)
 				.orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
 				.limit(limit + 1),
-			db.select({ total: sql<number>`count(*)::int` }).from(auditLogs).where(
-				// Count without cursor condition for accurate total
-				and(
-					eq(auditLogs.facilityId, filter.facilityId),
-					...(filter.startDate ? [gte(auditLogs.createdAt, new Date(filter.startDate))] : []),
-					...(filter.endDate ? [lte(auditLogs.createdAt, new Date(filter.endDate))] : []),
-					...(filter.userId ? [eq(auditLogs.userId, filter.userId)] : []),
-					...(filter.action ? [eq(auditLogs.action, filter.action as never)] : []),
-					...(filter.entityType ? [eq(auditLogs.entityType, filter.entityType)] : []),
-					...(filter.sessionId ? [eq(auditLogs.sessionId, filter.sessionId)] : []),
-					...(filter.severity ? [eq(auditLogs.severity, filter.severity)] : []),
-					...(filter.outcome ? [eq(auditLogs.outcome, filter.outcome)] : []),
-				)
-			),
+			db
+				.select({ total: sql<number>`count(*)::int` })
+				.from(auditLogs)
+				.where(
+					// Count without cursor condition for accurate total
+					and(
+						eq(auditLogs.facilityId, filter.facilityId),
+						...(filter.startDate ? [gte(auditLogs.createdAt, new Date(filter.startDate))] : []),
+						...(filter.endDate ? [lte(auditLogs.createdAt, new Date(filter.endDate))] : []),
+						...(filter.userId ? [eq(auditLogs.userId, filter.userId)] : []),
+						...(filter.action ? [eq(auditLogs.action, filter.action as never)] : []),
+						...(filter.entityType ? [eq(auditLogs.entityType, filter.entityType)] : []),
+						...(filter.sessionId ? [eq(auditLogs.sessionId, filter.sessionId)] : []),
+						...(filter.severity ? [eq(auditLogs.severity, filter.severity)] : []),
+						...(filter.outcome ? [eq(auditLogs.outcome, filter.outcome)] : [])
+					)
+				),
 		])
 
 		const total = countRows[0]?.total ?? 0
@@ -129,7 +135,7 @@ export class AuditLogService {
 		const lastRow = page[page.length - 1]
 		const nextCursor = hasMore && lastRow ? encodeCursor(lastRow.createdAt, lastRow.id) : null
 
-		const pageNum = filter.cursor ? null : (Number(filter.page) || 1)
+		const pageNum = filter.cursor ? null : Number(filter.page) || 1
 
 		return {
 			data: page.map(r => ({ ...r, metadata: redactSensitiveFields(r.metadata) })),
@@ -199,7 +205,17 @@ export class AuditLogService {
 	}) {
 		const { data } = await this.list({ ...params.filter, cursor: undefined, page: 1, limit: 10000 })
 
-		const headers = ["id", "userId", "action", "entityType", "entityId", "severity", "outcome", "ipAddress", "createdAt"]
+		const headers = [
+			"id",
+			"userId",
+			"action",
+			"entityType",
+			"entityId",
+			"severity",
+			"outcome",
+			"ipAddress",
+			"createdAt",
+		]
 		const rows = data.map(log =>
 			headers
 				.map(h => {

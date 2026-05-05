@@ -143,7 +143,6 @@ export const ConsentRecordSchema = z.object({
 	status: ConsentStatusEnum,
 	isActive: z.boolean(),
 
-
 	// Obtained by
 	obtainedByStaffId: z.string().uuid().nullable(),
 	obtainedByStaffName: z.string().nullable(),

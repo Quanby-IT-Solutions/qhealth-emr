@@ -32,19 +32,25 @@ export interface NhdrAcknowledgment {
 export class NhdrAdapterService {
 	private readonly logger = new Logger(NhdrAdapterService.name)
 
-	async submit(req: NhdrSubmissionRequest, runtimeConfig?: { baseUrl?: string; apiKey?: string }): Promise<NhdrAcknowledgment> {
+	async submit(
+		req: NhdrSubmissionRequest,
+		runtimeConfig?: { baseUrl?: string; apiKey?: string }
+	): Promise<NhdrAcknowledgment> {
 		if (env.NHDR_MODE === "real") {
 			return this.submitReal(req, runtimeConfig)
 		}
 		return this.submitMock(req)
 	}
 
-	private async submitReal(req: NhdrSubmissionRequest, runtimeConfig?: { baseUrl?: string; apiKey?: string }): Promise<NhdrAcknowledgment> {
+	private async submitReal(
+		req: NhdrSubmissionRequest,
+		runtimeConfig?: { baseUrl?: string; apiKey?: string }
+	): Promise<NhdrAcknowledgment> {
 		const baseUrl = runtimeConfig?.baseUrl
 		if (!baseUrl) {
 			throw new Error(
 				"NHDR submission requires a registry-configured endpoint. " +
-				"Enable an NHDR integration in Admin \u2192 Integration Registry."
+					"Enable an NHDR integration in Admin \u2192 Integration Registry."
 			)
 		}
 
@@ -71,7 +77,7 @@ export class NhdrAdapterService {
 			throw new Error(`NHDR submission failed: HTTP ${response.status} — ${errorBody}`)
 		}
 
-		const json = await response.json() as {
+		const json = (await response.json()) as {
 			receiptNumber?: string
 			responseCode?: string
 			responseMessage?: string
@@ -91,7 +97,7 @@ export class NhdrAdapterService {
 	private submitMock(req: NhdrSubmissionRequest): NhdrAcknowledgment {
 		this.logger.warn(
 			`NHDR_MODE=mock — submission for exportId=${req.exportId} is queued for manual submission. ` +
-			`Set NHDR_MODE=real and NHDR_BASE_URL to enable live NHDR integration.`
+				`Set NHDR_MODE=real and NHDR_BASE_URL to enable live NHDR integration.`
 		)
 
 		return {

@@ -1,9 +1,11 @@
 import { Injectable } from "@nestjs/common"
 import { and, between, eq, inArray } from "drizzle-orm"
 
+import type { FhirResourceType } from "@repo/contracts"
 import {
 	allergies,
 	encounters,
+	facilities,
 	imagingOrders,
 	labOrders,
 	medicationOrders,
@@ -15,11 +17,8 @@ import {
 	surgicalRvsAssignments,
 	users,
 } from "@repo/db/schema"
-import { facilities } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
-
-import type { FhirResourceType } from "@repo/contracts"
 
 // ============================================================================
 // FHIR R4 resource shape types (minimal but structurally valid)
@@ -146,7 +145,11 @@ interface FhirObservation {
 	valueString?: string
 	valueQuantity?: { value?: number; unit?: string; system?: string; code?: string }
 	interpretation?: FhirCodeableConcept[]
-	component?: Array<{ code: FhirCodeableConcept; valueString?: string; valueQuantity?: { value?: number; unit?: string } }>
+	component?: Array<{
+		code: FhirCodeableConcept
+		valueString?: string
+		valueQuantity?: { value?: number; unit?: string }
+	}>
 }
 
 interface FhirDiagnosticReport {
@@ -218,7 +221,15 @@ interface FhirAllergyIntolerance {
 interface FhirProcedure {
 	resourceType: "Procedure"
 	id: string
-	status: "preparation" | "in-progress" | "not-done" | "on-hold" | "stopped" | "completed" | "entered-in-error" | "unknown"
+	status:
+		| "preparation"
+		| "in-progress"
+		| "not-done"
+		| "on-hold"
+		| "stopped"
+		| "completed"
+		| "entered-in-error"
+		| "unknown"
 	code: FhirCodeableConcept
 	subject: FhirReference
 	encounter?: FhirReference
@@ -274,21 +285,51 @@ function ref(resourceType: string, id: string, display?: string): FhirReference 
 
 function mapEncounterStatus(status: string): string {
 	switch (status) {
-		case "active": return "in-progress"
-		case "discharged": return "finished"
-		case "closed": return "finished"
-		case "cancelled": return "cancelled"
-		default: return "unknown"
+		case "active":
+			return "in-progress"
+		case "discharged":
+			return "finished"
+		case "closed":
+			return "finished"
+		case "cancelled":
+			return "cancelled"
+		default:
+			return "unknown"
 	}
 }
 
 function mapEncounterClass(type: string): FhirCoding {
 	switch (type) {
-		case "inpatient": return { system: "http://terminology.hl7.org/CodeSystem/v3-ActCode", code: "IMP", display: "inpatient encounter" }
-		case "outpatient": return { system: "http://terminology.hl7.org/CodeSystem/v3-ActCode", code: "AMB", display: "ambulatory" }
-		case "emergency": return { system: "http://terminology.hl7.org/CodeSystem/v3-ActCode", code: "EMER", display: "emergency" }
-		case "telemedicine": return { system: "http://terminology.hl7.org/CodeSystem/v3-ActCode", code: "VR", display: "virtual" }
-		default: return { system: "http://terminology.hl7.org/CodeSystem/v3-ActCode", code: "AMB", display: "ambulatory" }
+		case "inpatient":
+			return {
+				system: "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+				code: "IMP",
+				display: "inpatient encounter",
+			}
+		case "outpatient":
+			return {
+				system: "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+				code: "AMB",
+				display: "ambulatory",
+			}
+		case "emergency":
+			return {
+				system: "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+				code: "EMER",
+				display: "emergency",
+			}
+		case "telemedicine":
+			return {
+				system: "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+				code: "VR",
+				display: "virtual",
+			}
+		default:
+			return {
+				system: "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+				code: "AMB",
+				display: "ambulatory",
+			}
 	}
 }
 
@@ -301,12 +342,17 @@ function mapGender(sex: string): "male" | "female" | "other" | "unknown" {
 
 function mapMedOrderStatus(status: string): string {
 	switch (status) {
-		case "active": return "active"
-		case "completed": return "completed"
+		case "active":
+			return "active"
+		case "completed":
+			return "completed"
 		case "discontinued":
-		case "cancelled": return "cancelled"
-		case "rejected": return "stopped"
-		default: return "draft"
+		case "cancelled":
+			return "cancelled"
+		case "rejected":
+			return "stopped"
+		default:
+			return "draft"
 	}
 }
 
@@ -330,41 +376,53 @@ function mapLabOrderStatus(status: string): FhirObservation["status"] {
 
 function mapNutritionOrderStatus(status: string): FhirNutritionOrder["status"] {
 	switch (status) {
-		case "active": return "active"
-		case "on-hold": return "on-hold"
-		case "completed": return "completed"
-		case "cancelled": return "cancelled"
-		default: return "active"
+		case "active":
+			return "active"
+		case "on-hold":
+			return "on-hold"
+		case "completed":
+			return "completed"
+		case "cancelled":
+			return "cancelled"
+		default:
+			return "active"
 	}
 }
 
 function mapOperationRecordStatus(status: string): FhirProcedure["status"] {
 	switch (status) {
-		case "draft": return "preparation"
-		case "signed": return "completed"
-		default: return "unknown"
+		case "draft":
+			return "preparation"
+		case "signed":
+			return "completed"
+		default:
+			return "unknown"
 	}
 }
 
-function mapAllergyCategory(
-	allergenType: string,
-): FhirAllergyIntolerance["category"] {
+function mapAllergyCategory(allergenType: string): FhirAllergyIntolerance["category"] {
 	switch (allergenType) {
-		case "medication": return ["medication"]
-		case "food": return ["food"]
-		case "environmental": return ["environment"]
-		default: return undefined
+		case "medication":
+			return ["medication"]
+		case "food":
+			return ["food"]
+		case "environmental":
+			return ["environment"]
+		default:
+			return undefined
 	}
 }
 
-function mapAllergyCriticality(
-	severity: string,
-): FhirAllergyIntolerance["criticality"] {
+function mapAllergyCriticality(severity: string): FhirAllergyIntolerance["criticality"] {
 	switch (severity) {
-		case "mild": return "low"
-		case "moderate": return "low"
-		case "severe": return "high"
-		default: return "unable-to-assess"
+		case "mild":
+			return "low"
+		case "moderate":
+			return "low"
+		case "severe":
+			return "high"
+		default:
+			return "unable-to-assess"
 	}
 }
 
@@ -384,7 +442,7 @@ export class FhirBundleBuilderService {
 		exportId: string,
 		dateRangeStart: string,
 		dateRangeEnd: string,
-		resourceTypes: FhirResourceType[],
+		resourceTypes: FhirResourceType[]
 	): Promise<BundleBuildResult> {
 		const typeSet = new Set<FhirResourceType>(resourceTypes)
 		const startDate = new Date(dateRangeStart)
@@ -394,10 +452,20 @@ export class FhirBundleBuilderService {
 		const countByType: Record<string, number> = {}
 
 		// ── Infrastructure (always included when referenced) ─────────────────
-		let facilityRow: { id: string; name: string; facilityType: string; address: string | null } | null = null
+		let facilityRow: {
+			id: string
+			name: string
+			facilityType: string
+			address: string | null
+		} | null = null
 		if (typeSet.has("Organization") || typeSet.has("Location")) {
 			const rows = await db
-				.select({ id: facilities.id, name: facilities.name, facilityType: facilities.facilityType, address: facilities.address })
+				.select({
+					id: facilities.id,
+					name: facilities.name,
+					facilityType: facilities.facilityType,
+					address: facilities.address,
+				})
 				.from(facilities)
 				.where(eq(facilities.id, facilityId))
 				.limit(1)
@@ -409,13 +477,17 @@ export class FhirBundleBuilderService {
 				resourceType: "Organization",
 				id: facilityRow.id,
 				name: facilityRow.name,
-				type: [{
-					coding: [{
-						system: "http://terminology.hl7.org/CodeSystem/organization-type",
-						code: "prov",
-						display: "Healthcare Provider",
-					}],
-				}],
+				type: [
+					{
+						coding: [
+							{
+								system: "http://terminology.hl7.org/CodeSystem/organization-type",
+								code: "prov",
+								display: "Healthcare Provider",
+							},
+						],
+					},
+				],
 			}
 			entries.push({ fullUrl: `Organization/${org.id}`, resource: org })
 			countByType["Organization"] = 1
@@ -451,17 +523,21 @@ export class FhirBundleBuilderService {
 				const prac: FhirPractitioner = {
 					resourceType: "Practitioner",
 					id: s.id,
-					name: [{
-						use: "official",
-						family: nameParts.slice(-1)[0] ?? "",
-						given: nameParts.slice(0, -1),
-						text: s.name ?? undefined,
-					}],
+					name: [
+						{
+							use: "official",
+							family: nameParts.slice(-1)[0] ?? "",
+							given: nameParts.slice(0, -1),
+							text: s.name ?? undefined,
+						},
+					],
 					qualification: s.prcLicenseNumber
-						? [{
-							identifier: [{ system: "https://www.prc.gov.ph", value: s.prcLicenseNumber }],
-							code: { text: "Professional License" },
-						}]
+						? [
+								{
+									identifier: [{ system: "https://www.prc.gov.ph", value: s.prcLicenseNumber }],
+									code: { text: "Professional License" },
+								},
+							]
 						: undefined,
 				}
 				entries.push({ fullUrl: `Practitioner/${prac.id}`, resource: prac })
@@ -475,10 +551,7 @@ export class FhirBundleBuilderService {
 				.select()
 				.from(patients)
 				.where(
-					and(
-						eq(patients.facilityId, facilityId),
-						between(patients.createdAt, startDate, endDate),
-					),
+					and(eq(patients.facilityId, facilityId), between(patients.createdAt, startDate, endDate))
 				)
 
 			countByType["Patient"] = patientRows.length
@@ -489,24 +562,39 @@ export class FhirBundleBuilderService {
 					identifier: [
 						{ use: "usual", system: "urn:oid:2.16.840.1.113883.2.33.1", value: p.mrn },
 						...(p.philhealthMemberId
-							? [{ use: "secondary", system: "https://www.philhealth.gov.ph/member", value: p.philhealthMemberId }]
+							? [
+									{
+										use: "secondary",
+										system: "https://www.philhealth.gov.ph/member",
+										value: p.philhealthMemberId,
+									},
+								]
 							: []),
 					],
-					name: [{
-						use: "official",
-						family: p.lastName,
-						given: [p.firstName, ...(p.middleName ? [p.middleName] : [])],
-						text: `${p.firstName}${p.middleName ? ` ${p.middleName}` : ""} ${p.lastName}`,
-					}],
+					name: [
+						{
+							use: "official",
+							family: p.lastName,
+							given: [p.firstName, ...(p.middleName ? [p.middleName] : [])],
+							text: `${p.firstName}${p.middleName ? ` ${p.middleName}` : ""} ${p.lastName}`,
+						},
+					],
 					gender: mapGender(p.sex),
 					birthDate: p.dateOfBirth,
-					address: (p.addressLine1 || p.city) ? [{
-						text: [p.addressLine1, p.addressLine2, p.city, p.province].filter(Boolean).join(", "),
-						city: p.city ?? undefined,
-						state: p.province ?? undefined,
-						postalCode: p.zipCode ?? undefined,
-						country: "PH",
-					}] : undefined,
+					address:
+						p.addressLine1 || p.city
+							? [
+									{
+										text: [p.addressLine1, p.addressLine2, p.city, p.province]
+											.filter(Boolean)
+											.join(", "),
+										city: p.city ?? undefined,
+										state: p.province ?? undefined,
+										postalCode: p.zipCode ?? undefined,
+										country: "PH",
+									},
+								]
+							: undefined,
 					telecom: [
 						...(p.phone ? [{ system: "phone", value: p.phone, use: "mobile" }] : []),
 						...(p.email ? [{ system: "email", value: p.email }] : []),
@@ -534,8 +622,8 @@ export class FhirBundleBuilderService {
 				.where(
 					and(
 						eq(encounters.facilityId, facilityId),
-						between(encounters.admissionDatetime, startDate, endDate),
-					),
+						between(encounters.admissionDatetime, startDate, endDate)
+					)
 				)
 
 			countByType["Encounter"] = encounterRows.length
@@ -550,16 +638,22 @@ export class FhirBundleBuilderService {
 						start: fhirDate(e.admissionDatetime),
 						...(e.dischargeDatetime ? { end: fhirDate(e.dischargeDatetime) } : {}),
 					},
-					...(e.chiefComplaint ? {
-						reasonCode: [{ text: e.chiefComplaint }],
-					} : {}),
+					...(e.chiefComplaint
+						? {
+								reasonCode: [{ text: e.chiefComplaint }],
+							}
+						: {}),
 					participant: [
-						...(e.attendingStaffId ? [{ individual: ref("Practitioner", e.attendingStaffId) }] : []),
+						...(e.attendingStaffId
+							? [{ individual: ref("Practitioner", e.attendingStaffId) }]
+							: []),
 						...(e.admittingStaffId && e.admittingStaffId !== e.attendingStaffId
 							? [{ individual: ref("Practitioner", e.admittingStaffId) }]
 							: []),
 					],
-					serviceProvider: facilityRow ? ref("Organization", facilityId, facilityRow.name) : undefined,
+					serviceProvider: facilityRow
+						? ref("Organization", facilityId, facilityRow.name)
+						: undefined,
 				}
 				entries.push({ fullUrl: `Encounter/${enc.id}`, resource: enc })
 			}
@@ -588,8 +682,8 @@ export class FhirBundleBuilderService {
 				.where(
 					and(
 						eq(medicationOrders.facilityId, facilityId),
-						between(medicationOrders.createdAt, startDate, endDate),
-					),
+						between(medicationOrders.createdAt, startDate, endDate)
+					)
 				)
 
 			countByType["MedicationRequest"] = medRows.length
@@ -602,18 +696,28 @@ export class FhirBundleBuilderService {
 					intent: "order",
 					medicationCodeableConcept: {
 						coding: m.rxnormCode
-							? [{ system: "http://www.nlm.nih.gov/research/umls/rxnorm", code: m.rxnormCode, display: m.genericName }]
+							? [
+									{
+										system: "http://www.nlm.nih.gov/research/umls/rxnorm",
+										code: m.rxnormCode,
+										display: m.genericName,
+									},
+								]
 							: [],
 						text: m.brandName ? `${m.genericName} (${m.brandName})` : m.genericName,
 					},
 					subject: ref("Patient", patId),
 					...(m.encounterId ? { encounter: ref("Encounter", m.encounterId) } : {}),
 					requester: ref("Practitioner", m.orderingStaffId),
-					dosageInstruction: [{
-						text: `${m.dose} ${m.doseUnit} ${m.route} ${m.frequency}`,
-						route: { text: m.route },
-						doseAndRate: [{ doseQuantity: { value: parseFloat(m.dose) || undefined, unit: m.doseUnit } }],
-					}],
+					dosageInstruction: [
+						{
+							text: `${m.dose} ${m.doseUnit} ${m.route} ${m.frequency}`,
+							route: { text: m.route },
+							doseAndRate: [
+								{ doseQuantity: { value: parseFloat(m.dose) || undefined, unit: m.doseUnit } },
+							],
+						},
+					],
 				}
 				entries.push({ fullUrl: `MedicationRequest/${medReq.id}`, resource: medReq })
 			}
@@ -638,12 +742,14 @@ export class FhirBundleBuilderService {
 					and(
 						eq(labOrders.facilityId, facilityId),
 						between(labOrders.createdAt, startDate, endDate),
-						inArray(labOrders.status, ["resulted", "completed"]),
-					),
+						inArray(labOrders.status, ["resulted", "completed"])
+					)
 				)
 
 			const encPatientMap = new Map<string, string>()
-			const uniqueEncIds = [...new Set(labRows.map(l => l.encounterId).filter((id): id is string => id !== null))]
+			const uniqueEncIds = [
+				...new Set(labRows.map(l => l.encounterId).filter((id): id is string => id !== null)),
+			]
 			if (uniqueEncIds.length > 0) {
 				const encRows = await db
 					.select({ id: encounters.id, patientId: encounters.patientId })
@@ -669,9 +775,7 @@ export class FhirBundleBuilderService {
 					subject: ref("Patient", patientId),
 					...(l.encounterId ? { encounter: ref("Encounter", l.encounterId) } : {}),
 					...(l.resultedDatetime ? { effectiveDateTime: fhirDate(l.resultedDatetime) } : {}),
-					...(resultsData
-						? { valueString: JSON.stringify(resultsData) }
-						: {}),
+					...(resultsData ? { valueString: JSON.stringify(resultsData) } : {}),
 				}
 				entries.push({ fullUrl: `Observation/${obs.id}`, resource: obs })
 			}
@@ -694,12 +798,14 @@ export class FhirBundleBuilderService {
 				.where(
 					and(
 						eq(imagingOrders.facilityId, facilityId),
-						between(imagingOrders.createdAt, startDate, endDate),
-					),
+						between(imagingOrders.createdAt, startDate, endDate)
+					)
 				)
 
 			const encPatientMap2 = new Map<string, string>()
-			const uniqueEncIds2 = [...new Set(imagingRows.map(i => i.encounterId).filter((id): id is string => id !== null))]
+			const uniqueEncIds2 = [
+				...new Set(imagingRows.map(i => i.encounterId).filter((id): id is string => id !== null)),
+			]
 			if (uniqueEncIds2.length > 0) {
 				const encRows = await db
 					.select({ id: encounters.id, patientId: encounters.patientId })
@@ -717,15 +823,22 @@ export class FhirBundleBuilderService {
 					id: i.id,
 					status: isCompleted ? "final" : "preliminary",
 					code: {
-						coding: [{
-							system: "http://loinc.org",
-							code: i.modality === "xray" ? "24627-2"
-								: i.modality === "ct" ? "24558-9"
-								: i.modality === "mri" ? "24591-0"
-								: i.modality === "ultrasound" ? "24542-3"
-								: "18748-4",
-							display: `${i.modality.toUpperCase()} ${i.bodyPart}`,
-						}],
+						coding: [
+							{
+								system: "http://loinc.org",
+								code:
+									i.modality === "xray"
+										? "24627-2"
+										: i.modality === "ct"
+											? "24558-9"
+											: i.modality === "mri"
+												? "24591-0"
+												: i.modality === "ultrasound"
+													? "24542-3"
+													: "18748-4",
+								display: `${i.modality.toUpperCase()} ${i.bodyPart}`,
+							},
+						],
 						text: `${i.modality.toUpperCase()} ${i.bodyPart}`,
 					},
 					subject: ref("Patient", patientId),
@@ -753,33 +866,68 @@ export class FhirBundleBuilderService {
 				.where(
 					and(
 						eq(nutritionAssessments.facilityId, facilityId),
-						between(nutritionAssessments.createdAt, startDate, endDate),
-					),
+						between(nutritionAssessments.createdAt, startDate, endDate)
+					)
 				)
 
 			countByType["NutritionOrder"] = nutritionRows.length
 			for (const n of nutritionRows) {
 				const plan = n.mealPlan ?? {}
 				const nutrientList: FhirNutritionOrder["oralDiet"] = {
-					type: plan.feedingRoute ? [{
-						coding: [{
-							system: "http://snomed.info/sct",
-							code: plan.feedingRoute === "oral" ? "229898009"
-								: plan.feedingRoute === "enteral" ? "11214006"
-								: "82014003",
-							display: plan.feedingRoute,
-						}],
-					}] : undefined,
+					type: plan.feedingRoute
+						? [
+								{
+									coding: [
+										{
+											system: "http://snomed.info/sct",
+											code:
+												plan.feedingRoute === "oral"
+													? "229898009"
+													: plan.feedingRoute === "enteral"
+														? "11214006"
+														: "82014003",
+											display: plan.feedingRoute,
+										},
+									],
+								},
+							]
+						: undefined,
 					texture: plan.texture ? [{ modifier: { text: plan.texture } }] : undefined,
 					nutrient: [
-						...(plan.caloricTarget ? [{
-							modifier: { coding: [{ system: "http://loinc.org", code: "9052-2", display: "Caloric intake" }] },
-							amount: { value: plan.caloricTarget, unit: "kcal/d", system: "http://unitsofmeasure.org", code: "kcal/d" },
-						}] : []),
-						...(plan.proteinTarget ? [{
-							modifier: { coding: [{ system: "http://loinc.org", code: "55284-4", display: "Protein intake" }] },
-							amount: { value: plan.proteinTarget, unit: "g/d", system: "http://unitsofmeasure.org", code: "g/d" },
-						}] : []),
+						...(plan.caloricTarget
+							? [
+									{
+										modifier: {
+											coding: [
+												{ system: "http://loinc.org", code: "9052-2", display: "Caloric intake" },
+											],
+										},
+										amount: {
+											value: plan.caloricTarget,
+											unit: "kcal/d",
+											system: "http://unitsofmeasure.org",
+											code: "kcal/d",
+										},
+									},
+								]
+							: []),
+						...(plan.proteinTarget
+							? [
+									{
+										modifier: {
+											coding: [
+												{ system: "http://loinc.org", code: "55284-4", display: "Protein intake" },
+											],
+										},
+										amount: {
+											value: plan.proteinTarget,
+											unit: "g/d",
+											system: "http://unitsofmeasure.org",
+											code: "g/d",
+										},
+									},
+								]
+							: []),
 					],
 				}
 
@@ -818,10 +966,7 @@ export class FhirBundleBuilderService {
 				})
 				.from(problems)
 				.where(
-					and(
-						eq(problems.facilityId, facilityId),
-						between(problems.createdAt, startDate, endDate),
-					),
+					and(eq(problems.facilityId, facilityId), between(problems.createdAt, startDate, endDate))
 				)
 
 			countByType["Condition"] = problemRows.length
@@ -831,23 +976,43 @@ export class FhirBundleBuilderService {
 					resourceType: "Condition",
 					id: p.id,
 					clinicalStatus: {
-						coding: [{
-							system: "http://terminology.hl7.org/CodeSystem/condition-clinical",
-							code: isResolved ? "resolved" : "active",
-							display: isResolved ? "Resolved" : "Active",
-						}],
+						coding: [
+							{
+								system: "http://terminology.hl7.org/CodeSystem/condition-clinical",
+								code: isResolved ? "resolved" : "active",
+								display: isResolved ? "Resolved" : "Active",
+							},
+						],
 					},
 					verificationStatus: {
-						coding: [{
-							system: "http://terminology.hl7.org/CodeSystem/condition-ver-status",
-							code: "confirmed",
-							display: "Confirmed",
-						}],
+						coding: [
+							{
+								system: "http://terminology.hl7.org/CodeSystem/condition-ver-status",
+								code: "confirmed",
+								display: "Confirmed",
+							},
+						],
 					},
 					code: {
 						coding: [
-							...(p.icd10Code ? [{ system: "http://hl7.org/fhir/sid/icd-10", code: p.icd10Code, display: p.icd10Display ?? undefined }] : []),
-							...(p.snomedCode ? [{ system: "http://snomed.info/sct", code: p.snomedCode, display: p.snomedDisplay ?? undefined }] : []),
+							...(p.icd10Code
+								? [
+										{
+											system: "http://hl7.org/fhir/sid/icd-10",
+											code: p.icd10Code,
+											display: p.icd10Display ?? undefined,
+										},
+									]
+								: []),
+							...(p.snomedCode
+								? [
+										{
+											system: "http://snomed.info/sct",
+											code: p.snomedCode,
+											display: p.snomedDisplay ?? undefined,
+										},
+									]
+								: []),
 						],
 						text: p.description,
 					},
@@ -881,8 +1046,8 @@ export class FhirBundleBuilderService {
 				.where(
 					and(
 						eq(allergies.facilityId, facilityId),
-						between(allergies.createdAt, startDate, endDate),
-					),
+						between(allergies.createdAt, startDate, endDate)
+					)
 				)
 
 			countByType["AllergyIntolerance"] = allergyRows.length
@@ -891,18 +1056,22 @@ export class FhirBundleBuilderService {
 					resourceType: "AllergyIntolerance",
 					id: a.id,
 					clinicalStatus: {
-						coding: [{
-							system: "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",
-							code: a.isActive ? "active" : "inactive",
-							display: a.isActive ? "Active" : "Inactive",
-						}],
+						coding: [
+							{
+								system: "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",
+								code: a.isActive ? "active" : "inactive",
+								display: a.isActive ? "Active" : "Inactive",
+							},
+						],
 					},
 					verificationStatus: {
-						coding: [{
-							system: "http://terminology.hl7.org/CodeSystem/allergyintolerance-verification",
-							code: "confirmed",
-							display: "Confirmed",
-						}],
+						coding: [
+							{
+								system: "http://terminology.hl7.org/CodeSystem/allergyintolerance-verification",
+								code: "confirmed",
+								display: "Confirmed",
+							},
+						],
 					},
 					type: a.allergenType === "medication" ? "allergy" : "intolerance",
 					category: mapAllergyCategory(a.allergenType),
@@ -912,10 +1081,14 @@ export class FhirBundleBuilderService {
 					...(a.onsetDate ? { onsetDateTime: a.onsetDate } : {}),
 					recordedDate: fhirDate(a.createdAt),
 					...(a.documentingStaffId ? { recorder: ref("Practitioner", a.documentingStaffId) } : {}),
-					reaction: a.reactionType ? [{
-						manifestation: [{ text: a.reactionType }],
-						severity: a.severity as "mild" | "moderate" | "severe",
-					}] : undefined,
+					reaction: a.reactionType
+						? [
+								{
+									manifestation: [{ text: a.reactionType }],
+									severity: a.severity as "mild" | "moderate" | "severe",
+								},
+							]
+						: undefined,
 				}
 				entries.push({ fullUrl: `AllergyIntolerance/${allergy.id}`, resource: allergy })
 			}
@@ -940,12 +1113,14 @@ export class FhirBundleBuilderService {
 				.where(
 					and(
 						eq(operationRecords.facilityId, facilityId),
-						between(operationRecords.createdAt, startDate, endDate),
-					),
+						between(operationRecords.createdAt, startDate, endDate)
+					)
 				)
 
 			// Batch-load patient IDs for all operation encounters
-			const opEncIds = [...new Set(opRows.map(r => r.encounterId).filter((id): id is string => !!id))]
+			const opEncIds = [
+				...new Set(opRows.map(r => r.encounterId).filter((id): id is string => !!id)),
+			]
 			const opEncPatientMap = new Map<string, string>()
 			if (opEncIds.length > 0) {
 				const encRows = await db
@@ -997,17 +1172,14 @@ export class FhirBundleBuilderService {
 			countByType["Procedure"] = opRows.length
 			for (const op of opRows) {
 				const patientId = op.encounterId ? (opEncPatientMap.get(op.encounterId) ?? "") : ""
-				const rvsAssignments =
-					(rvsMap.get(op.id) ?? [])
-						.slice()
-						.sort((left, right) => {
-							const statusOrder = { finalized: 0, validated: 1, suggested: 2 }
-							const assignmentTypeOrder = { primary: 0, adjunct: 1 }
-							return (
-								statusOrder[left.status] - statusOrder[right.status] ||
-								assignmentTypeOrder[left.assignmentType] - assignmentTypeOrder[right.assignmentType]
-							)
-						})
+				const rvsAssignments = (rvsMap.get(op.id) ?? []).slice().sort((left, right) => {
+					const statusOrder = { finalized: 0, validated: 1, suggested: 2 }
+					const assignmentTypeOrder = { primary: 0, adjunct: 1 }
+					return (
+						statusOrder[left.status] - statusOrder[right.status] ||
+						assignmentTypeOrder[left.assignmentType] - assignmentTypeOrder[right.assignmentType]
+					)
+				})
 				const codings: FhirCoding[] = []
 				const seenCodingKeys = new Set<string>()
 				for (const assignment of rvsAssignments) {

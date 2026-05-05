@@ -144,9 +144,9 @@ describe("SurgicalService", () => {
 			surgeonStaffId: "surgeon-1",
 		} as any)
 
-		await expect(
-			service.signOperationRecord({ caseId: "case-1" }, "surgeon-2")
-		).rejects.toThrow(ForbiddenException)
+		await expect(service.signOperationRecord({ caseId: "case-1" }, "surgeon-2")).rejects.toThrow(
+			ForbiddenException
+		)
 	})
 
 	it("rejects signing when the required operative charting fields are incomplete", async () => {
@@ -165,9 +165,9 @@ describe("SurgicalService", () => {
 			surgeonStaffId: "surgeon-1",
 		} as any)
 
-		await expect(
-			service.signOperationRecord({ caseId: "case-1" }, "surgeon-1")
-		).rejects.toThrow(BadRequestException)
+		await expect(service.signOperationRecord({ caseId: "case-1" }, "surgeon-1")).rejects.toThrow(
+			BadRequestException
+		)
 
 		expect(mockDb.update).not.toHaveBeenCalled()
 	})
@@ -258,9 +258,7 @@ describe("SurgicalService", () => {
 			.mockImplementationOnce(() =>
 				createSelectBuilder([{ rvsCode: "47562", procedureName: "Laparoscopic cholecystectomy" }])
 			)
-			.mockImplementationOnce(() =>
-				createSelectBuilder([{ facilityId: "facility-1" }])
-			)
+			.mockImplementationOnce(() => createSelectBuilder([{ facilityId: "facility-1" }]))
 		mockDb.insert.mockReturnValue({ values })
 
 		await service.suggestRvsCode(

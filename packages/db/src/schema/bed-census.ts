@@ -1,8 +1,8 @@
 import { index, uniqueIndex } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
-import { facilities } from "./rbac.js"
 import { wards } from "./core.js"
+import { facilities } from "./rbac.js"
 
 // DOH AHSR-compliant daily census snapshot written by the 00:05 midnight cron job.
 export const bedCensusDaily = createTable(
@@ -13,9 +13,7 @@ export const bedCensusDaily = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "cascade" }),
-		wardId: t
-			.uuid("ward_id")
-			.references(() => wards.id, { onDelete: "set null" }),
+		wardId: t.uuid("ward_id").references(() => wards.id, { onDelete: "set null" }),
 		censusDate: t.date("census_date").notNull(),
 		midnightCensus: t.integer("midnight_census").notNull().default(0),
 		admissions: t.integer("admissions").notNull().default(0),
@@ -28,7 +26,11 @@ export const bedCensusDaily = createTable(
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [
-		uniqueIndex("bed_census_daily_facility_ward_date_uniq").on(t.facilityId, t.wardId, t.censusDate),
+		uniqueIndex("bed_census_daily_facility_ward_date_uniq").on(
+			t.facilityId,
+			t.wardId,
+			t.censusDate
+		),
 		index("bed_census_daily_facility_date_idx").on(t.facilityId, t.censusDate),
 	]
 )

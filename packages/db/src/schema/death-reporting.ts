@@ -16,24 +16,21 @@ export const deathReports = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
 		patientId: t
 			.uuid("patient_id")
 			.notNull()
 			.references(() => patients.id, { onDelete: "restrict" }),
-		reportType: t
-			.text("report_type")
-			.notNull()
-			.$type<"fmdrf" | "fndrf">(),
+		reportType: t.text("report_type").notNull().$type<"fmdrf" | "fndrf">(),
 		deathDatetime: t.timestamp("death_datetime").notNull(),
 		causeOfDeath: t.text("cause_of_death").notNull(),
-		contributingFactors: t.jsonb("contributing_factors").$type<Array<{
-			factor: string
-			icd10Code?: string
-			duration?: string
-		}>>(),
+		contributingFactors: t.jsonb("contributing_factors").$type<
+			Array<{
+				factor: string
+				icd10Code?: string
+				duration?: string
+			}>
+		>(),
 		maternalHistory: t.jsonb("maternal_history").$type<{
 			// For FMDRF - Facility Maternal Death Review Form
 			gravida?: number

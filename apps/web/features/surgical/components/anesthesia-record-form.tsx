@@ -2,8 +2,18 @@
 
 import { useEffect, useState } from "react"
 
-import { Plus, Save, Trash2 } from "lucide-react"
+import { CheckCircle2, Plus, Save, Trash2 } from "lucide-react"
 
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/core/components/ui/alert-dialog"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
@@ -29,12 +39,18 @@ import {
 import { Textarea } from "@/core/components/ui/textarea"
 
 import {
-	type AnesthesiaAgent,
 	type AnesthesiaRecord,
+	type AnesthesiaType,
 	type AirwayType,
 	type AsaClass,
+	type InductionAgent,
+	type IntraopMedication,
 	type IntraopVital,
+	type IntubationGrade,
+	type MaintenanceAgent,
+	type MuscleRelaxant,
 	useSaveAnesthesiaRecordMutation,
+	useSignAnesthesiaRecordMutation,
 } from "../api/surgical.hooks"
 
 const ASA_OPTIONS: AsaClass[] = [
@@ -63,46 +79,89 @@ const AIRWAY_OPTIONS: { value: AirwayType; label: string }[] = [
 	{ value: "tracheostomy", label: "Tracheostomy" },
 ]
 
+const ANESTHESIA_TYPE_OPTIONS: { value: AnesthesiaType; label: string }[] = [
+	{ value: "general", label: "General" },
+	{ value: "regional", label: "Regional" },
+	{ value: "local", label: "Local" },
+	{ value: "sedation", label: "Sedation" },
+]
+
+const INTUBATION_GRADE_OPTIONS: { value: IntubationGrade; label: string }[] = [
+	{ value: "CL1", label: "CL Grade I" },
+	{ value: "CL2", label: "CL Grade II" },
+	{ value: "CL3", label: "CL Grade III" },
+	{ value: "CL4", label: "CL Grade IV" },
+	{ value: "not_applicable", label: "N/A" },
+]
+
 interface FormState {
-	asaClass: AsaClass
-	airwayType: AirwayType
+	asaClass: AsaClass | undefined
+	anesthesiaType: AnesthesiaType | undefined
+	airwayType: AirwayType | undefined
+	intubationGrade: IntubationGrade | undefined
+	difficultAirway: boolean
+	airwayManagement: string
 	intubationAttempts: string
-	agents: AnesthesiaAgent[]
+	inductionAgents: InductionAgent[]
+	maintenanceAgents: MaintenanceAgent[]
+	muscleRelaxants: MuscleRelaxant[]
+	intraopMedications: IntraopMedication[]
 	intraopVitals: IntraopVital[]
 	reversalAgent: string
 	totalAnesthesiaMinutes: string
-	emergenceSmooth: boolean
+	emergenceSmooth: boolean | undefined
 	complications: string
 	postAnesthesiaCareNotes: string
 }
 
 function buildInitialState(existing: AnesthesiaRecord | null | undefined): FormState {
 	return {
-		asaClass: existing?.asaClass ?? "ASA I",
-		airwayType: existing?.airwayType ?? "oral_ett",
-		intubationAttempts: existing?.intubationAttempts?.toString() ?? "1",
-		agents: existing?.agents ?? [],
+		asaClass: existing?.asaClass,
+		anesthesiaType: existing?.anesthesiaType,
+		airwayType: existing?.airwayType,
+		intubationGrade: existing?.intubationGrade,
+		difficultAirway: existing?.difficultAirway ?? false,
+		airwayManagement: existing?.airwayManagement ?? "",
+		intubationAttempts: existing?.intubationAttempts?.toString() ?? "",
+		inductionAgents: existing?.inductionAgents ?? [],
+		maintenanceAgents: existing?.maintenanceAgents ?? [],
+		muscleRelaxants: existing?.muscleRelaxants ?? [],
+		intraopMedications: existing?.intraopMedications ?? [],
 		intraopVitals: existing?.intraopVitals ?? [],
 		reversalAgent: existing?.reversalAgent ?? "",
 		totalAnesthesiaMinutes: existing?.totalAnesthesiaMinutes?.toString() ?? "",
-		emergenceSmooth: existing?.emergenceSmooth ?? true,
+		emergenceSmooth: existing?.emergenceSmooth,
 		complications: existing?.complications ?? "",
 		postAnesthesiaCareNotes: existing?.postAnesthesiaCareNotes ?? "",
 	}
 }
 
-const BLANK_AGENT: AnesthesiaAgent = { name: "", dose: "", route: "", time: "" }
-const BLANK_VITAL: IntraopVital = { time: "", bp: "", hr: 0, spo2: 100, etco2: undefined }
+const BLANK_INDUCTION: InductionAgent = { agent: "", dose: "", time: "" }
+const BLANK_MAINTENANCE: MaintenanceAgent = { agent: "", dose: "", time: "" }
+const BLANK_RELAXANT: MuscleRelaxant = { agent: "", dose: "", time: "" }
+const BLANK_MEDICATION: IntraopMedication = { name: "", dose: "", route: "", time: "", indication: "" }
+const BLANK_VITAL: IntraopVital = { time: "", bp: "", hr: 0, spo2: 100, etco2: undefined, temp: undefined }
 
 interface AnesthesiaRecordFormProps {
 	caseId: string
 	existing: AnesthesiaRecord | null | undefined
 	canEdit?: boolean
+	canSign?: boolean
 }
 
-export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: AnesthesiaRecordFormProps) {
+export function AnesthesiaRecordForm({
+	caseId,
+	existing,
+	canEdit = true,
+	canSign = false,
+}: AnesthesiaRecordFormProps) {
 	const [form, setForm] = useState<FormState>(() => buildInitialState(existing))
+	const [showSignConfirm, setShowSignConfirm] = useState(false)
 	const save = useSaveAnesthesiaRecordMutation()
+	const sign = useSignAnesthesiaRecordMutation()
+
+	const isSigned = existing?.status === "signed"
+	const fieldsDisabled = isSigned || !canEdit || save.isPending || sign.isPending
 
 	useEffect(() => {
 		setForm(buildInitialState(existing))
@@ -112,35 +171,101 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 		setForm((prev) => ({ ...prev, [key]: value }))
 	}
 
-	// ── Agents ────────────────────────────────────────────────────────────────
+	// ── Induction Agents ───────────────────────────────────────────────────────
 
-	function addAgent() {
-		setField("agents", [...form.agents, { ...BLANK_AGENT }])
+	function addInduction() {
+		setField("inductionAgents", [...form.inductionAgents, { ...BLANK_INDUCTION }])
 	}
 
-	function updateAgent(index: number, field: keyof AnesthesiaAgent, value: string) {
-		const updated = form.agents.map((a, i) => (i === index ? { ...a, [field]: value } : a))
-		setField("agents", updated)
-	}
-
-	function removeAgent(index: number) {
+	function updateInduction(index: number, field: keyof InductionAgent, value: string) {
 		setField(
-			"agents",
-			form.agents.filter((_, i) => i !== index),
+			"inductionAgents",
+			form.inductionAgents.map((a, i) => (i === index ? { ...a, [field]: value } : a)),
 		)
 	}
 
-	// ── Vitals ────────────────────────────────────────────────────────────────
+	function removeInduction(index: number) {
+		setField(
+			"inductionAgents",
+			form.inductionAgents.filter((_, i) => i !== index),
+		)
+	}
+
+	// ── Maintenance Agents ─────────────────────────────────────────────────────
+
+	function addMaintenance() {
+		setField("maintenanceAgents", [...form.maintenanceAgents, { ...BLANK_MAINTENANCE }])
+	}
+
+	function updateMaintenance(index: number, field: keyof MaintenanceAgent, value: string) {
+		setField(
+			"maintenanceAgents",
+			form.maintenanceAgents.map((a, i) => (i === index ? { ...a, [field]: value } : a)),
+		)
+	}
+
+	function removeMaintenance(index: number) {
+		setField(
+			"maintenanceAgents",
+			form.maintenanceAgents.filter((_, i) => i !== index),
+		)
+	}
+
+	// ── Muscle Relaxants ───────────────────────────────────────────────────────
+
+	function addRelaxant() {
+		setField("muscleRelaxants", [...form.muscleRelaxants, { ...BLANK_RELAXANT }])
+	}
+
+	function updateRelaxant(index: number, field: keyof MuscleRelaxant, value: string) {
+		setField(
+			"muscleRelaxants",
+			form.muscleRelaxants.map((a, i) => (i === index ? { ...a, [field]: value } : a)),
+		)
+	}
+
+	function removeRelaxant(index: number) {
+		setField(
+			"muscleRelaxants",
+			form.muscleRelaxants.filter((_, i) => i !== index),
+		)
+	}
+
+	// ── Intraop Medications ────────────────────────────────────────────────────
+
+	function addMedication() {
+		setField("intraopMedications", [...form.intraopMedications, { ...BLANK_MEDICATION }])
+	}
+
+	function updateMedication(index: number, field: keyof IntraopMedication, value: string) {
+		setField(
+			"intraopMedications",
+			form.intraopMedications.map((m, i) => (i === index ? { ...m, [field]: value } : m)),
+		)
+	}
+
+	function removeMedication(index: number) {
+		setField(
+			"intraopMedications",
+			form.intraopMedications.filter((_, i) => i !== index),
+		)
+	}
+
+	// ── Vitals ─────────────────────────────────────────────────────────────────
 
 	function addVital() {
 		setField("intraopVitals", [...form.intraopVitals, { ...BLANK_VITAL }])
 	}
 
-	function updateVital(index: number, field: keyof IntraopVital, value: string | number) {
-		const updated = form.intraopVitals.map((v, i) =>
-			i === index ? { ...v, [field]: value } : v,
+	function updateVital(
+		index: number,
+		field: keyof IntraopVital,
+		value: string | number | undefined,
+	) {
+		setField(
+			"intraopVitals",
+			form.intraopVitals.map((v, i) => (i === index ? { ...v, [field]: value } : v)),
 		)
-		setField("intraopVitals", updated)
 	}
 
 	function removeVital(index: number) {
@@ -156,9 +281,16 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 		save.mutate({
 			caseId,
 			asaClass: form.asaClass,
+			anesthesiaType: form.anesthesiaType,
 			airwayType: form.airwayType,
-			intubationAttempts: Number(form.intubationAttempts) || 1,
-			agents: form.agents,
+			airwayManagement: form.airwayManagement || undefined,
+			intubationAttempts: form.intubationAttempts ? Number(form.intubationAttempts) : undefined,
+			intubationGrade: form.intubationGrade,
+			difficultAirway: form.difficultAirway,
+			inductionAgents: form.inductionAgents,
+			maintenanceAgents: form.maintenanceAgents,
+			muscleRelaxants: form.muscleRelaxants,
+			intraopMedications: form.intraopMedications,
 			intraopVitals: form.intraopVitals,
 			reversalAgent: form.reversalAgent || undefined,
 			totalAnesthesiaMinutes: form.totalAnesthesiaMinutes
@@ -170,8 +302,33 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 		})
 	}
 
+	function handleSign() {
+		setShowSignConfirm(true)
+	}
+
+	function confirmSign() {
+		sign.mutate({ caseId })
+	}
+
 	return (
 		<div className="space-y-6">
+			{/* Signed banner */}
+			{isSigned && (
+				<div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-800">
+					<CheckCircle2 className="size-4 shrink-0" />
+					<span className="font-medium">Anesthesia record signed</span>
+					{existing?.signedAt && (
+						<span className="text-green-700">
+							&middot;{" "}
+							{new Date(existing.signedAt).toLocaleString("en-PH", {
+								dateStyle: "medium",
+								timeStyle: "short",
+							})}
+						</span>
+					)}
+				</div>
+			)}
+
 			{/* Classification */}
 			<Card>
 				<CardHeader>
@@ -179,13 +336,33 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 				</CardHeader>
 				<CardContent className="grid gap-4 sm:grid-cols-2">
 					<div className="space-y-1.5">
-						<Label>ASA Physical Status Class</Label>
+						<Label>Anesthesia Type</Label>
 						<Select
-							value={form.asaClass}
-							onValueChange={(v) => setField("asaClass", v as AsaClass)}
+							value={form.anesthesiaType ?? ""}
+							onValueChange={(v) => setField("anesthesiaType", v as AnesthesiaType)}
+							disabled={fieldsDisabled}
 						>
 							<SelectTrigger>
-								<SelectValue />
+								<SelectValue placeholder="Select type…" />
+							</SelectTrigger>
+							<SelectContent>
+								{ANESTHESIA_TYPE_OPTIONS.map((opt) => (
+									<SelectItem key={opt.value} value={opt.value}>
+										{opt.label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+					<div className="space-y-1.5">
+						<Label>ASA Physical Status Class</Label>
+						<Select
+							value={form.asaClass ?? ""}
+							onValueChange={(v) => setField("asaClass", v as AsaClass)}
+							disabled={fieldsDisabled}
+						>
+							<SelectTrigger>
+								<SelectValue placeholder="Select class…" />
 							</SelectTrigger>
 							<SelectContent>
 								{ASA_OPTIONS.map((cls) => (
@@ -196,14 +373,13 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 							</SelectContent>
 						</Select>
 					</div>
-					<div className="space-y-1.5">
-						<Label>Current ASA Classification</Label>
-						<div className="flex h-10 items-center">
+					{!isSigned && form.asaClass && (
+						<div className="flex h-10 items-center sm:col-span-2">
 							<Badge variant="secondary" className="text-sm">
 								{form.asaClass}: {ASA_DESCRIPTIONS[form.asaClass]}
 							</Badge>
 						</div>
-					</div>
+					)}
 				</CardContent>
 			</Card>
 
@@ -212,106 +388,406 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 				<CardHeader>
 					<CardTitle className="text-base">Airway Management</CardTitle>
 				</CardHeader>
-				<CardContent className="grid gap-4 sm:grid-cols-2">
-					<div className="space-y-1.5">
-						<Label>Airway Device</Label>
-						<Select
-							value={form.airwayType}
-							onValueChange={(v) => setField("airwayType", v as AirwayType)}
-						>
-							<SelectTrigger>
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{AIRWAY_OPTIONS.map((opt) => (
-									<SelectItem key={opt.value} value={opt.value}>
-										{opt.label}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
+				<CardContent className="space-y-4">
+					<div className="grid gap-4 sm:grid-cols-3">
+						<div className="space-y-1.5">
+							<Label>Airway Device</Label>
+							<Select
+								value={form.airwayType ?? ""}
+								onValueChange={(v) => setField("airwayType", v as AirwayType)}
+								disabled={fieldsDisabled}
+							>
+								<SelectTrigger>
+									<SelectValue placeholder="Select device…" />
+								</SelectTrigger>
+								<SelectContent>
+									{AIRWAY_OPTIONS.map((opt) => (
+										<SelectItem key={opt.value} value={opt.value}>
+											{opt.label}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+						<div className="space-y-1.5">
+							<Label>Cormack-Lehane Grade</Label>
+							<Select
+								value={form.intubationGrade ?? ""}
+								onValueChange={(v) => setField("intubationGrade", v as IntubationGrade)}
+								disabled={fieldsDisabled}
+							>
+								<SelectTrigger>
+									<SelectValue placeholder="Select grade…" />
+								</SelectTrigger>
+								<SelectContent>
+									{INTUBATION_GRADE_OPTIONS.map((opt) => (
+										<SelectItem key={opt.value} value={opt.value}>
+											{opt.label}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+						<div className="space-y-1.5">
+							<Label>Intubation Attempts</Label>
+							<Input
+								type="number"
+								min={1}
+								value={form.intubationAttempts}
+								onChange={(e) => setField("intubationAttempts", e.target.value)}
+								disabled={fieldsDisabled}
+							/>
+						</div>
+					</div>
+					<div className="flex items-center gap-3">
+						<Checkbox
+							id="difficult-airway"
+							checked={form.difficultAirway}
+							onCheckedChange={(v) => setField("difficultAirway", !!v)}
+							disabled={fieldsDisabled}
+						/>
+						<Label htmlFor="difficult-airway">Difficult airway documented</Label>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Intubation Attempts</Label>
-						<Input
-							type="number"
-							min={1}
-							value={form.intubationAttempts}
-							onChange={(e) => setField("intubationAttempts", e.target.value)}
+						<Label>Airway Notes</Label>
+						<Textarea
+							rows={2}
+							value={form.airwayManagement}
+							onChange={(e) => setField("airwayManagement", e.target.value)}
+							placeholder="Additional airway management notes…"
+							disabled={fieldsDisabled}
 						/>
 					</div>
 				</CardContent>
 			</Card>
 
-			{/* Agents */}
+			{/* Anesthetic Agents — three sub-sections */}
+			<Card>
+				<CardHeader>
+					<CardTitle className="text-base">Anesthetic Agents</CardTitle>
+				</CardHeader>
+				<CardContent className="space-y-0 p-0">
+					{/* Induction */}
+					<div className="px-6 pt-4 pb-4">
+						<p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+							Induction Agents
+						</p>
+						{form.inductionAgents.length > 0 && (
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>Agent</TableHead>
+										<TableHead>Dose</TableHead>
+										<TableHead>Time</TableHead>
+										<TableHead />
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{form.inductionAgents.map((a, i) => (
+										<TableRow key={i}>
+											<TableCell>
+												<Input
+													value={a.agent}
+													onChange={(e) =>
+														updateInduction(i, "agent", e.target.value)
+													}
+													placeholder="e.g. Propofol"
+													disabled={fieldsDisabled}
+												/>
+											</TableCell>
+											<TableCell>
+												<Input
+													value={a.dose}
+													onChange={(e) =>
+														updateInduction(i, "dose", e.target.value)
+													}
+													placeholder="e.g. 2 mg/kg"
+													disabled={fieldsDisabled}
+												/>
+											</TableCell>
+											<TableCell>
+												<Input
+													value={a.time ?? ""}
+													onChange={(e) =>
+														updateInduction(i, "time", e.target.value)
+													}
+													placeholder="HH:MM"
+													disabled={fieldsDisabled}
+												/>
+											</TableCell>
+											<TableCell>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={() => removeInduction(i)}
+													disabled={fieldsDisabled}
+												>
+													<Trash2 className="size-3.5 text-destructive" />
+												</Button>
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						)}
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={addInduction}
+							disabled={fieldsDisabled}
+							className="mt-2"
+						>
+							<Plus className="mr-1.5 size-3.5" />
+							Add Induction Agent
+						</Button>
+					</div>
+
+					<Separator />
+
+					{/* Maintenance */}
+					<div className="px-6 pt-4 pb-4">
+						<p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+							Maintenance Agents
+						</p>
+						{form.maintenanceAgents.length > 0 && (
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>Agent</TableHead>
+										<TableHead>Dose / Concentration</TableHead>
+										<TableHead>Time</TableHead>
+										<TableHead />
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{form.maintenanceAgents.map((a, i) => (
+										<TableRow key={i}>
+											<TableCell>
+												<Input
+													value={a.agent}
+													onChange={(e) =>
+														updateMaintenance(i, "agent", e.target.value)
+													}
+													placeholder="e.g. Sevoflurane"
+													disabled={fieldsDisabled}
+												/>
+											</TableCell>
+											<TableCell>
+												<Input
+													value={a.dose}
+													onChange={(e) =>
+														updateMaintenance(i, "dose", e.target.value)
+													}
+													placeholder="e.g. 2% in O₂/Air"
+													disabled={fieldsDisabled}
+												/>
+											</TableCell>
+											<TableCell>
+												<Input
+													value={a.time ?? ""}
+													onChange={(e) =>
+														updateMaintenance(i, "time", e.target.value)
+													}
+													placeholder="HH:MM"
+													disabled={fieldsDisabled}
+												/>
+											</TableCell>
+											<TableCell>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={() => removeMaintenance(i)}
+													disabled={fieldsDisabled}
+												>
+													<Trash2 className="size-3.5 text-destructive" />
+												</Button>
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						)}
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={addMaintenance}
+							disabled={fieldsDisabled}
+							className="mt-2"
+						>
+							<Plus className="mr-1.5 size-3.5" />
+							Add Maintenance Agent
+						</Button>
+					</div>
+
+					<Separator />
+
+					{/* Muscle Relaxants */}
+					<div className="px-6 pt-4 pb-4">
+						<p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+							Muscle Relaxants
+						</p>
+						{form.muscleRelaxants.length > 0 && (
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>Agent</TableHead>
+										<TableHead>Dose</TableHead>
+										<TableHead>Time</TableHead>
+										<TableHead />
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{form.muscleRelaxants.map((a, i) => (
+										<TableRow key={i}>
+											<TableCell>
+												<Input
+													value={a.agent}
+													onChange={(e) =>
+														updateRelaxant(i, "agent", e.target.value)
+													}
+													placeholder="e.g. Rocuronium"
+													disabled={fieldsDisabled}
+												/>
+											</TableCell>
+											<TableCell>
+												<Input
+													value={a.dose}
+													onChange={(e) =>
+														updateRelaxant(i, "dose", e.target.value)
+													}
+													placeholder="e.g. 0.6 mg/kg"
+													disabled={fieldsDisabled}
+												/>
+											</TableCell>
+											<TableCell>
+												<Input
+													value={a.time ?? ""}
+													onChange={(e) =>
+														updateRelaxant(i, "time", e.target.value)
+													}
+													placeholder="HH:MM"
+													disabled={fieldsDisabled}
+												/>
+											</TableCell>
+											<TableCell>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={() => removeRelaxant(i)}
+													disabled={fieldsDisabled}
+												>
+													<Trash2 className="size-3.5 text-destructive" />
+												</Button>
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						)}
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={addRelaxant}
+							disabled={fieldsDisabled}
+							className="mt-2"
+						>
+							<Plus className="mr-1.5 size-3.5" />
+							Add Muscle Relaxant
+						</Button>
+					</div>
+				</CardContent>
+			</Card>
+
+			{/* Intraoperative Medications */}
 			<Card>
 				<CardHeader className="flex flex-row items-center justify-between">
-					<CardTitle className="text-base">Anesthetic Agents</CardTitle>
-					<Button variant="outline" size="sm" onClick={addAgent}>
+					<CardTitle className="text-base">Intraoperative Medications</CardTitle>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={addMedication}
+						disabled={fieldsDisabled}
+					>
 						<Plus className="mr-1.5 size-3.5" />
-						Add Agent
+						Add Medication
 					</Button>
 				</CardHeader>
 				<CardContent className="p-0">
-					{form.agents.length === 0 ? (
+					{form.intraopMedications.length === 0 ? (
 						<p className="text-muted-foreground px-4 py-6 text-center text-sm">
-							No agents added. Click &ldquo;Add Agent&rdquo; to begin.
+							No medications recorded. Click &ldquo;Add Medication&rdquo; to begin.
 						</p>
 					) : (
 						<Table>
 							<TableHeader>
 								<TableRow>
-									<TableHead>Agent Name</TableHead>
+									<TableHead>Medication</TableHead>
 									<TableHead>Dose</TableHead>
 									<TableHead>Route</TableHead>
 									<TableHead>Time</TableHead>
+									<TableHead>Indication</TableHead>
 									<TableHead />
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{form.agents.map((agent, i) => (
+								{form.intraopMedications.map((m, i) => (
 									<TableRow key={i}>
 										<TableCell>
 											<Input
-												value={agent.name}
+												value={m.name}
 												onChange={(e) =>
-													updateAgent(i, "name", e.target.value)
+													updateMedication(i, "name", e.target.value)
 												}
-												placeholder="e.g. Propofol"
+												placeholder="e.g. Cefazolin"
+												disabled={fieldsDisabled}
 											/>
 										</TableCell>
 										<TableCell>
 											<Input
-												value={agent.dose}
+												value={m.dose}
 												onChange={(e) =>
-													updateAgent(i, "dose", e.target.value)
+													updateMedication(i, "dose", e.target.value)
 												}
-												placeholder="e.g. 2 mg/kg"
+												placeholder="e.g. 1g"
+												disabled={fieldsDisabled}
 											/>
 										</TableCell>
 										<TableCell>
 											<Input
-												value={agent.route}
+												value={m.route}
 												onChange={(e) =>
-													updateAgent(i, "route", e.target.value)
+													updateMedication(i, "route", e.target.value)
 												}
 												placeholder="e.g. IV"
+												disabled={fieldsDisabled}
 											/>
 										</TableCell>
 										<TableCell>
 											<Input
-												value={agent.time}
+												value={m.time}
 												onChange={(e) =>
-													updateAgent(i, "time", e.target.value)
+													updateMedication(i, "time", e.target.value)
 												}
 												placeholder="HH:MM"
+												disabled={fieldsDisabled}
+											/>
+										</TableCell>
+										<TableCell>
+											<Input
+												value={m.indication ?? ""}
+												onChange={(e) =>
+													updateMedication(i, "indication", e.target.value)
+												}
+												placeholder="Optional"
+												disabled={fieldsDisabled}
 											/>
 										</TableCell>
 										<TableCell>
 											<Button
 												variant="ghost"
 												size="sm"
-												onClick={() => removeAgent(i)}
+												onClick={() => removeMedication(i)}
+												disabled={fieldsDisabled}
 											>
 												<Trash2 className="size-3.5 text-destructive" />
 											</Button>
@@ -327,8 +803,13 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 			{/* Intraop Vitals */}
 			<Card>
 				<CardHeader className="flex flex-row items-center justify-between">
-					<CardTitle className="text-base">Intraoperative Vitals Timeline</CardTitle>
-					<Button variant="outline" size="sm" onClick={addVital}>
+					<CardTitle className="text-base">Intraoperative Vitals Flowsheet</CardTitle>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={addVital}
+						disabled={fieldsDisabled}
+					>
 						<Plus className="mr-1.5 size-3.5" />
 						Add Entry
 					</Button>
@@ -347,6 +828,7 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 									<TableHead>HR (bpm)</TableHead>
 									<TableHead>SpO₂ (%)</TableHead>
 									<TableHead>EtCO₂ (mmHg)</TableHead>
+									<TableHead>Temp (°C)</TableHead>
 									<TableHead />
 								</TableRow>
 							</TableHeader>
@@ -360,6 +842,7 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 													updateVital(i, "time", e.target.value)
 												}
 												placeholder="HH:MM"
+												disabled={fieldsDisabled}
 											/>
 										</TableCell>
 										<TableCell>
@@ -369,6 +852,7 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 													updateVital(i, "bp", e.target.value)
 												}
 												placeholder="120/80"
+												disabled={fieldsDisabled}
 											/>
 										</TableCell>
 										<TableCell>
@@ -380,6 +864,7 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 													updateVital(i, "hr", Number(e.target.value))
 												}
 												placeholder="72"
+												disabled={fieldsDisabled}
 											/>
 										</TableCell>
 										<TableCell>
@@ -389,13 +874,10 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 												max={100}
 												value={vital.spo2 || ""}
 												onChange={(e) =>
-													updateVital(
-														i,
-														"spo2",
-														Number(e.target.value),
-													)
+													updateVital(i, "spo2", Number(e.target.value))
 												}
 												placeholder="98"
+												disabled={fieldsDisabled}
 											/>
 										</TableCell>
 										<TableCell>
@@ -407,10 +889,33 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 													updateVital(
 														i,
 														"etco2",
-														e.target.value ? Number(e.target.value) : undefined as unknown as number,
+														e.target.value
+															? Number(e.target.value)
+															: undefined,
 													)
 												}
 												placeholder="35"
+												disabled={fieldsDisabled}
+											/>
+										</TableCell>
+										<TableCell>
+											<Input
+												type="number"
+												min={30}
+												max={45}
+												step={0.1}
+												value={vital.temp ?? ""}
+												onChange={(e) =>
+													updateVital(
+														i,
+														"temp",
+														e.target.value
+															? Number(e.target.value)
+															: undefined,
+													)
+												}
+												placeholder="36.5"
+												disabled={fieldsDisabled}
 											/>
 										</TableCell>
 										<TableCell>
@@ -418,6 +923,7 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 												variant="ghost"
 												size="sm"
 												onClick={() => removeVital(i)}
+												disabled={fieldsDisabled}
 											>
 												<Trash2 className="size-3.5 text-destructive" />
 											</Button>
@@ -442,6 +948,7 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 							value={form.reversalAgent}
 							onChange={(e) => setField("reversalAgent", e.target.value)}
 							placeholder="e.g. Neostigmine"
+							disabled={fieldsDisabled}
 						/>
 					</div>
 					<div className="space-y-1.5">
@@ -452,13 +959,15 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 							value={form.totalAnesthesiaMinutes}
 							onChange={(e) => setField("totalAnesthesiaMinutes", e.target.value)}
 							placeholder="0"
+							disabled={fieldsDisabled}
 						/>
 					</div>
 					<div className="flex items-center gap-3">
 						<Checkbox
 							id="emergence-smooth"
-							checked={form.emergenceSmooth}
+							checked={form.emergenceSmooth ?? false}
 							onCheckedChange={(v) => setField("emergenceSmooth", !!v)}
+							disabled={fieldsDisabled}
 						/>
 						<Label htmlFor="emergence-smooth">Smooth emergence from anesthesia</Label>
 					</div>
@@ -469,6 +978,7 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 							value={form.complications}
 							onChange={(e) => setField("complications", e.target.value)}
 							placeholder="Any anesthesia-related complications…"
+							disabled={fieldsDisabled}
 						/>
 					</div>
 					<div className="space-y-1.5 sm:col-span-2">
@@ -478,6 +988,7 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 							value={form.postAnesthesiaCareNotes}
 							onChange={(e) => setField("postAnesthesiaCareNotes", e.target.value)}
 							placeholder="Post-anesthesia care unit notes…"
+							disabled={fieldsDisabled}
 						/>
 					</div>
 				</CardContent>
@@ -485,12 +996,48 @@ export function AnesthesiaRecordForm({ caseId, existing, canEdit = true }: Anest
 
 			<Separator />
 
-			<div className="flex justify-end">
-				<Button onClick={handleSubmit} disabled={save.isPending || !canEdit}>
-					<Save className="mr-2 size-4" />
-					{save.isPending ? "Saving…" : "Save Anesthesia Record"}
-				</Button>
+			<div className="flex justify-end gap-3">
+				{!isSigned && (
+					<Button
+						onClick={handleSubmit}
+						disabled={save.isPending || !canEdit || isSigned}
+						variant="outline"
+					>
+						<Save className="mr-2 size-4" />
+						{save.isPending ? "Saving…" : "Save Draft"}
+					</Button>
+				)}
+				{canSign && !isSigned && (
+					<Button
+						className="bg-green-700 hover:bg-green-800"
+						onClick={handleSign}
+						disabled={sign.isPending || !existing}
+					>
+						<CheckCircle2 className="mr-2 size-4" />
+						{sign.isPending ? "Signing…" : "Sign Anesthesia Record"}
+					</Button>
+				)}
 			</div>
+
+			<AlertDialog open={showSignConfirm} onOpenChange={setShowSignConfirm}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Sign and lock anesthesia record?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Signing will permanently lock this record and cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={confirmSign}
+							className="bg-green-700 hover:bg-green-800"
+						>
+							Sign Record
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	)
 }

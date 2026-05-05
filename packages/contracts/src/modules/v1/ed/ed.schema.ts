@@ -26,12 +26,7 @@ const PaginatedResponseSchema = z.object({
 
 export const TriageAcuityScaleEnum = z.enum(["esi", "ats", "ctas"])
 export const PreEncounterStatusEnum = z.enum(["active", "merged", "cancelled"])
-export const EdQueueStatusEnum = z.enum([
-	"waiting",
-	"triage",
-	"being_seen",
-	"disposition",
-])
+export const EdQueueStatusEnum = z.enum(["waiting", "triage", "being_seen", "disposition"])
 export const EdDispositionEnum = z.enum(["admit", "discharge", "transfer", "deceased"])
 
 // ============================================================================

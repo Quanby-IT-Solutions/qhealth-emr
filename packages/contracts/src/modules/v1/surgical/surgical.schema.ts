@@ -42,6 +42,12 @@ export const AirwayTypeEnum = z.enum([
 	"tracheostomy",
 ])
 
+export const AnesthesiaTypeEnum = z.enum(["general", "regional", "local", "sedation"])
+
+export const IntubationGradeEnum = z.enum(["CL1", "CL2", "CL3", "CL4", "not_applicable"])
+
+export const AnesthesiaRecordStatusEnum = z.enum(["draft", "signed"])
+
 export const RvsCodeStatusEnum = z.enum(["suggested", "validated", "finalized"])
 export const RvsAssignmentTypeEnum = z.enum(["primary", "adjunct"])
 export const OperationRecordStatusEnum = z.enum(["draft", "signed"])
@@ -124,12 +130,46 @@ export const AnesthesiaAgentSchema = z.object({
 	time: z.string(),
 })
 
+export const InductionAgentSchema = z.object({
+	agent: z.string(),
+	dose: z.string(),
+	time: z.string().optional(),
+})
+
+export const MaintenanceAgentSchema = z.object({
+	agent: z.string(),
+	dose: z.string(),
+	time: z.string().optional(),
+})
+
+export const MuscleRelaxantSchema = z.object({
+	agent: z.string(),
+	dose: z.string(),
+	time: z.string().optional(),
+})
+
+export const IntraopMedicationSchema = z.object({
+	name: z.string(),
+	dose: z.string(),
+	route: z.string(),
+	time: z.string(),
+	indication: z.string().optional(),
+})
+
 export const IntraopVitalSchema = z.object({
 	time: z.string(),
 	bp: z.string(),
 	hr: z.number(),
 	spo2: z.number(),
 	etco2: z.number().optional(),
+	temp: z.number().optional(),
+})
+
+export const FluidBalanceSchema = z.object({
+	ivFluids: z.array(z.object({ type: z.string(), volumeMl: z.number() })).optional(),
+	estimatedBloodLoss: z.number().optional(),
+	urineOutput: z.number().optional(),
+	otherOutput: z.number().optional(),
 })
 
 // ============================================================================
@@ -139,16 +179,29 @@ export const IntraopVitalSchema = z.object({
 export const AnesthesiaRecordSchema = z.object({
 	id: z.string().uuid(),
 	surgicalCaseId: z.string().uuid(),
-	asaClass: AsaClassEnum,
-	airwayType: AirwayTypeEnum,
-	intubationAttempts: z.number().int(),
-	agents: z.array(AnesthesiaAgentSchema),
-	intraopVitals: z.array(IntraopVitalSchema),
+	asaClass: AsaClassEnum.nullable(),
+	anesthesiaType: AnesthesiaTypeEnum.nullable(),
+	airwayType: AirwayTypeEnum.nullable(),
+	airwayManagement: z.string().nullable(),
+	intubationAttempts: z.number().int().nullable(),
+	intubationGrade: IntubationGradeEnum.nullable(),
+	difficultAirway: z.boolean(),
+	agents: z.array(AnesthesiaAgentSchema).nullable(),
+	inductionAgents: z.array(InductionAgentSchema).nullable(),
+	maintenanceAgents: z.array(MaintenanceAgentSchema).nullable(),
+	muscleRelaxants: z.array(MuscleRelaxantSchema).nullable(),
+	intraopMedications: z.array(IntraopMedicationSchema).nullable(),
+	intraopVitals: z.array(IntraopVitalSchema).nullable(),
+	fluidBalance: FluidBalanceSchema.nullable(),
 	reversalAgent: z.string().nullable(),
 	totalAnesthesiaMinutes: z.number().nullable(),
-	emergenceSmooth: z.boolean(),
+	emergenceSmooth: z.boolean().nullable(),
 	complications: z.string().nullable(),
 	postAnesthesiaCareNotes: z.string().nullable(),
+	anesthesiologistStaffId: z.string().uuid().nullable(),
+	status: AnesthesiaRecordStatusEnum,
+	signedAt: z.string().nullable(),
+	signedByStaffId: z.string().uuid().nullable(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 })
@@ -324,16 +377,30 @@ export const SignOperationRecordSchema = z.object({
 
 export const SaveAnesthesiaRecordSchema = z.object({
 	caseId: z.string().uuid(),
-	asaClass: AsaClassEnum,
-	airwayType: AirwayTypeEnum,
-	intubationAttempts: z.number().int().min(0),
-	agents: z.array(AnesthesiaAgentSchema),
-	intraopVitals: z.array(IntraopVitalSchema),
+	asaClass: AsaClassEnum.optional(),
+	anesthesiaType: AnesthesiaTypeEnum.optional(),
+	airwayType: AirwayTypeEnum.optional(),
+	airwayManagement: z.string().optional(),
+	intubationAttempts: z.number().int().min(0).optional(),
+	intubationGrade: IntubationGradeEnum.optional(),
+	difficultAirway: z.boolean().optional(),
+	agents: z.array(AnesthesiaAgentSchema).optional(),
+	inductionAgents: z.array(InductionAgentSchema).optional(),
+	maintenanceAgents: z.array(MaintenanceAgentSchema).optional(),
+	muscleRelaxants: z.array(MuscleRelaxantSchema).optional(),
+	intraopMedications: z.array(IntraopMedicationSchema).optional(),
+	intraopVitals: z.array(IntraopVitalSchema).optional(),
+	fluidBalance: FluidBalanceSchema.optional(),
 	reversalAgent: z.string().optional(),
 	totalAnesthesiaMinutes: z.number().optional(),
-	emergenceSmooth: z.boolean(),
+	emergenceSmooth: z.boolean().optional(),
 	complications: z.string().optional(),
 	postAnesthesiaCareNotes: z.string().optional(),
+	anesthesiologistStaffId: z.string().uuid().optional(),
+})
+
+export const SignAnesthesiaRecordSchema = z.object({
+	caseId: z.string().uuid(),
 })
 
 // ============================================================================

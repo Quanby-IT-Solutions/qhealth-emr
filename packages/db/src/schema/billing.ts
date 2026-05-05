@@ -67,7 +67,9 @@ export const charges = createTable(
 	t => [
 		index("charges_facility_id_idx").on(t.facilityId),
 		index("charges_encounter_id_idx").on(t.encounterId),
-		uniqueIndex("charges_source_idempotency_uniq").on(t.sourceType, t.sourceOrderId, t.encounterId).where(sql`source_order_id IS NOT NULL`),
+		uniqueIndex("charges_source_idempotency_uniq")
+			.on(t.sourceType, t.sourceOrderId, t.encounterId)
+			.where(sql`source_order_id IS NOT NULL`),
 	]
 )
 
@@ -134,9 +136,7 @@ export const invoiceLineItems = createTable(
 			.uuid("invoice_id")
 			.notNull()
 			.references(() => invoices.id, { onDelete: "cascade" }),
-		chargeId: t
-			.uuid("charge_id")
-			.references(() => charges.id, { onDelete: "set null" }),
+		chargeId: t.uuid("charge_id").references(() => charges.id, { onDelete: "set null" }),
 		description: t.text("description").notNull(),
 		quantity: t.numeric("quantity", { precision: 8, scale: 2 }).notNull().default("1"),
 		unitPrice: t.numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
@@ -162,7 +162,9 @@ export const payments = createTable(
 		paymentMethod: t
 			.text("payment_method")
 			.notNull()
-			.$type<"cash" | "philhealth" | "hmo" | "credit_card" | "bank_transfer" | "malasakit" | "other">(),
+			.$type<
+				"cash" | "philhealth" | "hmo" | "credit_card" | "bank_transfer" | "malasakit" | "other"
+			>(),
 		referenceNumber: t.text("reference_number"),
 		hmoProvider: t.text("hmo_provider"),
 		hmoClaimNumber: t.text("hmo_claim_number"),
@@ -197,9 +199,7 @@ export const cf4Claims = createTable(
 			.uuid("patient_id")
 			.notNull()
 			.references(() => patients.id, { onDelete: "restrict" }),
-		invoiceId: t
-			.uuid("invoice_id")
-			.references(() => invoices.id, { onDelete: "set null" }),
+		invoiceId: t.uuid("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
 		claimNumber: t.text("claim_number"),
 		status: t
 			.text("status")
@@ -246,9 +246,7 @@ export const cf5Claims = createTable(
 			.uuid("encounter_id")
 			.notNull()
 			.references(() => encounters.id, { onDelete: "cascade" }),
-		cf4ClaimId: t
-			.uuid("cf4_claim_id")
-			.references(() => cf4Claims.id, { onDelete: "set null" }),
+		cf4ClaimId: t.uuid("cf4_claim_id").references(() => cf4Claims.id, { onDelete: "set null" }),
 		drgCode: t.text("drg_code"),
 		drgDescription: t.text("drg_description"),
 		drgWeight: t.numeric("drg_weight", { precision: 8, scale: 4 }),
@@ -401,14 +399,10 @@ export const esoaStatements = createTable(
 		version: t.integer("version").notNull().default(1),
 		xmlUri: t.text("xml_uri"),
 		pdfUri: t.text("pdf_uri"),
-		sentVia: t
-			.text("sent_via")
-			.$type<"patient_portal" | "email" | "print" | null>(),
+		sentVia: t.text("sent_via").$type<"patient_portal" | "email" | "print" | null>(),
 		sentAt: t.timestamp("sent_at"),
 		sentToRecipient: t.text("sent_to_recipient"),
-		deliveryStatus: t
-			.text("delivery_status")
-			.$type<"pending" | "delivered" | "failed" | null>(),
+		deliveryStatus: t.text("delivery_status").$type<"pending" | "delivered" | "failed" | null>(),
 		generatedByStaffId: t
 			.uuid("generated_by_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
@@ -461,10 +455,7 @@ export const konsultaActivities = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		activityType: t
-			.text("activity_type")
-			.notNull()
-			.$type<"FPE" | "Follow-up" | "Lab">(),
+		activityType: t.text("activity_type").notNull().$type<"FPE" | "Follow-up" | "Lab">(),
 		activityDate: t.date("activity_date").notNull(),
 		sourceRef: t.text("source_ref"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),

@@ -201,9 +201,7 @@ export const ConfigHistoryEntrySchema = z.object({
 	actor: z.string(),
 	beforeState: z.unknown().nullable(),
 	afterState: z.unknown().nullable(),
-	at: z
-		.union([z.date(), z.string()])
-		.transform(v => (typeof v === "string" ? new Date(v) : v)),
+	at: z.union([z.date(), z.string()]).transform(v => (typeof v === "string" ? new Date(v) : v)),
 })
 
 export type ConfigHistoryEntry = z.infer<typeof ConfigHistoryEntrySchema>

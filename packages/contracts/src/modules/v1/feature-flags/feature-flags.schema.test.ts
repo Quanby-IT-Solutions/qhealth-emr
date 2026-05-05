@@ -62,15 +62,11 @@ describe("CreateFeatureFlagSchema", () => {
 	})
 
 	it("rejects keys with uppercase letters", () => {
-		expect(() =>
-			CreateFeatureFlagSchema.parse({ ...valid, key: "My-Feature" })
-		).toThrow()
+		expect(() => CreateFeatureFlagSchema.parse({ ...valid, key: "My-Feature" })).toThrow()
 	})
 
 	it("rejects keys with spaces", () => {
-		expect(() =>
-			CreateFeatureFlagSchema.parse({ ...valid, key: "my feature" })
-		).toThrow()
+		expect(() => CreateFeatureFlagSchema.parse({ ...valid, key: "my feature" })).toThrow()
 	})
 
 	it("accepts keys with digits and hyphens", () => {
@@ -85,9 +81,7 @@ describe("CreateFeatureFlagSchema", () => {
 	})
 
 	it("rejects empty key", () => {
-		expect(() =>
-			CreateFeatureFlagSchema.parse({ ...valid, key: "" })
-		).toThrow()
+		expect(() => CreateFeatureFlagSchema.parse({ ...valid, key: "" })).toThrow()
 	})
 })
 

@@ -137,8 +137,7 @@ export const RegisterPatientWithOpdEncounterInputSchema = CreatePatientSchema.ex
 	if (!data.pendingTriageId) {
 		ctx.addIssue({
 			code: z.ZodIssueCode.custom,
-			message:
-				"Outpatient registration requires a pending triage intake (TOR Flow 1 Step 1)",
+			message: "Outpatient registration requires a pending triage intake (TOR Flow 1 Step 1)",
 			path: ["pendingTriageId"],
 		})
 	}

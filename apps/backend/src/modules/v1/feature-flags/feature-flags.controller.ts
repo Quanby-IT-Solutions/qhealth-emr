@@ -17,9 +17,8 @@ type RbacProfile = {
 function extractActor(session: UserSession, req: Request) {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
 	const activeProfile =
-		profile?.staffProfiles?.find(p =>
-			p.roles.some(r => r.id === profile?.activeRole?.id)
-		) ?? profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
 
 	return {
 		userId: session.user.id,
@@ -133,11 +132,7 @@ export class FeatureFlagsController {
 	@Implement(v1.featureFlags.history)
 	async history() {
 		return implement(v1.featureFlags.history).handler(async ({ input }) => {
-			return this.featureFlagsService.getHistory(
-				input.flagId,
-				input.page ?? 1,
-				input.limit ?? 20
-			)
+			return this.featureFlagsService.getHistory(input.flagId, input.page ?? 1, input.limit ?? 20)
 		})
 	}
 }

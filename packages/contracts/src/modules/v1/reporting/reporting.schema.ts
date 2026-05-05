@@ -321,11 +321,13 @@ export const AhsrRealTimeMetricsSchema = z.object({
 	),
 
 	// Emergency department metrics
-	edMetrics: z.object({
-		currentWaiting: z.number(),
-		averageWaitMinutes: z.number().nullable(),
-		bedsTurnover24h: z.number(),
-	}).nullable(),
+	edMetrics: z
+		.object({
+			currentWaiting: z.number(),
+			averageWaitMinutes: z.number().nullable(),
+			bedsTurnover24h: z.number(),
+		})
+		.nullable(),
 
 	// Alert counts (surveillance flags pending review)
 	pendingAlerts: z.number(),

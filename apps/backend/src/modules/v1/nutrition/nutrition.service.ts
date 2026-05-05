@@ -1,13 +1,12 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, sql } from "drizzle-orm"
 
-import {
-	nutritionAssessments,
-	patients,
-	staffProfiles,
-	users,
-} from "@repo/db/schema"
-import type { NutritionAssessment, ScreeningScoreInput, ScreeningScoreResult } from "@repo/contracts"
+import type {
+	NutritionAssessment,
+	ScreeningScoreInput,
+	ScreeningScoreResult,
+} from "@repo/contracts"
+import { nutritionAssessments, patients, staffProfiles, users } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
@@ -125,7 +124,8 @@ export class NutritionService {
 		}
 
 		return {
-			usualIntake: typeof dietaryHistory.usualIntake === "string" ? dietaryHistory.usualIntake : undefined,
+			usualIntake:
+				typeof dietaryHistory.usualIntake === "string" ? dietaryHistory.usualIntake : undefined,
 			foodAllergies: Array.isArray(dietaryHistory.foodAllergies)
 				? dietaryHistory.foodAllergies.filter((item): item is string => typeof item === "string")
 				: [],
@@ -133,9 +133,12 @@ export class NutritionService {
 				? dietaryHistory.intolerances.filter((item): item is string => typeof item === "string")
 				: [],
 			dietaryRestrictions: Array.isArray(dietaryHistory.dietaryRestrictions)
-				? dietaryHistory.dietaryRestrictions.filter((item): item is string => typeof item === "string")
+				? dietaryHistory.dietaryRestrictions.filter(
+						(item): item is string => typeof item === "string"
+					)
 				: [],
-			fluidIntake: typeof dietaryHistory.fluidIntake === "string" ? dietaryHistory.fluidIntake : undefined,
+			fluidIntake:
+				typeof dietaryHistory.fluidIntake === "string" ? dietaryHistory.fluidIntake : undefined,
 			appetiteStatus:
 				dietaryHistory.appetiteStatus === "good" ||
 				dietaryHistory.appetiteStatus === "fair" ||
@@ -159,7 +162,9 @@ export class NutritionService {
 		}
 	}
 
-	private mapLabReview(labReview: Record<string, unknown> | undefined): NutritionAssessment["labReview"] {
+	private mapLabReview(
+		labReview: Record<string, unknown> | undefined
+	): NutritionAssessment["labReview"] {
 		if (!labReview) {
 			return null
 		}
@@ -214,8 +219,10 @@ export class NutritionService {
 
 		return {
 			dietType,
-			caloricTarget: typeof mealPlan.caloricTarget === "number" ? mealPlan.caloricTarget : undefined,
-			proteinTarget: typeof mealPlan.proteinTarget === "number" ? mealPlan.proteinTarget : undefined,
+			caloricTarget:
+				typeof mealPlan.caloricTarget === "number" ? mealPlan.caloricTarget : undefined,
+			proteinTarget:
+				typeof mealPlan.proteinTarget === "number" ? mealPlan.proteinTarget : undefined,
 			carbTarget: typeof mealPlan.carbTarget === "number" ? mealPlan.carbTarget : undefined,
 			fatTarget: typeof mealPlan.fatTarget === "number" ? mealPlan.fatTarget : undefined,
 			fluidTarget: typeof mealPlan.fluidTarget === "number" ? mealPlan.fluidTarget : undefined,
@@ -232,15 +239,16 @@ export class NutritionService {
 				typeof mealPlan.enteralFormula === "string" ? mealPlan.enteralFormula : undefined,
 			parenteralFormula:
 				typeof mealPlan.parenteralFormula === "string" ? mealPlan.parenteralFormula : undefined,
-			mealFrequency: typeof mealPlan.mealFrequency === "string" ? mealPlan.mealFrequency : undefined,
+			mealFrequency:
+				typeof mealPlan.mealFrequency === "string" ? mealPlan.mealFrequency : undefined,
 			supplements: Array.isArray(mealPlan.supplements)
 				? mealPlan.supplements.map(item => {
-					if (typeof item === "string") return item
-					if (typeof item === "object" && item !== null && "name" in item) {
-						return String(item.name)
-					}
-					return String(item)
-				})
+						if (typeof item === "string") return item
+						if (typeof item === "object" && item !== null && "name" in item) {
+							return String(item.name)
+						}
+						return String(item)
+					})
 				: undefined,
 			restrictions: Array.isArray(mealPlan.restrictions)
 				? mealPlan.restrictions.filter((item): item is string => typeof item === "string")
@@ -268,10 +276,13 @@ export class NutritionService {
 		updatedAt: Date
 	}): NutritionAssessment {
 		const fullAssessmentData = (row.fullAssessmentData as Record<string, unknown> | null) ?? null
-		const anthropometrics = (fullAssessmentData?.anthropometrics as Record<string, unknown> | undefined) ?? null
-		const dietaryHistory = (fullAssessmentData?.dietaryHistory as Record<string, unknown> | undefined) ?? null
+		const anthropometrics =
+			(fullAssessmentData?.anthropometrics as Record<string, unknown> | undefined) ?? null
+		const dietaryHistory =
+			(fullAssessmentData?.dietaryHistory as Record<string, unknown> | undefined) ?? null
 		const labReview = (fullAssessmentData?.labReview as Record<string, unknown> | undefined) ?? null
-		const clinicalEval = (fullAssessmentData?.clinicalEval as Record<string, unknown> | undefined) ?? null
+		const clinicalEval =
+			(fullAssessmentData?.clinicalEval as Record<string, unknown> | undefined) ?? null
 		const mealPlan = (row.mealPlan as Record<string, unknown> | null) ?? null
 
 		return {
@@ -348,7 +359,8 @@ export class NutritionService {
 		if (input.facilityId) conditions.push(eq(nutritionAssessments.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(nutritionAssessments.encounterId, input.encounterId))
 		if (input.patientId) conditions.push(eq(nutritionAssessments.patientId, input.patientId))
-		if (input.malnutritionRisk) conditions.push(eq(nutritionAssessments.malnutritionRisk, input.malnutritionRisk))
+		if (input.malnutritionRisk)
+			conditions.push(eq(nutritionAssessments.malnutritionRisk, input.malnutritionRisk))
 
 		const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 
@@ -389,7 +401,7 @@ export class NutritionService {
 			? mappedRows.filter(row => row.status === input.status)
 			: mappedRows
 
-		const total = input.status ? filteredRows.length : totalRows[0]?.count ?? 0
+		const total = input.status ? filteredRows.length : (totalRows[0]?.count ?? 0)
 
 		return {
 			data: filteredRows,

@@ -3,8 +3,6 @@ import { z } from "zod"
 
 import {
 	ApiKeySchema,
-	RotateApiKeySchema,
-	RotatedApiKeyResponseSchema,
 	ConnectivityTestResultSchema,
 	CreateIntegrationSchema,
 	CreateWebhookSchema,
@@ -15,6 +13,8 @@ import {
 	IntegrationSchema,
 	ListApiKeysSchema,
 	RevokeApiKeySchema,
+	RotateApiKeySchema,
+	RotatedApiKeyResponseSchema,
 	UpdateIntegrationSchema,
 	UpdateWebhookSchema,
 	WebhookEndpointSchema,
@@ -194,5 +194,4 @@ export const integrationRegistryContract = {
 		})
 		.input(WebhookIdSchema)
 		.output(WebhookEndpointSchema),
-
 }

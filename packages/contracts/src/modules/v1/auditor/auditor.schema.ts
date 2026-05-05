@@ -105,12 +105,12 @@ export const BreakGlassReviewSchema = z.object({
 	reviewerStaffId: z.string().uuid(),
 	action: BreakGlassReviewActionEnum,
 	reason: z.string(),
-	decidedAt: z.union([z.date(), z.string()]).transform(v =>
-		typeof v === "string" ? new Date(v) : v
-	),
-	createdAt: z.union([z.date(), z.string()]).transform(v =>
-		typeof v === "string" ? new Date(v) : v
-	),
+	decidedAt: z
+		.union([z.date(), z.string()])
+		.transform(v => (typeof v === "string" ? new Date(v) : v)),
+	createdAt: z
+		.union([z.date(), z.string()])
+		.transform(v => (typeof v === "string" ? new Date(v) : v)),
 })
 
 export type BreakGlassReview = z.infer<typeof BreakGlassReviewSchema>
