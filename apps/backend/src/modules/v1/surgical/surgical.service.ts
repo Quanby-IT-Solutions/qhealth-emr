@@ -216,6 +216,29 @@ export class SurgicalService {
 		return missingFields
 	}
 
+	private getAnesthesiaRecordSignOffGaps(record: Awaited<ReturnType<typeof this.getAnesthesiaRecord>>) {
+		if (!record) {
+			return ["anesthesia record"]
+		}
+
+		const missingFields: string[] = []
+		const hasMedicationCharting =
+			(record.agents?.length ?? 0) > 0 ||
+			(record.inductionAgents?.length ?? 0) > 0 ||
+			(record.maintenanceAgents?.length ?? 0) > 0 ||
+			(record.muscleRelaxants?.length ?? 0) > 0 ||
+			(record.intraopMedications?.length ?? 0) > 0
+		const hasVitalCharting = (record.intraopVitals?.length ?? 0) > 0
+
+		if (!record.asaClass) missingFields.push("ASA classification")
+		if (!record.anesthesiaType) missingFields.push("anesthesia type")
+		if (!record.anesthesiologistStaffId) missingFields.push("anesthesiologist")
+		if (!hasMedicationCharting) missingFields.push("anesthetic agents or medications")
+		if (!hasVitalCharting) missingFields.push("intraoperative vitals")
+
+		return missingFields
+	}
+
 	private mapRvsRow(
 		row: {
 			id: string
@@ -738,7 +761,15 @@ export class SurgicalService {
 				| "not_applicable"
 				| null,
 			difficultAirway: input.difficultAirway ?? false,
-			agents: input.agents ?? null,
+			agents:
+				input.agents ??
+				input.intraopMedications?.map((medication) => ({
+					name: medication.name,
+					dose: medication.dose,
+					route: medication.route,
+					time: medication.time,
+				})) ??
+				null,
 			inductionAgents: input.inductionAgents ?? null,
 			maintenanceAgents: input.maintenanceAgents ?? null,
 			muscleRelaxants: input.muscleRelaxants ?? null,
@@ -771,6 +802,10 @@ export class SurgicalService {
 	async signAnesthesiaRecord(input: SignAnesthesiaRecordInput, staffProfileId: string | null) {
 		this.logger.log(`Signing anesthesia record for case: ${input.caseId}`)
 
+		if (!staffProfileId) {
+			throw new ForbiddenException("Active staff profile not found.")
+		}
+
 		const [existing] = await db
 			.select()
 			.from(anesthesiaRecords)
@@ -782,6 +817,13 @@ export class SurgicalService {
 		}
 		if (existing.status === "signed") {
 			throw new ConflictException("Anesthesia record is already signed")
+		}
+		const record = await this.getAnesthesiaRecord(input.caseId)
+		const signOffGaps = this.getAnesthesiaRecordSignOffGaps(record)
+		if (signOffGaps.length > 0) {
+			throw new BadRequestException(
+				`Anesthesia record is incomplete. Add: ${signOffGaps.join(", ")}.`
+			)
 		}
 
 		const signedAt = new Date()
@@ -795,9 +837,9 @@ export class SurgicalService {
 			})
 			.where(eq(anesthesiaRecords.id, existing.id))
 
-		const record = await this.getAnesthesiaRecord(input.caseId)
+		const savedRecord = await this.getAnesthesiaRecord(input.caseId)
 		return this.requireSavedRecord(
-			record,
+			savedRecord,
 			`Anesthesia record for case ${input.caseId} was not found after signing`
 		)
 	}
