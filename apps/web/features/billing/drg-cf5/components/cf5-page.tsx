@@ -53,8 +53,16 @@ export function Cf5Page({ encounterId }: Cf5PageProps) {
 	const latestClaim = claimsData?.claims?.[0] ?? null
 	const { data: xmlData } = usePreviewCf5XmlQuery(latestClaim?.id ?? "")
 
-	const { mutate: generateCf5, isPending: generating } = useGenerateCf5Mutation()
-	const { mutate: submitCf5, isPending: submitting } = useSubmitCf5Mutation()
+	const {
+		mutate: generateCf5,
+		isPending: generating,
+		error: generateError,
+	} = useGenerateCf5Mutation()
+	const {
+		mutate: submitCf5,
+		isPending: submitting,
+		error: submitError,
+	} = useSubmitCf5Mutation()
 	const { mutate: pollCf5, isPending: polling } = usePollCf5StatusMutation()
 	const { mutate: resubmitCf5, isPending: resubmitting } = useResubmitCf5Mutation()
 
@@ -88,6 +96,7 @@ export function Cf5Page({ encounterId }: Cf5PageProps) {
 	}
 
 	const { cf5 } = cf5Data
+	const surgicalReadiness = cf5Data.surgicalReadiness
 	const claimStatus = latestClaim?.status ?? "draft"
 	const timelineStatus: ClaimStatus = CF5_TIMELINE_MAP[claimStatus] ?? "draft"
 	const isRejected = claimStatus === "rejected"
@@ -131,11 +140,73 @@ export function Cf5Page({ encounterId }: Cf5PageProps) {
 						</CardContent>
 					</Card>
 
+					{!surgicalReadiness.isReady ? (
+						<Alert variant="destructive">
+							<AlertDescription>
+								CF5 is blocked until every signed operative procedure has a primary RVS code.
+								Missing: {surgicalReadiness.missingProcedureLabels.join(", ")}.
+							</AlertDescription>
+						</Alert>
+					) : (
+						<Alert>
+							<AlertDescription>
+								Surgical prerequisite check passed. Each listed operative procedure has a
+								primary RVS code.
+							</AlertDescription>
+						</Alert>
+					)}
+
+					{surgicalReadiness.procedures.length > 0 ? (
+						<Card>
+							<CardHeader className="pb-2">
+								<CardTitle className="text-sm">Surgical RVS Readiness</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-2">
+								{surgicalReadiness.procedures.map(procedure => (
+									<div
+										key={`${procedure.operationRecordId}-${procedure.procedureLabel}`}
+										className="flex items-start justify-between gap-3 rounded-md border px-3 py-2 text-sm"
+									>
+										<div className="min-w-0">
+											<p className="font-medium">{procedure.procedureLabel}</p>
+											<p className="text-muted-foreground text-xs">
+												{procedure.primaryCodeCount} primary • {procedure.adjunctCodeCount} adjunct
+											</p>
+										</div>
+										<Badge variant={procedure.isReady ? "default" : "destructive"}>
+											{procedure.isReady ? "Ready" : "Missing Primary"}
+										</Badge>
+									</div>
+								))}
+							</CardContent>
+						</Card>
+					) : null}
+
+					{generateError ? (
+						<Alert variant="destructive">
+							<AlertDescription>
+								{generateError instanceof Error
+									? generateError.message
+									: "Unable to generate CF5."}
+							</AlertDescription>
+						</Alert>
+					) : null}
+
+					{submitError ? (
+						<Alert variant="destructive">
+							<AlertDescription>
+								{submitError instanceof Error
+									? submitError.message
+									: "Unable to submit CF5."}
+							</AlertDescription>
+						</Alert>
+					) : null}
+
 					<div className="flex flex-wrap gap-2">
 						{!latestClaim && (
 							<Button
 								onClick={() => generateCf5({ facilityId: cf5.facilityId, encounterId, drgCode: cf5.drgCode })}
-								disabled={generating}
+								disabled={generating || !surgicalReadiness.isReady}
 							>
 								{generating ? "Generating..." : "Generate CF5"}
 							</Button>
@@ -144,7 +215,7 @@ export function Cf5Page({ encounterId }: Cf5PageProps) {
 						{latestClaim?.status === "draft" && (
 							<Button
 								onClick={() => submitCf5({ id: latestClaim.id })}
-								disabled={submitting}
+								disabled={submitting || !surgicalReadiness.isReady}
 							>
 								{submitting ? "Submitting..." : "Submit to PhilHealth"}
 							</Button>

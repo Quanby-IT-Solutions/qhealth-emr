@@ -9,6 +9,7 @@ import { Separator } from "@/core/components/ui/separator"
 import { SidebarTrigger } from "@/core/components/ui/sidebar"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { NotificationBadge } from "@/features/app-shell/components/notification-badge"
+import { getDefaultPatientsHref } from "@/features/app-shell/lib/navigation"
 import { RoleSwitcher } from "@/features/app-shell/components/role-switcher"
 import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 
@@ -16,9 +17,9 @@ export function AppTopbar() {
 	const pathname = usePathname()
 	const { data: profile } = useMyProfile()
 	const { isOnline } = useOfflineSync()
-	const canSearchPatients =
-		profile?.activeRole?.permissions.some(p => p.module === "patients" && p.action === "view") ??
-		false
+	const permissions = profile?.activeRole?.permissions ?? []
+	const canSearchPatients = permissions.some(p => p.module === "patients" && p.action === "view")
+	const patientSearchHref = getDefaultPatientsHref(permissions)
 	const isPatientProfilePage = /^\/patients\/[^/]+$/.test(pathname)
 
 	if (isPatientProfilePage) {
@@ -35,7 +36,7 @@ export function AppTopbar() {
 				<div className="flex flex-1 items-center">
 					{canSearchPatients && (
 						<Link
-							href="/patients/register"
+							href={patientSearchHref}
 							className="bg-muted/40 hover:bg-muted/60 flex h-8 w-full max-w-sm items-center gap-2 rounded-md border px-3 text-sm transition-colors"
 						>
 							<HugeiconsIcon icon={Search01FreeIcons} className="text-muted-foreground size-4" />

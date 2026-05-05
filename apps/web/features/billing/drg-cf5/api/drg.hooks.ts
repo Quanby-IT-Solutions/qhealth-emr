@@ -60,6 +60,7 @@ export function useConfirmDrgMutation() {
 			onSuccess: () => {
 				qc.invalidateQueries({ queryKey: billingOrpc.suggestDrg.key() })
 				qc.invalidateQueries({ queryKey: billingOrpc.getCf5.key() })
+				qc.invalidateQueries({ queryKey: billingOrpc.getCf5WithBilling.key() })
 			},
 		})
 	)
@@ -78,7 +79,10 @@ export function usePollCf5StatusMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		billingOrpc.pollCf5Status.mutationOptions({
-			onSuccess: () => qc.invalidateQueries({ queryKey: billingOrpc.listCf5Claims.key() }),
+			onSuccess: () => {
+				qc.invalidateQueries({ queryKey: billingOrpc.listCf5Claims.key() })
+				qc.invalidateQueries({ queryKey: billingOrpc.getCf5WithBilling.key() })
+			},
 		})
 	)
 }
@@ -96,7 +100,10 @@ export function useGenerateCf5Mutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		billingOrpc.generateCf5.mutationOptions({
-			onSuccess: () => qc.invalidateQueries({ queryKey: billingOrpc.listCf5Claims.key() }),
+			onSuccess: () => {
+				qc.invalidateQueries({ queryKey: billingOrpc.listCf5Claims.key() })
+				qc.invalidateQueries({ queryKey: billingOrpc.getCf5WithBilling.key() })
+			},
 		})
 	)
 }
@@ -105,7 +112,10 @@ export function useSubmitCf5Mutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		billingOrpc.submitCf5.mutationOptions({
-			onSuccess: () => qc.invalidateQueries({ queryKey: billingOrpc.listCf5Claims.key() }),
+			onSuccess: () => {
+				qc.invalidateQueries({ queryKey: billingOrpc.listCf5Claims.key() })
+				qc.invalidateQueries({ queryKey: billingOrpc.getCf5WithBilling.key() })
+			},
 		})
 	)
 }
@@ -114,7 +124,10 @@ export function useResubmitCf5Mutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		billingOrpc.resubmitCf5.mutationOptions({
-			onSuccess: () => qc.invalidateQueries({ queryKey: billingOrpc.listCf5Claims.key() }),
+			onSuccess: () => {
+				qc.invalidateQueries({ queryKey: billingOrpc.listCf5Claims.key() })
+				qc.invalidateQueries({ queryKey: billingOrpc.getCf5WithBilling.key() })
+			},
 		})
 	)
 }
