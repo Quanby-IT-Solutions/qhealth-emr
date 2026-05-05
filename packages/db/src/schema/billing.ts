@@ -164,7 +164,7 @@ export const payments = createTable(
 		paymentMethod: t
 			.text("payment_method")
 			.notNull()
-			.$type<"cash" | "card" | "gcash" | "hmo" | "malasakit" | "philhealth" | "coe">()
+			.$type<"cash" | "card" | "gcash" | "hmo" | "malasakit" | "philhealth" | "coe">(),
 		referenceNumber: t.text("reference_number"),
 		hmoProvider: t.text("hmo_provider"),
 		hmoClaimNumber: t.text("hmo_claim_number"),
