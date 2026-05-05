@@ -40,11 +40,13 @@ jest.mock("@repo/db/schema", () => ({
 	invoiceLineItems: {},
 	invoices: {},
 	konsultaActivities: {},
+	operationRecords: { id: "id", encounterId: "encounterId", procedurePerformed: "procedurePerformed", status: "status" },
 	patients: {},
 	payments: {},
 	problems: {},
 	receipts: {},
 	staffProfiles: {},
+	surgicalRvsAssignments: { operationRecordId: "operationRecordId", procedureLabel: "procedureLabel", assignmentType: "assignmentType", status: "status" },
 	vitalSigns: {},
 }))
 
@@ -78,6 +80,15 @@ beforeEach(() => {
 
 describe("BIL-BE-05 DRG Mapping & CF5", () => {
 	it("suggestDrg returns 3 ranked candidates with rationale", async () => {
+		;(db.select as jest.Mock).mockReturnValue({
+			from: () => ({
+				where: () => ({
+					limit: () => Promise.resolve([]),
+					orderBy: () => ({ limit: () => Promise.resolve([]) }),
+				}),
+			}),
+		})
+
 		const { service } = makeService()
 		const res = await service.suggestDrg({ encounterId: ENCOUNTER })
 
@@ -99,9 +110,14 @@ describe("BIL-BE-05 DRG Mapping & CF5", () => {
 	})
 
 	it("submitCf5 blocks on missing DRG code (XSD validation)", async () => {
-		;(db.select as jest.Mock).mockReturnValue({
-			from: () => ({ where: () => ({ limit: () => Promise.resolve([{ id: CLAIM, status: "draft", drgCode: null, encounterId: ENCOUNTER }]) }) }),
-		})
+		;(db.select as jest.Mock)
+			.mockReturnValueOnce({
+				from: () => ({ where: () => ({ limit: () => Promise.resolve([{ id: CLAIM, status: "draft", drgCode: null, encounterId: ENCOUNTER }]) }) }),
+			})
+			// buildSurgicalReadiness: operationRecords query → empty = isReady: true, passes readiness check
+			.mockReturnValueOnce({
+				from: () => ({ where: () => Promise.resolve([]) }),
+			})
 
 		const { service } = makeService()
 		await expect(service.submitCf5({ id: CLAIM }, STAFF_USER)).rejects.toBeInstanceOf(UnprocessableEntityException)

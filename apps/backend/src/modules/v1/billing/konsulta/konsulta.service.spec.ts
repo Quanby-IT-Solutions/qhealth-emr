@@ -116,13 +116,23 @@ describe("BIL-BE-08 Konsulta Capitation", () => {
 			{ patientId: "pt-2", activityType: "Lab", activityDate: "2026-04-20" },
 			{ patientId: "pt-3", activityType: "FPE", activityDate: "2026-04-30" },
 		]
-		;(db.select as jest.Mock).mockReturnValue({
-			from: () => ({
-				where: () => ({
-					orderBy: () => Promise.resolve(activities),
+		;(db.select as jest.Mock)
+			.mockReturnValueOnce({
+				from: () => ({
+					where: () => ({
+						orderBy: () => Promise.resolve(activities),
+					}),
 				}),
-			}),
-		})
+			})
+			.mockReturnValueOnce({
+				from: () => ({
+					where: () => Promise.resolve([
+						{ id: "pt-1", name: "Alice", pin: "001" },
+						{ id: "pt-2", name: "Bob", pin: "002" },
+						{ id: "pt-3", name: "Carol", pin: "003" },
+					]),
+				}),
+			})
 
 		const { service } = makeService()
 		const report = await service.generateKonsultaReport({

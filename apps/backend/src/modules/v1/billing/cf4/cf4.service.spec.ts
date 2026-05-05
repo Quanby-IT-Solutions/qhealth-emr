@@ -76,13 +76,17 @@ beforeEach(() => {
 
 describe("BIL-BE-04 CF4 Generator & eClaims", () => {
 	it("finalizeCf4 throws structured violations when required fields missing", async () => {
-		;(db.select as jest.Mock).mockReturnValue({
-			from: () => ({
-				where: () => Promise.resolve([
-					{ id: CLAIM, status: "draft", extractedData: { chiefComplaint: null } },
-				]),
-			}),
-		})
+		;(db.select as jest.Mock)
+			.mockReturnValueOnce({
+				from: () => ({
+					where: () => Promise.resolve([
+						{ id: CLAIM, status: "draft", patientId: null, encounterId: null, facilityId: null, extractedData: { chiefComplaint: null } },
+					]),
+				}),
+			})
+			.mockReturnValueOnce({
+				from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+			})
 
 		const { service } = makeService()
 		try {
@@ -101,16 +105,24 @@ describe("BIL-BE-04 CF4 Generator & eClaims", () => {
 		const claim = {
 			id: CLAIM,
 			status: "draft",
+			patientId: "pt-1",
+			encounterId: "enc-1",
+			facilityId: "fac-1",
 			extractedData: {
 				chiefComplaint: "fever",
 				historyOfPresentIllness: "x",
 				vitalSigns: [{ bp: "120/80" }],
 				courseInTheWard: "monitor",
+				icd10Codes: ["J11"],
 			},
 		}
-		;(db.select as jest.Mock).mockReturnValue({
-			from: () => ({ where: () => Promise.resolve([claim]) }),
-		})
+		;(db.select as jest.Mock)
+			.mockReturnValueOnce({
+				from: () => ({ where: () => Promise.resolve([claim]) }),
+			})
+			.mockReturnValueOnce({
+				from: () => ({ where: () => ({ limit: () => Promise.resolve([{ id: "inv-1" }]) }) }),
+			})
 		const insertValuesFn = jest.fn().mockResolvedValue(undefined)
 		;(db.update as jest.Mock).mockReturnValue({
 			set: () => ({
