@@ -68,6 +68,8 @@ import {
 	ListInvoicesResponseSchema,
 	ListKonsultaActivitiesInputSchema,
 	ListKonsultaActivitiesResponseSchema,
+	ListKonsultaTrackerRowsInputSchema,
+	ListKonsultaTrackerRowsResponseSchema,
 	ListPaymentsInputSchema,
 	ListPaymentsResponseSchema,
 	MalasakitAssistanceSchema,
@@ -510,6 +512,11 @@ export const billingContract = {
 		})
 		.input(ListKonsultaActivitiesInputSchema)
 		.output(ListKonsultaActivitiesResponseSchema),
+
+	listKonsultaTrackerRows: oc
+		.route({ method: "GET", path: "/konsulta/tracker", summary: "List per-patient Konsulta capitation tracker rows", tags: ["Billing"] })
+		.input(ListKonsultaTrackerRowsInputSchema)
+		.output(ListKonsultaTrackerRowsResponseSchema),
 
 	recordKonsultaEvent: oc
 		.route({

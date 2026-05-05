@@ -311,9 +311,13 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "HIM Dashboard",
 		href: "/him",
 		iconName: "records",
-		// HIM Coder owns chart completion queue, deficiency tracking, coding queue
-		// medical_records:view is the correct boundary — aligns with the backend guard
-		requiredPermissions: [{ module: "medical_records", action: "view" }],
+		// HIM access accepts the dedicated him:read/write permission pair and the
+		// legacy medical_records:view fallback during the RBAC transition.
+		requiredPermissions: [
+			{ module: "him", action: "read" },
+			{ module: "him", action: "write" },
+			{ module: "medical_records", action: "view" },
+		],
 		isSecondary: true,
 	},
 	{

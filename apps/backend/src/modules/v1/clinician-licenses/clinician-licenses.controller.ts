@@ -3,7 +3,7 @@ import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions } from "@/modules/v1/rbac/rbac.guard"
 
 import { ClinicianLicensesService } from "./clinician-licenses.service"
 
@@ -11,7 +11,10 @@ import { ClinicianLicensesService } from "./clinician-licenses.service"
 export class ClinicianLicensesController {
 	constructor(private readonly clinicianLicensesService: ClinicianLicensesService) {}
 
-	@RequirePermissions([{ module: "admin", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.licenses", action: "read" },
+		{ module: "admin", action: "view" },
+	])
 	@Implement(v1.clinicianLicenses.list)
 	async list() {
 		return implement(v1.clinicianLicenses.list).handler(async ({ input }) => {
@@ -25,7 +28,10 @@ export class ClinicianLicensesController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.licenses", action: "read" },
+		{ module: "admin", action: "view" },
+	])
 	@Implement(v1.clinicianLicenses.get)
 	async get() {
 		return implement(v1.clinicianLicenses.get).handler(async ({ input }) => {
@@ -33,7 +39,10 @@ export class ClinicianLicensesController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "edit" }])
+	@RequireAnyPermissions([
+		{ module: "admin.licenses", action: "write" },
+		{ module: "admin", action: "edit" },
+	])
 	@Implement(v1.clinicianLicenses.add)
 	async add() {
 		return implement(v1.clinicianLicenses.add).handler(async ({ input }) => {
@@ -48,7 +57,10 @@ export class ClinicianLicensesController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "edit" }])
+	@RequireAnyPermissions([
+		{ module: "admin.licenses", action: "write" },
+		{ module: "admin", action: "edit" },
+	])
 	@Implement(v1.clinicianLicenses.verify)
 	async verify() {
 		return implement(v1.clinicianLicenses.verify).handler(async ({ input }) => {
@@ -59,7 +71,10 @@ export class ClinicianLicensesController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "edit" }])
+	@RequireAnyPermissions([
+		{ module: "admin.licenses", action: "write" },
+		{ module: "admin", action: "edit" },
+	])
 	@Implement(v1.clinicianLicenses.markPending)
 	async markPending() {
 		return implement(v1.clinicianLicenses.markPending).handler(async ({ input }) => {
@@ -67,7 +82,10 @@ export class ClinicianLicensesController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "delete" }])
+	@RequireAnyPermissions([
+		{ module: "admin.licenses", action: "write" },
+		{ module: "admin", action: "delete" },
+	])
 	@Implement(v1.clinicianLicenses.delete)
 	async deleteLicense() {
 		return implement(v1.clinicianLicenses.delete).handler(async ({ input }) => {

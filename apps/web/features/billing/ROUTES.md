@@ -2,22 +2,22 @@
 
 | Route | Page | Story | Flow | Permission | Wireframe Page |
 |-------|------|-------|------|------------|----------------|
-| `/billing/billing` | Billing Dashboard | Stories 12.1–12.7 | Flows L1–L7 | `billing:view` | Billing Dashboard |
-| `/billing/encounters/[encounterId]/charges` | Charge Capture Page | Story 12.1 — Charge Capture | Flow L1 | `billing:view` | Charge Capture Page |
-| `/billing/encounters/[encounterId]/charges/add` | Service Item Page | Story 12.1 — Charge Capture | Flow L1 | `billing:create` | Service Item Page |
-| `/billing/encounters/[encounterId]/invoice` | Invoice Page | Story 12.2 — Invoice & Payment | Flow L2 | `billing:view` | Invoice Page |
-| `/billing/encounters/[encounterId]/invoice/payment` | Payment Entry Page | Story 12.2 — Invoice & Payment | Flow L2 | `billing:create` | Payment Entry Page |
-| `/billing/encounters/[encounterId]/invoice/receipt` | Receipt Page | Story 12.2 — Invoice & Payment | Flow L2 | `billing:view` | Receipt Page |
-| `/billing/encounters/[encounterId]/cf4` | CF4 Generation Page | Story 12.3 — CF4 / eClaims | Flow L3 | `billing:view` | CF4 Generation Page |
-| `/billing/encounters/[encounterId]/cf4/submit` | eClaims Submission Page | Story 12.3 — CF4 / eClaims | Flow L3 | `billing:create` | eClaims Submission Page |
-| `/billing/encounters/[encounterId]/drg` | DRG Mapping Page | Story 12.4 — DRG / CF5 | Flow L4 | `billing:view` | DRG Mapping Page |
-| `/billing/encounters/[encounterId]/drg/cf5` | CF5 Page | Story 12.4 — DRG / CF5 | Flow L4 | `billing:create` | CF5 Page |
-| `/billing/encounters/[encounterId]/esoa` | eSOA Page | Story 12.5 — eSOA | Flow L5 | `billing:view` | eSOA Page |
-| `/billing/encounters/[encounterId]/esoa/preview` | Statement Preview Page | Story 12.5 — eSOA | Flow L5 | `billing:view` | Statement Preview Page |
-| `/billing/eligibility-check` | Eligibility Check Page | Story 12.6 — CEWS Eligibility | Flow L6 | `billing:view` | Eligibility Check Page |
-| `/billing/eligibility-check/[memberPin]` | Membership Verification Page | Story 12.6 — CEWS Eligibility | Flow L6 | `billing:view` | Membership Verification Page |
-| `/billing/konsulta` | Konsulta Tracker Page | Story 12.7 — Konsulta Capitation | Flow L7 | `billing:view` | Konsulta Tracker Page |
-| `/billing/konsulta/report` | Capitation Report Page | Story 12.7 — Konsulta Capitation | Flow L7 | `billing:view` | Capitation Report Page |
+| `/billing/billing` | Billing Dashboard | Stories 12.1–12.7 | Flows L1–L7 | any of `billing.*:read` (or legacy `billing:view`) | Billing Dashboard |
+| `/billing/encounters/[encounterId]/charges` | Charge Capture Page | Story 12.1 — Charge Capture | Flow L1 | `billing.charges:read` | Charge Capture Page |
+| `/billing/encounters/[encounterId]/charges/add` | Service Item Page | Story 12.1 — Charge Capture | Flow L1 | `billing.charges:write` | Service Item Page |
+| `/billing/encounters/[encounterId]/invoice` | Invoice Page | Story 12.2 — Invoice & Payment | Flow L2 | `billing.invoices:read` | Invoice Page |
+| `/billing/encounters/[encounterId]/invoice/payment` | Payment Entry Page | Story 12.2 — Invoice & Payment | Flow L2 | `billing.payments:write` | Payment Entry Page |
+| `/billing/encounters/[encounterId]/invoice/receipt` | Receipt Page | Story 12.2 — Invoice & Payment | Flow L2 | `billing.payments:read` | Receipt Page |
+| `/billing/encounters/[encounterId]/cf4` | CF4 Generation Page | Story 12.3 — CF4 / eClaims | Flow L3 | `billing.cf4:read` | CF4 Generation Page |
+| `/billing/encounters/[encounterId]/cf4/submit` | eClaims Submission Page | Story 12.3 — CF4 / eClaims | Flow L3 | `billing.cf4:write` | eClaims Submission Page |
+| `/billing/encounters/[encounterId]/drg` | DRG Mapping Page | Story 12.4 — DRG / CF5 | Flow L4 | `billing.drg:read` | DRG Mapping Page |
+| `/billing/encounters/[encounterId]/drg/cf5` | CF5 Page | Story 12.4 — DRG / CF5 | Flow L4 | `billing.cf5:write` | CF5 Page |
+| `/billing/encounters/[encounterId]/esoa` | eSOA Page | Story 12.5 — eSOA | Flow L5 | `billing.esoa:read` | eSOA Page |
+| `/billing/encounters/[encounterId]/esoa/preview` | Statement Preview Page | Story 12.5 — eSOA | Flow L5 | `billing.esoa:read` | Statement Preview Page |
+| `/billing/eligibility-check` | Eligibility Check Page | Story 12.6 — CEWS Eligibility | Flow L6 | `billing.cews:read` | Eligibility Check Page |
+| `/billing/eligibility-check/[memberPin]` | Membership Verification Page | Story 12.6 — CEWS Eligibility | Flow L6 | `billing.cews:read` | Membership Verification Page |
+| `/billing/konsulta` | Konsulta Tracker Page | Story 12.7 — Konsulta Capitation | Flow L7 | `billing.konsulta:read` | Konsulta Tracker Page |
+| `/billing/konsulta/report` | Capitation Report Page | Story 12.7 — Konsulta Capitation | Flow L7 | `billing.konsulta:read` | Capitation Report Page |
 
 ## Feature Structure
 
@@ -74,7 +74,21 @@ apps/web/features/billing/
 
 ## RBAC
 
-All routes require `billing:view` permission. Write operations (charge creation, invoice generation, payment recording, CF4/CF5 submission) require `billing:create` or `billing:edit`.
+Granular per-feature permissions:
+
+| Sub-module | Read | Write |
+|------------|------|-------|
+| Charges | `billing.charges:read` | `billing.charges:write` |
+| Invoices | `billing.invoices:read` | `billing.invoices:write` |
+| Payments | `billing.payments:read` | `billing.payments:write` |
+| CF4 / eClaims | `billing.cf4:read` | `billing.cf4:write` |
+| DRG | `billing.drg:read` | `billing.drg:write` |
+| CF5 | `billing.cf5:read` | `billing.cf5:write` |
+| eSOA | `billing.esoa:read` | `billing.esoa:write` |
+| CEWS | `billing.cews:read` | `billing.cews:write` |
+| Konsulta | `billing.konsulta:read` | `billing.konsulta:write` |
+
+Shell-level access (`BillingShell`) grants entry when the active role holds at least one `billing.<sub>:read` permission. Legacy `billing:view` is accepted as a fallback for roles that have not been migrated yet.
 
 ## Notes
 

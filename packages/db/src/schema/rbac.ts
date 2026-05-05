@@ -84,11 +84,31 @@ export const rolePermissions = createTable(
 				| "orders"
 				| "nursing"
 				| "billing"
+				| "billing.charges"
+				| "billing.invoices"
+				| "billing.payments"
+				| "billing.cf4"
+				| "billing.drg"
+				| "billing.cf5"
+				| "billing.esoa"
+				| "billing.cews"
+				| "billing.konsulta"
 				| "formulary"
 				| "reporting"
 				| "notifications"
 				| "audit"
 				| "admin"
+				| "admin.users"
+				| "admin.feature-flags"
+				| "admin.licenses"
+				| "admin.bor"
+				| "admin.fhir"
+				| "admin.terminology"
+				| "admin.sla"
+				| "admin.master-data"
+				| "admin.integrations"
+				| "admin.facility"
+				| "admin.auth"
 				| "surgical"
 				| "opd"
 				| "nutrition"
@@ -108,23 +128,16 @@ export const rolePermissions = createTable(
 				| "integration_registry"
 				| "civil_registry"
 				| "medical_records"
+				| "him.deficiencies"
+				| "him.coding"
+				| "him.records"
+				| "him.hai"
 				| "patients"
 			>(),
 		action: t
 			.text("action")
 			.notNull()
-			.$type<
-				| "view"
-				| "create"
-				| "edit"
-				| "sign"
-				| "delete"
-				| "verify"
-				| "export"
-				| "manage_catalog"
-				| "clinical_policy"
-				| "terminology_admin"
-			>(),
+			.$type<"view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "read" | "write" | "manage_catalog" | "clinical_policy" | "terminology_admin">(),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [

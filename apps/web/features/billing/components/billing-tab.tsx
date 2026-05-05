@@ -501,11 +501,12 @@ function InvoicesPanel({
 								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="cash">Cash</SelectItem>
-									<SelectItem value="philhealth">PhilHealth</SelectItem>
+									<SelectItem value="card">Card</SelectItem>
+									<SelectItem value="gcash">GCash</SelectItem>
 									<SelectItem value="hmo">HMO</SelectItem>
-									<SelectItem value="credit_card">Credit Card</SelectItem>
-									<SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-									<SelectItem value="other">Other</SelectItem>
+									<SelectItem value="malasakit">Malasakit</SelectItem>
+									<SelectItem value="philhealth">PhilHealth</SelectItem>
+									<SelectItem value="coe">COE</SelectItem>
 								</SelectContent>
 							</Select>
 						</div>

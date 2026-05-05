@@ -5,20 +5,33 @@ import { ReceiptText } from "lucide-react"
 import { Card, CardContent } from "@/core/components/ui/card"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
+const BILLING_GRANULAR_READ_PERMS = [
+	"billing.charges:read",
+	"billing.invoices:read",
+	"billing.payments:read",
+	"billing.cf4:read",
+	"billing.drg:read",
+	"billing.cf5:read",
+	"billing.esoa:read",
+	"billing.cews:read",
+	"billing.konsulta:read",
+] as const
+
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
 	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
 }
 
-function can(permSet: Set<string>, module: string, action: string) {
-	return permSet.has(`${module}:${action}`)
+function canAccessBilling(permSet: Set<string>) {
+	if (permSet.has("billing:view")) return true
+	return BILLING_GRANULAR_READ_PERMS.some(p => permSet.has(p))
 }
 
 export default function BillingPage() {
 	const permSet = usePermissionSet()
 
-	if (!can(permSet, "billing", "view")) {
+	if (!canAccessBilling(permSet)) {
 		return (
 			<div className="flex items-center justify-center p-8 text-muted-foreground">
 				You do not have permission to access billing.

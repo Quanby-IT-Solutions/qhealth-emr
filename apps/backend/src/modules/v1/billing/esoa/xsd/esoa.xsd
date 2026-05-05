@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BIL-BE-06 — eSOA placeholder XSD.
+
+  Real PhilHealth eSOA XSD must replace this stub when the integration
+  credentials work (ADM-BE-12) lands. The eSOA itemized statement carries the
+  facility header, patient block, line-items pulled from the invoice, totals,
+  PhilHealth deductions, and balance due.
+
+  Service-side validation in `BillingService.generateEsoaFromInvoice` performs
+  totals tie-out (subtotal - discount - philhealth_coverage + vat == total)
+  before persisting; mismatches reject the call.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="ESOA">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="Facility" type="xs:anyType" />
+        <xs:element name="Patient" type="xs:anyType" />
+        <xs:element name="Invoice">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="InvoiceNumber" type="xs:string" />
+              <xs:element name="Subtotal" type="xs:decimal" />
+              <xs:element name="Discount" type="xs:decimal" minOccurs="0" />
+              <xs:element name="PhilHealthCoverage" type="xs:decimal" minOccurs="0" />
+              <xs:element name="VAT" type="xs:decimal" minOccurs="0" />
+              <xs:element name="Total" type="xs:decimal" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="LineItems" type="xs:anyType" />
+        <xs:element name="Version" type="xs:int" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

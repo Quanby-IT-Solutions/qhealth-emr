@@ -5,7 +5,7 @@ import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermission, RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions, RequirePermission, RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
 
 import { FeatureFlagsService } from "./feature-flags.service"
 
@@ -36,7 +36,10 @@ export class FeatureFlagsController {
 
 	// ── List ──────────────────────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "feature_flags", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.feature-flags", action: "read" },
+		{ module: "feature_flags", action: "view" },
+	])
 	@Implement(v1.featureFlags.list)
 	async list(@Session() _session: UserSession) {
 		return implement(v1.featureFlags.list).handler(async () => {
@@ -46,7 +49,10 @@ export class FeatureFlagsController {
 
 	// ── Get detail ───────────────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "feature_flags", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.feature-flags", action: "read" },
+		{ module: "feature_flags", action: "view" },
+	])
 	@Implement(v1.featureFlags.get)
 	async get(@Session() _session: UserSession) {
 		return implement(v1.featureFlags.get).handler(async ({ input }) => {
@@ -56,7 +62,10 @@ export class FeatureFlagsController {
 
 	// ── Create ────────────────────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "feature_flags", action: "create" }])
+	@RequireAnyPermissions([
+		{ module: "admin.feature-flags", action: "write" },
+		{ module: "feature_flags", action: "create" },
+	])
 	@Implement(v1.featureFlags.create)
 	async create(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.featureFlags.create).handler(async ({ input }) => {
@@ -67,7 +76,10 @@ export class FeatureFlagsController {
 
 	// ── Update ────────────────────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "feature_flags", action: "edit" }])
+	@RequireAnyPermissions([
+		{ module: "admin.feature-flags", action: "write" },
+		{ module: "feature_flags", action: "edit" },
+	])
 	@Implement(v1.featureFlags.update)
 	async update(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.featureFlags.update).handler(async ({ input }) => {
@@ -78,7 +90,10 @@ export class FeatureFlagsController {
 
 	// ── Delete ────────────────────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "feature_flags", action: "delete" }])
+	@RequireAnyPermissions([
+		{ module: "admin.feature-flags", action: "write" },
+		{ module: "feature_flags", action: "delete" },
+	])
 	@Implement(v1.featureFlags.delete)
 	async delete(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.featureFlags.delete).handler(async ({ input }) => {
@@ -89,7 +104,10 @@ export class FeatureFlagsController {
 
 	// ── Update targeting ──────────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "feature_flags", action: "edit" }])
+	@RequireAnyPermissions([
+		{ module: "admin.feature-flags", action: "write" },
+		{ module: "feature_flags", action: "edit" },
+	])
 	@Implement(v1.featureFlags.updateTargeting)
 	async updateTargeting(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.featureFlags.updateTargeting).handler(async ({ input }) => {
@@ -100,7 +118,10 @@ export class FeatureFlagsController {
 
 	// ── Resolve for session ───────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "feature_flags", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.feature-flags", action: "read" },
+		{ module: "feature_flags", action: "view" },
+	])
 	@Implement(v1.featureFlags.resolveForSession)
 	async resolveForSession(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.featureFlags.resolveForSession).handler(async () => {
@@ -114,7 +135,10 @@ export class FeatureFlagsController {
 
 	// ── Evaluate single flag ──────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "feature_flags", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.feature-flags", action: "read" },
+		{ module: "feature_flags", action: "view" },
+	])
 	@Implement(v1.featureFlags.evaluate)
 	async evaluate(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.featureFlags.evaluate).handler(async ({ input }) => {
@@ -128,7 +152,10 @@ export class FeatureFlagsController {
 
 	// ── History ───────────────────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "feature_flags", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.feature-flags", action: "read" },
+		{ module: "feature_flags", action: "view" },
+	])
 	@Implement(v1.featureFlags.history)
 	async history() {
 		return implement(v1.featureFlags.history).handler(async ({ input }) => {

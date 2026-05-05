@@ -42,6 +42,9 @@ import { v1Surgical } from "./surgical/v1.surgical.js"
 import { v1SystemSettings } from "./system-settings/v1.system-settings.js"
 import { v1Telemedicine } from "./telemedicine/v1.telemedicine.js"
 import { v1Terminology } from "./terminology/v1.terminology.js"
+import { v1MasterData } from "./master-data/v1.master-data.js"
+import { v1Auditor } from "./auditor/v1.auditor.js"
+import { himContract } from "./him/v1.him.js"
 
 /**
  * V1 contract router
@@ -99,5 +102,7 @@ export const v1Contract = oc.prefix("/v1").router(
 		terminology: v1Terminology,
 		// ADM-BE-11 master data
 		masterData: v1MasterData,
+		// HIM-BE-01..05: Health Information Management
+		him: himContract,
 	})
 )

@@ -6,8 +6,8 @@ import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
 
-import { RequirePermission } from "./rbac.guard"
 import { RbacService } from "./rbac.service"
+import { RequireAnyPermissions, RequirePermission } from "./rbac.guard"
 
 type RbacProfile = {
 	staffProfiles: Array<{ id: string; facilityId: string; roles: Array<{ id: string }> }>
@@ -49,7 +49,10 @@ export class RbacController {
 
 	// ── Staff Management ──────────────────────────────────────────────
 
-	@RequirePermission("admin", "view")
+	@RequireAnyPermissions([
+		{ module: "admin.users", action: "read" },
+		{ module: "admin", action: "view" },
+	])
 	@Implement(v1.rbac.listStaff)
 	async listStaff() {
 		return implement(v1.rbac.listStaff).handler(async ({ input }) => {
@@ -57,7 +60,10 @@ export class RbacController {
 		})
 	}
 
-	@RequirePermission("admin", "create")
+	@RequireAnyPermissions([
+		{ module: "admin.users", action: "write" },
+		{ module: "admin", action: "create" },
+	])
 	@Implement(v1.rbac.createStaff)
 	async createStaff() {
 		return implement(v1.rbac.createStaff).handler(async ({ input }) => {
@@ -65,7 +71,10 @@ export class RbacController {
 		})
 	}
 
-	@RequirePermission("admin", "edit")
+	@RequireAnyPermissions([
+		{ module: "admin.users", action: "write" },
+		{ module: "admin", action: "edit" },
+	])
 	@Implement(v1.rbac.updateStaff)
 	async updateStaff() {
 		return implement(v1.rbac.updateStaff).handler(async ({ input }) => {
@@ -73,7 +82,10 @@ export class RbacController {
 		})
 	}
 
-	@RequirePermission("admin", "delete")
+	@RequireAnyPermissions([
+		{ module: "admin.users", action: "write" },
+		{ module: "admin", action: "delete" },
+	])
 	@Implement(v1.rbac.deactivateStaff)
 	async deactivateStaff() {
 		return implement(v1.rbac.deactivateStaff).handler(async ({ input }) => {
@@ -81,7 +93,10 @@ export class RbacController {
 		})
 	}
 
-	@RequirePermission("admin", "view")
+	@RequireAnyPermissions([
+		{ module: "admin.users", action: "read" },
+		{ module: "admin", action: "view" },
+	])
 	@Implement(v1.rbac.getStaffUser)
 	async getStaffUser() {
 		return implement(v1.rbac.getStaffUser).handler(async ({ input }) => {

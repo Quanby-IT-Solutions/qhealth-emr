@@ -8,23 +8,36 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
+// Top-level nav links only.
+// Encounter-scoped flows (Charge Capture, Invoice & Payment, CF4/eClaims, DRG/CF5, eSOA)
+// require an encounter id and are reached from the patient chart or billing dashboard.
 const SUB_NAV = [
-	{ label: "Charge Capture", href: "/billing/encounters" },
-	{ label: "Invoice & Payment", href: "/billing/invoice" },
-	{ label: "CF4 / eClaims", href: "/billing/cf4" },
-	{ label: "DRG / CF5", href: "/billing/drg" },
-	{ label: "eSOA", href: "/billing/esoa" },
+	{ label: "Dashboard", href: "/billing", exact: true },
 	{ label: "CEWS Eligibility", href: "/billing/eligibility-check" },
 	{ label: "Konsulta Capitation", href: "/billing/konsulta" },
 ]
+
+const BILLING_GRANULAR_READ_PERMS = [
+	"billing.charges:read",
+	"billing.invoices:read",
+	"billing.payments:read",
+	"billing.cf4:read",
+	"billing.drg:read",
+	"billing.cf5:read",
+	"billing.esoa:read",
+	"billing.cews:read",
+	"billing.konsulta:read",
+] as const
 
 function useCanBilling() {
 	const { data: profile, isLoading } = useMyProfile()
 	const perms = profile?.activeRole?.permissions ?? []
 	const set = new Set(perms.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
 	const roleName = profile?.activeRole?.name ?? ""
+	const hasLegacy = set.has("billing:view")
+	const hasGranular = BILLING_GRANULAR_READ_PERMS.some(p => set.has(p))
 	return {
-		allowed: set.has("billing:view"),
+		allowed: hasLegacy || hasGranular,
 		loading: isLoading,
 		roleName,
 	}
@@ -62,7 +75,7 @@ export function BillingShell({ children }: { children: ReactNode }) {
 			{/* Sub-navigation */}
 			<nav className="flex gap-1 overflow-x-auto border-b px-4" aria-label="Billing sections">
 				{SUB_NAV.map(item => {
-					const active = pathname.startsWith(item.href)
+					const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
 					return (
 						<Link
 							key={item.href}
