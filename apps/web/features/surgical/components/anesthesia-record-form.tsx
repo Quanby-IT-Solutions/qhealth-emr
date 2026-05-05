@@ -39,6 +39,7 @@ import {
 import { Textarea } from "@/core/components/ui/textarea"
 
 import {
+	type AnesthesiaAgent,
 	type AnesthesiaRecord,
 	type AnesthesiaType,
 	type AirwayType,
@@ -114,6 +115,25 @@ interface FormState {
 	postAnesthesiaCareNotes: string
 }
 
+function mapLegacyAgentsToMedications(agents: AnesthesiaAgent[] | null | undefined): IntraopMedication[] {
+	return (agents ?? []).map((agent) => ({
+		name: agent.name,
+		dose: agent.dose,
+		route: agent.route,
+		time: agent.time,
+		indication: "",
+	}))
+}
+
+function mapMedicationsToLegacyAgents(medications: IntraopMedication[]): AnesthesiaAgent[] {
+	return medications.map((medication) => ({
+		name: medication.name,
+		dose: medication.dose,
+		route: medication.route,
+		time: medication.time,
+	}))
+}
+
 function buildInitialState(existing: AnesthesiaRecord | null | undefined): FormState {
 	return {
 		asaClass: existing?.asaClass,
@@ -126,7 +146,7 @@ function buildInitialState(existing: AnesthesiaRecord | null | undefined): FormS
 		inductionAgents: existing?.inductionAgents ?? [],
 		maintenanceAgents: existing?.maintenanceAgents ?? [],
 		muscleRelaxants: existing?.muscleRelaxants ?? [],
-		intraopMedications: existing?.intraopMedications ?? [],
+		intraopMedications: existing?.intraopMedications ?? mapLegacyAgentsToMedications(existing?.agents),
 		intraopVitals: existing?.intraopVitals ?? [],
 		reversalAgent: existing?.reversalAgent ?? "",
 		totalAnesthesiaMinutes: existing?.totalAnesthesiaMinutes?.toString() ?? "",
@@ -275,10 +295,8 @@ export function AnesthesiaRecordForm({
 		)
 	}
 
-	// ── Submit ─────────────────────────────────────────────────────────────────
-
-	function handleSubmit() {
-		save.mutate({
+	function buildPayload() {
+		return {
 			caseId,
 			asaClass: form.asaClass,
 			anesthesiaType: form.anesthesiaType,
@@ -287,6 +305,7 @@ export function AnesthesiaRecordForm({
 			intubationAttempts: form.intubationAttempts ? Number(form.intubationAttempts) : undefined,
 			intubationGrade: form.intubationGrade,
 			difficultAirway: form.difficultAirway,
+			agents: mapMedicationsToLegacyAgents(form.intraopMedications),
 			inductionAgents: form.inductionAgents,
 			maintenanceAgents: form.maintenanceAgents,
 			muscleRelaxants: form.muscleRelaxants,
@@ -299,15 +318,28 @@ export function AnesthesiaRecordForm({
 			emergenceSmooth: form.emergenceSmooth,
 			complications: form.complications || undefined,
 			postAnesthesiaCareNotes: form.postAnesthesiaCareNotes || undefined,
-		})
+		}
+	}
+
+	// ── Submit ─────────────────────────────────────────────────────────────────
+
+	async function handleSave() {
+		return save.mutateAsync(buildPayload())
 	}
 
 	function handleSign() {
 		setShowSignConfirm(true)
 	}
 
-	function confirmSign() {
-		sign.mutate({ caseId })
+	async function confirmSign() {
+		if (canEdit) {
+			await handleSave()
+		} else if (!existing) {
+			return
+		}
+
+		await sign.mutateAsync({ caseId })
+		setShowSignConfirm(false)
 	}
 
 	return (
@@ -999,7 +1031,9 @@ export function AnesthesiaRecordForm({
 			<div className="flex justify-end gap-3">
 				{!isSigned && (
 					<Button
-						onClick={handleSubmit}
+						onClick={() => {
+							void handleSave()
+						}}
 						disabled={save.isPending || !canEdit || isSigned}
 						variant="outline"
 					>
@@ -1011,7 +1045,7 @@ export function AnesthesiaRecordForm({
 					<Button
 						className="bg-green-700 hover:bg-green-800"
 						onClick={handleSign}
-						disabled={sign.isPending || !existing}
+						disabled={sign.isPending || save.isPending || (!existing && !canEdit)}
 					>
 						<CheckCircle2 className="mr-2 size-4" />
 						{sign.isPending ? "Signing…" : "Sign Anesthesia Record"}

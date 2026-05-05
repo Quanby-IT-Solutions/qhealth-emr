@@ -240,6 +240,154 @@ describe("SurgicalService", () => {
 		)
 	})
 
+	it("requires an active staff profile to sign an anesthesia record", async () => {
+		await expect(service.signAnesthesiaRecord({ caseId: "case-1" }, null)).rejects.toThrow(
+			ForbiddenException
+		)
+
+		expect(mockDb.select).not.toHaveBeenCalled()
+		expect(mockDb.update).not.toHaveBeenCalled()
+	})
+
+	it("rejects signing an incomplete anesthesia record", async () => {
+		mockDb.select.mockImplementationOnce(() =>
+			createSelectBuilder([
+				{
+					id: "anes-1",
+					surgicalCaseId: "case-1",
+					status: "draft",
+				},
+			])
+		)
+		jest.spyOn(service as any, "getAnesthesiaRecord").mockResolvedValue({
+			id: "anes-1",
+			surgicalCaseId: "case-1",
+			asaClass: null,
+			anesthesiaType: null,
+			airwayType: null,
+			airwayManagement: null,
+			intubationAttempts: null,
+			intubationGrade: null,
+			difficultAirway: false,
+			agents: null,
+			inductionAgents: null,
+			maintenanceAgents: null,
+			muscleRelaxants: null,
+			intraopMedications: null,
+			intraopVitals: null,
+			fluidBalance: null,
+			reversalAgent: null,
+			totalAnesthesiaMinutes: null,
+			emergenceSmooth: null,
+			complications: null,
+			postAnesthesiaCareNotes: null,
+			anesthesiologistStaffId: null,
+			status: "draft",
+			signedAt: null,
+			signedByStaffId: null,
+			createdAt: new Date("2026-05-05T00:00:00.000Z"),
+			updatedAt: new Date("2026-05-05T00:00:00.000Z"),
+		} as any)
+
+		await expect(service.signAnesthesiaRecord({ caseId: "case-1" }, "anes-1")).rejects.toThrow(
+			BadRequestException
+		)
+
+		expect(mockDb.update).not.toHaveBeenCalled()
+	})
+
+	it("signs a complete anesthesia draft and stamps signer metadata", async () => {
+		const updateBuilder = createUpdateBuilder()
+
+		mockDb.select.mockImplementationOnce(() =>
+			createSelectBuilder([
+				{
+					id: "anes-1",
+					surgicalCaseId: "case-1",
+					status: "draft",
+				},
+			])
+		)
+		jest
+			.spyOn(service as any, "getAnesthesiaRecord")
+			.mockResolvedValueOnce({
+				id: "anes-1",
+				surgicalCaseId: "case-1",
+				asaClass: "ASA II",
+				anesthesiaType: "general",
+				airwayType: "oral_ett",
+				airwayManagement: "Uneventful airway",
+				intubationAttempts: 1,
+				intubationGrade: "CL1",
+				difficultAirway: false,
+				agents: [{ name: "Propofol", dose: "2 mg/kg", route: "IV", time: "08:00" }],
+				inductionAgents: [{ agent: "Propofol", dose: "2 mg/kg", time: "08:00" }],
+				maintenanceAgents: null,
+				muscleRelaxants: null,
+				intraopMedications: [{ name: "Propofol", dose: "2 mg/kg", route: "IV", time: "08:00" }],
+				intraopVitals: [{ time: "08:05", bp: "120/80", hr: 72, spo2: 99 }],
+				fluidBalance: null,
+				reversalAgent: null,
+				totalAnesthesiaMinutes: 90,
+				emergenceSmooth: true,
+				complications: null,
+				postAnesthesiaCareNotes: null,
+				anesthesiologistStaffId: "anes-1",
+				status: "draft",
+				signedAt: null,
+				signedByStaffId: null,
+				createdAt: new Date("2026-05-05T00:00:00.000Z"),
+				updatedAt: new Date("2026-05-05T00:00:00.000Z"),
+			} as any)
+			.mockResolvedValueOnce({
+				id: "anes-1",
+				surgicalCaseId: "case-1",
+				asaClass: "ASA II",
+				anesthesiaType: "general",
+				airwayType: "oral_ett",
+				airwayManagement: "Uneventful airway",
+				intubationAttempts: 1,
+				intubationGrade: "CL1",
+				difficultAirway: false,
+				agents: [{ name: "Propofol", dose: "2 mg/kg", route: "IV", time: "08:00" }],
+				inductionAgents: [{ agent: "Propofol", dose: "2 mg/kg", time: "08:00" }],
+				maintenanceAgents: null,
+				muscleRelaxants: null,
+				intraopMedications: [{ name: "Propofol", dose: "2 mg/kg", route: "IV", time: "08:00" }],
+				intraopVitals: [{ time: "08:05", bp: "120/80", hr: 72, spo2: 99 }],
+				fluidBalance: null,
+				reversalAgent: null,
+				totalAnesthesiaMinutes: 90,
+				emergenceSmooth: true,
+				complications: null,
+				postAnesthesiaCareNotes: null,
+				anesthesiologistStaffId: "anes-1",
+				status: "signed",
+				signedAt: "2026-05-05T01:00:00.000Z",
+				signedByStaffId: "anes-1",
+				createdAt: new Date("2026-05-05T00:00:00.000Z"),
+				updatedAt: new Date("2026-05-05T01:00:00.000Z"),
+			} as any)
+		mockDb.update.mockReturnValue(updateBuilder)
+
+		const result = await service.signAnesthesiaRecord({ caseId: "case-1" }, "anes-1")
+
+		expect(updateBuilder.set).toHaveBeenCalledWith(
+			expect.objectContaining({
+				status: "signed",
+				signedByStaffId: "anes-1",
+				signedAt: expect.any(Date),
+				updatedAt: expect.any(Date),
+			})
+		)
+		expect(result).toEqual(
+			expect.objectContaining({
+				status: "signed",
+				signedByStaffId: "anes-1",
+			})
+		)
+	})
+
 	it("stores operationRecordId when suggesting an RVS code after signing", async () => {
 		const values = jest.fn().mockReturnValue({
 			returning: jest.fn().mockResolvedValue([{ id: "assignment-1" }]),
