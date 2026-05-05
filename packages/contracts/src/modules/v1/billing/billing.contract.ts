@@ -68,6 +68,8 @@ import {
 	ListInvoicesResponseSchema,
 	ListKonsultaActivitiesInputSchema,
 	ListKonsultaActivitiesResponseSchema,
+	ListKonsultaTrackerRowsInputSchema,
+	ListKonsultaTrackerRowsResponseSchema,
 	ListPaymentsInputSchema,
 	ListPaymentsResponseSchema,
 	MalasakitAssistanceSchema,
@@ -330,6 +332,11 @@ export const billingContract = {
 		.route({ method: "GET", path: "/konsulta/activities", summary: "List Konsulta activities for a patient", tags: ["Billing"] })
 		.input(ListKonsultaActivitiesInputSchema)
 		.output(ListKonsultaActivitiesResponseSchema),
+
+	listKonsultaTrackerRows: oc
+		.route({ method: "GET", path: "/konsulta/tracker", summary: "List per-patient Konsulta capitation tracker rows", tags: ["Billing"] })
+		.input(ListKonsultaTrackerRowsInputSchema)
+		.output(ListKonsultaTrackerRowsResponseSchema),
 
 	recordKonsultaEvent: oc
 		.route({ method: "POST", path: "/konsulta/activities", summary: "Record a Konsulta-eligible activity (idempotent)", tags: ["Billing"] })

@@ -94,6 +94,15 @@ type ModuleName =
 	| "orders"
 	| "nursing"
 	| "billing"
+	| "billing.charges"
+	| "billing.invoices"
+	| "billing.payments"
+	| "billing.cf4"
+	| "billing.drg"
+	| "billing.cf5"
+	| "billing.esoa"
+	| "billing.cews"
+	| "billing.konsulta"
 	| "formulary"
 	| "reporting"
 	| "audit"
@@ -117,9 +126,13 @@ type ModuleName =
 	| "fhir"
 	| "civil_registry"
 	| "medical_records"
+	| "him.deficiencies"
+	| "him.coding"
+	| "him.records"
+	| "him.hai"
 	| "notifications"
 
-type ActionName = "view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "manage_catalog" | "clinical_policy" | "terminology_admin"
+type ActionName = "view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "manage_catalog" | "clinical_policy" | "terminology_admin" | "read" | "write"
 
 interface DemoUser {
 	email: string
@@ -340,7 +353,16 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 	"Billing Officer": [
 		["adt", ["view"]],
 		["patients", ["view"]], // Patient record access for billing reconciliation
-		["billing", ["view", "create", "edit", "export"]],
+		["billing", ["view", "create", "edit", "export"]], // Legacy fallback for shell-level access
+		["billing.charges", ["read", "write"]],
+		["billing.invoices", ["read", "write"]],
+		["billing.payments", ["read", "write"]],
+		["billing.cf4", ["read", "write"]],
+		["billing.drg", ["read", "write"]],
+		["billing.cf5", ["read", "write"]],
+		["billing.esoa", ["read", "write"]],
+		["billing.cews", ["read", "write"]],
+		["billing.konsulta", ["read", "write"]],
 		["clinical_docs", ["view"]],
 		["reporting", ["view", "export"]],
 		["notifications", ["view"]], // All staff receive system notifications
@@ -417,6 +439,10 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["clinical_docs", ["view", "edit"]],
 		["reporting", ["view"]], // HAI tracking and report access
 		["medical_records", ["view", "create", "edit"]], // TOR: HIM manages medical records release and chart completion
+		["him.deficiencies", ["read", "write"]], // HIM: chart deficiency worklist
+		["him.coding", ["read", "write"]], // HIM: ICD-10 coding
+		["him.records", ["read", "write"]], // HIM: medical records issuance
+		["him.hai", ["read", "write"]], // HIM: HAI reconciliation
 		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Medical Social Worker": [

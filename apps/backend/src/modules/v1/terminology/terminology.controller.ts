@@ -4,7 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions } from "@/modules/v1/rbac/rbac.guard"
 
 import { TerminologyService } from "./terminology.service"
 
@@ -12,7 +12,10 @@ import { TerminologyService } from "./terminology.service"
 export class TerminologyController {
 	constructor(private readonly terminologyService: TerminologyService) {}
 
-	@RequirePermissions([{ module: "admin", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.terminology", action: "read" },
+		{ module: "admin", action: "view" },
+	])
 	@Implement(v1.terminology.listSystems)
 	async listSystems() {
 		return implement(v1.terminology.listSystems).handler(async () => {
@@ -20,7 +23,10 @@ export class TerminologyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.terminology", action: "read" },
+		{ module: "admin", action: "view" },
+	])
 	@Implement(v1.terminology.searchCodes)
 	async searchCodes() {
 		return implement(v1.terminology.searchCodes).handler(async ({ input }) => {
@@ -28,7 +34,10 @@ export class TerminologyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.terminology", action: "read" },
+		{ module: "admin", action: "view" },
+	])
 	@Implement(v1.terminology.getCode)
 	async getCode() {
 		return implement(v1.terminology.getCode).handler(async ({ input }) => {
@@ -36,7 +45,10 @@ export class TerminologyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "edit" }])
+	@RequireAnyPermissions([
+		{ module: "admin.terminology", action: "write" },
+		{ module: "admin", action: "edit" },
+	])
 	@Implement(v1.terminology.deprecate)
 	async deprecate(@Session() _session: UserSession) {
 		return implement(v1.terminology.deprecate).handler(async ({ input }) => {
@@ -44,7 +56,10 @@ export class TerminologyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "edit" }])
+	@RequireAnyPermissions([
+		{ module: "admin.terminology", action: "write" },
+		{ module: "admin", action: "edit" },
+	])
 	@Implement(v1.terminology.import)
 	async import(@Session() _session: UserSession) {
 		return implement(v1.terminology.import).handler(async ({ input }) => {
@@ -52,7 +67,10 @@ export class TerminologyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.terminology", action: "read" },
+		{ module: "admin", action: "view" },
+	])
 	@Implement(v1.terminology.diffVersions)
 	async diffVersions() {
 		return implement(v1.terminology.diffVersions).handler(async ({ input }) => {

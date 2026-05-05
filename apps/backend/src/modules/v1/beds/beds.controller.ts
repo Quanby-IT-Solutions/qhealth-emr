@@ -4,7 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { BedsService } from "./beds.service"
 
@@ -63,7 +63,10 @@ export class BedsController {
 		})
 	}
 
-	@RequirePermission("adt", "view")
+	@RequireAnyPermissions([
+		{ module: "admin.bor", action: "read" },
+		{ module: "adt", action: "view" },
+	])
 	@Implement(v1.bed.census)
 	async census() {
 		return implement(v1.bed.census).handler(async ({ input }) => {
@@ -71,7 +74,10 @@ export class BedsController {
 		})
 	}
 
-	@RequirePermission("adt", "view")
+	@RequireAnyPermissions([
+		{ module: "admin.bor", action: "read" },
+		{ module: "adt", action: "view" },
+	])
 	@Implement(v1.bed.dashboard)
 	async dashboard() {
 		return implement(v1.bed.dashboard).handler(async ({ input }) => {
@@ -79,7 +85,10 @@ export class BedsController {
 		})
 	}
 
-	@RequirePermission("admin", "view")
+	@RequireAnyPermissions([
+		{ module: "admin.bor", action: "read" },
+		{ module: "admin", action: "view" },
+	])
 	@Implement(v1.bed.borTrend)
 	async borTrend() {
 		return implement(v1.bed.borTrend).handler(async ({ input }) => {
@@ -87,7 +96,10 @@ export class BedsController {
 		})
 	}
 
-	@RequirePermission("admin", "view")
+	@RequireAnyPermissions([
+		{ module: "admin.bor", action: "read" },
+		{ module: "admin", action: "view" },
+	])
 	@Implement(v1.bed.exportAhsr)
 	async exportAhsr() {
 		return implement(v1.bed.exportAhsr).handler(async ({ input }) => {

@@ -47,14 +47,17 @@ export const InvoiceStatusEnum = z.enum([
 	"partially_paid",
 ])
 
+// BIL-BE-03: PhilHealth ticket spec — replaces legacy credit_card / bank_transfer / other.
+// Frontend payment-entry radio renders these exact methods (Cash, Card, GCash, HMO, Malasakit,
+// PhilHealth, COE — Certificate of Eligibility).
 export const PaymentMethodEnum = z.enum([
 	"cash",
-	"philhealth",
+	"card",
+	"gcash",
 	"hmo",
-	"credit_card",
-	"bank_transfer",
 	"malasakit",
-	"other",
+	"philhealth",
+	"coe",
 ])
 
 export const Cf4StatusEnum = z.enum([
@@ -789,7 +792,7 @@ export const ResubmitCf4InputSchema = z.object({
 
 export const CewsVerifyInputSchema = z.object({
 	memberPin: z.string().regex(/^\d{12}$/, "Member PIN must be exactly 12 digits"),
-	encounterId: z.string().uuid(),
+	encounterId: z.string().uuid().optional(),
 })
 
 export const CewsMembershipSchema = z.object({
@@ -905,6 +908,28 @@ export const KonsultaReportSchema = z.object({
 	),
 })
 
+// BIL-FE-09: Per-patient aggregate view for the Konsulta tracker table
+export const KonsultaTrackerRowSchema = z.object({
+	patientId: z.string().uuid(),
+	patientName: z.string(),
+	memberPin: z.string().nullable(),
+	fpeDate: z.string().nullable(),
+	lastFollowUp: z.string().nullable(),
+	labsCount: z.number().int(),
+	capitationTag: z.string(),
+})
+
+export const ListKonsultaTrackerRowsInputSchema = PaginationInputSchema.extend({
+	facilityId: z.string().uuid(),
+	periodStart: z.string().optional(),
+	periodEnd: z.string().optional(),
+	memberStatus: z.enum(["all", "active", "exhausted", "inactive"]).optional(),
+})
+
+export const ListKonsultaTrackerRowsResponseSchema = PaginatedResponseSchema.extend({
+	rows: z.array(KonsultaTrackerRowSchema),
+})
+
 // ============================================================================
 // BIL-BE-05: DRG Suggest, Confirm, CF5 Lifecycle
 // ============================================================================
@@ -954,6 +979,7 @@ export const Cf5ClaimSchema = z.object({
 	status: z.enum(["draft", "validated", "submitted", "approved", "rejected"]),
 	submissionData: z.record(z.string(), z.unknown()).nullable(),
 	responseData: z.record(z.string(), z.unknown()).nullable(),
+	resubmitCount: z.number().int().default(0),
 	validatedAt: dateOrString.nullable(),
 	submittedAt: dateOrString.nullable(),
 	createdAt: dateOrString,

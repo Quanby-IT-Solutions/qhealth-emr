@@ -8,6 +8,7 @@ import {
 	NotFoundException,
 	UnprocessableEntityException,
 } from "@nestjs/common"
+import { EventEmitter2 } from "@nestjs/event-emitter"
 import { and, count, desc, eq, gte, inArray, isNull, lt, max, sql } from "drizzle-orm"
 
 import {
@@ -53,7 +54,8 @@ export class EncountersService {
 
 	constructor(
 		private readonly auditService: AuditService,
-		private readonly chartAccessService: ChartAccessService
+		private readonly chartAccessService: ChartAccessService,
+		private readonly eventEmitter: EventEmitter2
 	) {}
 
 	// ========================================================================
@@ -955,6 +957,13 @@ export class EncountersService {
 			`Discharged encounter ${input.encounterId} with disposition: ${input.disposition}`
 		)
 
+		this.eventEmitter.emit("encounter.discharged", {
+			facilityId: encounter.facilityId,
+			encounterId: encounter.id,
+			encounterType: encounter.encounterType,
+			disposition: input.disposition,
+		})
+
 		// Return with SLA tracking fields
 		return {
 			...updated!,
@@ -1014,6 +1023,13 @@ export class EncountersService {
 		})
 
 		this.logger.log(`Discharged outpatient encounter ${input.encounterId}`)
+
+		this.eventEmitter.emit("encounter.discharged", {
+			facilityId: encounter.facilityId,
+			encounterId: encounter.id,
+			encounterType: encounter.encounterType,
+			disposition: null,
+		})
 
 		// Return with SLA tracking fields
 		return {

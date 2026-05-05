@@ -22,9 +22,9 @@ import { MoneyInput } from "@/features/billing/components/money-input"
 import { useInvoicesQuery, useRecordPaymentMutation } from "../api/invoices.hooks"
 import { computeChange, paymentMethodLabel } from "../lib/invoice-utils"
 
-type PaymentMethod = "cash" | "philhealth" | "hmo" | "credit_card" | "bank_transfer" | "malasakit" | "other"
+type PaymentMethod = "cash" | "card" | "gcash" | "hmo" | "malasakit" | "philhealth" | "coe"
 const PAYMENT_METHODS: PaymentMethod[] = [
-	"cash", "philhealth", "hmo", "credit_card", "bank_transfer", "malasakit", "other",
+	"cash", "card", "gcash", "hmo", "malasakit", "philhealth", "coe",
 ]
 
 interface PaymentEntryPageProps {

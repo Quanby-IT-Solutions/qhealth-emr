@@ -18,6 +18,12 @@ function maskName(name: string): string {
 		.join(" ")
 }
 
+const CEWS_STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+	active: "default",
+	lapsed: "destructive",
+	suspended: "destructive",
+}
+
 interface EncounterContextBarProps {
 	/** When true, patient name is masked per DPA requirements */
 	dpaFlag?: boolean
@@ -27,10 +33,12 @@ interface EncounterContextBarProps {
 	esoaVersion?: number
 	/** eSOA generation timestamp to show once issued */
 	esoaGeneratedAt?: string | Date | null
+	/** Saved CEWS eligibility status from latest snapshot */
+	cewsStatus?: string | null
 	className?: string
 }
 
-export function EncounterContextBar({ dpaFlag = false, drgCode, esoaVersion, esoaGeneratedAt, className }: EncounterContextBarProps) {
+export function EncounterContextBar({ dpaFlag = false, drgCode, esoaVersion, esoaGeneratedAt, cewsStatus, className }: EncounterContextBarProps) {
 	const { encounter, isLoading } = useChartContext()
 
 	if (isLoading) {
@@ -96,6 +104,12 @@ export function EncounterContextBar({ dpaFlag = false, drgCode, esoaVersion, eso
 						eSOA v{esoaVersion}
 						{esoaGeneratedAt && ` · ${new Date(esoaGeneratedAt).toLocaleDateString("en-PH")}`}
 					</span>
+				)}
+
+				{cewsStatus && (
+					<Badge variant={CEWS_STATUS_VARIANT[cewsStatus.toLowerCase()] ?? "outline"} className="capitalize text-xs">
+						CEWS: {cewsStatus}
+					</Badge>
 				)}
 			</div>
 

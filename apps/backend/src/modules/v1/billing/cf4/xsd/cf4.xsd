@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BIL-BE-04 — CF4 placeholder XSD.
+
+  Real PhilHealth CF4 XSD is licensed and must be dropped in here as part of
+  the integration credentials work (ADM-BE-12). This stub declares the
+  ticket-required sections (Patient, Encounter, Clinical Summary, ICD-10,
+  Procedures, Charges Summary) so structural callers can resolve the path.
+
+  Server-side validation in `BillingService.finalizeCf4` performs a
+  required-field check that mirrors this skeleton; the structured
+  { path, message } violation list returned to the UI maps to the named
+  elements below.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="CF4">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="Patient" type="xs:anyType" />
+        <xs:element name="Encounter" type="xs:anyType" />
+        <xs:element name="ClinicalSummary">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="ChiefComplaint" type="xs:string" />
+              <xs:element name="HistoryOfPresentIllness" type="xs:string" />
+              <xs:element name="VitalSigns" type="xs:anyType" />
+              <xs:element name="ManagementPlan" type="xs:string" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="Diagnoses" type="xs:anyType" />
+        <xs:element name="Procedures" type="xs:anyType" />
+        <xs:element name="ChargesSummary" type="xs:anyType" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

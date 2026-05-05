@@ -15,7 +15,8 @@ import { SaveToEncounterCta } from "./save-to-encounter-cta"
 
 interface MembershipVerificationPageProps {
 	memberPin: string
-	encounterId: string
+	/** Optional — omitted when doing a standalone lookup without an active encounter */
+	encounterId?: string
 }
 
 type CewsMembership = {
@@ -187,11 +188,13 @@ export function MembershipVerificationPage({ memberPin, encounterId }: Membershi
 						</Card>
 					)}
 
-					<SaveToEncounterCta
-						encounterId={encounterId}
-						memberPin={memberPin}
-						currentResult={result}
-					/>
+					{encounterId && (
+						<SaveToEncounterCta
+							encounterId={encounterId}
+							memberPin={memberPin}
+							currentResult={result}
+						/>
+					)}
 				</>
 			)}
 		</div>

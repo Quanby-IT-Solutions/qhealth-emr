@@ -90,7 +90,7 @@ interface Payment {
 	facilityId: string
 	invoiceId: string
 	amount: string
-	paymentMethod: "cash" | "philhealth" | "hmo" | "credit_card" | "bank_transfer" | "other"
+	paymentMethod: "cash" | "card" | "gcash" | "hmo" | "malasakit" | "philhealth" | "coe"
 	referenceNumber: string | null
 	receivedByStaffId: string
 	paymentDate: string

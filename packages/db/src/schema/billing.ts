@@ -9,6 +9,8 @@ import { facilities, staffProfiles } from "./rbac.js"
 // BILLING — Charges, Invoices, Payments, CF4 Claims, Eligibility
 // ============================================================================
 
+// `chargeMasterItems` serves as the `service_catalog` referenced by BIL-BE-01 / BIL-BE-02.
+// Same row shape: code (itemCode), name (description), category, default_price (unitPrice).
 export const chargeMasterItems = createTable(
 	"charge_master_items",
 	t => ({
@@ -162,7 +164,7 @@ export const payments = createTable(
 		paymentMethod: t
 			.text("payment_method")
 			.notNull()
-			.$type<"cash" | "philhealth" | "hmo" | "credit_card" | "bank_transfer" | "malasakit" | "other">(),
+			.$type<"cash" | "card" | "gcash" | "hmo" | "malasakit" | "philhealth" | "coe">(),
 		referenceNumber: t.text("reference_number"),
 		hmoProvider: t.text("hmo_provider"),
 		hmoClaimNumber: t.text("hmo_claim_number"),
@@ -263,6 +265,7 @@ export const cf5Claims = createTable(
 			.$type<"draft" | "validated" | "submitted" | "approved" | "rejected">(),
 		submissionData: t.jsonb("submission_data"),
 		responseData: t.jsonb("response_data"),
+		resubmitCount: t.integer("resubmit_count").notNull().default(0),
 		validatedAt: t.timestamp("validated_at"),
 		submittedAt: t.timestamp("submitted_at"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
@@ -362,6 +365,31 @@ export const cf4StatusLog = createTable(
 	t => [
 		index("cf4_status_log_claim_id_idx").on(t.claimId),
 		index("cf4_status_log_changed_at_idx").on(t.changedAt),
+	]
+)
+
+export const cf5StatusLog = createTable(
+	"cf5_status_log",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		claimId: t
+			.uuid("claim_id")
+			.notNull()
+			.references(() => cf5Claims.id, { onDelete: "cascade" }),
+		status: t
+			.text("status")
+			.notNull()
+			.$type<"draft" | "validated" | "submitted" | "approved" | "rejected" | "resubmitted">(),
+		philhealthRef: t.text("philhealth_ref"),
+		payload: t.jsonb("payload"),
+		changedByStaffId: t
+			.uuid("changed_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		changedAt: t.timestamp("changed_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("cf5_status_log_claim_id_idx").on(t.claimId),
+		index("cf5_status_log_changed_at_idx").on(t.changedAt),
 	]
 )
 

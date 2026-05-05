@@ -10,6 +10,10 @@ export { v1Contract } from "./modules/v1/v1.contract.js"
 // (v1Billing uses `as any` cast to avoid TS7056; billingContract retains full types)
 export { billingContract } from "./modules/v1/billing/billing.contract.js"
 
+// HIM contract (HIM-BE-01..05)
+export { himContract } from "./modules/v1/him/him.contract.js"
+export type { HimContract } from "./modules/v1/him/him.contract.js"
+
 // Admin dashboard schemas — exported for frontend and backend consumption
 export type {
 	AdminDashboardSummary,

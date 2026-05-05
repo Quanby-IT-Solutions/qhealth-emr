@@ -31,6 +31,31 @@ export function useListKonsultaActivitiesQuery(filter: KonsultaActivitiesFilter)
 	)
 }
 
+interface KonsultaTrackerRowsFilter {
+	facilityId: string
+	page?: number
+	limit?: number
+	periodStart?: string
+	periodEnd?: string
+	memberStatus?: "all" | "active" | "exhausted" | "inactive"
+}
+
+export function useListKonsultaTrackerRowsQuery(filter: KonsultaTrackerRowsFilter) {
+	return useQuery(
+		billingOrpc.listKonsultaTrackerRows.queryOptions({
+			input: {
+				facilityId: filter.facilityId,
+				page: filter.page ?? 1,
+				limit: filter.limit ?? 20,
+				periodStart: filter.periodStart,
+				periodEnd: filter.periodEnd,
+				memberStatus: filter.memberStatus,
+			},
+			enabled: !!filter.facilityId,
+		})
+	)
+}
+
 export function useRecordKonsultaEventMutation() {
 	const qc = useQueryClient()
 	return useMutation(
