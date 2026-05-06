@@ -6,7 +6,12 @@ import { CalendarDays, Clock3, Plus, Trash2 } from "lucide-react"
 import { z } from "zod"
 import { toast } from "sonner"
 
-import { CreateClinicTemplateSchema } from "@repo/contracts"
+import {
+	CreateClinicTemplateSchema,
+	type ClinicTemplate,
+	type CreateClinicTemplateInput,
+	type UpdateClinicTemplateInput,
+} from "@repo/contracts"
 
 import { EmptyState, ErrorState } from "@/features/admin/components/state-views"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle } from "@/core/components/ui/alert-dialog"
@@ -17,7 +22,6 @@ import { Checkbox } from "@/core/components/ui/checkbox"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet, FieldLegend } from "@/core/components/ui/field"
 import { Input } from "@/core/components/ui/input"
-import { Label } from "@/core/components/ui/label"
 import {
 	Select,
 	SelectContent,
@@ -28,10 +32,6 @@ import {
 import { Skeleton } from "@/core/components/ui/skeleton"
 import { cn } from "@/core/lib/utils"
 import {
-	type CreateScheduleTemplateInput,
-	type DayOfWeek,
-	type ScheduleTemplate,
-	type UpdateScheduleTemplateInput,
 	useClinicsQuery,
 	useCreateScheduleTemplateMutation,
 	useDeleteScheduleTemplateMutation,
@@ -39,6 +39,8 @@ import {
 	useStaffClinicianListQuery,
 	useUpdateScheduleTemplateMutation,
 } from "@/features/scheduling/api/scheduling.hooks"
+
+type DayOfWeek = ClinicTemplate["dayOfWeek"]
 
 const DAY_OPTIONS: Array<{ value: DayOfWeek; label: string; shortLabel: string }> = [
 	{ value: 0, label: "Sunday", shortLabel: "Sun" },
@@ -52,26 +54,35 @@ const DAY_OPTIONS: Array<{ value: DayOfWeek; label: string; shortLabel: string }
 
 const SLOT_DURATIONS = [5, 10, 15, 20, 30, 45, 60] as const
 
-const TemplateFormSchema = CreateClinicTemplateSchema.omit({ dayOfWeek: true }).extend({
-	dayOfWeeks: z.array(z.number().int().min(0).max(6)).min(1, "Select at least one day."),
-	isActive: z.boolean().default(true),
-}).superRefine((value, ctx) => {
-	if (value.endTime <= value.startTime) {
-		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
-			path: ["endTime"],
-			message: "End time must be later than start time.",
-		})
-	}
+const TemplateFormSchema = z
+	.object({
+		facilityId: CreateClinicTemplateSchema.shape.facilityId,
+		clinicName: CreateClinicTemplateSchema.shape.clinicName,
+		clinicianStaffId: CreateClinicTemplateSchema.shape.clinicianStaffId,
+		dayOfWeeks: z.array(z.number().int().min(0).max(6)).min(1, "Select at least one day."),
+		startTime: CreateClinicTemplateSchema.shape.startTime,
+		endTime: CreateClinicTemplateSchema.shape.endTime,
+		slotDurationMinutes: z.number().int().positive(),
+		maxPatients: z.number().int().positive(),
+		isActive: z.boolean(),
+	})
+	.superRefine((value, ctx) => {
+		if (value.endTime <= value.startTime) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				path: ["endTime"],
+				message: "End time must be later than start time.",
+			})
+		}
 
-	if (!SLOT_DURATIONS.includes(value.slotDurationMinutes as (typeof SLOT_DURATIONS)[number])) {
-		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
-			path: ["slotDurationMinutes"],
-			message: "Select an allowed slot duration.",
-		})
-	}
-})
+		if (!SLOT_DURATIONS.includes(value.slotDurationMinutes as (typeof SLOT_DURATIONS)[number])) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				path: ["slotDurationMinutes"],
+				message: "Select an allowed slot duration.",
+			})
+		}
+	})
 
 type TemplateFormValues = z.infer<typeof TemplateFormSchema>
 
@@ -183,14 +194,14 @@ function TemplateDialog({
 					maxPatients: value.maxPatients,
 				}
 
-				const results = await Promise.allSettled(
-					value.dayOfWeeks.map(dayOfWeek =>
-						createTemplateMutation.mutateAsync({
-							...payloadBase,
-							dayOfWeek,
-						} satisfies CreateScheduleTemplateInput)
+					const results = await Promise.allSettled(
+						value.dayOfWeeks.map(dayOfWeek =>
+							createTemplateMutation.mutateAsync({
+								...payloadBase,
+								dayOfWeek: dayOfWeek as DayOfWeek,
+							} satisfies CreateScheduleTemplateInput)
+						)
 					)
-				)
 
 				const succeeded = results.filter(result => result.status === "fulfilled").length
 				const failed = results.length - succeeded
@@ -491,7 +502,7 @@ function TemplateDialog({
 											</div>
 										</FieldLabel>
 									</Field>
-								}}
+								)}
 							</form.Field>
 						)}
 					</FieldGroup>

@@ -2,85 +2,36 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { env } from "@/env"
+import type {
+	Appointment,
+	AppointmentListInput,
+	AvailableSlotsQuery,
+	AvailableSlotsResponse,
+	CheckInAppointmentInput,
+	ClinicQueueQuery,
+	ClinicQueueResponse,
+	ClinicSlot,
+	ClinicTemplate,
+	CreateAppointmentInput,
+	CreateClinicTemplateInput,
+	ListTemplateSlotsQuery,
+	TimeSlot,
+	UnifiedQueueEntry,
+	UpdateAppointmentStatusInput,
+	UpdateClinicTemplateInput,
+	UpdateEncounterQueueStatusInput,
+	UpdateEncounterQueueStatusResponse,
+	UpdateSlotInput,
+} from "@repo/contracts"
+
+import { orpc } from "@/services/orpc/client"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useFacilityProfileQuery } from "@/features/facility-profile/api/facility-profile.hooks"
 import { useListCliniciansQuery as usePatientClinicianListQuery } from "@/features/patients/api/patients.hooks"
 
-const API_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/scheduling`
-
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-	const res = await fetch(url, {
-		credentials: "include",
-		...init,
-		headers: {
-			"Content-Type": "application/json",
-			...init?.headers,
-		},
-	})
-	if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-	return res.json() as Promise<T>
-}
-
-function buildQueryString(
-	params: Record<string, string | number | boolean | undefined>
-): string {
-	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
-	if (entries.length === 0) return ""
-	return (
-		"?" +
-		entries
-			.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-			.join("&")
-	)
-}
-
-// ============================================================================
-// Types
-// ============================================================================
-
-export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6
-
-export interface ScheduleTemplate {
-	id: string
-	facilityId: string
-	clinicianStaffId: string
-	clinicId: string
-	clinicName: string
-	clinicianId: string
-	clinicianName: string
-	dayOfWeek: DayOfWeek
-	startTime: string // "HH:mm"
-	endTime: string // "HH:mm"
-	slotDurationMinutes: number
-	maxPatients: number
-	isActive: boolean
-	createdAt: string
-	updatedAt: string
-}
-
-export interface ScheduleTemplateListResponse {
-	total: number
-	page: number
-	limit: number
-	totalPages: number
-	templates: ScheduleTemplate[]
-}
-
-export interface CreateScheduleTemplateInput {
-	facilityId: string
-	clinicName: string
-	clinicianStaffId: string
-	dayOfWeek: DayOfWeek
-	startTime: string
-	endTime: string
-	slotDurationMinutes: number
-	maxPatients: number
-}
-
-export interface UpdateScheduleTemplateInput extends Partial<CreateScheduleTemplateInput> {
-	isActive?: boolean
-}
+export type DayOfWeek = ClinicTemplate["dayOfWeek"]
+export type SlotStatus = ClinicSlot["status"]
+export type AppointmentStatus = Appointment["status"]
 
 export interface ClinicOption {
 	id: string
@@ -93,153 +44,42 @@ export interface ClinicianOption {
 	department?: string | null
 }
 
-interface BackendScheduleTemplate {
-	id: string
-	facilityId: string
-	clinicianStaffId: string
-	clinicName: string
-	dayOfWeek: DayOfWeek
-	startTime: string
-	endTime: string
-	slotDurationMinutes: number
-	maxPatients: number
-	isActive: boolean
-	createdAt: string
-	updatedAt: string
+interface ScheduleTemplatesQueryParams {
+	facilityId?: string
+	clinicId?: string
+	clinicianId?: string
+	clinicianStaffId?: string
+	dayOfWeek?: number
+	isActive?: boolean
+	page?: number
+	limit?: number
 }
 
-export interface AppointmentSlot {
+interface TemplateSlotsQueryParams {
+	templateId: string
+	fromDate: string
+	toDate: string
+	status?: SlotStatus
+}
+
+interface AvailableSlotQueryParams {
+	facilityId?: string
+	clinicId?: string
+	clinicianId?: string
+	clinicianStaffId?: string
 	date: string
-	time: string
-	clinicId: string
-	clinicianId: string
-	clinicianName: string
-	isAvailable: boolean
-	remainingSlots: number
 }
 
-export interface AvailableSlotsResponse {
-	slots: AppointmentSlot[]
-}
-
-export type AppointmentStatus =
-	| "scheduled"
-	| "checked_in"
-	| "in_progress"
-	| "completed"
-	| "no_show"
-	| "cancelled"
-
-export interface Appointment {
-	id: string
-	patientId: string
-	patientName: string
-	patientMrn: string
-	clinicId: string
-	clinicName: string
-	clinicianId: string
-	clinicianName: string
-	scheduledDate: string
-	slotTime: string
-	status: AppointmentStatus
-	notes?: string | null
-	checkInTime?: string | null
-	createdAt: string
-	updatedAt: string
-}
-
-export interface AppointmentListResponse {
-	total: number
-	page: number
-	limit: number
-	totalPages: number
-	appointments: Appointment[]
-}
-
-export interface BookAppointmentInput {
-	patientId: string
-	clinicId: string
-	clinicianId: string
-	scheduledDate: string
-	slotTime: string
-	notes?: string
-}
-
-export interface QueueEntry {
-	position: number
-	appointmentId: string
-	patientId: string
-	patientName: string
-	patientMrn: string
-	slotTime: string
-	checkInTime: string
-	status: AppointmentStatus
-}
-
-export type QueueEntryStatus = "waiting" | "in_progress" | "completed"
-
-export interface UnifiedQueueEntry {
-	entryType: "appointment" | "walk_in"
-	id: string
-	appointmentId: string | null
-	encounterId: string | null
-	queueNumber: number | null
-	slotTime: string | null
-	checkInTime: string | null
-	status: QueueEntryStatus
-	patientId: string
-	patientName?: string
-	patientMrn?: string
-	clinicianStaffId: string | null
-	clinicianName?: string
-}
-
-export interface ClinicQueueResponse {
-	entries: UnifiedQueueEntry[]
-	clinicName: string | null
-	stats: {
-		waiting: number
-		inProgress: number
-		completed: number
-		total: number
-	}
-}
-
-// ============================================================================
-// Query Keys
-// ============================================================================
-
-export const schedulingKeys = {
-	all: ["scheduling"] as const,
-	templates: () => [...schedulingKeys.all, "templates"] as const,
-	template: (id: string) => [...schedulingKeys.templates(), id] as const,
-	slots: (params: object) => [...schedulingKeys.all, "slots", params] as const,
-	appointments: () => [...schedulingKeys.all, "appointments"] as const,
-	appointment: (id: string) => [...schedulingKeys.appointments(), id] as const,
-	queue: (clinicId: string, date: string, clinicianStaffId?: string) =>
-		clinicianStaffId
-			? ([...schedulingKeys.all, "queue", clinicId, date, clinicianStaffId] as const)
-			: ([...schedulingKeys.all, "queue", clinicId, date] as const),
-}
-
-function mapScheduleTemplate(template: BackendScheduleTemplate): ScheduleTemplate {
-	return {
-		id: template.id,
-		facilityId: template.facilityId,
-		clinicianStaffId: template.clinicianStaffId,
-		clinicId: template.facilityId,
-		clinicName: template.clinicName,
-		clinicianId: template.clinicianStaffId,
-		clinicianName: "",
-		dayOfWeek: template.dayOfWeek,
-		startTime: template.startTime,
-		endTime: template.endTime,
-		slotDurationMinutes: template.slotDurationMinutes,
-		maxPatients: template.maxPatients,
-		isActive: template.isActive,
-		createdAt: template.createdAt,
-		updatedAt: template.updatedAt,
-	}
+interface AppointmentQueryParams {
+	facilityId?: string
+	clinicId?: string
+	clinicianId?: string
+	clinicianStaffId?: string
+	date?: string
+	status?: AppointmentStatus
+	patientId?: string
+	page?: number
+	limit?: number
 }
 
 export function useClinicsQuery() {
@@ -275,229 +115,270 @@ export function useStaffClinicianListQuery({ facilityId }: { facilityId?: string
 	}
 }
 
-// ============================================================================
-// Schedule Templates
-// ============================================================================
-
-export function useScheduleTemplatesQuery(params: {
-	facilityId?: string
-	clinicId?: string
-	clinicianId?: string
-	clinicianStaffId?: string
-	page?: number
-	limit?: number
-}) {
-	return useQuery({
-		queryKey: [...schedulingKeys.templates(), params],
-		queryFn: () =>
-			fetchJson<BackendScheduleTemplate[]>(
-				`${API_BASE}/clinic-templates${buildQueryString({
-					facilityId: params.facilityId ?? params.clinicId,
-					clinicianStaffId: params.clinicianStaffId ?? params.clinicianId,
-					page: params.page,
-					limit: params.limit,
-				})}`
-			),
-		select: templates => templates.map(mapScheduleTemplate),
-		enabled: true,
-	})
-}
-
-export function useScheduleTemplateDetailQuery(id: string) {
-	return useQuery({
-		queryKey: schedulingKeys.template(id),
-		queryFn: () => fetchJson<BackendScheduleTemplate>(`${API_BASE}/clinic-templates/${id}`),
-		select: mapScheduleTemplate,
-		enabled: !!id,
-	})
+export function useScheduleTemplatesQuery(params: ScheduleTemplatesQueryParams) {
+	return useQuery(
+		orpc.scheduling.listClinicTemplates.queryOptions({
+			input: {
+				facilityId: params.facilityId ?? params.clinicId,
+				clinicianStaffId: params.clinicianStaffId ?? params.clinicianId,
+				dayOfWeek: params.dayOfWeek,
+				isActive: params.isActive,
+				page: params.page,
+				limit: params.limit,
+			},
+		})
+	)
 }
 
 export function useCreateScheduleTemplateMutation() {
-	const qc = useQueryClient()
-	return useMutation({
-		mutationFn: (input: CreateScheduleTemplateInput) =>
-			fetchJson<BackendScheduleTemplate>(`${API_BASE}/clinic-templates`, {
-				method: "POST",
-				body: JSON.stringify(input),
-			}),
-		onSuccess: () => {
-			void qc.invalidateQueries({ queryKey: schedulingKeys.templates() })
-		},
-	})
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.scheduling.createClinicTemplate.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.listClinicTemplates.key(),
+				}),
+		})
+	)
 }
 
 export function useUpdateScheduleTemplateMutation() {
-	const qc = useQueryClient()
-	return useMutation({
-		mutationFn: ({ id, ...input }: UpdateScheduleTemplateInput & { id: string }) =>
-			fetchJson<BackendScheduleTemplate>(`${API_BASE}/clinic-templates/${id}`, {
-				method: "PUT",
-				body: JSON.stringify(input),
-			}),
-		onSuccess: (_, vars) => {
-			void qc.invalidateQueries({ queryKey: schedulingKeys.templates() })
-			void qc.invalidateQueries({ queryKey: schedulingKeys.template(vars.id) })
-		},
-	})
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.scheduling.updateClinicTemplate.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.listClinicTemplates.key(),
+				}),
+		})
+	)
 }
 
+// Compatibility wrapper until the backend exposes a dedicated delete/deactivate route.
+// For now, the UI "delete" action soft-deactivates the template via updateClinicTemplate.
 export function useDeleteScheduleTemplateMutation() {
-	const qc = useQueryClient()
+	const queryClient = useQueryClient()
+
 	return useMutation({
 		mutationFn: (id: string) =>
-			fetchJson<BackendScheduleTemplate>(`${API_BASE}/clinic-templates/${id}`, {
-				method: "PUT",
-				body: JSON.stringify({ isActive: false }),
+			orpc.scheduling.updateClinicTemplate.call({
+				id,
+				isActive: false,
+			} satisfies UpdateClinicTemplateInput),
+		onSuccess: () =>
+			queryClient.invalidateQueries({
+				queryKey: orpc.scheduling.listClinicTemplates.key(),
 			}),
-		onSuccess: () => {
-			void qc.invalidateQueries({ queryKey: schedulingKeys.templates() })
-		},
 	})
 }
 
-// ============================================================================
-// Available Slots
-// ============================================================================
+export function useTemplateSlotsQuery(params: TemplateSlotsQueryParams) {
+	return useQuery({
+		...orpc.scheduling.listTemplateSlots.queryOptions({
+			input: {
+				id: params.templateId,
+				fromDate: params.fromDate,
+				toDate: params.toDate,
+				status: params.status,
+			} satisfies ListTemplateSlotsQuery,
+		}),
+		enabled: !!params.templateId && !!params.fromDate && !!params.toDate,
+	})
+}
+
+export function useUpdateSlotMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.scheduling.updateSlot.mutationOptions({
+			onMutate: async variables => {
+				await queryClient.cancelQueries({
+					queryKey: orpc.scheduling.listTemplateSlots.key(),
+				})
+
+				const snapshots = queryClient.getQueriesData<ClinicSlot[]>({
+					queryKey: orpc.scheduling.listTemplateSlots.key(),
+				})
+
+				queryClient.setQueriesData<ClinicSlot[]>(
+					{
+						queryKey: orpc.scheduling.listTemplateSlots.key(),
+					},
+					current =>
+						current?.map(slot => {
+							if (slot.id !== variables.id) {
+								return slot
+							}
+
+							if (variables.action === "block") {
+								return {
+									...slot,
+									status: "blocked",
+									blockReason: variables.reason ?? null,
+									updatedAt: new Date().toISOString(),
+								}
+							}
+
+							return {
+								...slot,
+								status: "open",
+								blockReason: null,
+								updatedAt: new Date().toISOString(),
+							}
+						}) ?? current
+				)
+
+				return { snapshots }
+			},
+			onError: (_error, _variables, context) => {
+				context?.snapshots.forEach(([queryKey, data]) => {
+					queryClient.setQueryData(queryKey, data)
+				})
+			},
+			onSettled: () =>
+				queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.listTemplateSlots.key(),
+				}),
+		})
+	)
+}
 
 export function useAvailableSlotsQuery(
-	params: { clinicId?: string; clinicianId?: string; date: string },
+	params: AvailableSlotQueryParams,
 	enabled = true
 ) {
 	return useQuery({
-		queryKey: schedulingKeys.slots(params),
-		queryFn: () =>
-			fetchJson<AvailableSlotsResponse>(
-				`${API_BASE}/available-slots${buildQueryString(params)}`
-			),
+		...orpc.scheduling.getAvailableSlots.queryOptions({
+			input: {
+				facilityId: params.facilityId ?? params.clinicId,
+				clinicianStaffId: params.clinicianStaffId ?? params.clinicianId,
+				date: params.date,
+			} satisfies AvailableSlotsQuery,
+		}),
 		enabled: enabled && !!params.date,
 	})
 }
 
-// ============================================================================
-// Appointments
-// ============================================================================
-
-export function useAppointmentsQuery(params: {
-	facilityId?: string
-	date?: string
-	clinicId?: string
-	clinicianId?: string
-	status?: string
-	patientId?: string
-	page?: number
-	limit?: number
-}) {
-	return useQuery({
-		queryKey: [...schedulingKeys.appointments(), params],
-		queryFn: () =>
-			fetchJson<AppointmentListResponse>(
-				`${API_BASE}/appointments${buildQueryString(params)}`
-			),
-		enabled: true,
-	})
+export function useAppointmentsQuery(params: AppointmentQueryParams) {
+	return useQuery(
+		orpc.scheduling.listAppointments.queryOptions({
+			input: {
+				facilityId: params.facilityId ?? params.clinicId ?? "",
+				clinicianStaffId: params.clinicianStaffId ?? params.clinicianId,
+				date: params.date,
+				status: params.status,
+				patientId: params.patientId,
+				page: params.page,
+				limit: params.limit,
+			} satisfies AppointmentListInput,
+			enabled: !!(params.facilityId ?? params.clinicId),
+		})
+	)
 }
 
 export function useBookAppointmentMutation() {
-	const qc = useQueryClient()
-	return useMutation({
-		mutationFn: (input: BookAppointmentInput) =>
-			fetchJson<Appointment>(`${API_BASE}/appointments`, {
-				method: "POST",
-				body: JSON.stringify(input),
-			}),
-		onSuccess: () => {
-			void qc.invalidateQueries({ queryKey: schedulingKeys.appointments() })
-		},
-	})
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.scheduling.createAppointment.mutationOptions({
+			onSuccess: () => {
+				void queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.listAppointments.key(),
+				})
+				void queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.getAvailableSlots.key(),
+				})
+			},
+		})
+	)
 }
 
 export function useCheckInMutation() {
-	const qc = useQueryClient()
-	return useMutation({
-		mutationFn: (appointmentId: string) =>
-			fetchJson<Appointment>(`${API_BASE}/appointments/${appointmentId}/check-in`, {
-				method: "POST",
-				body: JSON.stringify({}),
-			}),
-		onSuccess: (data) => {
-			void qc.invalidateQueries({ queryKey: schedulingKeys.appointments() })
-			void qc.invalidateQueries({
-				queryKey: schedulingKeys.queue(data.clinicId, data.scheduledDate),
-			})
-		},
-	})
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.scheduling.checkInAppointment.mutationOptions({
+			onSuccess: () => {
+				void queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.listAppointments.key(),
+				})
+				void queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.getClinicQueue.key(),
+				})
+			},
+		})
+	)
 }
 
 export function useUpdateAppointmentStatusMutation() {
-	const qc = useQueryClient()
-	return useMutation({
-		mutationFn: ({
-			appointmentId,
-			status,
-		}: {
-			appointmentId: string
-			status: AppointmentStatus
-		}) =>
-			fetchJson<Appointment>(
-				`${API_BASE}/appointments/${appointmentId}/status`,
-				{
-					method: "PATCH",
-					body: JSON.stringify({ status }),
-				}
-			),
-		onSuccess: (data) => {
-			void qc.invalidateQueries({ queryKey: schedulingKeys.appointments() })
-			void qc.invalidateQueries({ queryKey: schedulingKeys.appointment(data.id) })
-			void qc.invalidateQueries({
-				queryKey: schedulingKeys.queue(data.clinicId, data.scheduledDate),
-			})
-		},
-	})
-}
+	const queryClient = useQueryClient()
 
-export function useCancelAppointmentMutation() {
-	const qc = useQueryClient()
-	return useMutation({
-		mutationFn: (appointmentId: string) =>
-			fetchJson<void>(`${API_BASE}/appointments/${appointmentId}`, {
-				method: "DELETE",
-			}),
-		onSuccess: () => {
-			void qc.invalidateQueries({ queryKey: schedulingKeys.appointments() })
-		},
-	})
+	return useMutation(
+		orpc.scheduling.updateAppointmentStatus.mutationOptions({
+			onSuccess: data => {
+				void queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.listAppointments.key(),
+				})
+				void queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.getAppointment.key({ input: { id: data.id } }),
+				})
+				void queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.getClinicQueue.key(),
+				})
+				void queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.getAvailableSlots.key(),
+				})
+			},
+		})
+	)
 }
-
-// ============================================================================
-// Clinic Queue
-// ============================================================================
 
 export function useClinicQueueQuery(
-	params: { facilityId?: string; clinicId?: string; clinicianStaffId?: string; date: string },
+	params: ClinicQueueQuery,
 	options?: { refetchInterval?: number }
 ) {
 	const hasFilter = !!params.facilityId || !!params.clinicId
+
 	return useQuery({
-		queryKey: schedulingKeys.queue(params.facilityId || params.clinicId || "", params.date, params.clinicianStaffId),
-		queryFn: () =>
-			fetchJson<ClinicQueueResponse>(
-				`${API_BASE}/queue${buildQueryString(params)}`
-			),
+		...orpc.scheduling.getClinicQueue.queryOptions({
+			input: params,
+		}),
 		enabled: hasFilter && !!params.date,
 		refetchInterval: options?.refetchInterval ?? 30_000,
 	})
 }
 
 export function useUpdateEncounterQueueStatusMutation() {
-	const qc = useQueryClient()
-	return useMutation({
-		mutationFn: ({ id, status }: { id: string; status: "in_progress" | "completed" }) =>
-			fetchJson<{ id: string; queueStatus: string }>(
-				`${env.NEXT_PUBLIC_API_BASE_URL}/v1/scheduling/encounters/${id}/queue-status`,
-				{ method: "PUT", body: JSON.stringify({ id, status }) }
-			),
-		onSuccess: () => {
-			void qc.invalidateQueries({ queryKey: schedulingKeys.all })
-		},
-	})
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.scheduling.updateEncounterQueueStatus.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.getClinicQueue.key(),
+				}),
+		})
+	)
+}
+
+export type {
+	Appointment,
+	AvailableSlotsResponse,
+	CheckInAppointmentInput,
+	ClinicQueueQuery,
+	ClinicQueueResponse,
+	ClinicSlot,
+	ClinicTemplate,
+	CreateAppointmentInput,
+	CreateClinicTemplateInput,
+	ListTemplateSlotsQuery,
+	TimeSlot,
+	UnifiedQueueEntry,
+	UpdateAppointmentStatusInput,
+	UpdateClinicTemplateInput,
+	UpdateEncounterQueueStatusInput,
+	UpdateEncounterQueueStatusResponse,
+	UpdateSlotInput,
 }
