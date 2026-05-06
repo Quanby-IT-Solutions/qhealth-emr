@@ -34,6 +34,7 @@ export const AppointmentStatusEnum = z.enum([
 ])
 
 export const AppointmentEncounterTypeEnum = z.enum(["outpatient", "telemedicine"])
+export const ClinicSlotStatusEnum = z.enum(["open", "blocked", "booked", "cancelled"])
 
 // ============================================================================
 // Clinic Template Schema
@@ -64,6 +65,7 @@ export const AppointmentSchema = z.object({
 	id: z.string().uuid(),
 	facilityId: z.string().uuid(),
 	clinicTemplateId: z.string().uuid().nullable(),
+	clinicSlotId: z.string().uuid().nullable(),
 	patientId: z.string().uuid(),
 	clinicianStaffId: z.string().uuid(),
 	appointmentDate: z.string(), // YYYY-MM-DD format
@@ -82,6 +84,29 @@ export const AppointmentSchema = z.object({
 })
 
 export type Appointment = z.infer<typeof AppointmentSchema>
+
+// ============================================================================
+// Clinic Slot Schema
+// ============================================================================
+
+export const ClinicSlotSchema = z.object({
+	id: z.string().uuid(),
+	clinicTemplateId: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	clinicianStaffId: z.string().uuid(),
+	slotDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+	slotStartTime: z.string().regex(/^\d{2}:\d{2}$/),
+	slotEndTime: z.string().regex(/^\d{2}:\d{2}$/),
+	status: ClinicSlotStatusEnum,
+	blockReason: z.string().nullable(),
+	appointmentId: z.string().uuid().nullable(),
+	blockedByStaffId: z.string().uuid().nullable(),
+	blockedAt: dateOrString.nullable(),
+	createdAt: dateOrString,
+	updatedAt: dateOrString,
+})
+
+export type ClinicSlot = z.infer<typeof ClinicSlotSchema>
 
 // ============================================================================
 // Appointment with Patient & Clinician info (for listing)
@@ -227,6 +252,19 @@ export const AvailableSlotsResponseSchema = z.object({
 	clinicName: z.string().nullable(),
 })
 
+export const ListTemplateSlotsQuerySchema = z.object({
+	id: z.string().uuid(),
+	fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+	toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+	status: ClinicSlotStatusEnum.optional(),
+})
+
+export const UpdateSlotSchema = z.object({
+	id: z.string().uuid(),
+	action: z.enum(["block", "unblock"]),
+	reason: z.string().max(500).optional(),
+})
+
 // ============================================================================
 // Clinic Queue
 // ============================================================================
@@ -295,4 +333,6 @@ export type CheckInAppointmentInput = z.infer<typeof CheckInAppointmentSchema>
 export type UpdateAppointmentStatusInput = z.infer<typeof UpdateAppointmentStatusSchema>
 export type AvailableSlotsQuery = z.infer<typeof AvailableSlotsQuerySchema>
 export type ClinicQueueQuery = z.infer<typeof ClinicQueueQuerySchema>
+export type ListTemplateSlotsQuery = z.infer<typeof ListTemplateSlotsQuerySchema>
+export type UpdateSlotInput = z.infer<typeof UpdateSlotSchema>
 export type UpdateEncounterQueueStatusInput = z.infer<typeof UpdateEncounterQueueStatusSchema>
