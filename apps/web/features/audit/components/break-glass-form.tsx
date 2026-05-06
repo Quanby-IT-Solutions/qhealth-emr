@@ -112,7 +112,7 @@ export function BreakGlassForm({
 }: BreakGlassFormProps) {
 	const [reasonCategory, setReasonCategory] = useState<ReasonCategory | "">("")
 	const [justification, setJustification] = useState("")
-	const [durationHours, setDurationHours] = useState<number>(4)
+	const [durationHours, setDurationHours] = useState<number | "">("")
 	const [acknowledged, setAcknowledged] = useState(false)
 	const createBreakGlassMutation = useCreateBreakGlassMutation()
 
@@ -162,7 +162,7 @@ export function BreakGlassForm({
 	}
 
 	const canSubmit =
-		reasonCategory && justification.trim().length >= 10 && acknowledged && !createBreakGlassMutation.isPending
+		reasonCategory && durationHours !== "" && justification.trim().length >= 10 && acknowledged && !createBreakGlassMutation.isPending
 
 	const handleSubmit = useCallback(() => {
 		if (!canSubmit) return
@@ -173,7 +173,7 @@ export function BreakGlassForm({
 				patientId,
 				reasonCategory: reasonCategory as ReasonCategory,
 				justification: justification.trim(),
-				durationHours,
+				durationHours: Number(durationHours),
 			},
 			{ onSuccess: () => onSuccess?.() }
 		)
@@ -197,24 +197,16 @@ export function BreakGlassForm({
 					<Label htmlFor="reason-category" className="text-sm font-medium">
 						Reason Category <span className="text-destructive">*</span>
 					</Label>
-					<Select value={reasonCategory || undefined} onValueChange={v => setReasonCategory(v ?? "")}>
+					<Select value={reasonCategory || null} onValueChange={v => setReasonCategory(v ?? "")}>
 						<SelectTrigger id="reason-category" className="w-full">
 							<SelectValue placeholder="Select reason…">
-								{reasonCategory
-									? reasonCategory
-											.split("_")
-											.map(word => word.charAt(0).toUpperCase() + word.slice(1))
-											.join(" ")
-									: null}
+								{reasonCategory ? REASON_CATEGORIES.find(c => c.value === reasonCategory)?.label : undefined}
 							</SelectValue>
 						</SelectTrigger>
 						<SelectContent className="w-max min-w-[var(--anchor-width)]">
 							{REASON_CATEGORIES.map(cat => (
 								<SelectItem key={cat.value} value={cat.value}>
-									{cat.value
-										.split("_")
-										.map(word => word.charAt(0).toUpperCase() + word.slice(1))
-										.join(" ")}
+									{cat.label}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -227,11 +219,13 @@ export function BreakGlassForm({
 						Access Duration <span className="text-destructive">*</span>
 					</Label>
 					<Select
-						value={String(durationHours)}
+						value={durationHours ? String(durationHours) : null}
 						onValueChange={v => setDurationHours(Number(v))}
 					>
 						<SelectTrigger id="duration" className="w-full">
-							<SelectValue />
+							<SelectValue placeholder="Select duration…">
+								{durationHours ? DURATION_OPTIONS.find(o => o.value === durationHours)?.label : undefined}
+							</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							{DURATION_OPTIONS.map(opt => (
