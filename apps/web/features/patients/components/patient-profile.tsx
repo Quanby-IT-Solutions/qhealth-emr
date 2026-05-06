@@ -14,6 +14,7 @@ import {
 	MapPin,
 	Phone,
 	Plus,
+	ShieldAlert,
 	UserRound,
 	Users,
 } from "lucide-react"
@@ -21,11 +22,18 @@ import {
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/core/components/ui/dialog"
 import { Separator } from "@/core/components/ui/separator"
 import { SidebarTrigger } from "@/core/components/ui/sidebar"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useMyActiveBreakGlassQuery } from "@/features/audit/api/audit.hooks"
-import { BreakGlassForm } from "@/features/audit/components/break-glass-form"
+import { BreakGlassCountdown, BreakGlassForm } from "@/features/audit/components/break-glass-form"
 import { ConsentHistory } from "@/features/clinical-docs/components/consent-history"
 import { DpaStatusBadge } from "@/features/clinical-docs/components/dpa-status-badge"
 import { usePatientProfileQuery } from "@/features/patients/api/patients.hooks"
@@ -226,6 +234,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 	const searchParams = useSearchParams()
 	const sourceFromQuery = searchParams.get("from")
 	const [source, setSource] = useState<string | null>(sourceFromQuery)
+	const [breakGlassOpen, setBreakGlassOpen] = useState(false)
 
 	useEffect(() => {
 		if (sourceFromQuery === "list" || sourceFromQuery === "register") {
@@ -258,13 +267,14 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 	const activeStaffProfile = getActiveStaffProfile(profile)
 	const activeFacilityId = activeStaffProfile?.facilityId
 	const canBreakGlass = can(permSet, "audit", "create")
-	const canViewAudit = can(permSet, "audit", "view")
 	const breakGlassRequired = isBreakGlassRequiredError(error)
-	const { data: activeBreakGlass } = useMyActiveBreakGlassQuery({
+	const {
+		data: activeBreakGlass,
+		refetch: refetchActiveBreakGlass,
+	} = useMyActiveBreakGlassQuery({
 		facilityId: activeFacilityId,
 		patientId,
-		staffId: activeStaffProfile?.id,
-		enabled: canBreakGlass && canViewAudit,
+		enabled: canBreakGlass,
 	})
 	const { data: summary } = usePatientSummaryQuery(patient ? patientId : "")
 
@@ -273,6 +283,32 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 			void refetchPatient()
 		}
 	}, [activeBreakGlass, breakGlassRequired, refetchPatient])
+
+	useEffect(() => {
+		if (!activeBreakGlass?.accessExpiresAt) return
+
+		const expiresAtMs = new Date(activeBreakGlass.accessExpiresAt).getTime()
+		const refreshDelayMs = expiresAtMs - Date.now() + 1000
+
+		if (refreshDelayMs <= 0) {
+			void refetchActiveBreakGlass()
+			void refetchPatient()
+			return
+		}
+
+		const timeoutId = window.setTimeout(() => {
+			void refetchActiveBreakGlass()
+			void refetchPatient()
+		}, refreshDelayMs)
+
+		return () => window.clearTimeout(timeoutId)
+	}, [activeBreakGlass?.accessExpiresAt, refetchActiveBreakGlass, refetchPatient])
+
+	useEffect(() => {
+		if (breakGlassRequired && canBreakGlass && activeFacilityId) {
+			setBreakGlassOpen(true)
+		}
+	}, [activeFacilityId, breakGlassRequired, canBreakGlass])
 
 	if (isLoading) {
 		return (
@@ -302,13 +338,42 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 					<Card>
 						<CardHeader>
-							<CardTitle>Break-Glass Required</CardTitle>
+							<CardTitle className="flex items-center gap-2">
+								<ShieldAlert className="size-4 text-orange-600" />
+								Restricted Patient Record
+							</CardTitle>
 						</CardHeader>
 						<CardContent className="space-y-4">
 							<p className="text-sm text-muted-foreground">
-								This patient chart is outside your regular access scope. Submit an emergency override
-								request to unlock temporary read-only access.
+								This patient chart is outside your regular access scope. Use the break-glass dialog to
+								request temporary emergency access without leaving this patient route.
 							</p>
+							<div className="flex flex-wrap items-center gap-3">
+								<Button onClick={() => setBreakGlassOpen(true)}>
+									{activeBreakGlass ? "Break-Glass Active" : "Request Break-Glass"}
+								</Button>
+								{activeBreakGlass?.accessExpiresAt ? (
+									<BreakGlassCountdown accessExpiresAt={activeBreakGlass.accessExpiresAt} />
+								) : null}
+							</div>
+						</CardContent>
+					</Card>
+
+					<Dialog open={breakGlassOpen} onOpenChange={setBreakGlassOpen}>
+						<DialogContent className="max-w-2xl">
+							<DialogHeader>
+								<div className="flex items-center gap-3">
+									<div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 dark:bg-orange-900/40">
+										<ShieldAlert className="size-5 text-orange-600 dark:text-orange-400" />
+									</div>
+									<div>
+										<DialogTitle className="text-lg">Emergency Override Access</DialogTitle>
+										<DialogDescription className="mt-0.5">
+											Break-glass request required to access this patient record.
+										</DialogDescription>
+									</div>
+								</div>
+							</DialogHeader>
 							<BreakGlassForm
 								patientId={patientId}
 								facilityId={activeFacilityId}
@@ -316,11 +381,13 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 								entityId={patientId}
 								activeEvent={activeBreakGlass}
 								onSuccess={() => {
+									setBreakGlassOpen(false)
 									void refetchPatient()
 								}}
+								onCancel={() => setBreakGlassOpen(false)}
 							/>
-						</CardContent>
-					</Card>
+						</DialogContent>
+					</Dialog>
 				</div>
 			)
 		}
@@ -363,38 +430,82 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 				</div>
 
 				<section className="mb-8">
-					<div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+					<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 						<div className="bg-secondary text-muted-foreground flex size-14 items-center justify-center rounded-full">
 							<UserRound className="size-6" />
 						</div>
-						<div className="space-y-3">
-							<p className="text-muted-foreground text-[0.68rem] font-medium tracking-[0.24em] uppercase">
-								Patient
-							</p>
-							<div className="space-y-2">
-								<h1 className="text-3xl font-semibold tracking-tight">{patientName}</h1>
-								<div className="flex flex-wrap items-center gap-3">
-									<Badge variant="secondary" className="font-mono">
-										{patient.mrn}
-									</Badge>
-									<span className="text-muted-foreground text-sm">
-										{patient.isActive ? "Active record" : "Inactive record"}
-									</span>
-									{summary?.hasSevereAllergies && (
-										<Badge variant="destructive">Severe Allergy</Badge>
-									)}
-									{summary && summary.activeAllergyCount > 0 && !summary.hasSevereAllergies && (
-										<Badge variant="outline">
-											{summary.activeAllergyCount} Allerg
-											{summary.activeAllergyCount === 1 ? "y" : "ies"}
+						<div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+							<div className="space-y-3">
+								<p className="text-muted-foreground text-[0.68rem] font-medium tracking-[0.24em] uppercase">
+									Patient
+								</p>
+								<div className="space-y-2">
+									<h1 className="text-3xl font-semibold tracking-tight">{patientName}</h1>
+									<div className="flex flex-wrap items-center gap-3">
+										<Badge variant="secondary" className="font-mono">
+											{patient.mrn}
 										</Badge>
-									)}
-									<DpaStatusBadge patientId={patientId} />
+										<span className="text-muted-foreground text-sm">
+											{patient.isActive ? "Active record" : "Inactive record"}
+										</span>
+										{summary?.hasSevereAllergies && (
+											<Badge variant="destructive">Severe Allergy</Badge>
+										)}
+										{summary && summary.activeAllergyCount > 0 && !summary.hasSevereAllergies && (
+											<Badge variant="outline">
+												{summary.activeAllergyCount} Allerg
+												{summary.activeAllergyCount === 1 ? "y" : "ies"}
+											</Badge>
+										)}
+										<DpaStatusBadge patientId={patientId} />
+									</div>
 								</div>
 							</div>
+
+							{activeBreakGlass ? (
+								<Button
+									variant="outline"
+									className="border-orange-300 text-orange-700 hover:bg-orange-50"
+									onClick={() => setBreakGlassOpen(true)}
+								>
+									<ShieldAlert className="size-4" />
+									Break-Glass Active
+								</Button>
+							) : null}
 						</div>
 					</div>
 				</section>
+
+				{activeBreakGlass ? (
+					<Card className="mb-8 border-orange-300 bg-orange-50/60 shadow-sm">
+						<CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+							<div className="space-y-1">
+								<div className="flex items-center gap-2">
+									<ShieldAlert className="size-4 text-orange-700" />
+									<p className="text-sm font-medium text-orange-900">Temporary Break-Glass Access Active</p>
+								</div>
+								<p className="text-sm text-orange-800">
+									Access to this patient record is temporary and will expire automatically. This does not
+									grant permanent access.
+								</p>
+								<p className="text-xs text-orange-700">
+									Expires at{" "}
+									{formatDateTime(activeBreakGlass.accessExpiresAt)}
+								</p>
+							</div>
+							<div className="flex flex-wrap items-center gap-3">
+								<BreakGlassCountdown accessExpiresAt={activeBreakGlass.accessExpiresAt} />
+								<Button
+									variant="outline"
+									className="border-orange-300 text-orange-700 hover:bg-orange-100"
+									onClick={() => setBreakGlassOpen(true)}
+								>
+									View Access Session
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+				) : null}
 
 				<Card className="border-border/60 mb-8 rounded-lg shadow-sm">
 					<CardContent className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -533,6 +644,37 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 						</div>
 					</>
 				)}
+
+				<Dialog open={breakGlassOpen} onOpenChange={setBreakGlassOpen}>
+					<DialogContent className="max-w-2xl">
+						<DialogHeader>
+							<div className="flex items-center gap-3">
+								<div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 dark:bg-orange-900/40">
+									<ShieldAlert className="size-5 text-orange-600 dark:text-orange-400" />
+								</div>
+								<div>
+									<DialogTitle className="text-lg">Emergency Override Access</DialogTitle>
+									<DialogDescription className="mt-0.5">
+										Review the active break-glass session or request a temporary override for this patient
+										record.
+									</DialogDescription>
+								</div>
+							</div>
+						</DialogHeader>
+						<BreakGlassForm
+							patientId={patientId}
+							facilityId={patient.facilityId}
+							entityType="patient"
+							entityId={patientId}
+							activeEvent={activeBreakGlass}
+							onSuccess={() => {
+								setBreakGlassOpen(false)
+								void refetchPatient()
+							}}
+							onCancel={() => setBreakGlassOpen(false)}
+						/>
+					</DialogContent>
+				</Dialog>
 			</div>
 		</div>
 	)

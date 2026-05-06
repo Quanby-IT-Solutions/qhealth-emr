@@ -6,6 +6,7 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
 
 import { ErrorState, SkeletonRows } from "@/features/admin/components/state-views"
 import { useHaiExportMutation, useHaiReportQuery } from "../api/hai.hooks"
@@ -81,9 +82,18 @@ export function HaiReportPage({ facilityId }: HaiReportPageProps) {
 							<p className="text-3xl font-bold tabular-nums">{data.patientDays}</p>
 						</CardContent>
 					</Card>
-					<Card title="AHSR formula: total HAI tags ÷ patient days × 1000">
+					<Card>
 						<CardHeader className="pb-2">
-							<CardTitle className="text-xs uppercase text-muted-foreground">Per 1000 patient days</CardTitle>
+							<Tooltip>
+								<TooltipTrigger>
+									<CardTitle className="cursor-help text-xs uppercase text-muted-foreground underline decoration-dotted">
+										Per 1000 patient days
+									</CardTitle>
+								</TooltipTrigger>
+								<TooltipContent>
+									<p className="max-w-xs text-xs">AHSR formula: (total HAI cases ÷ patient days) × 1000</p>
+								</TooltipContent>
+							</Tooltip>
 						</CardHeader>
 						<CardContent>
 							<p className="text-3xl font-bold tabular-nums">{data.incidencePer1000PatientDays}</p>

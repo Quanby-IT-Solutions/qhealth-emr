@@ -1,17 +1,38 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import Link from "next/link"
-import { ArrowRight, Baby, Search, UserRound, WifiOff } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
+import { ArrowRight, Baby, Loader2, Search, ShieldAlert, UserRound, WifiOff } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { SidebarTrigger } from "@/core/components/ui/sidebar"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
+import { BreakGlassForm } from "@/features/audit/components/break-glass-form"
 import { useOfflinePatients } from "@/features/offline-cache/lib/use-offline-patients"
 import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
+import { orpc } from "@/services/orpc/client"
+
+const BREAK_GLASS_REQUIRED_MESSAGE = "Break-glass required for this patient chart."
+
+function isBreakGlassRequiredError(error: unknown) {
+	if (!error || typeof error !== "object") return false
+	const candidate = error as { status?: number; message?: string } | null
+	return (
+		candidate?.message?.includes(BREAK_GLASS_REQUIRED_MESSAGE) === true ||
+		String(error).includes(BREAK_GLASS_REQUIRED_MESSAGE)
+	)
+}
 
 // ============================================================================
 // Helpers
@@ -59,6 +80,28 @@ function isNewborn(dateOfBirth: string): boolean {
 export function PatientListPage() {
 	const facilityId = useActiveFacilityId() ?? ""
 	const [filter, setFilter] = useState("")
+	const [breakGlassPatientId, setBreakGlassPatientId] = useState<string | null>(null)
+	const [checkingPatientId, setCheckingPatientId] = useState<string | null>(null)
+	const router = useRouter()
+	const queryClient = useQueryClient()
+
+	const handleOpenChart = async (patientId: string) => {
+		setCheckingPatientId(patientId)
+		try {
+			await queryClient.fetchQuery(
+				orpc.patient.get.queryOptions({ input: { id: patientId } })
+			)
+			router.push(`/patients/${patientId}?from=list`)
+		} catch (error) {
+			if (isBreakGlassRequiredError(error)) {
+				setBreakGlassPatientId(patientId)
+			} else {
+				router.push(`/patients/${patientId}?from=list`)
+			}
+		} finally {
+			setCheckingPatientId(null)
+		}
+	}
 
 	const { isOnline, offlinePatients, cachedAt } = useOfflinePatients()
 
@@ -193,11 +236,20 @@ export function PatientListPage() {
 													variant="ghost"
 													size="sm"
 													className="shrink-0 justify-between gap-2"
-													nativeButton={false}
-													render={<Link href={`/patients/${patient.id}?from=list`} />}
+													disabled={checkingPatientId === patient.id}
+													onClick={() => void handleOpenChart(patient.id)}
 												>
-													Open chart
-													<ArrowRight className="size-4" />
+													{checkingPatientId === patient.id ? (
+														<>
+															Checking…
+															<Loader2 className="size-4 animate-spin" />
+														</>
+													) : (
+														<>
+															Open chart
+															<ArrowRight className="size-4" />
+														</>
+													)}
 												</Button>
 											</div>
 										)
@@ -208,6 +260,38 @@ export function PatientListPage() {
 					</CardContent>
 				</Card>
 			</main>
+
+			<Dialog open={!!breakGlassPatientId} onOpenChange={open => { if (!open) setBreakGlassPatientId(null) }}>
+				<DialogContent className="max-w-2xl">
+					<DialogHeader>
+						<div className="flex items-center gap-3">
+							<div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 dark:bg-orange-900/40">
+								<ShieldAlert className="size-5 text-orange-600 dark:text-orange-400" />
+							</div>
+							<div>
+								<DialogTitle className="text-lg">Emergency Override Access</DialogTitle>
+								<DialogDescription className="mt-0.5">
+									Break-glass request required to access this patient record.
+								</DialogDescription>
+							</div>
+						</div>
+					</DialogHeader>
+					{breakGlassPatientId && (
+						<BreakGlassForm
+							patientId={breakGlassPatientId}
+							facilityId={facilityId}
+							entityType="patient"
+							entityId={breakGlassPatientId}
+							onSuccess={() => {
+								const id = breakGlassPatientId
+								setBreakGlassPatientId(null)
+								router.push(`/patients/${id}?from=list`)
+							}}
+							onCancel={() => setBreakGlassPatientId(null)}
+						/>
+					)}
+				</DialogContent>
+			</Dialog>
 		</div>
 	)
 }
