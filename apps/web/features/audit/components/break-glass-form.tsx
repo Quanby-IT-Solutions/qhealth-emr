@@ -192,19 +192,29 @@ export function BreakGlassForm({
 			</div>
 
 			{/* Form fields */}
-			<div className="grid grid-cols-2 gap-4">
+			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<div className="space-y-2">
 					<Label htmlFor="reason-category" className="text-sm font-medium">
 						Reason Category <span className="text-destructive">*</span>
 					</Label>
 					<Select value={reasonCategory || undefined} onValueChange={v => setReasonCategory(v ?? "")}>
 						<SelectTrigger id="reason-category" className="w-full">
-							<SelectValue placeholder="Select reason…" />
+							<SelectValue placeholder="Select reason…">
+								{reasonCategory
+									? reasonCategory
+											.split("_")
+											.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+											.join(" ")
+									: null}
+							</SelectValue>
 						</SelectTrigger>
-						<SelectContent>
+						<SelectContent className="w-max min-w-[var(--anchor-width)]">
 							{REASON_CATEGORIES.map(cat => (
 								<SelectItem key={cat.value} value={cat.value}>
-									{cat.label}
+									{cat.value
+										.split("_")
+										.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+										.join(" ")}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -287,9 +297,9 @@ export function BreakGlassForm({
 				</div>
 			)}
 
-			<div className="flex justify-end gap-2 pt-1">
+			<div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">
 				{onCancel && (
-					<Button variant="outline" onClick={onCancel} disabled={createBreakGlassMutation.isPending}>
+					<Button variant="outline" onClick={onCancel} disabled={createBreakGlassMutation.isPending} className="w-full sm:w-auto">
 						Cancel
 					</Button>
 				)}
@@ -297,7 +307,7 @@ export function BreakGlassForm({
 					variant="destructive"
 					onClick={handleSubmit}
 					disabled={!canSubmit}
-					className="gap-2"
+					className="w-full sm:w-auto gap-2"
 				>
 					<ShieldAlert className="size-4" />
 					{createBreakGlassMutation.isPending ? "Requesting Access…" : "Request Emergency Access"}
