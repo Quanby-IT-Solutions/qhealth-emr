@@ -284,16 +284,16 @@ function TagPicker({ label, options, selected, onChange, customPlaceholder }: Ta
 // ============================================================================
 
 interface FhirNutritionOrderEditorProps {
+	assessmentId: string
 	encounterId: string
 	patientId: string
-	existingMealPlanId?: string
 	onSaved?: () => void
 }
 
 export function FhirNutritionOrderEditor({
+	assessmentId,
 	encounterId,
 	patientId,
-	existingMealPlanId,
 	onSaved,
 }: FhirNutritionOrderEditorProps) {
 	const saveMutation = useSaveMealPlanMutation()
@@ -338,21 +338,22 @@ export function FhirNutritionOrderEditor({
 
 	async function handleSave() {
 		const payload: CreateMealPlanInput = {
-			encounterId,
-			patientId,
-			caloricTarget,
-			proteinGoalGrams: proteinTarget,
-			carbGoalGrams: carbTarget,
-			fatGoalGrams: fatTarget,
-			dietType,
-			restrictions,
-			notes: specialInstructions || undefined,
+			assessmentId,
+			mealPlan: {
+				dietType,
+				caloricTarget,
+				proteinTarget,
+				carbTarget,
+				fatTarget,
+				feedingRoute: feedingRoute as "oral" | "enteral" | "parenteral" | "mixed",
+				enteralFormula: enteralFormula || undefined,
+				parenteralFormula: parenteralFormula || undefined,
+				supplements: supplements.length > 0 ? supplements : undefined,
+				restrictions: restrictions.length > 0 ? restrictions : undefined,
+				specialInstructions: specialInstructions || undefined,
+			},
 		}
-		const mutPayload = existingMealPlanId
-			? { ...payload, id: existingMealPlanId }
-			: payload
-
-		await saveMutation.mutateAsync(mutPayload as Parameters<typeof saveMutation.mutateAsync>[0])
+		await saveMutation.mutateAsync(payload)
 		setSaved(true)
 		onSaved?.()
 	}

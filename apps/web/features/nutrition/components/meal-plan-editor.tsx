@@ -329,8 +329,8 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 								type="number"
 								min={0}
 								placeholder="e.g. 250"
-								value={form.carbGoalGrams}
-								onChange={(e) => update("carbGoalGrams", e.target.value)}
+						value={form.carbTarget}
+						onChange={(e) => update("carbTarget", e.target.value)}
 								required
 							/>
 						</div>
@@ -341,8 +341,8 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 								type="number"
 								min={0}
 								placeholder="e.g. 65"
-								value={form.fatGoalGrams}
-								onChange={(e) => update("fatGoalGrams", e.target.value)}
+						value={form.fatTarget}
+						onChange={(e) => update("fatTarget", e.target.value)}
 								required
 							/>
 						</div>

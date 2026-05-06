@@ -3,6 +3,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 
 import { DietOrderCard } from "@/features/nutrition/components/diet-order-card"
+import { FhirNutritionOrderEditor } from "@/features/nutrition/components/fhir-nutrition-order-editor"
 import { MalnutritionRiskBadge } from "@/features/nutrition/components/malnutrition-risk-badge"
 import { MealPlanEditor } from "@/features/nutrition/components/meal-plan-editor"
 import { NutritionAssessmentForm } from "@/features/nutrition/components/nutrition-assessment-form"
@@ -54,7 +55,15 @@ export function NutritionTab({ encounterId, patientId, facilityId }: NutritionTa
 				</TabsContent>
 
 				<TabsContent value="diet-orders" className="mt-4">
-					<DietOrderCard encounterId={encounterId} />
+					{latestAssessment ? (
+						<FhirNutritionOrderEditor
+							assessmentId={latestAssessment.id}
+							encounterId={encounterId}
+							patientId={patientId}
+						/>
+					) : (
+						<DietOrderCard encounterId={encounterId} />
+					)}
 				</TabsContent>
 			</Tabs>
 		</div>
