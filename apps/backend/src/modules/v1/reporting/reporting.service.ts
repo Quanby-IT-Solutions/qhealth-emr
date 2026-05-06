@@ -1284,7 +1284,7 @@ export class ReportingService {
 			)
 		}
 
-		let query = db
+		const query = db
 			.select({
 				encounterId: encounters.id,
 				patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,

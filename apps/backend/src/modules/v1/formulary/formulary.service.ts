@@ -1215,7 +1215,7 @@ export class FormularyService {
 			catalogType: CatalogType
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		 
 		const table: any = this.getCatalogTable(catalogType)
 
 		const rows = (await db
@@ -1244,7 +1244,7 @@ export class FormularyService {
 	async updateCatalogEntry(input: UpdateCatalogEntryInput, actor: FormularyActor) {
 		const { id, catalogType, ...updates } = input
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		 
 		const table: any = this.getCatalogTable(catalogType)
 
 		const [before] = await db.select().from(table).where(eq(table.id, id))
@@ -1282,7 +1282,7 @@ export class FormularyService {
 	async deleteCatalogEntry(input: DeleteCatalogEntryInput, actor: FormularyActor) {
 		const { id, catalogType } = input
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		 
 		const table: any = this.getCatalogTable(catalogType)
 
 		const [existing] = await db.select().from(table).where(eq(table.id, id))
@@ -1315,7 +1315,7 @@ export class FormularyService {
 	// ========================================================================
 
 	async publishCatalogVersion(input: PublishCatalogVersionInput, actor: FormularyActor) {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		 
 		const table: any = this.getCatalogTable(input.catalogType)
 		const [countResult] = await db.select({ count: count() }).from(table)
 		const entryCount = countResult?.count ?? 0

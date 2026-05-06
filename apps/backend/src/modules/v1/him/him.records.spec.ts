@@ -36,6 +36,7 @@ jest.mock("@repo/db/schema", () => ({
 		patientId: "patientId",
 		facilityId: "facilityId",
 		dpaConsentObtained: "dpaConsentObtained",
+		identityVerified: "identityVerified",
 		paidAt: "paidAt",
 		status: "status",
 		releasedAt: "releasedAt",
@@ -75,6 +76,7 @@ const baseRequest = {
 	patientId: "pt-1",
 	facilityId: "fac-1",
 	dpaConsentObtained: false,
+	identityVerified: false,
 	paidAt: null,
 	status: "pending",
 	releasedAt: null,
@@ -103,10 +105,12 @@ describe("HIM-BE-04 Records Issuance", () => {
 		expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ entityType: "medical_records_request" }))
 	})
 
-	it("attachIdentityProof records verification evidence in the audit trail", async () => {
+	it("attachIdentityProof records verification evidence and sets identityVerified = true", async () => {
 		;(db.select as jest.Mock).mockReturnValue({
 			from: () => ({ where: () => ({ limit: () => Promise.resolve([{ ...baseRequest }]) }) }),
 		})
+		const updateSet = jest.fn().mockReturnValue({ where: () => Promise.resolve(undefined) })
+		;(db.update as jest.Mock).mockReturnValue({ set: updateSet })
 		const insertValues = jest.fn().mockResolvedValue(undefined)
 		;(db.insert as jest.Mock).mockReturnValue({ values: insertValues })
 
@@ -120,6 +124,7 @@ describe("HIM-BE-04 Records Issuance", () => {
 		})
 
 		expect(res).toEqual({ success: true })
+		expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ identityVerified: true }))
 		expect(insertValues).toHaveBeenCalledWith(expect.objectContaining({
 			action: "identity_proof",
 			documentTypes: ["government_id"],
@@ -161,11 +166,31 @@ describe("HIM-BE-04 Records Issuance", () => {
 		).rejects.toBeInstanceOf(BadRequestException)
 	})
 
+	it("releaseRecords rejects when identity not verified", async () => {
+		;(db.select as jest.Mock).mockReturnValue({
+			from: () => ({
+				where: () => ({
+					limit: () => Promise.resolve([{ ...baseRequest, dpaConsentObtained: true, identityVerified: false }]),
+				}),
+			}),
+		})
+		const { service } = makeService()
+		await expect(
+			service.releaseRecords({
+				requestId: "req-1",
+				recipient: "Patient",
+				documentTypes: ["discharge_summary"],
+				contentHashes: ["abc"],
+				staffId: STAFF_USER,
+			})
+		).rejects.toBeInstanceOf(BadRequestException)
+	})
+
 	it("releaseRecords rejects when payment not cleared", async () => {
 		;(db.select as jest.Mock).mockReturnValue({
 			from: () => ({
 				where: () => ({
-					limit: () => Promise.resolve([{ ...baseRequest, dpaConsentObtained: true }]),
+					limit: () => Promise.resolve([{ ...baseRequest, dpaConsentObtained: true, identityVerified: true }]),
 				}),
 			}),
 		})
@@ -187,7 +212,7 @@ describe("HIM-BE-04 Records Issuance", () => {
 				where: () => ({
 					limit: () =>
 						Promise.resolve([
-							{ ...baseRequest, dpaConsentObtained: true, paidAt: new Date() },
+							{ ...baseRequest, dpaConsentObtained: true, identityVerified: true, paidAt: new Date() },
 						]),
 				}),
 			}),

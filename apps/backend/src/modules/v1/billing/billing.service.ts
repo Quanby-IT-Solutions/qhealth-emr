@@ -528,7 +528,7 @@ export class BillingService {
 		if (isActive !== undefined) conditions.push(eq(chargeMasterItems.isActive, isActive))
 		if (search) {
 			conditions.push(
-				sql`(${chargeMasterItems.description} ILIKE ${"%" + search + "%"} OR ${chargeMasterItems.itemCode} ILIKE ${"%" + search + "%"})`
+				sql`(${chargeMasterItems.description} ILIKE ${`%${  search  }%`} OR ${chargeMasterItems.itemCode} ILIKE ${`%${  search  }%`})`
 			)
 		}
 
