@@ -11,6 +11,8 @@
 
 import { BadRequestException } from "@nestjs/common"
 
+import { db } from "@/common/database/database.client"
+
 import { BillingService } from "../billing.service"
 
 jest.mock("@/common/database/database.client", () => ({
@@ -40,7 +42,20 @@ jest.mock("@repo/db/schema", () => ({
 	eligibilityChecks: {},
 	esoaStatements: {},
 	invoiceLineItems: {},
-	invoices: { id: "id", facilityId: "facilityId", encounterId: "encounterId", patientResponsibility: "patientResponsibility", status: "status", subtotal: "subtotal", vatAmount: "vatAmount", philhealthCoverage: "philhealthCoverage", discountType: "discountType", discount: "discount", totalAmount: "totalAmount", invoiceNumber: "invoiceNumber" },
+	invoices: {
+		id: "id",
+		facilityId: "facilityId",
+		encounterId: "encounterId",
+		patientResponsibility: "patientResponsibility",
+		status: "status",
+		subtotal: "subtotal",
+		vatAmount: "vatAmount",
+		philhealthCoverage: "philhealthCoverage",
+		discountType: "discountType",
+		discount: "discount",
+		totalAmount: "totalAmount",
+		invoiceNumber: "invoiceNumber",
+	},
 	konsultaActivities: {},
 	payments: { id: "id", invoiceId: "invoiceId", amount: "amount" },
 	problems: {},
@@ -56,8 +71,6 @@ jest.mock("@/config/env.config", () => ({ env: {} }))
 jest.mock("@/utils/sla-events", () => ({ closeOpenSlaStep: jest.fn() }))
 jest.mock("@/utils/sla-step-target", () => ({ resolveStepTarget: jest.fn(() => 60) }))
 
-import { db } from "@/common/database/database.client"
-
 const FACILITY = "fac-uuid-0001"
 const INVOICE = "inv-uuid-0001"
 const STAFF_USER = "user-id-0001"
@@ -71,7 +84,8 @@ function makeService() {
 	const audit = makeAudit()
 	const adapter = { submit: jest.fn(), poll: jest.fn() }
 	const service = new BillingService(adapter as never, audit as never)
-	;(service as unknown as { getStaffProfileId: (u: string) => Promise<string> }).getStaffProfileId = async () => STAFF_PROFILE
+	;(service as unknown as { getStaffProfileId: (u: string) => Promise<string> }).getStaffProfileId =
+		async () => STAFF_PROFILE
 	return { service, audit }
 }
 

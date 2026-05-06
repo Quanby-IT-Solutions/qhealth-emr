@@ -137,7 +137,20 @@ export const rolePermissions = createTable(
 		action: t
 			.text("action")
 			.notNull()
-			.$type<"view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "read" | "write" | "manage_catalog" | "clinical_policy" | "terminology_admin">(),
+			.$type<
+				| "view"
+				| "create"
+				| "edit"
+				| "sign"
+				| "delete"
+				| "verify"
+				| "export"
+				| "read"
+				| "write"
+				| "manage_catalog"
+				| "clinical_policy"
+				| "terminology_admin"
+			>(),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [

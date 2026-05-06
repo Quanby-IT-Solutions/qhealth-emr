@@ -25,9 +25,7 @@ export const chartDeficiencies = createTable(
 			.text("deficiency_type")
 			.notNull()
 			.$type<"missing_discharge_summary" | "missing_signature" | "undocumented_procedure">(),
-		sourceKind: t
-			.text("source_kind")
-			.$type<"encounter" | "clinical_note" | "operation_record">(),
+		sourceKind: t.text("source_kind").$type<"encounter" | "clinical_note" | "operation_record">(),
 		sourceId: t.uuid("source_id"),
 		ownerStaffId: t
 			.uuid("owner_staff_id")
@@ -75,9 +73,7 @@ export const deficiencyNotifications = createTable(
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
 		payload: t.jsonb("payload"),
 	}),
-	t => [
-		index("deficiency_notifications_deficiency_id_idx").on(t.deficiencyId),
-	]
+	t => [index("deficiency_notifications_deficiency_id_idx").on(t.deficiencyId)]
 )
 
 // ============================================================================
@@ -155,9 +151,7 @@ export const recordsRequestItems = createTable(
 		contentHash: t.text("content_hash"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
-	t => [
-		index("records_request_items_request_id_idx").on(t.requestId),
-	]
+	t => [index("records_request_items_request_id_idx").on(t.requestId)]
 )
 
 export const recordsReleaseAudit = createTable(
@@ -179,7 +173,14 @@ export const recordsReleaseAudit = createTable(
 		action: t
 			.text("action")
 			.notNull()
-			.$type<"create" | "dpa_consent" | "identity_proof" | "physician_signature" | "payment_cleared" | "release">(),
+			.$type<
+				| "create"
+				| "dpa_consent"
+				| "identity_proof"
+				| "physician_signature"
+				| "payment_cleared"
+				| "release"
+			>(),
 		recipient: t.text("recipient"),
 		documentTypes: t.jsonb("document_types"),
 		contentHashes: t.jsonb("content_hashes"),
@@ -208,10 +209,7 @@ export const haiReconciliations = createTable(
 			.notNull()
 			.references(() => facilities.id, { onDelete: "cascade" }),
 		haiTagId: t.uuid("hai_tag_id").notNull(),
-		decision: t
-			.text("decision")
-			.notNull()
-			.$type<"confirm" | "reclassify" | "dismiss">(),
+		decision: t.text("decision").notNull().$type<"confirm" | "reclassify" | "dismiss">(),
 		previousType: t.text("previous_type"),
 		newType: t.text("new_type"),
 		reason: t.text("reason"),

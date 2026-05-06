@@ -10,6 +10,8 @@
 
 import { BadRequestException, NotFoundException } from "@nestjs/common"
 
+import { db } from "@/common/database/database.client"
+
 import { BillingService } from "../billing.service"
 
 jest.mock("@/common/database/database.client", () => ({
@@ -36,7 +38,14 @@ jest.mock("@repo/db/schema", () => ({
 	eligibilityChecks: {},
 	encounters: {},
 	encounterStatusEvents: {},
-	esoaStatements: { id: "id", invoiceId: "invoiceId", version: "version", sentAt: "sentAt", sentVia: "sentVia", deliveryStatus: "deliveryStatus" },
+	esoaStatements: {
+		id: "id",
+		invoiceId: "invoiceId",
+		version: "version",
+		sentAt: "sentAt",
+		sentVia: "sentVia",
+		deliveryStatus: "deliveryStatus",
+	},
 	invoiceLineItems: {},
 	invoices: { id: "id", facilityId: "facilityId", status: "status" },
 	konsultaActivities: {},
@@ -56,8 +65,6 @@ jest.mock("@/config/env.config", () => ({ env: {} }))
 jest.mock("@/utils/sla-events", () => ({ closeOpenSlaStep: jest.fn() }))
 jest.mock("@/utils/sla-step-target", () => ({ resolveStepTarget: jest.fn() }))
 
-import { db } from "@/common/database/database.client"
-
 const INVOICE = "inv-uuid-0001"
 const STATEMENT = "esoa-0001"
 
@@ -65,7 +72,9 @@ function makeService() {
 	const audit = { log: jest.fn().mockResolvedValue(undefined) }
 	const adapter = { submit: jest.fn(), poll: jest.fn() }
 	const service = new BillingService(adapter as never, audit as never)
-	;(service as unknown as { getOptionalStaffProfileId: (u: string) => Promise<string | null> }).getOptionalStaffProfileId = async () => "staff-profile-1"
+	;(
+		service as unknown as { getOptionalStaffProfileId: (u: string) => Promise<string | null> }
+	).getOptionalStaffProfileId = async () => "staff-profile-1"
 	return { service, audit }
 }
 
@@ -104,9 +113,9 @@ describe("BIL-BE-06 eSOA Generation & Delivery", () => {
 		})
 
 		const { service } = makeService()
-		await expect(
-			service.generateEsoaFromInvoice({ invoiceId: INVOICE })
-		).rejects.toBeInstanceOf(BadRequestException)
+		await expect(service.generateEsoaFromInvoice({ invoiceId: INVOICE })).rejects.toBeInstanceOf(
+			BadRequestException
+		)
 	})
 
 	it("sendEsoa rejects unsettled invoice without allowDraft", async () => {
@@ -116,7 +125,9 @@ describe("BIL-BE-06 eSOA Generation & Delivery", () => {
 				from: () => ({ where: () => ({ limit: () => Promise.resolve([statement]) }) }),
 			})
 			.mockReturnValueOnce({
-				from: () => ({ where: () => ({ limit: () => Promise.resolve([{ status: "finalized" }]) }) }),
+				from: () => ({
+					where: () => ({ limit: () => Promise.resolve([{ status: "finalized" }]) }),
+				}),
 			})
 
 		const { service } = makeService()
@@ -148,14 +159,20 @@ describe("BIL-BE-06 eSOA Generation & Delivery", () => {
 				from: () => ({ where: () => ({ limit: () => Promise.resolve([{ status: "paid" }]) }) }),
 			})
 			.mockReturnValueOnce({
-				from: () => ({ where: () => ({ limit: () => Promise.resolve([{ facilityId: "fac-1" }]) }) }),
+				from: () => ({
+					where: () => ({ limit: () => Promise.resolve([{ facilityId: "fac-1" }]) }),
+				}),
 			})
 		;(db.update as jest.Mock).mockReturnValue({
 			set: () => ({ where: () => ({ returning: () => Promise.resolve([updated]) }) }),
 		})
 
 		const { service, audit } = makeService()
-		const res = await service.sendEsoa({ id: STATEMENT, channel: "patient_portal", staffId: "user-1" })
+		const res = await service.sendEsoa({
+			id: STATEMENT,
+			channel: "patient_portal",
+			staffId: "user-1",
+		})
 
 		expect(res.success).toBe(true)
 		expect(audit.log).toHaveBeenCalledWith(

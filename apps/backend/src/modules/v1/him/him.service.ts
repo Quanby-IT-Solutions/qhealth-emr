@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { Cron, CronExpression } from "@nestjs/schedule"
 import { EventEmitter2 } from "@nestjs/event-emitter"
+import { Cron, CronExpression } from "@nestjs/schedule"
 import { and, count, desc, eq, gte, ilike, inArray, isNotNull, lte, sql } from "drizzle-orm"
 import { PDFDocument, StandardFonts } from "pdf-lib"
 
@@ -8,8 +8,8 @@ import {
 	beds,
 	chartDeficiencies,
 	clinicalNotes,
-	codeVersions,
 	codes,
+	codeVersions,
 	deficiencyNotifications,
 	encounterCodes,
 	encounters,
@@ -18,8 +18,8 @@ import {
 	haiTags,
 	medicalRecordsRequests,
 	operationRecords,
-	problems,
 	patients,
+	problems,
 	recordsReleaseAudit,
 	staffProfiles,
 	users,
@@ -27,6 +27,7 @@ import {
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
+
 import { AuditService } from "../audit/audit.service"
 
 interface ListDeficienciesInput {
@@ -60,7 +61,10 @@ interface ScanInput {
 	staffId?: string
 }
 
-type NormalizedDeficiencyType = "missing_discharge_summary" | "missing_signature" | "undocumented_procedure"
+type NormalizedDeficiencyType =
+	| "missing_discharge_summary"
+	| "missing_signature"
+	| "undocumented_procedure"
 type DeficiencySourceKind = "encounter" | "clinical_note" | "operation_record"
 
 interface DeficiencyDetectionResult {
@@ -85,7 +89,12 @@ interface CodingDraftCode {
 }
 
 interface CodingValidationSummary {
-	violations: Array<{ path: string; code?: string; message: string; suggestedReplacement?: string | null }>
+	violations: Array<{
+		path: string
+		code?: string
+		message: string
+		suggestedReplacement?: string | null
+	}>
 	hasPrimary: boolean
 	hasDeprecated: boolean
 	primaryCount: number
@@ -195,7 +204,11 @@ export class HimService {
 		return type as NormalizedDeficiencyType
 	}
 
-	private buildPatientName(patient: { firstName: string; lastName: string; middleName: string | null }) {
+	private buildPatientName(patient: {
+		firstName: string
+		lastName: string
+		middleName: string | null
+	}) {
 		return [patient.lastName, patient.firstName, patient.middleName].filter(Boolean).join(", ")
 	}
 
@@ -231,14 +244,20 @@ export class HimService {
 			return `${input.patientName} has a discharge summary draft that still needs physician signature. ${dischargeText}`
 		}
 
-		const sourceLabel = input.sourceKind === "operation_record" ? "operation record" : "procedure documentation"
+		const sourceLabel =
+			input.sourceKind === "operation_record" ? "operation record" : "procedure documentation"
 		return `${input.patientName} has an undocumented procedure with incomplete ${sourceLabel}. ${dischargeText}`
 	}
 
-	private sortDeficiencies<T extends { patientName: string; dischargeDatetime: Date | null; ageDays: number; status: string; deficiencyType: string }>(
-		items: T[],
-		input: ListDeficienciesInput
-	) {
+	private sortDeficiencies<
+		T extends {
+			patientName: string
+			dischargeDatetime: Date | null
+			ageDays: number
+			status: string
+			deficiencyType: string
+		},
+	>(items: T[], input: ListDeficienciesInput) {
 		const sortBy = input.sortBy ?? "dischargeDatetime"
 		const direction = input.sortDirection === "asc" ? 1 : -1
 
@@ -252,7 +271,7 @@ export class HimService {
 							? left.status
 							: sortBy === "deficiencyType"
 								? left.deficiencyType
-								: left.dischargeDatetime?.getTime() ?? 0
+								: (left.dischargeDatetime?.getTime() ?? 0)
 			const rightValue =
 				sortBy === "patientName"
 					? right.patientName
@@ -262,14 +281,26 @@ export class HimService {
 							? right.status
 							: sortBy === "deficiencyType"
 								? right.deficiencyType
-								: right.dischargeDatetime?.getTime() ?? 0
+								: (right.dischargeDatetime?.getTime() ?? 0)
 
 			if (leftValue === rightValue) return 0
 			return leftValue > rightValue ? direction : -direction
 		})
 	}
 
-	private async lookupDeprecatedIcd10(codeStrings: string[]): Promise<Map<string, { isDeprecated: boolean; replacedByCodeId: string | null; replacementCode: string | null; replacementDisplay: string | null }>> {
+	private async lookupDeprecatedIcd10(
+		codeStrings: string[]
+	): Promise<
+		Map<
+			string,
+			{
+				isDeprecated: boolean
+				replacedByCodeId: string | null
+				replacementCode: string | null
+				replacementDisplay: string | null
+			}
+		>
+	> {
 		if (codeStrings.length === 0) return new Map()
 		const rows = await db
 			.select({
@@ -278,13 +309,32 @@ export class HimService {
 				replacedByCodeId: codes.replacedByCodeId,
 			})
 			.from(codes)
-			.where(and(eq(codes.codeSystemId, sql`(SELECT id FROM code_systems WHERE name = 'ICD-10' LIMIT 1)`), inArray(codes.code, codeStrings)))
+			.where(
+				and(
+					eq(codes.codeSystemId, sql`(SELECT id FROM code_systems WHERE name = 'ICD-10' LIMIT 1)`),
+					inArray(codes.code, codeStrings)
+				)
+			)
 		const replacementIds = rows.map(r => r.replacedByCodeId).filter((x): x is string => Boolean(x))
-		const replacementDisplays = replacementIds.length > 0
-			? await db.select({ id: codes.id, code: codes.code, display: codes.displayName }).from(codes).where(inArray(codes.id, replacementIds))
-			: []
-		const replacementMap = new Map(replacementDisplays.map(r => [r.id, { code: r.code, display: r.display }]))
-		const result = new Map<string, { isDeprecated: boolean; replacedByCodeId: string | null; replacementCode: string | null; replacementDisplay: string | null }>()
+		const replacementDisplays =
+			replacementIds.length > 0
+				? await db
+						.select({ id: codes.id, code: codes.code, display: codes.displayName })
+						.from(codes)
+						.where(inArray(codes.id, replacementIds))
+				: []
+		const replacementMap = new Map(
+			replacementDisplays.map(r => [r.id, { code: r.code, display: r.display }])
+		)
+		const result = new Map<
+			string,
+			{
+				isDeprecated: boolean
+				replacedByCodeId: string | null
+				replacementCode: string | null
+				replacementDisplay: string | null
+			}
+		>()
 		for (const r of rows) {
 			const replacement = r.replacedByCodeId ? replacementMap.get(r.replacedByCodeId) : null
 			result.set(r.code, {
@@ -401,7 +451,9 @@ export class HimService {
 
 			if (diagnosisEntries.length > 0) {
 				return diagnosisEntries
-					.filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+					.filter(
+						(item): item is Record<string, unknown> => typeof item === "object" && item !== null
+					)
 					.map((item, index) => ({
 						id: `note:${note.id}:${index}`,
 						sourceType: "clinical_note" as const,
@@ -500,7 +552,10 @@ export class HimService {
 		)
 	}
 
-	private async validateCodingSet(encounterId: string, codesToValidate: CodingDraftCode[]): Promise<CodingValidationSummary> {
+	private async validateCodingSet(
+		encounterId: string,
+		codesToValidate: CodingDraftCode[]
+	): Promise<CodingValidationSummary> {
 		const violations: CodingValidationSummary["violations"] = []
 		const primaryCount = codesToValidate.filter(code => code.isPrimary).length
 
@@ -512,7 +567,9 @@ export class HimService {
 			violations.push({ path: "primary_count", message: "Exactly one Primary code is allowed" })
 		}
 
-		const deprecatedLookup = await this.lookupDeprecatedIcd10(codesToValidate.map(code => code.code))
+		const deprecatedLookup = await this.lookupDeprecatedIcd10(
+			codesToValidate.map(code => code.code)
+		)
 		for (const [index, code] of codesToValidate.entries()) {
 			if (!code.linkedDiagnosisRef?.trim() && !code.notes?.trim()) {
 				violations.push({
@@ -537,11 +594,14 @@ export class HimService {
 
 		const ahsrReferenceCodes = await this.getAhsrReferenceCodes(encounterId)
 		if (codesToValidate.length > 0 && ahsrReferenceCodes.size > 0) {
-			const hasAhsrAlignment = codesToValidate.some(code => ahsrReferenceCodes.has(code.code.toUpperCase()))
+			const hasAhsrAlignment = codesToValidate.some(code =>
+				ahsrReferenceCodes.has(code.code.toUpperCase())
+			)
 			if (!hasAhsrAlignment) {
 				violations.push({
 					path: "ahsr",
-					message: "Assigned codes do not yet align with the facility's current Top-10 morbidity/mortality ICD-10 list",
+					message:
+						"Assigned codes do not yet align with the facility's current Top-10 morbidity/mortality ICD-10 list",
 				})
 			}
 		}
@@ -559,7 +619,8 @@ export class HimService {
 	// ========================================================================
 
 	async listDeficiencies(input: ListDeficienciesInput) {
-		const { facilityId, page, limit, deficiencyType, status, ownerStaffId, ownerQuery, ageBucket } = input
+		const { facilityId, page, limit, deficiencyType, status, ownerStaffId, ownerQuery, ageBucket } =
+			input
 		const offset = (page - 1) * limit
 		const conditions = [eq(chartDeficiencies.facilityId, facilityId)]
 		if (status) conditions.push(eq(chartDeficiencies.status, status))
@@ -615,8 +676,17 @@ export class HimService {
 					}
 				})
 				.filter(row => this.matchesAgeBucket(row.ageDays, ageBucket))
-				.filter(row => !deficiencyType || this.normalizeDeficiencyType(row.deficiencyType) === this.normalizeDeficiencyType(deficiencyType))
-				.filter(row => !ownerQuery || (row.ownerDisplayName ?? "").toLowerCase().includes(ownerQuery.toLowerCase())),
+				.filter(
+					row =>
+						!deficiencyType ||
+						this.normalizeDeficiencyType(row.deficiencyType) ===
+							this.normalizeDeficiencyType(deficiencyType)
+				)
+				.filter(
+					row =>
+						!ownerQuery ||
+						(row.ownerDisplayName ?? "").toLowerCase().includes(ownerQuery.toLowerCase())
+				),
 			input
 		)
 
@@ -709,7 +779,11 @@ export class HimService {
 	}
 
 	async notifyDeficiency(input: NotifyInput) {
-		const [def] = await db.select().from(chartDeficiencies).where(eq(chartDeficiencies.id, input.id)).limit(1)
+		const [def] = await db
+			.select()
+			.from(chartDeficiencies)
+			.where(eq(chartDeficiencies.id, input.id))
+			.limit(1)
 		if (!def) throw new NotFoundException("Deficiency not found")
 
 		const staffProfileId = await this.getStaffProfileId(input.staffId)
@@ -764,11 +838,18 @@ export class HimService {
 	}
 
 	async markDeficiencyResolved(input: MarkResolvedInput) {
-		const [def] = await db.select().from(chartDeficiencies).where(eq(chartDeficiencies.id, input.id)).limit(1)
+		const [def] = await db
+			.select()
+			.from(chartDeficiencies)
+			.where(eq(chartDeficiencies.id, input.id))
+			.limit(1)
 		if (!def) throw new NotFoundException("Deficiency not found")
 
 		// Verify the underlying artifact actually exists per deficiency type.
-		const stillMissing = await this.deficiencyArtifactStillMissing(def.encounterId, def.deficiencyType)
+		const stillMissing = await this.deficiencyArtifactStillMissing(
+			def.encounterId,
+			def.deficiencyType
+		)
 		if (stillMissing) {
 			throw new BadRequestException(
 				`Cannot mark resolved — required artifact for ${def.deficiencyType} still missing on encounter ${def.encounterId}`
@@ -805,19 +886,30 @@ export class HimService {
 		return this.getDeficiency({ id: updated.id })
 	}
 
-	private async deficiencyArtifactStillMissing(encounterId: string, type: string): Promise<boolean> {
+	private async deficiencyArtifactStillMissing(
+		encounterId: string,
+		type: string
+	): Promise<boolean> {
 		const detection = await this.detectDeficiencySource(encounterId, type)
 		return detection.missing
 	}
 
-	private async detectDeficiencySource(encounterId: string, type: string): Promise<DeficiencyDetectionResult> {
+	private async detectDeficiencySource(
+		encounterId: string,
+		type: string
+	): Promise<DeficiencyDetectionResult> {
 		const normalizedType = this.normalizeDeficiencyType(type)
 
 		if (normalizedType === "missing_discharge_summary") {
 			const [note] = await db
 				.select({ id: clinicalNotes.id })
 				.from(clinicalNotes)
-				.where(and(eq(clinicalNotes.encounterId, encounterId), eq(clinicalNotes.noteType, "discharge_summary")))
+				.where(
+					and(
+						eq(clinicalNotes.encounterId, encounterId),
+						eq(clinicalNotes.noteType, "discharge_summary")
+					)
+				)
 				.limit(1)
 
 			return {
@@ -829,9 +921,18 @@ export class HimService {
 
 		if (normalizedType === "missing_signature") {
 			const notes = await db
-				.select({ id: clinicalNotes.id, status: clinicalNotes.status, signedAt: clinicalNotes.signedAt })
+				.select({
+					id: clinicalNotes.id,
+					status: clinicalNotes.status,
+					signedAt: clinicalNotes.signedAt,
+				})
 				.from(clinicalNotes)
-				.where(and(eq(clinicalNotes.encounterId, encounterId), eq(clinicalNotes.noteType, "discharge_summary")))
+				.where(
+					and(
+						eq(clinicalNotes.encounterId, encounterId),
+						eq(clinicalNotes.noteType, "discharge_summary")
+					)
+				)
 
 			const unsigned = notes.find(note => note.status !== "signed" || !note.signedAt)
 			return {
@@ -866,13 +967,13 @@ export class HimService {
 		// Idempotent via uniqueIndex (encounterId, deficiencyType).
 		const target = input.encounterId
 			? await db
-				.select({
-					id: encounters.id,
-					facilityId: encounters.facilityId,
-					attendingStaffId: encounters.attendingStaffId,
-				})
-				.from(encounters)
-				.where(eq(encounters.id, input.encounterId))
+					.select({
+						id: encounters.id,
+						facilityId: encounters.facilityId,
+						attendingStaffId: encounters.attendingStaffId,
+					})
+					.from(encounters)
+					.where(eq(encounters.id, input.encounterId))
 			: await db
 					.select({
 						id: encounters.id,
@@ -880,12 +981,21 @@ export class HimService {
 						attendingStaffId: encounters.attendingStaffId,
 					})
 					.from(encounters)
-					.where(and(eq(encounters.facilityId, input.facilityId), inArray(encounters.status, ["discharged"])))
+					.where(
+						and(
+							eq(encounters.facilityId, input.facilityId),
+							inArray(encounters.status, ["discharged"])
+						)
+					)
 					.limit(500)
 
 		let created = 0
 		for (const enc of target) {
-			for (const type of ["missing_discharge_summary", "missing_signature", "undocumented_procedure"] as const) {
+			for (const type of [
+				"missing_discharge_summary",
+				"missing_signature",
+				"undocumented_procedure",
+			] as const) {
 				const detection = await this.detectDeficiencySource(enc.id, type)
 				if (!detection.missing) continue
 				const result = await db
@@ -921,7 +1031,11 @@ export class HimService {
 				.where(and(eq(encounters.facilityId, fac.id), inArray(encounters.status, ["discharged"])))
 				.limit(500)
 			for (const enc of summary) {
-				for (const type of ["missing_discharge_summary", "missing_signature", "undocumented_procedure"] as const) {
+				for (const type of [
+					"missing_discharge_summary",
+					"missing_signature",
+					"undocumented_procedure",
+				] as const) {
 					const detection = await this.detectDeficiencySource(enc.id, type)
 					if (!detection.missing) continue
 					const result = await db
@@ -939,7 +1053,9 @@ export class HimService {
 				}
 			}
 		}
-		this.logger.log(`Nightly deficiency scan: facilities=${allFacilities.length} created=${totalCreated}`)
+		this.logger.log(
+			`Nightly deficiency scan: facilities=${allFacilities.length} created=${totalCreated}`
+		)
 	}
 
 	// ========================================================================
@@ -957,7 +1073,8 @@ export class HimService {
 			this.listCodeVersionHistory(input.encounterId),
 		])
 		const signed = codes.find(c => c.signedAt) ?? null
-		const currentVersion = codes.length > 0 ? Math.max(...codes.map(c => c.version)) : (versionHistory[0]?.version ?? 1)
+		const currentVersion =
+			codes.length > 0 ? Math.max(...codes.map(c => c.version)) : (versionHistory[0]?.version ?? 1)
 		return {
 			codes,
 			signedAt: signed?.signedAt ?? null,
@@ -968,15 +1085,22 @@ export class HimService {
 	}
 
 	async upsertCodes(input: UpsertCodesInput) {
-		const existing = await db.select().from(encounterCodes).where(eq(encounterCodes.encounterId, input.encounterId))
+		const existing = await db
+			.select()
+			.from(encounterCodes)
+			.where(eq(encounterCodes.encounterId, input.encounterId))
 		if (existing.some(c => c.signedAt)) {
 			throw new BadRequestException("Coding is signed; use amend to modify")
 		}
 
 		const validation = await this.validateCodingSet(input.encounterId, input.codes)
-		const blockingViolations = validation.violations.filter(violation => violation.path === "primary_count" || violation.path.startsWith("source:"))
+		const blockingViolations = validation.violations.filter(
+			violation => violation.path === "primary_count" || violation.path.startsWith("source:")
+		)
 		if (blockingViolations.length > 0) {
-			throw new BadRequestException(blockingViolations.map(violation => violation.message).join("; "))
+			throw new BadRequestException(
+				blockingViolations.map(violation => violation.message).join("; ")
+			)
 		}
 
 		const staffProfileId = await this.getStaffProfileId(input.staffId)
@@ -1018,7 +1142,10 @@ export class HimService {
 	}
 
 	async signCodes(input: SignCodesInput) {
-		const codes = await db.select().from(encounterCodes).where(eq(encounterCodes.encounterId, input.encounterId))
+		const codes = await db
+			.select()
+			.from(encounterCodes)
+			.where(eq(encounterCodes.encounterId, input.encounterId))
 		if (codes.length === 0) throw new BadRequestException("Cannot sign empty coding")
 		if (codes.some(code => code.signedAt)) {
 			throw new BadRequestException("Coding is already signed; use amend to create a new version")
@@ -1027,7 +1154,9 @@ export class HimService {
 		const validation = await this.validateCodingSet(input.encounterId, codes)
 		const blockingViolations = validation.violations.filter(violation => violation.path !== "ahsr")
 		if (blockingViolations.length > 0) {
-			throw new BadRequestException(blockingViolations.map(violation => violation.message).join("; "))
+			throw new BadRequestException(
+				blockingViolations.map(violation => violation.message).join("; ")
+			)
 		}
 
 		const staffProfileId = await this.getStaffProfileId(input.staffId)
@@ -1071,15 +1200,22 @@ export class HimService {
 	}
 
 	async amendCodes(input: AmendCodesInput) {
-		const existing = await db.select().from(encounterCodes).where(eq(encounterCodes.encounterId, input.encounterId))
+		const existing = await db
+			.select()
+			.from(encounterCodes)
+			.where(eq(encounterCodes.encounterId, input.encounterId))
 		if (existing.length === 0 || !existing[0]?.signedAt) {
 			throw new BadRequestException("Amend requires signed coding")
 		}
 
 		const validation = await this.validateCodingSet(input.encounterId, input.codes)
-		const blockingViolations = validation.violations.filter(violation => violation.path === "primary_count" || violation.path.startsWith("source:"))
+		const blockingViolations = validation.violations.filter(
+			violation => violation.path === "primary_count" || violation.path.startsWith("source:")
+		)
 		if (blockingViolations.length > 0) {
-			throw new BadRequestException(blockingViolations.map(violation => violation.message).join("; "))
+			throw new BadRequestException(
+				blockingViolations.map(violation => violation.message).join("; ")
+			)
 		}
 
 		const staffProfileId = await this.getStaffProfileId(input.staffId)
@@ -1091,7 +1227,12 @@ export class HimService {
 		const [existingHistory] = await db
 			.select({ id: codeVersions.id })
 			.from(codeVersions)
-			.where(and(eq(codeVersions.encounterId, input.encounterId), eq(codeVersions.version, currentVersion)))
+			.where(
+				and(
+					eq(codeVersions.encounterId, input.encounterId),
+					eq(codeVersions.version, currentVersion)
+				)
+			)
 			.limit(1)
 
 		if (existingHistory) {
@@ -1144,7 +1285,10 @@ export class HimService {
 	}
 
 	async validateCodes(input: { encounterId: string }) {
-		const codes = await db.select().from(encounterCodes).where(eq(encounterCodes.encounterId, input.encounterId))
+		const codes = await db
+			.select()
+			.from(encounterCodes)
+			.where(eq(encounterCodes.encounterId, input.encounterId))
 		const validation = await this.validateCodingSet(input.encounterId, codes)
 		return {
 			violations: validation.violations,
@@ -1158,7 +1302,11 @@ export class HimService {
 	// ========================================================================
 
 	async captureDpaConsent(input: CaptureDpaConsentInput) {
-		const [req] = await db.select().from(medicalRecordsRequests).where(eq(medicalRecordsRequests.id, input.requestId)).limit(1)
+		const [req] = await db
+			.select()
+			.from(medicalRecordsRequests)
+			.where(eq(medicalRecordsRequests.id, input.requestId))
+			.limit(1)
 		if (!req) throw new NotFoundException("Records request not found")
 		const staffProfileId = await this.getStaffProfileId(input.staffId)
 
@@ -1198,7 +1346,11 @@ export class HimService {
 	}
 
 	async attachIdentityProof(input: AttachIdentityProofInput) {
-		const [req] = await db.select().from(medicalRecordsRequests).where(eq(medicalRecordsRequests.id, input.requestId)).limit(1)
+		const [req] = await db
+			.select()
+			.from(medicalRecordsRequests)
+			.where(eq(medicalRecordsRequests.id, input.requestId))
+			.limit(1)
 		if (!req) throw new NotFoundException("Records request not found")
 		const staffProfileId = await this.getStaffProfileId(input.staffId)
 
@@ -1228,7 +1380,11 @@ export class HimService {
 			entityType: "medical_records_request",
 			entityId: input.requestId,
 			beforeState: null,
-			afterState: { identityProofUri: input.uri, contentHash: input.contentHash, documentType: input.documentType },
+			afterState: {
+				identityProofUri: input.uri,
+				contentHash: input.contentHash,
+				documentType: input.documentType,
+			},
 			ipAddress: null,
 			userAgent: null,
 			metadata: { operation: "attachIdentityProof" },
@@ -1238,7 +1394,11 @@ export class HimService {
 	}
 
 	async attachPhysicianSignature(input: AttachPhysicianSignatureInput) {
-		const [req] = await db.select().from(medicalRecordsRequests).where(eq(medicalRecordsRequests.id, input.requestId)).limit(1)
+		const [req] = await db
+			.select()
+			.from(medicalRecordsRequests)
+			.where(eq(medicalRecordsRequests.id, input.requestId))
+			.limit(1)
 		if (!req) throw new NotFoundException("Records request not found")
 		const staffProfileId = await this.getStaffProfileId(input.staffId)
 
@@ -1259,7 +1419,11 @@ export class HimService {
 	}
 
 	async markRecordsPaymentCleared(input: MarkPaymentClearedInput) {
-		const [req] = await db.select().from(medicalRecordsRequests).where(eq(medicalRecordsRequests.id, input.requestId)).limit(1)
+		const [req] = await db
+			.select()
+			.from(medicalRecordsRequests)
+			.where(eq(medicalRecordsRequests.id, input.requestId))
+			.limit(1)
 		if (!req) throw new NotFoundException("Records request not found")
 		const staffProfileId = await this.getStaffProfileId(input.staffId)
 
@@ -1285,7 +1449,11 @@ export class HimService {
 	}
 
 	async releaseRecords(input: ReleaseRecordsInput) {
-		const [req] = await db.select().from(medicalRecordsRequests).where(eq(medicalRecordsRequests.id, input.requestId)).limit(1)
+		const [req] = await db
+			.select()
+			.from(medicalRecordsRequests)
+			.where(eq(medicalRecordsRequests.id, input.requestId))
+			.limit(1)
 		if (!req) throw new NotFoundException("Records request not found")
 		if (!req.dpaConsentObtained) {
 			throw new BadRequestException("DPA consent required before release")
@@ -1333,7 +1501,11 @@ export class HimService {
 			entityType: "medical_records_request",
 			entityId: input.requestId,
 			beforeState: { status: req.status, releasedAt: req.releasedAt?.toISOString() ?? null },
-			afterState: { status: "completed", releasedAt: new Date().toISOString(), recipient: input.recipient },
+			afterState: {
+				status: "completed",
+				releasedAt: new Date().toISOString(),
+				recipient: input.recipient,
+			},
 			ipAddress: input.ipAddress ?? null,
 			userAgent: input.userAgent ?? null,
 			metadata: { operation: "releaseRecords", documentTypes: input.documentTypes },
@@ -1350,10 +1522,19 @@ export class HimService {
 		if (dateFrom) conditions.push(gte(recordsReleaseAudit.occurredAt, new Date(dateFrom)))
 		if (dateTo) conditions.push(lte(recordsReleaseAudit.occurredAt, new Date(`${dateTo}T23:59:59`)))
 		if (recipient) conditions.push(ilike(recordsReleaseAudit.recipient, `%${recipient}%`))
-		if (documentType) conditions.push(sql`${recordsReleaseAudit.documentTypes}::jsonb @> ${JSON.stringify([documentType])}::jsonb`)
+		if (documentType)
+			conditions.push(
+				sql`${recordsReleaseAudit.documentTypes}::jsonb @> ${JSON.stringify([documentType])}::jsonb`
+			)
 		const where = and(...conditions)
 		const [rows, [countRow]] = await Promise.all([
-			db.select().from(recordsReleaseAudit).where(where).orderBy(desc(recordsReleaseAudit.occurredAt)).limit(limit).offset(offset),
+			db
+				.select()
+				.from(recordsReleaseAudit)
+				.where(where)
+				.orderBy(desc(recordsReleaseAudit.occurredAt))
+				.limit(limit)
+				.offset(offset),
 			db.select({ total: count() }).from(recordsReleaseAudit).where(where),
 		])
 		const total = countRow?.total ?? 0
@@ -1415,16 +1596,28 @@ export class HimService {
 		const [reconciliationRows, linkedCodes] = await Promise.all([
 			tagIds.length > 0
 				? db
-					.select({ haiTagId: haiReconciliations.haiTagId, decision: haiReconciliations.decision })
-					.from(haiReconciliations)
-					.where(inArray(haiReconciliations.haiTagId, tagIds))
+						.select({
+							haiTagId: haiReconciliations.haiTagId,
+							decision: haiReconciliations.decision,
+						})
+						.from(haiReconciliations)
+						.where(inArray(haiReconciliations.haiTagId, tagIds))
 				: Promise.resolve([]),
 			encounterIds.length > 0
 				? db
-					.select({ encounterId: encounterCodes.encounterId, code: encounterCodes.code, isPrimary: encounterCodes.isPrimary })
-					.from(encounterCodes)
-					.where(and(inArray(encounterCodes.encounterId, encounterIds), eq(encounterCodes.codeSystem, "ICD-10")))
-					.orderBy(desc(encounterCodes.isPrimary), encounterCodes.code)
+						.select({
+							encounterId: encounterCodes.encounterId,
+							code: encounterCodes.code,
+							isPrimary: encounterCodes.isPrimary,
+						})
+						.from(encounterCodes)
+						.where(
+							and(
+								inArray(encounterCodes.encounterId, encounterIds),
+								eq(encounterCodes.codeSystem, "ICD-10")
+							)
+						)
+						.orderBy(desc(encounterCodes.isPrimary), encounterCodes.code)
 				: Promise.resolve([]),
 		])
 		const statusByTagId = new Map(reconciliationRows.map(row => [row.haiTagId, row.decision]))
@@ -1467,13 +1660,16 @@ export class HimService {
 		const staffProfileId = await this.getStaffProfileId(input.staffId)
 
 		const previousType = tag.haiType
-		const newType = input.decision === "reclassify" ? input.newType ?? null : null
+		const newType = input.decision === "reclassify" ? (input.newType ?? null) : null
 
 		// Idempotent: upsert on hai_tag_id (overwrites prior decision but preserves audit trail).
-		const existing = await db.select().from(haiReconciliations).where(eq(haiReconciliations.haiTagId, input.haiTagId))
+		const existing = await db
+			.select()
+			.from(haiReconciliations)
+			.where(eq(haiReconciliations.haiTagId, input.haiTagId))
 		let row
 		if (existing.length > 0) {
-			[row] = await db
+			;[row] = await db
 				.update(haiReconciliations)
 				.set({
 					decision: input.decision,
@@ -1486,7 +1682,7 @@ export class HimService {
 				.where(eq(haiReconciliations.haiTagId, input.haiTagId))
 				.returning()
 		} else {
-			[row] = await db
+			;[row] = await db
 				.insert(haiReconciliations)
 				.values({
 					facilityId: tag.facilityId,

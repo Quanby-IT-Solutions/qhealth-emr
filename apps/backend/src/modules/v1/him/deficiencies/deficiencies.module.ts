@@ -1,7 +1,6 @@
 import { Module } from "@nestjs/common"
 
 import { HimSharedModule } from "../him-shared.module"
-
 import { DeficienciesController } from "./deficiencies.controller"
 import { DeficienciesService } from "./deficiencies.service"
 

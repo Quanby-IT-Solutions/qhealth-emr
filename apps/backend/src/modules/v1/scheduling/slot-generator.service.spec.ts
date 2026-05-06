@@ -97,11 +97,7 @@ describe("SlotGeneratorService", () => {
 		;(db.select as jest.Mock).mockReturnValueOnce(mockSelectTemplate([template]))
 		const { values } = mockInsert(4)
 
-		const result = await service.generateSlotsForTemplate(
-			template.id,
-			"2026-05-04",
-			"2026-05-04"
-		)
+		const result = await service.generateSlotsForTemplate(template.id, "2026-05-04", "2026-05-04")
 
 		expect(result.inserted).toBe(4)
 		expect(values).toHaveBeenCalledTimes(1)
@@ -163,11 +159,7 @@ describe("SlotGeneratorService", () => {
 		;(db.select as jest.Mock).mockReturnValueOnce(mockSelectTemplate([template]))
 		const { values } = mockInsert(3)
 
-		const result = await service.generateSlotsForTemplate(
-			template.id,
-			"2026-05-04",
-			"2026-05-04"
-		)
+		const result = await service.generateSlotsForTemplate(template.id, "2026-05-04", "2026-05-04")
 
 		expect(result.inserted).toBe(3)
 		const insertedRows = values.mock.calls[0]![0] as Array<Record<string, unknown>>

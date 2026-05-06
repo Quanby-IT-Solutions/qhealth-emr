@@ -696,10 +696,7 @@ export class SchedulingService {
 				.where(eq(appointments.id, input.id))
 				.returning()
 
-			if (
-				(input.status === "cancelled" || input.status === "no_show") &&
-				existing.clinicSlotId
-			) {
+			if ((input.status === "cancelled" || input.status === "no_show") && existing.clinicSlotId) {
 				await tx
 					.update(clinicSlots)
 					.set({
@@ -1028,7 +1025,11 @@ export class SchedulingService {
 			return undefined
 		}
 
-		await this.slotGenerator.generateSlotsForTemplate(template.id, input.appointmentDate, input.appointmentDate)
+		await this.slotGenerator.generateSlotsForTemplate(
+			template.id,
+			input.appointmentDate,
+			input.appointmentDate
+		)
 
 		const [generatedSlot] = await db
 			.select({ id: clinicSlots.id })
@@ -1167,7 +1168,11 @@ export class SchedulingService {
 			throw new BadRequestException("Clinic template endTime must be later than startTime")
 		}
 
-		if (!ALLOWED_SLOT_DURATIONS.includes(slotDurationMinutes as (typeof ALLOWED_SLOT_DURATIONS)[number])) {
+		if (
+			!ALLOWED_SLOT_DURATIONS.includes(
+				slotDurationMinutes as (typeof ALLOWED_SLOT_DURATIONS)[number]
+			)
+		) {
 			throw new BadRequestException(
 				`slotDurationMinutes must be one of: ${ALLOWED_SLOT_DURATIONS.join(", ")}`
 			)
@@ -1181,12 +1186,7 @@ export class SchedulingService {
 		const [row] = await db
 			.select({ id: staffProfiles.id })
 			.from(staffProfiles)
-			.where(
-				and(
-					eq(staffProfiles.id, clinicianStaffId),
-					eq(staffProfiles.facilityId, facilityId)
-				)
-			)
+			.where(and(eq(staffProfiles.id, clinicianStaffId), eq(staffProfiles.facilityId, facilityId)))
 			.limit(1)
 
 		if (!row) {
@@ -1203,10 +1203,7 @@ export class SchedulingService {
 			.select({ id: staffProfiles.id })
 			.from(staffProfiles)
 			.where(
-				and(
-					eq(staffProfiles.userId, actor.userId),
-					eq(staffProfiles.facilityId, actor.facilityId)
-				)
+				and(eq(staffProfiles.userId, actor.userId), eq(staffProfiles.facilityId, actor.facilityId))
 			)
 			.limit(1)
 
