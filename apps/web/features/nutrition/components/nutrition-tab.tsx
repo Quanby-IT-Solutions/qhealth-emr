@@ -15,9 +15,9 @@ interface NutritionTabProps {
 	facilityId: string
 }
 
-export function NutritionTab({ encounterId, patientId }: NutritionTabProps) {
+export function NutritionTab({ encounterId, patientId, facilityId }: NutritionTabProps) {
 	const { data: assessments } = useNutritionAssessmentsQuery(encounterId, { limit: 1 })
-	const latestAssessment = assessments?.assessments[0]
+	const latestAssessment = assessments?.data[0]
 
 	return (
 		<div className="space-y-4 p-6">
@@ -32,7 +32,7 @@ export function NutritionTab({ encounterId, patientId }: NutritionTabProps) {
 				{latestAssessment && (
 					<div className="flex items-center gap-2 text-sm text-muted-foreground">
 						<span>Malnutrition risk:</span>
-						<MalnutritionRiskBadge risk={latestAssessment.riskLevel} />
+						<MalnutritionRiskBadge risk={latestAssessment.malnutritionRisk} />
 					</div>
 				)}
 			</div>
@@ -46,7 +46,7 @@ export function NutritionTab({ encounterId, patientId }: NutritionTabProps) {
 				</TabsList>
 
 				<TabsContent value="assessment" className="mt-4">
-					<NutritionAssessmentForm encounterId={encounterId} patientId={patientId} />
+					<NutritionAssessmentForm encounterId={encounterId} patientId={patientId} facilityId={facilityId} />
 				</TabsContent>
 
 				<TabsContent value="meal-plan" className="mt-4">

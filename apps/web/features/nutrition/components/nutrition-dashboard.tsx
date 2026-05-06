@@ -128,13 +128,13 @@ export function NutritionDashboard() {
 	})
 
 	const stats = useMemo(() => {
-		const all = data?.assessments ?? []
+		const all = data?.data ?? []
 		const today = new Date().toDateString()
 		return {
 			assessedToday: all.filter(
 				(a) => new Date(a.assessedAt).toDateString() === today
 			).length,
-			highRisk: all.filter((a) => a.riskLevel === "high").length,
+			highRisk: all.filter((a) => a.malnutritionRisk === "high").length,
 			pending: all.filter((a) => !a.mealPlanStatus || a.mealPlanStatus === "none").length,
 		}
 	}, [data])
@@ -220,7 +220,7 @@ export function NutritionDashboard() {
 						<div className="flex items-center justify-center py-16">
 							<Loader2 className="size-6 animate-spin text-muted-foreground" />
 						</div>
-					) : !data?.assessments?.length ? (
+					) : !data?.data?.length ? (
 						<div className="flex flex-col items-center justify-center py-16 text-center">
 							<Utensils className="mb-3 size-10 text-muted-foreground" />
 							<p className="font-medium">No assessments found</p>
@@ -245,7 +245,7 @@ export function NutritionDashboard() {
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{data.assessments.map((assessment) => (
+									{data.data.map((assessment) => (
 										<TableRow key={assessment.id}>
 											<TableCell className="font-medium">
 												{assessment.patientName ?? "—"}
@@ -257,9 +257,9 @@ export function NutritionDashboard() {
 											<TableCell className="uppercase text-xs">
 												{assessment.screeningTool}
 											</TableCell>
-											<TableCell>{assessment.score}</TableCell>
+											<TableCell>{assessment.screeningScore}</TableCell>
 											<TableCell>
-												<RiskBadge risk={assessment.riskLevel} />
+												<RiskBadge risk={assessment.malnutritionRisk} />
 											</TableCell>
 											<TableCell>
 												<MealPlanBadge status={assessment.mealPlanStatus} />

@@ -18,11 +18,11 @@ import { useQueryClient } from "@tanstack/react-query"
  */
 export function useOfflineSync() {
 	const queryClient = useQueryClient()
-	const [isOnline, setIsOnline] = useState<boolean>(
-		typeof navigator !== "undefined" ? navigator.onLine : true
-	)
+	const [isOnline, setIsOnline] = useState<boolean>(true)
 
 	useEffect(() => {
+		// Sync to actual browser state after hydration
+		setIsOnline(navigator.onLine)
 		function handleOnline() {
 			setIsOnline(true)
 			// Reconnect synchronisation: invalidate all queries so the UI re-fetches

@@ -131,6 +131,13 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		excludePermissions: [{ module: "adt", action: "create" }],
 	},
 	{
+		// Dietitian patient list: browse active patients to access nutrition tabs
+		title: "Patients",
+		href: "/patients/search",
+		iconName: "patient",
+		requiredPermissions: [{ module: "nutrition", action: "view" }],
+	},
+	{
 		title: "Patients",
 		href: "/patients/search",
 		iconName: "patient",
@@ -156,6 +163,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 			{ module: "radiology", action: "view" }, // Radiologist
 			{ module: "reporting", action: "edit" }, // PIDSR Officer
 			{ module: "nursing", action: "create" }, // Nurse — uses /patients/search instead
+			{ module: "nutrition", action: "view" }, // Dietitian — uses /patients/search instead
 			{ module: "clinical_docs", action: "sign" }, // Physicians — use /patients/search instead
 		],
 	},
