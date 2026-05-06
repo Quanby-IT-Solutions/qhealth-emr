@@ -2,7 +2,7 @@ import { NotFoundException } from "@nestjs/common"
 
 import { db } from "@/common/database/database.client"
 
-import { ProblemsAllergiesService } from "../problems-allergies/problems-allergies.service"
+import { type ProblemsAllergiesService } from "../problems-allergies/problems-allergies.service"
 import { OrdersService } from "./orders.service"
 
 // Bypass the @repo/contracts barrel (which transitively loads @orpc/contract

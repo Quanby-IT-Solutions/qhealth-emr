@@ -1202,6 +1202,11 @@ export class HimService {
 		if (!req) throw new NotFoundException("Records request not found")
 		const staffProfileId = await this.getStaffProfileId(input.staffId)
 
+		await db
+			.update(medicalRecordsRequests)
+			.set({ identityVerified: true, updatedAt: new Date() })
+			.where(eq(medicalRecordsRequests.id, input.requestId))
+
 		await db.insert(recordsReleaseAudit).values({
 			requestId: input.requestId,
 			patientId: req.patientId,
@@ -1284,6 +1289,9 @@ export class HimService {
 		if (!req) throw new NotFoundException("Records request not found")
 		if (!req.dpaConsentObtained) {
 			throw new BadRequestException("DPA consent required before release")
+		}
+		if (!req.identityVerified) {
+			throw new BadRequestException("Identity verification required before release")
 		}
 		if (!req.paidAt) {
 			throw new BadRequestException("Payment must clear before release")

@@ -402,6 +402,32 @@ export class AuditService {
 	}
 
 	/**
+	 * Get the current clinician's active break-glass event for a patient, if any.
+	 */
+	async findMyActiveBreakGlassEvent(input: {
+		facilityId: string
+		patientId: string
+		clinicianStaffId: string
+	}) {
+		const now = new Date()
+		const [event] = await db
+			.select()
+			.from(breakGlassEvents)
+			.where(
+				and(
+					eq(breakGlassEvents.facilityId, input.facilityId),
+					eq(breakGlassEvents.patientId, input.patientId),
+					eq(breakGlassEvents.clinicianStaffId, input.clinicianStaffId),
+					gte(breakGlassEvents.accessExpiresAt, now)
+				)
+			)
+			.orderBy(desc(breakGlassEvents.accessExpiresAt))
+			.limit(1)
+
+		return event ?? null
+	}
+
+	/**
 	 * Review a break-glass event (Privacy Officer action).
 	 */
 	async reviewBreakGlass(input: ReviewBreakGlassInput & { reviewerStaffId: string }) {

@@ -76,10 +76,10 @@ type MockDb = {
 function makeLimitBuilder(rows: unknown[]) {
 	const b: Record<string, unknown> = {}
 	for (const m of ["from", "leftJoin", "where"]) {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		 
 		;(b as any)[m] = jest.fn().mockReturnValue(b)
 	}
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	 
 	;(b as any)["limit"] = jest.fn().mockImplementation(() => ({
 		then: (resolve: (v: unknown) => unknown) => Promise.resolve(rows).then(resolve),
 	}))
@@ -366,7 +366,7 @@ describe("FhirService — audit trails (FHIR-001)", () => {
 			const auditValuesMock = jest.fn().mockResolvedValue([])
 			setupHappyPath(auditValuesMock)
 
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			 
 			await service.createExport(INPUT as any, USER_ID, "Test User")
 
 			expect(auditValuesMock).toHaveBeenCalledWith(
@@ -385,7 +385,7 @@ describe("FhirService — audit trails (FHIR-001)", () => {
 			const auditValuesMock = jest.fn().mockResolvedValue([])
 			setupHappyPath(auditValuesMock)
 
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			 
 			await service.createExport(INPUT as any, USER_ID, "Test User")
 
 			expect(auditValuesMock).toHaveBeenCalledWith(
