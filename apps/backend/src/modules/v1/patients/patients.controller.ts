@@ -6,7 +6,7 @@ import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
 import { buildChartAccessActor } from "@/modules/v1/audit/chart-access.service"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { PatientsService } from "./patients.service"
 
@@ -22,8 +22,10 @@ export class PatientsController {
 		})
 	}
 
-	// Static subpaths must be registered before /patients/{id} to avoid route shadowing.
-	@RequirePermission("opd", "view")
+	@RequireAnyPermissions([
+		{ module: "opd", action: "view" },
+		{ module: "scheduling", action: "view" },
+	])
 	@Implement(v1.patient.listClinicians)
 	async listClinicians() {
 		return implement(v1.patient.listClinicians).handler(async ({ input }) => {

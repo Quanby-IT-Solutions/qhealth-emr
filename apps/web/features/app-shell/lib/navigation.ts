@@ -178,7 +178,11 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 			{ module: "adt", action: "edit" }, // Registrar fallback (also manages appointments)
 		],
 		// Exclude Nurses who have adt:edit for bed management, not scheduling
-		excludePermissions: [{ module: "nursing", action: "create" }],
+		// Auditors retain read permissions for audit scope, but this workspace is for operational scheduling.
+		excludePermissions: [
+			{ module: "nursing", action: "create" },
+			{ module: "audit", action: "view" },
+		],
 	},
 	{
 		title: "Bed Management",

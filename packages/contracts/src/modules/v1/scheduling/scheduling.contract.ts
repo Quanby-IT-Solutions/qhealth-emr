@@ -10,16 +10,19 @@ import {
 	AvailableSlotsResponseSchema,
 	CheckInAppointmentSchema,
 	CheckInResponseSchema,
+	ClinicSlotSchema,
 	ClinicQueueQuerySchema,
 	ClinicQueueResponseSchema,
 	ClinicTemplateListSchema,
 	ClinicTemplateSchema,
 	CreateAppointmentSchema,
 	CreateClinicTemplateSchema,
+	ListTemplateSlotsQuerySchema,
 	UpdateAppointmentStatusSchema,
 	UpdateClinicTemplateSchema,
 	UpdateEncounterQueueStatusResponseSchema,
 	UpdateEncounterQueueStatusSchema,
+	UpdateSlotSchema,
 } from "./scheduling.schema.js"
 
 export const schedulingContract = {
@@ -56,6 +59,26 @@ export const schedulingContract = {
 		})
 		.input(UpdateClinicTemplateSchema)
 		.output(ClinicTemplateSchema),
+
+	listTemplateSlots: oc
+		.route({
+			method: "GET",
+			path: "/clinic-templates/{id}/slots",
+			summary: "List materialized slots for a clinic template",
+			tags: ["Scheduling"],
+		})
+		.input(ListTemplateSlotsQuerySchema)
+		.output(z.array(ClinicSlotSchema)),
+
+	updateSlot: oc
+		.route({
+			method: "PATCH",
+			path: "/slots/{id}",
+			summary: "Block or unblock a materialized clinic slot",
+			tags: ["Scheduling"],
+		})
+		.input(UpdateSlotSchema)
+		.output(ClinicSlotSchema),
 
 	// ========================================================================
 	// Appointments

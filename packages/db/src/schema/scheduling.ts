@@ -1,4 +1,4 @@
-import { index, uniqueIndex } from "drizzle-orm/pg-core"
+import { index, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
 import { patients } from "./core.js"
@@ -53,6 +53,9 @@ export const appointments = createTable(
 		clinicTemplateId: t
 			.uuid("clinic_template_id")
 			.references(() => clinicTemplates.id, { onDelete: "set null" }),
+		clinicSlotId: t
+			.uuid("clinic_slot_id")
+			.references((): AnyPgColumn => clinicSlots.id, { onDelete: "set null" }),
 		patientId: t
 			.uuid("patient_id")
 			.notNull()
@@ -96,5 +99,53 @@ export const appointments = createTable(
 			t.appointmentDate,
 			t.appointmentTime
 		),
+	]
+)
+
+export const clinicSlots = createTable(
+	"clinic_slots",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		clinicTemplateId: t
+			.uuid("clinic_template_id")
+			.notNull()
+			.references(() => clinicTemplates.id, { onDelete: "cascade" }),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "cascade" }),
+		clinicianStaffId: t
+			.uuid("clinician_staff_id")
+			.notNull()
+			.references(() => staffProfiles.id, { onDelete: "cascade" }),
+		slotDate: t.date("slot_date").notNull(),
+		slotStartTime: t.time("slot_start_time").notNull(),
+		slotEndTime: t.time("slot_end_time").notNull(),
+		status: t
+			.text("status")
+			.notNull()
+			.default("open")
+			.$type<"open" | "blocked" | "booked" | "cancelled">(),
+		blockReason: t.text("block_reason"),
+		appointmentId: t
+			.uuid("appointment_id")
+			.references((): AnyPgColumn => appointments.id, { onDelete: "set null" }),
+		blockedByStaffId: t
+			.uuid("blocked_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		blockedAt: t.timestamp("blocked_at"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		uniqueIndex("clinic_slots_clinician_date_time_uniq").on(
+			t.clinicianStaffId,
+			t.slotDate,
+			t.slotStartTime
+		),
+		index("clinic_slots_template_id_idx").on(t.clinicTemplateId),
+		index("clinic_slots_slot_date_idx").on(t.slotDate),
+		index("clinic_slots_status_idx").on(t.status),
+		index("clinic_slots_facility_id_idx").on(t.facilityId),
 	]
 )
