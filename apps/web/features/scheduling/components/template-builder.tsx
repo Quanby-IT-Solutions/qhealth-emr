@@ -30,6 +30,7 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Skeleton } from "@/core/components/ui/skeleton"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
 import {
 	useClinicsQuery,
 	useCreateScheduleTemplateMutation,
@@ -187,6 +188,87 @@ function formatDay(dayOfWeek: DayOfWeek) {
 	return DAY_OPTIONS.find(option => option.value === dayOfWeek)?.label ?? "Unknown"
 }
 
+function toFriendlyDisabledReason(
+	issue: { message: string; path: Array<string | number> },
+	values: TemplateFormValues
+) {
+	const [root, second, third] = issue.path
+
+	if (root === "facilityId") {
+		return "Select a clinic or facility."
+	}
+
+	if (root === "clinicianStaffId") {
+		return values.facilityId
+			? "Select a clinician for the chosen facility."
+			: "Select a clinic or facility first, then choose a clinician."
+	}
+
+	if (root === "clinicName") {
+		return "Enter a clinic name."
+	}
+
+	if (root === "weeklyHours") {
+		if (typeof second === "number" && third === "periods") {
+			const dayName = formatDay(values.weeklyHours[second]?.dayOfWeek as DayOfWeek)
+			return `Check the working hours for ${dayName}. End time must be later than start time.`
+		}
+
+		return "Add working hours for at least one day."
+	}
+
+	if (root === "slotDurationMinutes") {
+		return "Choose a valid slot duration."
+	}
+
+	if (root === "maxPatients") {
+		return "Enter a valid maximum patient count."
+	}
+
+	return issue.message
+}
+
+function getDisabledReasons(params: {
+	values: TemplateFormValues
+	isEditing: boolean
+	isSubmitting: boolean
+	clinicsLoading: boolean
+	cliniciansLoading: boolean
+}) {
+	const reasons: string[] = []
+	const validationResult = TemplateFormSchema.safeParse(params.values)
+
+	if (params.clinicsLoading) {
+		reasons.push("Facilities are still loading.")
+	}
+
+	if (params.values.facilityId && params.cliniciansLoading) {
+		reasons.push("Clinicians are still loading.")
+	}
+
+	if (!validationResult.success) {
+		for (const issue of validationResult.error.issues) {
+			const friendlyReason = toFriendlyDisabledReason(issue, params.values)
+			if (!reasons.includes(friendlyReason)) {
+				reasons.push(friendlyReason)
+			}
+		}
+	}
+
+	if (params.isEditing) {
+		const activeDay = params.values.weeklyHours.find(day => day.periods.length > 0)
+		if (!activeDay) {
+			reasons.push("Add working hours for this template day.")
+		}
+	}
+
+	if (params.isSubmitting) {
+		reasons.push("Template save is already in progress.")
+	}
+
+	return reasons
+}
+
 function TemplateDialog({
 	open,
 	onOpenChange,
@@ -202,11 +284,11 @@ function TemplateDialog({
 	const createTemplateMutation = useCreateScheduleTemplateMutation()
 	const updateTemplateMutation = useUpdateScheduleTemplateMutation()
 	const [isSubmitting, setIsSubmitting] = useState(false)
-
 	const initialValues = useMemo(
 		() => buildInitialValues(template, facilityId),
 		[template, facilityId]
 	)
+	const [selectedFacilityId, setSelectedFacilityId] = useState(initialValues.facilityId || facilityId)
 
 	const form = useForm({
 		defaultValues: initialValues,
@@ -291,31 +373,29 @@ function TemplateDialog({
 		},
 	})
 
-	const selectedFacilityId = form.state.values.facilityId || facilityId
 	const cliniciansQuery = useStaffClinicianListQuery({
 		facilityId: selectedFacilityId,
 	})
 
-	const canSubmit = TemplateFormSchema.safeParse(form.state.values).success
 	const isEditing = Boolean(template)
 	const isPending =
 		isSubmitting || createTemplateMutation.isPending || updateTemplateMutation.isPending
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-5xl">
+			<DialogContent size="xl" className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden">
 				<DialogHeader>
 					<DialogTitle>{isEditing ? "Edit Schedule Template" : "New Schedule Template"}</DialogTitle>
 				</DialogHeader>
 
 				<form
-					className="space-y-6"
+					className="flex min-h-0 flex-1 flex-col"
 					onSubmit={event => {
 						event.preventDefault()
 						void form.handleSubmit()
 					}}
 				>
-					<FieldGroup>
+					<FieldGroup className="min-h-0 flex-1 overflow-y-auto pr-1">
 						<div className="grid gap-4 lg:grid-cols-2">
 							<form.Field name="facilityId">
 								{field => {
@@ -327,6 +407,7 @@ function TemplateDialog({
 												value={field.state.value}
 												onValueChange={value => {
 													field.handleChange(value ?? "")
+													setSelectedFacilityId(value ?? "")
 													form.setFieldValue("clinicianStaffId", "")
 												}}
 												disabled={clinicsQuery.isLoading || clinicsQuery.data.length === 0}
@@ -413,22 +494,7 @@ function TemplateDialog({
 								const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid
 								return (
 									<FieldSet>
-										<div className="rounded-2xl border bg-muted/20 p-4">
-											<div className="flex items-center justify-between gap-3">
-												<div>
-													<FieldLegend variant="label">Working Hours</FieldLegend>
-													<FieldDescription>
-														Add one or more time ranges per day. Each range becomes its own recurring template on save.
-													</FieldDescription>
-												</div>
-												<div className="text-sm text-muted-foreground">
-													{
-														field.state.value.filter(day => day.periods.length > 0).length
-													}{" "}
-													days
-												</div>
-											</div>
-										</div>
+										<FieldLegend variant="label">Working Hours</FieldLegend>
 
 										<div className="space-y-3">
 											{field.state.value.map((day, dayIndex) => {
@@ -439,10 +505,10 @@ function TemplateDialog({
 												return (
 													<div
 														key={day.dayOfWeek}
-														className="rounded-2xl border bg-card px-4 py-3"
+														className="rounded-2xl border bg-card px-4 py-2.5"
 													>
-														<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-6">
-															<div className="w-full max-w-32 shrink-0 pt-1">
+														<div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-4">
+															<div className="w-full max-w-32 shrink-0">
 																<div className="font-medium">{dayLabel}</div>
 															</div>
 
@@ -473,13 +539,13 @@ function TemplateDialog({
 																	day.periods.map((period, periodIndex) => (
 																		<div
 																			key={`${day.dayOfWeek}-${periodIndex}`}
-																			className="flex flex-col gap-3 rounded-xl border bg-muted/10 p-3 lg:flex-row lg:items-center"
+																			className="flex flex-col gap-2 lg:flex-row lg:items-center"
 																		>
 																			<Input
 																				type="time"
 																				value={period.startTime}
 																				disabled={!isEditableDay}
-																				className="w-full lg:max-w-44"
+																				className="w-full lg:w-44"
 																				onChange={event => {
 																					const nextValue = field.state.value.map((entry, entryIndex) =>
 																						entryIndex === dayIndex
@@ -499,12 +565,12 @@ function TemplateDialog({
 																					field.handleChange(nextValue)
 																				}}
 																			/>
-																			<div className="text-sm text-muted-foreground">to</div>
+																			<div className="px-1 text-sm text-muted-foreground">to</div>
 																			<Input
 																				type="time"
 																				value={period.endTime}
 																				disabled={!isEditableDay}
-																				className="w-full lg:max-w-44"
+																				className="w-full lg:w-44"
 																				onChange={event => {
 																					const nextValue = field.state.value.map((entry, entryIndex) =>
 																						entryIndex === dayIndex
@@ -667,13 +733,47 @@ function TemplateDialog({
 						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
 							Cancel
 						</Button>
-						<Button type="submit" disabled={isPending || !canSubmit}>
-							{isPending
-								? "Saving..."
-								: isEditing
-									? "Save Changes"
-									: "Create Templates"}
-						</Button>
+						<form.Subscribe selector={state => state.values}>
+							{values => {
+								const disabledReasons = getDisabledReasons({
+									values,
+									isEditing,
+									isSubmitting: isPending,
+									clinicsLoading: clinicsQuery.isLoading,
+									cliniciansLoading: cliniciansQuery.isLoading,
+								})
+								const canSubmit = disabledReasons.length === 0
+
+								if (canSubmit) {
+									return (
+										<Button type="submit" disabled={isPending}>
+											{isPending
+												? "Saving..."
+												: isEditing
+													? "Save Changes"
+													: "Create Templates"}
+										</Button>
+									)
+								}
+
+								return (
+									<Tooltip>
+										<TooltipTrigger render={<span className="inline-flex" />}>
+											<Button type="submit" disabled>
+												{isEditing ? "Save Changes" : "Create Templates"}
+											</Button>
+										</TooltipTrigger>
+										<TooltipContent side="top" className="max-w-xs text-xs">
+											<ul className="list-disc space-y-1 pl-4">
+												{disabledReasons.map(reason => (
+													<li key={reason}>{reason}</li>
+												))}
+											</ul>
+										</TooltipContent>
+									</Tooltip>
+								)
+							}}
+						</form.Subscribe>
 					</DialogFooter>
 				</form>
 			</DialogContent>
