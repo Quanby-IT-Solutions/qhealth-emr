@@ -3,6 +3,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { env } from "@/env"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { useFacilityProfileQuery } from "@/features/facility-profile/api/facility-profile.hooks"
+import { useListCliniciansQuery as usePatientClinicianListQuery } from "@/features/patients/api/patients.hooks"
 
 const API_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/scheduling`
 
@@ -40,6 +43,8 @@ export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
 export interface ScheduleTemplate {
 	id: string
+	facilityId: string
+	clinicianStaffId: string
 	clinicId: string
 	clinicName: string
 	clinicianId: string
@@ -63,8 +68,9 @@ export interface ScheduleTemplateListResponse {
 }
 
 export interface CreateScheduleTemplateInput {
-	clinicId: string
-	clinicianId: string
+	facilityId: string
+	clinicName: string
+	clinicianStaffId: string
 	dayOfWeek: DayOfWeek
 	startTime: string
 	endTime: string
@@ -74,6 +80,32 @@ export interface CreateScheduleTemplateInput {
 
 export interface UpdateScheduleTemplateInput extends Partial<CreateScheduleTemplateInput> {
 	isActive?: boolean
+}
+
+export interface ClinicOption {
+	id: string
+	name: string
+}
+
+export interface ClinicianOption {
+	id: string
+	name: string
+	department?: string | null
+}
+
+interface BackendScheduleTemplate {
+	id: string
+	facilityId: string
+	clinicianStaffId: string
+	clinicName: string
+	dayOfWeek: DayOfWeek
+	startTime: string
+	endTime: string
+	slotDurationMinutes: number
+	maxPatients: number
+	isActive: boolean
+	createdAt: string
+	updatedAt: string
 }
 
 export interface AppointmentSlot {
@@ -190,22 +222,83 @@ export const schedulingKeys = {
 			: ([...schedulingKeys.all, "queue", clinicId, date] as const),
 }
 
+function mapScheduleTemplate(template: BackendScheduleTemplate): ScheduleTemplate {
+	return {
+		id: template.id,
+		facilityId: template.facilityId,
+		clinicianStaffId: template.clinicianStaffId,
+		clinicId: template.facilityId,
+		clinicName: template.clinicName,
+		clinicianId: template.clinicianStaffId,
+		clinicianName: "",
+		dayOfWeek: template.dayOfWeek,
+		startTime: template.startTime,
+		endTime: template.endTime,
+		slotDurationMinutes: template.slotDurationMinutes,
+		maxPatients: template.maxPatients,
+		isActive: template.isActive,
+		createdAt: template.createdAt,
+		updatedAt: template.updatedAt,
+	}
+}
+
+export function useClinicsQuery() {
+	const { data: profile } = useMyProfile()
+	const facilityProfile = useFacilityProfileQuery()
+	const activeFacilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+
+	return {
+		...facilityProfile,
+		data:
+			facilityProfile.data && activeFacilityId
+				? [
+						{
+							id: activeFacilityId,
+							name: facilityProfile.data.name,
+						},
+					]
+				: ([] as ClinicOption[]),
+	}
+}
+
+export function useStaffClinicianListQuery({ facilityId }: { facilityId?: string }) {
+	const clinicianDirectory = usePatientClinicianListQuery(facilityId)
+
+	return {
+		...clinicianDirectory,
+		data:
+			clinicianDirectory.data?.data.map(clinician => ({
+				id: clinician.staffProfileId,
+				name: clinician.name,
+				department: clinician.department,
+			})) ?? ([] as ClinicianOption[]),
+	}
+}
+
 // ============================================================================
 // Schedule Templates
 // ============================================================================
 
 export function useScheduleTemplatesQuery(params: {
+	facilityId?: string
 	clinicId?: string
 	clinicianId?: string
+	clinicianStaffId?: string
 	page?: number
 	limit?: number
 }) {
 	return useQuery({
 		queryKey: [...schedulingKeys.templates(), params],
 		queryFn: () =>
-			fetchJson<ScheduleTemplate[]>(
-				`${API_BASE}/clinic-templates${buildQueryString(params)}`
+			fetchJson<BackendScheduleTemplate[]>(
+				`${API_BASE}/clinic-templates${buildQueryString({
+					facilityId: params.facilityId ?? params.clinicId,
+					clinicianStaffId: params.clinicianStaffId ?? params.clinicianId,
+					page: params.page,
+					limit: params.limit,
+				})}`
 			),
+		select: templates => templates.map(mapScheduleTemplate),
 		enabled: true,
 	})
 }
@@ -213,7 +306,8 @@ export function useScheduleTemplatesQuery(params: {
 export function useScheduleTemplateDetailQuery(id: string) {
 	return useQuery({
 		queryKey: schedulingKeys.template(id),
-		queryFn: () => fetchJson<ScheduleTemplate>(`${API_BASE}/clinic-templates/${id}`),
+		queryFn: () => fetchJson<BackendScheduleTemplate>(`${API_BASE}/clinic-templates/${id}`),
+		select: mapScheduleTemplate,
 		enabled: !!id,
 	})
 }
@@ -222,7 +316,7 @@ export function useCreateScheduleTemplateMutation() {
 	const qc = useQueryClient()
 	return useMutation({
 		mutationFn: (input: CreateScheduleTemplateInput) =>
-			fetchJson<ScheduleTemplate>(`${API_BASE}/clinic-templates`, {
+			fetchJson<BackendScheduleTemplate>(`${API_BASE}/clinic-templates`, {
 				method: "POST",
 				body: JSON.stringify(input),
 			}),
@@ -236,7 +330,7 @@ export function useUpdateScheduleTemplateMutation() {
 	const qc = useQueryClient()
 	return useMutation({
 		mutationFn: ({ id, ...input }: UpdateScheduleTemplateInput & { id: string }) =>
-			fetchJson<ScheduleTemplate>(`${API_BASE}/clinic-templates/${id}`, {
+			fetchJson<BackendScheduleTemplate>(`${API_BASE}/clinic-templates/${id}`, {
 				method: "PUT",
 				body: JSON.stringify(input),
 			}),
@@ -251,7 +345,10 @@ export function useDeleteScheduleTemplateMutation() {
 	const qc = useQueryClient()
 	return useMutation({
 		mutationFn: (id: string) =>
-			fetchJson<void>(`${API_BASE}/clinic-templates/${id}`, { method: "DELETE" }),
+			fetchJson<BackendScheduleTemplate>(`${API_BASE}/clinic-templates/${id}`, {
+				method: "PUT",
+				body: JSON.stringify({ isActive: false }),
+			}),
 		onSuccess: () => {
 			void qc.invalidateQueries({ queryKey: schedulingKeys.templates() })
 		},
