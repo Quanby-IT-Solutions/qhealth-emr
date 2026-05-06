@@ -1,12 +1,43 @@
-import { Controller } from "@nestjs/common"
+import { Controller, Req } from "@nestjs/common"
 import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
+import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { SurgicalService } from "./surgical.service"
+
+type RbacProfile = {
+	staffProfiles: Array<{ id: string; facilityId: string; roles: Array<{ id: string }> }>
+	activeRole: {
+		id: string
+		permissions: Array<{ module: string; action: string }>
+	} | null
+}
+
+function extractRbacProfile(req: Request): RbacProfile | undefined {
+	return (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
+}
+
+function extractActiveStaffProfileId(req: Request): string | null {
+	const profile = extractRbacProfile(req)
+	const activeProfile =
+		profile?.staffProfiles.find(p => p.roles.some(role => role.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles[0]
+
+	return activeProfile?.id ?? null
+}
+
+function hasPermission(req: Request, module: string, action: string) {
+	const profile = extractRbacProfile(req)
+	return (
+		profile?.activeRole?.permissions.some(
+			permission => permission.module === module && permission.action === action
+		) ?? false
+	)
+}
 
 @Controller()
 export class SurgicalController {
@@ -69,6 +100,14 @@ export class SurgicalController {
 		})
 	}
 
+	@RequirePermission("surgical", "sign")
+	@Implement(v1.surgical.signOperationRecord)
+	async signOperationRecord(@Req() req: Request) {
+		return implement(v1.surgical.signOperationRecord).handler(async ({ input }) => {
+			return this.surgicalService.signOperationRecord(input, extractActiveStaffProfileId(req))
+		})
+	}
+
 	// ========================================================================
 	// Anesthesia Record
 	// ========================================================================
@@ -86,6 +125,14 @@ export class SurgicalController {
 	async saveAnesthesiaRecord(@Session() session: UserSession) {
 		return implement(v1.surgical.saveAnesthesiaRecord).handler(async ({ input }) => {
 			return this.surgicalService.saveAnesthesiaRecord(input, session)
+		})
+	}
+
+	@RequirePermission("surgical", "sign")
+	@Implement(v1.surgical.signAnesthesiaRecord)
+	async signAnesthesiaRecord(@Req() req: Request) {
+		return implement(v1.surgical.signAnesthesiaRecord).handler(async ({ input }) => {
+			return this.surgicalService.signAnesthesiaRecord(input, extractActiveStaffProfileId(req))
 		})
 	}
 
@@ -135,17 +182,24 @@ export class SurgicalController {
 
 	@RequirePermission("surgical", "edit")
 	@Implement(v1.surgical.suggestRvsCode)
-	async suggestRvsCode(@Session() session: UserSession) {
+	async suggestRvsCode(@Session() _session: UserSession, @Req() req: Request) {
 		return implement(v1.surgical.suggestRvsCode).handler(async ({ input }) => {
-			return this.surgicalService.suggestRvsCode(input, session)
+			return this.surgicalService.suggestRvsCode(input, extractActiveStaffProfileId(req))
 		})
 	}
 
-	@RequirePermission("surgical", "edit")
+	@RequireAnyPermissions([
+		{ module: "billing", action: "edit" },
+		{ module: "billing", action: "sign" },
+	])
 	@Implement(v1.surgical.updateRvsStatus)
-	async updateRvsStatus(@Session() session: UserSession) {
+	async updateRvsStatus(@Session() _session: UserSession, @Req() req: Request) {
 		return implement(v1.surgical.updateRvsStatus).handler(async ({ input }) => {
-			return this.surgicalService.updateRvsStatus(input, session)
+			return this.surgicalService.updateRvsStatus(input, {
+				staffProfileId: extractActiveStaffProfileId(req),
+				canEditBilling: hasPermission(req, "billing", "edit"),
+				canSignBilling: hasPermission(req, "billing", "sign"),
+			})
 		})
 	}
 

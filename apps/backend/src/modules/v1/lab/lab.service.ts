@@ -35,7 +35,10 @@ export class LabService {
 		throw new NotFoundException(`Cross-match request with id ${id} not found`)
 	}
 
-	async createCrossMatch(input: CreateCrossMatch, requestedById: string): Promise<CrossMatchRequest> {
+	async createCrossMatch(
+		input: CreateCrossMatch,
+		requestedById: string
+	): Promise<CrossMatchRequest> {
 		// Stub implementation - returns mock cross-match request
 		const now = new Date().toISOString()
 		return {
@@ -63,7 +66,10 @@ export class LabService {
 		}
 	}
 
-	async approveCrossMatch(input: ApproveCrossMatch, approvedById: string): Promise<CrossMatchRequest> {
+	async approveCrossMatch(
+		input: ApproveCrossMatch,
+		approvedById: string
+	): Promise<CrossMatchRequest> {
 		// Stub implementation - throws not found
 		void approvedById
 		throw new NotFoundException(`Cross-match request with id ${input.id} not found`)

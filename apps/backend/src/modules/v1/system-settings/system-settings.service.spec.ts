@@ -119,7 +119,6 @@ describe("SystemSettingsService", () => {
 
 			// Call twice (simulates second request for same facility)
 			await service.get("fac-1")
-
 			;(db.insert as jest.Mock).mockReturnValue(mockInsertChain())
 			;(db.select as jest.Mock).mockReturnValue(mockSelectChain([row]))
 			const result2 = await service.get("fac-1")
@@ -132,17 +131,28 @@ describe("SystemSettingsService", () => {
 	// ── Update — per-field diff for typed columns ─────────────────────────────
 
 	describe("update()", () => {
-		const actor = { userId: "user-1", facilityId: "fac-1", staffProfileId: "staff-1", ipAddress: null, userAgent: null }
+		const actor = {
+			userId: "user-1",
+			facilityId: "fac-1",
+			staffProfileId: "staff-1",
+			ipAddress: null,
+			userAgent: null,
+		}
 
-		function setupTransaction(currentRow: ReturnType<typeof makeRow>, updatedRow: ReturnType<typeof makeRow>) {
-			;(db.transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-				const tx = {
-					insert: jest.fn().mockReturnValue(mockInsertChain()),
-					select: jest.fn().mockReturnValue(mockSelectChain([currentRow])),
-					update: jest.fn().mockReturnValue(mockUpdateChain([updatedRow])),
+		function setupTransaction(
+			currentRow: ReturnType<typeof makeRow>,
+			updatedRow: ReturnType<typeof makeRow>
+		) {
+			;(db.transaction as jest.Mock).mockImplementation(
+				async (fn: (tx: unknown) => Promise<unknown>) => {
+					const tx = {
+						insert: jest.fn().mockReturnValue(mockInsertChain()),
+						select: jest.fn().mockReturnValue(mockSelectChain([currentRow])),
+						update: jest.fn().mockReturnValue(mockUpdateChain([updatedRow])),
+					}
+					return fn(tx)
 				}
-				return fn(tx)
-			})
+			)
 		}
 
 		it("computes diff for changed typed column and writes audit", async () => {

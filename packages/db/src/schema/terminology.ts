@@ -4,18 +4,15 @@ import { createTable } from "../utils/table.js"
 
 export type CodeSystemName = "ICD-10" | "SNOMED-CT" | "LOINC" | "RxNorm" | "RVS"
 
-export const codeSystems = createTable(
-	"code_systems",
-	t => ({
-		id: t.uuid("id").primaryKey().defaultRandom(),
-		name: t.text("name").notNull().unique().$type<CodeSystemName>(),
-		oid: t.text("oid"),
-		description: t.text("description"),
-		currentVersionId: t.uuid("current_version_id"),
-		createdAt: t.timestamp("created_at").notNull().defaultNow(),
-		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
-	})
-)
+export const codeSystems = createTable("code_systems", t => ({
+	id: t.uuid("id").primaryKey().defaultRandom(),
+	name: t.text("name").notNull().unique().$type<CodeSystemName>(),
+	oid: t.text("oid"),
+	description: t.text("description"),
+	currentVersionId: t.uuid("current_version_id"),
+	createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+}))
 
 export type CodeSystemRow = typeof codeSystems.$inferSelect
 
@@ -60,8 +57,7 @@ export const codes = createTable(
 		displayName: t.text("display_name").notNull(),
 		description: t.text("description"),
 		isDeprecated: t.boolean("is_deprecated").notNull().default(false),
-		replacedByCodeId: t
-			.uuid("replaced_by_code_id"),
+		replacedByCodeId: t.uuid("replaced_by_code_id"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [

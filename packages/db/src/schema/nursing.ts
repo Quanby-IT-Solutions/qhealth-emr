@@ -17,9 +17,7 @@ export const vitalSigns = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
 		preEncounterId: t
 			.uuid("pre_encounter_id")
 			.references(() => preEncounters.id, { onDelete: "set null" }),
@@ -86,9 +84,7 @@ export const marEntries = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
 		preEncounterId: t
 			.uuid("pre_encounter_id")
 			.references(() => preEncounters.id, { onDelete: "set null" }),
@@ -129,9 +125,7 @@ export const tarEntries = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
 		preEncounterId: t
 			.uuid("pre_encounter_id")
 			.references(() => preEncounters.id, { onDelete: "set null" }),
@@ -163,9 +157,7 @@ export const ioEntries = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
 		preEncounterId: t
 			.uuid("pre_encounter_id")
 			.references(() => preEncounters.id, { onDelete: "set null" }),
@@ -229,10 +221,7 @@ export const haiTags = createTable(
 			.uuid("encounter_id")
 			.notNull()
 			.references(() => encounters.id, { onDelete: "cascade" }),
-		haiType: t
-			.text("hai_type")
-			.notNull()
-			.$type<"clabsi" | "cauti" | "vap" | "ssi" | "cdiff">(),
+		haiType: t.text("hai_type").notNull().$type<"clabsi" | "cauti" | "vap" | "ssi" | "cdiff">(),
 		onsetDate: t.date("onset_date").notNull(),
 		confirmedAt: t.timestamp("confirmed_at"),
 		resolvedAt: t.timestamp("resolved_at"),

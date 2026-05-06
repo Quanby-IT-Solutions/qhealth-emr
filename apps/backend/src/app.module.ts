@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common"
 import { ConfigModule } from "@nestjs/config"
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from "@nestjs/core"
+import { EventEmitterModule } from "@nestjs/event-emitter"
 import { ScheduleModule } from "@nestjs/schedule"
 import { ThrottlerModule } from "@nestjs/throttler"
 import { AuthModule } from "@thallesp/nestjs-better-auth"
@@ -26,6 +27,8 @@ import { env } from "./config/env.config"
 		}),
 		// Scheduler (cron jobs)
 		ScheduleModule.forRoot(),
+		// Event bus (in-process pub/sub for cross-module signals like coding.signed, records.released)
+		EventEmitterModule.forRoot({ wildcard: true }),
 		// Rate limiting — 60 req/min globally; auth endpoints are further restricted per-route
 		ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }]),
 		// Authentication (controllers disabled - we register versioned routes in setupBetterAuth)

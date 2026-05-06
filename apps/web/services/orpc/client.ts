@@ -3,10 +3,11 @@ import type { ContractRouterClient } from "@orpc/contract"
 import { OpenAPILink } from "@orpc/openapi-client/fetch"
 import { createTanstackQueryUtils } from "@orpc/tanstack-query"
 
-import { billingContract, v1Contract } from "@repo/contracts"
+import { billingContract, himContract, v1Contract } from "@repo/contracts"
 
 type V1Contract = typeof v1Contract
 type BillingContract = typeof billingContract
+type HimContract = typeof himContract
 
 import { env } from "@/env"
 
@@ -115,4 +116,16 @@ export const orpc = createTanstackQueryUtils(baseOrpc, { path: ["orpc"] })
 export const billingOrpc = createTanstackQueryUtils(
 	(baseOrpc as unknown as { billing: ContractRouterClient<BillingContract> }).billing,
 	{ path: ["orpc", "billing"] }
+)
+
+/**
+ * Typed HIM oRPC utils — uses himContract directly for full type inference.
+ *
+ * Usage:
+ *   import { himOrpc } from "@/services/orpc/client"
+ *   useQuery(himOrpc.listDeficiencies.queryOptions({ input: { facilityId, page: 1, limit: 50 } }))
+ */
+export const himOrpc = createTanstackQueryUtils(
+	(baseOrpc as unknown as { him: ContractRouterClient<HimContract> }).him,
+	{ path: ["orpc", "him"] }
 )

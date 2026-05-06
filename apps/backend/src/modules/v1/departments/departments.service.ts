@@ -20,17 +20,11 @@ export class DepartmentsService {
 	constructor(private readonly auditService: AuditService) {}
 
 	async list(facilityId: string) {
-		return db
-			.select()
-			.from(departments)
-			.where(eq(departments.facilityId, facilityId))
+		return db.select().from(departments).where(eq(departments.facilityId, facilityId))
 	}
 
 	async get(id: string) {
-		const [dept] = await db
-			.select()
-			.from(departments)
-			.where(eq(departments.id, id))
+		const [dept] = await db.select().from(departments).where(eq(departments.id, id))
 		if (!dept) throw new NotFoundException("Department not found")
 		return dept
 	}
@@ -97,17 +91,16 @@ export class DepartmentsService {
 	}
 
 	async delete(id: string, facilityId: string, actorId: string) {
-		const [existing] = await db
-			.select()
-			.from(departments)
-			.where(eq(departments.id, id))
+		const [existing] = await db.select().from(departments).where(eq(departments.id, id))
 		if (!existing) throw new NotFoundException("Department not found")
 
 		// ADM-BE-11: block delete when staff profiles are assigned to this department
 		const [staffCount] = await db
 			.select({ count: count() })
 			.from(staffProfiles)
-			.where(and(eq(staffProfiles.facilityId, facilityId), eq(staffProfiles.department, existing.name)))
+			.where(
+				and(eq(staffProfiles.facilityId, facilityId), eq(staffProfiles.department, existing.name))
+			)
 		if ((staffCount?.count ?? 0) > 0) {
 			throw new BadRequestException(
 				`Cannot delete department "${existing.name}": ${staffCount!.count} staff member(s) are assigned to it.`

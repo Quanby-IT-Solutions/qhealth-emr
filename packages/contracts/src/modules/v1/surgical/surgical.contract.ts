@@ -3,6 +3,7 @@ import { z } from "zod"
 
 import {
 	AnesthesiaRecordSchema,
+	CreateSurgicalCaseSchema,
 	OperationRecordSchema,
 	OrSlotSchema,
 	OrSlotsQuerySchema,
@@ -14,13 +15,14 @@ import {
 	SaveAnesthesiaRecordSchema,
 	SaveOperationRecordSchema,
 	SavePreOpChecklistSchema,
+	SignAnesthesiaRecordSchema,
+	SignOperationRecordSchema,
 	SuggestRvsCodeSchema,
 	SurgicalCaseListResponseSchema,
 	SurgicalCaseListSchema,
 	SurgicalCaseSchema,
-	CreateSurgicalCaseSchema,
-	UpdateSurgicalCaseSchema,
 	UpdateRvsStatusSchema,
+	UpdateSurgicalCaseSchema,
 } from "./surgical.schema.js"
 
 export const surgicalContract = {
@@ -92,6 +94,16 @@ export const surgicalContract = {
 		.input(SaveOperationRecordSchema)
 		.output(OperationRecordSchema),
 
+	signOperationRecord: oc
+		.route({
+			method: "PUT",
+			path: "/cases/{caseId}/operation-record/sign",
+			summary: "Sign an operation record",
+			tags: ["Surgical"],
+		})
+		.input(SignOperationRecordSchema)
+		.output(OperationRecordSchema),
+
 	// ========================================================================
 	// Anesthesia Record
 	// ========================================================================
@@ -114,6 +126,16 @@ export const surgicalContract = {
 			tags: ["Surgical"],
 		})
 		.input(SaveAnesthesiaRecordSchema)
+		.output(AnesthesiaRecordSchema),
+
+	signAnesthesiaRecord: oc
+		.route({
+			method: "PUT",
+			path: "/cases/{caseId}/anesthesia-record/sign",
+			summary: "Sign an anesthesia record, locking it from further edits",
+			tags: ["Surgical"],
+		})
+		.input(SignAnesthesiaRecordSchema)
 		.output(AnesthesiaRecordSchema),
 
 	// ========================================================================

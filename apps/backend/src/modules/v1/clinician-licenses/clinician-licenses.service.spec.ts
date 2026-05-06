@@ -144,9 +144,7 @@ describe("ClinicianLicensesService", () => {
 
 		it("inserts and returns a new license record", async () => {
 			const newLicense = makeLicense()
-			;(db.select as jest.Mock).mockReturnValueOnce(
-				mockSelectChain([{ id: PROFILE_ID }])
-			)
+			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([{ id: PROFILE_ID }]))
 			;(db.insert as jest.Mock).mockReturnValueOnce(mockInsertChain(newLicense))
 
 			const result = await service.add({
@@ -184,8 +182,16 @@ describe("ClinicianLicensesService", () => {
 		})
 
 		it("propagates S2 verification to staff profile s2VerifiedUntil", async () => {
-			const s2License = makeLicense({ licenseType: "S2", status: "pending", expiryDate: "2026-06-30" })
-			const updatedLicense = makeLicense({ licenseType: "S2", status: "verified", verifiedAt: new Date() })
+			const s2License = makeLicense({
+				licenseType: "S2",
+				status: "pending",
+				expiryDate: "2026-06-30",
+			})
+			const updatedLicense = makeLicense({
+				licenseType: "S2",
+				status: "verified",
+				verifiedAt: new Date(),
+			})
 
 			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([s2License]))
 			// First update: license status
@@ -223,9 +229,7 @@ describe("ClinicianLicensesService", () => {
 
 			await service.sweepExpiredLicenses()
 
-			expect(db.update).toHaveBeenCalledWith(
-				expect.objectContaining({ status: "status" })
-			)
+			expect(db.update).toHaveBeenCalledWith(expect.objectContaining({ status: "status" }))
 		})
 	})
 })

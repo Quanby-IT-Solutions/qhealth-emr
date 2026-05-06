@@ -5,7 +5,7 @@ import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions, RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
 
 import { IntegrationRegistryService } from "./integration-registry.service"
 
@@ -17,12 +17,14 @@ type RbacProfile = {
 function extractActor(session: UserSession, req: Request) {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
 	const activeProfile =
-		profile?.staffProfiles?.find(p =>
-			p.roles.some(r => r.id === profile?.activeRole?.id)
-		) ?? profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
 
 	const forwarded = req.headers["x-forwarded-for"] as string | undefined
-	const ipAddress = forwarded?.split(",")[0]?.trim() ?? (req.socket as { remoteAddress?: string } | undefined)?.remoteAddress ?? null
+	const ipAddress =
+		forwarded?.split(",")[0]?.trim() ??
+		(req.socket as { remoteAddress?: string } | undefined)?.remoteAddress ??
+		null
 	const userAgent = req.headers["user-agent"] ?? null
 
 	return {
@@ -37,9 +39,8 @@ function extractActor(session: UserSession, req: Request) {
 function getActiveFacilityId(req: Request): string {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
 	const activeProfile =
-		profile?.staffProfiles?.find(p =>
-			p.roles.some(r => r.id === profile?.activeRole?.id)
-		) ?? profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
 
 	return activeProfile?.facilityId ?? ""
 }
@@ -50,7 +51,11 @@ export class IntegrationRegistryController {
 
 	// ── List ──────────────────────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "integration_registry", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.integrations", action: "read" },
+		{ module: "integration_registry", action: "view" },
+		{ module: "admin", action: "view" },
+	])
 	@Implement(v1.integrationRegistry.list)
 	async list(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -62,7 +67,11 @@ export class IntegrationRegistryController {
 
 	// ── Get ───────────────────────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "integration_registry", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.integrations", action: "read" },
+		{ module: "integration_registry", action: "view" },
+		{ module: "admin", action: "view" },
+	])
 	@Implement(v1.integrationRegistry.get)
 	async get(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -74,7 +83,11 @@ export class IntegrationRegistryController {
 
 	// ── Create ────────────────────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "integration_registry", action: "create" }])
+	@RequireAnyPermissions([
+		{ module: "admin.integrations", action: "write" },
+		{ module: "integration_registry", action: "create" },
+		{ module: "admin", action: "create" },
+	])
 	@Implement(v1.integrationRegistry.create)
 	async create(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -85,7 +98,11 @@ export class IntegrationRegistryController {
 
 	// ── Update ────────────────────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "integration_registry", action: "edit" }])
+	@RequireAnyPermissions([
+		{ module: "admin.integrations", action: "write" },
+		{ module: "integration_registry", action: "edit" },
+		{ module: "admin", action: "edit" },
+	])
 	@Implement(v1.integrationRegistry.update)
 	async update(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -96,7 +113,11 @@ export class IntegrationRegistryController {
 
 	// ── Delete ────────────────────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "integration_registry", action: "delete" }])
+	@RequireAnyPermissions([
+		{ module: "admin.integrations", action: "write" },
+		{ module: "integration_registry", action: "delete" },
+		{ module: "admin", action: "delete" },
+	])
 	@Implement(v1.integrationRegistry.delete)
 	async deleteIntegration(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -107,7 +128,11 @@ export class IntegrationRegistryController {
 
 	// ── List credential refs ───────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "integration_registry", action: "view" }])
+	@RequireAnyPermissions([
+		{ module: "admin.integrations", action: "read" },
+		{ module: "integration_registry", action: "view" },
+		{ module: "admin", action: "view" },
+	])
 	@Implement(v1.integrationRegistry.listCredentialRefs)
 	async listCredentialRefs(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -118,7 +143,11 @@ export class IntegrationRegistryController {
 
 	// ── Test connectivity ──────────────────────────────────────────────────────
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "integration_registry", action: "edit" }])
+	@RequireAnyPermissions([
+		{ module: "admin.integrations", action: "write" },
+		{ module: "integration_registry", action: "edit" },
+		{ module: "admin", action: "edit" },
+	])
 	@Implement(v1.integrationRegistry.testConnectivity)
 	async testConnectivity(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -157,7 +186,7 @@ export class IntegrationRegistryController {
 		})
 	}
 
-	@RequirePermissions([{ module: 'admin', action: 'edit' }])
+	@RequirePermissions([{ module: "admin", action: "edit" }])
 	@Implement(v1.integrationRegistry.rotateApiKey)
 	async rotateApiKey(@Session() session: UserSession) {
 		return implement(v1.integrationRegistry.rotateApiKey).handler(async ({ input }) => {

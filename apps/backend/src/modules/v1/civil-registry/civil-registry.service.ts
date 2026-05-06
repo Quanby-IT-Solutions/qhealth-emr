@@ -124,7 +124,8 @@ export class CivilRegistryService {
 
 		const updateData: Record<string, unknown> = { updatedAt: new Date() }
 		if (input.status !== undefined) updateData.status = input.status
-		if (input.certificateNumber !== undefined) updateData.certificateNumber = input.certificateNumber
+		if (input.certificateNumber !== undefined)
+			updateData.certificateNumber = input.certificateNumber
 		if (input.completedAt !== undefined) updateData.completedAt = new Date(input.completedAt)
 		if (input.submittedAt !== undefined) updateData.submittedAt = new Date(input.submittedAt)
 
@@ -158,7 +159,11 @@ export class CivilRegistryService {
 	 * Sets releasedByStaffId, releasedAt, completedAt, and status="completed" to provide
 	 * an authoritative Flow 7 Step 3 evidence trail and close the SLA window.
 	 */
-	async markBirthRegistrationReleased(input: { id: string; releasedByStaffId: string; releasedAt?: Date }) {
+	async markBirthRegistrationReleased(input: {
+		id: string
+		releasedByStaffId: string
+		releasedAt?: Date
+	}) {
 		const releasedAt = input.releasedAt ?? new Date()
 
 		const [updated] = await db

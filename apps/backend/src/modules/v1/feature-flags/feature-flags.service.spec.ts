@@ -176,9 +176,19 @@ describe("FeatureFlagsService — resolution algorithm", () => {
 
 	it("higher specificity target wins over lower specificity", async () => {
 		// spec=1 (env only): disabled
-		const lowSpec = makeTarget({ environment: "prod", facilityId: null, roleId: null, enabled: false })
+		const lowSpec = makeTarget({
+			environment: "prod",
+			facilityId: null,
+			roleId: null,
+			enabled: false,
+		})
 		// spec=2 (env + facility): enabled — should win
-		const highSpec = makeTarget({ environment: "prod", facilityId: "fac-a", roleId: null, enabled: true })
+		const highSpec = makeTarget({
+			environment: "prod",
+			facilityId: "fac-a",
+			roleId: null,
+			enabled: true,
+		})
 
 		mockTwoSelects(makeFlag({ defaultEnabled: false }), [lowSpec, highSpec])
 

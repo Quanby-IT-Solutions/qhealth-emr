@@ -92,7 +92,8 @@ function makeFullRow(
 		name: (facilityOverrides.name as string) ?? "QHealth General Hospital",
 		facilityType: (facilityOverrides.facilityType as string) ?? "community",
 		dohLicenseNumber: (facilityOverrides.dohLicenseNumber as string | null) ?? null,
-		philhealthAccreditationId: (facilityOverrides.philhealthAccreditationId as string | null) ?? null,
+		philhealthAccreditationId:
+			(facilityOverrides.philhealthAccreditationId as string | null) ?? null,
 	}
 }
 
@@ -166,7 +167,6 @@ describe("FacilityProfileService", () => {
 			;(db.select as jest.Mock).mockReturnValue(mockSelectJoinChain([fullRow]))
 
 			await service.get(FACILITY_ID)
-
 			;(db.insert as jest.Mock).mockReturnValue(mockInsertChain())
 			;(db.select as jest.Mock).mockReturnValue(mockSelectJoinChain([fullRow]))
 			const result2 = await service.get(FACILITY_ID)
@@ -239,11 +239,7 @@ describe("FacilityProfileService", () => {
 			const updated = makeProfileRow({ addressLine1: "123 Health St", city: "Makati" })
 			setupTransaction(current, updated)
 
-			await service.update(
-				FACILITY_ID,
-				{ addressLine1: "123 Health St", city: "Makati" },
-				actor
-			)
+			await service.update(FACILITY_ID, { addressLine1: "123 Health St", city: "Makati" }, actor)
 
 			expect(mockAuditService.log).toHaveBeenCalledTimes(1)
 			const changes: Array<{ path: string; before: unknown; after: unknown }> =

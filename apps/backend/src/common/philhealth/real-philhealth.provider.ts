@@ -53,7 +53,9 @@ export class RealPhilHealthProvider implements PhilHealthAdapter {
 				method: "GET",
 				headers: {
 					Accept: "application/json",
-					...(env.PHILHEALTH_CEWS_API_KEY ? { Authorization: `Bearer ${env.PHILHEALTH_CEWS_API_KEY}` } : {}),
+					...(env.PHILHEALTH_CEWS_API_KEY
+						? { Authorization: `Bearer ${env.PHILHEALTH_CEWS_API_KEY}` }
+						: {}),
 				},
 			})
 
@@ -97,7 +99,8 @@ export class RealPhilHealthProvider implements PhilHealthAdapter {
 				memberName: typeof payload?.memberName === "string" ? payload.memberName : null,
 				memberType: normalizeMemberType(payload?.memberType),
 				patientRelation: normalizePatientRelation(payload?.patientRelation),
-				effectivityDate: typeof payload?.effectivityDate === "string" ? payload.effectivityDate : null,
+				effectivityDate:
+					typeof payload?.effectivityDate === "string" ? payload.effectivityDate : null,
 				expiryDate,
 				remainingDays:
 					typeof payload?.remainingDays === "number"
@@ -131,7 +134,9 @@ export class RealPhilHealthProvider implements PhilHealthAdapter {
 		}
 	}
 
-	async submitClaim(input: PhilHealthClaimSubmissionInput): Promise<PhilHealthClaimSubmissionResult> {
+	async submitClaim(
+		input: PhilHealthClaimSubmissionInput
+	): Promise<PhilHealthClaimSubmissionResult> {
 		const submittedAt = new Date().toISOString()
 
 		if (!env.PHILHEALTH_CEWS_BASE_URL) {
@@ -147,15 +152,24 @@ export class RealPhilHealthProvider implements PhilHealthAdapter {
 		}
 
 		try {
-			const response = await fetch(new URL(`/claims/${input.claimType}`, env.PHILHEALTH_CEWS_BASE_URL), {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Accept: "application/json",
-					...(env.PHILHEALTH_CEWS_API_KEY ? { Authorization: `Bearer ${env.PHILHEALTH_CEWS_API_KEY}` } : {}),
-				},
-				body: JSON.stringify({ claimId: input.claimId, facilityId: input.facilityId, payload: input.payload }),
-			})
+			const response = await fetch(
+				new URL(`/claims/${input.claimType}`, env.PHILHEALTH_CEWS_BASE_URL),
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"Accept": "application/json",
+						...(env.PHILHEALTH_CEWS_API_KEY
+							? { Authorization: `Bearer ${env.PHILHEALTH_CEWS_API_KEY}` }
+							: {}),
+					},
+					body: JSON.stringify({
+						claimId: input.claimId,
+						facilityId: input.facilityId,
+						payload: input.payload,
+					}),
+				}
+			)
 
 			const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null
 			return {
@@ -174,7 +188,8 @@ export class RealPhilHealthProvider implements PhilHealthAdapter {
 				success: false,
 				transactionId: null,
 				status: "failed",
-				message: error instanceof Error ? error.message : "Unknown PhilHealth claim submission error.",
+				message:
+					error instanceof Error ? error.message : "Unknown PhilHealth claim submission error.",
 				response: null,
 				submittedAt,
 			}
@@ -196,13 +211,18 @@ export class RealPhilHealthProvider implements PhilHealthAdapter {
 		}
 
 		try {
-			const response = await fetch(new URL(`/cews/status/${input.transactionId}`, env.PHILHEALTH_CEWS_BASE_URL), {
-				method: "GET",
-				headers: {
-					Accept: "application/json",
-					...(env.PHILHEALTH_CEWS_API_KEY ? { Authorization: `Bearer ${env.PHILHEALTH_CEWS_API_KEY}` } : {}),
-				},
-			})
+			const response = await fetch(
+				new URL(`/cews/status/${input.transactionId}`, env.PHILHEALTH_CEWS_BASE_URL),
+				{
+					method: "GET",
+					headers: {
+						Accept: "application/json",
+						...(env.PHILHEALTH_CEWS_API_KEY
+							? { Authorization: `Bearer ${env.PHILHEALTH_CEWS_API_KEY}` }
+							: {}),
+					},
+				}
+			)
 
 			const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null
 			return {

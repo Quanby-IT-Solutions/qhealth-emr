@@ -1,3 +1,5 @@
+import { FormularyController } from "./formulary.controller"
+
 /**
  * Formulary RBAC Guard Tests (FORM-010, FORM-011, FORM-013, FORM-014)
  *
@@ -38,7 +40,19 @@ jest.mock("@thallesp/nestjs-better-auth", () => ({
 	Session: () => () => {},
 }))
 jest.mock("@/config/api-versions.config", () => ({
-	v1: { formulary: { drugGeneric: {}, drugBrand: {}, item: {}, icd10: {}, loinc: {}, rxnorm: {}, rvs: {}, snomedCt: {}, codeSetAdmin: {} } },
+	v1: {
+		formulary: {
+			drugGeneric: {},
+			drugBrand: {},
+			item: {},
+			icd10: {},
+			loinc: {},
+			rxnorm: {},
+			rvs: {},
+			snomedCt: {},
+			codeSetAdmin: {},
+		},
+	},
 }))
 jest.mock("./formulary.service", () => ({
 	FormularyService: class FormularyService {},
@@ -46,17 +60,15 @@ jest.mock("./formulary.service", () => ({
 jest.mock("@/modules/v1/rbac/rbac.guard", () => ({
 	RBAC_PERMISSION_KEY: "rbac",
 	RBAC_PERMISSIONS_KEY: "rbac_all",
-	RequirePermission: (module: string, action: string) =>
-		(target: object, key: string | symbol) => {
-			Reflect.defineMetadata("rbac", { module, action }, target, key)
-		},
-	RequirePermissions: (permissions: Array<{ module: string; action: string }>) =>
+	RequirePermission: (module: string, action: string) => (target: object, key: string | symbol) => {
+		Reflect.defineMetadata("rbac", { module, action }, target, key)
+	},
+	RequirePermissions:
+		(permissions: Array<{ module: string; action: string }>) =>
 		(target: object, key: string | symbol) => {
 			Reflect.defineMetadata("rbac_all", permissions, target, key)
 		},
 }))
-
-import { FormularyController } from "./formulary.controller"
 
 type PermEntry = { module: string; action: string }
 
@@ -78,31 +90,43 @@ describe("FormularyController — RBAC guard metadata (FORM-010, FORM-011, FORM-
 			"updateDrugBrand",
 		]
 
-		it.each(drugCatalogMutators)("%s uses single formulary:manage_catalog permission", (method) => {
+		it.each(drugCatalogMutators)("%s uses single formulary:manage_catalog permission", method => {
 			expect(getSinglePermission(method)).toEqual({ module: "formulary", action: "manage_catalog" })
 		})
 
-		it.each(drugCatalogMutators)("%s does NOT use a multi-permission (AND) gate — admin:view would block Pharmacist", (method) => {
-			expect(getMultiPermissions(method)).toBeUndefined()
-		})
+		it.each(drugCatalogMutators)(
+			"%s does NOT use a multi-permission (AND) gate — admin:view would block Pharmacist",
+			method => {
+				expect(getMultiPermissions(method)).toBeUndefined()
+			}
+		)
 	})
 
 	// ── Formulary Items (pharmacist-level — formulary:edit only) ─────────────
 	describe("FORM-010 — Formulary item write handlers require formulary:edit (pharmacist), not admin:view", () => {
 		it("createFormularyItem requires formulary:edit only", () => {
 			// Single-permission guard — no admin:view dual gate
-			expect(getSinglePermission("createFormularyItem")).toEqual({ module: "formulary", action: "edit" })
+			expect(getSinglePermission("createFormularyItem")).toEqual({
+				module: "formulary",
+				action: "edit",
+			})
 			// Must NOT carry a multi-permission (AND) gate that would require admin:view
 			expect(getMultiPermissions("createFormularyItem")).toBeUndefined()
 		})
 
 		it("updateFormularyItem requires formulary:edit only", () => {
-			expect(getSinglePermission("updateFormularyItem")).toEqual({ module: "formulary", action: "edit" })
+			expect(getSinglePermission("updateFormularyItem")).toEqual({
+				module: "formulary",
+				action: "edit",
+			})
 			expect(getMultiPermissions("updateFormularyItem")).toBeUndefined()
 		})
 
 		it("deleteFormularyItem requires formulary:edit only", () => {
-			expect(getSinglePermission("deleteFormularyItem")).toEqual({ module: "formulary", action: "edit" })
+			expect(getSinglePermission("deleteFormularyItem")).toEqual({
+				module: "formulary",
+				action: "edit",
+			})
 			expect(getMultiPermissions("deleteFormularyItem")).toBeUndefined()
 		})
 	})
@@ -136,26 +160,29 @@ describe("FormularyController — RBAC guard metadata (FORM-010, FORM-011, FORM-
 			"publishVersion",
 		]
 
-		it.each(codeSetMutators)("%s requires admin:view AND formulary:terminology_admin", (method) => {
+		it.each(codeSetMutators)("%s requires admin:view AND formulary:terminology_admin", method => {
 			expect(getMultiPermissions(method)).toEqual([
 				{ module: "admin", action: "view" },
 				{ module: "formulary", action: "terminology_admin" },
 			])
 		})
 
-		it.each(codeSetMutators)("%s does NOT use formulary:manage_catalog (Administrator is blocked)", (method) => {
-			const perms = getMultiPermissions(method)
-			expect(perms?.some((p) => p.action === "manage_catalog")).toBe(false)
-		})
+		it.each(codeSetMutators)(
+			"%s does NOT use formulary:manage_catalog (Administrator is blocked)",
+			method => {
+				const perms = getMultiPermissions(method)
+				expect(perms?.some(p => p.action === "manage_catalog")).toBe(false)
+			}
+		)
 
 		it("deleteDeprecation does NOT use formulary:delete", () => {
 			const perms = getMultiPermissions("deleteDeprecation")
-			expect(perms?.some((p) => p.action === "delete")).toBe(false)
+			expect(perms?.some(p => p.action === "delete")).toBe(false)
 		})
 
 		it("deleteEntry does NOT use formulary:delete", () => {
 			const perms = getMultiPermissions("deleteEntry")
-			expect(perms?.some((p) => p.action === "delete")).toBe(false)
+			expect(perms?.some(p => p.action === "delete")).toBe(false)
 		})
 	})
 })

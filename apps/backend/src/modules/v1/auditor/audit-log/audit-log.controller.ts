@@ -65,10 +65,7 @@ export class AuditLogController {
 	@Implement(v1.auditor.events.session)
 	async getSessionEvents(@Session() session: UserSession) {
 		return implement(v1.auditor.events.session).handler(async ({ input }) => {
-			const events = await this.auditLogService.getSessionEvents(
-				input.sessionId,
-				input.facilityId
-			)
+			const events = await this.auditLogService.getSessionEvents(input.sessionId, input.facilityId)
 			await this.auditLogService.emitSelfAudit({
 				facilityId: input.facilityId,
 				auditorUserId: session.user.id,

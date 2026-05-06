@@ -407,8 +407,10 @@ export class NursingService {
 		if (input.encounterId) conditions.push(eq(marEntries.encounterId, input.encounterId))
 		if (input.preEncounterId) conditions.push(eq(marEntries.preEncounterId, input.preEncounterId))
 		if (input.status) conditions.push(eq(marEntries.status, input.status))
-		if (input.scheduledFrom) conditions.push(gte(marEntries.scheduledTime, new Date(input.scheduledFrom)))
-		if (input.scheduledTo) conditions.push(lte(marEntries.scheduledTime, new Date(input.scheduledTo)))
+		if (input.scheduledFrom)
+			conditions.push(gte(marEntries.scheduledTime, new Date(input.scheduledFrom)))
+		if (input.scheduledTo)
+			conditions.push(lte(marEntries.scheduledTime, new Date(input.scheduledTo)))
 
 		const where = and(...conditions)
 		const offset = (input.page - 1) * input.limit
@@ -634,11 +636,10 @@ export class NursingService {
 	// ========================================================================
 
 	async findFlowsheetEntries(input: FlowsheetListInput) {
-		const conditions = [
-			eq(flowsheetEntries.encounterId, input.encounterId),
-		]
+		const conditions = [eq(flowsheetEntries.encounterId, input.encounterId)]
 		if (input.facilityId) conditions.push(eq(flowsheetEntries.facilityId, input.facilityId))
-		if (input.parameterName) conditions.push(eq(flowsheetEntries.parameterName, input.parameterName))
+		if (input.parameterName)
+			conditions.push(eq(flowsheetEntries.parameterName, input.parameterName))
 		if (input.dateFrom) conditions.push(gte(flowsheetEntries.recordedAt, new Date(input.dateFrom)))
 		if (input.dateTo) conditions.push(lte(flowsheetEntries.recordedAt, new Date(input.dateTo)))
 
@@ -674,7 +675,8 @@ export class NursingService {
 		const conditions = []
 		if (input.facilityId) conditions.push(eq(shiftHandoffs.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(shiftHandoffs.encounterId, input.encounterId))
-		if (input.outgoingStaffId) conditions.push(eq(shiftHandoffs.outgoingStaffId, input.outgoingStaffId))
+		if (input.outgoingStaffId)
+			conditions.push(eq(shiftHandoffs.outgoingStaffId, input.outgoingStaffId))
 
 		const where = and(...conditions)
 		const offset = (input.page - 1) * input.limit
@@ -881,11 +883,7 @@ export class NursingService {
 		if (input.status === "confirmed") updates.confirmedAt = new Date()
 		if (input.status === "resolved") updates.resolvedAt = new Date()
 
-		const [row] = await db
-			.update(haiTags)
-			.set(updates)
-			.where(eq(haiTags.id, input.id))
-			.returning()
+		const [row] = await db.update(haiTags).set(updates).where(eq(haiTags.id, input.id)).returning()
 
 		if (!row) throw new NotFoundException("HAI tag not found")
 		return row
@@ -899,7 +897,8 @@ export class NursingService {
 		const conditions = []
 		if (input.facilityId) conditions.push(eq(consentRecords.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(consentRecords.encounterId, input.encounterId))
-		if (input.preEncounterId) conditions.push(eq(consentRecords.preEncounterId, input.preEncounterId))
+		if (input.preEncounterId)
+			conditions.push(eq(consentRecords.preEncounterId, input.preEncounterId))
 		if (input.consentType)
 			conditions.push(
 				eq(

@@ -75,15 +75,17 @@ export const CreateFmdrfInputSchema = FmdrfReportSchema.omit({
 	updatedAt: true,
 })
 
-export const UpdateFmdrfInputSchema = z.object({
-	id: z.string().uuid(),
-}).extend(
-	FmdrfReportSchema.omit({
-		id: true,
-		createdAt: true,
-		updatedAt: true,
-	}).partial().shape
-)
+export const UpdateFmdrfInputSchema = z
+	.object({
+		id: z.string().uuid(),
+	})
+	.extend(
+		FmdrfReportSchema.omit({
+			id: true,
+			createdAt: true,
+			updatedAt: true,
+		}).partial().shape
+	)
 
 export const GetFmdrfInputSchema = z.object({
 	encounterId: z.string().uuid(),
@@ -155,15 +157,17 @@ export const CreateFndrfInputSchema = FndrfReportSchema.omit({
 	updatedAt: true,
 })
 
-export const UpdateFndrfInputSchema = z.object({
-	id: z.string().uuid(),
-}).extend(
-	FndrfReportSchema.omit({
-		id: true,
-		createdAt: true,
-		updatedAt: true,
-	}).partial().shape
-)
+export const UpdateFndrfInputSchema = z
+	.object({
+		id: z.string().uuid(),
+	})
+	.extend(
+		FndrfReportSchema.omit({
+			id: true,
+			createdAt: true,
+			updatedAt: true,
+		}).partial().shape
+	)
 
 export const GetFndrfInputSchema = z.object({
 	encounterId: z.string().uuid(),

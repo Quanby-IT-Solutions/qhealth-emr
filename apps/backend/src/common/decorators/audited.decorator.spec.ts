@@ -55,9 +55,7 @@ describe("@Audited decorator", () => {
 			// Allow async fire-and-forget to settle
 			await Promise.resolve()
 
-			expect(fakeAuditService.log).toHaveBeenCalledWith(
-				expect.objectContaining({ metadata: null })
-			)
+			expect(fakeAuditService.log).toHaveBeenCalledWith(expect.objectContaining({ metadata: null }))
 		})
 
 		it("returns the method result regardless", async () => {
@@ -121,9 +119,7 @@ describe("@Audited decorator", () => {
 			await Promise.resolve()
 
 			expect(extractChanges).not.toHaveBeenCalled()
-			expect(fakeAuditService.log).toHaveBeenCalledWith(
-				expect.objectContaining({ metadata: null })
-			)
+			expect(fakeAuditService.log).toHaveBeenCalledWith(expect.objectContaining({ metadata: null }))
 		})
 
 		it("sets metadata: null when extractChanges returns an empty array", async () => {
@@ -139,9 +135,7 @@ describe("@Audited decorator", () => {
 			await instance.doWork({}, "u1", "f1")
 			await Promise.resolve()
 
-			expect(fakeAuditService.log).toHaveBeenCalledWith(
-				expect.objectContaining({ metadata: null })
-			)
+			expect(fakeAuditService.log).toHaveBeenCalledWith(expect.objectContaining({ metadata: null }))
 		})
 	})
 })

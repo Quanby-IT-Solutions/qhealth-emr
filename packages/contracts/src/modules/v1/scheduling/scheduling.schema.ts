@@ -132,8 +132,14 @@ export const CreateClinicTemplateSchema = z.object({
 export const UpdateClinicTemplateSchema = z.object({
 	id: z.string().uuid(),
 	clinicName: z.string().min(1).max(255).optional(),
-	startTime: z.string().regex(/^\d{2}:\d{2}$/, "Must be HH:mm format").optional(),
-	endTime: z.string().regex(/^\d{2}:\d{2}$/, "Must be HH:mm format").optional(),
+	startTime: z
+		.string()
+		.regex(/^\d{2}:\d{2}$/, "Must be HH:mm format")
+		.optional(),
+	endTime: z
+		.string()
+		.regex(/^\d{2}:\d{2}$/, "Must be HH:mm format")
+		.optional(),
 	maxPatients: z.number().int().positive().optional(),
 	slotDurationMinutes: z.number().int().positive().optional(),
 	isActive: z.boolean().optional(),

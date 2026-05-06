@@ -139,6 +139,15 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 	},
 	{
 		title: "Patients",
+		href: "/patients/search",
+		iconName: "patient",
+		requiredPermissions: [{ module: "patients", action: "view" }],
+		requireAllPermissions: [{ module: "clinical_docs", action: "sign" }],
+		// Physicians and other chart-authoring clinicians should land on the
+		// chart-first patient list, not the registrar dedup workflow.
+	},
+	{
+		title: "Patients",
 		href: "/patients/register",
 		iconName: "patient",
 		requiredPermissions: [{ module: "patients", action: "view" }],
@@ -155,6 +164,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 			{ module: "reporting", action: "edit" }, // PIDSR Officer
 			{ module: "nursing", action: "create" }, // Nurse — uses /patients/search instead
 			{ module: "nutrition", action: "view" }, // Dietitian — uses /patients/search instead
+			{ module: "clinical_docs", action: "sign" }, // Physicians — use /patients/search instead
 		],
 	},
 	{
@@ -309,9 +319,13 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "HIM Dashboard",
 		href: "/him",
 		iconName: "records",
-		// HIM Coder owns chart completion queue, deficiency tracking, coding queue
-		// medical_records:view is the correct boundary — aligns with the backend guard
-		requiredPermissions: [{ module: "medical_records", action: "view" }],
+		// HIM access accepts the dedicated him:read/write permission pair and the
+		// legacy medical_records:view fallback during the RBAC transition.
+		requiredPermissions: [
+			{ module: "him", action: "read" },
+			{ module: "him", action: "write" },
+			{ module: "medical_records", action: "view" },
+		],
 		isSecondary: true,
 	},
 	{
@@ -584,6 +598,20 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 interface Permission {
 	module: string
 	action: string
+}
+
+export function getDefaultPatientsHref(permissions: Permission[]): string {
+	const permSet = new Set(permissions.map(p => `${p.module}:${p.action}`))
+
+	if (permSet.has("clinical_docs:sign")) {
+		return "/patients/search"
+	}
+
+	if (permSet.has("nursing:create") && !permSet.has("adt:create")) {
+		return "/patients/search"
+	}
+
+	return "/patients/register"
 }
 
 /**

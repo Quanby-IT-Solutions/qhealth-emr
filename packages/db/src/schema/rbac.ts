@@ -10,10 +10,7 @@ import { users } from "./auth.js"
 export const facilities = createTable("facilities", t => ({
 	id: t.uuid("id").primaryKey().defaultRandom(),
 	name: t.text("name").notNull(),
-	facilityType: t
-		.text("facility_type")
-		.notNull()
-		.$type<"community" | "district" | "tertiary">(),
+	facilityType: t.text("facility_type").notNull().$type<"community" | "district" | "tertiary">(),
 	address: t.text("address"),
 	dohLicenseNumber: t.text("doh_license_number"),
 	philhealthAccreditationId: t.text("philhealth_accreditation_id"),
@@ -87,11 +84,31 @@ export const rolePermissions = createTable(
 				| "orders"
 				| "nursing"
 				| "billing"
+				| "billing.charges"
+				| "billing.invoices"
+				| "billing.payments"
+				| "billing.cf4"
+				| "billing.drg"
+				| "billing.cf5"
+				| "billing.esoa"
+				| "billing.cews"
+				| "billing.konsulta"
 				| "formulary"
 				| "reporting"
 				| "notifications"
 				| "audit"
 				| "admin"
+				| "admin.users"
+				| "admin.feature-flags"
+				| "admin.licenses"
+				| "admin.bor"
+				| "admin.fhir"
+				| "admin.terminology"
+				| "admin.sla"
+				| "admin.master-data"
+				| "admin.integrations"
+				| "admin.facility"
+				| "admin.auth"
 				| "surgical"
 				| "opd"
 				| "nutrition"
@@ -111,15 +128,22 @@ export const rolePermissions = createTable(
 				| "integration_registry"
 				| "civil_registry"
 				| "medical_records"
+				| "him.deficiencies"
+				| "him.coding"
+				| "him.records"
+				| "him.hai"
 				| "patients"
 			>(),
 		action: t
 			.text("action")
 			.notNull()
-			.$type<"view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "manage_catalog" | "clinical_policy" | "terminology_admin">(),
+			.$type<"view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "read" | "write" | "manage_catalog" | "clinical_policy" | "terminology_admin">(),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
-	t => [index("role_permissions_role_id_idx").on(t.roleId), uniqueIndex("role_permissions_role_module_action_unique").on(t.roleId, t.module, t.action)]
+	t => [
+		index("role_permissions_role_id_idx").on(t.roleId),
+		uniqueIndex("role_permissions_role_module_action_unique").on(t.roleId, t.module, t.action),
+	]
 )
 
 export const userRoles = createTable(

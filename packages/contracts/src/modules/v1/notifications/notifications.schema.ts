@@ -43,9 +43,7 @@ export type Notification = z.infer<typeof NotificationSchema>
 
 export const NotificationListFilterSchema = z.object({
 	facilityId: z.string().uuid(),
-	isRead: z
-		.union([z.boolean(), z.string().transform(v => v === "true")])
-		.optional(),
+	isRead: z.union([z.boolean(), z.string().transform(v => v === "true")]).optional(),
 	topic: NotificationTopicEnum.optional(),
 	page: z.coerce.number().int().positive().default(1),
 	limit: z.coerce.number().int().positive().max(100).default(20),

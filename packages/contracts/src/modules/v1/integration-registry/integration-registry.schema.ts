@@ -28,12 +28,7 @@ export type IntegrationKind = z.infer<typeof IntegrationKindEnum>
  * - "not_in_whitelist" — ref is not in the current whitelist
  * - "unset"            — credentialsRef is null (no credential configured)
  */
-export const CredentialStatusEnum = z.enum([
-	"ok",
-	"missing_in_env",
-	"not_in_whitelist",
-	"unset",
-])
+export const CredentialStatusEnum = z.enum(["ok", "missing_in_env", "not_in_whitelist", "unset"])
 
 export type CredentialStatus = z.infer<typeof CredentialStatusEnum>
 
@@ -147,8 +142,13 @@ export const ApiKeySchema = z.object({
 	label: z.string(),
 	keyPrefix: z.string(),
 	createdBy: z.string(),
-	createdAt: z.union([z.date(), z.string()]).transform(v => (typeof v === "string" ? new Date(v) : v)),
-	revokedAt: z.union([z.date(), z.string()]).transform(v => (typeof v === "string" ? new Date(v) : v)).nullable(),
+	createdAt: z
+		.union([z.date(), z.string()])
+		.transform(v => (typeof v === "string" ? new Date(v) : v)),
+	revokedAt: z
+		.union([z.date(), z.string()])
+		.transform(v => (typeof v === "string" ? new Date(v) : v))
+		.nullable(),
 })
 
 export type ApiKey = z.infer<typeof ApiKeySchema>

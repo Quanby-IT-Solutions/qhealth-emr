@@ -15,8 +15,26 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 			...init?.headers,
 		},
 	})
-	if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-	return res.json() as Promise<T>
+	const text = await res.text()
+	if (!res.ok) {
+		let message = `HTTP ${res.status}: ${res.statusText}`
+
+		if (text) {
+			try {
+				const parsed = JSON.parse(text) as {
+					message?: string
+					error?: { message?: string }
+				}
+				message = parsed.message ?? parsed.error?.message ?? text
+			} catch {
+				message = text
+			}
+		}
+
+		throw new Error(message)
+	}
+
+	return (text ? JSON.parse(text) : null) as T
 }
 
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
@@ -32,7 +50,12 @@ function buildQueryString(params: Record<string, string | number | boolean | und
 export type SurgeryStatus = "scheduled" | "in_progress" | "completed" | "cancelled" | "postponed"
 export type AsaClass = "ASA I" | "ASA II" | "ASA III" | "ASA IV" | "ASA V" | "ASA VI"
 export type AirwayType = "oral_ett" | "nasal_ett" | "lma" | "awake_fiber_optic" | "tracheostomy"
+export type AnesthesiaType = "general" | "regional" | "local" | "sedation"
+export type IntubationGrade = "CL1" | "CL2" | "CL3" | "CL4" | "not_applicable"
+export type AnesthesiaRecordStatus = "draft" | "signed"
 export type RvsCodeStatus = "suggested" | "validated" | "finalized"
+export type RvsAssignmentType = "primary" | "adjunct"
+export type OperationRecordStatus = "draft" | "signed"
 
 export interface SurgicalCase {
 	id: string
@@ -63,6 +86,7 @@ export interface OperationRecord {
 	preOpDiagnosis: string
 	postOpDiagnosis: string | null
 	procedurePerformed: string
+	procedureDescription: string | null
 	operativeTechnique: string | null
 	findings: string | null
 	specimens: string | null
@@ -76,9 +100,14 @@ export interface OperationRecord {
 	secondAssistantStaffId: string | null
 	scrubNurseStaffId: string | null
 	circulatingNurseStaffId: string | null
+	anesthesiologistStaffId: string | null
 	instrumentCountCorrect: boolean
 	swabCountCorrect: boolean
 	complications: string | null
+	status: OperationRecordStatus
+	signedAt: string | null
+	signedByStaffId: string | null
+	signedByName: string | null
 	createdAt: string
 	updatedAt: string
 }
@@ -90,27 +119,65 @@ export interface AnesthesiaAgent {
 	time: string
 }
 
+export interface InductionAgent {
+	agent: string
+	dose: string
+	time?: string
+}
+
+export interface MaintenanceAgent {
+	agent: string
+	dose: string
+	time?: string
+}
+
+export interface MuscleRelaxant {
+	agent: string
+	dose: string
+	time?: string
+}
+
+export interface IntraopMedication {
+	name: string
+	dose: string
+	route: string
+	time: string
+	indication?: string
+}
+
 export interface IntraopVital {
 	time: string
 	bp: string
 	hr: number
 	spo2: number
 	etco2?: number
+	temp?: number
 }
 
 export interface AnesthesiaRecord {
 	id: string
 	surgicalCaseId: string
-	asaClass: AsaClass
-	airwayType: AirwayType
-	intubationAttempts: number
-	agents: AnesthesiaAgent[]
-	intraopVitals: IntraopVital[]
+	asaClass: AsaClass | null
+	anesthesiaType: AnesthesiaType | null
+	airwayType: AirwayType | null
+	airwayManagement: string | null
+	intubationAttempts: number | null
+	intubationGrade: IntubationGrade | null
+	difficultAirway: boolean
+	agents: AnesthesiaAgent[] | null
+	inductionAgents: InductionAgent[] | null
+	maintenanceAgents: MaintenanceAgent[] | null
+	muscleRelaxants: MuscleRelaxant[] | null
+	intraopMedications: IntraopMedication[] | null
+	intraopVitals: IntraopVital[] | null
 	reversalAgent: string | null
 	totalAnesthesiaMinutes: number | null
-	emergenceSmooth: boolean
+	emergenceSmooth: boolean | null
 	complications: string | null
 	postAnesthesiaCareNotes: string | null
+	status: AnesthesiaRecordStatus
+	signedAt: string | null
+	signedByStaffId: string | null
 	createdAt: string
 	updatedAt: string
 }
@@ -146,8 +213,10 @@ export interface RvsAssignment {
 	id: string
 	surgicalCaseId: string
 	rvsCodeId: string
+	procedureLabel: string | null
 	code: string
 	description: string
+	assignmentType: RvsAssignmentType
 	status: RvsCodeStatus
 	suggestedByName: string | null
 	validatedByName: string | null
@@ -280,9 +349,9 @@ export function useUpdateSurgicalCaseMutation() {
 // Operation Record
 // ============================================================================
 
-export function useOperationRecordQuery(caseId: string) {
+export function useOperationRecordQuery(caseId: string | undefined) {
 	return useQuery({
-		queryKey: surgicalKeys.operationRecord(caseId),
+		queryKey: surgicalKeys.operationRecord(caseId ?? ""),
 		queryFn: () => fetchJson<OperationRecord | null>(`${API_BASE}/cases/${caseId}/operation-record`),
 		enabled: !!caseId,
 	})
@@ -293,6 +362,7 @@ interface SaveOperationRecordData {
 	preOpDiagnosis: string
 	postOpDiagnosis?: string
 	procedurePerformed: string
+	procedureDescription?: string
 	operativeTechnique?: string
 	findings?: string
 	specimens?: string
@@ -306,6 +376,7 @@ interface SaveOperationRecordData {
 	secondAssistantStaffId?: string
 	scrubNurseStaffId?: string
 	circulatingNurseStaffId?: string
+	anesthesiologistStaffId?: string | null
 	instrumentCountCorrect: boolean
 	swabCountCorrect: boolean
 	complications?: string
@@ -326,13 +397,29 @@ export function useSaveOperationRecordMutation() {
 	})
 }
 
+export function useSignOperationRecordMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: ({ caseId }: { caseId: string }) =>
+			fetchJson<OperationRecord>(`${API_BASE}/cases/${caseId}/operation-record/sign`, {
+				method: "PUT",
+				body: JSON.stringify({ caseId }),
+			}),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.operationRecord(variables.caseId) })
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.rvsAssignments(variables.caseId) })
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.all })
+		},
+	})
+}
+
 // ============================================================================
 // Anesthesia Record
 // ============================================================================
 
-export function useAnesthesiaRecordQuery(caseId: string) {
+export function useAnesthesiaRecordQuery(caseId: string | undefined) {
 	return useQuery({
-		queryKey: surgicalKeys.anesthesiaRecord(caseId),
+		queryKey: surgicalKeys.anesthesiaRecord(caseId ?? ""),
 		queryFn: () => fetchJson<AnesthesiaRecord | null>(`${API_BASE}/cases/${caseId}/anesthesia-record`),
 		enabled: !!caseId,
 	})
@@ -340,14 +427,22 @@ export function useAnesthesiaRecordQuery(caseId: string) {
 
 interface SaveAnesthesiaRecordData {
 	caseId: string
-	asaClass: AsaClass
-	airwayType: AirwayType
-	intubationAttempts: number
-	agents: AnesthesiaAgent[]
-	intraopVitals: IntraopVital[]
+	asaClass?: AsaClass
+	anesthesiaType?: AnesthesiaType
+	airwayType?: AirwayType
+	airwayManagement?: string
+	intubationAttempts?: number
+	intubationGrade?: IntubationGrade
+	difficultAirway?: boolean
+	agents?: AnesthesiaAgent[]
+	inductionAgents?: InductionAgent[]
+	maintenanceAgents?: MaintenanceAgent[]
+	muscleRelaxants?: MuscleRelaxant[]
+	intraopMedications?: IntraopMedication[]
+	intraopVitals?: IntraopVital[]
 	reversalAgent?: string
 	totalAnesthesiaMinutes?: number
-	emergenceSmooth: boolean
+	emergenceSmooth?: boolean
 	complications?: string
 	postAnesthesiaCareNotes?: string
 }
@@ -366,13 +461,28 @@ export function useSaveAnesthesiaRecordMutation() {
 	})
 }
 
+export function useSignAnesthesiaRecordMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: ({ caseId }: { caseId: string }) =>
+			fetchJson<AnesthesiaRecord>(`${API_BASE}/cases/${caseId}/anesthesia-record/sign`, {
+				method: "PUT",
+				body: JSON.stringify({ caseId }),
+			}),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.anesthesiaRecord(variables.caseId) })
+			queryClient.invalidateQueries({ queryKey: surgicalKeys.all })
+		},
+	})
+}
+
 // ============================================================================
 // Pre-Op Checklist
 // ============================================================================
 
-export function usePreOpChecklistQuery(caseId: string) {
+export function usePreOpChecklistQuery(caseId: string | undefined) {
 	return useQuery({
-		queryKey: surgicalKeys.preOpChecklist(caseId),
+		queryKey: surgicalKeys.preOpChecklist(caseId ?? ""),
 		queryFn: () => fetchJson<PreOpChecklist | null>(`${API_BASE}/cases/${caseId}/pre-op-checklist`),
 		enabled: !!caseId,
 	})
@@ -423,6 +533,8 @@ export function useRvsAssignmentsQuery(caseId: string) {
 interface SuggestRvsCodeData {
 	caseId: string
 	rvsCodeId: string
+	procedureLabel: string
+	assignmentType?: RvsAssignmentType
 	modifier?: string
 	units?: number
 }

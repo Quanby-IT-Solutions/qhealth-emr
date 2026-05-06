@@ -1,4 +1,4 @@
-import { type AnyPgColumn, index } from "drizzle-orm/pg-core"
+import { index, type AnyPgColumn } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
 import { encounters, patients } from "./core.js"
@@ -19,19 +19,14 @@ export const surgicalCases = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
 		patientId: t
 			.uuid("patient_id")
 			.notNull()
 			.references(() => patients.id, { onDelete: "restrict" }),
 		procedureName: t.text("procedure_name").notNull(),
 		orSuite: t.text("or_suite"),
-		surgicalType: t
-			.text("surgical_type")
-			.notNull()
-			.$type<"elective" | "emergency" | "urgent">(),
+		surgicalType: t.text("surgical_type").notNull().$type<"elective" | "emergency" | "urgent">(),
 		surgeonStaffId: t
 			.uuid("surgeon_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
@@ -78,9 +73,7 @@ export const operationRecords = createTable(
 		surgicalCaseId: t
 			.uuid("surgical_case_id")
 			.references(() => surgicalCases.id, { onDelete: "cascade" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
 		preOpDiagnosis: t.text("pre_op_diagnosis"),
 		postOpDiagnosis: t.text("post_op_diagnosis"),
 		procedurePerformed: t.text("procedure_performed"),
@@ -116,11 +109,7 @@ export const operationRecords = createTable(
 		instrumentCountCorrect: t.boolean("instrument_count_correct").notNull().default(false),
 		swabCountCorrect: t.boolean("swab_count_correct").notNull().default(false),
 		complications: t.text("complications"),
-		status: t
-			.text("status")
-			.notNull()
-			.default("draft")
-			.$type<"draft" | "signed">(),
+		status: t.text("status").notNull().default("draft").$type<"draft" | "signed">(),
 		signedAt: t.timestamp("signed_at"),
 		signedByStaffId: t
 			.uuid("signed_by_staff_id")
@@ -152,9 +141,7 @@ export const anesthesiaRecords = createTable(
 		operationRecordId: t
 			.uuid("operation_record_id")
 			.references(() => operationRecords.id, { onDelete: "cascade" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
 		asaClass: t
 			.text("asa_class")
 			.$type<"ASA I" | "ASA II" | "ASA III" | "ASA IV" | "ASA V" | "ASA VI">(),
@@ -178,26 +165,35 @@ export const anesthesiaRecords = createTable(
 		muscleRelaxants: t
 			.jsonb("muscle_relaxants")
 			.$type<Array<{ agent: string; dose: string; time?: string }>>(),
-		intraopVitals: t
-			.jsonb("intraop_vitals")
-			.$type<
-				Array<{
-					time: string
-					bp?: string
-					hr?: number
-					spo2?: number
-					etco2?: number
-					temp?: number
-				}>
-			>(),
-		fluidBalance: t
-			.jsonb("fluid_balance")
-			.$type<{
-				ivFluids?: Array<{ type: string; volumeMl: number }>
-				estimatedBloodLoss?: number
-				urineOutput?: number
-				otherOutput?: number
-			}>(),
+		intubationGrade: t
+			.text("intubation_grade")
+			.$type<"CL1" | "CL2" | "CL3" | "CL4" | "not_applicable">(),
+		difficultAirway: t.boolean("difficult_airway").default(false),
+		intraopVitals: t.jsonb("intraop_vitals").$type<
+			Array<{
+				time: string
+				bp?: string
+				hr?: number
+				spo2?: number
+				etco2?: number
+				temp?: number
+			}>
+		>(),
+		intraopMedications: t.jsonb("intraop_medications").$type<
+			Array<{
+				name: string
+				dose: string
+				route: string
+				time: string
+				indication?: string
+			}>
+		>(),
+		fluidBalance: t.jsonb("fluid_balance").$type<{
+			ivFluids?: Array<{ type: string; volumeMl: number }>
+			estimatedBloodLoss?: number
+			urineOutput?: number
+			otherOutput?: number
+		}>(),
 		reversalAgent: t.text("reversal_agent"),
 		totalAnesthesiaMinutes: t.integer("total_anesthesia_minutes"),
 		emergenceSmooth: t.boolean("emergence_smooth"),
@@ -206,12 +202,11 @@ export const anesthesiaRecords = createTable(
 		anesthesiologistStaffId: t
 			.uuid("anesthesiologist_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
-		status: t
-			.text("status")
-			.notNull()
-			.default("draft")
-			.$type<"draft" | "signed">(),
+		status: t.text("status").notNull().default("draft").$type<"draft" | "signed">(),
 		signedAt: t.timestamp("signed_at"),
+		signedByStaffId: t
+			.uuid("signed_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 	}),
@@ -241,8 +236,14 @@ export const surgicalRvsAssignments = createTable(
 		rvsCodeId: t
 			.uuid("rvs_code_id")
 			.references((): AnyPgColumn => rvsCodes.id, { onDelete: "set null" }),
+		procedureLabel: t.text("procedure_label"),
 		rvsCode: t.text("rvs_code"),
 		rvsDescription: t.text("rvs_description"),
+		assignmentType: t
+			.text("assignment_type")
+			.notNull()
+			.default("primary")
+			.$type<"primary" | "adjunct">(),
 		modifier: t.text("modifier"),
 		units: t.integer("units").notNull().default(1),
 		suggestedByStaffId: t
@@ -269,6 +270,7 @@ export const surgicalRvsAssignments = createTable(
 		index("surgical_rvs_assignments_facility_id_idx").on(t.facilityId),
 		index("surgical_rvs_assignments_surgical_case_id_idx").on(t.surgicalCaseId),
 		index("surgical_rvs_assignments_operation_record_id_idx").on(t.operationRecordId),
+		index("surgical_rvs_assignments_procedure_label_idx").on(t.procedureLabel),
 		index("surgical_rvs_assignments_status_idx").on(t.status),
 	]
 )
@@ -284,23 +286,19 @@ export const surgicalChecklists = createTable(
 		surgicalCaseId: t
 			.uuid("surgical_case_id")
 			.references(() => surgicalCases.id, { onDelete: "cascade" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
 		operationRecordId: t
 			.uuid("operation_record_id")
 			.references(() => operationRecords.id, { onDelete: "set null" }),
-		items: t
-			.jsonb("items")
-			.$type<
-				Array<{
-					key: string
-					label: string
-					checked: boolean
-					checkedAt: string | null
-					checkedByName: string | null
-				}>
-			>(),
+		items: t.jsonb("items").$type<
+			Array<{
+				key: string
+				label: string
+				checked: boolean
+				checkedAt: string | null
+				checkedByName: string | null
+			}>
+		>(),
 		allClear: t.boolean("all_clear").notNull().default(false),
 		npoStatus: t.boolean("npo_status"),
 		medsHeld: t

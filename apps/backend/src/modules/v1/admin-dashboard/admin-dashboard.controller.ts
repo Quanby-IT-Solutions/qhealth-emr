@@ -20,15 +20,16 @@ type RbacProfile = {
 function extractFacilityId(req: Request): string {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
 	const activeProfile =
-		profile?.staffProfiles?.find(p =>
-			p.roles.some(r => r.id === profile?.activeRole?.id)
-		) ?? profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
 	return activeProfile?.facilityId ?? ""
 }
 
 function extractCanViewFhir(req: Request): boolean {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
-	return profile?.activeRole?.permissions.some(p => p.module === "fhir" && p.action === "view") ?? false
+	return (
+		profile?.activeRole?.permissions.some(p => p.module === "fhir" && p.action === "view") ?? false
+	)
 }
 
 @Controller()

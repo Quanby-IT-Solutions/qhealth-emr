@@ -67,9 +67,7 @@ const actor = {
 	userAgent: null,
 }
 
-function makeRow(
-	overrides: Record<string, unknown> = {}
-): Record<string, unknown> {
+function makeRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
 	return {
 		id: TEST_INTEGRATION_ID,
 		facilityId: TEST_FACILITY_ID,
@@ -308,9 +306,7 @@ describe("IntegrationRegistryService", () => {
 					txTyped.select = jest.fn().mockReturnValue(mockSelectChain([currentRow]))
 					txTyped.update = jest.fn().mockReturnValue(mockUpdateChain(updatedRow))
 					// Invoke the transaction function body
-					const result = await (
-						db.transaction as jest.Mock
-					).mock.calls[0]?.[0]?.(txTyped)
+					const result = await (db.transaction as jest.Mock).mock.calls[0]?.[0]?.(txTyped)
 					return result
 				})
 			}
@@ -335,7 +331,11 @@ describe("IntegrationRegistryService", () => {
 				const call = mockAuditService.log.mock.calls[0]![0]
 				expect(call.action).toBe("update")
 				expect(call.entityType).toBe("integration")
-				const changes = call.metadata.changes as Array<{ path: string; before: unknown; after: unknown }>
+				const changes = call.metadata.changes as Array<{
+					path: string
+					before: unknown
+					after: unknown
+				}>
 				const nameChange = changes.find(c => c.path === "name")
 				expect(nameChange).toBeDefined()
 				expect(nameChange!.before).toBe("Old Name")
@@ -356,7 +356,11 @@ describe("IntegrationRegistryService", () => {
 					}
 				)
 
-				await service.update(TEST_FACILITY_ID, { id: TEST_INTEGRATION_ID, name: "Same Name" }, actor)
+				await service.update(
+					TEST_FACILITY_ID,
+					{ id: TEST_INTEGRATION_ID, name: "Same Name" },
+					actor
+				)
 
 				expect(mockAuditService.log).not.toHaveBeenCalled()
 			})
@@ -602,9 +606,9 @@ describe("IntegrationRegistryService", () => {
 					}
 				)
 
-				await expect(
-					service.delete(TEST_FACILITY_ID, TEST_INTEGRATION_ID, actor)
-				).rejects.toThrow(NotFoundException)
+				await expect(service.delete(TEST_FACILITY_ID, TEST_INTEGRATION_ID, actor)).rejects.toThrow(
+					NotFoundException
+				)
 			})
 		})
 	})
@@ -697,7 +701,9 @@ describe("IntegrationRegistryService", () => {
 		}
 
 		function mockGetRow(overrides: Record<string, unknown> = {}) {
-			;(db.select as jest.Mock).mockReturnValue(mockSelectChain([{ ...mockIntegrationRow, ...overrides }]))
+			;(db.select as jest.Mock).mockReturnValue(
+				mockSelectChain([{ ...mockIntegrationRow, ...overrides }])
+			)
 		}
 
 		function mockUpdateChainForTest() {
@@ -781,7 +787,11 @@ describe("IntegrationRegistryService", () => {
 
 		it("NHDR: probes /submissions path (not root URL) with X-API-Key header", async () => {
 			process.env.FHIR_API_KEY = "test-nhdr-token"
-			mockGetRow({ kind: "nhdr", credentialsRef: "FHIR_API_KEY", endpointUrl: "https://nhdr.gov.ph/fhir" })
+			mockGetRow({
+				kind: "nhdr",
+				credentialsRef: "FHIR_API_KEY",
+				endpointUrl: "https://nhdr.gov.ph/fhir",
+			})
 			mockUpdateChainForTest()
 			mockFetch([fakeResponse(200)])
 
@@ -963,7 +973,11 @@ describe("IntegrationRegistryService", () => {
 
 		it("PIDSR (credentialed): probes with X-API-Key header (not Bearer)", async () => {
 			process.env.PIDSR_API_KEY = "test-pidsr-token"
-			mockGetRow({ kind: "pidsr", credentialsRef: "PIDSR_API_KEY", endpointUrl: "https://pidsr.doh.gov.ph/api" })
+			mockGetRow({
+				kind: "pidsr",
+				credentialsRef: "PIDSR_API_KEY",
+				endpointUrl: "https://pidsr.doh.gov.ph/api",
+			})
 			mockUpdateChainForTest()
 			mockFetch([fakeResponse(200)])
 

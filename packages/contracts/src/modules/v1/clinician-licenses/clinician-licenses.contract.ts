@@ -19,12 +19,14 @@ export const clinicianLicensesContract = {
 			tags: ["Clinician Licenses"],
 		})
 		.input(ListCliniciansQuerySchema)
-		.output(z.object({
-			data: z.array(ClinicianWithLicensesSchema),
-			total: z.number().int(),
-			page: z.number().int(),
-			limit: z.number().int(),
-		})),
+		.output(
+			z.object({
+				data: z.array(ClinicianWithLicensesSchema),
+				total: z.number().int(),
+				page: z.number().int(),
+				limit: z.number().int(),
+			})
+		),
 
 	get: oc
 		.route({

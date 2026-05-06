@@ -41,7 +41,9 @@ export class MockPhilHealthProvider implements PhilHealthAdapter {
 		}
 	}
 
-	async submitClaim(input: PhilHealthClaimSubmissionInput): Promise<PhilHealthClaimSubmissionResult> {
+	async submitClaim(
+		input: PhilHealthClaimSubmissionInput
+	): Promise<PhilHealthClaimSubmissionResult> {
 		return {
 			provider: this.providerName,
 			success: true,

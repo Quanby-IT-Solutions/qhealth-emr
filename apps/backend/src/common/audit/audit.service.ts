@@ -4,7 +4,7 @@ import { auditLogs } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 
-export type DBTransaction = Parameters<Parameters<typeof db["transaction"]>[0]>[0]
+export type DBTransaction = Parameters<Parameters<(typeof db)["transaction"]>[0]>[0]
 
 export interface AuditLogEntry {
 	facilityId: string

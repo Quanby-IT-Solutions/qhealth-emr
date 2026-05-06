@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 
 import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Badge } from "@/core/components/ui/badge"
@@ -13,14 +14,9 @@ import { Skeleton } from "@/core/components/ui/skeleton"
 import { Textarea } from "@/core/components/ui/textarea"
 
 import { EncounterContextBar } from "@/features/billing/components/encounter-context-bar"
+import { orpc } from "@/services/orpc/client"
 import { formatConfidence } from "../lib/drg-confidence"
 import { useSuggestDrgMutation, useConfirmDrgMutation } from "../api/drg.hooks"
-
-const PLACEHOLDER_ICD10_CODES = [
-	{ code: "J18.9", description: "Pneumonia, unspecified organism" },
-	{ code: "J96.0", description: "Acute respiratory failure" },
-	{ code: "E11.9", description: "Type 2 diabetes mellitus without complications" },
-]
 
 interface DrgMappingPageProps {
 	encounterId: string
@@ -30,10 +26,14 @@ interface DrgMappingPageProps {
 
 export function DrgMappingPage({ encounterId, facilityId, patientId }: DrgMappingPageProps) {
 	void facilityId
-	void patientId
 	const router = useRouter()
 	const [selectedDrg, setSelectedDrg] = useState<string | null>(null)
 	const [overrideReason, setOverrideReason] = useState("")
+
+	const { data: problemsData, isLoading: problemsLoading } = useQuery(
+		orpc.problemsAllergies.listProblems.queryOptions({ input: { patientId } })
+	)
+	const icd10Codes = (problemsData?.data ?? []).filter(p => !!p.icd10Code).map(p => ({ code: p.icd10Code!, description: p.description ?? p.icd10Code! }))
 
 	const { mutate: suggestDrg, isPending: suggesting, data: suggestions, error: suggestError } = useSuggestDrgMutation()
 	const { mutate: confirmDrg, isPending: confirming } = useConfirmDrgMutation()
@@ -75,8 +75,12 @@ export function DrgMappingPage({ encounterId, facilityId, patientId }: DrgMappin
 					<CardHeader className="pb-2">
 						<CardTitle className="text-sm">ICD-10 Codes (Encounter)</CardTitle>
 					</CardHeader>
-					<CardContent className="space-y-2">
-						{PLACEHOLDER_ICD10_CODES.map(icd => (
+				<CardContent className="space-y-2">
+					{problemsLoading && <Skeleton className="h-16 w-full" />}
+					{!problemsLoading && icd10Codes.length === 0 && (
+						<p className="text-sm text-muted-foreground">No ICD-10 codes on problem list.</p>
+					)}
+					{icd10Codes.map(icd => (
 							<div key={icd.code} className="flex gap-2 text-sm">
 								<span className="font-mono font-semibold">{icd.code}</span>
 								<span className="text-muted-foreground">{icd.description}</span>

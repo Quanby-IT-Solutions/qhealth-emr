@@ -19,33 +19,27 @@ export class SchedulingController {
 	@RequirePermission("scheduling", "view")
 	@Implement(v1.scheduling.listClinicTemplates)
 	async listClinicTemplates() {
-		return implement(v1.scheduling.listClinicTemplates).handler(
-			async ({ input }) => {
-				return this.schedulingService.listClinicTemplates(input)
-			}
-		)
+		return implement(v1.scheduling.listClinicTemplates).handler(async ({ input }) => {
+			return this.schedulingService.listClinicTemplates(input)
+		})
 	}
 
 	@RequirePermission("scheduling", "create")
 	@Implement(v1.scheduling.createClinicTemplate)
 	async createClinicTemplate(@Session() session: UserSession) {
-		return implement(v1.scheduling.createClinicTemplate).handler(
-			async ({ input }) => {
-				void session
-				return this.schedulingService.createClinicTemplate(input)
-			}
-		)
+		return implement(v1.scheduling.createClinicTemplate).handler(async ({ input }) => {
+			void session
+			return this.schedulingService.createClinicTemplate(input)
+		})
 	}
 
 	@RequirePermission("scheduling", "edit")
 	@Implement(v1.scheduling.updateClinicTemplate)
 	async updateClinicTemplate(@Session() session: UserSession) {
-		return implement(v1.scheduling.updateClinicTemplate).handler(
-			async ({ input }) => {
-				void session
-				return this.schedulingService.updateClinicTemplate(input)
-			}
-		)
+		return implement(v1.scheduling.updateClinicTemplate).handler(async ({ input }) => {
+			void session
+			return this.schedulingService.updateClinicTemplate(input)
+		})
 	}
 
 	// ========================================================================
@@ -55,53 +49,43 @@ export class SchedulingController {
 	@RequirePermission("scheduling", "view")
 	@Implement(v1.scheduling.listAppointments)
 	async listAppointments() {
-		return implement(v1.scheduling.listAppointments).handler(
-			async ({ input }) => {
-				return this.schedulingService.listAppointments(input)
-			}
-		)
+		return implement(v1.scheduling.listAppointments).handler(async ({ input }) => {
+			return this.schedulingService.listAppointments(input)
+		})
 	}
 
 	@RequirePermission("scheduling", "view")
 	@Implement(v1.scheduling.getAppointment)
 	async getAppointment() {
-		return implement(v1.scheduling.getAppointment).handler(
-			async ({ input }) => {
-				return this.schedulingService.getAppointment(input.id)
-			}
-		)
+		return implement(v1.scheduling.getAppointment).handler(async ({ input }) => {
+			return this.schedulingService.getAppointment(input.id)
+		})
 	}
 
 	@RequirePermission("scheduling", "create")
 	@Implement(v1.scheduling.createAppointment)
 	async createAppointment(@Session() session: UserSession) {
-		return implement(v1.scheduling.createAppointment).handler(
-			async ({ input }) => {
-				return this.schedulingService.createAppointment(input, session)
-			}
-		)
+		return implement(v1.scheduling.createAppointment).handler(async ({ input }) => {
+			return this.schedulingService.createAppointment(input, session)
+		})
 	}
 
 	@RequirePermission("scheduling", "create")
 	@Implement(v1.scheduling.checkInAppointment)
 	async checkInAppointment(@Session() session: UserSession) {
-		return implement(v1.scheduling.checkInAppointment).handler(
-			async ({ input }) => {
-				void session
-				return this.schedulingService.checkInAppointment(input)
-			}
-		)
+		return implement(v1.scheduling.checkInAppointment).handler(async ({ input }) => {
+			void session
+			return this.schedulingService.checkInAppointment(input)
+		})
 	}
 
 	@RequirePermission("scheduling", "edit")
 	@Implement(v1.scheduling.updateAppointmentStatus)
 	async updateAppointmentStatus(@Session() session: UserSession) {
-		return implement(v1.scheduling.updateAppointmentStatus).handler(
-			async ({ input }) => {
-				void session
-				return this.schedulingService.updateAppointmentStatus(input)
-			}
-		)
+		return implement(v1.scheduling.updateAppointmentStatus).handler(async ({ input }) => {
+			void session
+			return this.schedulingService.updateAppointmentStatus(input)
+		})
 	}
 
 	// ========================================================================
@@ -111,21 +95,17 @@ export class SchedulingController {
 	@RequirePermission("scheduling", "view")
 	@Implement(v1.scheduling.getAvailableSlots)
 	async getAvailableSlots() {
-		return implement(v1.scheduling.getAvailableSlots).handler(
-			async ({ input }) => {
-				return this.schedulingService.getAvailableSlots(input)
-			}
-		)
+		return implement(v1.scheduling.getAvailableSlots).handler(async ({ input }) => {
+			return this.schedulingService.getAvailableSlots(input)
+		})
 	}
 
 	@RequirePermission("scheduling", "view")
 	@Implement(v1.scheduling.getClinicQueue)
 	async getClinicQueue() {
-		return implement(v1.scheduling.getClinicQueue).handler(
-			async ({ input }) => {
-				return this.schedulingService.getClinicQueue(input)
-			}
-		)
+		return implement(v1.scheduling.getClinicQueue).handler(async ({ input }) => {
+			return this.schedulingService.getClinicQueue(input)
+		})
 	}
 
 	// PS-003: Update walk-in encounter queue status
@@ -133,10 +113,8 @@ export class SchedulingController {
 	@RequirePermission("scheduling", "edit")
 	@Implement(v1.scheduling.updateEncounterQueueStatus)
 	async updateEncounterQueueStatus() {
-		return implement(v1.scheduling.updateEncounterQueueStatus).handler(
-			async ({ input }) => {
-				return this.schedulingService.updateEncounterQueueStatus(input)
-			}
-		)
+		return implement(v1.scheduling.updateEncounterQueueStatus).handler(async ({ input }) => {
+			return this.schedulingService.updateEncounterQueueStatus(input)
+		})
 	}
 }

@@ -7,8 +7,12 @@ export const DepartmentSchema = z.object({
 	code: z.string().nullable(),
 	description: z.string().nullable(),
 	isActive: z.boolean(),
-	createdAt: z.union([z.date(), z.string()]).transform(v => (typeof v === "string" ? new Date(v) : v)),
-	updatedAt: z.union([z.date(), z.string()]).transform(v => (typeof v === "string" ? new Date(v) : v)),
+	createdAt: z
+		.union([z.date(), z.string()])
+		.transform(v => (typeof v === "string" ? new Date(v) : v)),
+	updatedAt: z
+		.union([z.date(), z.string()])
+		.transform(v => (typeof v === "string" ? new Date(v) : v)),
 })
 
 export type Department = z.infer<typeof DepartmentSchema>

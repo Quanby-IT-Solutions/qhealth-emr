@@ -4,19 +4,20 @@ import { and, eq, sql } from "drizzle-orm"
 
 import { createDBClient } from "./client.js"
 import {
-	allergies,
 	ahsrSnapshots,
+	allergies,
 	auditLogs,
 	beds,
 	breakGlassEvents,
 	chargeMasterItems,
 	charges,
 	clinicalNotes,
+	consentRecords,
 	drugBrands,
 	drugGenerics,
 	encounters,
-	facilityProfiles,
 	facilities,
+	facilityProfiles,
 	featureFlags,
 	featureFlagTargets,
 	flowsheetEntries,
@@ -30,9 +31,8 @@ import {
 	labOrders,
 	marEntries,
 	medicationOrders,
-	noteTemplates,
 	nbsLogEntries,
-	consentRecords,
+	noteTemplates,
 	patients,
 	payments,
 	pidsrCases,
@@ -62,8 +62,9 @@ if (!DATABASE_URL) {
 }
 
 const db = createDBClient(DATABASE_URL)
-let authModulePromise: Promise<{ getAuth: () => { api: { signUpEmail: (input: { body: unknown }) => Promise<unknown> } } }> | null =
-	null
+let authModulePromise: Promise<{
+	getAuth: () => { api: { signUpEmail: (input: { body: unknown }) => Promise<unknown> } }
+}> | null = null
 
 async function assertSeedSchemaReady() {
 	const result = await db.execute(
@@ -94,6 +95,15 @@ type ModuleName =
 	| "orders"
 	| "nursing"
 	| "billing"
+	| "billing.charges"
+	| "billing.invoices"
+	| "billing.payments"
+	| "billing.cf4"
+	| "billing.drg"
+	| "billing.cf5"
+	| "billing.esoa"
+	| "billing.cews"
+	| "billing.konsulta"
 	| "formulary"
 	| "reporting"
 	| "audit"
@@ -117,9 +127,13 @@ type ModuleName =
 	| "fhir"
 	| "civil_registry"
 	| "medical_records"
+	| "him.deficiencies"
+	| "him.coding"
+	| "him.records"
+	| "him.hai"
 	| "notifications"
 
-type ActionName = "view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "manage_catalog" | "clinical_policy" | "terminology_admin"
+type ActionName = "view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "manage_catalog" | "clinical_policy" | "terminology_admin" | "read" | "write"
 
 interface DemoUser {
 	email: string
@@ -290,7 +304,7 @@ const demoUsers: DemoUser[] = [
 const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 	// TOR: System Admin manages configuration, users, roles, and feature flags.
 	// Has NO clinical write access (no create/edit/sign/verify/delete on clinical modules).
-	Administrator: [
+	"Administrator": [
 		["admin", ["view", "create", "edit", "delete", "export"]], // User/role management
 		["feature_flags", ["view", "create", "edit", "delete"]], // Feature flag management
 		["system_settings", ["view", "create", "edit"]], // System configuration
@@ -301,7 +315,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["fhir", ["view", "export"]], // FHIR export management
 		["notifications", ["view"]], // All staff receive system notifications
 	],
-	Physician: [
+	"Physician": [
 		// Physicians view patients and create encounters, but don't manage scheduling/beds (Registrar's job)
 		["adt", ["view", "create"]],
 		["patients", ["view"]], // Patient record access (search, profile)
@@ -318,7 +332,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["audit", ["create"]], // Break-glass emergency access invocation
 		["notifications", ["view"]], // All staff receive system notifications
 	],
-	Nurse: [
+	"Nurse": [
 		["adt", ["view", "edit"]], // edit for bed management access
 		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view"]],
@@ -330,7 +344,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["opd", ["view"]], // TOR: Nurses participate in OPD triage and vital-sign capture
 		["notifications", ["view"]], // All staff receive system notifications
 	],
-	Pharmacist: [
+	"Pharmacist": [
 		["orders", ["view", "edit", "verify"]],
 		["formulary", ["view", "create", "edit", "manage_catalog", "clinical_policy"]], // manage_catalog: drug generic/brand catalog master-data authoring
 		["clinical_docs", ["view"]],
@@ -340,7 +354,16 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 	"Billing Officer": [
 		["adt", ["view"]],
 		["patients", ["view"]], // Patient record access for billing reconciliation
-		["billing", ["view", "create", "edit", "export"]],
+		["billing", ["view", "create", "edit", "export"]], // Legacy fallback for shell-level access
+		["billing.charges", ["read", "write"]],
+		["billing.invoices", ["read", "write"]],
+		["billing.payments", ["read", "write"]],
+		["billing.cf4", ["read", "write"]],
+		["billing.drg", ["read", "write"]],
+		["billing.cf5", ["read", "write"]],
+		["billing.esoa", ["read", "write"]],
+		["billing.cews", ["read", "write"]],
+		["billing.konsulta", ["read", "write"]],
 		["clinical_docs", ["view"]],
 		["reporting", ["view", "export"]],
 		["notifications", ["view"]], // All staff receive system notifications
@@ -351,7 +374,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["reporting", ["view", "create", "edit", "verify", "export"]],
 		["notifications", ["view"]], // All staff receive system notifications
 	],
-	Registrar: [
+	"Registrar": [
 		["adt", ["view", "create", "edit"]],
 		["patients", ["view", "create", "edit"]], // TOR: Registrar views, creates and updates patient records
 		["opd", ["view"]], // OPD dashboard access for patient routing
@@ -369,24 +392,24 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["opd", ["view"]], // TOR: Triage Officers staff the OPD triage desk
 		["notifications", ["view"]], // All staff receive system notifications
 	],
-	Surgeon: [
+	"Surgeon": [
 		["adt", ["view"]],
 		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
 		["orders", ["view", "create", "sign"]],
-		["surgical", ["view", "create", "edit"]], // Surgical tab visibility + create/save operation/anesthesia records
+		["surgical", ["view", "create", "edit", "sign"]], // Surgical tab visibility + create/save/sign operation records for OR workflows
 		["formulary", ["view"]],
 		["opd", ["view"]], // OPD dashboard access (per TOR)
 		["death_reporting", ["view", "create", "edit"]], // Surgeon may author FMDRF/FNDRF for surgical cases
 		["audit", ["create"]], // Break-glass emergency access invocation
 		["notifications", ["view"]], // All staff receive system notifications
 	],
-	Anesthesiologist: [
+	"Anesthesiologist": [
 		["adt", ["view"]],
 		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
-		["orders", ["view", "create"]],
-		["surgical", ["view", "edit"]], // Surgical tab visibility + save anesthesia records
+		["orders", ["view", "create", "sign"]], // TOR: anesthesiologists place/sign orders and compliant e-prescriptions
+		["surgical", ["view", "edit", "sign"]], // Surgical tab visibility + save/sign anesthesia records
 		["formulary", ["view"]],
 		["audit", ["create"]], // Break-glass emergency access invocation
 		["notifications", ["view"]], // All staff receive system notifications
@@ -398,7 +421,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["laboratory", ["view", "edit"]],
 		["notifications", ["view"]], // All staff receive system notifications
 	],
-	Radiologist: [
+	"Radiologist": [
 		["adt", ["view"]],
 		["patients", ["view"]], // Patient record access for imaging lookup
 		["radiology", ["view", "edit"]],
@@ -417,6 +440,10 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["clinical_docs", ["view", "edit"]],
 		["reporting", ["view"]], // HAI tracking and report access
 		["medical_records", ["view", "create", "edit"]], // TOR: HIM manages medical records release and chart completion
+		["him.deficiencies", ["read", "write"]], // HIM: chart deficiency worklist
+		["him.coding", ["read", "write"]], // HIM: ICD-10 coding
+		["him.records", ["read", "write"]], // HIM: medical records issuance
+		["him.hai", ["read", "write"]], // HIM: HAI reconciliation
 		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Medical Social Worker": [
@@ -435,13 +462,13 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["clinical_docs", ["view"]],
 		["notifications", ["view"]], // All staff receive system notifications
 	],
-	Scheduler: [
+	"Scheduler": [
 		["adt", ["view", "create"]],
 		["patients", ["view"]], // Patient record access for appointment scheduling
 		["scheduling", ["view", "create", "edit"]],
 		["notifications", ["view"]], // All staff receive system notifications
 	],
-	Auditor: [
+	"Auditor": [
 		["adt", ["view"]],
 		["patients", ["view"]], // TOR: Auditor/Privacy Officer has read-all access
 		["clinical_docs", ["view"]], // TOR: clinical documentation audit
@@ -474,7 +501,9 @@ async function postAuth(path: string, data: unknown) {
 	if (!AUTH_API) {
 		process.env.BETTER_AUTH_SECRET ??= "seed-dev-secret-not-for-production"
 		process.env.BETTER_AUTH_TRUSTED_ORIGINS ??= `${WEB_ORIGIN},http://localhost:3000`
-		authModulePromise ??= import(new URL("../../auth/src/index.ts", import.meta.url).href) as Promise<{
+		authModulePromise ??= import(
+			new URL("../../auth/src/index.ts", import.meta.url).href
+		) as Promise<{
 			getAuth: () => { api: { signUpEmail: (input: { body: unknown }) => Promise<unknown> } }
 		}>
 		const { getAuth } = await authModulePromise
@@ -486,7 +515,7 @@ async function postAuth(path: string, data: unknown) {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
-			Origin: WEB_ORIGIN,
+			"Origin": WEB_ORIGIN,
 		},
 		body: JSON.stringify(data),
 	})
@@ -515,7 +544,10 @@ async function ensureAuthUser(user: DemoUser) {
 }
 
 async function ensureFacility() {
-	const [existing] = await db.select().from(facilities).where(eq(facilities.name, "QHealth Community Hospital"))
+	const [existing] = await db
+		.select()
+		.from(facilities)
+		.where(eq(facilities.name, "QHealth Community Hospital"))
 	if (existing) return existing
 	const [created] = await db
 		.insert(facilities)
@@ -550,7 +582,7 @@ async function ensureRole(facilityId: string, roleName: string) {
 
 async function ensureRolePermissions(roleId: string, roleName: string) {
 	const bundles = roleBundles[roleName] ?? []
-	
+
 	// Build set of expected permissions
 	const expectedPerms = new Set<string>()
 	for (const [moduleName, actions] of bundles) {
@@ -558,13 +590,13 @@ async function ensureRolePermissions(roleId: string, roleName: string) {
 			expectedPerms.add(`${moduleName}:${action}`)
 		}
 	}
-	
+
 	// Get current permissions for this role
 	const currentPerms = await db
 		.select()
 		.from(rolePermissions)
 		.where(eq(rolePermissions.roleId, roleId))
-	
+
 	// Delete permissions that shouldn't exist
 	for (const perm of currentPerms) {
 		const key = `${perm.module}:${perm.action}`
@@ -580,7 +612,7 @@ async function ensureRolePermissions(roleId: string, roleName: string) {
 				)
 		}
 	}
-	
+
 	// Add missing permissions
 	for (const [moduleName, actions] of bundles) {
 		for (const action of actions) {
@@ -627,13 +659,21 @@ async function ensureUserRole(staffProfileId: string, roleId: string) {
 	}
 }
 
-async function ensureWard(facilityId: string, name: string, wardType: "general" | "icu" | "er" | "or" | "nursery", totalBeds: number) {
+async function ensureWard(
+	facilityId: string,
+	name: string,
+	wardType: "general" | "icu" | "er" | "or" | "nursery",
+	totalBeds: number
+) {
 	const [existing] = await db
 		.select()
 		.from(wards)
 		.where(and(eq(wards.facilityId, facilityId), eq(wards.name, name)))
 	if (existing) return existing
-	const [created] = await db.insert(wards).values({ facilityId, name, wardType, totalBeds, isActive: true }).returning()
+	const [created] = await db
+		.insert(wards)
+		.values({ facilityId, name, wardType, totalBeds, isActive: true })
+		.returning()
 	return created!
 }
 
@@ -650,7 +690,14 @@ async function ensureBed(facilityId: string, wardId: string, bedNumber: string) 
 	return created!
 }
 
-async function ensurePatient(facilityId: string, mrn: string, firstName: string, lastName: string, dateOfBirth: string, sex: "male" | "female" | "other") {
+async function ensurePatient(
+	facilityId: string,
+	mrn: string,
+	firstName: string,
+	lastName: string,
+	dateOfBirth: string,
+	sex: "male" | "female" | "other"
+) {
 	const [existing] = await db
 		.select()
 		.from(patients)
@@ -679,7 +726,14 @@ async function ensurePatient(facilityId: string, mrn: string, firstName: string,
 
 // Like ensurePatient but always updates dateOfBirth so the NBS tab (< 30-day rule)
 // stays active on every seed run.
-async function ensureNewbornPatient(facilityId: string, mrn: string, firstName: string, lastName: string, dateOfBirth: string, sex: "male" | "female" | "other") {
+async function ensureNewbornPatient(
+	facilityId: string,
+	mrn: string,
+	firstName: string,
+	lastName: string,
+	dateOfBirth: string,
+	sex: "male" | "female" | "other"
+) {
 	const [existing] = await db
 		.select()
 		.from(patients)
@@ -718,7 +772,9 @@ async function ensurePreEncounter(facilityId: string, traumaAlias: string, triag
 	const [existing] = await db
 		.select()
 		.from(preEncounters)
-		.where(and(eq(preEncounters.facilityId, facilityId), eq(preEncounters.traumaAlias, traumaAlias)))
+		.where(
+			and(eq(preEncounters.facilityId, facilityId), eq(preEncounters.traumaAlias, traumaAlias))
+		)
 	if (existing) return existing
 	const [created] = await db
 		.insert(preEncounters)
@@ -736,7 +792,14 @@ async function ensurePreEncounter(facilityId: string, traumaAlias: string, triag
 	return created!
 }
 
-async function ensureEncounter(facilityId: string, patientId: string, attendingStaffId: string, bedId: string | null, encounterType: "inpatient" | "outpatient" | "emergency", chiefComplaint: string) {
+async function ensureEncounter(
+	facilityId: string,
+	patientId: string,
+	attendingStaffId: string,
+	bedId: string | null,
+	encounterType: "inpatient" | "outpatient" | "emergency",
+	chiefComplaint: string
+) {
 	const [existing] = await db
 		.select()
 		.from(encounters)
@@ -767,9 +830,15 @@ async function ensureEncounter(facilityId: string, patientId: string, attendingS
 }
 
 async function ensureReferenceData(facilityId: string) {
-	let [generic] = await db.select().from(drugGenerics).where(eq(drugGenerics.genericName, "Paracetamol"))
+	let [generic] = await db
+		.select()
+		.from(drugGenerics)
+		.where(eq(drugGenerics.genericName, "Paracetamol"))
 	if (!generic) {
-		;[generic] = await db.insert(drugGenerics).values({ genericName: "Paracetamol", rxnormCode: "161", atcCode: "N02BE01" }).returning()
+		;[generic] = await db
+			.insert(drugGenerics)
+			.values({ genericName: "Paracetamol", rxnormCode: "161", atcCode: "N02BE01" })
+			.returning()
 	}
 
 	let [brand] = await db
@@ -777,13 +846,22 @@ async function ensureReferenceData(facilityId: string) {
 		.from(drugBrands)
 		.where(and(eq(drugBrands.drugGenericId, generic!.id), eq(drugBrands.brandName, "Biogesic")))
 	if (!brand) {
-		;[brand] = await db.insert(drugBrands).values({ drugGenericId: generic!.id, brandName: "Biogesic", manufacturer: "Unilab" }).returning()
+		;[brand] = await db
+			.insert(drugBrands)
+			.values({ drugGenericId: generic!.id, brandName: "Biogesic", manufacturer: "Unilab" })
+			.returning()
 	}
 
 	let [formulary] = await db
 		.select()
 		.from(formularyItems)
-		.where(and(eq(formularyItems.facilityId, facilityId), eq(formularyItems.drugGenericId, generic!.id), eq(formularyItems.strength, "500 mg")))
+		.where(
+			and(
+				eq(formularyItems.facilityId, facilityId),
+				eq(formularyItems.drugGenericId, generic!.id),
+				eq(formularyItems.strength, "500 mg")
+			)
+		)
 	if (!formulary) {
 		;[formulary] = await db
 			.insert(formularyItems)
@@ -802,7 +880,12 @@ async function ensureReferenceData(facilityId: string) {
 	let [chargeItem] = await db
 		.select()
 		.from(chargeMasterItems)
-		.where(and(eq(chargeMasterItems.facilityId, facilityId), eq(chargeMasterItems.itemCode, "ER-CONSULT")))
+		.where(
+			and(
+				eq(chargeMasterItems.facilityId, facilityId),
+				eq(chargeMasterItems.itemCode, "ER-CONSULT")
+			)
+		)
 	if (!chargeItem) {
 		;[chargeItem] = await db
 			.insert(chargeMasterItems)
@@ -829,7 +912,12 @@ async function ensureClinicalData(params: {
 	let [template] = await db
 		.select()
 		.from(noteTemplates)
-		.where(and(eq(noteTemplates.facilityId, params.facilityId), eq(noteTemplates.name, "General Progress Note")))
+		.where(
+			and(
+				eq(noteTemplates.facilityId, params.facilityId),
+				eq(noteTemplates.name, "General Progress Note")
+			)
+		)
 	if (!template) {
 		;[template] = await db
 			.insert(noteTemplates)
@@ -848,24 +936,29 @@ async function ensureClinicalData(params: {
 	const [consultTemplate] = await db
 		.select()
 		.from(noteTemplates)
-		.where(and(eq(noteTemplates.facilityId, params.facilityId), eq(noteTemplates.name, "Outpatient Consultation (SOAP)")))
+		.where(
+			and(
+				eq(noteTemplates.facilityId, params.facilityId),
+				eq(noteTemplates.name, "Outpatient Consultation (SOAP)")
+			)
+		)
 	if (!consultTemplate) {
-		await db
-			.insert(noteTemplates)
-			.values({
-				facilityId: params.facilityId,
-				name: "Outpatient Consultation (SOAP)",
-				category: "consultation",
-				sections: ["Subjective", "Objective", "Assessment", "Plan"],
-				isActive: true,
-				createdByStaffId: params.staffId,
-			})
+		await db.insert(noteTemplates).values({
+			facilityId: params.facilityId,
+			name: "Outpatient Consultation (SOAP)",
+			category: "consultation",
+			sections: ["Subjective", "Objective", "Assessment", "Plan"],
+			isActive: true,
+			createdByStaffId: params.staffId,
+		})
 	}
 
 	const [note] = await db
 		.select()
 		.from(clinicalNotes)
-		.where(and(eq(clinicalNotes.encounterId, params.encounterId), eq(clinicalNotes.noteType, "progress")))
+		.where(
+			and(eq(clinicalNotes.encounterId, params.encounterId), eq(clinicalNotes.noteType, "progress"))
+		)
 	if (!note) {
 		await db.insert(clinicalNotes).values({
 			facilityId: params.facilityId,
@@ -882,7 +975,12 @@ async function ensureClinicalData(params: {
 	const [problem] = await db
 		.select()
 		.from(problems)
-		.where(and(eq(problems.patientId, params.patientId), eq(problems.description, "Community acquired pneumonia")))
+		.where(
+			and(
+				eq(problems.patientId, params.patientId),
+				eq(problems.description, "Community acquired pneumonia")
+			)
+		)
 	if (!problem) {
 		await db.insert(problems).values({
 			facilityId: params.facilityId,
@@ -926,7 +1024,10 @@ async function ensureNursingAndOrders(params: {
 	billingStaffId: string
 	reportingStaffId: string
 }) {
-	const [vitalsForEncounter] = await db.select().from(vitalSigns).where(eq(vitalSigns.encounterId, params.encounterId))
+	const [vitalsForEncounter] = await db
+		.select()
+		.from(vitalSigns)
+		.where(eq(vitalSigns.encounterId, params.encounterId))
 	if (!vitalsForEncounter) {
 		await db.insert(vitalSigns).values({
 			facilityId: params.facilityId,
@@ -944,7 +1045,10 @@ async function ensureNursingAndOrders(params: {
 		})
 	}
 
-	const [vitalsForPreEncounter] = await db.select().from(vitalSigns).where(eq(vitalSigns.preEncounterId, params.preEncounterId))
+	const [vitalsForPreEncounter] = await db
+		.select()
+		.from(vitalSigns)
+		.where(eq(vitalSigns.preEncounterId, params.preEncounterId))
 	if (!vitalsForPreEncounter) {
 		await db.insert(vitalSigns).values({
 			facilityId: params.facilityId,
@@ -965,7 +1069,12 @@ async function ensureNursingAndOrders(params: {
 	let [medOrder] = await db
 		.select()
 		.from(medicationOrders)
-		.where(and(eq(medicationOrders.encounterId, params.encounterId), eq(medicationOrders.genericName, "Paracetamol")))
+		.where(
+			and(
+				eq(medicationOrders.encounterId, params.encounterId),
+				eq(medicationOrders.genericName, "Paracetamol")
+			)
+		)
 	if (!medOrder) {
 		;[medOrder] = await db
 			.insert(medicationOrders)
@@ -988,7 +1097,15 @@ async function ensureNursingAndOrders(params: {
 			.returning()
 	}
 
-	const [lab] = await db.select().from(labOrders).where(and(eq(labOrders.encounterId, params.encounterId), eq(labOrders.testName, "Complete Blood Count")))
+	const [lab] = await db
+		.select()
+		.from(labOrders)
+		.where(
+			and(
+				eq(labOrders.encounterId, params.encounterId),
+				eq(labOrders.testName, "Complete Blood Count")
+			)
+		)
 	if (!lab) {
 		await db.insert(labOrders).values({
 			facilityId: params.facilityId,
@@ -1002,7 +1119,12 @@ async function ensureNursingAndOrders(params: {
 		})
 	}
 
-	const [imaging] = await db.select().from(imagingOrders).where(and(eq(imagingOrders.encounterId, params.encounterId), eq(imagingOrders.bodyPart, "Chest")))
+	const [imaging] = await db
+		.select()
+		.from(imagingOrders)
+		.where(
+			and(eq(imagingOrders.encounterId, params.encounterId), eq(imagingOrders.bodyPart, "Chest"))
+		)
 	if (!imaging) {
 		await db.insert(imagingOrders).values({
 			facilityId: params.facilityId,
@@ -1016,7 +1138,15 @@ async function ensureNursingAndOrders(params: {
 		})
 	}
 
-	const [mar] = await db.select().from(marEntries).where(and(eq(marEntries.encounterId, params.encounterId), eq(marEntries.medicationOrderId, medOrder!.id)))
+	const [mar] = await db
+		.select()
+		.from(marEntries)
+		.where(
+			and(
+				eq(marEntries.encounterId, params.encounterId),
+				eq(marEntries.medicationOrderId, medOrder!.id)
+			)
+		)
 	if (!mar) {
 		await db.insert(marEntries).values({
 			facilityId: params.facilityId,
@@ -1032,7 +1162,15 @@ async function ensureNursingAndOrders(params: {
 		})
 	}
 
-	const [tar] = await db.select().from(tarEntries).where(and(eq(tarEntries.encounterId, params.encounterId), eq(tarEntries.treatmentDescription, "Nebulization treatment")))
+	const [tar] = await db
+		.select()
+		.from(tarEntries)
+		.where(
+			and(
+				eq(tarEntries.encounterId, params.encounterId),
+				eq(tarEntries.treatmentDescription, "Nebulization treatment")
+			)
+		)
 	if (!tar) {
 		await db.insert(tarEntries).values({
 			facilityId: params.facilityId,
@@ -1046,7 +1184,12 @@ async function ensureNursingAndOrders(params: {
 		})
 	}
 
-	const [io] = await db.select().from(ioEntries).where(and(eq(ioEntries.encounterId, params.encounterId), eq(ioEntries.description, "Oral fluids")))
+	const [io] = await db
+		.select()
+		.from(ioEntries)
+		.where(
+			and(eq(ioEntries.encounterId, params.encounterId), eq(ioEntries.description, "Oral fluids"))
+		)
 	if (!io) {
 		await db.insert(ioEntries).values({
 			facilityId: params.facilityId,
@@ -1059,7 +1202,15 @@ async function ensureNursingAndOrders(params: {
 		})
 	}
 
-	let [charge] = await db.select().from(charges).where(and(eq(charges.encounterId, params.encounterId), eq(charges.description, "Emergency Room Consultation")))
+	let [charge] = await db
+		.select()
+		.from(charges)
+		.where(
+			and(
+				eq(charges.encounterId, params.encounterId),
+				eq(charges.description, "Emergency Room Consultation")
+			)
+		)
 	if (!charge) {
 		;[charge] = await db
 			.insert(charges)
@@ -1077,7 +1228,12 @@ async function ensureNursingAndOrders(params: {
 			.returning()
 	}
 
-	let [invoice] = await db.select().from(invoices).where(and(eq(invoices.encounterId, params.encounterId), eq(invoices.invoiceNumber, "INV-0001")))
+	let [invoice] = await db
+		.select()
+		.from(invoices)
+		.where(
+			and(eq(invoices.encounterId, params.encounterId), eq(invoices.invoiceNumber, "INV-0001"))
+		)
 	if (!invoice) {
 		;[invoice] = await db
 			.insert(invoices)
@@ -1096,7 +1252,10 @@ async function ensureNursingAndOrders(params: {
 			.returning()
 	}
 
-	const [lineItem] = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, invoice!.id))
+	const [lineItem] = await db
+		.select()
+		.from(invoiceLineItems)
+		.where(eq(invoiceLineItems.invoiceId, invoice!.id))
 	if (!lineItem) {
 		await db.insert(invoiceLineItems).values({
 			invoiceId: invoice!.id,
@@ -1121,7 +1280,10 @@ async function ensureNursingAndOrders(params: {
 		})
 	}
 
-	const [pidsr] = await db.select().from(pidsrCases).where(and(eq(pidsrCases.patientId, params.patientId), eq(pidsrCases.diseaseCode, "A90")))
+	const [pidsr] = await db
+		.select()
+		.from(pidsrCases)
+		.where(and(eq(pidsrCases.patientId, params.patientId), eq(pidsrCases.diseaseCode, "A90")))
 	if (!pidsr) {
 		await db.insert(pidsrCases).values({
 			facilityId: params.facilityId,
@@ -1136,8 +1298,19 @@ async function ensureNursingAndOrders(params: {
 		})
 	}
 
-	const [noteForFlag] = await db.select().from(clinicalNotes).where(eq(clinicalNotes.encounterId, params.encounterId))
-	const [flag] = await db.select().from(surveillanceFlags).where(and(eq(surveillanceFlags.encounterId, params.encounterId), eq(surveillanceFlags.flagType, "dengue_watch")))
+	const [noteForFlag] = await db
+		.select()
+		.from(clinicalNotes)
+		.where(eq(clinicalNotes.encounterId, params.encounterId))
+	const [flag] = await db
+		.select()
+		.from(surveillanceFlags)
+		.where(
+			and(
+				eq(surveillanceFlags.encounterId, params.encounterId),
+				eq(surveillanceFlags.flagType, "dengue_watch")
+			)
+		)
 	if (!flag) {
 		await db.insert(surveillanceFlags).values({
 			facilityId: params.facilityId,
@@ -1150,7 +1323,16 @@ async function ensureNursingAndOrders(params: {
 		})
 	}
 
-	const [snapshot] = await db.select().from(ahsrSnapshots).where(and(eq(ahsrSnapshots.facilityId, params.facilityId), eq(ahsrSnapshots.reportYear, 2026), eq(ahsrSnapshots.reportMonth, 4)))
+	const [snapshot] = await db
+		.select()
+		.from(ahsrSnapshots)
+		.where(
+			and(
+				eq(ahsrSnapshots.facilityId, params.facilityId),
+				eq(ahsrSnapshots.reportYear, 2026),
+				eq(ahsrSnapshots.reportMonth, 4)
+			)
+		)
 	if (!snapshot) {
 		await db.insert(ahsrSnapshots).values({
 			facilityId: params.facilityId,
@@ -1246,10 +1428,7 @@ async function seedAdminScenarios(params: {
 		},
 	]
 	for (const def of flagDefs) {
-		const [existing] = await db
-			.select()
-			.from(featureFlags)
-			.where(eq(featureFlags.key, def.key))
+		const [existing] = await db.select().from(featureFlags).where(eq(featureFlags.key, def.key))
 		if (!existing) {
 			await db.insert(featureFlags).values(def)
 		}
@@ -1373,7 +1552,16 @@ async function ensureNursingScenarios(params: {
 	doctorStaffId: string
 	paracetamolFormulaId: string
 }) {
-	const { facilityId, erEncounterId, inpatientEncounterId, erPatientId, inpatientPatientId, nurseStaffId, doctorStaffId, paracetamolFormulaId } = params
+	const {
+		facilityId,
+		erEncounterId,
+		inpatientEncounterId,
+		erPatientId,
+		inpatientPatientId,
+		nurseStaffId,
+		doctorStaffId,
+		paracetamolFormulaId,
+	} = params
 	const now = new Date()
 	const h = (hours: number) => new Date(now.getTime() + hours * 3_600_000)
 
@@ -1392,18 +1580,29 @@ async function ensureNursingScenarios(params: {
 	let [amlodipineBrand] = await db
 		.select()
 		.from(drugBrands)
-		.where(and(eq(drugBrands.drugGenericId, amlodipineGeneric!.id), eq(drugBrands.brandName, "Norvasc")))
+		.where(
+			and(eq(drugBrands.drugGenericId, amlodipineGeneric!.id), eq(drugBrands.brandName, "Norvasc"))
+		)
 	if (!amlodipineBrand) {
 		;[amlodipineBrand] = await db
 			.insert(drugBrands)
-			.values({ drugGenericId: amlodipineGeneric!.id, brandName: "Norvasc", manufacturer: "Pfizer" })
+			.values({
+				drugGenericId: amlodipineGeneric!.id,
+				brandName: "Norvasc",
+				manufacturer: "Pfizer",
+			})
 			.returning()
 	}
 
 	let [amlodipineFormulary] = await db
 		.select()
 		.from(formularyItems)
-		.where(and(eq(formularyItems.facilityId, facilityId), eq(formularyItems.drugGenericId, amlodipineGeneric!.id)))
+		.where(
+			and(
+				eq(formularyItems.facilityId, facilityId),
+				eq(formularyItems.drugGenericId, amlodipineGeneric!.id)
+			)
+		)
 	if (!amlodipineFormulary) {
 		;[amlodipineFormulary] = await db
 			.insert(formularyItems)
@@ -1424,7 +1623,12 @@ async function ensureNursingScenarios(params: {
 	let [paracetamolOrder] = await db
 		.select()
 		.from(medicationOrders)
-		.where(and(eq(medicationOrders.encounterId, erEncounterId), eq(medicationOrders.genericName, "Paracetamol")))
+		.where(
+			and(
+				eq(medicationOrders.encounterId, erEncounterId),
+				eq(medicationOrders.genericName, "Paracetamol")
+			)
+		)
 	if (!paracetamolOrder) {
 		;[paracetamolOrder] = await db
 			.insert(medicationOrders)
@@ -1452,7 +1656,10 @@ async function ensureNursingScenarios(params: {
 		.select()
 		.from(medicationOrders)
 		.where(
-			and(eq(medicationOrders.encounterId, inpatientEncounterId), eq(medicationOrders.genericName, "Amlodipine"))
+			and(
+				eq(medicationOrders.encounterId, inpatientEncounterId),
+				eq(medicationOrders.genericName, "Amlodipine")
+			)
 		)
 	if (!amlodipineOrder) {
 		;[amlodipineOrder] = await db
@@ -1572,7 +1779,12 @@ async function ensureNursingScenarios(params: {
 	const [gcsEntry] = await db
 		.select()
 		.from(flowsheetEntries)
-		.where(and(eq(flowsheetEntries.encounterId, inpatientEncounterId), eq(flowsheetEntries.parameterName, "GCS")))
+		.where(
+			and(
+				eq(flowsheetEntries.encounterId, inpatientEncounterId),
+				eq(flowsheetEntries.parameterName, "GCS")
+			)
+		)
 	if (!gcsEntry) {
 		await db.insert(flowsheetEntries).values([
 			{
@@ -1692,7 +1904,12 @@ async function ensureNursingScenarios(params: {
 	const [tarWoundDressing] = await db
 		.select()
 		.from(tarEntries)
-		.where(and(eq(tarEntries.encounterId, inpatientEncounterId), eq(tarEntries.treatmentDescription, "Wound dressing change")))
+		.where(
+			and(
+				eq(tarEntries.encounterId, inpatientEncounterId),
+				eq(tarEntries.treatmentDescription, "Wound dressing change")
+			)
+		)
 	if (!tarWoundDressing) {
 		await db.insert(tarEntries).values([
 			{
@@ -1726,7 +1943,9 @@ async function ensureNursingScenarios(params: {
 	const [ivfEntry] = await db
 		.select()
 		.from(ioEntries)
-		.where(and(eq(ioEntries.encounterId, erEncounterId), eq(ioEntries.description, "IVF - PNSS 1L")))
+		.where(
+			and(eq(ioEntries.encounterId, erEncounterId), eq(ioEntries.description, "IVF - PNSS 1L"))
+		)
 	if (!ivfEntry) {
 		await db.insert(ioEntries).values([
 			{
@@ -1805,7 +2024,9 @@ async function ensureNursingScenarios(params: {
 	const [draftHandoff] = await db
 		.select()
 		.from(shiftHandoffs)
-		.where(and(eq(shiftHandoffs.encounterId, inpatientEncounterId), eq(shiftHandoffs.status, "draft")))
+		.where(
+			and(eq(shiftHandoffs.encounterId, inpatientEncounterId), eq(shiftHandoffs.status, "draft"))
+		)
 	if (!draftHandoff) {
 		await db.insert(shiftHandoffs).values({
 			facilityId,
@@ -1852,7 +2073,8 @@ async function ensureNursingScenarios(params: {
 				.split("T")[0]!,
 			status: "confirmed",
 			confirmedAt: h(-6),
-			notes: "Blood cultures positive for Staphylococcus epidermidis. Central line removed. IV antibiotics started.",
+			notes:
+				"Blood cultures positive for Staphylococcus epidermidis. Central line removed. IV antibiotics started.",
 			documentedByStaffId: nurseStaffId,
 		})
 	}
@@ -1862,7 +2084,9 @@ async function ensureNursingScenarios(params: {
 	const [generalConsent] = await db
 		.select()
 		.from(consentRecords)
-		.where(and(eq(consentRecords.encounterId, erEncounterId), eq(consentRecords.consentType, "general")))
+		.where(
+			and(eq(consentRecords.encounterId, erEncounterId), eq(consentRecords.consentType, "general"))
+		)
 	if (!generalConsent) {
 		await db.insert(consentRecords).values({
 			facilityId,
@@ -1884,7 +2108,9 @@ async function ensureNursingScenarios(params: {
 	const [dpaConsent] = await db
 		.select()
 		.from(consentRecords)
-		.where(and(eq(consentRecords.encounterId, erEncounterId), eq(consentRecords.consentType, "dpa")))
+		.where(
+			and(eq(consentRecords.encounterId, erEncounterId), eq(consentRecords.consentType, "dpa"))
+		)
 	if (!dpaConsent) {
 		await db.insert(consentRecords).values({
 			facilityId,
@@ -1907,7 +2133,10 @@ async function ensureNursingScenarios(params: {
 		.select()
 		.from(consentRecords)
 		.where(
-			and(eq(consentRecords.encounterId, inpatientEncounterId), eq(consentRecords.consentType, "general"))
+			and(
+				eq(consentRecords.encounterId, inpatientEncounterId),
+				eq(consentRecords.consentType, "general")
+			)
 		)
 	if (!ipGeneralConsent) {
 		await db.insert(consentRecords).values({
@@ -1974,14 +2203,35 @@ async function main() {
 	const medBed1 = await ensureBed(facility.id, medWard.id, "MED-101")
 	const nurseryBed1 = await ensureBed(facility.id, nurseryWard.id, "NUR-01")
 
-	const patient1 = await ensurePatient(facility.id, "QH-000001", "Juan", "Dela Cruz", "1985-01-15", "male")
-	const patient2 = await ensurePatient(facility.id, "QH-000002", "Maria", "Santos", "1992-07-03", "female")
+	const patient1 = await ensurePatient(
+		facility.id,
+		"QH-000001",
+		"Juan",
+		"Dela Cruz",
+		"1985-01-15",
+		"male"
+	)
+	const patient2 = await ensurePatient(
+		facility.id,
+		"QH-000002",
+		"Maria",
+		"Santos",
+		"1992-07-03",
+		"female"
+	)
 	await ensurePatient(facility.id, "QH-000003", "Pedro", "Reyes", "1978-11-21", "male")
 
 	// Newborn patient — DOB set to ~36 hours ago so the NBS tab (< 30 days rule) is always visible.
 	// Re-run the seed if this patient's age exceeds 28 days.
 	const newbornDOB = new Date(Date.now() - 36 * 3_600_000).toISOString().slice(0, 10)
-	const newbornPatient = await ensureNewbornPatient(facility.id, "QH-NBN-001", "Baby", "Santos", newbornDOB, "female")
+	const newbornPatient = await ensureNewbornPatient(
+		facility.id,
+		"QH-NBN-001",
+		"Baby",
+		"Santos",
+		newbornDOB,
+		"female"
+	)
 	const newbornReferralDOB = new Date(Date.now() - 30 * 3_600_000).toISOString().slice(0, 10)
 	const newbornReferralPatient = await ensureNewbornPatient(
 		facility.id,
@@ -1997,7 +2247,7 @@ async function main() {
 		staffMap.get("nurse@qhealth.local")!,
 		nurseryBed1.id,
 		"inpatient",
-		"Newborn admission for routine care and newborn screening",
+		"Newborn admission for routine care and newborn screening"
 	)
 	const nurseryReferralBed = await ensureBed(facility.id, nurseryWard.id, "NUR-02")
 	const nurseryReferralEncounter = await ensureEncounter(
@@ -2006,7 +2256,7 @@ async function main() {
 		staffMap.get("nurse@qhealth.local")!,
 		nurseryReferralBed.id,
 		"inpatient",
-		"Newborn admission for referral tracking test",
+		"Newborn admission for referral tracking test"
 	)
 	await db
 		.update(beds)
@@ -2014,7 +2264,11 @@ async function main() {
 		.where(eq(beds.id, nurseryBed1.id))
 	await db
 		.update(beds)
-		.set({ status: "occupied", currentEncounterId: nurseryReferralEncounter.id, updatedAt: new Date() })
+		.set({
+			status: "occupied",
+			currentEncounterId: nurseryReferralEncounter.id,
+			updatedAt: new Date(),
+		})
 		.where(eq(beds.id, nurseryReferralBed.id))
 
 	// Seed one demo NBS logbook row so /nbs has visible data out-of-the-box.
@@ -2056,7 +2310,9 @@ async function main() {
 	const [babySantosNbs] = await db
 		.select()
 		.from(nbsLogEntries)
-		.where(and(eq(nbsLogEntries.facilityId, facility.id), eq(nbsLogEntries.patientId, newbornPatient.id)))
+		.where(
+			and(eq(nbsLogEntries.facilityId, facility.id), eq(nbsLogEntries.patientId, newbornPatient.id))
+		)
 
 	if (babySantosNbs) {
 		const [existingConsent] = await db
@@ -2126,9 +2382,27 @@ async function main() {
 		})
 	}
 
-	const preEncounter = await ensurePreEncounter(facility.id, `TRAUMA-${new Date().getFullYear()}-0001`, staffMap.get("nurse@qhealth.local")!)
-	const erEncounter = await ensureEncounter(facility.id, patient2.id, staffMap.get("doctor@qhealth.local")!, erBed1.id, "emergency", "Fever and productive cough")
-	const inpatientEncounter = await ensureEncounter(facility.id, patient1.id, staffMap.get("doctor@qhealth.local")!, medBed1.id, "inpatient", "Uncontrolled hypertension")
+	const preEncounter = await ensurePreEncounter(
+		facility.id,
+		`TRAUMA-${new Date().getFullYear()}-0001`,
+		staffMap.get("nurse@qhealth.local")!
+	)
+	const erEncounter = await ensureEncounter(
+		facility.id,
+		patient2.id,
+		staffMap.get("doctor@qhealth.local")!,
+		erBed1.id,
+		"emergency",
+		"Fever and productive cough"
+	)
+	const inpatientEncounter = await ensureEncounter(
+		facility.id,
+		patient1.id,
+		staffMap.get("doctor@qhealth.local")!,
+		medBed1.id,
+		"inpatient",
+		"Uncontrolled hypertension"
+	)
 
 	const refs = await ensureReferenceData(facility.id)
 	await ensureClinicalData({
@@ -2151,8 +2425,14 @@ async function main() {
 		reportingStaffId: staffMap.get("pidsr@qhealth.local")!,
 	})
 
-	await db.update(beds).set({ status: "occupied", currentEncounterId: erEncounter.id, updatedAt: new Date() }).where(eq(beds.id, erBed1.id))
-	await db.update(beds).set({ status: "occupied", currentEncounterId: inpatientEncounter.id, updatedAt: new Date() }).where(eq(beds.id, medBed1.id))
+	await db
+		.update(beds)
+		.set({ status: "occupied", currentEncounterId: erEncounter.id, updatedAt: new Date() })
+		.where(eq(beds.id, erBed1.id))
+	await db
+		.update(beds)
+		.set({ status: "occupied", currentEncounterId: inpatientEncounter.id, updatedAt: new Date() })
+		.where(eq(beds.id, medBed1.id))
 
 	await seedAdminScenarios({
 		facilityId: facility.id,
@@ -2180,7 +2460,9 @@ async function main() {
 	}
 }
 
-main().then(() => process.exit(0)).catch(err => {
-	console.error("Seed failed:", err)
-	process.exit(1)
-})
+main()
+	.then(() => process.exit(0))
+	.catch(err => {
+		console.error("Seed failed:", err)
+		process.exit(1)
+	})

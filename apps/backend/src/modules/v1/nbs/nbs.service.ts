@@ -1,21 +1,21 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm"
 
-import { db } from "@/common/database/database.client"
-import { consentRecords, nbsLogEntries, patients, staffProfiles } from "@repo/db/schema"
-
 import type {
-	NbsScreening,
-	NbsConsent,
-	NbsReferral,
-	NbsLogbookQuery,
-	NbsLogbookResponse,
-	CreateNbsScreening,
-	UpdateNbsScreening,
 	CreateNbsConsent,
 	CreateNbsReferral,
+	CreateNbsScreening,
+	NbsConsent,
+	NbsLogbookQuery,
+	NbsLogbookResponse,
+	NbsReferral,
+	NbsScreening,
 	UpdateNbsReferral,
+	UpdateNbsScreening,
 } from "@repo/contracts"
+import { consentRecords, nbsLogEntries, patients, staffProfiles } from "@repo/db/schema"
+
+import { db } from "@/common/database/database.client"
 
 type NbsScreeningResultCondition = {
 	condition: string
@@ -99,10 +99,7 @@ function mapLogEntryToScreening(row: {
 	patientName?: string
 	patientMrn?: string
 }) {
-	const screeningResult = row.screeningResult as
-		| NbsScreeningResultJson
-		| null
-		| undefined
+	const screeningResult = row.screeningResult as NbsScreeningResultJson | null | undefined
 	const conditions = screeningResult?.conditions ?? []
 	const hasAbnormal = conditions.some(condition => condition.result === "abnormal")
 	const hasBorderline = conditions.some(condition => condition.result === "inconclusive")
@@ -192,7 +189,9 @@ export class NbsService {
 		const [capturingStaff] = await db
 			.select({ id: staffProfiles.id })
 			.from(staffProfiles)
-			.where(and(eq(staffProfiles.userId, performedBy), eq(staffProfiles.facilityId, input.facilityId)))
+			.where(
+				and(eq(staffProfiles.userId, performedBy), eq(staffProfiles.facilityId, input.facilityId))
+			)
 
 		const [created] = await db
 			.insert(nbsLogEntries)
@@ -206,8 +205,11 @@ export class NbsService {
 				screeningResult: input.specimenType
 					? {
 							sampleId: input.specimenBarcode ?? undefined,
-							testType: input.specimenType === "heel_prick" || input.specimenType === "cord_blood" ? input.specimenType : undefined,
-					  }
+							testType:
+								input.specimenType === "heel_prick" || input.specimenType === "cord_blood"
+									? input.specimenType
+									: undefined,
+						}
 					: null,
 				consentStatus: "pending",
 				referralStatus: "none",
@@ -244,10 +246,7 @@ export class NbsService {
 	}
 
 	async updateScreening(input: UpdateNbsScreening): Promise<NbsScreening> {
-		const [existing] = await db
-			.select()
-			.from(nbsLogEntries)
-			.where(eq(nbsLogEntries.id, input.id))
+		const [existing] = await db.select().from(nbsLogEntries).where(eq(nbsLogEntries.id, input.id))
 
 		if (!existing) {
 			throw new NotFoundException(`NBS screening with id ${input.id} not found`)
@@ -261,26 +260,75 @@ export class NbsService {
 		const screeningResult: NbsScreeningResultJson = {
 			...existingScreeningResult,
 			...(input.specimenBarcode ? { sampleId: input.specimenBarcode } : {}),
-			...(input.specimenType ? { testType: (input.specimenType === "heel_prick" || input.specimenType === "cord_blood") ? input.specimenType : undefined } : {}),
+			...(input.specimenType
+				? {
+						testType:
+							input.specimenType === "heel_prick" || input.specimenType === "cord_blood"
+								? input.specimenType
+								: undefined,
+					}
+				: {}),
 			conditions: [
 				...(existingScreeningResult.conditions ?? []),
 				...(input.result_ch
-					? [{ condition: "CH", result: (input.result_ch === "positive" ? "abnormal" : "normal") as "normal" | "abnormal" }]
+					? [
+							{
+								condition: "CH",
+								result: (input.result_ch === "positive" ? "abnormal" : "normal") as
+									| "normal"
+									| "abnormal",
+							},
+						]
 					: []),
 				...(input.result_cah
-					? [{ condition: "CAH", result: (input.result_cah === "positive" ? "abnormal" : "normal") as "normal" | "abnormal" }]
+					? [
+							{
+								condition: "CAH",
+								result: (input.result_cah === "positive" ? "abnormal" : "normal") as
+									| "normal"
+									| "abnormal",
+							},
+						]
 					: []),
 				...(input.result_g6pd
-					? [{ condition: "G6PD", result: (input.result_g6pd === "positive" ? "abnormal" : "normal") as "normal" | "abnormal" }]
+					? [
+							{
+								condition: "G6PD",
+								result: (input.result_g6pd === "positive" ? "abnormal" : "normal") as
+									| "normal"
+									| "abnormal",
+							},
+						]
 					: []),
 				...(input.result_gal
-					? [{ condition: "GAL", result: (input.result_gal === "positive" ? "abnormal" : "normal") as "normal" | "abnormal" }]
+					? [
+							{
+								condition: "GAL",
+								result: (input.result_gal === "positive" ? "abnormal" : "normal") as
+									| "normal"
+									| "abnormal",
+							},
+						]
 					: []),
 				...(input.result_pku
-					? [{ condition: "PKU", result: (input.result_pku === "positive" ? "abnormal" : "normal") as "normal" | "abnormal" }]
+					? [
+							{
+								condition: "PKU",
+								result: (input.result_pku === "positive" ? "abnormal" : "normal") as
+									| "normal"
+									| "abnormal",
+							},
+						]
 					: []),
 				...(input.result_msud
-					? [{ condition: "MSUD", result: (input.result_msud === "positive" ? "abnormal" : "normal") as "normal" | "abnormal" }]
+					? [
+							{
+								condition: "MSUD",
+								result: (input.result_msud === "positive" ? "abnormal" : "normal") as
+									| "normal"
+									| "abnormal",
+							},
+						]
 					: []),
 			],
 		}
@@ -372,9 +420,7 @@ export class NbsService {
 
 		const signatureData = record.signatureData as { dataUrl?: string } | null
 		const consentType: "consent" | "waiver" =
-			entry.consentStatus === "waived" || entry.consentStatus === "refused"
-				? "waiver"
-				: "consent"
+			entry.consentStatus === "waived" || entry.consentStatus === "refused" ? "waiver" : "consent"
 
 		return {
 			id: record.id,
@@ -412,7 +458,9 @@ export class NbsService {
 		const [capturingStaff] = await db
 			.select({ id: staffProfiles.id })
 			.from(staffProfiles)
-			.where(and(eq(staffProfiles.userId, performedBy), eq(staffProfiles.facilityId, entry.facilityId)))
+			.where(
+				and(eq(staffProfiles.userId, performedBy), eq(staffProfiles.facilityId, entry.facilityId))
+			)
 
 		const normalizedRelationship = input.relationship.trim().toLowerCase()
 		const relationship: "self" | "parent" | "guardian" | "spouse" | "other" =
@@ -470,7 +518,7 @@ export class NbsService {
 			.set({
 				consentRecordId: created.id,
 				consentStatus: input.consentType === "waiver" ? "waived" : "consented",
-				waiverReason: input.consentType === "waiver" ? input.waiverReason ?? null : null,
+				waiverReason: input.consentType === "waiver" ? (input.waiverReason ?? null) : null,
 				updatedAt: now,
 			})
 			.where(eq(nbsLogEntries.id, input.nbsId))
@@ -484,7 +532,7 @@ export class NbsService {
 			consentType: input.consentType,
 			parentName: created.signedByName,
 			relationship: created.relationship,
-			waiverReason: input.consentType === "waiver" ? input.waiverReason ?? null : null,
+			waiverReason: input.consentType === "waiver" ? (input.waiverReason ?? null) : null,
 			signatureDataUrl: signatureData?.dataUrl ?? null,
 			signedAt: created.signedAt ?? now,
 			witnessName: created.witnessSignature,
@@ -552,7 +600,9 @@ export class NbsService {
 		const [capturingStaff] = await db
 			.select({ id: staffProfiles.id })
 			.from(staffProfiles)
-			.where(and(eq(staffProfiles.userId, performedBy), eq(staffProfiles.facilityId, entry.facilityId)))
+			.where(
+				and(eq(staffProfiles.userId, performedBy), eq(staffProfiles.facilityId, entry.facilityId))
+			)
 		const actorId = capturingStaff?.id ?? entry.patientId
 
 		const createdReferral: NbsReferralJson = {
@@ -649,7 +699,7 @@ export class NbsService {
 						completedAt: input.completedAt ?? referral.completedAt ?? null,
 						referralNotes: input.referralNotes ?? referral.referralNotes ?? null,
 						updatedAt: now.toISOString(),
-				  }
+					}
 				: referral
 		)
 		const updatedReferral = updatedReferrals.find(referral => referral.id === input.id)!
@@ -657,13 +707,11 @@ export class NbsService {
 		await db
 			.update(nbsLogEntries)
 			.set({
-				referralStatus:
-					updatedReferral.referralStatus === "completed" ? "completed" : "referred",
+				referralStatus: updatedReferral.referralStatus === "completed" ? "completed" : "referred",
 				referralFacility: updatedReferral.referralFacility,
 				referralDate: updatedReferral.referralDatetime.slice(0, 10),
 				referralNotes: JSON.stringify({ referrals: updatedReferrals }),
-				status:
-					updatedReferral.referralStatus === "completed" ? "completed" : "referred",
+				status: updatedReferral.referralStatus === "completed" ? "completed" : "referred",
 				updatedAt: now,
 			})
 			.where(eq(nbsLogEntries.id, matchedEntry.id))

@@ -1,3 +1,5 @@
+import { FhirController } from "./fhir.controller"
+
 /**
  * FHIR Permission Guard Tests (FHIR-003, FHIR-007)
  *
@@ -49,17 +51,15 @@ jest.mock("./fhir.service", () => ({
 jest.mock("@/modules/v1/rbac/rbac.guard", () => ({
 	RBAC_PERMISSION_KEY: "rbac",
 	RBAC_PERMISSIONS_KEY: "rbac_all",
-	RequirePermission: (module: string, action: string) =>
-		(target: object, key: string | symbol) => {
-			Reflect.defineMetadata("rbac", { module, action }, target, key)
-		},
-	RequirePermissions: (permissions: Array<{ module: string; action: string }>) =>
+	RequirePermission: (module: string, action: string) => (target: object, key: string | symbol) => {
+		Reflect.defineMetadata("rbac", { module, action }, target, key)
+	},
+	RequirePermissions:
+		(permissions: Array<{ module: string; action: string }>) =>
 		(target: object, key: string | symbol) => {
 			Reflect.defineMetadata("rbac_all", permissions, target, key)
 		},
 }))
-
-import { FhirController } from "./fhir.controller"
 
 type PermEntry = { module: string; action: string }
 

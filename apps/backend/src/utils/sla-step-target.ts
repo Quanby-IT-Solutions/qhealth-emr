@@ -94,7 +94,7 @@ const EVENT_STATUS_TO_STEP_TYPE: Record<string, Record<string, SlaStepType>> = {
 export async function resolveStepTarget(
 	facilityId: string,
 	workflowType: string,
-	toStatus: string,
+	toStatus: string
 ): Promise<number | null> {
 	const stepType = EVENT_STATUS_TO_STEP_TYPE[workflowType]?.[toStatus]
 	if (!stepType) return null
@@ -106,8 +106,8 @@ export async function resolveStepTarget(
 			and(
 				eq(slaStepConfigs.facilityId, facilityId),
 				eq(slaStepConfigs.stepType, stepType),
-				eq(slaStepConfigs.isActive, true),
-			),
+				eq(slaStepConfigs.isActive, true)
+			)
 		)
 		.limit(1)
 
@@ -128,7 +128,7 @@ export async function resolveStepTarget(
  */
 export async function resolveStepTargetByType(
 	facilityId: string,
-	stepType: SlaStepType,
+	stepType: SlaStepType
 ): Promise<number> {
 	const [override] = await db
 		.select({ targetMinutes: slaStepConfigs.targetMinutes })
@@ -137,8 +137,8 @@ export async function resolveStepTargetByType(
 			and(
 				eq(slaStepConfigs.facilityId, facilityId),
 				eq(slaStepConfigs.stepType, stepType),
-				eq(slaStepConfigs.isActive, true),
-			),
+				eq(slaStepConfigs.isActive, true)
+			)
 		)
 		.limit(1)
 

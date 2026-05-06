@@ -136,10 +136,7 @@ export class DeathReportingService {
 			.select()
 			.from(deathReports)
 			.where(
-				and(
-					eq(deathReports.encounterId, input.encounterId),
-					eq(deathReports.reportType, "fmdrf")
-				)
+				and(eq(deathReports.encounterId, input.encounterId), eq(deathReports.reportType, "fmdrf"))
 			)
 			.limit(1)
 
@@ -177,9 +174,8 @@ export class DeathReportingService {
 					gestationalAge: input.gestationalAgeWeeks ?? undefined,
 					antenatalCareVisits: input.antenatalVisitCount ?? undefined,
 					complications: input.complicationType ? [input.complicationType] : undefined,
-					preventableFactors: input.avoidableFactors && input.avoidableRemark
-						? [input.avoidableRemark]
-						: undefined,
+					preventableFactors:
+						input.avoidableFactors && input.avoidableRemark ? [input.avoidableRemark] : undefined,
 				},
 				physicianCertification: {
 					certifyingPhysicianName: input.physicianName,
@@ -210,11 +206,7 @@ export class DeathReportingService {
 	async updateFmdrf(input: UpdateFmdrfInput) {
 		const { id, ...data } = input
 
-		const [existing] = await db
-			.select()
-			.from(deathReports)
-			.where(eq(deathReports.id, id))
-			.limit(1)
+		const [existing] = await db.select().from(deathReports).where(eq(deathReports.id, id)).limit(1)
 
 		if (!existing) {
 			throw new NotFoundException(`FMDRF report ${id} not found`)
@@ -252,10 +244,7 @@ export class DeathReportingService {
 			.select()
 			.from(deathReports)
 			.where(
-				and(
-					eq(deathReports.encounterId, input.encounterId),
-					eq(deathReports.reportType, "fndrf")
-				)
+				and(eq(deathReports.encounterId, input.encounterId), eq(deathReports.reportType, "fndrf"))
 			)
 			.limit(1)
 
@@ -324,11 +313,7 @@ export class DeathReportingService {
 	async updateFndrf(input: UpdateFndrfInput) {
 		const { id, ...data } = input
 
-		const [existing] = await db
-			.select()
-			.from(deathReports)
-			.where(eq(deathReports.id, id))
-			.limit(1)
+		const [existing] = await db.select().from(deathReports).where(eq(deathReports.id, id)).limit(1)
 
 		if (!existing) {
 			throw new NotFoundException(`FNDRF report ${id} not found`)
@@ -393,9 +378,13 @@ export class DeathReportingService {
 			factorEclampsia: factors.some(f => f.factor === "Eclampsia"),
 			factorObstructedLabor: factors.some(f => f.factor === "Obstructed Labor"),
 			factorUnsafeAbortion: factors.some(f => f.factor === "Unsafe Abortion"),
-			factorOther: factors.find(f =>
-				!["Hemorrhage", "Sepsis", "Eclampsia", "Obstructed Labor", "Unsafe Abortion"].includes(f.factor)
-			)?.factor ?? null,
+			factorOther:
+				factors.find(
+					f =>
+						!["Hemorrhage", "Sepsis", "Eclampsia", "Obstructed Labor", "Unsafe Abortion"].includes(
+							f.factor
+						)
+				)?.factor ?? null,
 			avoidableFactors: !!maternal.preventableFactors?.length,
 			avoidableRemark: maternal.preventableFactors?.[0] ?? null,
 			physicianName: cert.certifyingPhysicianName ?? "",
@@ -436,7 +425,11 @@ export class DeathReportingService {
 	 * Sets releasedByStaffId, releasedAt, completedAt, and status="completed" to provide
 	 * an authoritative Flow 7 Step 3 evidence trail and close the SLA window.
 	 */
-	async markDeathReportReleased(input: { id: string; releasedByStaffId: string; releasedAt?: Date }) {
+	async markDeathReportReleased(input: {
+		id: string
+		releasedByStaffId: string
+		releasedAt?: Date
+	}) {
 		const releasedAt = input.releasedAt ?? new Date()
 
 		const [report] = await db
@@ -499,9 +492,17 @@ export class DeathReportingService {
 			causeSepsis: causes.includes("Sepsis"),
 			causeCongenitalAnomaly: causes.includes("Congenital Anomaly"),
 			causeRds: causes.includes("Respiratory Distress Syndrome"),
-			causeOther: causes.find(c =>
-				!["Prematurity", "Birth Asphyxia", "Sepsis", "Congenital Anomaly", "Respiratory Distress Syndrome"].includes(c)
-			) ?? null,
+			causeOther:
+				causes.find(
+					c =>
+						![
+							"Prematurity",
+							"Birth Asphyxia",
+							"Sepsis",
+							"Congenital Anomaly",
+							"Respiratory Distress Syndrome",
+						].includes(c)
+				) ?? null,
 			contributingRemarks: report.contributingFactors?.[0]?.factor ?? null,
 			physicianName: cert.certifyingPhysicianName ?? "",
 			physicianLicenseNo: cert.prcLicenseNumber ?? "",

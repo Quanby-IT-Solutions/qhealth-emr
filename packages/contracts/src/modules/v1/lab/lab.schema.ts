@@ -30,7 +30,9 @@ export const BloodUnitSchema = z.object({
 	unitBarcode: z.string().min(1).max(50),
 	bloodType: BloodTypeEnum,
 	componentType: z.string().min(1).max(100),
-	expiryDate: z.union([z.date(), z.string()]).transform((val) => (typeof val === "string" ? val : val.toISOString())),
+	expiryDate: z
+		.union([z.date(), z.string()])
+		.transform(val => (typeof val === "string" ? val : val.toISOString())),
 	status: BloodUnitStatusEnum,
 	donorId: z.string().uuid().nullable(),
 })
@@ -52,24 +54,28 @@ export const CrossMatchRequestSchema = z.object({
 	compatibilityResult: CompatibilityResultEnum.nullable(),
 	status: CrossMatchStatusEnum,
 	requestedBy: z.string().min(1).max(255),
-	requestedAt: z.union([z.date(), z.string()]).transform((val) => (typeof val === "string" ? val : val.toISOString())),
+	requestedAt: z
+		.union([z.date(), z.string()])
+		.transform(val => (typeof val === "string" ? val : val.toISOString())),
 	crossMatchedBy: z.string().max(255).nullable(),
 	crossMatchedAt: z
 		.union([z.date(), z.string()])
-		.transform((val) => (typeof val === "string" ? val : val.toISOString()))
+		.transform(val => (typeof val === "string" ? val : val.toISOString()))
 		.nullable(),
 	approvedBy: z.string().max(255).nullable(),
 	approvedAt: z
 		.union([z.date(), z.string()])
-		.transform((val) => (typeof val === "string" ? val : val.toISOString()))
+		.transform(val => (typeof val === "string" ? val : val.toISOString()))
 		.nullable(),
 	issuedBy: z.string().max(255).nullable(),
 	issuedAt: z
 		.union([z.date(), z.string()])
-		.transform((val) => (typeof val === "string" ? val : val.toISOString()))
+		.transform(val => (typeof val === "string" ? val : val.toISOString()))
 		.nullable(),
 	bloodUnits: z.array(BloodUnitSchema),
-	createdAt: z.union([z.date(), z.string()]).transform((val) => (typeof val === "string" ? val : val.toISOString())),
+	createdAt: z
+		.union([z.date(), z.string()])
+		.transform(val => (typeof val === "string" ? val : val.toISOString())),
 })
 
 // ============================================================================

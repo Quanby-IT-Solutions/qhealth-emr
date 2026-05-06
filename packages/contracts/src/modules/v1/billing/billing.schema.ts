@@ -40,37 +40,24 @@ export const ChargeMasterCategoryEnum = z.enum([
 	"other",
 ])
 
-export const InvoiceStatusEnum = z.enum([
-	"draft",
-	"finalized",
-	"paid",
-	"partially_paid",
-])
+export const InvoiceStatusEnum = z.enum(["draft", "finalized", "paid", "partially_paid"])
 
+// BIL-BE-03: PhilHealth ticket spec — replaces legacy credit_card / bank_transfer / other.
+// Frontend payment-entry radio renders these exact methods (Cash, Card, GCash, HMO, Malasakit,
+// PhilHealth, COE — Certificate of Eligibility).
 export const PaymentMethodEnum = z.enum([
 	"cash",
-	"philhealth",
+	"card",
+	"gcash",
 	"hmo",
-	"credit_card",
-	"bank_transfer",
 	"malasakit",
-	"other",
+	"philhealth",
+	"coe",
 ])
 
-export const Cf4StatusEnum = z.enum([
-	"draft",
-	"submitted",
-	"approved",
-	"rejected",
-	"resubmitted",
-])
+export const Cf4StatusEnum = z.enum(["draft", "submitted", "approved", "rejected", "resubmitted"])
 
-export const EligibilityCheckStatusEnum = z.enum([
-	"pending",
-	"eligible",
-	"ineligible",
-	"error",
-])
+export const EligibilityCheckStatusEnum = z.enum(["pending", "eligible", "ineligible", "error"])
 
 // ============================================================================
 // Charge Master Items
@@ -291,14 +278,18 @@ export const Cf4PreviewSchema = z.object({
 		chiefComplaint: z.string().nullable(),
 		briefHistory: z.string().nullable(),
 		vitalSigns: z.record(z.string(), z.unknown()).nullable(),
-		diagnoses: z.array(z.object({
-			code: z.string(),
-			displayName: z.string(),
-		})),
-		procedures: z.array(z.object({
-			rvsCode: z.string().nullable(),
-			description: z.string(),
-		})),
+		diagnoses: z.array(
+			z.object({
+				code: z.string(),
+				displayName: z.string(),
+			})
+		),
+		procedures: z.array(
+			z.object({
+				rvsCode: z.string().nullable(),
+				description: z.string(),
+			})
+		),
 		managementPlan: z.string().nullable(),
 	}),
 	missingFields: z.array(z.string()),
@@ -611,6 +602,21 @@ export const Cf5BillingItemSchema = z.object({
 	isPhilhealthCovered: z.boolean(),
 })
 
+export const Cf5SurgicalProcedureReadinessSchema = z.object({
+	operationRecordId: z.string().uuid(),
+	procedureLabel: z.string(),
+	operationRecordSigned: z.boolean(),
+	primaryCodeCount: z.number().int(),
+	adjunctCodeCount: z.number().int(),
+	isReady: z.boolean(),
+})
+
+export const Cf5SurgicalReadinessSchema = z.object({
+	isReady: z.boolean(),
+	missingProcedureLabels: z.array(z.string()),
+	procedures: z.array(Cf5SurgicalProcedureReadinessSchema),
+})
+
 export const Cf5WithBillingSchema = z.object({
 	cf5: Cf5AssignmentSchema,
 	billingItems: z.array(Cf5BillingItemSchema),
@@ -618,6 +624,7 @@ export const Cf5WithBillingSchema = z.object({
 	philhealthCoverage: z.number(),
 	patientResponsibility: z.number(),
 	approvalRequired: z.boolean(),
+	surgicalReadiness: Cf5SurgicalReadinessSchema,
 })
 
 export const GetCf5WithBillingInputSchema = z.object({
@@ -789,7 +796,7 @@ export const ResubmitCf4InputSchema = z.object({
 
 export const CewsVerifyInputSchema = z.object({
 	memberPin: z.string().regex(/^\d{12}$/, "Member PIN must be exactly 12 digits"),
-	encounterId: z.string().uuid(),
+	encounterId: z.string().uuid().optional(),
 })
 
 export const CewsMembershipSchema = z.object({
@@ -905,6 +912,28 @@ export const KonsultaReportSchema = z.object({
 	),
 })
 
+// BIL-FE-09: Per-patient aggregate view for the Konsulta tracker table
+export const KonsultaTrackerRowSchema = z.object({
+	patientId: z.string().uuid(),
+	patientName: z.string(),
+	memberPin: z.string().nullable(),
+	fpeDate: z.string().nullable(),
+	lastFollowUp: z.string().nullable(),
+	labsCount: z.number().int(),
+	capitationTag: z.string(),
+})
+
+export const ListKonsultaTrackerRowsInputSchema = PaginationInputSchema.extend({
+	facilityId: z.string().uuid(),
+	periodStart: z.string().optional(),
+	periodEnd: z.string().optional(),
+	memberStatus: z.enum(["all", "active", "exhausted", "inactive"]).optional(),
+})
+
+export const ListKonsultaTrackerRowsResponseSchema = PaginatedResponseSchema.extend({
+	rows: z.array(KonsultaTrackerRowSchema),
+})
+
 // ============================================================================
 // BIL-BE-05: DRG Suggest, Confirm, CF5 Lifecycle
 // ============================================================================
@@ -954,6 +983,7 @@ export const Cf5ClaimSchema = z.object({
 	status: z.enum(["draft", "validated", "submitted", "approved", "rejected"]),
 	submissionData: z.record(z.string(), z.unknown()).nullable(),
 	responseData: z.record(z.string(), z.unknown()).nullable(),
+	resubmitCount: z.number().int().default(0),
 	validatedAt: dateOrString.nullable(),
 	submittedAt: dateOrString.nullable(),
 	createdAt: dateOrString,

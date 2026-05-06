@@ -63,10 +63,7 @@ export class FhirEndpointsService {
 	}
 
 	async get(id: string): Promise<FhirEndpointRow> {
-		const [row] = await db
-			.select()
-			.from(fhirEndpoints)
-			.where(eq(fhirEndpoints.id, id))
+		const [row] = await db.select().from(fhirEndpoints).where(eq(fhirEndpoints.id, id))
 
 		if (!row) throw new NotFoundException(`FHIR endpoint ${id} not found`)
 		return coerceEndpoint(row)
@@ -88,9 +85,13 @@ export class FhirEndpointsService {
 					endpointUrl: input.endpointUrl,
 					fhirVersion: input.fhirVersion ?? existing.fhirVersion,
 					authMethod: input.authMethod ?? existing.authMethod,
-					authCredentialsRef: input.authCredentialsRef !== undefined ? input.authCredentialsRef : existing.authCredentialsRef,
+					authCredentialsRef:
+						input.authCredentialsRef !== undefined
+							? input.authCredentialsRef
+							: existing.authCredentialsRef,
 					resourceTypes: input.resourceTypes ?? existing.resourceTypes,
-					cronSchedule: input.cronSchedule !== undefined ? input.cronSchedule : existing.cronSchedule,
+					cronSchedule:
+						input.cronSchedule !== undefined ? input.cronSchedule : existing.cronSchedule,
 					enabled: input.enabled !== undefined ? input.enabled : existing.enabled,
 					updatedAt: new Date(),
 				})
@@ -104,8 +105,16 @@ export class FhirEndpointsService {
 				action: "update",
 				entityType: "fhir_endpoint",
 				entityId: updated!.id,
-				beforeState: { name: existing.name, endpointUrl: existing.endpointUrl, enabled: existing.enabled },
-				afterState: { name: updated!.name, endpointUrl: updated!.endpointUrl, enabled: updated!.enabled },
+				beforeState: {
+					name: existing.name,
+					endpointUrl: existing.endpointUrl,
+					enabled: existing.enabled,
+				},
+				afterState: {
+					name: updated!.name,
+					endpointUrl: updated!.endpointUrl,
+					enabled: updated!.enabled,
+				},
 				ipAddress: null,
 				userAgent: null,
 				metadata: null,
@@ -147,10 +156,7 @@ export class FhirEndpointsService {
 	}
 
 	async delete(id: string, facilityId: string, actorId: string): Promise<{ success: boolean }> {
-		const [existing] = await db
-			.select()
-			.from(fhirEndpoints)
-			.where(eq(fhirEndpoints.id, id))
+		const [existing] = await db.select().from(fhirEndpoints).where(eq(fhirEndpoints.id, id))
 
 		if (!existing) throw new NotFoundException(`FHIR endpoint ${id} not found`)
 
@@ -236,10 +242,7 @@ export class FhirEndpointsService {
 	}
 
 	async retryExchange(logId: string): Promise<{ success: boolean; message: string }> {
-		const [entry] = await db
-			.select()
-			.from(fhirExchangeLog)
-			.where(eq(fhirExchangeLog.id, logId))
+		const [entry] = await db.select().from(fhirExchangeLog).where(eq(fhirExchangeLog.id, logId))
 
 		if (!entry) throw new NotFoundException(`Exchange log entry ${logId} not found`)
 

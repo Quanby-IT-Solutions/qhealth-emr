@@ -1,12 +1,15 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 
 import { Button } from "@/core/components/ui/button"
 import { Input } from "@/core/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
 import { cn } from "@/core/lib/utils"
 import { MoneyInput } from "./money-input"
+
+type SortColumn = "description" | "quantity" | "unitPrice" | "totalAmount"
+type SortDir = "asc" | "desc"
 
 export interface LineItem {
 	id: string
@@ -64,6 +67,33 @@ export function LineItemEditor({
 	const [searchQuery, setSearchQuery] = useState("")
 	const [showSearch, setShowSearch] = useState(false)
 	const [editingOverride, setEditingOverride] = useState<string | null>(null)
+	const [sortColumn, setSortColumn] = useState<SortColumn | null>(null)
+	const [sortDir, setSortDir] = useState<SortDir>("asc")
+
+	const handleSort = useCallback((col: SortColumn) => {
+		setSortColumn(prev => {
+			if (prev === col) {
+				setSortDir(d => (d === "asc" ? "desc" : "asc"))
+				return prev
+			}
+			setSortDir("asc")
+			return col
+		})
+	}, [])
+
+	const sortedItems = useMemo(() => {
+		if (!sortColumn) return items
+		const dir = sortDir === "asc" ? 1 : -1
+		return [...items].sort((a, b) => {
+			const av = a[sortColumn]
+			const bv = b[sortColumn]
+			if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir
+			return String(av).localeCompare(String(bv)) * dir
+		})
+	}, [items, sortColumn, sortDir])
+
+	const sortIndicator = (col: SortColumn) =>
+		sortColumn !== col ? "" : sortDir === "asc" ? " ↑" : " ↓"
 
 	const update = useCallback(
 		(updated: LineItem[]) => {
@@ -126,10 +156,46 @@ export function LineItemEditor({
 				<Table>
 					<TableHeader>
 						<TableRow>
-							<TableHead>Description</TableHead>
-							<TableHead className="w-24 text-right">Qty</TableHead>
-							<TableHead className="w-36 text-right">Unit Price</TableHead>
-							<TableHead className="w-36 text-right">Total</TableHead>
+							<TableHead>
+								<button
+									type="button"
+									onClick={() => handleSort("description")}
+									className="text-left font-medium hover:text-foreground"
+									aria-label={`Sort by description ${sortColumn === "description" ? sortDir : "ascending"}`}
+								>
+									Description{sortIndicator("description")}
+								</button>
+							</TableHead>
+							<TableHead className="w-24 text-right">
+								<button
+									type="button"
+									onClick={() => handleSort("quantity")}
+									className="font-medium hover:text-foreground"
+									aria-label={`Sort by quantity ${sortColumn === "quantity" ? sortDir : "ascending"}`}
+								>
+									Qty{sortIndicator("quantity")}
+								</button>
+							</TableHead>
+							<TableHead className="w-36 text-right">
+								<button
+									type="button"
+									onClick={() => handleSort("unitPrice")}
+									className="font-medium hover:text-foreground"
+									aria-label={`Sort by unit price ${sortColumn === "unitPrice" ? sortDir : "ascending"}`}
+								>
+									Unit Price{sortIndicator("unitPrice")}
+								</button>
+							</TableHead>
+							<TableHead className="w-36 text-right">
+								<button
+									type="button"
+									onClick={() => handleSort("totalAmount")}
+									className="font-medium hover:text-foreground"
+									aria-label={`Sort by total ${sortColumn === "totalAmount" ? sortDir : "ascending"}`}
+								>
+									Total{sortIndicator("totalAmount")}
+								</button>
+							</TableHead>
 							<TableHead className="w-10" />
 						</TableRow>
 					</TableHeader>
@@ -141,9 +207,8 @@ export function LineItemEditor({
 								</TableCell>
 							</TableRow>
 						)}
-						{items.map(item => (
-							<>
-								<TableRow key={item.id}>
+						{sortedItems.map(item => (
+							<TableRow key={item.id}>
 									<TableCell className="align-top">
 										<div className="flex flex-col gap-1">
 											<span className="text-sm">{item.description}</span>
@@ -209,7 +274,6 @@ export function LineItemEditor({
 										</button>
 									</TableCell>
 								</TableRow>
-							</>
 						))}
 					</TableBody>
 				</Table>

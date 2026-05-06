@@ -12,12 +12,12 @@ export function computeInvoiceTotals(params: {
 export function paymentMethodLabel(method: string): string {
 	const map: Record<string, string> = {
 		cash: "Cash",
-		philhealth: "PhilHealth",
+		card: "Card",
+		gcash: "GCash",
 		hmo: "HMO",
-		credit_card: "Credit Card",
-		bank_transfer: "Bank Transfer",
 		malasakit: "Malasakit",
-		other: "Other",
+		philhealth: "PhilHealth",
+		coe: "COE",
 	}
 	return map[method] ?? method
 }

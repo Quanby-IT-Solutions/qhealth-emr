@@ -25,7 +25,13 @@ const PaginatedResponseSchema = z.object({
 // ============================================================================
 
 export const WardTypeEnum = z.enum(["general", "icu", "er", "or", "nursery"])
-export const BedStatusEnum = z.enum(["available", "occupied", "reserved", "cleaning", "out_of_service"])
+export const BedStatusEnum = z.enum([
+	"available",
+	"occupied",
+	"reserved",
+	"cleaning",
+	"out_of_service",
+])
 
 // ============================================================================
 // Ward Schema

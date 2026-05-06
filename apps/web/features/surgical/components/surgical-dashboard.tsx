@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 
+import { useRouter } from "next/navigation"
+
 import { Stethoscope } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -62,9 +64,10 @@ const STATUS_TABS: { value: SurgeryStatus | "all"; label: string }[] = [
 
 interface SurgicalTableProps {
 	cases: SurgicalCase[]
+	onRowClick: (caseId: string) => void
 }
 
-function SurgicalTable({ cases }: SurgicalTableProps) {
+function SurgicalTable({ cases, onRowClick }: SurgicalTableProps) {
 	if (cases.length === 0) {
 		return (
 			<div className="flex flex-col items-center gap-2 py-10 text-center">
@@ -90,7 +93,11 @@ function SurgicalTable({ cases }: SurgicalTableProps) {
 			</TableHeader>
 			<TableBody>
 				{cases.map((c) => (
-					<TableRow key={c.id}>
+					<TableRow
+						key={c.id}
+						className="cursor-pointer hover:bg-muted/50"
+						onClick={() => onRowClick(c.id)}
+					>
 						<TableCell className="font-medium">{c.patientName ?? "—"}</TableCell>
 						<TableCell>{c.procedureName}</TableCell>
 						<TableCell className="capitalize">{c.surgicalType}</TableCell>
@@ -109,6 +116,7 @@ function SurgicalTable({ cases }: SurgicalTableProps) {
 }
 
 export function SurgicalDashboard() {
+	const router = useRouter()
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 
@@ -167,7 +175,10 @@ export function SurgicalDashboard() {
 							Loading…
 						</div>
 					) : (
-						<SurgicalTable cases={data?.data ?? []} />
+						<SurgicalTable
+								cases={data?.data ?? []}
+								onRowClick={(id) => router.push(`/surgical/${id}`)}
+							/>
 					)}
 				</CardContent>
 			</Card>

@@ -10,11 +10,31 @@ export const RbacModuleEnum = z.enum([
 	"orders",
 	"nursing",
 	"billing",
+	"billing.charges",
+	"billing.invoices",
+	"billing.payments",
+	"billing.cf4",
+	"billing.drg",
+	"billing.cf5",
+	"billing.esoa",
+	"billing.cews",
+	"billing.konsulta",
 	"formulary",
 	"reporting",
 	"notifications",
 	"audit",
 	"admin",
+	"admin.users",
+	"admin.feature-flags",
+	"admin.licenses",
+	"admin.bor",
+	"admin.fhir",
+	"admin.terminology",
+	"admin.sla",
+	"admin.master-data",
+	"admin.integrations",
+	"admin.facility",
+	"admin.auth",
 	"surgical",
 	"opd",
 	"nutrition",
@@ -34,6 +54,10 @@ export const RbacModuleEnum = z.enum([
 	"integration_registry",
 	"civil_registry",
 	"medical_records",
+	"him.deficiencies",
+	"him.coding",
+	"him.records",
+	"him.hai",
 	"patients",
 ])
 
@@ -45,6 +69,8 @@ export const RbacActionEnum = z.enum([
 	"delete",
 	"verify",
 	"export",
+	"read",
+	"write",
 	"manage_catalog",
 	"clinical_policy",
 	"terminology_admin",
@@ -308,14 +334,14 @@ export const CreateUserWithFacilitiesSchema = z
 		pdeaS2License: z.string().optional(),
 		pdeaS2Expiry: z.string().date().optional(),
 	})
-	.refine(
-		data => data.facilities.filter(f => f.isPrimary).length === 1,
-		{ message: "Exactly one facility must be marked as primary", path: ["facilities"] }
-	)
-	.refine(
-		data => new Set(data.facilities.map(f => f.facilityId)).size === data.facilities.length,
-		{ message: "Duplicate facilityId values are not allowed", path: ["facilities"] }
-	)
+	.refine(data => data.facilities.filter(f => f.isPrimary).length === 1, {
+		message: "Exactly one facility must be marked as primary",
+		path: ["facilities"],
+	})
+	.refine(data => new Set(data.facilities.map(f => f.facilityId)).size === data.facilities.length, {
+		message: "Duplicate facilityId values are not allowed",
+		path: ["facilities"],
+	})
 
 export const CreateUserWithFacilitiesResponseSchema = z.object({
 	userId: z.string(),
@@ -368,10 +394,7 @@ export const RemoveRoleAssignmentSchema = z.object({
  * Also accepts actual booleans for JSON transport.
  */
 const queryBoolean = z
-	.union([
-		z.boolean(),
-		z.enum(["true", "false"]).transform((v) => v === "true"),
-	])
+	.union([z.boolean(), z.enum(["true", "false"]).transform(v => v === "true")])
 	.optional()
 
 // ============================================================================

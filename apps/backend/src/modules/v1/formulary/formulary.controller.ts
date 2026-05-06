@@ -7,7 +7,7 @@ import type { Request } from "express"
 import { v1 } from "@/config/api-versions.config"
 import { RequirePermission, RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
 
-import { type FormularyActor, FormularyService } from "./formulary.service"
+import { FormularyService, type FormularyActor } from "./formulary.service"
 
 type RbacProfile = {
 	staffProfiles: Array<{ id: string; facilityId: string; roles: Array<{ id: string }> }>
@@ -17,9 +17,8 @@ type RbacProfile = {
 function extractActor(session: UserSession, req: Request): FormularyActor {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
 	const activeProfile =
-		profile?.staffProfiles?.find(p =>
-			p.roles.some(r => r.id === profile?.activeRole?.id)
-		) ?? profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
 
 	const forwarded = req.headers["x-forwarded-for"] as string | undefined
 	const ipAddress =
@@ -205,7 +204,10 @@ export class FormularyController {
 	// Code Set Admin — terminology governance (FORM-001)
 	// ========================================================================
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "formulary", action: "view" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "formulary", action: "view" },
+	])
 	@Implement(v1.formulary.codeSetAdmin.listUploads)
 	async listCatalogUploads() {
 		return implement(v1.formulary.codeSetAdmin.listUploads).handler(async ({ input }) => {
@@ -213,7 +215,10 @@ export class FormularyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "formulary", action: "terminology_admin" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "formulary", action: "terminology_admin" },
+	])
 	@Implement(v1.formulary.codeSetAdmin.recordUpload)
 	async recordCatalogUpload(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -222,7 +227,10 @@ export class FormularyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "formulary", action: "terminology_admin" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "formulary", action: "terminology_admin" },
+	])
 	@Implement(v1.formulary.codeSetAdmin.setCodeActive)
 	async setCodeActive(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -231,7 +239,10 @@ export class FormularyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "formulary", action: "view" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "formulary", action: "view" },
+	])
 	@Implement(v1.formulary.codeSetAdmin.listDeprecations)
 	async listDeprecations() {
 		return implement(v1.formulary.codeSetAdmin.listDeprecations).handler(async ({ input }) => {
@@ -239,7 +250,10 @@ export class FormularyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "formulary", action: "terminology_admin" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "formulary", action: "terminology_admin" },
+	])
 	@Implement(v1.formulary.codeSetAdmin.createDeprecation)
 	async createDeprecation(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -248,7 +262,10 @@ export class FormularyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "formulary", action: "terminology_admin" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "formulary", action: "terminology_admin" },
+	])
 	@Implement(v1.formulary.codeSetAdmin.updateDeprecation)
 	async updateDeprecation(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -257,7 +274,10 @@ export class FormularyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "formulary", action: "terminology_admin" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "formulary", action: "terminology_admin" },
+	])
 	@Implement(v1.formulary.codeSetAdmin.deleteDeprecation)
 	async deleteDeprecation(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -268,7 +288,10 @@ export class FormularyController {
 
 	// ── Catalog Entry Editor (FORM-006) ──────────────────────────────────────
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "formulary", action: "terminology_admin" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "formulary", action: "terminology_admin" },
+	])
 	@Implement(v1.formulary.codeSetAdmin.adminSearchEntries)
 	async adminSearchEntries(@Session() _session: UserSession) {
 		return implement(v1.formulary.codeSetAdmin.adminSearchEntries).handler(async ({ input }) => {
@@ -276,7 +299,10 @@ export class FormularyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "formulary", action: "terminology_admin" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "formulary", action: "terminology_admin" },
+	])
 	@Implement(v1.formulary.codeSetAdmin.createEntry)
 	async createEntry(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -285,7 +311,10 @@ export class FormularyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "formulary", action: "terminology_admin" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "formulary", action: "terminology_admin" },
+	])
 	@Implement(v1.formulary.codeSetAdmin.updateEntry)
 	async updateEntry(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -294,7 +323,10 @@ export class FormularyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "formulary", action: "terminology_admin" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "formulary", action: "terminology_admin" },
+	])
 	@Implement(v1.formulary.codeSetAdmin.deleteEntry)
 	async deleteEntry(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
@@ -305,7 +337,10 @@ export class FormularyController {
 
 	// ── Catalog Versions (FORM-006) ───────────────────────────────────────────
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "formulary", action: "view" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "formulary", action: "view" },
+	])
 	@Implement(v1.formulary.codeSetAdmin.listVersions)
 	async listVersions(@Session() _session: UserSession) {
 		return implement(v1.formulary.codeSetAdmin.listVersions).handler(async ({ input }) => {
@@ -313,7 +348,10 @@ export class FormularyController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "formulary", action: "terminology_admin" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "formulary", action: "terminology_admin" },
+	])
 	@Implement(v1.formulary.codeSetAdmin.publishVersion)
 	async publishVersion(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)
