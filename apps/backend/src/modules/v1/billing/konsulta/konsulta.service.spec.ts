@@ -7,6 +7,8 @@
  *  3. generateKonsultaReport handles period boundary edges (inclusive).
  */
 
+import { db } from "@/common/database/database.client"
+
 import { BillingService } from "../billing.service"
 
 jest.mock("@/common/database/database.client", () => ({
@@ -36,7 +38,13 @@ jest.mock("@repo/db/schema", () => ({
 	esoaStatements: {},
 	invoiceLineItems: {},
 	invoices: {},
-	konsultaActivities: { id: "id", patientId: "patientId", facilityId: "facilityId", activityType: "activityType", activityDate: "activityDate" },
+	konsultaActivities: {
+		id: "id",
+		patientId: "patientId",
+		facilityId: "facilityId",
+		activityType: "activityType",
+		activityDate: "activityDate",
+	},
 	patients: {},
 	payments: {},
 	problems: {},
@@ -52,8 +60,6 @@ jest.mock("@/common/philhealth/philhealth.adapter", () => ({
 jest.mock("@/config/env.config", () => ({ env: {} }))
 jest.mock("@/utils/sla-events", () => ({ closeOpenSlaStep: jest.fn() }))
 jest.mock("@/utils/sla-step-target", () => ({ resolveStepTarget: jest.fn() }))
-
-import { db } from "@/common/database/database.client"
 
 function makeService() {
 	const audit = { log: jest.fn().mockResolvedValue(undefined) }
@@ -126,11 +132,12 @@ describe("BIL-BE-08 Konsulta Capitation", () => {
 			})
 			.mockReturnValueOnce({
 				from: () => ({
-					where: () => Promise.resolve([
-						{ id: "pt-1", name: "Alice", pin: "001" },
-						{ id: "pt-2", name: "Bob", pin: "002" },
-						{ id: "pt-3", name: "Carol", pin: "003" },
-					]),
+					where: () =>
+						Promise.resolve([
+							{ id: "pt-1", name: "Alice", pin: "001" },
+							{ id: "pt-2", name: "Bob", pin: "002" },
+							{ id: "pt-3", name: "Carol", pin: "003" },
+						]),
 				}),
 			})
 

@@ -44,7 +44,7 @@ jest.mock("@/common/database/database.client", () => ({
 	// Use arrow-function wrappers so mockInsert/mockUpdate/mockSelect are accessed
 	// lazily (at call time, not factory-creation time). This avoids the TDZ error
 	// that occurs when jest.mock factories referencing const variables are hoisted.
-	 
+
 	db: {
 		insert: (...args: any[]) => mockInsert(...args),
 		update: (...args: any[]) => mockUpdate(...args),

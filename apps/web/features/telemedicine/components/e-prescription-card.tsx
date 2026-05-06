@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import {
+	AlertTriangle,
 	CheckCircle2,
 	Download,
 	FileText,
@@ -13,7 +14,9 @@ import {
 	Printer,
 	Trash2,
 } from "lucide-react"
+import { toast } from "sonner"
 
+import { Alert, AlertDescription, AlertTitle } from "@/core/components/ui/alert"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
@@ -35,13 +38,44 @@ interface EPrescriptionCardProps {
 	encounterId: string
 	patientName: string
 	patientMrn: string
-	patientAge: number
-	patientSex: string
+	patientAge?: number
+	patientSex?: string
 	clinicianName: string
 	clinicianPrcNumber: string
+	clinicianPrcExpiry?: string | null
+	clinicianPtrExpiry?: string | null
 	facilityName: string
-	facilityAddress: string
+	facilityAddress?: string
 	onPrescriptionCreated?: (prescriptionId: string) => void
+}
+
+// ============================================================================
+// License helpers
+// ============================================================================
+
+function normalizeDate(d: string) {
+	const date = new Date(d)
+	date.setHours(0, 0, 0, 0)
+	return date
+}
+
+function isPastDate(d: string | null | undefined): boolean {
+	if (!d) return true
+	const today = new Date()
+	today.setHours(0, 0, 0, 0)
+	return normalizeDate(d) < today
+}
+
+function isWithinDays(d: string | null | undefined, days: number): boolean {
+	if (!d || isPastDate(d)) return false
+	const today = new Date()
+	today.setHours(0, 0, 0, 0)
+	return normalizeDate(d).getTime() - today.getTime() <= days * 86400000
+}
+
+function formatDate(d: string | null | undefined): string {
+	if (!d) return "--"
+	return new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" })
 }
 
 type NewMedItem = Omit<EPrescriptionItem, "id">
@@ -361,19 +395,31 @@ function PrescriptionPreview({ rx }: { rx: EPrescription }) {
 
 			{/* Action Buttons */}
 			<div className="flex flex-wrap gap-3">
-				<Button variant="outline" size="sm">
+				<Button variant="outline" size="sm" onClick={() => window.print()}>
 					<Printer className="mr-1.5 size-3.5" />
 					Print
 				</Button>
-				<Button variant="outline" size="sm">
+				<Button
+					variant="outline"
+					size="sm"
+					onClick={() => toast.info("PDF download is not yet available.")}
+				>
 					<Download className="mr-1.5 size-3.5" />
 					Download PDF
 				</Button>
-				<Button variant="outline" size="sm">
+				<Button
+					variant="outline"
+					size="sm"
+					onClick={() => toast.info("SMS delivery is not yet configured.")}
+				>
 					<MessageSquare className="mr-1.5 size-3.5" />
 					Send via SMS
 				</Button>
-				<Button variant="outline" size="sm">
+				<Button
+					variant="outline"
+					size="sm"
+					onClick={() => toast.info("Email delivery is not yet configured.")}
+				>
 					<Mail className="mr-1.5 size-3.5" />
 					Send via Email
 				</Button>
@@ -394,6 +440,8 @@ export function EPrescriptionCard({
 	patientSex,
 	clinicianName,
 	clinicianPrcNumber,
+	clinicianPrcExpiry,
+	clinicianPtrExpiry,
 	facilityName,
 	facilityAddress,
 	onPrescriptionCreated,
@@ -406,6 +454,22 @@ export function EPrescriptionCard({
 
 	const { data: prescriptions, isLoading } = useEncounterPrescriptionsQuery(encounterId)
 	const createMutation = useCreatePrescriptionMutation()
+
+	const prcExpired = isPastDate(clinicianPrcExpiry)
+	const ptrExpired = isPastDate(clinicianPtrExpiry)
+	const prcExpiringSoon = isWithinDays(clinicianPrcExpiry, 30)
+	const ptrExpiringSoon = isWithinDays(clinicianPtrExpiry, 30)
+	const licenseBlocked = Boolean(clinicianPrcExpiry || clinicianPtrExpiry) && (prcExpired || ptrExpired)
+
+	const licenseWarnings: string[] = []
+	if (clinicianPrcExpiry && prcExpired)
+		licenseWarnings.push(`PRC license expired ${formatDate(clinicianPrcExpiry)} — prescription generation blocked.`)
+	else if (clinicianPrcExpiry && prcExpiringSoon)
+		licenseWarnings.push(`PRC license expires ${formatDate(clinicianPrcExpiry)}.`)
+	if (clinicianPtrExpiry && ptrExpired)
+		licenseWarnings.push(`PTR expired ${formatDate(clinicianPtrExpiry)} — prescription generation blocked.`)
+	else if (clinicianPtrExpiry && ptrExpiringSoon)
+		licenseWarnings.push(`PTR expires ${formatDate(clinicianPtrExpiry)}.`)
 
 	const selectedRx = prescriptions?.find((rx) => rx.id === selectedRxId) ?? prescriptions?.[0] ?? null
 
@@ -465,6 +529,7 @@ export function EPrescriptionCard({
 						size="sm"
 						onClick={() => setShowForm((v) => !v)}
 						variant={showForm ? "outline" : "default"}
+						disabled={licenseBlocked && !showForm}
 					>
 						{showForm ? "Cancel" : (
 							<>
@@ -474,6 +539,17 @@ export function EPrescriptionCard({
 						)}
 					</Button>
 				</div>
+				{licenseWarnings.length > 0 && (
+					<Alert variant={licenseBlocked ? "destructive" : "default"} className="mt-3">
+						<AlertTriangle className="size-4" />
+						<AlertTitle>Prescription License Warning</AlertTitle>
+						<AlertDescription>
+							{licenseWarnings.map((msg, i) => (
+								<p key={i}>{msg}</p>
+							))}
+						</AlertDescription>
+					</Alert>
+				)}
 			</CardHeader>
 			<CardContent>
 				{showForm ? (
@@ -522,7 +598,7 @@ export function EPrescriptionCard({
 							<Button type="button" variant="outline" onClick={() => setShowForm(false)}>
 								Cancel
 							</Button>
-							<Button type="submit" disabled={createMutation.isPending}>
+							<Button type="submit" disabled={createMutation.isPending || licenseBlocked}>
 								{createMutation.isPending ? (
 									<>
 										<Loader2 className="mr-1.5 size-3.5 animate-spin" />
@@ -546,7 +622,7 @@ export function EPrescriptionCard({
 					<div className="flex flex-col items-center gap-3 py-8 text-center">
 						<Pill className="text-muted-foreground size-10" />
 						<p className="text-muted-foreground text-sm">No prescriptions yet for this encounter.</p>
-						<Button onClick={() => setShowForm(true)}>
+						<Button onClick={() => setShowForm(true)} disabled={licenseBlocked}>
 							<Plus className="mr-1.5 size-3.5" />
 							Generate E-Prescription
 						</Button>

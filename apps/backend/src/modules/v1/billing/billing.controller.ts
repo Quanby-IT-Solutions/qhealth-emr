@@ -3,9 +3,9 @@ import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
-import { v1 } from "@/config/api-versions.config"
 import { billingContract } from "@repo/contracts"
 
+import { v1 } from "@/config/api-versions.config"
 import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { BillingService } from "./billing.service"
@@ -362,7 +362,10 @@ export class BillingController {
 	@Implement(billingV1.markReadyForInvoicing)
 	async markReadyForInvoicing(@Session() session: UserSession) {
 		return implement(billingV1.markReadyForInvoicing).handler(async ({ input }) => {
-			return this.billingService.markReadyForInvoicing({ ...input, staffId: session.user.id }) as never
+			return this.billingService.markReadyForInvoicing({
+				...input,
+				staffId: session.user.id,
+			}) as never
 		})
 	}
 
@@ -407,7 +410,10 @@ export class BillingController {
 	@Implement(billingV1.issueReceipt)
 	async issueReceipt(@Session() session: UserSession) {
 		return implement(billingV1.issueReceipt).handler(async ({ input }) => {
-			return this.billingService.issueReceipt({ paymentId: input.paymentId, staffId: session.user.id }) as never
+			return this.billingService.issueReceipt({
+				paymentId: input.paymentId,
+				staffId: session.user.id,
+			}) as never
 		})
 	}
 
@@ -422,7 +428,10 @@ export class BillingController {
 	@Implement(billingV1.recordMalasakitPayment)
 	async recordMalasakitPayment(@Session() session: UserSession) {
 		return implement(billingV1.recordMalasakitPayment).handler(async ({ input }) => {
-			return this.billingService.recordMalasakitPayment({ ...input, staffId: session.user.id }) as never
+			return this.billingService.recordMalasakitPayment({
+				...input,
+				staffId: session.user.id,
+			}) as never
 		})
 	}
 
@@ -712,5 +721,3 @@ export class BillingController {
 		})
 	}
 }
-
-

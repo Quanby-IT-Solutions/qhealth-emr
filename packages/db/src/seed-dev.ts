@@ -133,7 +133,19 @@ type ModuleName =
 	| "him.hai"
 	| "notifications"
 
-type ActionName = "view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "manage_catalog" | "clinical_policy" | "terminology_admin" | "read" | "write"
+type ActionName =
+	| "view"
+	| "create"
+	| "edit"
+	| "sign"
+	| "delete"
+	| "verify"
+	| "export"
+	| "manage_catalog"
+	| "clinical_policy"
+	| "terminology_admin"
+	| "read"
+	| "write"
 
 interface DemoUser {
 	email: string
@@ -661,10 +673,7 @@ async function ensureAuthUser(user: DemoUser) {
 }
 
 async function ensureFacility(seed: DemoFacility) {
-	const [existing] = await db
-		.select()
-		.from(facilities)
-		.where(eq(facilities.name, seed.name))
+	const [existing] = await db.select().from(facilities).where(eq(facilities.name, seed.name))
 	if (existing) return existing
 	const [created] = await db
 		.insert(facilities)
@@ -2489,7 +2498,10 @@ async function main() {
 		.select()
 		.from(nbsLogEntries)
 		.where(
-			and(eq(nbsLogEntries.facilityId, mainFacility.id), eq(nbsLogEntries.patientId, newbornPatient.id))
+			and(
+				eq(nbsLogEntries.facilityId, mainFacility.id),
+				eq(nbsLogEntries.patientId, newbornPatient.id)
+			)
 		)
 
 	if (babySantosNbs) {

@@ -11,6 +11,8 @@
 
 import { BadRequestException, UnprocessableEntityException } from "@nestjs/common"
 
+import { db } from "@/common/database/database.client"
+
 import { BillingService } from "../billing.service"
 
 jest.mock("@/common/database/database.client", () => ({
@@ -25,7 +27,13 @@ jest.mock("@/common/database/database.client", () => ({
 }))
 
 jest.mock("@repo/db/schema", () => ({
-	cf4Claims: { id: "id", facilityId: "facilityId", encounterId: "encounterId", status: "status", resubmitCount: "resubmitCount" },
+	cf4Claims: {
+		id: "id",
+		facilityId: "facilityId",
+		encounterId: "encounterId",
+		status: "status",
+		resubmitCount: "resubmitCount",
+	},
 	cf4StatusLog: { id: "id", claimId: "claimId", status: "status", changedAt: "changedAt" },
 	cf5Claims: {},
 	cewsSnapshots: {},
@@ -56,8 +64,6 @@ jest.mock("@/config/env.config", () => ({ env: {} }))
 jest.mock("@/utils/sla-events", () => ({ closeOpenSlaStep: jest.fn() }))
 jest.mock("@/utils/sla-step-target", () => ({ resolveStepTarget: jest.fn() }))
 
-import { db } from "@/common/database/database.client"
-
 const CLAIM = "claim-uuid-0001"
 const STAFF_USER = "user-id-0001"
 const STAFF_PROFILE = "staff-profile-0001"
@@ -66,7 +72,8 @@ function makeService() {
 	const audit = { log: jest.fn().mockResolvedValue(undefined) }
 	const adapter = { submit: jest.fn(), poll: jest.fn() }
 	const service = new BillingService(adapter as never, audit as never)
-	;(service as unknown as { getStaffProfileId: (u: string) => Promise<string> }).getStaffProfileId = async () => STAFF_PROFILE
+	;(service as unknown as { getStaffProfileId: (u: string) => Promise<string> }).getStaffProfileId =
+		async () => STAFF_PROFILE
 	return { service, audit }
 }
 
@@ -79,9 +86,17 @@ describe("BIL-BE-04 CF4 Generator & eClaims", () => {
 		;(db.select as jest.Mock)
 			.mockReturnValueOnce({
 				from: () => ({
-					where: () => Promise.resolve([
-						{ id: CLAIM, status: "draft", patientId: null, encounterId: null, facilityId: null, extractedData: { chiefComplaint: null } },
-					]),
+					where: () =>
+						Promise.resolve([
+							{
+								id: CLAIM,
+								status: "draft",
+								patientId: null,
+								encounterId: null,
+								facilityId: null,
+								extractedData: { chiefComplaint: null },
+							},
+						]),
 				}),
 			})
 			.mockReturnValueOnce({
@@ -94,7 +109,9 @@ describe("BIL-BE-04 CF4 Generator & eClaims", () => {
 			fail("expected UnprocessableEntityException")
 		} catch (err) {
 			expect(err).toBeInstanceOf(UnprocessableEntityException)
-			const response = (err as UnprocessableEntityException).getResponse() as { violations: Array<{ path: string }> }
+			const response = (err as UnprocessableEntityException).getResponse() as {
+				violations: Array<{ path: string }>
+			}
 			expect(response.violations.length).toBeGreaterThan(0)
 			expect(response.violations[0]).toHaveProperty("path")
 			expect(response.violations[0]).toHaveProperty("message")
@@ -127,7 +144,8 @@ describe("BIL-BE-04 CF4 Generator & eClaims", () => {
 		;(db.update as jest.Mock).mockReturnValue({
 			set: () => ({
 				where: () => ({
-					returning: () => Promise.resolve([{ ...claim, status: "submitted", submittedAt: new Date() }]),
+					returning: () =>
+						Promise.resolve([{ ...claim, status: "submitted", submittedAt: new Date() }]),
 				}),
 			}),
 		})
@@ -180,11 +198,15 @@ describe("BIL-BE-04 CF4 Generator & eClaims", () => {
 
 	it("resubmitCf4 rejects when claim not in rejected status", async () => {
 		;(db.select as jest.Mock).mockReturnValue({
-			from: () => ({ where: () => ({ limit: () => Promise.resolve([{ id: CLAIM, status: "submitted" }]) }) }),
+			from: () => ({
+				where: () => ({ limit: () => Promise.resolve([{ id: CLAIM, status: "submitted" }]) }),
+			}),
 		})
 
 		const { service } = makeService()
-		await expect(service.resubmitCf4({ id: CLAIM, reason: "x" })).rejects.toBeInstanceOf(BadRequestException)
+		await expect(service.resubmitCf4({ id: CLAIM, reason: "x" })).rejects.toBeInstanceOf(
+			BadRequestException
+		)
 	})
 
 	it("pollCf4Status does not write duplicate log row when status unchanged", async () => {
@@ -203,7 +225,14 @@ describe("BIL-BE-04 CF4 Generator & eClaims", () => {
 				}),
 			})
 			.mockReturnValueOnce({
-				from: () => ({ where: () => ({ orderBy: () => Promise.resolve([{ id: "log-1", status: "submitted", changedAt: new Date(), claimId: CLAIM }]) }) }),
+				from: () => ({
+					where: () => ({
+						orderBy: () =>
+							Promise.resolve([
+								{ id: "log-1", status: "submitted", changedAt: new Date(), claimId: CLAIM },
+							]),
+					}),
+				}),
 			})
 		;(db.insert as jest.Mock).mockReturnValue({ values: insertValuesFn })
 
