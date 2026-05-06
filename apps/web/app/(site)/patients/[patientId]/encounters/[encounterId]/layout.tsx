@@ -21,7 +21,7 @@ import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 import { useMyActiveBreakGlassQuery } from "@/features/audit/api/audit.hooks"
-import { BreakGlassForm } from "@/features/audit/components/break-glass-form"
+import { BreakGlassCountdown, BreakGlassForm } from "@/features/audit/components/break-glass-form"
 import { useEncounterDetailQuery } from "@/features/encounters/api/encounters.hooks"
 import { ChartContext } from "@/features/encounters/context/chart-context"
 import { usePatientSummaryQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
@@ -84,12 +84,13 @@ export default function EncounterChartLayout({
 	const [breakGlassOpen, setBreakGlassOpen] = useState(false)
 	// Clinicians with audit:create can invoke break-glass
 	const canInvokeBreakGlass = can(permSet, "audit", "create")
-	const canViewAudit = can(permSet, "audit", "view")
-	const { data: activeBreakGlass } = useMyActiveBreakGlassQuery({
+	const {
+		data: activeBreakGlass,
+		refetch: refetchActiveBreakGlass,
+	} = useMyActiveBreakGlassQuery({
 		facilityId: encounter?.facilityId ?? activeFacilityId,
 		patientId: encounter?.patientId ?? patientId,
-		staffId: activeStaffProfile?.id,
-		enabled: canInvokeBreakGlass && canViewAudit,
+		enabled: canInvokeBreakGlass,
 	})
 
 	const base = `/patients/${patientId}/encounters/${encounterId}`
@@ -99,6 +100,26 @@ export default function EncounterChartLayout({
 			void refetchEncounter()
 		}
 	}, [activeBreakGlass, breakGlassRequired, refetchEncounter])
+
+	useEffect(() => {
+		if (!activeBreakGlass?.accessExpiresAt) return
+
+		const expiresAtMs = new Date(activeBreakGlass.accessExpiresAt).getTime()
+		const refreshDelayMs = expiresAtMs - Date.now() + 1000
+
+		if (refreshDelayMs <= 0) {
+			void refetchActiveBreakGlass()
+			void refetchEncounter()
+			return
+		}
+
+		const timeoutId = window.setTimeout(() => {
+			void refetchActiveBreakGlass()
+			void refetchEncounter()
+		}, refreshDelayMs)
+
+		return () => window.clearTimeout(timeoutId)
+	}, [activeBreakGlass?.accessExpiresAt, refetchActiveBreakGlass, refetchEncounter])
 
 	// Each tab declares which permission it needs. Summary is always shown.
 	// Tabs are omitted entirely when the role lacks the required permission —
@@ -246,19 +267,45 @@ export default function EncounterChartLayout({
 									<p className="text-sm font-medium text-foreground">Break-Glass Required</p>
 									<p className="text-sm text-muted-foreground">
 										This encounter is outside your regular access scope. Submit an emergency override
-										request to unlock temporary read-only access.
+										request to unlock temporary access without leaving this encounter route.
 									</p>
 								</div>
-								<BreakGlassForm
-									patientId={patientId}
-									facilityId={activeFacilityId}
-									entityType="encounter"
-									entityId={encounterId}
-									activeEvent={activeBreakGlass}
-									onSuccess={() => {
-										void refetchEncounter()
-									}}
-								/>
+								<div className="flex flex-wrap items-center gap-3">
+									<Button
+										variant="outline"
+										className="border-orange-300 text-orange-700 hover:bg-orange-50"
+										onClick={() => setBreakGlassOpen(true)}
+									>
+										<ShieldAlert className="size-4" />
+										{activeBreakGlass ? "Break-Glass Active" : "Request Break-Glass"}
+									</Button>
+									{activeBreakGlass?.accessExpiresAt ? (
+										<BreakGlassCountdown accessExpiresAt={activeBreakGlass.accessExpiresAt} />
+									) : null}
+								</div>
+								<Dialog open={breakGlassOpen} onOpenChange={setBreakGlassOpen}>
+									<DialogContent className="max-w-lg">
+										<DialogHeader>
+											<DialogTitle>Emergency Override Access</DialogTitle>
+											<DialogDescription>
+												Request temporary access to this restricted encounter. Access is timeboxed
+												and reviewed through the audit trail.
+											</DialogDescription>
+										</DialogHeader>
+										<BreakGlassForm
+											patientId={patientId}
+											facilityId={activeFacilityId}
+											entityType="encounter"
+											entityId={encounterId}
+											activeEvent={activeBreakGlass}
+											onSuccess={() => {
+												setBreakGlassOpen(false)
+												void refetchEncounter()
+											}}
+											onCancel={() => setBreakGlassOpen(false)}
+										/>
+									</DialogContent>
+								</Dialog>
 							</div>
 						) : (
 							<p className="text-sm text-destructive">You do not have permission to view this encounter.</p>
@@ -318,45 +365,54 @@ export default function EncounterChartLayout({
 
 							{/* Break-Glass Button - for clinicians */}
 							{canInvokeBreakGlass && encounter?.facilityId && encounter?.patientId && (
-								<Dialog open={breakGlassOpen} onOpenChange={setBreakGlassOpen}>
-									<DialogTrigger
-										render={
-											<Button
-												variant={activeBreakGlass ? "default" : "outline"}
-												size="sm"
-												className={cn(
-													"ml-auto gap-2",
-													activeBreakGlass
-														? "bg-orange-500 hover:bg-orange-600 text-white"
-														: "border-orange-300 text-orange-700 hover:bg-orange-50"
-												)}
-											>
-												<ShieldAlert className="size-4" />
-												{activeBreakGlass ? "Break-Glass Active" : "Request Break-Glass"}
-											</Button>
-										}
-									/>
-									<DialogContent className="max-w-lg">
-										<DialogHeader>
-											<DialogTitle>Emergency Override Access</DialogTitle>
-											<DialogDescription>
-												Request emergency access to this patient&apos;s chart when you do not have standard authorization.
-											</DialogDescription>
-										</DialogHeader>
-										<BreakGlassForm
-											patientId={encounter.patientId}
-											facilityId={encounter.facilityId}
-											entityType="encounter"
-											entityId={encounterId}
-											activeEvent={activeBreakGlass}
-											onSuccess={() => {
-												setBreakGlassOpen(false)
-												void refetchEncounter()
-											}}
-											onCancel={() => setBreakGlassOpen(false)}
+								<div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+									{activeBreakGlass?.accessExpiresAt ? (
+										<>
+											<span className="text-xs font-medium text-orange-700">Temporary access only</span>
+											<BreakGlassCountdown accessExpiresAt={activeBreakGlass.accessExpiresAt} />
+										</>
+									) : null}
+									<Dialog open={breakGlassOpen} onOpenChange={setBreakGlassOpen}>
+										<DialogTrigger
+											render={
+												<Button
+													variant={activeBreakGlass ? "default" : "outline"}
+													size="sm"
+													className={cn(
+														"gap-2",
+														activeBreakGlass
+															? "bg-orange-500 text-white hover:bg-orange-600"
+															: "border-orange-300 text-orange-700 hover:bg-orange-50"
+													)}
+												>
+													<ShieldAlert className="size-4" />
+													{activeBreakGlass ? "Break-Glass Active" : "Request Break-Glass"}
+												</Button>
+											}
 										/>
-									</DialogContent>
-								</Dialog>
+										<DialogContent className="max-w-lg">
+											<DialogHeader>
+												<DialogTitle>Emergency Override Access</DialogTitle>
+												<DialogDescription>
+													Request emergency access to this patient&apos;s chart when you do not have
+													standard authorization. Access remains temporary and expires automatically.
+												</DialogDescription>
+											</DialogHeader>
+											<BreakGlassForm
+												patientId={encounter.patientId}
+												facilityId={encounter.facilityId}
+												entityType="encounter"
+												entityId={encounterId}
+												activeEvent={activeBreakGlass}
+												onSuccess={() => {
+													setBreakGlassOpen(false)
+													void refetchEncounter()
+												}}
+												onCancel={() => setBreakGlassOpen(false)}
+											/>
+										</DialogContent>
+									</Dialog>
+								</div>
 							)}
 						</div>
 					) : null}

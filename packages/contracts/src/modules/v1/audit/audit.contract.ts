@@ -1,6 +1,7 @@
 import { oc } from "@orpc/contract"
 
 import {
+	ActiveBreakGlassLookupSchema,
 	AuditLogExportFilterSchema,
 	AuditLogFilterSchema,
 	AuditLogListResponseSchema,
@@ -83,6 +84,16 @@ export const breakGlassContract = {
 		})
 		.input(BreakGlassIdSchema)
 		.output(BreakGlassEventSchema),
+
+	myActive: oc
+		.route({
+			method: "GET",
+			path: "/break-glass/me/active",
+			summary: "Get the current clinician's active break-glass event for a patient",
+			tags: ["Audit", "Break Glass"],
+		})
+		.input(ActiveBreakGlassLookupSchema)
+		.output(BreakGlassEventSchema.nullable()),
 
 	create: oc
 		.route({

@@ -89,10 +89,14 @@ export function useCreateBreakGlassMutation() {
 
 	return useMutation(
 		orpc.audit.breakGlass.create.mutationOptions({
-			onSuccess: () =>
+			onSuccess: () => {
 				queryClient.invalidateQueries({
 					queryKey: orpc.audit.breakGlass.list.key(),
-				}),
+				})
+				queryClient.invalidateQueries({
+					queryKey: orpc.audit.breakGlass.myActive.key(),
+				})
+			},
 		})
 	)
 }
@@ -224,33 +228,19 @@ export function useConfigHistoryQuery(filter: {
 export function useMyActiveBreakGlassQuery(params: {
 	facilityId: string | undefined
 	patientId: string | undefined
-	staffId: string | undefined
 	enabled?: boolean
 }) {
-	const query = useQuery({
-		...orpc.audit.breakGlass.list.queryOptions({
+	return useQuery({
+		...orpc.audit.breakGlass.myActive.queryOptions({
 			input: {
 				facilityId: params.facilityId!,
 				patientId: params.patientId!,
-				clinicianStaffId: params.staffId!,
-				page: 1,
-				limit: 10,
 			},
 		}),
 		enabled:
 			(params.enabled ?? true) &&
 			!!params.facilityId &&
-			!!params.patientId &&
-			!!params.staffId,
-		select: data => {
-			// Find an event that is still active (accessExpiresAt > now)
-			const now = new Date()
-			const activeEvent = data?.data.find(
-				event => new Date(event.accessExpiresAt) > now
-			)
-			return activeEvent ?? null
-		},
+			!!params.patientId,
 	})
-	return query
 }
 
