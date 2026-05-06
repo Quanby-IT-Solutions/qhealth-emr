@@ -13,7 +13,7 @@
  */
 
 import { NotFoundException } from "@nestjs/common"
-import { Test, TestingModule } from "@nestjs/testing"
+import { Test, type TestingModule } from "@nestjs/testing"
 
 import { CivilRegistryService } from "../civil-registry/civil-registry.service"
 import { MedicalRecordsService } from "../medical-records/medical-records.service"
@@ -44,7 +44,7 @@ jest.mock("@/common/database/database.client", () => ({
 	// Use arrow-function wrappers so mockInsert/mockUpdate/mockSelect are accessed
 	// lazily (at call time, not factory-creation time). This avoids the TDZ error
 	// that occurs when jest.mock factories referencing const variables are hoisted.
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	 
 	db: {
 		insert: (...args: any[]) => mockInsert(...args),
 		update: (...args: any[]) => mockUpdate(...args),

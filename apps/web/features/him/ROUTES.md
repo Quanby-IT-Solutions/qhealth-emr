@@ -1,6 +1,6 @@
 # HIM Module — Route Map
 
-Routes live under `apps/web/app/(site)/(him)/him/` so the HIM console has its own route group while still sharing the site shell.
+Routes live under `apps/web/app/(site)/him/` sharing the site shell.
 
 | Route | Page | Story | Flow | Permission | Wireframe Page |
 |-------|------|-------|------|------------|----------------|

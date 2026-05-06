@@ -2,7 +2,7 @@ import { and, desc, eq, isNull } from "drizzle-orm"
 
 import { encounterStatusEvents } from "@repo/db/schema"
 
-import { db } from "@/common/database/database.client"
+import { type db } from "@/common/database/database.client"
 
 type DbClient = typeof db
 

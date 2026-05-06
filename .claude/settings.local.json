@@ -1,4 +1,4 @@
-﻿{
+{
   "permissions": {
     "allow": [
       "Bash(pnpm build:*)",
@@ -144,7 +144,8 @@
       "Bash(ls \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\coding\\\\lib\")",
       "Bash(ls \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\components\")",
       "Bash(ls \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\app\\\\\\(site\\)\\\\him\")",
-      "Bash(grep -r \"him\\\\\\\\.deficiencies\\\\\\\\.read\\\\|him\\\\\\\\.coding\\\\\\\\.read\\\\|him\\\\\\\\.records\\\\\\\\.read\\\\|him\\\\\\\\.hai\\\\\\\\.read\" --include=\"*.ts\")",      "PowerShell(head *)",
+      "Bash(grep -r \"him\\\\\\\\.deficiencies\\\\\\\\.read\\\\|him\\\\\\\\.coding\\\\\\\\.read\\\\|him\\\\\\\\.records\\\\\\\\.read\\\\|him\\\\\\\\.hai\\\\\\\\.read\" --include=\"*.ts\")",
+      "PowerShell(head *)",
       "Bash(mkdir -p /c/Users/USER/.traycer/yolo_artifacts)",
       "Bash(echo '{}')",
       "Bash(pnpm format *)",
@@ -153,7 +154,21 @@
       "Bash(mkdir -p ~/.traycer/yolo_artifacts)",
       "Bash(New-Item -ItemType Directory -Force -Path '__TRACKED_VAR__\\\\.traycer\\\\yolo_artifacts')",
       "Bash(Out-Null)",
-      "Bash(Set-Content -Path '__TRACKED_VAR__\\\\.traycer\\\\yolo_artifacts\\\\undefined.json' -Value '{}')"
+      "Bash(Set-Content -Path '__TRACKED_VAR__\\\\.traycer\\\\yolo_artifacts\\\\undefined.json' -Value '{}')",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(New-Item -ItemType File -Force \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\deficiency-tracking\\\\lib\\\\.gitkeep\")",
+      "Bash(New-Item -ItemType File -Force \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\icd10-coding\\\\lib\\\\.gitkeep\")",
+      "Bash(New-Item -ItemType File -Force \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\records-issuance\\\\lib\\\\.gitkeep\")",
+      "Bash(New-Item -ItemType File -Force \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\hai-reconciliation\\\\lib\\\\.gitkeep\")",
+      "Bash(Write-Host \"Done\")",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(Select-String \"schema|deficienc\")",
+      "Bash(Find \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\" -type f -name \"tooltip.tsx\")",
+      "Bash(grep *)",
+      "Bash(Find D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\hai-reconciliation\\\\components *)",
+      "Bash(Find D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\deficiency-tracking\\\\components *)",
+      "Bash(Select-Object -First 10 FullName)",
+      "Bash([ -f \"D:/PROJECTS/qhealth-emr/apps/backend/src/modules/v1/him/$dir/$dir.module.ts\" ])"
     ]
   }
 }
