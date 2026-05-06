@@ -26,7 +26,6 @@ import type {
 
 import { orpc } from "@/services/orpc/client"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { useFacilityProfileQuery } from "@/features/facility-profile/api/facility-profile.hooks"
 import { useListCliniciansQuery as usePatientClinicianListQuery } from "@/features/patients/api/patients.hooks"
 
 export type DayOfWeek = ClinicTemplate["dayOfWeek"]
@@ -84,20 +83,26 @@ interface AppointmentQueryParams {
 
 export function useClinicsQuery() {
 	const { data: profile } = useMyProfile()
-	const facilityProfile = useFacilityProfileQuery()
-	const activeFacilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+
+	const clinics =
+		profile?.staffProfiles.reduce<ClinicOption[]>((list, staffProfile) => {
+			const exists = list.some(clinic => clinic.id === staffProfile.facility.id)
+			if (exists) {
+				return list
+			}
+
+			list.push({
+				id: staffProfile.facility.id,
+				name: staffProfile.facility.name,
+			})
+			return list
+		}, []) ?? []
 
 	return {
-		...facilityProfile,
-		data:
-			facilityProfile.data && activeFacilityId
-				? [
-						{
-							id: activeFacilityId,
-							name: facilityProfile.data.name,
-						},
-					]
-				: ([] as ClinicOption[]),
+		data: clinics,
+		isLoading: !profile,
+		isError: false,
+		error: null,
 	}
 }
 
@@ -217,7 +222,7 @@ export function useUpdateSlotMutation() {
 									...slot,
 									status: "blocked",
 									blockReason: variables.reason ?? null,
-									updatedAt: new Date().toISOString(),
+									updatedAt: new Date(),
 								}
 							}
 
@@ -225,7 +230,7 @@ export function useUpdateSlotMutation() {
 								...slot,
 								status: "open",
 								blockReason: null,
-								updatedAt: new Date().toISOString(),
+								updatedAt: new Date(),
 							}
 						}) ?? current
 				)

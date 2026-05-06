@@ -1,11 +1,10 @@
 "use client"
 
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { TemplateBuilder } from "@/features/scheduling/components/template-builder"
 
 export default function SchedulingTemplatesPage() {
-	const { data: profile } = useMyProfile()
-	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+	const facilityId = useActiveFacilityId() ?? ""
 
 	if (!facilityId) {
 		return (
@@ -17,12 +16,6 @@ export default function SchedulingTemplatesPage() {
 
 	return (
 		<div className="space-y-6">
-			<div>
-				<h1 className="text-2xl font-bold">Clinic Schedule Templates</h1>
-				<p className="text-muted-foreground">
-					Configure available days, time slots, and patient limits per clinician
-				</p>
-			</div>
 			<TemplateBuilder facilityId={facilityId} />
 		</div>
 	)

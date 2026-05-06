@@ -30,7 +30,6 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Skeleton } from "@/core/components/ui/skeleton"
-import { cn } from "@/core/lib/utils"
 import {
 	useClinicsQuery,
 	useCreateScheduleTemplateMutation,
@@ -41,6 +40,15 @@ import {
 } from "@/features/scheduling/api/scheduling.hooks"
 
 type DayOfWeek = ClinicTemplate["dayOfWeek"]
+type WorkingHoursPeriod = {
+	startTime: string
+	endTime: string
+}
+
+type WeeklyHoursEntry = {
+	dayOfWeek: DayOfWeek
+	periods: WorkingHoursPeriod[]
+}
 
 const DAY_OPTIONS: Array<{ value: DayOfWeek; label: string; shortLabel: string }> = [
 	{ value: 0, label: "Sunday", shortLabel: "Sun" },
@@ -53,28 +61,36 @@ const DAY_OPTIONS: Array<{ value: DayOfWeek; label: string; shortLabel: string }
 ]
 
 const SLOT_DURATIONS = [5, 10, 15, 20, 30, 45, 60] as const
+const EMPTY_PERIOD: WorkingHoursPeriod = {
+	startTime: "09:00",
+	endTime: "17:00",
+}
+const EMPTY_WEEKLY_HOURS: WeeklyHoursEntry[] = DAY_OPTIONS.map(day => ({
+	dayOfWeek: day.value,
+	periods: [],
+}))
 
 const TemplateFormSchema = z
 	.object({
 		facilityId: CreateClinicTemplateSchema.shape.facilityId,
 		clinicName: CreateClinicTemplateSchema.shape.clinicName,
 		clinicianStaffId: CreateClinicTemplateSchema.shape.clinicianStaffId,
-		dayOfWeeks: z.array(z.number().int().min(0).max(6)).min(1, "Select at least one day."),
-		startTime: CreateClinicTemplateSchema.shape.startTime,
-		endTime: CreateClinicTemplateSchema.shape.endTime,
+		weeklyHours: z.array(
+			z.object({
+				dayOfWeek: z.number().int().min(0).max(6),
+				periods: z.array(
+					z.object({
+						startTime: CreateClinicTemplateSchema.shape.startTime,
+						endTime: CreateClinicTemplateSchema.shape.endTime,
+					})
+				),
+			})
+		),
 		slotDurationMinutes: z.number().int().positive(),
 		maxPatients: z.number().int().positive(),
 		isActive: z.boolean(),
 	})
 	.superRefine((value, ctx) => {
-		if (value.endTime <= value.startTime) {
-			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
-				path: ["endTime"],
-				message: "End time must be later than start time.",
-			})
-		}
-
 		if (!SLOT_DURATIONS.includes(value.slotDurationMinutes as (typeof SLOT_DURATIONS)[number])) {
 			ctx.addIssue({
 				code: z.ZodIssueCode.custom,
@@ -82,6 +98,27 @@ const TemplateFormSchema = z
 				message: "Select an allowed slot duration.",
 			})
 		}
+
+		const totalPeriods = value.weeklyHours.reduce((count, day) => count + day.periods.length, 0)
+		if (totalPeriods === 0) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				path: ["weeklyHours"],
+				message: "Add working hours for at least one day.",
+			})
+		}
+
+		value.weeklyHours.forEach((day, dayIndex) => {
+			day.periods.forEach((period, periodIndex) => {
+				if (period.endTime <= period.startTime) {
+					ctx.addIssue({
+						code: z.ZodIssueCode.custom,
+						path: ["weeklyHours", dayIndex, "periods", periodIndex, "endTime"],
+						message: "End time must be later than start time.",
+					})
+				}
+			})
+		})
 	})
 
 type TemplateFormValues = z.infer<typeof TemplateFormSchema>
@@ -90,9 +127,7 @@ const DEFAULT_FORM_VALUES: TemplateFormValues = {
 	facilityId: "",
 	clinicName: "",
 	clinicianStaffId: "",
-	dayOfWeeks: [],
-	startTime: "08:00",
-	endTime: "17:00",
+	weeklyHours: EMPTY_WEEKLY_HOURS,
 	slotDurationMinutes: 15,
 	maxPatients: 20,
 	isActive: true,
@@ -106,11 +141,34 @@ function toFieldErrors(errors: unknown[] | undefined) {
 	)
 }
 
-function buildInitialValues(template: ScheduleTemplate | null, fallbackFacilityId: string): TemplateFormValues {
+function cloneWeeklyHours(weeklyHours: WeeklyHoursEntry[]) {
+	return weeklyHours.map(day => ({
+		dayOfWeek: day.dayOfWeek,
+		periods: day.periods.map(period => ({ ...period })),
+	}))
+}
+
+function buildInitialWeeklyHours(template: ClinicTemplate | null): WeeklyHoursEntry[] {
+	const weeklyHours = cloneWeeklyHours(EMPTY_WEEKLY_HOURS)
+
+	if (!template) {
+		return weeklyHours
+	}
+
+	const targetDay = weeklyHours.find(day => day.dayOfWeek === template.dayOfWeek)
+	if (targetDay) {
+		targetDay.periods = [{ startTime: template.startTime, endTime: template.endTime }]
+	}
+
+	return weeklyHours
+}
+
+function buildInitialValues(template: ClinicTemplate | null, fallbackFacilityId: string): TemplateFormValues {
 	if (!template) {
 		return {
 			...DEFAULT_FORM_VALUES,
 			facilityId: fallbackFacilityId,
+			weeklyHours: cloneWeeklyHours(EMPTY_WEEKLY_HOURS),
 		}
 	}
 
@@ -118,9 +176,7 @@ function buildInitialValues(template: ScheduleTemplate | null, fallbackFacilityI
 		facilityId: template.facilityId,
 		clinicName: template.clinicName,
 		clinicianStaffId: template.clinicianStaffId,
-		dayOfWeeks: [template.dayOfWeek],
-		startTime: template.startTime,
-		endTime: template.endTime,
+		weeklyHours: buildInitialWeeklyHours(template),
 		slotDurationMinutes: template.slotDurationMinutes,
 		maxPatients: template.maxPatients,
 		isActive: template.isActive,
@@ -139,7 +195,7 @@ function TemplateDialog({
 }: {
 	open: boolean
 	onOpenChange: (open: boolean) => void
-	template: ScheduleTemplate | null
+	template: ClinicTemplate | null
 	facilityId: string
 }) {
 	const clinicsQuery = useClinicsQuery()
@@ -152,10 +208,6 @@ function TemplateDialog({
 		[template, facilityId]
 	)
 
-	const cliniciansQuery = useStaffClinicianListQuery({
-		facilityId: initialValues.facilityId || facilityId,
-	})
-
 	const form = useForm({
 		defaultValues: initialValues,
 		validators: {
@@ -166,13 +218,19 @@ function TemplateDialog({
 
 			try {
 				if (template) {
-					const payload: UpdateScheduleTemplateInput & { id: string } = {
+					const activeDay = value.weeklyHours.find(day => day.dayOfWeek === template.dayOfWeek)
+					const period = activeDay?.periods[0]
+					if (!period) {
+						toast.error("Add working hours for the selected day.")
+						return
+					}
+
+					const payload: UpdateClinicTemplateInput & { id: string } = {
 						id: template.id,
-						facilityId: value.facilityId,
 						clinicName: value.clinicName.trim(),
 						clinicianStaffId: value.clinicianStaffId,
-						startTime: value.startTime,
-						endTime: value.endTime,
+						startTime: period.startTime,
+						endTime: period.endTime,
 						slotDurationMinutes: value.slotDurationMinutes,
 						maxPatients: value.maxPatients,
 						isActive: value.isActive,
@@ -188,20 +246,22 @@ function TemplateDialog({
 					facilityId: value.facilityId,
 					clinicName: value.clinicName.trim(),
 					clinicianStaffId: value.clinicianStaffId,
-					startTime: value.startTime,
-					endTime: value.endTime,
 					slotDurationMinutes: value.slotDurationMinutes,
 					maxPatients: value.maxPatients,
 				}
 
-					const results = await Promise.allSettled(
-						value.dayOfWeeks.map(dayOfWeek =>
-							createTemplateMutation.mutateAsync({
-								...payloadBase,
-								dayOfWeek: dayOfWeek as DayOfWeek,
-							} satisfies CreateScheduleTemplateInput)
-						)
+				const templateRequests = value.weeklyHours.flatMap(day =>
+					day.periods.map(period =>
+						createTemplateMutation.mutateAsync({
+							...payloadBase,
+							dayOfWeek: day.dayOfWeek,
+							startTime: period.startTime,
+							endTime: period.endTime,
+						} satisfies CreateClinicTemplateInput)
 					)
+				)
+
+				const results = await Promise.allSettled(templateRequests)
 
 				const succeeded = results.filter(result => result.status === "fulfilled").length
 				const failed = results.length - succeeded
@@ -231,6 +291,11 @@ function TemplateDialog({
 		},
 	})
 
+	const selectedFacilityId = form.state.values.facilityId || facilityId
+	const cliniciansQuery = useStaffClinicianListQuery({
+		facilityId: selectedFacilityId,
+	})
+
 	const canSubmit = TemplateFormSchema.safeParse(form.state.values).success
 	const isEditing = Boolean(template)
 	const isPending =
@@ -238,7 +303,7 @@ function TemplateDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-2xl">
+			<DialogContent className="max-w-5xl">
 				<DialogHeader>
 					<DialogTitle>{isEditing ? "Edit Schedule Template" : "New Schedule Template"}</DialogTitle>
 				</DialogHeader>
@@ -251,7 +316,7 @@ function TemplateDialog({
 					}}
 				>
 					<FieldGroup>
-						<div className="grid gap-4 md:grid-cols-2">
+						<div className="grid gap-4 lg:grid-cols-2">
 							<form.Field name="facilityId">
 								{field => {
 									const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid
@@ -343,97 +408,188 @@ function TemplateDialog({
 							}}
 						</form.Field>
 
-						<form.Field name="dayOfWeeks">
+						<form.Field name="weeklyHours">
 							{field => {
 								const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid
 								return (
 									<FieldSet>
-										<FieldLegend variant="label">Days of Week</FieldLegend>
-										<div
-											className={cn(
-												"grid gap-2 sm:grid-cols-2 lg:grid-cols-4",
-												isEditing && "opacity-80"
-											)}
-										>
-											{DAY_OPTIONS.map(option => {
-												const checked = field.state.value.includes(option.value)
+										<div className="rounded-2xl border bg-muted/20 p-4">
+											<div className="flex items-center justify-between gap-3">
+												<div>
+													<FieldLegend variant="label">Working Hours</FieldLegend>
+													<FieldDescription>
+														Add one or more time ranges per day. Each range becomes its own recurring template on save.
+													</FieldDescription>
+												</div>
+												<div className="text-sm text-muted-foreground">
+													{
+														field.state.value.filter(day => day.periods.length > 0).length
+													}{" "}
+													days
+												</div>
+											</div>
+										</div>
+
+										<div className="space-y-3">
+											{field.state.value.map((day, dayIndex) => {
+												const dayLabel =
+													DAY_OPTIONS.find(option => option.value === day.dayOfWeek)?.label ?? "Unknown"
+												const isEditableDay = !isEditing || day.dayOfWeek === template?.dayOfWeek
+
 												return (
-													<FieldLabel key={option.value} className="rounded-lg border px-3 py-2">
-														<Checkbox
-															checked={checked}
-															disabled={isEditing}
-															onCheckedChange={nextChecked => {
-																if (isEditing) return
+													<div
+														key={day.dayOfWeek}
+														className="rounded-2xl border bg-card px-4 py-3"
+													>
+														<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-6">
+															<div className="w-full max-w-32 shrink-0 pt-1">
+																<div className="font-medium">{dayLabel}</div>
+															</div>
 
-																const nextValues = nextChecked
-																	? [...field.state.value, option.value]
-																	: field.state.value.filter(value => value !== option.value)
+															<div className="flex-1 space-y-2">
+																{day.periods.length === 0 ? (
+																	<Button
+																		type="button"
+																		variant="ghost"
+																		className="justify-start px-0 text-muted-foreground"
+																		disabled={!isEditableDay}
+																		onClick={() => {
+																			if (!isEditableDay) return
+																			const nextValue = field.state.value.map((entry, index) =>
+																				index === dayIndex
+																					? {
+																							...entry,
+																							periods: [{ ...EMPTY_PERIOD }],
+																						}
+																					: entry
+																			)
+																			field.handleChange(nextValue)
+																		}}
+																	>
+																		<Plus className="mr-2 size-4" />
+																		Add hours
+																	</Button>
+																) : (
+																	day.periods.map((period, periodIndex) => (
+																		<div
+																			key={`${day.dayOfWeek}-${periodIndex}`}
+																			className="flex flex-col gap-3 rounded-xl border bg-muted/10 p-3 lg:flex-row lg:items-center"
+																		>
+																			<Input
+																				type="time"
+																				value={period.startTime}
+																				disabled={!isEditableDay}
+																				className="w-full lg:max-w-44"
+																				onChange={event => {
+																					const nextValue = field.state.value.map((entry, entryIndex) =>
+																						entryIndex === dayIndex
+																							? {
+																									...entry,
+																									periods: entry.periods.map((candidate, candidateIndex) =>
+																										candidateIndex === periodIndex
+																											? {
+																													...candidate,
+																													startTime: event.target.value,
+																												}
+																											: candidate
+																									),
+																								}
+																							: entry
+																					)
+																					field.handleChange(nextValue)
+																				}}
+																			/>
+																			<div className="text-sm text-muted-foreground">to</div>
+																			<Input
+																				type="time"
+																				value={period.endTime}
+																				disabled={!isEditableDay}
+																				className="w-full lg:max-w-44"
+																				onChange={event => {
+																					const nextValue = field.state.value.map((entry, entryIndex) =>
+																						entryIndex === dayIndex
+																							? {
+																									...entry,
+																									periods: entry.periods.map((candidate, candidateIndex) =>
+																										candidateIndex === periodIndex
+																											? {
+																													...candidate,
+																													endTime: event.target.value,
+																												}
+																											: candidate
+																									),
+																								}
+																							: entry
+																					)
+																					field.handleChange(nextValue)
+																				}}
+																			/>
 
-																field.handleChange(
-																	nextValues.sort((left, right) => left - right) as DayOfWeek[]
-																)
-															}}
-														/>
-														<div className="flex flex-col">
-															<span>{option.shortLabel}</span>
-															<span className="text-xs text-muted-foreground">{option.label}</span>
+																			<div className="flex items-center gap-1 lg:ml-auto">
+																				<Button
+																					type="button"
+																					variant="ghost"
+																					size="sm"
+																					disabled={!isEditableDay}
+																					onClick={() => {
+																						if (!isEditableDay) return
+																						const nextPeriods = day.periods.filter(
+																							(_, index) => index !== periodIndex
+																						)
+																						const nextValue = field.state.value.map((entry, entryIndex) =>
+																							entryIndex === dayIndex
+																								? {
+																										...entry,
+																										periods: nextPeriods,
+																									}
+																								: entry
+																						)
+																						field.handleChange(nextValue)
+																					}}
+																				>
+																					<Trash2 className="size-4" />
+																				</Button>
+																				<Button
+																					type="button"
+																					variant="ghost"
+																					size="sm"
+																					disabled={!isEditableDay}
+																					onClick={() => {
+																						if (!isEditableDay) return
+																						const nextValue = field.state.value.map((entry, entryIndex) =>
+																							entryIndex === dayIndex
+																								? {
+																										...entry,
+																										periods: [...entry.periods, { ...EMPTY_PERIOD }],
+																									}
+																								: entry
+																						)
+																						field.handleChange(nextValue)
+																					}}
+																				>
+																					<Plus className="size-4" />
+																				</Button>
+																			</div>
+																		</div>
+																	))
+																)}
+
+																{isEditing && day.dayOfWeek !== template?.dayOfWeek ? (
+																	<p className="text-xs text-muted-foreground">
+																		Editing keeps this template on {formatDay(template.dayOfWeek)}. Create a new template to add another day.
+																	</p>
+																) : null}
+															</div>
 														</div>
-													</FieldLabel>
+													</div>
 												)
 											})}
 										</div>
-										{isEditing && (
-											<FieldDescription>
-												Day selection is locked for existing templates. Create a new template to move it to another day.
-											</FieldDescription>
-										)}
 										{isInvalid && <FieldError errors={toFieldErrors(field.state.meta.errors)} />}
 									</FieldSet>
 								)
 							}}
 						</form.Field>
-
-						<div className="grid gap-4 md:grid-cols-2">
-							<form.Field name="startTime">
-								{field => {
-									const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid
-									return (
-										<Field data-invalid={isInvalid}>
-											<FieldLabel htmlFor={field.name}>Start Time</FieldLabel>
-											<Input
-												id={field.name}
-												type="time"
-												value={field.state.value}
-												onBlur={field.handleBlur}
-												onChange={event => field.handleChange(event.target.value)}
-												aria-invalid={isInvalid}
-											/>
-											{isInvalid && <FieldError errors={toFieldErrors(field.state.meta.errors)} />}
-										</Field>
-									)
-								}}
-							</form.Field>
-
-							<form.Field name="endTime">
-								{field => {
-									const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid
-									return (
-										<Field data-invalid={isInvalid}>
-											<FieldLabel htmlFor={field.name}>End Time</FieldLabel>
-											<Input
-												id={field.name}
-												type="time"
-												value={field.state.value}
-												onBlur={field.handleBlur}
-												onChange={event => field.handleChange(event.target.value)}
-												aria-invalid={isInvalid}
-											/>
-											{isInvalid && <FieldError errors={toFieldErrors(field.state.meta.errors)} />}
-										</Field>
-									)
-								}}
-							</form.Field>
-						</div>
 
 						<div className="grid gap-4 md:grid-cols-2">
 							<form.Field name="slotDurationMinutes">
@@ -535,8 +691,8 @@ export function TemplateBuilder({ facilityId }: TemplateBuilderProps) {
 	const deactivateTemplateMutation = useDeleteScheduleTemplateMutation()
 
 	const [dialogOpen, setDialogOpen] = useState(false)
-	const [selectedTemplate, setSelectedTemplate] = useState<ScheduleTemplate | null>(null)
-	const [deleteTarget, setDeleteTarget] = useState<ScheduleTemplate | null>(null)
+	const [selectedTemplate, setSelectedTemplate] = useState<ClinicTemplate | null>(null)
+	const [deleteTarget, setDeleteTarget] = useState<ClinicTemplate | null>(null)
 
 	const clinicianNameById = useMemo(
 		() =>
@@ -563,7 +719,7 @@ export function TemplateBuilder({ facilityId }: TemplateBuilderProps) {
 		setDialogOpen(true)
 	}
 
-	function openEditDialog(template: ScheduleTemplate) {
+	function openEditDialog(template: ClinicTemplate) {
 		setSelectedTemplate(template)
 		setDialogOpen(true)
 	}

@@ -23,17 +23,6 @@ export function SchedulingShell({
 
 	return (
 		<div className="flex flex-col gap-0">
-			<div className="flex items-center justify-between border-b bg-sky-50 px-4 py-2 text-sm font-medium text-sky-900">
-				<div className="flex items-center gap-2">
-					<span className="size-2 rounded-full bg-sky-500" aria-hidden />
-					Scheduling Workspace
-				</div>
-				{roleName ? (
-					<span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">
-						{roleName}
-					</span>
-				) : null}
-			</div>
 
 			<nav className="flex gap-1 overflow-x-auto border-b px-4" aria-label="Scheduling sections">
 				{SCHEDULING_SUB_NAV.map(item => {
