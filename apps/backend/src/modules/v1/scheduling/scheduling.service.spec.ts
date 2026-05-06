@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common"
+import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common"
 
 import { db } from "@/common/database/database.client"
 
@@ -49,9 +49,12 @@ jest.mock("@repo/db/schema", () => ({
 		updatedAt: "clinicTemplates.updatedAt",
 	},
 	clinicSlots: {
+		id: "clinicSlots.id",
 		clinicTemplateId: "clinicSlots.clinicTemplateId",
 		slotDate: "clinicSlots.slotDate",
+		slotStartTime: "clinicSlots.slotStartTime",
 		status: "clinicSlots.status",
+		facilityId: "clinicSlots.facilityId",
 	},
 	staffProfiles: {
 		id: "staffProfiles.id",
@@ -99,11 +102,33 @@ function makeTemplate(overrides: Record<string, unknown> = {}) {
 	}
 }
 
+function makeSlot(overrides: Record<string, unknown> = {}) {
+	return {
+		id: "slot-1",
+		clinicTemplateId: "template-1",
+		facilityId: "fac-1",
+		clinicianStaffId: "clinician-1",
+		slotDate: "2026-05-07",
+		slotStartTime: "08:00",
+		slotEndTime: "08:15",
+		status: "open",
+		blockReason: null,
+		appointmentId: null,
+		blockedByStaffId: null,
+		blockedAt: null,
+		createdAt: new Date("2026-05-06T00:00:00.000Z"),
+		updatedAt: new Date("2026-05-06T00:00:00.000Z"),
+		...overrides,
+	}
+}
+
 function mockSelectWhere(rows: unknown[]) {
 	const result = Promise.resolve(rows) as Promise<unknown[]> & {
 		limit: jest.Mock
+		orderBy: jest.Mock
 	}
 	result.limit = jest.fn().mockResolvedValue(rows)
+	result.orderBy = jest.fn().mockResolvedValue(rows)
 
 	return {
 		where: jest.fn().mockReturnValue(result),
@@ -335,6 +360,218 @@ describe("SchedulingService", () => {
 
 			await expect(service.updateClinicTemplate({ id: "missing-template" }, actor)).rejects.toThrow(
 				NotFoundException
+			)
+		})
+	})
+
+	describe("listTemplateSlots()", () => {
+		it("returns slots and lazily generates when requested range exceeds materialized window", async () => {
+			const slot = makeSlot()
+			;(db.select as jest.Mock)
+				.mockReturnValueOnce(mockSelectChain([{ latestSlotDate: "2026-05-08" }]))
+				.mockReturnValueOnce(mockSelectChain([slot]))
+
+			const result = await service.listTemplateSlots({
+				id: "template-1",
+				fromDate: "2026-05-07",
+				toDate: "2026-05-12",
+			})
+
+			expect(mockSlotGenerator.generateSlotsForTemplate).toHaveBeenCalledWith(
+				"template-1",
+				"2026-05-07",
+				"2026-05-12"
+			)
+			expect(result).toEqual([slot])
+		})
+	})
+
+	describe("updateSlot()", () => {
+		it("blocks an open slot", async () => {
+			const existing = makeSlot()
+			const updated = makeSlot({
+				status: "blocked",
+				blockReason: "Holiday",
+				blockedByStaffId: actor.staffProfileId,
+				blockedAt: new Date("2026-05-06T10:00:00.000Z"),
+			})
+
+			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([existing]))
+			;(db.transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+				const tx = {
+					update: jest.fn().mockReturnValue(mockUpdateReturning(updated)),
+				}
+				return fn(tx)
+			})
+
+			const result = await service.updateSlot(
+				{ id: existing.id, action: "block", reason: "Holiday" },
+				actor
+			)
+
+			expect(result.status).toBe("blocked")
+			expect(mockAuditService.log).toHaveBeenCalledWith(
+				expect.objectContaining({
+					entityId: existing.id,
+					metadata: expect.objectContaining({
+						event: "audit.scheduling.slot.block",
+						slotId: existing.id,
+						actorStaffId: actor.staffProfileId,
+					}),
+				}),
+				expect.any(Object)
+			)
+		})
+
+		it("unblocks a blocked slot", async () => {
+			const existing = makeSlot({
+				status: "blocked",
+				blockReason: "Leave",
+				blockedByStaffId: "staff-2",
+				blockedAt: new Date("2026-05-06T10:00:00.000Z"),
+			})
+			const updated = makeSlot({
+				status: "open",
+				blockReason: null,
+				blockedByStaffId: null,
+				blockedAt: null,
+			})
+
+			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([existing]))
+			;(db.transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+				const tx = {
+					update: jest.fn().mockReturnValue(mockUpdateReturning(updated)),
+				}
+				return fn(tx)
+			})
+
+			const result = await service.updateSlot({ id: existing.id, action: "unblock" }, actor)
+
+			expect(result.status).toBe("open")
+			expect(mockAuditService.log).toHaveBeenCalledWith(
+				expect.objectContaining({
+					metadata: expect.objectContaining({
+						event: "audit.scheduling.slot.unblock",
+					}),
+				}),
+				expect.any(Object)
+			)
+		})
+
+		it("throws ConflictException when blocking a booked slot", async () => {
+			;(db.select as jest.Mock).mockReturnValueOnce(
+				mockSelectChain([makeSlot({ status: "booked", appointmentId: "appt-1" })])
+			)
+
+			await expect(
+				service.updateSlot({ id: "slot-1", action: "block", reason: "Holiday" }, actor)
+			).rejects.toThrow(ConflictException)
+		})
+
+		it("returns the current row when unblocking an open slot", async () => {
+			const existing = makeSlot({ status: "open" })
+			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([existing]))
+
+			const result = await service.updateSlot({ id: existing.id, action: "unblock" }, actor)
+
+			expect(result).toEqual(existing)
+			expect(db.transaction).not.toHaveBeenCalled()
+		})
+
+		it("throws NotFoundException when the slot does not exist", async () => {
+			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([]))
+
+			await expect(service.updateSlot({ id: "missing-slot", action: "block" }, actor)).rejects.toThrow(
+				NotFoundException
+			)
+		})
+	})
+
+	describe("slot management integration flow", () => {
+		it("creates a template, lists generated slots, blocks one slot, and returns the updated status", async () => {
+			const createdTemplate = makeTemplate()
+			const openSlot = makeSlot()
+			const blockedSlot = makeSlot({
+				status: "blocked",
+				blockReason: "Clinician leave",
+				blockedByStaffId: actor.staffProfileId,
+				blockedAt: new Date("2026-05-06T10:00:00.000Z"),
+			})
+
+			;(db.select as jest.Mock)
+				.mockReturnValueOnce(mockSelectChain([{ id: "clinician-1" }]))
+				.mockReturnValueOnce(mockSelectChain([{ latestSlotDate: null }]))
+				.mockReturnValueOnce(mockSelectChain([openSlot]))
+				.mockReturnValueOnce(mockSelectChain([openSlot]))
+				.mockReturnValueOnce(mockSelectChain([{ latestSlotDate: "2026-05-12" }]))
+				.mockReturnValueOnce(mockSelectChain([blockedSlot]))
+
+			;(db.transaction as jest.Mock)
+				.mockImplementationOnce(async (fn: (tx: unknown) => Promise<unknown>) => {
+					const tx = {
+						insert: jest.fn().mockReturnValue(mockInsertReturning(createdTemplate)),
+					}
+					return fn(tx)
+				})
+				.mockImplementationOnce(async (fn: (tx: unknown) => Promise<unknown>) => {
+					const tx = {
+						update: jest.fn().mockReturnValue(mockUpdateReturning(blockedSlot)),
+					}
+					return fn(tx)
+				})
+
+			await service.createClinicTemplate(
+				{
+					facilityId: "fac-1",
+					clinicianStaffId: "clinician-1",
+					clinicName: "OPD AM",
+					dayOfWeek: 1,
+					startTime: "08:00",
+					endTime: "10:00",
+					maxPatients: 8,
+					slotDurationMinutes: 15,
+				},
+				actor
+			)
+
+			const initialSlots = await service.listTemplateSlots({
+				id: createdTemplate.id,
+				fromDate: "2026-05-07",
+				toDate: "2026-05-12",
+			})
+
+			await service.updateSlot(
+				{ id: openSlot.id, action: "block", reason: "Clinician leave" },
+				actor
+			)
+
+			const updatedSlots = await service.listTemplateSlots({
+				id: createdTemplate.id,
+				fromDate: "2026-05-07",
+				toDate: "2026-05-12",
+			})
+
+			expect(initialSlots).toEqual([openSlot])
+			expect(updatedSlots).toEqual([blockedSlot])
+			expect(mockSlotGenerator.generateSlotsForTemplate).toHaveBeenNthCalledWith(
+				1,
+				createdTemplate.id,
+				expect.any(String),
+				expect.any(String)
+			)
+			expect(mockSlotGenerator.generateSlotsForTemplate).toHaveBeenCalledWith(
+				createdTemplate.id,
+				"2026-05-07",
+				"2026-05-12"
+			)
+			expect(mockAuditService.log).toHaveBeenCalledWith(
+				expect.objectContaining({
+					metadata: expect.objectContaining({
+						event: "audit.scheduling.slot.block",
+						actorStaffId: actor.staffProfileId,
+					}),
+				}),
+				expect.any(Object)
 			)
 		})
 	})

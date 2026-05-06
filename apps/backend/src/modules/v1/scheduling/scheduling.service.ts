@@ -33,6 +33,8 @@ type WorkflowType = "opd" | "ed" | "admission" | "discharge" | "ancillary" | "ph
 type ClinicTemplateListInput = V1Inputs["scheduling"]["listClinicTemplates"]
 type CreateClinicTemplateInput = V1Inputs["scheduling"]["createClinicTemplate"]
 type UpdateClinicTemplateInput = V1Inputs["scheduling"]["updateClinicTemplate"]
+type ListTemplateSlotsInput = V1Inputs["scheduling"]["listTemplateSlots"]
+type UpdateSlotInput = V1Inputs["scheduling"]["updateSlot"]
 type AppointmentListInput = V1Inputs["scheduling"]["listAppointments"]
 type CreateAppointmentInput = V1Inputs["scheduling"]["createAppointment"]
 type CheckInAppointmentInput = V1Inputs["scheduling"]["checkInAppointment"]
@@ -233,6 +235,141 @@ export class SchedulingService {
 		return updated!
 	}
 
+	async listTemplateSlots(input: ListTemplateSlotsInput) {
+		this.assertValidSlotRange(input.fromDate, input.toDate)
+
+		const [rangeState] = await db
+			.select({
+				latestSlotDate: sql<string | null>`max(${clinicSlots.slotDate})`,
+			})
+			.from(clinicSlots)
+			.where(eq(clinicSlots.clinicTemplateId, input.id))
+
+		if (!rangeState?.latestSlotDate || rangeState.latestSlotDate < input.toDate) {
+			await this.slotGenerator.generateSlotsForTemplate(input.id, input.fromDate, input.toDate)
+		}
+
+		const conditions: SQL[] = [
+			eq(clinicSlots.clinicTemplateId, input.id),
+			gte(clinicSlots.slotDate, input.fromDate),
+			sql`${clinicSlots.slotDate} <= ${input.toDate}`,
+		]
+
+		if (input.status) {
+			conditions.push(eq(clinicSlots.status, input.status))
+		}
+
+		return db
+			.select()
+			.from(clinicSlots)
+			.where(and(...conditions))
+			.orderBy(clinicSlots.slotDate, clinicSlots.slotStartTime)
+	}
+
+	async updateSlot(input: UpdateSlotInput, actor: SchedulingActor) {
+		const [existing] = await db.select().from(clinicSlots).where(eq(clinicSlots.id, input.id))
+
+		if (!existing) {
+			throw new NotFoundException(`Clinic slot ${input.id} not found`)
+		}
+
+		if (input.action === "block") {
+			if (existing.status === "booked") {
+				throw new ConflictException("Booked slots cannot be blocked")
+			}
+
+			const actorStaffId = await this.resolveActorStaffProfileId(actor)
+			return db.transaction(async (tx: DBTransaction) => {
+				const [updated] = await tx
+					.update(clinicSlots)
+					.set({
+						status: "blocked",
+						blockReason: input.reason ?? null,
+						blockedByStaffId: actorStaffId,
+						blockedAt: new Date(),
+						updatedAt: new Date(),
+					})
+					.where(eq(clinicSlots.id, input.id))
+					.returning()
+
+				await this.auditService.log(
+					{
+						facilityId: updated!.facilityId,
+						userId: actor.userId,
+						staffProfileId: actorStaffId,
+						action: "update",
+						entityType: AUDIT_ENTITY_TYPES.CLINIC_SLOT,
+						entityId: updated!.id,
+						beforeState: existing as unknown as Record<string, unknown>,
+						afterState: updated! as unknown as Record<string, unknown>,
+						ipAddress: actor.ipAddress,
+						userAgent: actor.userAgent,
+						metadata: {
+							event: "audit.scheduling.slot.block",
+							slotId: updated!.id,
+							actorStaffId,
+							templateId: updated!.clinicTemplateId,
+							slotDate: updated!.slotDate,
+							slotStartTime: updated!.slotStartTime,
+						},
+					},
+					{ tx }
+				)
+
+				return updated!
+			})
+		}
+
+		if (existing.status === "open") {
+			return existing
+		}
+
+		if (existing.status === "booked" || existing.status === "cancelled") {
+			throw new ConflictException(`Slots with status "${existing.status}" cannot be unblocked`)
+		}
+
+		const actorStaffId = await this.resolveActorStaffProfileId(actor)
+		return db.transaction(async (tx: DBTransaction) => {
+			const [updated] = await tx
+				.update(clinicSlots)
+				.set({
+					status: "open",
+					blockReason: null,
+					blockedByStaffId: null,
+					blockedAt: null,
+					updatedAt: new Date(),
+				})
+				.where(eq(clinicSlots.id, input.id))
+				.returning()
+
+			await this.auditService.log(
+				{
+					facilityId: updated!.facilityId,
+					userId: actor.userId,
+					staffProfileId: actorStaffId,
+					action: "update",
+					entityType: AUDIT_ENTITY_TYPES.CLINIC_SLOT,
+					entityId: updated!.id,
+					beforeState: existing as unknown as Record<string, unknown>,
+					afterState: updated! as unknown as Record<string, unknown>,
+					ipAddress: actor.ipAddress,
+					userAgent: actor.userAgent,
+					metadata: {
+						event: "audit.scheduling.slot.unblock",
+						slotId: updated!.id,
+						actorStaffId,
+						templateId: updated!.clinicTemplateId,
+						slotDate: updated!.slotDate,
+						slotStartTime: updated!.slotStartTime,
+					},
+				},
+				{ tx }
+			)
+
+			return updated!
+		})
+	}
+
 	// ========================================================================
 	// Appointments
 	// ========================================================================
@@ -269,6 +406,7 @@ export class SchedulingService {
 				id: appointments.id,
 				facilityId: appointments.facilityId,
 				clinicTemplateId: appointments.clinicTemplateId,
+				clinicSlotId: appointments.clinicSlotId,
 				patientId: appointments.patientId,
 				clinicianStaffId: appointments.clinicianStaffId,
 				appointmentDate: appointments.appointmentDate,
@@ -299,6 +437,7 @@ export class SchedulingService {
 			id: row.id,
 			facilityId: row.facilityId,
 			clinicTemplateId: row.clinicTemplateId,
+			clinicSlotId: row.clinicSlotId,
 			patientId: row.patientId,
 			clinicianStaffId: row.clinicianStaffId,
 			appointmentDate: row.appointmentDate,
@@ -335,6 +474,7 @@ export class SchedulingService {
 				id: appointments.id,
 				facilityId: appointments.facilityId,
 				clinicTemplateId: appointments.clinicTemplateId,
+				clinicSlotId: appointments.clinicSlotId,
 				patientId: appointments.patientId,
 				clinicianStaffId: appointments.clinicianStaffId,
 				appointmentDate: appointments.appointmentDate,
@@ -371,6 +511,7 @@ export class SchedulingService {
 			id: row.id,
 			facilityId: row.facilityId,
 			clinicTemplateId: row.clinicTemplateId,
+			clinicSlotId: row.clinicSlotId,
 			patientId: row.patientId,
 			clinicianStaffId: row.clinicianStaffId,
 			appointmentDate: row.appointmentDate,
@@ -816,6 +957,12 @@ export class SchedulingService {
 
 	private todayDateString(): string {
 		return new Date().toISOString().slice(0, 10)
+	}
+
+	private assertValidSlotRange(fromDate: string, toDate: string): void {
+		if (fromDate > toDate) {
+			throw new BadRequestException("fromDate must be on or before toDate")
+		}
 	}
 
 	private addDays(date: string, days: number): string {

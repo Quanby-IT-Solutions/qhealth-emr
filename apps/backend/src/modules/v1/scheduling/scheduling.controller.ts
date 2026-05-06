@@ -61,6 +61,22 @@ export class SchedulingController {
 		})
 	}
 
+	@RequirePermission("scheduling", "view")
+	@Implement(v1.scheduling.listTemplateSlots)
+	async listTemplateSlots() {
+		return implement(v1.scheduling.listTemplateSlots).handler(async ({ input }) => {
+			return this.schedulingService.listTemplateSlots(input)
+		})
+	}
+
+	@RequirePermission("scheduling", "edit")
+	@Implement(v1.scheduling.updateSlot)
+	async updateSlot(@Session() session: UserSession, @Req() req: Request) {
+		return implement(v1.scheduling.updateSlot).handler(async ({ input }) => {
+			return this.schedulingService.updateSlot(input, extractActor(session, req))
+		})
+	}
+
 	// ========================================================================
 	// Appointments
 	// ========================================================================
