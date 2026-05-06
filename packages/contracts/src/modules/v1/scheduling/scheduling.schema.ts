@@ -198,6 +198,7 @@ export const AppointmentListResponseSchema = PaginatedResponseSchema.extend({
 export const CreateAppointmentSchema = z.object({
 	facilityId: z.string().uuid(),
 	clinicTemplateId: z.string().uuid().optional(),
+	clinicSlotId: z.string().uuid().optional(),
 	patientId: z.string().uuid(),
 	clinicianStaffId: z.string().uuid(),
 	appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format"),
@@ -243,6 +244,7 @@ export const AvailableSlotsQuerySchema = z.object({
 })
 
 export const TimeSlotSchema = z.object({
+	slotId: z.string().uuid(),
 	time: z.string(), // HH:mm
 	available: z.boolean(),
 })

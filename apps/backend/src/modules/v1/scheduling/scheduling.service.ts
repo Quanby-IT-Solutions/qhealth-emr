@@ -36,7 +36,9 @@ type UpdateClinicTemplateInput = V1Inputs["scheduling"]["updateClinicTemplate"]
 type ListTemplateSlotsInput = V1Inputs["scheduling"]["listTemplateSlots"]
 type UpdateSlotInput = V1Inputs["scheduling"]["updateSlot"]
 type AppointmentListInput = V1Inputs["scheduling"]["listAppointments"]
-type CreateAppointmentInput = V1Inputs["scheduling"]["createAppointment"]
+type CreateAppointmentInput = V1Inputs["scheduling"]["createAppointment"] & {
+	clinicSlotId?: string
+}
 type CheckInAppointmentInput = V1Inputs["scheduling"]["checkInAppointment"]
 type UpdateAppointmentStatusInput = V1Inputs["scheduling"]["updateAppointmentStatus"]
 type AvailableSlotsInput = V1Inputs["scheduling"]["getAvailableSlots"]
@@ -538,63 +540,86 @@ export class SchedulingService {
 	}
 
 	async createAppointment(input: CreateAppointmentInput, session: UserSession) {
-		// Check for conflicting appointment (same clinician, date, time)
-		const [conflict] = await db
-			.select({ id: appointments.id })
-			.from(appointments)
-			.where(
-				and(
-					eq(appointments.clinicianStaffId, input.clinicianStaffId),
-					eq(appointments.appointmentDate, input.appointmentDate),
-					eq(appointments.appointmentTime, input.appointmentTime),
-					sql`${appointments.status} NOT IN ('cancelled', 'no_show')`
-				)
-			)
+		const clinicSlotId = input.clinicSlotId ?? (await this.resolveClinicSlotIdForBooking(input))
 
-		if (conflict) {
-			throw new ConflictException(
-				`Time slot ${input.appointmentTime} on ${input.appointmentDate} is already booked`
-			)
+		if (!clinicSlotId) {
+			const created = await this.createAppointmentWithoutSlot(input, session)
+			this.logger.log(`Created appointment ${created.id} for patient ${input.patientId}`)
+			return created
 		}
 
-		// Get next queue number for the date
-		const [queueResult] = await db
-			.select({ maxQueue: sql<number>`COALESCE(MAX(${appointments.queueNumber}), 0)` })
-			.from(appointments)
-			.where(
-				and(
-					eq(appointments.facilityId, input.facilityId),
-					eq(appointments.appointmentDate, input.appointmentDate)
+		const created = await db.transaction(async (tx: DBTransaction) => {
+			const [slot] = await tx
+				.select()
+				.from(clinicSlots)
+				.where(eq(clinicSlots.id, clinicSlotId))
+				.limit(1)
+				.for("update")
+
+			if (!slot) {
+				throw new NotFoundException(`Clinic slot ${clinicSlotId} not found`)
+			}
+
+			if (slot.status !== "open") {
+				throw new ConflictException(
+					`Slot ${slot.slotStartTime} on ${slot.slotDate} is not available for booking`
 				)
-			)
+			}
 
-		const queueNumber = (queueResult?.maxQueue ?? 0) + 1
+			const [conflict] = await tx
+				.select({ id: appointments.id })
+				.from(appointments)
+				.where(
+					and(
+						eq(appointments.clinicianStaffId, slot.clinicianStaffId),
+						eq(appointments.appointmentDate, slot.slotDate),
+						eq(appointments.appointmentTime, slot.slotStartTime),
+						sql`${appointments.status} NOT IN ('cancelled', 'no_show')`
+					)
+				)
+				.limit(1)
 
-		// Get bookedByStaffId from session
-		const [staffProfile] = await db
-			.select({ id: staffProfiles.id })
-			.from(staffProfiles)
-			.where(eq(staffProfiles.userId, session.user.id))
+			if (conflict) {
+				throw new ConflictException(
+					`Time slot ${slot.slotStartTime} on ${slot.slotDate} is already booked`
+				)
+			}
 
-		const [created] = await db
-			.insert(appointments)
-			.values({
-				facilityId: input.facilityId,
-				clinicTemplateId: input.clinicTemplateId,
-				patientId: input.patientId,
-				clinicianStaffId: input.clinicianStaffId,
-				appointmentDate: input.appointmentDate,
-				appointmentTime: input.appointmentTime,
-				queueNumber,
-				encounterType: input.encounterType ?? "outpatient",
-				chiefComplaint: input.chiefComplaint,
-				notes: input.notes,
-				bookedByStaffId: staffProfile?.id,
-			})
-			.returning()
+			const queueNumber = await this.getNextQueueNumber(tx, slot.facilityId, slot.slotDate)
+			const bookedByStaffId = await this.findBookedByStaffProfileId(tx, session.user.id)
 
-		this.logger.log(`Created appointment ${created!.id} for patient ${input.patientId}`)
-		return created!
+			const [appointment] = await tx
+				.insert(appointments)
+				.values({
+					facilityId: slot.facilityId,
+					clinicTemplateId: slot.clinicTemplateId,
+					clinicSlotId: slot.id,
+					patientId: input.patientId,
+					clinicianStaffId: slot.clinicianStaffId,
+					appointmentDate: slot.slotDate,
+					appointmentTime: slot.slotStartTime,
+					queueNumber,
+					encounterType: input.encounterType ?? "outpatient",
+					chiefComplaint: input.chiefComplaint,
+					notes: input.notes,
+					bookedByStaffId,
+				})
+				.returning()
+
+			await tx
+				.update(clinicSlots)
+				.set({
+					status: "booked",
+					appointmentId: appointment!.id,
+					updatedAt: new Date(),
+				})
+				.where(eq(clinicSlots.id, slot.id))
+
+			return appointment!
+		})
+
+		this.logger.log(`Created appointment ${created.id} for patient ${input.patientId}`)
+		return created
 	}
 
 	async checkInAppointment(input: CheckInAppointmentInput) {
@@ -664,11 +689,29 @@ export class SchedulingService {
 			}
 		}
 
-		const [updated] = await db
-			.update(appointments)
-			.set(updateData)
-			.where(eq(appointments.id, input.id))
-			.returning()
+		const [updated] = await db.transaction(async (tx: DBTransaction) => {
+			const [saved] = await tx
+				.update(appointments)
+				.set(updateData)
+				.where(eq(appointments.id, input.id))
+				.returning()
+
+			if (
+				(input.status === "cancelled" || input.status === "no_show") &&
+				existing.clinicSlotId
+			) {
+				await tx
+					.update(clinicSlots)
+					.set({
+						status: "open",
+						appointmentId: null,
+						updatedAt: new Date(),
+					})
+					.where(eq(clinicSlots.id, existing.clinicSlotId))
+			}
+
+			return [saved]
+		})
 
 		// SLA-006: Same constraint — cancellations cannot be logged to encounterStatusEvents
 		// without a real encounterId.  If an encounter was already created for this appointment,
@@ -682,65 +725,46 @@ export class SchedulingService {
 	// ========================================================================
 
 	async getAvailableSlots(input: AvailableSlotsInput) {
-		// Get the clinic template for this clinician
 		const dayOfWeek = new Date(input.date).getDay()
-
-		// Support both clinicianStaffId and clinicianId as aliases
 		const clinicianId = input.clinicianStaffId || input.clinicianId
 
 		if (!clinicianId) {
-			// If no clinician specified, return empty slots
 			return { slots: [], clinicName: null }
+		}
+
+		const templateConditions: SQL[] = [
+			eq(clinicTemplates.clinicianStaffId, clinicianId),
+			eq(clinicTemplates.dayOfWeek, dayOfWeek),
+			eq(clinicTemplates.isActive, true),
+		]
+
+		if (input.facilityId) {
+			templateConditions.push(eq(clinicTemplates.facilityId, input.facilityId))
 		}
 
 		const templates = await db
 			.select()
 			.from(clinicTemplates)
-			.where(
-				and(
-					eq(clinicTemplates.clinicianStaffId, clinicianId),
-					eq(clinicTemplates.dayOfWeek, dayOfWeek),
-					eq(clinicTemplates.isActive, true)
-				)
-			)
+			.where(and(...templateConditions))
 
 		if (templates.length === 0) {
 			return { slots: [], clinicName: null }
 		}
 
-		const template = templates[0]!
+		let slots = await this.listAvailableSlotRows(clinicianId, input.date, input.facilityId)
 
-		// Get existing appointments for the date
-		const existingAppointments = await db
-			.select({ time: appointments.appointmentTime })
-			.from(appointments)
-			.where(
-				and(
-					eq(appointments.clinicianStaffId, clinicianId),
-					eq(appointments.appointmentDate, input.date),
-					sql`${appointments.status} NOT IN ('cancelled', 'no_show')`
+		if (slots.length === 0) {
+			await Promise.all(
+				templates.map(template =>
+					this.slotGenerator.generateSlotsForTemplate(template.id, input.date, input.date)
 				)
 			)
-
-		const bookedTimes = new Set(existingAppointments.map(a => a.time))
-
-		// Generate time slots
-		const slots: Array<{ time: string; available: boolean }> = []
-		const startMinutes = this.timeToMinutes(template.startTime)
-		const endMinutes = this.timeToMinutes(template.endTime)
-		const slotDuration = template.slotDurationMinutes
-
-		for (let mins = startMinutes; mins < endMinutes; mins += slotDuration) {
-			const time = this.minutesToTime(mins)
-			slots.push({
-				time,
-				available: !bookedTimes.has(time),
-			})
+			slots = await this.listAvailableSlotRows(clinicianId, input.date, input.facilityId)
 		}
 
 		return {
 			slots,
-			clinicName: template.clinicName,
+			clinicName: templates[0]!.clinicName,
 		}
 	}
 
@@ -963,6 +987,169 @@ export class SchedulingService {
 		if (fromDate > toDate) {
 			throw new BadRequestException("fromDate must be on or before toDate")
 		}
+	}
+
+	private async resolveClinicSlotIdForBooking(
+		input: CreateAppointmentInput
+	): Promise<string | undefined> {
+		const [existingSlot] = await db
+			.select({ id: clinicSlots.id })
+			.from(clinicSlots)
+			.where(
+				and(
+					eq(clinicSlots.clinicianStaffId, input.clinicianStaffId),
+					eq(clinicSlots.slotDate, input.appointmentDate),
+					eq(clinicSlots.slotStartTime, input.appointmentTime)
+				)
+			)
+			.limit(1)
+
+		if (existingSlot) {
+			return existingSlot.id
+		}
+
+		const dayOfWeek = new Date(`${input.appointmentDate}T00:00:00.000Z`).getUTCDay()
+		const [template] = await db
+			.select({ id: clinicTemplates.id })
+			.from(clinicTemplates)
+			.where(
+				and(
+					eq(clinicTemplates.facilityId, input.facilityId),
+					eq(clinicTemplates.clinicianStaffId, input.clinicianStaffId),
+					eq(clinicTemplates.dayOfWeek, dayOfWeek),
+					eq(clinicTemplates.isActive, true),
+					sql`${clinicTemplates.startTime} <= ${input.appointmentTime}`,
+					sql`${clinicTemplates.endTime} > ${input.appointmentTime}`
+				)
+			)
+			.limit(1)
+
+		if (!template) {
+			return undefined
+		}
+
+		await this.slotGenerator.generateSlotsForTemplate(template.id, input.appointmentDate, input.appointmentDate)
+
+		const [generatedSlot] = await db
+			.select({ id: clinicSlots.id })
+			.from(clinicSlots)
+			.where(
+				and(
+					eq(clinicSlots.clinicianStaffId, input.clinicianStaffId),
+					eq(clinicSlots.slotDate, input.appointmentDate),
+					eq(clinicSlots.slotStartTime, input.appointmentTime)
+				)
+			)
+			.limit(1)
+
+		return generatedSlot?.id
+	}
+
+	private async createAppointmentWithoutSlot(input: CreateAppointmentInput, session: UserSession) {
+		const [conflict] = await db
+			.select({ id: appointments.id })
+			.from(appointments)
+			.where(
+				and(
+					eq(appointments.clinicianStaffId, input.clinicianStaffId),
+					eq(appointments.appointmentDate, input.appointmentDate),
+					eq(appointments.appointmentTime, input.appointmentTime),
+					sql`${appointments.status} NOT IN ('cancelled', 'no_show')`
+				)
+			)
+			.limit(1)
+
+		if (conflict) {
+			throw new ConflictException(
+				`Time slot ${input.appointmentTime} on ${input.appointmentDate} is already booked`
+			)
+		}
+
+		const queueNumber = await this.getNextQueueNumber(db, input.facilityId, input.appointmentDate)
+		const bookedByStaffId = await this.findBookedByStaffProfileId(db, session.user.id)
+
+		const [created] = await db
+			.insert(appointments)
+			.values({
+				facilityId: input.facilityId,
+				clinicTemplateId: input.clinicTemplateId,
+				clinicSlotId: null,
+				patientId: input.patientId,
+				clinicianStaffId: input.clinicianStaffId,
+				appointmentDate: input.appointmentDate,
+				appointmentTime: input.appointmentTime,
+				queueNumber,
+				encounterType: input.encounterType ?? "outpatient",
+				chiefComplaint: input.chiefComplaint,
+				notes: input.notes,
+				bookedByStaffId,
+			})
+			.returning()
+
+		return created!
+	}
+
+	private async getNextQueueNumber(
+		client: Pick<typeof db, "select">,
+		facilityId: string,
+		appointmentDate: string
+	): Promise<number> {
+		const [queueResult] = await client
+			.select({ maxQueue: sql<number>`COALESCE(MAX(${appointments.queueNumber}), 0)` })
+			.from(appointments)
+			.where(
+				and(
+					eq(appointments.facilityId, facilityId),
+					eq(appointments.appointmentDate, appointmentDate)
+				)
+			)
+
+		return (queueResult?.maxQueue ?? 0) + 1
+	}
+
+	private async findBookedByStaffProfileId(
+		client: Pick<typeof db, "select">,
+		userId: string
+	): Promise<string | undefined> {
+		const [staffProfile] = await client
+			.select({ id: staffProfiles.id })
+			.from(staffProfiles)
+			.where(eq(staffProfiles.userId, userId))
+			.limit(1)
+
+		return staffProfile?.id
+	}
+
+	private async listAvailableSlotRows(
+		clinicianId: string,
+		date: string,
+		facilityId?: string
+	): Promise<Array<{ slotId: string; time: string; available: boolean }>> {
+		const conditions: SQL[] = [
+			eq(clinicSlots.clinicianStaffId, clinicianId),
+			eq(clinicSlots.slotDate, date),
+			sql`${clinicSlots.status} IN ('open', 'booked')`,
+		]
+
+		if (facilityId) {
+			conditions.push(eq(clinicSlots.facilityId, facilityId))
+		}
+
+		const rows = await db
+			.select({
+				slotId: clinicSlots.id,
+				time: clinicSlots.slotStartTime,
+				available: sql<boolean>`${clinicSlots.status} = 'open'`,
+			})
+			.from(clinicSlots)
+			.where(and(...conditions))
+			.orderBy(clinicSlots.slotStartTime)
+
+		return rows.map(row => ({
+			slotId: row.slotId,
+			time: row.time,
+			available: Boolean(row.available),
+		}))
 	}
 
 	private addDays(date: string, days: number): string {
