@@ -117,6 +117,11 @@ export type CreateBreakGlassInput = z.infer<typeof CreateBreakGlassSchema>
 
 export const BreakGlassIdSchema = z.object({ id: z.string().uuid() })
 
+export const ActiveBreakGlassLookupSchema = z.object({
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid(),
+})
+
 export const ReviewBreakGlassSchema = z.object({
 	id: z.string().uuid(),
 	reviewStatus: z.enum(["appropriate", "flagged"]),
