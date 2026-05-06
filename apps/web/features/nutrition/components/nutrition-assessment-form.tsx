@@ -61,11 +61,12 @@ function calcSga(grade: string): { score: number; risk: MalnutritionRisk } {
 interface NutritionAssessmentFormProps {
 	encounterId: string
 	patientId: string
+	facilityId: string
 	onSaved?: () => void
 }
 
 const TOOL_LABELS: Record<ScreeningTool, string> = {
-	nrs2002: "NRS-2002",
+	nrs_2002: "NRS-2002",
 	must: "MUST",
 	sga: "SGA",
 }
@@ -119,9 +120,10 @@ const SGA_GRADE_OPTIONS = [
 export function NutritionAssessmentForm({
 	encounterId,
 	patientId,
+	facilityId,
 	onSaved,
 }: NutritionAssessmentFormProps) {
-	const [tool, setTool] = useState<ScreeningTool>("nrs2002")
+	const [tool, setTool] = useState<ScreeningTool>("nrs_2002")
 	const [nrsNutritional, setNrsNutritional] = useState("0")
 	const [nrsDisease, setNrsDisease] = useState("0")
 	const [nrsAgeOver70, setNrsAgeOver70] = useState("no")
@@ -140,7 +142,7 @@ export function NutritionAssessmentForm({
 
 	// Derive current score / risk
 	const derived = (() => {
-		if (tool === "nrs2002") {
+		if (tool === "nrs_2002") {
 			return calcNrs2002(
 				Number(nrsNutritional),
 				Number(nrsDisease),
@@ -157,12 +159,12 @@ export function NutritionAssessmentForm({
 		e.preventDefault()
 		createMutation.mutate(
 			{
+				facilityId,
 				encounterId,
 				patientId,
 				screeningTool: tool,
-				score: derived.score,
-				riskLevel: derived.risk,
-				notes: notes.trim() || undefined,
+				screeningScore: derived.score,
+				malnutritionRisk: derived.risk,
 			},
 			{
 				onSuccess: () => {
@@ -211,7 +213,7 @@ export function NutritionAssessmentForm({
 						</div>
 
 						{/* NRS-2002 fields */}
-						{tool === "nrs2002" && (
+					{tool === "nrs_2002" && (
 							<>
 								<div className="space-y-1.5">
 									<Label htmlFor="nrsNutritional">Nutritional Status Score</Label>
@@ -400,22 +402,22 @@ export function NutritionAssessmentForm({
 						<CardContent className="pt-4">
 							{historyLoading ? (
 								<p className="text-sm text-muted-foreground">Loading history…</p>
-							) : !history?.assessments.length ? (
-								<p className="text-sm text-muted-foreground">No prior assessments for this encounter.</p>
-							) : (
-								<div className="divide-y">
-									{history.assessments.map((a) => (
+			) : !history?.data.length ? (
+							<p className="text-sm text-muted-foreground">No prior assessments for this encounter.</p>
+						) : (
+							<div className="divide-y">
+								{history.data.map((a) => (
 										<div key={a.id} className="flex items-center justify-between py-3 text-sm">
 											<div className="flex flex-col gap-0.5">
 												<span className="font-medium">
 													{TOOL_LABELS[a.screeningTool]}
-													{a.screeningTool !== "sga" && ` — Score ${a.score}`}
+													{a.screeningTool !== "sga" && ` — Score ${a.screeningScore}`}
 													{a.screeningTool === "sga" &&
-														` — Grade ${a.score === 0 ? "A" : a.score === 1 ? "B" : "C"}`}
+														` — Grade ${a.screeningScore === 0 ? "A" : a.screeningScore === 1 ? "B" : "C"}`}
 												</span>
 												<span className="text-xs text-muted-foreground">
-													{a.assessedByName} ·{" "}
-													{new Date(a.assessedAt).toLocaleDateString(undefined, {
+													{a.assessedByStaffName} ·{" "}
+													{new Date(a.createdAt).toLocaleDateString(undefined, {
 														day: "numeric",
 														month: "short",
 														year: "numeric",
@@ -423,13 +425,8 @@ export function NutritionAssessmentForm({
 														minute: "2-digit",
 													})}
 												</span>
-												{a.notes && (
-													<span className="mt-0.5 text-xs text-muted-foreground italic">
-														{a.notes}
-													</span>
-												)}
 											</div>
-											<MalnutritionRiskBadge risk={a.riskLevel} />
+											<MalnutritionRiskBadge risk={a.malnutritionRisk} />
 										</div>
 									))}
 								</div>

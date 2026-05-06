@@ -36,32 +36,51 @@ function buildQueryString(
 // Types
 // ============================================================================
 
-export type ScreeningTool = "nrs2002" | "sga" | "must"
+export type ScreeningTool = "nrs_2002" | "sga" | "must"
 
 export type MalnutritionRisk = "low" | "moderate" | "high"
 
+export interface MealPlan {
+	dietType: string
+	caloricTarget?: number
+	proteinTarget?: number
+	carbTarget?: number
+	fatTarget?: number
+	fluidTarget?: number
+	specialInstructions?: string
+	feedingRoute?: "oral" | "enteral" | "parenteral" | "mixed"
+	enteralFormula?: string
+	parenteralFormula?: string
+	mealFrequency?: string
+	supplements?: string[]
+	restrictions?: string[]
+}
+
 export interface NutritionAssessment {
 	id: string
+	facilityId: string
 	encounterId: string
 	patientId: string
+	patientName: string | null
+	patientMrn: string | null
 	screeningTool: ScreeningTool
-	score: number
-	riskLevel: MalnutritionRisk
-	notes: string | null
-	assessedBy: string
-	assessedByName: string
-	assessedAt: string
+	screeningScore: number
+	malnutritionRisk: MalnutritionRisk
+	mealPlan: MealPlan | null
+	assessedByStaffId: string
+	assessedByStaffName: string | null
+	status: string
 	createdAt: string
 	updatedAt: string
 }
 
 export interface CreateNutritionAssessmentInput {
+	facilityId: string
 	encounterId: string
 	patientId: string
 	screeningTool: ScreeningTool
-	score: number
-	riskLevel: MalnutritionRisk
-	notes?: string
+	screeningScore: number
+	malnutritionRisk: MalnutritionRisk
 }
 
 export interface NutritionAssessmentListResponse {
@@ -69,7 +88,7 @@ export interface NutritionAssessmentListResponse {
 	page: number
 	limit: number
 	totalPages: number
-	assessments: NutritionAssessment[]
+	data: NutritionAssessment[]
 }
 
 // NRS-2002 specific question scores
@@ -91,37 +110,9 @@ export interface MustInput {
 // SGA (Subjective Global Assessment) - A, B, or C grades
 export type SgaGrade = "A" | "B" | "C"
 
-export interface MealPlan {
-	id: string
-	encounterId: string
-	patientId: string
-	caloricTarget: number // kcal/day
-	proteinGoalGrams: number
-	carbGoalGrams: number
-	fatGoalGrams: number
-	dietType: string // regular, soft, liquid, diabetic, renal, cardiac, etc.
-	restrictions: string[] // lactose-free, gluten-free, low-sodium, etc.
-	notes: string | null
-	createdBy: string
-	createdByName: string
-	createdAt: string
-	updatedAt: string
-}
-
 export interface CreateMealPlanInput {
-	encounterId: string
-	patientId: string
-	caloricTarget: number
-	proteinGoalGrams: number
-	carbGoalGrams: number
-	fatGoalGrams: number
-	dietType: string
-	restrictions?: string[]
-	notes?: string
-}
-
-export interface UpdateMealPlanInput extends Partial<CreateMealPlanInput> {
-	id: string
+	assessmentId: string
+	mealPlan: MealPlan
 }
 
 export interface DietOrder {
@@ -217,8 +208,8 @@ export function useMealPlanQuery(encounterId: string) {
 	return useQuery({
 		queryKey: nutritionKeys.mealPlan(encounterId),
 		queryFn: () =>
-			fetchJson<MealPlan | null>(
-				`${API_BASE}/meal-plans${buildQueryString({ encounterId })}`
+			fetchJson<NutritionAssessment | null>(
+				`${API_BASE}/assessments/by-encounter/${encodeURIComponent(encounterId)}`
 			),
 		enabled: !!encounterId,
 	})
@@ -227,18 +218,14 @@ export function useMealPlanQuery(encounterId: string) {
 export function useSaveMealPlanMutation() {
 	const qc = useQueryClient()
 	return useMutation({
-		mutationFn: (input: CreateMealPlanInput | UpdateMealPlanInput) => {
-			const isUpdate = "id" in input && input.id
-			return isUpdate
-				? fetchJson<MealPlan>(`${API_BASE}/meal-plans/${(input as UpdateMealPlanInput).id}`, {
-						method: "PUT",
-						body: JSON.stringify(input),
-					})
-				: fetchJson<MealPlan>(`${API_BASE}/meal-plans`, {
-						method: "POST",
-						body: JSON.stringify(input),
-					})
-		},
+		mutationFn: (input: CreateMealPlanInput) =>
+			fetchJson<NutritionAssessment>(
+				`${API_BASE}/assessments/${encodeURIComponent(input.assessmentId)}/meal-plan`,
+				{
+					method: "POST",
+					body: JSON.stringify(input),
+				}
+			),
 		onSuccess: (data) => {
 			void qc.invalidateQueries({
 				queryKey: nutritionKeys.mealPlan(data.encounterId),
@@ -251,14 +238,11 @@ export function useSaveMealPlanMutation() {
 // Diet Orders
 // ============================================================================
 
-export function useDietOrdersQuery(encounterId: string) {
+export function useDietOrdersQuery(_encounterId: string) {
 	return useQuery({
-		queryKey: nutritionKeys.dietOrders(encounterId),
-		queryFn: () =>
-			fetchJson<DietOrderListResponse>(
-				`${API_BASE}/diet-orders${buildQueryString({ encounterId })}`
-			),
-		enabled: !!encounterId,
+		queryKey: nutritionKeys.dietOrders(_encounterId),
+		queryFn: () => Promise.resolve<DietOrderListResponse>({ orders: [] }),
+		enabled: false,
 	})
 }
 
@@ -271,7 +255,7 @@ export interface WorklistResponse {
 	page: number
 	limit: number
 	totalPages: number
-	assessments: WorklistAssessment[]
+	data: WorklistAssessment[]
 }
 
 export function useNutritionWorklistQuery(
