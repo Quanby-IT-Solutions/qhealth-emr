@@ -1,8 +1,8 @@
 import { and, ilike, or } from "drizzle-orm"
 
 import { db } from "@/common/database/database.client"
-import { AuditService } from "@/modules/v1/audit/audit.service"
-import { ChartAccessService } from "@/modules/v1/audit/chart-access.service"
+import { type AuditService } from "@/modules/v1/audit/audit.service"
+import { type ChartAccessService } from "@/modules/v1/audit/chart-access.service"
 
 import { PatientsService } from "./patients.service"
 

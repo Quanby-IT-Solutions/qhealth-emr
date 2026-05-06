@@ -293,7 +293,7 @@ export class IntegrationRegistryService {
 						? "Run the connectivity test first and ensure it reaches activation-grade readiness."
 						: "Run the connectivity test first and ensure it passes (transport-grade proof is sufficient for this kind)."
 					throw new BadRequestException(
-						"Integration cannot be enabled without a recent successful connectivity test. " + hint
+						`Integration cannot be enabled without a recent successful connectivity test. ${  hint}`
 					)
 				}
 			}
@@ -1097,7 +1097,7 @@ export class IntegrationRegistryService {
 				.insert(integrationApiKeys)
 				.values({
 					integrationId: existing.integrationId,
-					label: existing.label + " (rotated)",
+					label: `${existing.label  } (rotated)`,
 					keyPrefix: keyTail,
 					keyHash,
 					createdBy: actorId,

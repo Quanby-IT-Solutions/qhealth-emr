@@ -1,12 +1,33 @@
-import { Controller } from "@nestjs/common"
+import { Controller, Req } from "@nestjs/common"
 import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
+import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
 import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { SchedulingService } from "./scheduling.service"
+
+type RbacProfile = {
+	staffProfiles: Array<{ id: string; facilityId: string; roles: Array<{ id: string }> }>
+	activeRole: { id: string } | null
+}
+
+function extractActor(session: UserSession, req: Request) {
+	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
+	const activeProfile =
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
+
+	return {
+		userId: session.user.id,
+		facilityId: activeProfile?.facilityId ?? "",
+		staffProfileId: activeProfile?.id ?? null,
+		ipAddress: (req.ip ?? null) as string | null,
+		userAgent: (req.get("user-agent") ?? null) as string | null,
+	}
+}
 
 @Controller()
 export class SchedulingController {
@@ -26,19 +47,17 @@ export class SchedulingController {
 
 	@RequirePermission("scheduling", "create")
 	@Implement(v1.scheduling.createClinicTemplate)
-	async createClinicTemplate(@Session() session: UserSession) {
+	async createClinicTemplate(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.scheduling.createClinicTemplate).handler(async ({ input }) => {
-			void session
-			return this.schedulingService.createClinicTemplate(input)
+			return this.schedulingService.createClinicTemplate(input, extractActor(session, req))
 		})
 	}
 
 	@RequirePermission("scheduling", "edit")
 	@Implement(v1.scheduling.updateClinicTemplate)
-	async updateClinicTemplate(@Session() session: UserSession) {
+	async updateClinicTemplate(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.scheduling.updateClinicTemplate).handler(async ({ input }) => {
-			void session
-			return this.schedulingService.updateClinicTemplate(input)
+			return this.schedulingService.updateClinicTemplate(input, extractActor(session, req))
 		})
 	}
 

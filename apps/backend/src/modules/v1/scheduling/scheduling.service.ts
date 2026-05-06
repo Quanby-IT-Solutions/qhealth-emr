@@ -1,9 +1,16 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common"
+import {
+	BadRequestException,
+	ConflictException,
+	Injectable,
+	Logger,
+	NotFoundException,
+} from "@nestjs/common"
 import type { UserSession } from "@thallesp/nestjs-better-auth"
-import { and, count, desc, eq, gte, isNotNull, lt, or, sql, type SQL } from "drizzle-orm"
+import { and, count, eq, gte, isNotNull, lt, sql, type SQL } from "drizzle-orm"
 
 import {
 	appointments,
+	clinicSlots,
 	clinicTemplates,
 	encounters,
 	encounterStatusEvents,
@@ -14,8 +21,12 @@ import {
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
+import { AUDIT_ENTITY_TYPES } from "@/modules/v1/audit/audit-entity-types"
+import { AuditService, type DBTransaction } from "@/modules/v1/audit/audit.service"
 import { closeOpenSlaStep } from "@/utils/sla-events"
 import { resolveStepTarget } from "@/utils/sla-step-target"
+
+import { SlotGeneratorService } from "./slot-generator.service"
 
 type WorkflowType = "opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing"
 
@@ -30,9 +41,34 @@ type AvailableSlotsInput = V1Inputs["scheduling"]["getAvailableSlots"]
 type ClinicQueueInput = V1Inputs["scheduling"]["getClinicQueue"]
 type UpdateEncounterQueueStatusInput = V1Inputs["scheduling"]["updateEncounterQueueStatus"]
 
+type SchedulingActor = {
+	userId: string
+	facilityId: string
+	staffProfileId: string | null
+	ipAddress: string | null
+	userAgent: string | null
+}
+
+type ClinicTemplateRow = typeof clinicTemplates.$inferSelect
+
+type FieldChange = {
+	path: string
+	before: unknown
+	after: unknown
+}
+
+const ALLOWED_SLOT_DURATIONS = [5, 10, 15, 20, 30, 45, 60] as const
+const REGENERATIVE_TEMPLATE_FIELDS = ["startTime", "endTime", "slotDurationMinutes"] as const
+
 @Injectable()
 export class SchedulingService {
 	private readonly logger = new Logger(SchedulingService.name)
+	private readonly slotWindowDays = Number(process.env.SCHEDULER_SLOT_WINDOW_DAYS ?? 60) || 60
+
+	constructor(
+		private readonly auditService: AuditService,
+		private readonly slotGenerator: SlotGeneratorService
+	) {}
 
 	// ========================================================================
 	// Clinic Templates
@@ -60,26 +96,60 @@ export class SchedulingService {
 			.orderBy(clinicTemplates.dayOfWeek, clinicTemplates.startTime)
 	}
 
-	async createClinicTemplate(input: CreateClinicTemplateInput) {
-		const [created] = await db
-			.insert(clinicTemplates)
-			.values({
-				facilityId: input.facilityId,
-				clinicianStaffId: input.clinicianStaffId,
-				clinicName: input.clinicName,
-				dayOfWeek: input.dayOfWeek,
-				startTime: input.startTime,
-				endTime: input.endTime,
-				maxPatients: input.maxPatients ?? 20,
-				slotDurationMinutes: input.slotDurationMinutes ?? 15,
-			})
-			.returning()
+	async createClinicTemplate(input: CreateClinicTemplateInput, actor: SchedulingActor) {
+		this.validateTemplateSchedule(input.startTime, input.endTime, input.slotDurationMinutes ?? 15)
+		await this.assertClinicianBelongsToFacility(input.clinicianStaffId, input.facilityId)
 
-		this.logger.log(`Created clinic template: ${input.clinicName}`)
+		const actorStaffId = await this.resolveActorStaffProfileId(actor)
+		const [created] = await db.transaction(async (tx: DBTransaction) => {
+			const [inserted] = await tx
+				.insert(clinicTemplates)
+				.values({
+					facilityId: input.facilityId,
+					clinicianStaffId: input.clinicianStaffId,
+					clinicName: input.clinicName,
+					dayOfWeek: input.dayOfWeek,
+					startTime: input.startTime,
+					endTime: input.endTime,
+					maxPatients: input.maxPatients ?? 20,
+					slotDurationMinutes: input.slotDurationMinutes ?? 15,
+				})
+				.returning()
+
+			const changes = this.diffCreatedTemplate(inserted!)
+			await this.auditService.log(
+				{
+					facilityId: inserted!.facilityId,
+					userId: actor.userId,
+					staffProfileId: actorStaffId,
+					action: "create",
+					entityType: AUDIT_ENTITY_TYPES.CLINIC_TEMPLATE,
+					entityId: inserted!.id,
+					beforeState: null,
+					afterState: inserted! as unknown as Record<string, unknown>,
+					ipAddress: actor.ipAddress,
+					userAgent: actor.userAgent,
+					metadata: {
+						event: "audit.scheduling.template.create",
+						templateId: inserted!.id,
+						actorStaffId,
+						changes,
+					},
+				},
+				{ tx }
+			)
+
+			return [inserted]
+		})
+
+		await this.generateSlotsForTemplate(created!.id)
+		this.logger.log(
+			`audit.scheduling.template.create templateId=${created!.id} actorStaffId=${actorStaffId}`
+		)
 		return created!
 	}
 
-	async updateClinicTemplate(input: UpdateClinicTemplateInput) {
+	async updateClinicTemplate(input: UpdateClinicTemplateInput, actor: SchedulingActor) {
 		const [existing] = await db
 			.select()
 			.from(clinicTemplates)
@@ -89,20 +159,77 @@ export class SchedulingService {
 			throw new NotFoundException(`Clinic template ${input.id} not found`)
 		}
 
-		const [updated] = await db
-			.update(clinicTemplates)
-			.set({
-				clinicName: input.clinicName ?? existing.clinicName,
-				startTime: input.startTime ?? existing.startTime,
-				endTime: input.endTime ?? existing.endTime,
-				maxPatients: input.maxPatients ?? existing.maxPatients,
-				slotDurationMinutes: input.slotDurationMinutes ?? existing.slotDurationMinutes,
-				isActive: input.isActive ?? existing.isActive,
-				updatedAt: new Date(),
-			})
-			.where(eq(clinicTemplates.id, input.id))
-			.returning()
+		const nextStartTime = input.startTime ?? existing.startTime
+		const nextEndTime = input.endTime ?? existing.endTime
+		const nextSlotDurationMinutes = input.slotDurationMinutes ?? existing.slotDurationMinutes
+		const nextIsActive = input.isActive ?? existing.isActive
 
+		this.validateTemplateSchedule(nextStartTime, nextEndTime, nextSlotDurationMinutes)
+
+		const actorStaffId = await this.resolveActorStaffProfileId(actor)
+		const changes = this.diffUpdatedTemplate(existing, input)
+		const shouldRegenerate = this.shouldRegenerateTemplate(existing, input)
+		const isReactivated = existing.isActive === false && nextIsActive === true
+
+		const [updated] = await db.transaction(async (tx: DBTransaction) => {
+			const [saved] = await tx
+				.update(clinicTemplates)
+				.set({
+					clinicName: input.clinicName ?? existing.clinicName,
+					startTime: nextStartTime,
+					endTime: nextEndTime,
+					maxPatients: input.maxPatients ?? existing.maxPatients,
+					slotDurationMinutes: nextSlotDurationMinutes,
+					isActive: nextIsActive,
+					updatedAt: new Date(),
+				})
+				.where(eq(clinicTemplates.id, input.id))
+				.returning()
+
+			if (shouldRegenerate) {
+				await tx
+					.delete(clinicSlots)
+					.where(
+						and(
+							eq(clinicSlots.clinicTemplateId, input.id),
+							gte(clinicSlots.slotDate, this.todayDateString()),
+							eq(clinicSlots.status, "open")
+						)
+					)
+			}
+
+			await this.auditService.log(
+				{
+					facilityId: saved!.facilityId,
+					userId: actor.userId,
+					staffProfileId: actorStaffId,
+					action: "update",
+					entityType: AUDIT_ENTITY_TYPES.CLINIC_TEMPLATE,
+					entityId: saved!.id,
+					beforeState: existing as unknown as Record<string, unknown>,
+					afterState: saved! as unknown as Record<string, unknown>,
+					ipAddress: actor.ipAddress,
+					userAgent: actor.userAgent,
+					metadata: {
+						event: "audit.scheduling.template.update",
+						templateId: saved!.id,
+						actorStaffId,
+						changes,
+					},
+				},
+				{ tx }
+			)
+
+			return [saved]
+		})
+
+		if (shouldRegenerate || isReactivated) {
+			await this.generateSlotsForTemplate(updated!.id)
+		}
+
+		this.logger.log(
+			`audit.scheduling.template.update templateId=${updated!.id} actorStaffId=${actorStaffId}`
+		)
 		return updated!
 	}
 
@@ -685,5 +812,129 @@ export class SchedulingService {
 		const hours = Math.floor(minutes / 60)
 		const mins = minutes % 60
 		return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`
+	}
+
+	private todayDateString(): string {
+		return new Date().toISOString().slice(0, 10)
+	}
+
+	private addDays(date: string, days: number): string {
+		const next = new Date(`${date}T00:00:00.000Z`)
+		next.setUTCDate(next.getUTCDate() + days)
+		return next.toISOString().slice(0, 10)
+	}
+
+	private validateTemplateSchedule(
+		startTime: string,
+		endTime: string,
+		slotDurationMinutes: number
+	): void {
+		if (this.timeToMinutes(endTime) <= this.timeToMinutes(startTime)) {
+			throw new BadRequestException("Clinic template endTime must be later than startTime")
+		}
+
+		if (!ALLOWED_SLOT_DURATIONS.includes(slotDurationMinutes as (typeof ALLOWED_SLOT_DURATIONS)[number])) {
+			throw new BadRequestException(
+				`slotDurationMinutes must be one of: ${ALLOWED_SLOT_DURATIONS.join(", ")}`
+			)
+		}
+	}
+
+	private async assertClinicianBelongsToFacility(
+		clinicianStaffId: string,
+		facilityId: string
+	): Promise<void> {
+		const [row] = await db
+			.select({ id: staffProfiles.id })
+			.from(staffProfiles)
+			.where(
+				and(
+					eq(staffProfiles.id, clinicianStaffId),
+					eq(staffProfiles.facilityId, facilityId)
+				)
+			)
+			.limit(1)
+
+		if (!row) {
+			throw new BadRequestException("Clinician does not belong to the selected facility")
+		}
+	}
+
+	private async resolveActorStaffProfileId(actor: SchedulingActor): Promise<string | null> {
+		if (actor.staffProfileId) {
+			return actor.staffProfileId
+		}
+
+		const [row] = await db
+			.select({ id: staffProfiles.id })
+			.from(staffProfiles)
+			.where(
+				and(
+					eq(staffProfiles.userId, actor.userId),
+					eq(staffProfiles.facilityId, actor.facilityId)
+				)
+			)
+			.limit(1)
+
+		return row?.id ?? null
+	}
+
+	private diffCreatedTemplate(row: ClinicTemplateRow): FieldChange[] {
+		return [
+			{ path: "facilityId", before: null, after: row.facilityId },
+			{ path: "clinicianStaffId", before: null, after: row.clinicianStaffId },
+			{ path: "clinicName", before: null, after: row.clinicName },
+			{ path: "dayOfWeek", before: null, after: row.dayOfWeek },
+			{ path: "startTime", before: null, after: row.startTime },
+			{ path: "endTime", before: null, after: row.endTime },
+			{ path: "maxPatients", before: null, after: row.maxPatients },
+			{ path: "slotDurationMinutes", before: null, after: row.slotDurationMinutes },
+			{ path: "isActive", before: null, after: row.isActive },
+		]
+	}
+
+	private diffUpdatedTemplate(
+		existing: ClinicTemplateRow,
+		input: UpdateClinicTemplateInput
+	): FieldChange[] {
+		const changes: FieldChange[] = []
+		const mutableFields = [
+			"clinicName",
+			"startTime",
+			"endTime",
+			"maxPatients",
+			"slotDurationMinutes",
+			"isActive",
+		] as const
+
+		for (const field of mutableFields) {
+			if (!(field in input)) continue
+			const nextValue = input[field]
+			if (nextValue !== undefined && existing[field] !== nextValue) {
+				changes.push({ path: field, before: existing[field], after: nextValue })
+			}
+		}
+
+		return changes
+	}
+
+	private shouldRegenerateTemplate(
+		existing: ClinicTemplateRow,
+		input: UpdateClinicTemplateInput
+	): boolean {
+		if (input.isActive === true && existing.isActive === false) {
+			return false
+		}
+
+		return REGENERATIVE_TEMPLATE_FIELDS.some(field => {
+			const nextValue = input[field]
+			return nextValue !== undefined && nextValue !== existing[field]
+		})
+	}
+
+	private async generateSlotsForTemplate(templateId: string): Promise<void> {
+		const fromDate = this.todayDateString()
+		const toDate = this.addDays(fromDate, this.slotWindowDays)
+		await this.slotGenerator.generateSlotsForTemplate(templateId, fromDate, toDate)
 	}
 }

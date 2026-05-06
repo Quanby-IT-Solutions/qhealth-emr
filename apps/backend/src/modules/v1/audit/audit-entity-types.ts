@@ -19,6 +19,7 @@ export const AUDIT_ENTITY_TYPES = {
 	FEATURE_FLAG: "feature_flag",
 	FEATURE_FLAG_TARGET: "feature_flag_target",
 	SYSTEM_SETTING: "system_setting",
+	CLINIC_TEMPLATE: "clinic_template",
 	FACILITY_PROFILE: "facility_profile",
 	INTEGRATION: "integration",
 	ROLE: "role",
