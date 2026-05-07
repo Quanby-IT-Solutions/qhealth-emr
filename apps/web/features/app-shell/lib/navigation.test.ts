@@ -34,6 +34,15 @@ const registrarPermissions = [
 	{ module: "medical_records", action: "view" },
 ]
 
+const schedulerPermissions = [
+	{ module: "adt", action: "view" },
+	{ module: "adt", action: "create" },
+	{ module: "patients", action: "view" },
+	{ module: "scheduling", action: "view" },
+	{ module: "scheduling", action: "create" },
+	{ module: "scheduling", action: "edit" },
+]
+
 describe("filterNavItems", () => {
 	it("keeps the Triage Officer sidebar scoped to triage-owned workflows", () => {
 		const primaryTitles = filterNavItems(PRIMARY_NAV_ITEMS, triagePermissions).map(
@@ -63,6 +72,26 @@ describe("filterNavItems", () => {
 			"OPD",
 			"Chart Merge",
 			"Civil Registry",
+		])
+		expect(secondaryTitles).toEqual([])
+	})
+
+	it("keeps the Scheduler sidebar scoped to scheduling-owned workflows", () => {
+		const primaryTitles = filterNavItems(PRIMARY_NAV_ITEMS, schedulerPermissions).map(
+			item => item.title
+		)
+		const secondaryTitles = filterNavItems(SECONDARY_NAV_ITEMS, schedulerPermissions).map(
+			item => item.title
+		)
+
+		expect(primaryTitles).toEqual([
+			"Dashboard",
+			"Clinic Templates",
+			"Slot Management",
+			"Appointment Booking",
+			"Check-In",
+			"OPD Queue",
+			"OR Schedule",
 		])
 		expect(secondaryTitles).toEqual([])
 	})
