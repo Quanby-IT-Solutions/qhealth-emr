@@ -1225,6 +1225,20 @@ export class OrdersService {
 		// Capture the order before status update so we have facilityId/encounterId/fromStatus
 		const medOrder = await this.findMedOrder(input.medicationOrderId)
 
+		// Enforce dual verification for high-alert medications before pharmacist approval
+		if (input.action === "approved" && this.hasHighAlertAlert(medOrder.cdsAlerts)) {
+			const dualVerification = await db
+				.select()
+				.from(highAlertVerifications)
+				.where(eq(highAlertVerifications.medicationOrderId, input.medicationOrderId))
+				.limit(1)
+			if (dualVerification.length === 0) {
+				throw new BadRequestException(
+					"High-alert medication requires dual verification by a second clinician before pharmacist approval.",
+				)
+			}
+		}
+
 		// Insert verification record
 		const [verification] = await db
 			.insert(orderVerifications)
