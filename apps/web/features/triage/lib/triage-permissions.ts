@@ -8,5 +8,9 @@ export function hasTriageAccess(permissions: TriagePermission[]) {
 		permissions.map(permission => `${permission.module}:${permission.action}`)
 	)
 
-	return permissionSet.has("adt:create") && permissionSet.has("nursing:create")
+	return (
+		permissionSet.has("adt:create") &&
+		permissionSet.has("nursing:create") &&
+		permissionSet.has("ed:create")
+	)
 }

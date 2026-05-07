@@ -63,7 +63,11 @@ interface RequiredPermission {
 	action: string
 }
 
-export type AdminNavGroup = "Identity & Access" | "Clinical Configuration" | "Reporting & Compliance" | "System Settings"
+export type AdminNavGroup =
+	| "Identity & Access"
+	| "Clinical Configuration"
+	| "Reporting & Compliance"
+	| "System Settings"
 
 interface NavItemConfig {
 	title: string
@@ -83,6 +87,12 @@ interface NavItemConfig {
 	 */
 	excludePermissions?: RequiredPermission[]
 	/**
+	 * Hide the item only when the user holds every listed permission. This is
+	 * used to identify role bundles without blocking unrelated roles that share
+	 * one broad module permission.
+	 */
+	excludeAllPermissions?: RequiredPermission[]
+	/**
 	 * All permissions in this list must be present for the item to show.
 	 * Applied after requiredPermissions. Use this to enforce AND logic across
 	 * multiple distinct permission requirements (e.g. admin:view + fhir:view).
@@ -93,16 +103,31 @@ interface NavItemConfig {
 	adminGroup?: AdminNavGroup
 }
 
+const TRIAGE_ROLE_BUNDLE: RequiredPermission[] = [
+	{ module: "adt", action: "create" },
+	{ module: "nursing", action: "create" },
+	{ module: "ed", action: "create" },
+]
+
+const REGISTRAR_ROLE_BUNDLE: RequiredPermission[] = [
+	{ module: "adt", action: "create" },
+	{ module: "adt", action: "edit" },
+	{ module: "patients", action: "edit" },
+]
+
 /**
  * Primary navigation items visible in the sidebar.
  *
  * Visibility rules (per TOR role bundles in seed-dev.ts):
  *
  * Dashboard          — always visible
- * Register Patient   — roles that create patient records (adt/create → Registrar, Admin)
- * Patients           — patient-facing roles with read access, excluding registrar's duplicate entry
- * Bed Management     — roles that modify ADT records (adt/edit → Admin, Registrar-like)
- * Emergency          — roles that create pre-encounters (adt/create) OR chart nursing in ER (nursing/create)
+ * Register Patient   — registrar/admin full MRN registration (triage uses /triage)
+ * Patients & Encounters — registrar patient search, encounter creation, transfer, discharge
+ * Bed Management     — registrar bed assignment and post-discharge bed status
+ * Chart Merge        — registrar trauma-alias merge into permanent MRN
+ * Civil Registry     — registrar birth/death certificate generation and tracking
+ * Triage             — triage-only intake, acuity scoring, trauma alias, tele-triage workflows
+ * Emergency          — ED tracker/disposition workspace for nurse/physician roles
  * Pharmacy           — roles with order-verify authority (orders/verify → Pharmacist)
  */
 export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
@@ -117,19 +142,25 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		href: "/patients/register",
 		iconName: "patient",
 		requiredPermissions: [{ module: "adt", action: "create" }],
-		// Registration is for Registrars/Triage, not clinical staff who sign documents
+		// Full patient registration is registrar/admin-owned. Triage creates
+		// pre-encounters/trauma aliases from the dedicated triage workspace.
 		excludePermissions: [{ module: "clinical_docs", action: "sign" }],
+		excludeAllPermissions: TRIAGE_ROLE_BUNDLE,
 	},
 	{
 		title: "Triage",
 		href: "/triage",
 		iconName: "emergency",
 		requiredPermissions: [{ module: "adt", action: "create" }],
-		requireAllPermissions: [{ module: "nursing", action: "create" }],
+		requireAllPermissions: [
+			{ module: "nursing", action: "create" },
+			{ module: "ed", action: "create" },
+		],
 	},
 	{
-		// Registrar patient list: search and manage existing patient records.
-		title: "Patients",
+		// Registrar patient list: search records, create encounters, then access
+		// encounter transfer and discharge tabs from the patient chart.
+		title: "Patients & Encounters",
 		href: "/patients/search",
 		iconName: "patient",
 		requiredPermissions: [{ module: "patients", action: "view" }],
@@ -203,14 +234,9 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "Scheduling",
 		href: "/scheduling",
 		iconName: "calendar",
-		// Scheduling module is for Scheduler role and Registrar (adt:edit)
-		// Admin does not have scheduling access per TOR
-		requiredPermissions: [
-			{ module: "scheduling", action: "view" },
-			{ module: "adt", action: "edit" }, // Registrar fallback (also manages appointments)
-		],
-		// Exclude Nurses who have adt:edit for bed management, not scheduling
-		// Auditors retain read permissions for audit scope, but this workspace is for operational scheduling.
+		// Scheduling module is for Scheduler role. Registrar encounter creation
+		// is handled from Patients & Encounters, not the scheduling workspace.
+		requiredPermissions: [{ module: "scheduling", action: "view" }],
 		excludePermissions: [
 			{ module: "nursing", action: "create" },
 			{ module: "audit", action: "view" },
@@ -231,9 +257,10 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "Emergency",
 		href: "/ed",
 		iconName: "emergency",
-		// ed:view is the dedicated ED module permission (seeded for Triage Officer, Nurse, Physician)
-		// Replaces the proxy adt:create/nursing:create approach — no excludePermissions needed
+		// Triage Officers use /triage for Story 2.7, 3.1, and 3.4. The broader
+		// ED workspace contains nurse tracking and physician disposition flows.
 		requiredPermissions: [{ module: "ed", action: "view" }],
+		excludeAllPermissions: TRIAGE_ROLE_BUNDLE,
 	},
 	{
 		title: "Surgical Services",
@@ -252,6 +279,22 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		// NOT seeded for: Anesthesiologist (works only in OR), Auditor (non-clinical role)
 		// NOTE: Auditor doesn't have opd:view, so OPD is already hidden from them
 		requiredPermissions: [{ module: "opd", action: "view" }],
+		excludePermissions: [{ module: "patients", action: "edit" }],
+		excludeAllPermissions: TRIAGE_ROLE_BUNDLE,
+	},
+	{
+		title: "Chart Merge",
+		href: "/registrar/chart-merge",
+		iconName: "records",
+		requiredPermissions: [{ module: "adt", action: "edit" }],
+		requireAllPermissions: [{ module: "patients", action: "edit" }],
+	},
+	{
+		title: "Civil Registry",
+		href: "/registrar/civil-registry",
+		iconName: "records",
+		requiredPermissions: [{ module: "civil_registry", action: "view" }],
+		requireAllPermissions: REGISTRAR_ROLE_BUNDLE,
 	},
 	{
 		title: "Laboratory",
@@ -291,13 +334,9 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		href: "/pharmacy/formulary",
 		iconName: "formulary",
 		// Primary sidebar for Pharmacist — note-editing workflow
-		requiredPermissions: [
-			{ module: "orders", action: "verify" },
-		],
+		requiredPermissions: [{ module: "orders", action: "verify" }],
 		// Admin users access the governance surface at /admin/formulary instead
-		excludePermissions: [
-			{ module: "admin", action: "view" },
-		],
+		excludePermissions: [{ module: "admin", action: "view" }],
 	},
 	{
 		title: "Nursing",
@@ -306,6 +345,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		requiredPermissions: [{ module: "nursing", action: "view" }],
 		// Physicians have nursing:view to read nursing notes, not to manage the nursing dashboard
 		excludePermissions: [{ module: "clinical_docs", action: "sign" }],
+		excludeAllPermissions: TRIAGE_ROLE_BUNDLE,
 	},
 	{
 		title: "Nutrition",
@@ -349,6 +389,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		// Seeded for: HIM Coder (view/create/edit) and Registrar (view)
 		// Admin does not have medical records access per TOR
 		requiredPermissions: [{ module: "medical_records", action: "view" }],
+		excludeAllPermissions: REGISTRAR_ROLE_BUNDLE,
 		isSecondary: true,
 	},
 	{
@@ -362,6 +403,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 			{ module: "him", action: "write" },
 			{ module: "medical_records", action: "view" },
 		],
+		excludeAllPermissions: REGISTRAR_ROLE_BUNDLE,
 		isSecondary: true,
 	},
 	{
@@ -380,9 +422,8 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "records",
 		// Civil registry operations belong to civil_registry-role staff (Registrar, Nurse/Midwife).
 		// The page gate and backend guard both require civil_registry:view — align nav to match.
-		requiredPermissions: [
-			{ module: "civil_registry", action: "view" },
-		],
+		requiredPermissions: [{ module: "civil_registry", action: "view" }],
+		excludeAllPermissions: REGISTRAR_ROLE_BUNDLE,
 		isSecondary: true,
 	},
 	{
@@ -505,12 +546,8 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "Integration Registry",
 		href: "/admin/integration-registry",
 		iconName: "settings",
-		requiredPermissions: [
-			{ module: "integration_registry", action: "view" },
-		],
-		requireAllPermissions: [
-			{ module: "admin", action: "view" },
-		],
+		requiredPermissions: [{ module: "integration_registry", action: "view" }],
+		requireAllPermissions: [{ module: "admin", action: "view" }],
 		isSecondary: true,
 		adminGroup: "System Settings",
 	},
@@ -566,13 +603,9 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "Formulary",
 		href: "/admin/formulary",
 		iconName: "formulary",
-		requiredPermissions: [
-			{ module: "formulary", action: "view" },
-		],
+		requiredPermissions: [{ module: "formulary", action: "view" }],
 		// Dual-gate: admin governance surface requires admin:view (FORM-005)
-		requireAllPermissions: [
-			{ module: "admin", action: "view" },
-		],
+		requireAllPermissions: [{ module: "admin", action: "view" }],
 		isSecondary: true,
 	},
 	{
@@ -639,6 +672,12 @@ interface Permission {
 export function getDefaultPatientsHref(permissions: Permission[]): string {
 	const permSet = new Set(permissions.map(p => `${p.module}:${p.action}`))
 
+	if (
+		TRIAGE_ROLE_BUNDLE.every(permission => permSet.has(`${permission.module}:${permission.action}`))
+	) {
+		return "/triage"
+	}
+
 	if (permSet.has("clinical_docs:sign")) {
 		return "/patients/search"
 	}
@@ -671,6 +710,13 @@ export function filterNavItems(items: NavItemConfig[], permissions: Permission[]
 	return items.filter(item => {
 		// Check excludes first (takes precedence over includes)
 		if (item.excludePermissions?.some(p => permSet.has(`${p.module}:${p.action}`))) {
+			return false
+		}
+
+		if (
+			item.excludeAllPermissions?.length &&
+			item.excludeAllPermissions.every(p => permSet.has(`${p.module}:${p.action}`))
+		) {
 			return false
 		}
 

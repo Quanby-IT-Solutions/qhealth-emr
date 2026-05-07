@@ -1,17 +1,15 @@
 "use client"
 
 import type { ReactNode } from "react"
-
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 import { cn } from "@/core/lib/utils"
 
 const SUB_NAV = [
-	{ label: "Dashboard", href: "/triage" },
-	{ label: "Walk-in OPD", href: "/triage/new" },
-	{ label: "Patients", href: "/patients/search" },
-	{ label: "Emergency", href: "/ed" },
+	{ label: "Triage Queue", href: "/triage" },
+	{ label: "Trauma Alias", href: "/triage/trauma-alias" },
+	{ label: "Tele-Triage", href: "/triage/tele" },
 ]
 
 export function TriageShell({ children, roleName }: { children: ReactNode; roleName?: string }) {
@@ -40,10 +38,10 @@ export function TriageShell({ children, roleName }: { children: ReactNode; roleN
 							key={item.href}
 							href={item.href}
 							className={cn(
-								"whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+								"border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
 								active
 									? "border-primary text-foreground"
-									: "border-transparent text-muted-foreground hover:text-foreground"
+									: "text-muted-foreground hover:text-foreground border-transparent"
 							)}
 						>
 							{item.label}
