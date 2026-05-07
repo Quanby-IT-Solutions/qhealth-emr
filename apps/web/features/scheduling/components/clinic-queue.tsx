@@ -92,7 +92,7 @@ export function ClinicQueue({ facilityId, clinicianStaffId }: ClinicQueueProps) 
 
 		if (nextWaiting.entryType === "appointment" && nextWaiting.appointmentId) {
 			apptStatusMut.mutate({
-				appointmentId: nextWaiting.appointmentId,
+				id: nextWaiting.appointmentId,
 				status: "in_progress",
 			})
 		} else if (nextWaiting.entryType === "walk_in" && nextWaiting.encounterId) {
@@ -105,7 +105,7 @@ export function ClinicQueue({ facilityId, clinicianStaffId }: ClinicQueueProps) 
 
 	function markCompleted(entry: UnifiedQueueEntry) {
 		if (entry.entryType === "appointment" && entry.appointmentId) {
-			apptStatusMut.mutate({ appointmentId: entry.appointmentId, status: "completed" })
+			apptStatusMut.mutate({ id: entry.appointmentId, status: "completed" })
 		}
 		// Walk-in encounters must be finalized through the chart disposition panel (PS-016 TOR Flow 1 Step 5)
 	}

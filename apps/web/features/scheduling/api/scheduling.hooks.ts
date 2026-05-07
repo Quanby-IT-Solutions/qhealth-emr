@@ -275,8 +275,8 @@ export function useAppointmentsQuery(params: AppointmentQueryParams) {
 				date: params.date,
 				status: params.status,
 				patientId: params.patientId,
-				page: params.page,
-				limit: params.limit,
+				page: params.page ?? 1,
+				limit: params.limit ?? 25,
 			} satisfies AppointmentListInput,
 			enabled: !!(params.facilityId ?? params.clinicId),
 		})
