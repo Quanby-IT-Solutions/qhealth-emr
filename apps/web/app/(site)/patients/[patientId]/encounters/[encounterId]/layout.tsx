@@ -70,9 +70,13 @@ export default function EncounterChartLayout({
 	const { patientId, encounterId } = use(params)
 	const encounterQuery = useEncounterDetailQuery(encounterId)
 	const { data: encounter, isLoading, isError, error, refetch: refetchEncounter } = encounterQuery
-	const { data: summary } = usePatientSummaryQuery(encounter?.patientId ?? "")
 	const pathname = usePathname()
 	const permSet = usePermissionSet()
+	const canViewClinicalSummary = can(permSet, "clinical_docs", "view")
+	const canViewVitals = can(permSet, "nursing", "view")
+	const { data: summary } = usePatientSummaryQuery(encounter?.patientId ?? "", {
+		enabled: !!encounter?.patientId && canViewClinicalSummary,
+	})
 	const { data: profile } = useMyProfile()
 	const { isOnline } = useOfflineSync()
 	const activeStaffProfile = getActiveStaffProfile(profile)
@@ -242,6 +246,8 @@ export default function EncounterChartLayout({
 				facilityId: encounter?.facilityId,
 				activeAllergyCount: summary?.activeAllergyCount ?? 0,
 				hasSevereAllergies: summary?.hasSevereAllergies ?? false,
+				canViewClinicalSummary,
+				canViewVitals,
 			}}
 		>
 			<div className="flex h-full min-w-0 flex-col">

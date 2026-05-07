@@ -71,6 +71,15 @@ export const CreatePreEncounterSchema = z.object({
 	triageAcuityScale: TriageAcuityScaleEnum,
 	triageAcuityLevel: z.number().int().min(1).max(5),
 	triageStaffId: z.string().uuid(),
+	temperature: z.number().min(30).max(45).optional(),
+	bpSystolic: z.number().int().positive().optional(),
+	bpDiastolic: z.number().int().positive().optional(),
+	heartRate: z.number().int().positive().optional(),
+	respiratoryRate: z.number().int().positive().optional(),
+	spo2: z.number().min(0).max(100).optional(),
+	painScore: z.number().int().min(0).max(10).optional(),
+	weight: z.number().positive().optional(),
+	height: z.number().positive().optional(),
 })
 
 export type CreatePreEncounterInput = z.infer<typeof CreatePreEncounterSchema>

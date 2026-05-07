@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
 	ArrowLeft,
 	Calendar,
@@ -267,16 +267,16 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 	const activeStaffProfile = getActiveStaffProfile(profile)
 	const activeFacilityId = activeStaffProfile?.facilityId
 	const canBreakGlass = can(permSet, "audit", "create")
+	const canViewClinicalSummary = can(permSet, "clinical_docs", "view")
 	const breakGlassRequired = isBreakGlassRequiredError(error)
-	const {
-		data: activeBreakGlass,
-		refetch: refetchActiveBreakGlass,
-	} = useMyActiveBreakGlassQuery({
+	const { data: activeBreakGlass, refetch: refetchActiveBreakGlass } = useMyActiveBreakGlassQuery({
 		facilityId: activeFacilityId,
 		patientId,
 		enabled: canBreakGlass,
 	})
-	const { data: summary } = usePatientSummaryQuery(patient ? patientId : "")
+	const { data: summary } = usePatientSummaryQuery(patient ? patientId : "", {
+		enabled: !!patient && canViewClinicalSummary,
+	})
 
 	useEffect(() => {
 		if (breakGlassRequired && activeBreakGlass) {
@@ -325,12 +325,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 			return (
 				<div className="space-y-6">
 					<div className="flex items-center gap-3">
-						<Button
-							variant="ghost"
-							size="sm"
-							className="h-8 px-2"
-							onClick={handleBackToPrevious}
-						>
+						<Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleBackToPrevious}>
 							<ArrowLeft className="size-4" />
 							Back to Search
 						</Button>
@@ -344,9 +339,9 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 							</CardTitle>
 						</CardHeader>
 						<CardContent className="space-y-4">
-							<p className="text-sm text-muted-foreground">
-								This patient chart is outside your regular access scope. Use the break-glass dialog to
-								request temporary emergency access without leaving this patient route.
+							<p className="text-muted-foreground text-sm">
+								This patient chart is outside your regular access scope. Use the break-glass dialog
+								to request temporary emergency access without leaving this patient route.
 							</p>
 							<div className="flex flex-wrap items-center gap-3">
 								<Button onClick={() => setBreakGlassOpen(true)}>
@@ -418,12 +413,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 					<div className="md:hidden">
 						<SidebarTrigger className="border-border/60 bg-background size-9 rounded-full border shadow-sm" />
 					</div>
-					<Button
-						variant="ghost"
-						size="sm"
-						className="h-8 px-2"
-						onClick={handleBackToPrevious}
-					>
+					<Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleBackToPrevious}>
 						<ArrowLeft className="size-4" />
 						Back to Search
 					</Button>
@@ -457,7 +447,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 												{summary.activeAllergyCount === 1 ? "y" : "ies"}
 											</Badge>
 										)}
-										<DpaStatusBadge patientId={patientId} />
+										{canViewClinicalSummary && <DpaStatusBadge patientId={patientId} />}
 									</div>
 								</div>
 							</div>
@@ -482,15 +472,16 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 							<div className="space-y-1">
 								<div className="flex items-center gap-2">
 									<ShieldAlert className="size-4 text-orange-700" />
-									<p className="text-sm font-medium text-orange-900">Temporary Break-Glass Access Active</p>
+									<p className="text-sm font-medium text-orange-900">
+										Temporary Break-Glass Access Active
+									</p>
 								</div>
 								<p className="text-sm text-orange-800">
-									Access to this patient record is temporary and will expire automatically. This does not
-									grant permanent access.
+									Access to this patient record is temporary and will expire automatically. This
+									does not grant permanent access.
 								</p>
 								<p className="text-xs text-orange-700">
-									Expires at{" "}
-									{formatDateTime(activeBreakGlass.accessExpiresAt)}
+									Expires at {formatDateTime(activeBreakGlass.accessExpiresAt)}
 								</p>
 							</div>
 							<div className="flex flex-wrap items-center gap-3">
@@ -622,7 +613,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 					</CardContent>
 				</Card>
 
-				{(can(permSet, "clinical_docs", "view") || can(permSet, "orders", "view")) && (
+				{canViewClinicalSummary && (
 					<div className="mb-8">
 						<ProblemsAllergiesTab
 							patientId={patientId}
@@ -655,8 +646,8 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 								<div>
 									<DialogTitle className="text-lg">Emergency Override Access</DialogTitle>
 									<DialogDescription className="mt-0.5">
-										Review the active break-glass session or request a temporary override for this patient
-										record.
+										Review the active break-glass session or request a temporary override for this
+										patient record.
 									</DialogDescription>
 								</div>
 							</div>

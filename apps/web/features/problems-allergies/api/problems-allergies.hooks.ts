@@ -15,19 +15,26 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 			...init?.headers,
 		},
 	})
-	if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+	if (!res.ok) {
+		throw Object.assign(new Error(`HTTP ${res.status}: ${res.statusText}`), {
+			status: res.status,
+		})
+	}
 	return res.json() as Promise<T>
+}
+
+function shouldRetryPatientSummary(failureCount: number, error: unknown) {
+	const status = (error as { status?: number } | null)?.status
+	if (status === 401 || status === 403 || status === 404) return false
+	return failureCount < 3
 }
 
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, value]) => value !== undefined && value !== "")
 	if (entries.length === 0) return ""
-	return (
-		"?" +
-		entries
-			.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
-			.join("&")
-	)
+	return `?${entries
+		.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+		.join("&")}`
 }
 
 export type ProblemStatus = "active" | "resolved"
@@ -446,11 +453,12 @@ export function useActiveAllergiesQuery(patientId: string) {
 	})
 }
 
-export function usePatientSummaryQuery(patientId: string) {
+export function usePatientSummaryQuery(patientId: string, options?: { enabled?: boolean }) {
 	return useQuery({
 		queryKey: problemsAllergiesKeys.summary(patientId),
 		queryFn: () =>
 			fetchJson<PatientSummaryResponse>(`${API_BASE}/summary${buildQueryString({ patientId })}`),
-		enabled: !!patientId,
+		enabled: (options?.enabled ?? true) && !!patientId,
+		retry: shouldRetryPatientSummary,
 	})
 }

@@ -5,8 +5,8 @@ import { WifiOff } from "lucide-react"
 import { Badge } from "@/core/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { useChartContext } from "@/features/encounters/context/chart-context"
-import { useOfflineEncounter } from "@/features/offline-cache/lib/use-offline-encounter"
 import type { OfflineVitalSummary } from "@/features/offline-cache/lib/offline-cache"
+import { useOfflineEncounter } from "@/features/offline-cache/lib/use-offline-encounter"
 
 function formatDateTime(dateStr: string | Date | null | undefined) {
 	if (!dateStr) return "—"
@@ -22,9 +22,9 @@ function formatDateTime(dateStr: string | Date | null | undefined) {
 function VitalItem({ label, value, unit }: { label: string; value: string; unit: string }) {
 	return (
 		<div className="rounded-lg border p-3 text-center">
-			<div className="text-xs font-medium text-muted-foreground">{label}</div>
+			<div className="text-muted-foreground text-xs font-medium">{label}</div>
 			<div className="mt-1 text-lg font-semibold">{value}</div>
-			<div className="text-xs text-muted-foreground">{unit}</div>
+			<div className="text-muted-foreground text-xs">{unit}</div>
 		</div>
 	)
 }
@@ -38,14 +38,14 @@ function VitalsCard({ vital }: { vital: OfflineVitalSummary | null }) {
 			<CardContent>
 				{vital ? (
 					<div>
-						<div className="mb-3 text-xs text-muted-foreground">
+						<div className="text-muted-foreground mb-3 text-xs">
 							Recorded {formatDateTime(vital.recordedAt)}
 						</div>
 						<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
 							<VitalItem
 								label="BP"
 								value={
-									vital.bpSystolic != null && vital.bpDiastolic != null
+									vital.bpSystolic !== null && vital.bpDiastolic !== null
 										? `${vital.bpSystolic}/${vital.bpDiastolic}`
 										: "—"
 								}
@@ -53,32 +53,32 @@ function VitalsCard({ vital }: { vital: OfflineVitalSummary | null }) {
 							/>
 							<VitalItem
 								label="HR"
-								value={vital.heartRate != null ? String(vital.heartRate) : "—"}
+								value={vital.heartRate !== null ? String(vital.heartRate) : "—"}
 								unit="bpm"
 							/>
 							<VitalItem
 								label="RR"
-								value={vital.respiratoryRate != null ? String(vital.respiratoryRate) : "—"}
+								value={vital.respiratoryRate !== null ? String(vital.respiratoryRate) : "—"}
 								unit="br/min"
 							/>
 							<VitalItem
 								label="Temp"
-								value={vital.temperature != null ? String(vital.temperature) : "—"}
+								value={vital.temperature !== null ? String(vital.temperature) : "—"}
 								unit="°C"
 							/>
 							<VitalItem
 								label="SpO₂"
-								value={vital.spo2 != null ? String(vital.spo2) : "—"}
+								value={vital.spo2 !== null ? String(vital.spo2) : "—"}
 								unit="%"
 							/>
 						</div>
-						{vital.newsScore != null && (
+						{vital.newsScore !== null && (
 							<div className="mt-3 text-sm">
 								<span className="text-muted-foreground">NEWS Score: </span>
 								<span
 									className={
 										vital.newsRiskLevel === "high"
-											? "font-semibold text-destructive"
+											? "text-destructive font-semibold"
 											: vital.newsRiskLevel === "medium"
 												? "font-semibold text-amber-600"
 												: "font-medium"
@@ -87,7 +87,7 @@ function VitalsCard({ vital }: { vital: OfflineVitalSummary | null }) {
 									{vital.newsScore}
 								</span>
 								{vital.newsRiskLevel && (
-									<span className="ml-1 capitalize text-muted-foreground">
+									<span className="text-muted-foreground ml-1 capitalize">
 										({vital.newsRiskLevel} risk)
 									</span>
 								)}
@@ -95,7 +95,7 @@ function VitalsCard({ vital }: { vital: OfflineVitalSummary | null }) {
 						)}
 					</div>
 				) : (
-					<p className="text-sm text-muted-foreground">No vitals recorded.</p>
+					<p className="text-muted-foreground text-sm">No vitals recorded.</p>
 				)}
 			</CardContent>
 		</Card>
@@ -103,14 +103,16 @@ function VitalsCard({ vital }: { vital: OfflineVitalSummary | null }) {
 }
 
 export default function EncounterSummaryPage() {
-	const { encounter, isLoading, encounterId, patientId } = useChartContext()
+	const { encounter, isLoading, encounterId, patientId, canViewClinicalSummary, canViewVitals } =
+		useChartContext()
 	const { isOnline, latestVital, cachedSummary, cachedAt } = useOfflineEncounter(
 		encounterId,
 		patientId,
+		{ canViewClinicalSummary, canViewVitals }
 	)
 
 	if (isLoading && isOnline) {
-		return <div className="h-32 animate-pulse rounded bg-muted" />
+		return <div className="bg-muted h-32 animate-pulse rounded" />
 	}
 
 	// Offline with no cached data
@@ -118,9 +120,9 @@ export default function EncounterSummaryPage() {
 		return (
 			<Card>
 				<CardContent className="flex flex-col items-center justify-center py-12 text-center">
-					<WifiOff className="mb-3 size-8 text-muted-foreground" />
+					<WifiOff className="text-muted-foreground mb-3 size-8" />
 					<p className="font-medium">No cached data available</p>
-					<p className="mt-1 text-sm text-muted-foreground">
+					<p className="text-muted-foreground mt-1 text-sm">
 						Connect to the network to load this encounter.
 					</p>
 				</CardContent>
@@ -136,20 +138,17 @@ export default function EncounterSummaryPage() {
 		<div className="space-y-4">
 			{!isOnline && (
 				<div className="flex items-center gap-2">
-					<Badge
-						variant="secondary"
-						className="gap-1 border-amber-300 bg-amber-100 text-amber-800"
-					>
+					<Badge variant="secondary" className="gap-1 border-amber-300 bg-amber-100 text-amber-800">
 						<WifiOff className="size-3" />
 						Cached
 					</Badge>
 					{cachedAt && (
-						<span className="text-xs text-muted-foreground">as of {formatDateTime(cachedAt)}</span>
+						<span className="text-muted-foreground text-xs">as of {formatDateTime(cachedAt)}</span>
 					)}
 				</div>
 			)}
 
-			<VitalsCard vital={latestVital} />
+			{canViewVitals && <VitalsCard vital={latestVital} />}
 
 			<Card>
 				<CardHeader>
