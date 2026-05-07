@@ -127,6 +127,7 @@ const REGISTRAR_ROLE_BUNDLE: RequiredPermission[] = [
  * Chart Merge        — registrar trauma-alias merge into permanent MRN
  * Civil Registry     — registrar birth/death certificate generation and tracking
  * Triage             — triage-only intake, acuity scoring, trauma alias, tele-triage workflows
+ * Scheduler          — clinic templates, slots, appointments, check-in, OPD queue, OR schedule
  * Emergency          — ED tracker/disposition workspace for nurse/physician roles
  * Pharmacy           — roles with order-verify authority (orders/verify → Pharmacist)
  */
@@ -144,7 +145,10 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		requiredPermissions: [{ module: "adt", action: "create" }],
 		// Full patient registration is registrar/admin-owned. Triage creates
 		// pre-encounters/trauma aliases from the dedicated triage workspace.
-		excludePermissions: [{ module: "clinical_docs", action: "sign" }],
+		excludePermissions: [
+			{ module: "clinical_docs", action: "sign" },
+			{ module: "scheduling", action: "view" },
+		],
 		excludeAllPermissions: TRIAGE_ROLE_BUNDLE,
 	},
 	{
@@ -187,19 +191,6 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		requiredPermissions: [{ module: "nutrition", action: "view" }],
 	},
 	{
-		// Scheduler patient list: search existing patients for appointment booking.
-		// Keep this separate from Register Patient so both scheduler items have
-		// distinct destinations and active states.
-		title: "Patients",
-		href: "/patients/search",
-		iconName: "patient",
-		requiredPermissions: [{ module: "scheduling", action: "view" }],
-		requireAllPermissions: [
-			{ module: "adt", action: "create" },
-			{ module: "patients", action: "view" },
-		],
-	},
-	{
 		title: "Patients",
 		href: "/patients/search",
 		iconName: "patient",
@@ -231,16 +222,61 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		],
 	},
 	{
-		title: "Scheduling",
-		href: "/scheduling",
+		title: "Clinic Templates",
+		href: "/scheduling/templates",
 		iconName: "calendar",
-		// Scheduling module is for Scheduler role. Registrar encounter creation
-		// is handled from Patients & Encounters, not the scheduling workspace.
+		// Scheduler Story 13.1 — define provider clinic templates.
 		requiredPermissions: [{ module: "scheduling", action: "view" }],
+		requireAllPermissions: [{ module: "scheduling", action: "edit" }],
 		excludePermissions: [
 			{ module: "nursing", action: "create" },
 			{ module: "audit", action: "view" },
 		],
+	},
+	{
+		title: "Slot Management",
+		href: "/scheduling/slots",
+		iconName: "calendar",
+		// Scheduler Story 13.1 — manage bookable slots, holidays, and leaves.
+		requiredPermissions: [{ module: "scheduling", action: "view" }],
+		requireAllPermissions: [{ module: "scheduling", action: "edit" }],
+		excludePermissions: [{ module: "audit", action: "view" }],
+	},
+	{
+		title: "Appointment Booking",
+		href: "/scheduling/book",
+		iconName: "calendar",
+		// Scheduler Story 13.2 — search/select patient inside booking workflow.
+		requiredPermissions: [{ module: "scheduling", action: "view" }],
+		requireAllPermissions: [{ module: "scheduling", action: "create" }],
+		excludePermissions: [{ module: "audit", action: "view" }],
+	},
+	{
+		title: "Check-In",
+		href: "/scheduling/check-in",
+		iconName: "calendar",
+		// Scheduler Story 13.2 — mark appointments arrived and issue queue numbers.
+		requiredPermissions: [{ module: "scheduling", action: "view" }],
+		requireAllPermissions: [{ module: "scheduling", action: "create" }],
+		excludePermissions: [{ module: "audit", action: "view" }],
+	},
+	{
+		title: "OPD Queue",
+		href: "/scheduling/queue",
+		iconName: "calendar",
+		// Scheduler Story 13.2 — monitor and advance the OPD queue.
+		requiredPermissions: [{ module: "scheduling", action: "view" }],
+		requireAllPermissions: [{ module: "scheduling", action: "edit" }],
+		excludePermissions: [{ module: "audit", action: "view" }],
+	},
+	{
+		title: "OR Schedule",
+		href: "/or/schedule",
+		iconName: "surgical",
+		// Scheduler Story 9.4 — book surgical cases against OR availability.
+		requiredPermissions: [{ module: "scheduling", action: "view" }],
+		requireAllPermissions: [{ module: "scheduling", action: "create" }],
+		excludePermissions: [{ module: "audit", action: "view" }],
 	},
 	{
 		title: "Bed Management",

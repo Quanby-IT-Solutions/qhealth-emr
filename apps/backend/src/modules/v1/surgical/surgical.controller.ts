@@ -63,7 +63,10 @@ export class SurgicalController {
 		})
 	}
 
-	@RequirePermission("surgical", "create")
+	@RequireAnyPermissions([
+		{ module: "surgical", action: "create" },
+		{ module: "scheduling", action: "create" },
+	])
 	@Implement(v1.surgical.createCase)
 	async createCase(@Session() session: UserSession) {
 		return implement(v1.surgical.createCase).handler(async ({ input }) => {
@@ -216,7 +219,10 @@ export class SurgicalController {
 	// OR Slots
 	// ========================================================================
 
-	@RequirePermission("surgical", "view")
+	@RequireAnyPermissions([
+		{ module: "surgical", action: "view" },
+		{ module: "scheduling", action: "view" },
+	])
 	@Implement(v1.surgical.listOrSlots)
 	async listOrSlots() {
 		return implement(v1.surgical.listOrSlots).handler(async ({ input }) => {
@@ -228,7 +234,10 @@ export class SurgicalController {
 	// OR Conflict Check
 	// ========================================================================
 
-	@RequirePermission("surgical", "view")
+	@RequireAnyPermissions([
+		{ module: "surgical", action: "view" },
+		{ module: "scheduling", action: "view" },
+	])
 	@Implement(v1.surgical.checkOrConflicts)
 	async checkOrConflicts() {
 		return implement(v1.surgical.checkOrConflicts).handler(async ({ input }) => {

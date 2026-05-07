@@ -1,0 +1,48 @@
+"use client"
+
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { CheckInList } from "@/features/scheduling/components/check-in-list"
+
+function usePermissionSet() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
+}
+
+function can(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
+}
+
+export default function CheckInPage() {
+	const { data: profile } = useMyProfile()
+	const permSet = usePermissionSet()
+	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+
+	if (!can(permSet, "scheduling", "view")) {
+		return (
+			<div className="text-muted-foreground flex items-center justify-center p-8">
+				You do not have permission to access scheduling.
+			</div>
+		)
+	}
+
+	if (!facilityId) {
+		return (
+			<div className="text-muted-foreground flex h-48 items-center justify-center">
+				No facility context available.
+			</div>
+		)
+	}
+
+	return (
+		<div className="space-y-6">
+			<div>
+				<h1 className="text-2xl font-bold">Check-In</h1>
+				<p className="text-muted-foreground">Process appointment arrivals and queue numbers</p>
+			</div>
+			<CheckInList facilityId={facilityId} />
+		</div>
+	)
+}
