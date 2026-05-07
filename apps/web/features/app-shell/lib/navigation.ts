@@ -671,6 +671,8 @@ export const ROLE_DASHBOARD_WIDGETS: Record<string, string[]> = {
 	"registrar": ["my-patient-list", "quick-stats", "alerts"],
 	"clinician": ["my-patient-list", "pending-orders", "unsigned-notes", "alerts"],
 	"physician": ["my-patient-list", "pending-orders", "unsigned-notes", "alerts"],
+	"surgeon": ["my-patient-list", "unsigned-notes", "alerts"],
+	"anesthesiologist": ["my-patient-list", "unsigned-notes", "alerts"],
 	"nurse": ["my-patient-list", "pending-orders", "alerts", "quick-stats"],
 	"pharmacist": ["pending-orders", "alerts", "quick-stats"],
 	"billing officer": ["quick-stats", "alerts"],

@@ -345,6 +345,12 @@ export function AnesthesiaRecordForm({
 
 	return (
 		<div className="space-y-6">
+			{!canEdit && !canSign && (
+				<div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+					<Info className="mt-0.5 size-4 shrink-0" />
+					<p>You have view-only access to this record. The Anesthesia Record is authored and signed by the assigned anesthesiologist.</p>
+				</div>
+			)}
 			{/* AC3: Compliance notice — bedside monitor auto-capture not available */}
 			<div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
 				<Info className="mt-0.5 size-4 shrink-0" />
@@ -1067,32 +1073,36 @@ export function AnesthesiaRecordForm({
 				</CardContent>
 			</Card>
 
-			<Separator />
+			{(canEdit || canSign) && (
+				<>
+					<Separator />
 
-			<div className="flex justify-end gap-3">
-				{!isSigned && (
-					<Button
-						onClick={() => {
-							void handleSave()
-						}}
-						disabled={save.isPending || !canEdit || isSigned}
-						variant="outline"
-					>
-						<Save className="mr-2 size-4" />
-						{save.isPending ? "Saving…" : "Save Draft"}
-					</Button>
-				)}
-				{canSign && !isSigned && (
-					<Button
-						className="bg-green-700 hover:bg-green-800"
-						onClick={handleSign}
-						disabled={sign.isPending || save.isPending || (!existing && !canEdit)}
-					>
-						<CheckCircle2 className="mr-2 size-4" />
-						{sign.isPending ? "Signing…" : "Sign Anesthesia Record"}
-					</Button>
-				)}
-			</div>
+					<div className="flex justify-end gap-3">
+						{!isSigned && (
+							<Button
+								onClick={() => {
+									void handleSave()
+								}}
+								disabled={save.isPending || !canEdit || isSigned}
+								variant="outline"
+							>
+								<Save className="mr-2 size-4" />
+								{save.isPending ? "Saving…" : "Save Draft"}
+							</Button>
+						)}
+						{canSign && !isSigned && (
+							<Button
+								className="bg-green-700 hover:bg-green-800"
+								onClick={handleSign}
+								disabled={sign.isPending || save.isPending || (!existing && !canEdit)}
+							>
+								<CheckCircle2 className="mr-2 size-4" />
+								{sign.isPending ? "Signing…" : "Sign Anesthesia Record"}
+							</Button>
+						)}
+					</div>
+				</>
+			)}
 
 			<AlertDialog open={showSignConfirm} onOpenChange={setShowSignConfirm}>
 				<AlertDialogContent>
