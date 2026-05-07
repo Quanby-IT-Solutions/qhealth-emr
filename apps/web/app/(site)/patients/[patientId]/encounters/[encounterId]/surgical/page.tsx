@@ -51,6 +51,19 @@ export default function SurgicalPage() {
 	const canFinalizeRvs = can(permSet, "billing", "sign")
 	const isOperationRecordSigned = opRecord?.status === "signed"
 
+	const roleName = (profile?.activeRole?.name ?? "").toLowerCase()
+	const isSurgeon = roleName === "surgeon"
+	const isAnesthesiologist = roleName === "anesthesiologist"
+
+	const defaultTab = isSurgeon ? "operation" : isAnesthesiologist ? "anesthesia" : "checklist"
+	const showRvsTab = !isAnesthesiologist
+
+	const canEditPreOp = isAnesthesiologist ? false : canEditSurgical
+	const canEditOperation = isAnesthesiologist ? false : canEditSurgical
+	const canSignOperation = isAnesthesiologist ? false : canSignSurgical
+	const canEditAnesthesia = isSurgeon ? false : canEditSurgical
+	const canSignAnesthesia = isSurgeon ? false : canSignSurgical
+
 	if (casesLoading) {
 		return (
 			<div className="flex items-center gap-2 p-8 text-sm">
@@ -96,19 +109,19 @@ export default function SurgicalPage() {
 				</p>
 			</div>
 
-			<Tabs defaultValue="checklist">
+			<Tabs defaultValue={defaultTab}>
 				<TabsList>
 					<TabsTrigger value="checklist">Pre-Op Checklist</TabsTrigger>
 					<TabsTrigger value="operation">Operation Record</TabsTrigger>
 					<TabsTrigger value="anesthesia">Anesthesia Record</TabsTrigger>
-					<TabsTrigger value="rvs">RVS Codes</TabsTrigger>
+					{showRvsTab && <TabsTrigger value="rvs">RVS Codes</TabsTrigger>}
 				</TabsList>
 
 				<TabsContent value="checklist" className="mt-6">
 					{checklistLoading ? (
 						<Loader2 className="size-4 animate-spin" />
 					) : (
-						<PreOpChecklist caseId={caseId} existing={preOpChecklist} canEdit={canEditSurgical} />
+						<PreOpChecklist caseId={caseId} existing={preOpChecklist} canEdit={canEditPreOp} />
 					)}
 				</TabsContent>
 
@@ -122,8 +135,8 @@ export default function SurgicalPage() {
 							surgeonStaffId={surgicalCase.surgeonStaffId ?? staffId}
 							defaultAnesthesiologistStaffId={surgicalCase.anesthesiologistStaffId}
 							existing={opRecord}
-							canEdit={canEditSurgical}
-							canSign={canSignSurgical}
+							canEdit={canEditOperation}
+							canSign={canSignOperation}
 						/>
 					)}
 				</TabsContent>
@@ -135,22 +148,24 @@ export default function SurgicalPage() {
 						<AnesthesiaRecordForm
 							caseId={caseId}
 							existing={anesthesiaRecord}
-							canEdit={canEditSurgical}
-							canSign={canSignSurgical}
+							canEdit={canEditAnesthesia}
+							canSign={canSignAnesthesia}
 						/>
 					)}
 				</TabsContent>
 
-				<TabsContent value="rvs" className="mt-6">
-					<RvsCodeSelector
-						caseId={caseId}
-						operationRecord={opRecord}
-						canEdit={canEditSurgical}
-						canValidate={canValidateRvs}
-						canFinalize={canFinalizeRvs}
-						isOperationRecordSigned={isOperationRecordSigned}
-					/>
-				</TabsContent>
+				{showRvsTab && (
+					<TabsContent value="rvs" className="mt-6">
+						<RvsCodeSelector
+							caseId={caseId}
+							operationRecord={opRecord}
+							canEdit={canEditSurgical}
+							canValidate={canValidateRvs}
+							canFinalize={canFinalizeRvs}
+							isOperationRecordSigned={isOperationRecordSigned}
+						/>
+					</TabsContent>
+				)}
 			</Tabs>
 		</div>
 	)

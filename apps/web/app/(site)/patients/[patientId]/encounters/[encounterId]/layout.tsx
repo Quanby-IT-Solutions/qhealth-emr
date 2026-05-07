@@ -158,8 +158,8 @@ export default function EncounterChartLayout({
 		{
 			label: "e-Prescription",
 			href: `${base}/e-prescription`,
-			// e-Prescription is for clinicians who sign orders (Physicians, Surgeons, Anesthesiologists)
-			show: can(permSet, "orders", "sign"),
+			// e-Prescription is for Physicians only — Surgeons and Anesthesiologists use surgical workflows
+			show: can(permSet, "orders", "sign") && !can(permSet, "surgical", "view"),
 		},
 		{
 			label: "Surgical",
