@@ -364,12 +364,14 @@ DONE - KARL
 
 ## 10. Pharmacy Verification & Dispensing
 
+DONE - KARL
 - **Story 10.1 – Clinical Verification of Medication Orders**
   - **As a** Pharmacist
   - **I want to** verify medication orders for appropriateness, interactions, and dosing against patient weight and labs
   - **So that** medications are safe before they appear on the MAR
   - **Pages**: Pharmacy Verification Queue, Medication Verification Page
 
+DONE - KARL
 - **Story 10.2 – Formulary Note Management**
   - **As a** Pharmacist
   - **I want to** maintain formulary notes and constraints
@@ -386,12 +388,14 @@ DONE - KARL
 
 ## 11. Nutrition Services
 
+DONE - KARL
 - **Story 11.1 – Nutrition Assessment**
   - **As a** Dietitian
   - **I want to** conduct and document a comprehensive nutrition assessment
   - **So that** malnutrition risk is identified and addressed during the encounter
   - **Pages**: Nutrition Assessment Page, Malnutrition Risk Page
 
+DONE - KARL
 - **Story 11.2 – Therapeutic Meal Plan & NutritionOrder**
   - **As a** Dietitian
   - **I want to** create therapeutic meal plans and author HL7 FHIR NutritionOrders
