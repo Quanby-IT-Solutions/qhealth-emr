@@ -76,10 +76,9 @@ type MockDb = {
 function makeLimitBuilder(rows: unknown[]) {
 	const b: Record<string, unknown> = {}
 	for (const m of ["from", "leftJoin", "where"]) {
-		 
 		;(b as any)[m] = jest.fn().mockReturnValue(b)
 	}
-	 
+
 	;(b as any)["limit"] = jest.fn().mockImplementation(() => ({
 		then: (resolve: (v: unknown) => unknown) => Promise.resolve(rows).then(resolve),
 	}))
@@ -366,7 +365,6 @@ describe("FhirService — audit trails (FHIR-001)", () => {
 			const auditValuesMock = jest.fn().mockResolvedValue([])
 			setupHappyPath(auditValuesMock)
 
-			 
 			await service.createExport(INPUT as any, USER_ID, "Test User")
 
 			expect(auditValuesMock).toHaveBeenCalledWith(
@@ -385,7 +383,6 @@ describe("FhirService — audit trails (FHIR-001)", () => {
 			const auditValuesMock = jest.fn().mockResolvedValue([])
 			setupHappyPath(auditValuesMock)
 
-			 
 			await service.createExport(INPUT as any, USER_ID, "Test User")
 
 			expect(auditValuesMock).toHaveBeenCalledWith(

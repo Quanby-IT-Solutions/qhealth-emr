@@ -202,7 +202,7 @@ export const CreateMedOrderSchema = z.object({
 	preEncounterId: z.string().uuid().optional(),
 	patientId: z.string().uuid().optional(),
 	formularyItemId: z.string().uuid().optional(),
-	genericName: z.string().min(1),
+	genericName: z.string().trim().min(1),
 	brandName: z.string().optional(),
 	rxnormCode: z.string().optional(),
 	dose: z.string().min(1),

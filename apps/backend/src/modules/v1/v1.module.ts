@@ -18,6 +18,7 @@ import { FhirEndpointsModule } from "./fhir-endpoints/fhir-endpoints.module"
 import { FhirModule } from "./fhir/fhir.module"
 import { FormularyModule } from "./formulary/formulary.module"
 import { HealthModule } from "./health/health.module"
+import { HimModule } from "./him/him.module"
 import { IntegrationRegistryModule } from "./integration-registry/integration-registry.module"
 import { LabModule } from "./lab/lab.module"
 import { MasterDataModule } from "./master-data/master-data.module"
@@ -39,7 +40,6 @@ import { SurgicalModule } from "./surgical/surgical.module"
 import { SystemSettingsModule } from "./system-settings/system-settings.module"
 import { TelemedicineModule } from "./telemedicine/telemedicine.module"
 import { TerminologyModule } from "./terminology/terminology.module"
-import { HimModule } from "./him/him.module"
 
 @Module({
 	imports: [

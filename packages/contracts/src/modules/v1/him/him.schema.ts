@@ -52,7 +52,9 @@ export const ListDeficienciesInputSchema = Pagination.extend({
 	ownerStaffId: z.string().uuid().optional(),
 	ownerQuery: z.string().optional(),
 	ageBucket: z.enum(["lt_7", "d7_14", "d14_30", "gt_30"]).optional(),
-	sortBy: z.enum(["dischargeDatetime", "ageDays", "status", "deficiencyType", "patientName"]).optional(),
+	sortBy: z
+		.enum(["dischargeDatetime", "ageDays", "status", "deficiencyType", "patientName"])
+		.optional(),
 	sortDirection: z.enum(["asc", "desc"]).optional(),
 })
 
@@ -317,13 +319,19 @@ export const ListHaiResponseSchema = PaginatedResponse.extend({
 	),
 })
 
-export const ConfirmHaiInputSchema = z.object({ haiTagId: z.string().uuid(), reason: z.string().optional() })
+export const ConfirmHaiInputSchema = z.object({
+	haiTagId: z.string().uuid(),
+	reason: z.string().optional(),
+})
 export const ReclassifyHaiInputSchema = z.object({
 	haiTagId: z.string().uuid(),
 	newType: HaiTagTypeEnum,
 	reason: z.string().min(1),
 })
-export const DismissHaiInputSchema = z.object({ haiTagId: z.string().uuid(), reason: z.string().min(1) })
+export const DismissHaiInputSchema = z.object({
+	haiTagId: z.string().uuid(),
+	reason: z.string().min(1),
+})
 
 export const HaiReportInputSchema = z.object({
 	facilityId: z.string().uuid(),

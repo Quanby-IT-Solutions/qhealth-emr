@@ -5,7 +5,11 @@ import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequireAnyPermissions, RequirePermission, RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
+import {
+	RequireAnyPermissions,
+	RequirePermission,
+	RequirePermissions,
+} from "@/modules/v1/rbac/rbac.guard"
 
 import { FeatureFlagsService } from "./feature-flags.service"
 

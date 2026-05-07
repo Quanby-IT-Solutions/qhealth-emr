@@ -10,6 +10,8 @@
 
 import { NotFoundException } from "@nestjs/common"
 
+import { db } from "@/common/database/database.client"
+
 import { BillingService } from "../billing.service"
 
 interface TxMock {
@@ -64,7 +66,12 @@ jest.mock("@repo/db/schema", () => ({
 	konsultaActivities: {},
 	payments: { id: "id", invoiceId: "invoiceId", amount: "amount", facilityId: "facilityId" },
 	problems: {},
-	receipts: { facilityId: "facilityId", fiscalYear: "fiscalYear", issuedAt: "issuedAt", receiptNumber: "receiptNumber" },
+	receipts: {
+		facilityId: "facilityId",
+		fiscalYear: "fiscalYear",
+		issuedAt: "issuedAt",
+		receiptNumber: "receiptNumber",
+	},
 	vitalSigns: {},
 }))
 
@@ -75,8 +82,6 @@ jest.mock("@/common/philhealth/philhealth.adapter", () => ({
 jest.mock("@/config/env.config", () => ({ env: {} }))
 jest.mock("@/utils/sla-events", () => ({ closeOpenSlaStep: jest.fn() }))
 jest.mock("@/utils/sla-step-target", () => ({ resolveStepTarget: jest.fn(() => 60) }))
-
-import { db } from "@/common/database/database.client"
 
 const FACILITY = "fac-uuid-0001"
 const INVOICE = "inv-uuid-0001"

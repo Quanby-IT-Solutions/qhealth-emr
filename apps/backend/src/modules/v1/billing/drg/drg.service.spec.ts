@@ -10,6 +10,8 @@
 
 import { BadRequestException, UnprocessableEntityException } from "@nestjs/common"
 
+import { db } from "@/common/database/database.client"
+
 import { BillingService } from "../billing.service"
 
 jest.mock("@/common/database/database.client", () => ({
@@ -26,7 +28,14 @@ jest.mock("@/common/database/database.client", () => ({
 jest.mock("@repo/db/schema", () => ({
 	cf4Claims: {},
 	cf4StatusLog: {},
-	cf5Claims: { id: "id", facilityId: "facilityId", encounterId: "encounterId", drgCode: "drgCode", status: "status", resubmitCount: "resubmitCount" },
+	cf5Claims: {
+		id: "id",
+		facilityId: "facilityId",
+		encounterId: "encounterId",
+		drgCode: "drgCode",
+		status: "status",
+		resubmitCount: "resubmitCount",
+	},
 	cf5StatusLog: { id: "id", claimId: "claimId", status: "status", changedAt: "changedAt" },
 	cewsSnapshots: {},
 	chargeMasterItems: {},
@@ -40,13 +49,23 @@ jest.mock("@repo/db/schema", () => ({
 	invoiceLineItems: {},
 	invoices: {},
 	konsultaActivities: {},
-	operationRecords: { id: "id", encounterId: "encounterId", procedurePerformed: "procedurePerformed", status: "status" },
+	operationRecords: {
+		id: "id",
+		encounterId: "encounterId",
+		procedurePerformed: "procedurePerformed",
+		status: "status",
+	},
 	patients: {},
 	payments: {},
 	problems: {},
 	receipts: {},
 	staffProfiles: {},
-	surgicalRvsAssignments: { operationRecordId: "operationRecordId", procedureLabel: "procedureLabel", assignmentType: "assignmentType", status: "status" },
+	surgicalRvsAssignments: {
+		operationRecordId: "operationRecordId",
+		procedureLabel: "procedureLabel",
+		assignmentType: "assignmentType",
+		status: "status",
+	},
 	vitalSigns: {},
 }))
 
@@ -58,8 +77,6 @@ jest.mock("@/config/env.config", () => ({ env: {} }))
 jest.mock("@/utils/sla-events", () => ({ closeOpenSlaStep: jest.fn() }))
 jest.mock("@/utils/sla-step-target", () => ({ resolveStepTarget: jest.fn() }))
 
-import { db } from "@/common/database/database.client"
-
 const STAFF_USER = "user-id-0001"
 const STAFF_PROFILE = "staff-profile-0001"
 const ENCOUNTER = "enc-uuid-0001"
@@ -69,8 +86,11 @@ function makeService() {
 	const audit = { log: jest.fn().mockResolvedValue(undefined) }
 	const adapter = { submit: jest.fn(), poll: jest.fn() }
 	const service = new BillingService(adapter as never, audit as never)
-	;(service as unknown as { getStaffProfileId: (u: string) => Promise<string> }).getStaffProfileId = async () => STAFF_PROFILE
-	;(service as unknown as { getOptionalStaffProfileId: (u: string) => Promise<string | null> }).getOptionalStaffProfileId = async () => STAFF_PROFILE
+	;(service as unknown as { getStaffProfileId: (u: string) => Promise<string> }).getStaffProfileId =
+		async () => STAFF_PROFILE
+	;(
+		service as unknown as { getOptionalStaffProfileId: (u: string) => Promise<string | null> }
+	).getOptionalStaffProfileId = async () => STAFF_PROFILE
 	return { service, audit }
 }
 
@@ -112,7 +132,14 @@ describe("BIL-BE-05 DRG Mapping & CF5", () => {
 	it("submitCf5 blocks on missing DRG code (XSD validation)", async () => {
 		;(db.select as jest.Mock)
 			.mockReturnValueOnce({
-				from: () => ({ where: () => ({ limit: () => Promise.resolve([{ id: CLAIM, status: "draft", drgCode: null, encounterId: ENCOUNTER }]) }) }),
+				from: () => ({
+					where: () => ({
+						limit: () =>
+							Promise.resolve([
+								{ id: CLAIM, status: "draft", drgCode: null, encounterId: ENCOUNTER },
+							]),
+					}),
+				}),
 			})
 			// buildSurgicalReadiness: operationRecords query → empty = isReady: true, passes readiness check
 			.mockReturnValueOnce({
@@ -120,7 +147,9 @@ describe("BIL-BE-05 DRG Mapping & CF5", () => {
 			})
 
 		const { service } = makeService()
-		await expect(service.submitCf5({ id: CLAIM }, STAFF_USER)).rejects.toBeInstanceOf(UnprocessableEntityException)
+		await expect(service.submitCf5({ id: CLAIM }, STAFF_USER)).rejects.toBeInstanceOf(
+			UnprocessableEntityException
+		)
 	})
 
 	it("resubmitCf5 increments counter and writes cf5_status_log", async () => {

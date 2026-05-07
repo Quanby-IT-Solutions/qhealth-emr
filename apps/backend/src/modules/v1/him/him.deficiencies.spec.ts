@@ -9,8 +9,10 @@
 
 import { BadRequestException } from "@nestjs/common"
 
-import { HimService } from "./him.service"
+import { db } from "@/common/database/database.client"
+
 import { DeficienciesService } from "./deficiencies/deficiencies.service"
+import { HimService } from "./him.service"
 
 jest.mock("@/common/database/database.client", () => ({
 	db: {
@@ -40,23 +42,46 @@ jest.mock("@repo/db/schema", () => ({
 		updatedAt: "updatedAt",
 	},
 	clinicalNotes: { id: "id", encounterId: "encounterId", noteType: "noteType", status: "status" },
-	codes: { id: "id", code: "code", codeSystemId: "codeSystemId", isDeprecated: "isDeprecated", replacedByCodeId: "replacedByCodeId", displayName: "displayName" },
+	codes: {
+		id: "id",
+		code: "code",
+		codeSystemId: "codeSystemId",
+		isDeprecated: "isDeprecated",
+		replacedByCodeId: "replacedByCodeId",
+		displayName: "displayName",
+	},
 	codeVersions: {},
 	deficiencyNotifications: { id: "id", deficiencyId: "deficiencyId" },
 	encounterCodes: { id: "id", encounterId: "encounterId" },
 	encounters: { id: "id", facilityId: "facilityId", status: "status" },
 	facilities: { id: "id" },
 	haiReconciliations: { id: "id", haiTagId: "haiTagId" },
-	haiTags: { id: "id", facilityId: "facilityId", haiType: "haiType", status: "status", encounterId: "encounterId", onsetDate: "onsetDate" },
+	haiTags: {
+		id: "id",
+		facilityId: "facilityId",
+		haiType: "haiType",
+		status: "status",
+		encounterId: "encounterId",
+		onsetDate: "onsetDate",
+	},
 	medicalRecordsRequests: { id: "id" },
-	operationRecords: { id: "id", encounterId: "encounterId", procedurePerformed: "procedurePerformed", status: "status" },
-	patients: { id: "id", mrn: "mrn", firstName: "firstName", lastName: "lastName", middleName: "middleName" },
+	operationRecords: {
+		id: "id",
+		encounterId: "encounterId",
+		procedurePerformed: "procedurePerformed",
+		status: "status",
+	},
+	patients: {
+		id: "id",
+		mrn: "mrn",
+		firstName: "firstName",
+		lastName: "lastName",
+		middleName: "middleName",
+	},
 	recordsReleaseAudit: { id: "id" },
 	staffProfiles: { id: "id", userId: "userId" },
 	users: { id: "id", name: "name" },
 }))
-
-import { db } from "@/common/database/database.client"
 
 const STAFF_USER = "user-1"
 const STAFF_PROFILE = "staff-1"
@@ -65,7 +90,8 @@ function makeService() {
 	const audit = { log: jest.fn().mockResolvedValue(undefined) }
 	const eventEmitter = { emit: jest.fn().mockReturnValue(true) }
 	const service = new HimService(audit as never, eventEmitter as never)
-	;(service as unknown as { getStaffProfileId: (u: string) => Promise<string> }).getStaffProfileId = async () => STAFF_PROFILE
+	;(service as unknown as { getStaffProfileId: (u: string) => Promise<string> }).getStaffProfileId =
+		async () => STAFF_PROFILE
 	return { service, audit, eventEmitter }
 }
 
@@ -89,11 +115,15 @@ describe("HIM-BE-02 Deficiency Tracking", () => {
 				from: () => ({ where: () => ({ limit: () => Promise.resolve([def]) }) }),
 			})
 			.mockReturnValueOnce({
-				from: () => ({ where: () => Promise.resolve([{ id: "op-1", procedurePerformed: null, status: "draft" }]) }),
+				from: () => ({
+					where: () => Promise.resolve([{ id: "op-1", procedurePerformed: null, status: "draft" }]),
+				}),
 			})
 
 		const { service } = makeService()
-		await expect(service.markDeficiencyResolved({ id: "d-1", staffId: STAFF_USER })).rejects.toBeInstanceOf(BadRequestException)
+		await expect(
+			service.markDeficiencyResolved({ id: "d-1", staffId: STAFF_USER })
+		).rejects.toBeInstanceOf(BadRequestException)
 	})
 
 	it("notifyDeficiency persists notification + flips status to notified", async () => {
@@ -109,7 +139,9 @@ describe("HIM-BE-02 Deficiency Tracking", () => {
 		;(db.select as jest.Mock).mockReturnValue({
 			from: () => ({ where: () => ({ limit: () => Promise.resolve([def]) }) }),
 		})
-		const insertValues = jest.fn().mockReturnValue({ returning: () => Promise.resolve([{ id: "notif-1" }]) })
+		const insertValues = jest
+			.fn()
+			.mockReturnValue({ returning: () => Promise.resolve([{ id: "notif-1" }]) })
 		;(db.insert as jest.Mock).mockReturnValue({ values: insertValues })
 		const updateSet = jest.fn().mockReturnValue({ where: () => Promise.resolve(undefined) })
 		;(db.update as jest.Mock).mockReturnValue({ set: updateSet })
@@ -122,11 +154,17 @@ describe("HIM-BE-02 Deficiency Tracking", () => {
 			expect.objectContaining({
 				deficiencyId: "d-1",
 				channel: "email",
-				payload: expect.objectContaining({ deficiencyType: "missing_signature", encounterId: "enc-1", facilityId: "fac-1" }),
+				payload: expect.objectContaining({
+					deficiencyType: "missing_signature",
+					encounterId: "enc-1",
+					facilityId: "fac-1",
+				}),
 			})
 		)
 		expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ status: "notified" }))
-		expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ entityType: "chart_deficiency" }))
+		expect(audit.log).toHaveBeenCalledWith(
+			expect.objectContaining({ entityType: "chart_deficiency" })
+		)
 		expect(eventEmitter.emit).toHaveBeenCalledWith(
 			"deficiency.notified",
 			expect.objectContaining({ deficiencyId: "d-1", notificationId: "notif-1", channel: "email" })
@@ -135,7 +173,10 @@ describe("HIM-BE-02 Deficiency Tracking", () => {
 
 	it("scanDeficiencies detects all required deficiency types for a discharged encounter", async () => {
 		;(db.select as jest.Mock).mockReturnValue({
-			from: () => ({ where: () => Promise.resolve([{ id: "enc-1", facilityId: "fac-1", attendingStaffId: "staff-1" }]) }),
+			from: () => ({
+				where: () =>
+					Promise.resolve([{ id: "enc-1", facilityId: "fac-1", attendingStaffId: "staff-1" }]),
+			}),
 		})
 
 		const onConflictDoNothing = jest
@@ -147,7 +188,14 @@ describe("HIM-BE-02 Deficiency Tracking", () => {
 		;(db.insert as jest.Mock).mockReturnValue({ values })
 
 		const { service } = makeService()
-		;(service as unknown as { detectDeficiencySource: (encounterId: string, type: string) => Promise<{ missing: boolean; sourceKind: string | null; sourceId: string | null }> }).detectDeficiencySource = jest
+		;(
+			service as unknown as {
+				detectDeficiencySource: (
+					encounterId: string,
+					type: string
+				) => Promise<{ missing: boolean; sourceKind: string | null; sourceId: string | null }>
+			}
+		).detectDeficiencySource = jest
 			.fn()
 			.mockResolvedValueOnce({ missing: true, sourceKind: "encounter", sourceId: "enc-1" })
 			.mockResolvedValueOnce({ missing: true, sourceKind: "clinical_note", sourceId: "note-1" })
@@ -158,21 +206,36 @@ describe("HIM-BE-02 Deficiency Tracking", () => {
 		expect(result).toEqual({ scanned: 1, created: 3 })
 		expect(values).toHaveBeenNthCalledWith(
 			1,
-			expect.objectContaining({ encounterId: "enc-1", deficiencyType: "missing_discharge_summary", sourceId: "enc-1" })
+			expect.objectContaining({
+				encounterId: "enc-1",
+				deficiencyType: "missing_discharge_summary",
+				sourceId: "enc-1",
+			})
 		)
 		expect(values).toHaveBeenNthCalledWith(
 			2,
-			expect.objectContaining({ encounterId: "enc-1", deficiencyType: "missing_signature", sourceId: "note-1" })
+			expect.objectContaining({
+				encounterId: "enc-1",
+				deficiencyType: "missing_signature",
+				sourceId: "note-1",
+			})
 		)
 		expect(values).toHaveBeenNthCalledWith(
 			3,
-			expect.objectContaining({ encounterId: "enc-1", deficiencyType: "undocumented_procedure", sourceId: "op-1" })
+			expect.objectContaining({
+				encounterId: "enc-1",
+				deficiencyType: "undocumented_procedure",
+				sourceId: "op-1",
+			})
 		)
 	})
 
 	it("scanDeficiencies remains idempotent when conflicts prevent new deficiency rows", async () => {
 		;(db.select as jest.Mock).mockReturnValue({
-			from: () => ({ where: () => Promise.resolve([{ id: "enc-1", facilityId: "fac-1", attendingStaffId: "staff-1" }]) }),
+			from: () => ({
+				where: () =>
+					Promise.resolve([{ id: "enc-1", facilityId: "fac-1", attendingStaffId: "staff-1" }]),
+			}),
 		})
 
 		const onConflictDoNothing = jest
@@ -184,7 +247,14 @@ describe("HIM-BE-02 Deficiency Tracking", () => {
 		;(db.insert as jest.Mock).mockReturnValue({ values })
 
 		const { service } = makeService()
-		;(service as unknown as { detectDeficiencySource: (encounterId: string, type: string) => Promise<{ missing: boolean; sourceKind: string | null; sourceId: string | null }> }).detectDeficiencySource = jest
+		;(
+			service as unknown as {
+				detectDeficiencySource: (
+					encounterId: string,
+					type: string
+				) => Promise<{ missing: boolean; sourceKind: string | null; sourceId: string | null }>
+			}
+		).detectDeficiencySource = jest
 			.fn()
 			.mockResolvedValue({ missing: true, sourceKind: "encounter", sourceId: "enc-1" })
 

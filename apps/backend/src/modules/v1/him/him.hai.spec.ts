@@ -7,6 +7,8 @@
  *  3. haiReport returns aggregated counts + incidence per 1000 patient days.
  */
 
+import { db } from "@/common/database/database.client"
+
 import { HimService } from "./him.service"
 
 jest.mock("@/common/database/database.client", () => ({
@@ -53,8 +55,6 @@ jest.mock("@repo/db/schema", () => ({
 	wards: { id: "id", name: "name" },
 }))
 
-import { db } from "@/common/database/database.client"
-
 const STAFF_USER = "user-1"
 const STAFF_PROFILE = "staff-1"
 
@@ -62,7 +62,8 @@ function makeService() {
 	const audit = { log: jest.fn().mockResolvedValue(undefined) }
 	const eventEmitter = { emit: jest.fn().mockReturnValue(true) }
 	const service = new HimService(audit as never, eventEmitter as never)
-	;(service as unknown as { getStaffProfileId: (u: string) => Promise<string> }).getStaffProfileId = async () => STAFF_PROFILE
+	;(service as unknown as { getStaffProfileId: (u: string) => Promise<string> }).getStaffProfileId =
+		async () => STAFF_PROFILE
 	return { service, audit, eventEmitter }
 }
 
@@ -74,14 +75,24 @@ describe("HIM-BE-05 HAI Reconciliation", () => {
 	it("decideHai inserts row when no prior decision", async () => {
 		const tag = { id: "h-1", facilityId: "fac-1", haiType: "clabsi", status: "suspected" }
 		;(db.select as jest.Mock)
-			.mockReturnValueOnce({ from: () => ({ where: () => ({ limit: () => Promise.resolve([tag]) }) }) })
+			.mockReturnValueOnce({
+				from: () => ({ where: () => ({ limit: () => Promise.resolve([tag]) }) }),
+			})
 			.mockReturnValueOnce({ from: () => ({ where: () => Promise.resolve([]) }) })
-		const insertValues = jest.fn().mockReturnValue({ returning: () => Promise.resolve([{ id: "rec-1", decision: "confirm" }]) })
+		const insertValues = jest
+			.fn()
+			.mockReturnValue({ returning: () => Promise.resolve([{ id: "rec-1", decision: "confirm" }]) })
 		;(db.insert as jest.Mock).mockReturnValue({ values: insertValues })
-		;(db.update as jest.Mock).mockReturnValue({ set: () => ({ where: () => Promise.resolve(undefined) }) })
+		;(db.update as jest.Mock).mockReturnValue({
+			set: () => ({ where: () => Promise.resolve(undefined) }),
+		})
 
 		const { service } = makeService()
-		const res = await service.decideHai({ haiTagId: "h-1", decision: "confirm", staffId: STAFF_USER })
+		const res = await service.decideHai({
+			haiTagId: "h-1",
+			decision: "confirm",
+			staffId: STAFF_USER,
+		})
 		expect(res.decision).toBe("confirm")
 		expect(insertValues).toHaveBeenCalled()
 	})
@@ -90,7 +101,9 @@ describe("HIM-BE-05 HAI Reconciliation", () => {
 		const tag = { id: "h-1", facilityId: "fac-1", haiType: "clabsi", status: "suspected" }
 		const existing = { id: "rec-existing", haiTagId: "h-1", decision: "confirm" }
 		;(db.select as jest.Mock)
-			.mockReturnValueOnce({ from: () => ({ where: () => ({ limit: () => Promise.resolve([tag]) }) }) })
+			.mockReturnValueOnce({
+				from: () => ({ where: () => ({ limit: () => Promise.resolve([tag]) }) }),
+			})
 			.mockReturnValueOnce({ from: () => ({ where: () => Promise.resolve([existing]) }) })
 		const updateSet = jest.fn().mockReturnValue({
 			where: () => ({ returning: () => Promise.resolve([{ ...existing, decision: "dismiss" }]) }),
@@ -98,7 +111,12 @@ describe("HIM-BE-05 HAI Reconciliation", () => {
 		;(db.update as jest.Mock).mockReturnValue({ set: updateSet })
 
 		const { service } = makeService()
-		const res = await service.decideHai({ haiTagId: "h-1", decision: "dismiss", reason: "not HAI", staffId: STAFF_USER })
+		const res = await service.decideHai({
+			haiTagId: "h-1",
+			decision: "dismiss",
+			reason: "not HAI",
+			staffId: STAFF_USER,
+		})
 		expect(res.decision).toBe("dismiss")
 		expect(updateSet).toHaveBeenCalled()
 	})
@@ -120,7 +138,11 @@ describe("HIM-BE-05 HAI Reconciliation", () => {
 		})
 
 		const { service } = makeService()
-		const res = await service.haiReport({ facilityId: "fac-1", periodStart: "2026-04-01", periodEnd: "2026-04-30" })
+		const res = await service.haiReport({
+			facilityId: "fac-1",
+			periodStart: "2026-04-01",
+			periodEnd: "2026-04-30",
+		})
 		expect(res.totalTags).toBe(3)
 		expect(res.byType.clabsi).toBe(2)
 		expect(res.byType.vap).toBe(1)
@@ -132,36 +154,64 @@ describe("HIM-BE-05 HAI Reconciliation", () => {
 
 	it("haiExport returns a CSV data URI with AHSR-ready headers", async () => {
 		const { service } = makeService()
-		;(service as unknown as { haiReport: (input: { facilityId: string; periodStart: string; periodEnd: string }) => Promise<unknown> }).haiReport = async () => ({
+		;(
+			service as unknown as {
+				haiReport: (input: {
+					facilityId: string
+					periodStart: string
+					periodEnd: string
+				}) => Promise<unknown>
+			}
+		).haiReport = async () => ({
 			periodStart: "2026-04-01",
 			periodEnd: "2026-04-30",
 			totalTags: 3,
 			patientDays: 60,
 			incidencePer1000PatientDays: 50,
 			byType: { clabsi: 2, vap: 1 },
-			byWard: { ICU: 2, "Ward A": 1 },
+			byWard: { "ICU": 2, "Ward A": 1 },
 		})
 
-		const res = await service.haiExport({ facilityId: "fac-1", periodStart: "2026-04-01", periodEnd: "2026-04-30", format: "csv" })
+		const res = await service.haiExport({
+			facilityId: "fac-1",
+			periodStart: "2026-04-01",
+			periodEnd: "2026-04-30",
+			format: "csv",
+		})
 
 		expect(res.format).toBe("csv")
 		expect(res.uri.startsWith("data:text/csv")).toBe(true)
-		expect(decodeURIComponent(res.uri)).toContain("Ward,HAI Type,Cases,Patient Days,Incidence Per 1000 Patient Days,Period Start,Period End")
+		expect(decodeURIComponent(res.uri)).toContain(
+			"Ward,HAI Type,Cases,Patient Days,Incidence Per 1000 Patient Days,Period Start,Period End"
+		)
 	})
 
 	it("haiExport returns a PDF data URI", async () => {
 		const { service } = makeService()
-		;(service as unknown as { haiReport: (input: { facilityId: string; periodStart: string; periodEnd: string }) => Promise<unknown> }).haiReport = async () => ({
+		;(
+			service as unknown as {
+				haiReport: (input: {
+					facilityId: string
+					periodStart: string
+					periodEnd: string
+				}) => Promise<unknown>
+			}
+		).haiReport = async () => ({
 			periodStart: "2026-04-01",
 			periodEnd: "2026-04-30",
 			totalTags: 3,
 			patientDays: 60,
 			incidencePer1000PatientDays: 50,
 			byType: { clabsi: 2, vap: 1 },
-			byWard: { ICU: 2, "Ward A": 1 },
+			byWard: { "ICU": 2, "Ward A": 1 },
 		})
 
-		const res = await service.haiExport({ facilityId: "fac-1", periodStart: "2026-04-01", periodEnd: "2026-04-30", format: "pdf" })
+		const res = await service.haiExport({
+			facilityId: "fac-1",
+			periodStart: "2026-04-01",
+			periodEnd: "2026-04-30",
+			format: "pdf",
+		})
 
 		expect(res.format).toBe("pdf")
 		expect(res.uri.startsWith("data:application/pdf;base64,")).toBe(true)

@@ -496,7 +496,7 @@ export class SlaService implements OnModuleInit {
 		offset: number
 	): Promise<SlaEventsResponse> {
 		const facilityId = query.facilityId
-		 
+
 		const workflowType = query.workflowType!
 		if (!facilityId) {
 			return { data: [], total: 0, page, limit, totalPages: 0 }
@@ -2289,9 +2289,7 @@ export class SlaService implements OnModuleInit {
 	// Public helper for admin-dashboard integration
 	// ========================================================================
 
-	async getActiveSlaBreaches(
-		facilityId: string
-	): Promise<{
+	async getActiveSlaBreaches(facilityId: string): Promise<{
 		activeBreaches: number
 		overdueQueues: number
 		topBreachedWorkflows: Array<{ workflow: string; count: number }>
@@ -2948,7 +2946,7 @@ export class SlaService implements OnModuleInit {
 					eq(workflowStatusLog.facilityId, facilityId),
 					eq(workflowStatusLog.workflow, workflowType as SlaWorkflowType),
 					gte(workflowStatusLog.startedAt, new Date(startDate)),
-					lte(workflowStatusLog.startedAt, new Date(`${endDate  }T23:59:59Z`)),
+					lte(workflowStatusLog.startedAt, new Date(`${endDate}T23:59:59Z`)),
 					isNotNull(workflowStatusLog.durationMinutes)
 				)
 			)
@@ -3005,7 +3003,7 @@ export class SlaService implements OnModuleInit {
 					eq(workflowStatusLog.facilityId, input.facilityId),
 					eq(workflowStatusLog.workflow, input.workflowType as SlaWorkflowType),
 					gte(workflowStatusLog.startedAt, new Date(input.startDate)),
-					lte(workflowStatusLog.startedAt, new Date(`${input.endDate  }T23:59:59Z`)),
+					lte(workflowStatusLog.startedAt, new Date(`${input.endDate}T23:59:59Z`)),
 					isNotNull(workflowStatusLog.durationMinutes)
 				)
 			)
@@ -3079,7 +3077,7 @@ export class SlaService implements OnModuleInit {
 					eq(workflowStatusLog.facilityId, input.facilityId),
 					eq(workflowStatusLog.workflow, input.workflowType as SlaWorkflowType),
 					gte(workflowStatusLog.startedAt, new Date(input.dateFrom)),
-					lte(workflowStatusLog.startedAt, new Date(`${input.dateTo  }T23:59:59Z`))
+					lte(workflowStatusLog.startedAt, new Date(`${input.dateTo}T23:59:59Z`))
 				)
 			)
 			.orderBy(asc(workflowStatusLog.startedAt))
