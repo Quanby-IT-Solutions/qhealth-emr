@@ -138,6 +138,19 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		requiredPermissions: [{ module: "nutrition", action: "view" }],
 	},
 	{
+		// Scheduler patient list: search existing patients for appointment booking.
+		// Keep this separate from Register Patient so both scheduler items have
+		// distinct destinations and active states.
+		title: "Patients",
+		href: "/patients/search",
+		iconName: "patient",
+		requiredPermissions: [{ module: "scheduling", action: "view" }],
+		requireAllPermissions: [
+			{ module: "adt", action: "create" },
+			{ module: "patients", action: "view" },
+		],
+	},
+	{
 		title: "Patients",
 		href: "/patients/search",
 		iconName: "patient",
@@ -165,6 +178,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 			{ module: "nursing", action: "create" }, // Nurse — uses /patients/search instead
 			{ module: "nutrition", action: "view" }, // Dietitian — uses /patients/search instead
 			{ module: "clinical_docs", action: "sign" }, // Physicians — use /patients/search instead
+			{ module: "scheduling", action: "view" }, // Scheduler — uses /patients/search above
 		],
 	},
 	{
