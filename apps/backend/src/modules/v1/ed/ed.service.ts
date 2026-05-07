@@ -83,6 +83,27 @@ export class EdService {
 					})
 					.returning()
 
+				if (this.hasVitalSigns(input)) {
+					await db.insert(vitalSigns).values({
+						facilityId: input.facilityId,
+						preEncounterId: created!.id,
+						encounterId: null,
+						temperature: input.temperature?.toString(),
+						bpSystolic: input.bpSystolic,
+						bpDiastolic: input.bpDiastolic,
+						heartRate: input.heartRate,
+						respiratoryRate: input.respiratoryRate,
+						spo2: input.spo2?.toString(),
+						painScore: input.painScore,
+						weight: input.weight?.toString(),
+						height: input.height?.toString(),
+						newsScore: null,
+						newsRiskLevel: null,
+						recordedByStaffId: input.triageStaffId,
+						recordedAt: new Date(),
+					})
+				}
+
 				this.logger.log(`Created pre-encounter ${created!.id} with alias ${traumaAlias}`)
 				this.notificationService.broadcast(
 					"ed_queue",
@@ -101,6 +122,20 @@ export class EdService {
 		}
 
 		throw new Error("Failed to generate a unique trauma alias after 3 attempts")
+	}
+
+	private hasVitalSigns(input: CreatePreEncounterInput) {
+		return (
+			input.temperature !== undefined ||
+			input.bpSystolic !== undefined ||
+			input.bpDiastolic !== undefined ||
+			input.heartRate !== undefined ||
+			input.respiratoryRate !== undefined ||
+			input.spo2 !== undefined ||
+			input.painScore !== undefined ||
+			input.weight !== undefined ||
+			input.height !== undefined
+		)
 	}
 
 	async getPreEncounter(id: string) {

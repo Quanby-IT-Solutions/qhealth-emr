@@ -121,6 +121,24 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		excludePermissions: [{ module: "clinical_docs", action: "sign" }],
 	},
 	{
+		title: "Triage",
+		href: "/triage",
+		iconName: "emergency",
+		requiredPermissions: [{ module: "adt", action: "create" }],
+		requireAllPermissions: [{ module: "nursing", action: "create" }],
+	},
+	{
+		// Registrar patient list: search and manage existing patient records.
+		title: "Patients",
+		href: "/patients/search",
+		iconName: "patient",
+		requiredPermissions: [{ module: "patients", action: "view" }],
+		requireAllPermissions: [
+			{ module: "adt", action: "create" },
+			{ module: "patients", action: "edit" },
+		],
+	},
+	{
 		// Nurse-specific patient list: browse & filter all active patients without
 		// the strict Name+DOB dedup requirement of the registrar workflow.
 		title: "Patients",
