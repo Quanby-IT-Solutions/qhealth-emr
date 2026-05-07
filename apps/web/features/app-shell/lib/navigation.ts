@@ -279,7 +279,6 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		// NOT seeded for: Anesthesiologist (works only in OR), Auditor (non-clinical role)
 		// NOTE: Auditor doesn't have opd:view, so OPD is already hidden from them
 		requiredPermissions: [{ module: "opd", action: "view" }],
-		excludePermissions: [{ module: "patients", action: "edit" }],
 		excludeAllPermissions: TRIAGE_ROLE_BUNDLE,
 	},
 	{

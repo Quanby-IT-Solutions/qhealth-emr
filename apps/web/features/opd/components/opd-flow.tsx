@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Check, ChevronRight, Clock, Lock } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Check, ChevronRight, Clock, Lock, RotateCcw } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -431,26 +431,64 @@ function StepReadOnlyView({ step, status }: { step: OpdStep; status: OpdStepStat
 interface OpdFlowProps {
 	encounterId?: string
 	patientName?: string
+	patientId?: string
 }
 
-export function OpdFlow({ encounterId, patientName }: OpdFlowProps) {
-	const permSet = usePermissionSet()
-	const [currentStep, setCurrentStep] = useState<OpdStepId>("triage")
-	const [stepStatuses, setStepStatuses] = useState<Record<OpdStepId, OpdStepStatus>>({
+const storageKey = (patientId?: string) =>
+	patientId ? `opd_flow_state_${patientId}` : "opd_flow_state"
+
+interface PersistedOpdState {
+	currentStep: OpdStepId
+	stepStatuses: Record<OpdStepId, OpdStepStatus>
+	stepData: OpdFlowState
+	startedAt: string
+}
+
+const defaultOpdState = (): PersistedOpdState => ({
+	currentStep: "triage",
+	stepStatuses: {
 		triage: "in_progress",
 		registration: "pending",
 		vitals: "pending",
 		consultation: "pending",
 		disposition: "pending",
-	})
-	const [stepData, setStepData] = useState<OpdFlowState>({
+	},
+	stepData: {
 		triage: { completedAt: null, notes: "" },
 		registration: { completedAt: null, notes: "" },
 		vitals: { completedAt: null, notes: "" },
 		consultation: { completedAt: null, notes: "" },
 		disposition: { completedAt: null, notes: "" },
-	})
-	const [startedAt] = useState<string>(new Date().toISOString())
+	},
+	startedAt: new Date().toISOString(),
+})
+
+function loadOpdState(patientId?: string): PersistedOpdState {
+	if (typeof window === "undefined") return defaultOpdState()
+	try {
+		const raw = localStorage.getItem(storageKey(patientId))
+		if (raw) return JSON.parse(raw) as PersistedOpdState
+	} catch {
+		// ignore parse errors
+	}
+	return defaultOpdState()
+}
+
+export function OpdFlow({ encounterId, patientName, patientId }: OpdFlowProps) {
+	const permSet = usePermissionSet()
+
+	const [currentStep, setCurrentStep] = useState<OpdStepId>(() => loadOpdState(patientId).currentStep)
+	const [stepStatuses, setStepStatuses] = useState<Record<OpdStepId, OpdStepStatus>>(
+		() => loadOpdState(patientId).stepStatuses,
+	)
+	const [stepData, setStepData] = useState<OpdFlowState>(() => loadOpdState(patientId).stepData)
+	const [startedAt] = useState<string>(() => loadOpdState(patientId).startedAt)
+
+	// Persist to localStorage whenever state changes
+	useEffect(() => {
+		const state: PersistedOpdState = { currentStep, stepStatuses, stepData, startedAt }
+		localStorage.setItem(storageKey(patientId), JSON.stringify(state))
+	}, [currentStep, stepStatuses, stepData, startedAt, patientId])
 
 	const currentIdx = OPD_STEPS.findIndex(s => s.id === currentStep)
 	const currentStepDef = OPD_STEPS[currentIdx]!
@@ -489,6 +527,14 @@ export function OpdFlow({ encounterId, patientName }: OpdFlowProps) {
 		}
 	}
 
+	function handleReset() {
+		const fresh = defaultOpdState()
+		setCurrentStep(fresh.currentStep)
+		setStepStatuses(fresh.stepStatuses)
+		setStepData(fresh.stepData)
+		localStorage.removeItem(storageKey(patientId))
+	}
+
 	const isAllComplete = OPD_STEPS.every(s => stepStatuses[s.id] === "completed")
 	const elapsedMin = Math.round((Date.now() - Date.parse(startedAt)) / 60_000)
 
@@ -511,6 +557,16 @@ export function OpdFlow({ encounterId, patientName }: OpdFlowProps) {
 					<Badge variant={isAllComplete ? "default" : "secondary"}>
 						{isAllComplete ? "Completed" : `Step ${currentIdx + 1} of ${OPD_STEPS.length}`}
 					</Badge>
+					<Button
+						variant="ghost"
+						size="sm"
+						className="ml-2 text-xs text-muted-foreground"
+						onClick={handleReset}
+						title="Start a new OPD consultation"
+					>
+						<RotateCcw className="mr-1 size-3" />
+						New Consultation
+					</Button>
 				</div>
 			</div>
 
