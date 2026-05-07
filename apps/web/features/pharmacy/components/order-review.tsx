@@ -16,6 +16,8 @@ import {
 	XCircle,
 } from "lucide-react"
 
+import { toast } from "sonner"
+
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
@@ -213,6 +215,7 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 		return (
 			<DispenseConfirmation
 				order={order}
+				overrideNotes={overrideNotes || undefined}
 				onSuccess={() => {
 					setShowDispense(false)
 					onDispenseSuccess()
@@ -238,7 +241,11 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 				action: "approved",
 				overrideNotes: overrideNotes || undefined,
 			},
-			{ onSuccess: onDispenseSuccess }
+			{
+				onSuccess: onDispenseSuccess,
+				onError: (err) =>
+					toast.error(err instanceof Error ? err.message : "Failed to verify order"),
+			}
 		)
 	}
 
@@ -249,7 +256,11 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 				action: "rejected",
 				rejectionReason,
 			},
-			{ onSuccess: onBack }
+			{
+				onSuccess: onBack,
+				onError: (err) =>
+					toast.error(err instanceof Error ? err.message : "Failed to reject order"),
+			}
 		)
 	}
 
@@ -260,7 +271,11 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 				action: "on_hold",
 				modificationNotes: overrideNotes || undefined,
 			},
-			{ onSuccess: onBack }
+			{
+				onSuccess: onBack,
+				onError: (err) =>
+					toast.error(err instanceof Error ? err.message : "Failed to place order on hold"),
+			}
 		)
 	}
 

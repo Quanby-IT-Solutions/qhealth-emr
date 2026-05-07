@@ -25,11 +25,23 @@ import {
 interface SignatureCanvasProps {
 	onCapture: (dataUrl: string) => void
 	disabled?: boolean
+	initialDataUrl?: string
 }
 
-function SignatureCanvas({ onCapture, disabled }: SignatureCanvasProps) {
+function SignatureCanvas({ onCapture, disabled, initialDataUrl }: SignatureCanvasProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const drawing = useRef(false)
+	const initialized = useRef(false)
+
+	useEffect(() => {
+		if (!initialDataUrl || initialized.current || !canvasRef.current) return
+		initialized.current = true
+		const img = new window.Image()
+		img.onload = () => {
+			canvasRef.current?.getContext("2d")?.drawImage(img, 0, 0)
+		}
+		img.src = initialDataUrl
+	}, [initialDataUrl])
 
 	const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
 		const rect = canvasRef.current!.getBoundingClientRect()
@@ -71,6 +83,7 @@ function SignatureCanvas({ onCapture, disabled }: SignatureCanvasProps) {
 	const clear = () => {
 		const canvas = canvasRef.current!
 		canvas.getContext("2d")!.clearRect(0, 0, canvas.width, canvas.height)
+		initialized.current = false
 		onCapture("")
 	}
 
@@ -372,7 +385,7 @@ export function FndrfForm({
 							type="number"
 							min={20}
 							max={45}
-							value={form.gestationalAgeWeeks}
+							value={form.gestationalAgeWeeks || ""}
 							onChange={e => set("gestationalAgeWeeks", Number(e.target.value))}
 							disabled={isReadOnly}
 						/>
@@ -382,7 +395,7 @@ export function FndrfForm({
 						<Input
 							type="number"
 							min={0}
-							value={form.birthWeightGrams}
+							value={form.birthWeightGrams || ""}
 							onChange={e => set("birthWeightGrams", Number(e.target.value))}
 							disabled={isReadOnly}
 						/>
@@ -456,7 +469,7 @@ export function FndrfForm({
 							type="number"
 							min={10}
 							max={70}
-							value={form.motherAge}
+							value={form.motherAge || ""}
 							onChange={e => set("motherAge", Number(e.target.value))}
 							disabled={isReadOnly}
 						/>
@@ -466,7 +479,7 @@ export function FndrfForm({
 						<Input
 							type="number"
 							min={0}
-							value={form.motherGravidity}
+							value={form.motherGravidity || ""}
 							onChange={e => set("motherGravidity", Number(e.target.value))}
 							disabled={isReadOnly}
 						/>
@@ -476,7 +489,7 @@ export function FndrfForm({
 						<Input
 							type="number"
 							min={0}
-							value={form.motherParity}
+							value={form.motherParity || ""}
 							onChange={e => set("motherParity", Number(e.target.value))}
 							disabled={isReadOnly}
 						/>
@@ -664,14 +677,8 @@ export function FndrfForm({
 							/>
 						) : (
 							<>
-								{form.physicianSignatureDataUrl ? (
-									<img
-										src={form.physicianSignatureDataUrl}
-										alt="Current signature"
-										className="mb-1 h-[130px] rounded border bg-white"
-									/>
-								) : null}
 								<SignatureCanvas
+									initialDataUrl={existing?.physicianSignatureDataUrl ?? undefined}
 									onCapture={url => set("physicianSignatureDataUrl", url)}
 									disabled={isReadOnly}
 								/>

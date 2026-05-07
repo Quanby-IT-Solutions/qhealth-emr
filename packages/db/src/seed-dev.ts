@@ -1265,6 +1265,35 @@ async function ensureNursingAndOrders(params: {
 			.returning()
 	}
 
+	// Pending-verification order — feeds the Pharmacy Verification Queue (Story 10.1)
+	const [pendingMedOrder] = await db
+		.select()
+		.from(medicationOrders)
+		.where(
+			and(
+				eq(medicationOrders.encounterId, params.encounterId),
+				eq(medicationOrders.genericName, "Amoxicillin"),
+				eq(medicationOrders.status, "pending_verification")
+			)
+		)
+	if (!pendingMedOrder) {
+		await db.insert(medicationOrders).values({
+			facilityId: params.facilityId,
+			encounterId: params.encounterId,
+			genericName: "Amoxicillin",
+			brandName: "Amoxil",
+			rxnormCode: "723",
+			dose: "500",
+			doseUnit: "mg",
+			doseForm: "capsule",
+			route: "oral",
+			frequency: "q8h",
+			durationDays: 7,
+			status: "pending_verification",
+			orderingStaffId: params.doctorStaffId,
+		})
+	}
+
 	const [lab] = await db
 		.select()
 		.from(labOrders)
@@ -1760,6 +1789,28 @@ async function ensureNursingScenarios(params: {
 				manufacturer: "Pfizer",
 			})
 			.returning()
+	}
+
+	// Add more drug generics if they don't exist
+	const moreGenerics = [
+		{ genericName: "Amoxicillin", rxnormCode: "723", atcCode: "J01CA04" },
+		{ genericName: "Metformin", rxnormCode: "6809", atcCode: "A10BA02" },
+		{ genericName: "Atorvastatin", rxnormCode: "83367", atcCode: "C10AA05" },
+		{ genericName: "Losartan", rxnormCode: "52242", atcCode: "C09CA01" },
+		{ genericName: "Salbutamol", rxnormCode: "435", atcCode: "R03AC02" },
+		{ genericName: "Omeprazole", rxnormCode: "7646", atcCode: "A02BC01" },
+		{ genericName: "Metoprolol", rxnormCode: "6918", atcCode: "C07AB02" },
+		{ genericName: "Azithromycin", rxnormCode: "18631", atcCode: "J01FA10" },
+	]
+
+	for (const g of moreGenerics) {
+		const [exists] = await db
+			.select()
+			.from(drugGenerics)
+			.where(eq(drugGenerics.genericName, g.genericName))
+		if (!exists) {
+			await db.insert(drugGenerics).values(g)
+		}
 	}
 
 	let [amlodipineFormulary] = await db

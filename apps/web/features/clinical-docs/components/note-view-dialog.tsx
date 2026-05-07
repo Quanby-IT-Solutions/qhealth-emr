@@ -104,13 +104,13 @@ export function NoteViewDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+			<DialogContent className="max-h-[85vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-2xl">
 				{isLoading || !note ? (
 					<div className="text-muted-foreground py-8 text-center text-sm">Loading note…</div>
 				) : (
 					<>
 						<DialogHeader>
-							<DialogTitle className="flex items-center gap-2">
+							<DialogTitle className="flex flex-wrap items-center gap-2">
 								{noteTypeLabel(note.noteType)}
 								<Badge variant={isSigned ? "default" : "secondary"}>
 									{isSigned ? "Signed" : "Draft"}
@@ -188,7 +188,7 @@ export function NoteViewDialog({
 												</div>
 											</div>
 										) : (
-											<div className="bg-muted/50 rounded-md border p-4 text-sm whitespace-pre-wrap">
+											<div className="bg-muted/50 rounded-md border p-4 text-sm break-words whitespace-pre-wrap">
 												{note.content || "No content"}
 											</div>
 										)}
@@ -218,7 +218,7 @@ export function NoteViewDialog({
 																		Reason: {addendum.reason}
 																	</div>
 																)}
-																<div className="text-sm whitespace-pre-wrap">
+																<div className="text-sm break-words whitespace-pre-wrap">
 																	{addendum.content}
 																</div>
 																<Button
