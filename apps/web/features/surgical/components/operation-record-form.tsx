@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 
-import { Loader2, Lock, Save, Signature } from "lucide-react"
+import { Info, Loader2, Lock, Save, Signature } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -322,6 +322,12 @@ export function OperationRecordForm({
 
 	return (
 		<div className="space-y-6">
+			{!canEdit && !canSign && (
+				<div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+					<Info className="mt-0.5 size-4 shrink-0" />
+					<p>You have view-only access to this record. The Operation Record is authored and signed by the assigned surgeon.</p>
+				</div>
+			)}
 			<Card>
 				<CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 					<div>
@@ -627,42 +633,46 @@ export function OperationRecordForm({
 				</p>
 			) : null}
 
-			<Separator />
+			{(canEdit || canSign) && (
+				<>
+					<Separator />
 
-			{canSign && !isSigned && signChecklistMissing.length > 0 ? (
-				<p className="text-muted-foreground text-sm">
-					Complete these fields before signing: {signChecklistMissing.join(", ")}.
-				</p>
-			) : null}
+					{canSign && !isSigned && signChecklistMissing.length > 0 ? (
+						<p className="text-muted-foreground text-sm">
+							Complete these fields before signing: {signChecklistMissing.join(", ")}.
+						</p>
+					) : null}
 
-			<div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-				<Button
-					variant="outline"
-					onClick={() => {
-						void handleSave()
-					}}
-					disabled={!canSubmit || !canEdit || isSigned || sign.isPending}
-				>
-					<Save className="mr-2 size-4" />
-					{save.isPending ? "Saving..." : "Save Operation Record"}
-				</Button>
-				{canSign ? (
-					<Button
-						onClick={() => {
-							void handleSign()
-						}}
-						disabled={
-							!canSignRecord ||
-							sign.isPending ||
-							(canEdit && !canSubmit) ||
-							(!canEdit && !existing)
-						}
-					>
-						<Signature className="mr-2 size-4" />
-						{sign.isPending ? "Signing..." : isSigned ? "Signed" : "Sign Operation Record"}
-					</Button>
-				) : null}
-			</div>
+					<div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+						<Button
+							variant="outline"
+							onClick={() => {
+								void handleSave()
+							}}
+							disabled={!canSubmit || !canEdit || isSigned || sign.isPending}
+						>
+							<Save className="mr-2 size-4" />
+							{save.isPending ? "Saving..." : "Save Operation Record"}
+						</Button>
+						{canSign ? (
+							<Button
+								onClick={() => {
+									void handleSign()
+								}}
+								disabled={
+									!canSignRecord ||
+									sign.isPending ||
+									(canEdit && !canSubmit) ||
+									(!canEdit && !existing)
+								}
+							>
+								<Signature className="mr-2 size-4" />
+								{sign.isPending ? "Signing..." : isSigned ? "Signed" : "Sign Operation Record"}
+							</Button>
+						) : null}
+					</div>
+				</>
+			)}
 		</div>
 	)
 }

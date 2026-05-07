@@ -884,6 +884,25 @@ export class EncountersService {
 			throw new BadRequestException("Use the close endpoint for outpatient encounters")
 		}
 
+		// Enforce death report mandate before discharge
+		if (input.disposition === "deceased") {
+			const completedDeathReport = await db
+				.select()
+				.from(deathReports)
+				.where(
+					and(
+						eq(deathReports.encounterId, input.encounterId),
+						inArray(deathReports.status, ["completed", "submitted"]),
+					),
+				)
+				.limit(1)
+			if (completedDeathReport.length === 0) {
+				throw new BadRequestException(
+					"A completed death report (FMDRF or FNDRF) must be submitted before discharging a deceased patient.",
+				)
+			}
+		}
+
 		// Release bed
 		if (encounter.bedId) {
 			await db
@@ -913,29 +932,6 @@ export class EncountersService {
 			staffId: null,
 			notes: `Disposition: ${input.disposition}`,
 		})
-
-		// Trigger draft death report creation if disposition is deceased
-		if (input.disposition === "deceased") {
-			try {
-				await db.insert(deathReports).values({
-					facilityId: encounter.facilityId,
-					encounterId: encounter.id,
-					patientId: encounter.patientId,
-					reportType: "fmdrf", // Default to FMDRF, can be changed during review
-					deathDatetime: input.dischargeDatetime ? new Date(input.dischargeDatetime) : new Date(),
-					causeOfDeath: "Pending determination", // Placeholder
-					status: "draft",
-				})
-				this.logger.log(
-					`Created draft death report for deceased patient on encounter ${encounter.id}`
-				)
-			} catch (error) {
-				// Log but don't fail discharge — death report can be created manually
-				this.logger.error(
-					`Failed to create draft death report for encounter ${encounter.id}: ${error}`
-				)
-			}
-		}
 
 		this.logger.log(
 			`Discharged encounter ${input.encounterId} with disposition: ${input.disposition}`

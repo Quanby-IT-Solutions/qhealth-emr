@@ -260,14 +260,15 @@ describe("SchedulingService", () => {
 	describe("createClinicTemplate()", () => {
 		it("creates the template and triggers slot generation", async () => {
 			const created = makeTemplate()
-			;(db.select as jest.Mock)
-				.mockReturnValueOnce(mockSelectChain([{ id: "clinician-1" }]))
-			;(db.transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-				const tx = {
-					insert: jest.fn().mockReturnValue(mockInsertReturning(created)),
+			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([{ id: "clinician-1" }]))
+			;(db.transaction as jest.Mock).mockImplementation(
+				async (fn: (tx: unknown) => Promise<unknown>) => {
+					const tx = {
+						insert: jest.fn().mockReturnValue(mockInsertReturning(created)),
+					}
+					return fn(tx)
 				}
-				return fn(tx)
-			})
+			)
 
 			const result = await service.createClinicTemplate(
 				{
@@ -359,17 +360,22 @@ describe("SchedulingService", () => {
 	describe("updateClinicTemplate()", () => {
 		it("drops future open slots and regenerates when startTime changes", async () => {
 			const existing = makeTemplate()
-			const updated = makeTemplate({ startTime: "09:00", updatedAt: new Date("2026-05-07T00:00:00.000Z") })
+			const updated = makeTemplate({
+				startTime: "09:00",
+				updatedAt: new Date("2026-05-07T00:00:00.000Z"),
+			})
 			const deleteChain = mockDeleteChain()
 
 			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([existing]))
-			;(db.transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-				const tx = {
-					update: jest.fn().mockReturnValue(mockUpdateReturning(updated)),
-					delete: jest.fn().mockReturnValue(deleteChain),
+			;(db.transaction as jest.Mock).mockImplementation(
+				async (fn: (tx: unknown) => Promise<unknown>) => {
+					const tx = {
+						update: jest.fn().mockReturnValue(mockUpdateReturning(updated)),
+						delete: jest.fn().mockReturnValue(deleteChain),
+					}
+					return fn(tx)
 				}
-				return fn(tx)
-			})
+			)
 
 			const result = await service.updateClinicTemplate(
 				{
@@ -420,13 +426,15 @@ describe("SchedulingService", () => {
 			const updated = makeTemplate({ isActive: true })
 
 			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([existing]))
-			;(db.transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-				const tx = {
-					update: jest.fn().mockReturnValue(mockUpdateReturning(updated)),
-					delete: jest.fn().mockReturnValue(mockDeleteChain()),
+			;(db.transaction as jest.Mock).mockImplementation(
+				async (fn: (tx: unknown) => Promise<unknown>) => {
+					const tx = {
+						update: jest.fn().mockReturnValue(mockUpdateReturning(updated)),
+						delete: jest.fn().mockReturnValue(mockDeleteChain()),
+					}
+					return fn(tx)
 				}
-				return fn(tx)
-			})
+			)
 
 			await service.updateClinicTemplate(
 				{
@@ -487,12 +495,14 @@ describe("SchedulingService", () => {
 			})
 
 			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([existing]))
-			;(db.transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-				const tx = {
-					update: jest.fn().mockReturnValue(mockUpdateReturning(updated)),
+			;(db.transaction as jest.Mock).mockImplementation(
+				async (fn: (tx: unknown) => Promise<unknown>) => {
+					const tx = {
+						update: jest.fn().mockReturnValue(mockUpdateReturning(updated)),
+					}
+					return fn(tx)
 				}
-				return fn(tx)
-			})
+			)
 
 			const result = await service.updateSlot(
 				{ id: existing.id, action: "block", reason: "Holiday" },
@@ -528,12 +538,14 @@ describe("SchedulingService", () => {
 			})
 
 			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([existing]))
-			;(db.transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-				const tx = {
-					update: jest.fn().mockReturnValue(mockUpdateReturning(updated)),
+			;(db.transaction as jest.Mock).mockImplementation(
+				async (fn: (tx: unknown) => Promise<unknown>) => {
+					const tx = {
+						update: jest.fn().mockReturnValue(mockUpdateReturning(updated)),
+					}
+					return fn(tx)
 				}
-				return fn(tx)
-			})
+			)
 
 			const result = await service.updateSlot({ id: existing.id, action: "unblock" }, actor)
 
@@ -571,9 +583,9 @@ describe("SchedulingService", () => {
 		it("throws NotFoundException when the slot does not exist", async () => {
 			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([]))
 
-			await expect(service.updateSlot({ id: "missing-slot", action: "block" }, actor)).rejects.toThrow(
-				NotFoundException
-			)
+			await expect(
+				service.updateSlot({ id: "missing-slot", action: "block" }, actor)
+			).rejects.toThrow(NotFoundException)
 		})
 	})
 
@@ -583,75 +595,77 @@ describe("SchedulingService", () => {
 			let createdCount = 0
 			let queueTail = Promise.resolve()
 
-			;(db.transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-				const previous = queueTail
-				let release: (() => void) | undefined
-				queueTail = new Promise<void>(resolve => {
-					release = resolve
-				})
-				await previous
+			;(db.transaction as jest.Mock).mockImplementation(
+				async (fn: (tx: unknown) => Promise<unknown>) => {
+					const previous = queueTail
+					let release: (() => void) | undefined
+					queueTail = new Promise<void>(resolve => {
+						release = resolve
+					})
+					await previous
 
-				let selectCall = 0
-				const tx = {
-					select: jest.fn().mockImplementation(() => {
-						selectCall += 1
+					let selectCall = 0
+					const tx = {
+						select: jest.fn().mockImplementation(() => {
+							selectCall += 1
 
-						if (selectCall === 1) {
-							return {
-								from: jest.fn().mockReturnValue({
-									where: jest.fn().mockReturnValue({
-										limit: jest.fn().mockReturnValue({
-											for: jest.fn().mockResolvedValue([slotState]),
+							if (selectCall === 1) {
+								return {
+									from: jest.fn().mockReturnValue({
+										where: jest.fn().mockReturnValue({
+											limit: jest.fn().mockReturnValue({
+												for: jest.fn().mockResolvedValue([slotState]),
+											}),
 										}),
 									}),
-								}),
+								}
 							}
-						}
 
-						if (selectCall === 2) {
-							return mockSelectChain([])
-						}
+							if (selectCall === 2) {
+								return mockSelectChain([])
+							}
 
-						if (selectCall === 3) {
-							return mockSelectChain([{ maxQueue: createdCount }])
-						}
+							if (selectCall === 3) {
+								return mockSelectChain([{ maxQueue: createdCount }])
+							}
 
-						return mockSelectChain([{ id: actor.staffProfileId }])
-					}),
-					insert: jest.fn().mockImplementation(() => ({
-						values: jest.fn().mockReturnValue({
-							returning: jest.fn().mockImplementation(async () => {
-								createdCount += 1
-								return [
-									makeAppointment({
-										id: `appointment-${createdCount}`,
-										clinicSlotId: slotState.id,
-										queueNumber: createdCount,
-									}),
-								]
-							}),
+							return mockSelectChain([{ id: actor.staffProfileId }])
 						}),
-					})),
-					update: jest.fn().mockImplementation(() => ({
-						set: jest.fn().mockReturnValue({
-							where: jest.fn().mockImplementation(async () => {
-								slotState = makeSlot({
-									...slotState,
-									status: "booked",
-									appointmentId: `appointment-${createdCount}`,
-								})
-								return undefined
+						insert: jest.fn().mockImplementation(() => ({
+							values: jest.fn().mockReturnValue({
+								returning: jest.fn().mockImplementation(async () => {
+									createdCount += 1
+									return [
+										makeAppointment({
+											id: `appointment-${createdCount}`,
+											clinicSlotId: slotState.id,
+											queueNumber: createdCount,
+										}),
+									]
+								}),
 							}),
-						}),
-					})),
-				}
+						})),
+						update: jest.fn().mockImplementation(() => ({
+							set: jest.fn().mockReturnValue({
+								where: jest.fn().mockImplementation(async () => {
+									slotState = makeSlot({
+										...slotState,
+										status: "booked",
+										appointmentId: `appointment-${createdCount}`,
+									})
+									return undefined
+								}),
+							}),
+						})),
+					}
 
-				try {
-					return await fn(tx)
-				} finally {
-					release?.()
+					try {
+						return await fn(tx)
+					} finally {
+						release?.()
+					}
 				}
-			})
+			)
 
 			const bookingInput = {
 				facilityId: "fac-1",
@@ -692,15 +706,17 @@ describe("SchedulingService", () => {
 			const slotReleaseChain = mockUpdateWithoutReturning()
 
 			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([existing]))
-			;(db.transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-				const tx = {
-					update: jest
-						.fn()
-						.mockImplementationOnce(() => mockUpdateReturning(updated))
-						.mockImplementationOnce(() => slotReleaseChain),
+			;(db.transaction as jest.Mock).mockImplementation(
+				async (fn: (tx: unknown) => Promise<unknown>) => {
+					const tx = {
+						update: jest
+							.fn()
+							.mockImplementationOnce(() => mockUpdateReturning(updated))
+							.mockImplementationOnce(() => slotReleaseChain),
+					}
+					return fn(tx)
 				}
-				return fn(tx)
-			})
+			)
 
 			const result = await service.updateAppointmentStatus({
 				id: existing.id,
@@ -764,7 +780,6 @@ describe("SchedulingService", () => {
 				.mockReturnValueOnce(mockSelectChain([openSlot]))
 				.mockReturnValueOnce(mockSelectChain([{ latestSlotDate: "2026-05-12" }]))
 				.mockReturnValueOnce(mockSelectChain([blockedSlot]))
-
 			;(db.transaction as jest.Mock)
 				.mockImplementationOnce(async (fn: (tx: unknown) => Promise<unknown>) => {
 					const tx = {

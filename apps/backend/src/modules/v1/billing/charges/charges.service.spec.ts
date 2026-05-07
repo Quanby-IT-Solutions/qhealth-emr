@@ -14,6 +14,8 @@
 
 import { BadRequestException } from "@nestjs/common"
 
+import { db } from "@/common/database/database.client"
+
 import { BillingService } from "../billing.service"
 
 jest.mock("@/common/database/database.client", () => ({
@@ -27,8 +29,20 @@ jest.mock("@/common/database/database.client", () => ({
 }))
 
 jest.mock("@repo/db/schema", () => ({
-	charges: { id: "id", encounterId: "encounterId", facilityId: "facilityId", sourceType: "sourceType" },
-	chargeMasterItems: { id: "id", facilityId: "facilityId", isActive: "isActive", description: "description", itemCode: "itemCode", category: "category" },
+	charges: {
+		id: "id",
+		encounterId: "encounterId",
+		facilityId: "facilityId",
+		sourceType: "sourceType",
+	},
+	chargeMasterItems: {
+		id: "id",
+		facilityId: "facilityId",
+		isActive: "isActive",
+		description: "description",
+		itemCode: "itemCode",
+		category: "category",
+	},
 	encounterStatusEvents: {},
 	encounters: {},
 	patients: {},
@@ -61,15 +75,15 @@ jest.mock("@/config/env.config", () => ({
 jest.mock("@/utils/sla-events", () => ({ closeOpenSlaStep: jest.fn() }))
 jest.mock("@/utils/sla-step-target", () => ({ resolveStepTarget: jest.fn() }))
 
-import { db } from "@/common/database/database.client"
-
 const FACILITY = "fac-uuid-0001"
 const ENCOUNTER = "enc-uuid-0001"
 const STAFF_USER = "user-id-0001"
 const STAFF_PROFILE = "staff-profile-0001"
 
 function makeAudit() {
-	return { log: jest.fn().mockResolvedValue(undefined) } as unknown as ConstructorParameters<typeof BillingService>[0]
+	return { log: jest.fn().mockResolvedValue(undefined) } as unknown as ConstructorParameters<
+		typeof BillingService
+	>[0]
 }
 
 function makeService() {
@@ -81,7 +95,8 @@ function makeService() {
 	// Constructor: (philHealthAdapter, auditService)
 	const service = new BillingService(adapter as never, audit as never)
 	// Stub staff profile lookup
-	;(service as unknown as { getStaffProfileId: (u: string) => Promise<string> }).getStaffProfileId = async () => STAFF_PROFILE
+	;(service as unknown as { getStaffProfileId: (u: string) => Promise<string> }).getStaffProfileId =
+		async () => STAFF_PROFILE
 	return { service, audit }
 }
 
@@ -164,7 +179,10 @@ describe("BIL-BE-02 Charge Capture", () => {
 		})
 		;(db.update as jest.Mock).mockReturnValue({
 			set: () => ({
-				where: () => ({ returning: () => Promise.resolve([{ ...existing, unitPrice: "300.00", totalAmount: "300.00" }]) }),
+				where: () => ({
+					returning: () =>
+						Promise.resolve([{ ...existing, unitPrice: "300.00", totalAmount: "300.00" }]),
+				}),
 			}),
 		})
 
@@ -190,7 +208,11 @@ describe("BIL-BE-02 Charge Capture", () => {
 
 		const { service } = makeService()
 		await expect(
-			service.markReadyForInvoicing({ encounterId: ENCOUNTER, facilityId: FACILITY, staffId: STAFF_USER })
+			service.markReadyForInvoicing({
+				encounterId: ENCOUNTER,
+				facilityId: FACILITY,
+				staffId: STAFF_USER,
+			})
 		).rejects.toBeInstanceOf(BadRequestException)
 	})
 
@@ -215,7 +237,9 @@ describe("BIL-BE-02 Charge Capture", () => {
 
 		expect(res.success).toBe(true)
 		expect(res.chargeCount).toBe(3)
-		expect(insertValues).toHaveBeenCalledWith(expect.objectContaining({ toStatus: "ready_for_billing" }))
+		expect(insertValues).toHaveBeenCalledWith(
+			expect.objectContaining({ toStatus: "ready_for_billing" })
+		)
 		expect((audit as unknown as { log: jest.Mock }).log).toHaveBeenCalled()
 	})
 
@@ -238,6 +262,8 @@ describe("BIL-BE-02 Charge Capture", () => {
 		})
 
 		const { service } = makeService()
-		await expect(service.deleteCharge("charge-1", STAFF_USER)).rejects.toBeInstanceOf(BadRequestException)
+		await expect(service.deleteCharge("charge-1", STAFF_USER)).rejects.toBeInstanceOf(
+			BadRequestException
+		)
 	})
 })

@@ -41,10 +41,10 @@ import { PHILHEALTH_ADAPTER, type PhilHealthAdapter } from "@/common/philhealth/
 import { env } from "@/config/env.config"
 import { closeOpenSlaStep } from "@/utils/sla-events"
 import { resolveStepTarget } from "@/utils/sla-step-target"
-import { ACTIVE_DRG_CODES, findDrgCode } from "./drg-master-codes"
 
 import { AuditService } from "../audit/audit.service"
 import { evaluateProcedureCoverage } from "../surgical/surgical-procedure-utils"
+import { ACTIVE_DRG_CODES, findDrgCode } from "./drg-master-codes"
 
 // ============================================================================
 // Input Types (explicit — avoids TypeScript depth limit with InferContractRouterInputs)
@@ -528,7 +528,7 @@ export class BillingService {
 		if (isActive !== undefined) conditions.push(eq(chargeMasterItems.isActive, isActive))
 		if (search) {
 			conditions.push(
-				sql`(${chargeMasterItems.description} ILIKE ${`%${  search  }%`} OR ${chargeMasterItems.itemCode} ILIKE ${`%${  search  }%`})`
+				sql`(${chargeMasterItems.description} ILIKE ${`%${search}%`} OR ${chargeMasterItems.itemCode} ILIKE ${`%${search}%`})`
 			)
 		}
 
@@ -905,8 +905,10 @@ export class BillingService {
 
 		// HMO sub-form validation: provider + claim number + percentage required.
 		if (input.paymentMethod === "hmo") {
-			if (!input.hmoProvider) throw new BadRequestException("HMO provider is required for HMO payments")
-			if (!input.hmoClaimNumber) throw new BadRequestException("HMO claim number is required for HMO payments")
+			if (!input.hmoProvider)
+				throw new BadRequestException("HMO provider is required for HMO payments")
+			if (!input.hmoClaimNumber)
+				throw new BadRequestException("HMO claim number is required for HMO payments")
 			if (input.hmoPercentageCovered == null) {
 				throw new BadRequestException("HMO percentage covered is required for HMO payments")
 			}
@@ -1163,25 +1165,50 @@ export class BillingService {
 		const ed = existing.extractedData as Record<string, unknown> | null
 		const violations: { path: string; message: string }[] = []
 		// Patient section
-		if (!existing.patientId) violations.push({ path: "Patient.PatientId", message: "Patient ID is required" })
+		if (!existing.patientId)
+			violations.push({ path: "Patient.PatientId", message: "Patient ID is required" })
 		// Encounter section
-		if (!existing.encounterId) violations.push({ path: "Encounter.EncounterId", message: "Encounter ID is required" })
-		if (!existing.facilityId) violations.push({ path: "Encounter.FacilityId", message: "Facility ID is required" })
+		if (!existing.encounterId)
+			violations.push({ path: "Encounter.EncounterId", message: "Encounter ID is required" })
+		if (!existing.facilityId)
+			violations.push({ path: "Encounter.FacilityId", message: "Facility ID is required" })
 		// ClinicalSummary section
-		if (!ed?.chiefComplaint) violations.push({ path: "ClinicalSummary.ChiefComplaint", message: "Chief complaint is required" })
-		if (!ed?.historyOfPresentIllness) violations.push({ path: "ClinicalSummary.HistoryOfPresentIllness", message: "History of present illness is required" })
-		if (!ed?.vitalSigns) violations.push({ path: "ClinicalSummary.VitalSigns", message: "Vital signs are required" })
-		if (!ed?.courseInTheWard) violations.push({ path: "ClinicalSummary.ManagementPlan", message: "Management plan / course in the ward is required" })
+		if (!ed?.chiefComplaint)
+			violations.push({
+				path: "ClinicalSummary.ChiefComplaint",
+				message: "Chief complaint is required",
+			})
+		if (!ed?.historyOfPresentIllness)
+			violations.push({
+				path: "ClinicalSummary.HistoryOfPresentIllness",
+				message: "History of present illness is required",
+			})
+		if (!ed?.vitalSigns)
+			violations.push({ path: "ClinicalSummary.VitalSigns", message: "Vital signs are required" })
+		if (!ed?.courseInTheWard)
+			violations.push({
+				path: "ClinicalSummary.ManagementPlan",
+				message: "Management plan / course in the ward is required",
+			})
 		// Diagnoses section — at least one ICD-10 code is required for CF4
 		const icd10Codes = Array.isArray(ed?.icd10Codes) ? (ed.icd10Codes as unknown[]) : []
-		if (icd10Codes.length === 0) violations.push({ path: "Diagnoses.ICD10", message: "At least one ICD-10 diagnosis code is required" })
+		if (icd10Codes.length === 0)
+			violations.push({
+				path: "Diagnoses.ICD10",
+				message: "At least one ICD-10 diagnosis code is required",
+			})
 		// ChargesSummary — verify an invoice exists for this encounter so charges are present
 		const [encounterInvoice] = await db
 			.select({ id: invoices.id })
 			.from(invoices)
 			.where(eq(invoices.encounterId, existing.encounterId))
 			.limit(1)
-		if (!encounterInvoice) violations.push({ path: "ChargesSummary", message: "No invoice found for this encounter — charges must be captured before CF4 submission" })
+		if (!encounterInvoice)
+			violations.push({
+				path: "ChargesSummary",
+				message:
+					"No invoice found for this encounter — charges must be captured before CF4 submission",
+			})
 		if (violations.length > 0) {
 			throw new UnprocessableEntityException({ message: "CF4 XSD validation failed", violations })
 		}
@@ -1552,7 +1579,10 @@ export class BillingService {
 		const { search } = input
 		const lower = search.toLowerCase()
 		return ACTIVE_DRG_CODES.filter(
-			d => d.code.toLowerCase().includes(lower) || d.description.toLowerCase().includes(lower) || d.mdrg.toLowerCase().includes(lower)
+			d =>
+				d.code.toLowerCase().includes(lower) ||
+				d.description.toLowerCase().includes(lower) ||
+				d.mdrg.toLowerCase().includes(lower)
 		).slice(0, 20)
 	}
 
@@ -2104,7 +2134,11 @@ export class BillingService {
 	}
 
 	private buildCf4XmlStub(claim: typeof cf4Claims.$inferSelect): string {
-		const esc = (v: unknown) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+		const esc = (v: unknown) =>
+			String(v ?? "")
+				.replace(/&/g, "&amp;")
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;")
 		const ed = claim.extractedData as Record<string, unknown> | null
 		const icd10Codes = Array.isArray(ed?.icd10Codes) ? (ed.icd10Codes as string[]) : []
 		const procedures = Array.isArray(ed?.procedures) ? (ed.procedures as string[]) : []
@@ -2467,7 +2501,10 @@ ${procedures.map(proc => `    <Procedure>${esc(proc)}</Procedure>`).join("\n")}
 			.where(where)
 
 		// Group by patientId
-		const grouped = new Map<string, { fpeDates: string[]; followUpDates: string[]; labDates: string[] }>()
+		const grouped = new Map<
+			string,
+			{ fpeDates: string[]; followUpDates: string[]; labDates: string[] }
+		>()
 		for (const a of activities) {
 			const g = grouped.get(a.patientId) ?? { fpeDates: [], followUpDates: [], labDates: [] }
 			if (a.activityType === "FPE") g.fpeDates.push(a.activityDate)
@@ -2477,43 +2514,45 @@ ${procedures.map(proc => `    <Procedure>${esc(proc)}</Procedure>`).join("\n")}
 		}
 
 		const allPatientIds = [...grouped.keys()]
-		const patientRows = allPatientIds.length > 0
-			? await db
-				.select({
-					id: patients.id,
-					name: sql<string>`CONCAT(${patients.firstName}, ' ', ${patients.lastName})`,
-					pin: patients.philhealthMemberId,
-				})
-				.from(patients)
-				.where(inArray(patients.id, allPatientIds))
-			: []
+		const patientRows =
+			allPatientIds.length > 0
+				? await db
+						.select({
+							id: patients.id,
+							name: sql<string>`CONCAT(${patients.firstName}, ' ', ${patients.lastName})`,
+							pin: patients.philhealthMemberId,
+						})
+						.from(patients)
+						.where(inArray(patients.id, allPatientIds))
+				: []
 		const patientLookup = new Map(patientRows.map(p => [p.id, p]))
 
 		// Build rows
-		const allRows = allPatientIds
-			.map(patientId => {
-				const g = grouped.get(patientId)!
-				const info = patientLookup.get(patientId)
-				const fpeDate = g.fpeDates.sort()[0] ?? null
-				const lastFollowUp = g.followUpDates.sort().reverse()[0] ?? null
-				const labsCount = g.labDates.length
-				const consultations = g.fpeDates.length + g.followUpDates.length
-				const capitationTag = consultations === 0 ? "Pending" : consultations >= 3 ? "Eligible" : "Pending"
+		const allRows = allPatientIds.map(patientId => {
+			const g = grouped.get(patientId)!
+			const info = patientLookup.get(patientId)
+			const fpeDate = g.fpeDates.sort()[0] ?? null
+			const lastFollowUp = g.followUpDates.sort().reverse()[0] ?? null
+			const labsCount = g.labDates.length
+			const consultations = g.fpeDates.length + g.followUpDates.length
+			const capitationTag =
+				consultations === 0 ? "Pending" : consultations >= 3 ? "Eligible" : "Pending"
 
-				return {
-					patientId,
-					patientName: info?.name ?? "",
-					memberPin: info?.pin ?? null,
-					fpeDate,
-					lastFollowUp,
-					labsCount,
-					capitationTag,
-				}
-			})
+			return {
+				patientId,
+				patientName: info?.name ?? "",
+				memberPin: info?.pin ?? null,
+				fpeDate,
+				lastFollowUp,
+				labsCount,
+				capitationTag,
+			}
+		})
 
-		const filteredRows = input.memberStatus && input.memberStatus !== "all"
-			? allRows // memberStatus filter requires separate join — include all for now
-			: allRows
+		const filteredRows =
+			input.memberStatus && input.memberStatus !== "all"
+				? allRows // memberStatus filter requires separate join — include all for now
+				: allRows
 
 		const total = filteredRows.length
 		const rows = filteredRows.slice(offset, offset + limit)
@@ -2588,18 +2627,21 @@ ${procedures.map(proc => `    <Procedure>${esc(proc)}</Procedure>`).join("\n")}
 
 		// Group by patient; join with patients table for name + PhilHealth PIN
 		const patientIds = [...new Set(activities.map(a => a.patientId))]
-		const patientRows = patientIds.length > 0
-			? await db
-				.select({
-					id: patients.id,
-					name: sql<string>`CONCAT(${patients.firstName}, ' ', ${patients.lastName})`,
-					pin: patients.philhealthMemberId,
-				})
-				.from(patients)
-				.where(inArray(patients.id, patientIds))
-			: []
+		const patientRows =
+			patientIds.length > 0
+				? await db
+						.select({
+							id: patients.id,
+							name: sql<string>`CONCAT(${patients.firstName}, ' ', ${patients.lastName})`,
+							pin: patients.philhealthMemberId,
+						})
+						.from(patients)
+						.where(inArray(patients.id, patientIds))
+				: []
 
-		const patientLookup = new Map(patientRows.map(p => [p.id, { name: p.name, pin: p.pin ?? null }]))
+		const patientLookup = new Map(
+			patientRows.map(p => [p.id, { name: p.name, pin: p.pin ?? null }])
+		)
 
 		const patientMap = new Map<string, { fpe: number; followUp: number; lab: number }>()
 		for (const a of activities) {
@@ -2620,7 +2662,11 @@ ${procedures.map(proc => `    <Procedure>${esc(proc)}</Procedure>`).join("\n")}
 		}))
 
 		// Build PhilHealth Konsulta capitation XML
-		const esc = (v: unknown) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+		const esc = (v: unknown) =>
+			String(v ?? "")
+				.replace(/&/g, "&amp;")
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;")
 		const memberXml = memberBreakdown
 			.map(
 				m => `  <Member>
@@ -2755,7 +2801,11 @@ ${procedures.map(proc => `    <Procedure>${esc(proc)}</Procedure>`).join("\n")}
 
 	private buildEsoaXmlFromSoa(soa: Awaited<ReturnType<typeof this.getSoa>>): string {
 		if (!soa) return ""
-		const esc = (v: unknown) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+		const esc = (v: unknown) =>
+			String(v ?? "")
+				.replace(/&/g, "&amp;")
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;")
 		const lineItemsXml = soa.lines
 			.map(
 				l => `    <Item>
@@ -2794,7 +2844,11 @@ ${lineItemsXml}
 
 	private buildEsoaHtmlFromSoa(soa: Awaited<ReturnType<typeof this.getSoa>>): string {
 		if (!soa) return ""
-		const esc = (v: unknown) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+		const esc = (v: unknown) =>
+			String(v ?? "")
+				.replace(/&/g, "&amp;")
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;")
 		const rows = soa.lines
 			.map(
 				l =>
@@ -2833,14 +2887,18 @@ ${rows}
 			.where(eq(cf4Claims.encounterId, input.encounterId))
 			.orderBy(desc(cf4Claims.createdAt))
 			.limit(1)
-		const icd10Codes: string[] = Array.isArray((cf4?.extractedData as Record<string, unknown> | null)?.icd10Codes)
+		const icd10Codes: string[] = Array.isArray(
+			(cf4?.extractedData as Record<string, unknown> | null)?.icd10Codes
+		)
 			? ((cf4?.extractedData as Record<string, unknown>).icd10Codes as string[])
 			: []
 
 		// Rule-based suggestion: filter ACTIVE_DRG_CODES for codes mentioned in the encounter
 		// or fall back to the three most common respiratory/general codes
 		let top3 = ACTIVE_DRG_CODES.filter(d =>
-			icd10Codes.some(icd => d.description.toLowerCase().includes((icd.split(".")[0] ?? icd).toLowerCase()))
+			icd10Codes.some(icd =>
+				d.description.toLowerCase().includes((icd.split(".")[0] ?? icd).toLowerCase())
+			)
 		).slice(0, 3)
 
 		if (top3.length < 3) {
@@ -3148,8 +3206,19 @@ ${rows}
 		return { statements, total: statements.length }
 	}
 
-	async sendEsoa(input: { id: string; channel: "patient_portal" | "email" | "print"; recipient?: string; allowDraft?: boolean; allowDraftReason?: string; staffId?: string }) {
-		const [statement] = await db.select().from(esoaStatements).where(eq(esoaStatements.id, input.id)).limit(1)
+	async sendEsoa(input: {
+		id: string
+		channel: "patient_portal" | "email" | "print"
+		recipient?: string
+		allowDraft?: boolean
+		allowDraftReason?: string
+		staffId?: string
+	}) {
+		const [statement] = await db
+			.select()
+			.from(esoaStatements)
+			.where(eq(esoaStatements.id, input.id))
+			.limit(1)
 		if (!statement) throw new NotFoundException("eSOA statement not found.")
 
 		// Reject send if invoice has unsettled balance, unless allowDraft override
@@ -3184,9 +3253,15 @@ ${rows}
 
 		// Find facility for audit emit
 		const [invoice] = statement.invoiceId
-			? await db.select({ facilityId: invoices.facilityId }).from(invoices).where(eq(invoices.id, statement.invoiceId)).limit(1)
+			? await db
+					.select({ facilityId: invoices.facilityId })
+					.from(invoices)
+					.where(eq(invoices.id, statement.invoiceId))
+					.limit(1)
 			: [{ facilityId: "" }]
-		const staffProfileId = input.staffId ? await this.getOptionalStaffProfileId(input.staffId) : null
+		const staffProfileId = input.staffId
+			? await this.getOptionalStaffProfileId(input.staffId)
+			: null
 		await this.auditService.log({
 			facilityId: invoice?.facilityId ?? "",
 			userId: input.staffId ?? "system",
@@ -3195,7 +3270,11 @@ ${rows}
 			entityType: "esoa_statement",
 			entityId: updated.id,
 			beforeState: { sentVia: statement.sentVia, deliveryStatus: statement.deliveryStatus },
-			afterState: { sentVia: input.channel, deliveryStatus: "delivered", recipient: input.recipient ?? null },
+			afterState: {
+				sentVia: input.channel,
+				deliveryStatus: "delivered",
+				recipient: input.recipient ?? null,
+			},
 			ipAddress: null,
 			userAgent: null,
 			metadata: {
@@ -3209,7 +3288,11 @@ ${rows}
 		return { success: true, statementId: updated.id, deliveryStatus: "delivered" }
 	}
 
-	async generateEsoaFromInvoice(input: { invoiceId: string; allowDraft?: boolean; allowDraftReason?: string }) {
+	async generateEsoaFromInvoice(input: {
+		invoiceId: string
+		allowDraft?: boolean
+		allowDraftReason?: string
+	}) {
 		const [invoice] = await db
 			.select()
 			.from(invoices)
@@ -3239,7 +3322,10 @@ ${rows}
 			.where(eq(invoiceLineItems.invoiceId, invoice.id))
 
 		const [patient] = await db
-			.select({ name: sql<string>`CONCAT(${patients.firstName}, ' ', ${patients.lastName})`, mrn: patients.mrn })
+			.select({
+				name: sql<string>`CONCAT(${patients.firstName}, ' ', ${patients.lastName})`,
+				mrn: patients.mrn,
+			})
 			.from(patients)
 			.where(eq(patients.id, invoice.patientId))
 			.limit(1)
@@ -3266,7 +3352,11 @@ ${rows}
 		const nextVersion = (latestVersion?.version ?? 0) + 1
 
 		// Build PhilHealth-compliant eSOA XML
-		const esc = (v: unknown) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+		const esc = (v: unknown) =>
+			String(v ?? "")
+				.replace(/&/g, "&amp;")
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;")
 		const lineItemsXml = lineItems
 			.map(
 				li => `    <Item>

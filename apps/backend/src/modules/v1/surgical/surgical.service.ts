@@ -227,7 +227,9 @@ export class SurgicalService {
 		return missingFields
 	}
 
-	private getAnesthesiaRecordSignOffGaps(record: Awaited<ReturnType<typeof this.getAnesthesiaRecord>>) {
+	private getAnesthesiaRecordSignOffGaps(
+		record: Awaited<ReturnType<typeof this.getAnesthesiaRecord>>
+	) {
 		if (!record) {
 			return ["anesthesia record"]
 		}
@@ -944,7 +946,7 @@ export class SurgicalService {
 			difficultAirway: input.difficultAirway ?? false,
 			agents:
 				input.agents ??
-				input.intraopMedications?.map((medication) => ({
+				input.intraopMedications?.map(medication => ({
 					name: medication.name,
 					dose: medication.dose,
 					route: medication.route,
@@ -967,7 +969,10 @@ export class SurgicalService {
 		}
 
 		if (existingCheck) {
-			await db.update(anesthesiaRecords).set(values).where(eq(anesthesiaRecords.id, existingCheck.id))
+			await db
+				.update(anesthesiaRecords)
+				.set(values)
+				.where(eq(anesthesiaRecords.id, existingCheck.id))
 		} else {
 			await db.insert(anesthesiaRecords).values(values)
 		}
