@@ -12,6 +12,8 @@ export interface ChartContextValue {
 	facilityId: string | undefined
 	activeAllergyCount: number
 	hasSevereAllergies: boolean
+	canViewClinicalSummary: boolean
+	canViewVitals: boolean
 }
 
 export const ChartContext = createContext<ChartContextValue | null>(null)

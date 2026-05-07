@@ -2,9 +2,9 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { env } from "@/env"
 import { orpc } from "@/services/orpc/client"
 import { useOfflineNursingMutation } from "@/features/nursing/lib/use-offline-mutation"
+import { env } from "@/env"
 
 const API_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/nursing`
 
@@ -17,14 +17,26 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 			...init?.headers,
 		},
 	})
-	if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+	if (!res.ok) {
+		throw Object.assign(new Error(`HTTP ${res.status}: ${res.statusText}`), {
+			status: res.status,
+		})
+	}
 	return res.json() as Promise<T>
+}
+
+function shouldRetryRead(failureCount: number, error: unknown) {
+	const status = (error as { status?: number } | null)?.status
+	if (status === 401 || status === 403 || status === 404) return false
+	return failureCount < 3
 }
 
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== "")
 	if (entries.length === 0) return ""
-	return "?" + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
+	return `?${entries
+		.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+		.join("&")}`
 }
 
 // ============================================================================
@@ -195,14 +207,15 @@ interface VitalSignListParams {
 	limit?: number
 }
 
-export function useVitalsQuery(params: VitalSignListParams) {
+export function useVitalsQuery(params: VitalSignListParams, options?: { enabled?: boolean }) {
 	return useQuery({
 		queryKey: nursingKeys.vitals(params),
 		queryFn: () =>
 			fetchJson<PaginatedResponse<VitalSign>>(
 				`${API_BASE}/vitals${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
 			),
-		enabled: !!(params.encounterId || params.preEncounterId),
+		enabled: (options?.enabled ?? true) && !!(params.encounterId || params.preEncounterId),
+		retry: shouldRetryRead,
 	})
 }
 
@@ -234,7 +247,7 @@ export function useCreateVitalMutation() {
 		endpoint: `${API_BASE}/vitals`,
 		method: "POST",
 		recordType: "vital_sign",
-		describe: (d) => {
+		describe: d => {
 			const parts: string[] = []
 			if (d.bpSystolic && d.bpDiastolic) parts.push(`BP ${d.bpSystolic}/${d.bpDiastolic}`)
 			if (d.heartRate) parts.push(`HR ${d.heartRate}`)
@@ -242,8 +255,8 @@ export function useCreateVitalMutation() {
 			if (d.spo2) parts.push(`SpO₂ ${d.spo2}%`)
 			return parts.length ? parts.join(", ") : "Vital signs"
 		},
-		facilityId: (d) => d.facilityId,
-		encounterId: (d) => d.encounterId ?? d.preEncounterId ?? "",
+		facilityId: d => d.facilityId,
+		encounterId: d => d.encounterId ?? d.preEncounterId ?? "",
 	})
 }
 
@@ -417,10 +430,10 @@ export function useCreateIoEntryMutation() {
 		endpoint: `${API_BASE}/io`,
 		method: "POST",
 		recordType: "io_entry",
-		describe: (d) =>
+		describe: d =>
 			`${d.ioType === "intake" ? "Intake" : "Output"} — ${d.route}${d.description ? ` (${d.description})` : ""} ${d.amountMl} mL`,
-		facilityId: (d) => d.facilityId,
-		encounterId: (d) => d.encounterId ?? d.preEncounterId ?? "",
+		facilityId: d => d.facilityId,
+		encounterId: d => d.encounterId ?? d.preEncounterId ?? "",
 	})
 }
 
@@ -523,9 +536,10 @@ export function useCreateHandoffMutation() {
 		endpoint: `${API_BASE}/handoffs`,
 		method: "POST",
 		recordType: "handoff",
-		describe: (d) => d.handoffNotes ? `Shift handoff: ${d.handoffNotes.slice(0, 60)}` : "Shift handoff note",
-		facilityId: (d) => d.facilityId,
-		encounterId: (d) => d.encounterId,
+		describe: d =>
+			d.handoffNotes ? `Shift handoff: ${d.handoffNotes.slice(0, 60)}` : "Shift handoff note",
+		facilityId: d => d.facilityId,
+		encounterId: d => d.encounterId,
 	})
 }
 
@@ -588,9 +602,9 @@ export function useCreateHaiTagMutation() {
 		endpoint: `${API_BASE}/hai-tags`,
 		method: "POST",
 		recordType: "hai_tag",
-		describe: (d) => `${d.haiType.toUpperCase()} — onset ${d.onsetDate}`,
-		facilityId: (d) => d.facilityId,
-		encounterId: (d) => d.encounterId,
+		describe: d => `${d.haiType.toUpperCase()} — onset ${d.onsetDate}`,
+		facilityId: d => d.facilityId,
+		encounterId: d => d.encounterId,
 	})
 }
 
@@ -840,8 +854,7 @@ export function useConsentQuery(id: string | null) {
 export function useCreateConsentMutation() {
 	const queryClient = useQueryClient()
 	return useMutation({
-		mutationFn: (data: CreateConsentInput) =>
-			orpc.nursing.createConsent.call(data),
+		mutationFn: (data: CreateConsentInput) => orpc.nursing.createConsent.call(data),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
 		},

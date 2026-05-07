@@ -3,7 +3,6 @@
 import { use, useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-
 import { ArrowLeft, ShieldAlert, WifiOff } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -19,17 +18,19 @@ import {
 import { Separator } from "@/core/components/ui/separator"
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 import { useMyActiveBreakGlassQuery } from "@/features/audit/api/audit.hooks"
 import { BreakGlassCountdown, BreakGlassForm } from "@/features/audit/components/break-glass-form"
 import { useEncounterDetailQuery } from "@/features/encounters/api/encounters.hooks"
 import { ChartContext } from "@/features/encounters/context/chart-context"
+import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 import { usePatientSummaryQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
 
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -69,9 +70,13 @@ export default function EncounterChartLayout({
 	const { patientId, encounterId } = use(params)
 	const encounterQuery = useEncounterDetailQuery(encounterId)
 	const { data: encounter, isLoading, isError, error, refetch: refetchEncounter } = encounterQuery
-	const { data: summary } = usePatientSummaryQuery(encounter?.patientId ?? "")
 	const pathname = usePathname()
 	const permSet = usePermissionSet()
+	const canViewClinicalSummary = can(permSet, "clinical_docs", "view")
+	const canViewVitals = can(permSet, "nursing", "view")
+	const { data: summary } = usePatientSummaryQuery(encounter?.patientId ?? "", {
+		enabled: !!encounter?.patientId && canViewClinicalSummary,
+	})
 	const { data: profile } = useMyProfile()
 	const { isOnline } = useOfflineSync()
 	const activeStaffProfile = getActiveStaffProfile(profile)
@@ -84,10 +89,7 @@ export default function EncounterChartLayout({
 	const [breakGlassOpen, setBreakGlassOpen] = useState(false)
 	// Clinicians with audit:create can invoke break-glass
 	const canInvokeBreakGlass = can(permSet, "audit", "create")
-	const {
-		data: activeBreakGlass,
-		refetch: refetchActiveBreakGlass,
-	} = useMyActiveBreakGlassQuery({
+	const { data: activeBreakGlass, refetch: refetchActiveBreakGlass } = useMyActiveBreakGlassQuery({
 		facilityId: encounter?.facilityId ?? activeFacilityId,
 		patientId: encounter?.patientId ?? patientId,
 		enabled: canInvokeBreakGlass,
@@ -217,10 +219,13 @@ export default function EncounterChartLayout({
 			href: `${base}/audit-trail`,
 			show: can(permSet, "audit", "view"),
 		},
-		...(encounter?.status === "active" && encounter.encounterType !== "outpatient" && can(permSet, "adt", "edit")
+		...(encounter?.status === "active" &&
+		encounter.encounterType !== "outpatient" &&
+		can(permSet, "adt", "edit")
 			? [{ label: "Transfer Patient", href: `${base}/transfer`, show: true }]
 			: []),
-		...(encounter?.status === "active" && (can(permSet, "adt", "edit") || can(permSet, "clinical_docs", "sign"))
+		...(encounter?.status === "active" &&
+		(can(permSet, "adt", "edit") || can(permSet, "clinical_docs", "sign"))
 			? [
 					{
 						label: encounter?.encounterType === "outpatient" ? "Close" : "Discharge",
@@ -241,6 +246,8 @@ export default function EncounterChartLayout({
 				facilityId: encounter?.facilityId,
 				activeAllergyCount: summary?.activeAllergyCount ?? 0,
 				hasSevereAllergies: summary?.hasSevereAllergies ?? false,
+				canViewClinicalSummary,
+				canViewVitals,
 			}}
 		>
 			<div className="flex h-full flex-col">
@@ -257,17 +264,18 @@ export default function EncounterChartLayout({
 					</Button>
 				</div>
 				{/* Patient Banner */}
-				<div className="border-b bg-background px-6 py-4">
+				<div className="bg-background border-b px-6 py-4">
 					{isLoading ? (
-						<div className="h-12 animate-pulse rounded bg-muted" />
+						<div className="bg-muted h-12 animate-pulse rounded" />
 					) : isError ? (
 						breakGlassRequired && canInvokeBreakGlass && activeFacilityId ? (
 							<div className="w-full max-w-lg space-y-4">
 								<div>
-									<p className="text-sm font-medium text-foreground">Break-Glass Required</p>
-									<p className="text-sm text-muted-foreground">
-										This encounter is outside your regular access scope. Submit an emergency override
-										request to unlock temporary access without leaving this encounter route.
+									<p className="text-foreground text-sm font-medium">Break-Glass Required</p>
+									<p className="text-muted-foreground text-sm">
+										This encounter is outside your regular access scope. Submit an emergency
+										override request to unlock temporary access without leaving this encounter
+										route.
 									</p>
 								</div>
 								<div className="flex flex-wrap items-center gap-3">
@@ -308,7 +316,9 @@ export default function EncounterChartLayout({
 								</Dialog>
 							</div>
 						) : (
-							<p className="text-sm text-destructive">You do not have permission to view this encounter.</p>
+							<p className="text-destructive text-sm">
+								You do not have permission to view this encounter.
+							</p>
 						)
 					) : encounter ? (
 						<div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -357,7 +367,10 @@ export default function EncounterChartLayout({
 								</Badge>
 							)}
 							{!isOnline && (
-								<Badge variant="secondary" className="gap-1 border-amber-300 bg-amber-100 text-amber-800">
+								<Badge
+									variant="secondary"
+									className="gap-1 border-amber-300 bg-amber-100 text-amber-800"
+								>
 									<WifiOff className="size-3" />
 									Cached
 								</Badge>
@@ -368,7 +381,9 @@ export default function EncounterChartLayout({
 								<div className="ml-auto flex flex-wrap items-center justify-end gap-2">
 									{activeBreakGlass?.accessExpiresAt ? (
 										<>
-											<span className="text-xs font-medium text-orange-700">Temporary access only</span>
+											<span className="text-xs font-medium text-orange-700">
+												Temporary access only
+											</span>
 											<BreakGlassCountdown accessExpiresAt={activeBreakGlass.accessExpiresAt} />
 										</>
 									) : null}
@@ -395,7 +410,8 @@ export default function EncounterChartLayout({
 												<DialogTitle>Emergency Override Access</DialogTitle>
 												<DialogDescription>
 													Request emergency access to this patient&apos;s chart when you do not have
-													standard authorization. Access remains temporary and expires automatically.
+													standard authorization. Access remains temporary and expires
+													automatically.
 												</DialogDescription>
 											</DialogHeader>
 											<BreakGlassForm
@@ -421,7 +437,7 @@ export default function EncounterChartLayout({
 				{encounter ? (
 					<>
 						{/* Tab Bar */}
-						<div className="border-b bg-background">
+						<div className="bg-background border-b">
 							<nav className="flex overflow-x-auto px-6" aria-label="Encounter chart tabs">
 								{tabs.map(tab => {
 									const isActive =
@@ -433,10 +449,10 @@ export default function EncounterChartLayout({
 											key={tab.href}
 											href={tab.href}
 											className={cn(
-												"whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+												"border-b-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors",
 												isActive
 													? "border-primary text-foreground"
-													: "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
+													: "text-muted-foreground hover:border-border hover:text-foreground border-transparent"
 											)}
 											aria-current={isActive ? "page" : undefined}
 										>
