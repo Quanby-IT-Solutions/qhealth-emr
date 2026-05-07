@@ -250,8 +250,8 @@ export default function EncounterChartLayout({
 				canViewVitals,
 			}}
 		>
-			<div className="flex h-full flex-col">
-				<div>
+			<div className="flex h-full min-w-0 flex-col">
+				<div className="px-3 sm:px-6">
 					<Button
 						variant="ghost"
 						size="sm"
@@ -264,7 +264,7 @@ export default function EncounterChartLayout({
 					</Button>
 				</div>
 				{/* Patient Banner */}
-				<div className="bg-background border-b px-6 py-4">
+				<div className="bg-background border-b px-3 py-4 sm:px-6">
 					{isLoading ? (
 						<div className="bg-muted h-12 animate-pulse rounded" />
 					) : isError ? (
@@ -377,59 +377,62 @@ export default function EncounterChartLayout({
 							)}
 
 							{/* Break-Glass Button - for clinicians */}
-							{canInvokeBreakGlass && encounter?.facilityId && encounter?.patientId && (
-								<div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-									{activeBreakGlass?.accessExpiresAt ? (
-										<>
-											<span className="text-xs font-medium text-orange-700">
-												Temporary access only
-											</span>
-											<BreakGlassCountdown accessExpiresAt={activeBreakGlass.accessExpiresAt} />
-										</>
-									) : null}
-									<Dialog open={breakGlassOpen} onOpenChange={setBreakGlassOpen}>
-										<DialogTrigger
-											render={
-												<Button
-													variant={activeBreakGlass ? "default" : "outline"}
-													size="sm"
-													className={cn(
-														"gap-2",
-														activeBreakGlass
-															? "bg-orange-500 text-white hover:bg-orange-600"
-															: "border-orange-300 text-orange-700 hover:bg-orange-50"
-													)}
-												>
-													<ShieldAlert className="size-4" />
-													{activeBreakGlass ? "Break-Glass Active" : "Request Break-Glass"}
-												</Button>
-											}
-										/>
-										<DialogContent className="max-w-lg">
-											<DialogHeader>
-												<DialogTitle>Emergency Override Access</DialogTitle>
-												<DialogDescription>
-													Request emergency access to this patient&apos;s chart when you do not have
-													standard authorization. Access remains temporary and expires
-													automatically.
-												</DialogDescription>
-											</DialogHeader>
-											<BreakGlassForm
-												patientId={encounter.patientId}
-												facilityId={encounter.facilityId}
-												entityType="encounter"
-												entityId={encounterId}
-												activeEvent={activeBreakGlass}
-												onSuccess={() => {
-													setBreakGlassOpen(false)
-													void refetchEncounter()
-												}}
-												onCancel={() => setBreakGlassOpen(false)}
+							{canInvokeBreakGlass &&
+								encounter?.facilityId &&
+								encounter?.patientId &&
+								(breakGlassRequired || !!activeBreakGlass) && (
+									<div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+										{activeBreakGlass?.accessExpiresAt ? (
+											<>
+												<span className="text-xs font-medium text-orange-700">
+													Temporary access only
+												</span>
+												<BreakGlassCountdown accessExpiresAt={activeBreakGlass.accessExpiresAt} />
+											</>
+										) : null}
+										<Dialog open={breakGlassOpen} onOpenChange={setBreakGlassOpen}>
+											<DialogTrigger
+												render={
+													<Button
+														variant={activeBreakGlass ? "default" : "outline"}
+														size="sm"
+														className={cn(
+															"gap-2",
+															activeBreakGlass
+																? "bg-orange-500 text-white hover:bg-orange-600"
+																: "border-orange-300 text-orange-700 hover:bg-orange-50"
+														)}
+													>
+														<ShieldAlert className="size-4" />
+														{activeBreakGlass ? "Break-Glass Active" : "Request Break-Glass"}
+													</Button>
+												}
 											/>
-										</DialogContent>
-									</Dialog>
-								</div>
-							)}
+											<DialogContent className="max-w-lg">
+												<DialogHeader>
+													<DialogTitle>Emergency Override Access</DialogTitle>
+													<DialogDescription>
+														Request emergency access to this patient&apos;s chart when you do not
+														have standard authorization. Access remains temporary and expires
+														automatically.
+													</DialogDescription>
+												</DialogHeader>
+												<BreakGlassForm
+													patientId={encounter.patientId}
+													facilityId={encounter.facilityId}
+													entityType="encounter"
+													entityId={encounterId}
+													activeEvent={activeBreakGlass}
+													onSuccess={() => {
+														setBreakGlassOpen(false)
+														void refetchEncounter()
+													}}
+													onCancel={() => setBreakGlassOpen(false)}
+												/>
+											</DialogContent>
+										</Dialog>
+									</div>
+								)}
 						</div>
 					) : null}
 				</div>
@@ -438,7 +441,7 @@ export default function EncounterChartLayout({
 					<>
 						{/* Tab Bar */}
 						<div className="bg-background border-b">
-							<nav className="flex overflow-x-auto px-6" aria-label="Encounter chart tabs">
+							<nav className="flex overflow-x-auto px-3 sm:px-6" aria-label="Encounter chart tabs">
 								{tabs.map(tab => {
 									const isActive =
 										tab.href === base
@@ -464,7 +467,7 @@ export default function EncounterChartLayout({
 						</div>
 
 						{/* Page content */}
-						<main className="flex-1 overflow-auto p-6">{children}</main>
+						<main className="min-w-0 flex-1 overflow-auto p-3 sm:p-6">{children}</main>
 					</>
 				) : null}
 			</div>

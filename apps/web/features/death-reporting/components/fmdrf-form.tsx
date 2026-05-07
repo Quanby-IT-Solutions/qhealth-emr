@@ -25,11 +25,23 @@ import {
 interface SignatureCanvasProps {
 	onCapture: (dataUrl: string) => void
 	disabled?: boolean
+	initialDataUrl?: string
 }
 
-function SignatureCanvas({ onCapture, disabled }: SignatureCanvasProps) {
+function SignatureCanvas({ onCapture, disabled, initialDataUrl }: SignatureCanvasProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const drawing = useRef(false)
+	const initialized = useRef(false)
+
+	useEffect(() => {
+		if (!initialDataUrl || initialized.current || !canvasRef.current) return
+		initialized.current = true
+		const img = new window.Image()
+		img.onload = () => {
+			canvasRef.current?.getContext("2d")?.drawImage(img, 0, 0)
+		}
+		img.src = initialDataUrl
+	}, [initialDataUrl])
 
 	const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
 		const rect = canvasRef.current!.getBoundingClientRect()
@@ -71,6 +83,7 @@ function SignatureCanvas({ onCapture, disabled }: SignatureCanvasProps) {
 	const clear = () => {
 		const canvas = canvasRef.current!
 		canvas.getContext("2d")!.clearRect(0, 0, canvas.width, canvas.height)
+		initialized.current = false
 		onCapture("")
 	}
 
@@ -360,7 +373,7 @@ export function FmdrfForm({
 							type="number"
 							min={0}
 							max={120}
-							value={form.patientAge}
+							value={form.patientAge || ""}
 							onChange={e => set("patientAge", Number(e.target.value))}
 							disabled={isReadOnly}
 							required
@@ -446,7 +459,7 @@ export function FmdrfForm({
 						<Input
 							type="number"
 							min={0}
-							value={form.gravidity}
+							value={form.gravidity || ""}
 							onChange={e => set("gravidity", Number(e.target.value))}
 							disabled={isReadOnly}
 						/>
@@ -456,7 +469,7 @@ export function FmdrfForm({
 						<Input
 							type="number"
 							min={0}
-							value={form.parity}
+							value={form.parity || ""}
 							onChange={e => set("parity", Number(e.target.value))}
 							disabled={isReadOnly}
 						/>
@@ -650,14 +663,8 @@ export function FmdrfForm({
 							/>
 						) : (
 							<>
-								{form.physicianSignatureDataUrl ? (
-									<img
-										src={form.physicianSignatureDataUrl}
-										alt="Current signature"
-										className="mb-1 h-[130px] rounded border bg-white"
-									/>
-								) : null}
 								<SignatureCanvas
+									initialDataUrl={existing?.physicianSignatureDataUrl ?? undefined}
 									onCapture={url => set("physicianSignatureDataUrl", url)}
 									disabled={isReadOnly}
 								/>

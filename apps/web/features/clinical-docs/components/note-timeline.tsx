@@ -129,21 +129,21 @@ export function NoteTimeline({ notes, onSelectNote, isLoading }: NoteTimelinePro
 	const dateKeys = Object.keys(groups)
 
 	return (
-		<div className="space-y-6">
+		<div className="min-w-0 space-y-6 px-3 pb-4 sm:px-4">
 			{dateKeys.map((dateKey, groupIdx) => {
 				const notesForDate = groups[dateKey] ?? []
 				return (
-					<div key={dateKey} className="space-y-3">
+					<div key={dateKey} className="min-w-0 space-y-3">
 						{/* Date header */}
-						<div className="flex items-center gap-3">
-							<span className="text-muted-foreground text-xs font-medium">
+						<div className="flex min-w-0 items-center gap-3">
+							<span className="text-muted-foreground shrink-0 text-xs font-medium">
 								{formatDate(new Date(dateKey).toISOString())}
 							</span>
 							<Separator className="flex-1" />
 						</div>
 
 						{/* Notes for this date */}
-						<div className="relative ml-4 space-y-3">
+						<div className="relative space-y-3 sm:ml-4">
 							{/* Vertical connector line */}
 							{notesForDate.length > 1 && (
 								<div
@@ -153,7 +153,7 @@ export function NoteTimeline({ notes, onSelectNote, isLoading }: NoteTimelinePro
 							)}
 
 							{notesForDate.map(note => (
-								<div key={note.id} className="relative flex gap-3">
+								<div key={note.id} className="relative flex min-w-0 gap-3">
 									{/* Icon bubble */}
 									<div
 										className={`relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full ${noteTypeColor(note.noteType)}`}
@@ -165,15 +165,20 @@ export function NoteTimeline({ notes, onSelectNote, isLoading }: NoteTimelinePro
 									<Button
 										type="button"
 										variant="outline"
-										className="h-auto w-full justify-start px-4 py-3 text-left"
+										className="h-auto min-w-0 flex-1 justify-start px-3 py-3 text-left whitespace-normal sm:px-4"
 										onClick={() => onSelectNote(note.id)}
 									>
-										<div className="w-full space-y-1">
-											<div className="flex items-center justify-between gap-2">
-												<span className="text-sm font-medium">{noteTypeLabel(note.noteType)}</span>
-												<div className="flex shrink-0 items-center gap-1.5">
+										<div className="min-w-0 flex-1 space-y-2">
+											<div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+												<span className="min-w-0 text-sm font-medium break-words">
+													{noteTypeLabel(note.noteType)}
+												</span>
+												<div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:justify-end">
 													{note.templateName && (
-														<Badge variant="outline" className="text-xs">
+														<Badge
+															variant="outline"
+															className="max-w-full text-xs whitespace-normal"
+														>
 															{note.templateName}
 														</Badge>
 													)}
@@ -183,8 +188,10 @@ export function NoteTimeline({ notes, onSelectNote, isLoading }: NoteTimelinePro
 												</div>
 											</div>
 
-											<div className="text-muted-foreground flex items-center gap-2 text-xs">
-												<span>{note.authorStaffName ?? "Unknown author"}</span>
+											<div className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+												<span className="min-w-0 break-words">
+													{note.authorStaffName ?? "Unknown author"}
+												</span>
 												<span>·</span>
 												<span>{formatDateTime(note.createdAt)}</span>
 												{note.signedAt && (
@@ -198,7 +205,7 @@ export function NoteTimeline({ notes, onSelectNote, isLoading }: NoteTimelinePro
 											</div>
 
 											{noteExcerpt(note.content) && (
-												<p className="text-muted-foreground line-clamp-2 text-xs">
+												<p className="text-muted-foreground line-clamp-3 min-w-0 text-xs break-words">
 													{noteExcerpt(note.content)}
 												</p>
 											)}

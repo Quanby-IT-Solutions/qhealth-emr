@@ -85,9 +85,9 @@ export function DocumentationTab({
 	}
 
 	return (
-		<div className="space-y-4">
-			<Card>
-				<CardHeader className="flex flex-row items-center justify-between">
+		<div className="min-w-0 space-y-4">
+			<Card className="min-w-0 overflow-hidden">
+				<CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
 					<CardTitle>Clinical Notes</CardTitle>
 					{canCreateNote && (
 						<Button size="sm" onClick={() => setMode("template")}>
