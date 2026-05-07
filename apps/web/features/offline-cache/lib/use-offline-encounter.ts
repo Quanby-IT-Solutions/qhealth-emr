@@ -36,19 +36,30 @@ export interface UseOfflineEncounterResult {
 export function useOfflineEncounter(
 	encounterId: string,
 	patientId: string,
+	options?: {
+		canViewClinicalSummary?: boolean
+		canViewVitals?: boolean
+	}
 ): UseOfflineEncounterResult {
 	const { isOnline } = useOfflineSync()
+	const canViewClinicalSummary = options?.canViewClinicalSummary ?? true
+	const canViewVitals = options?.canViewVitals ?? true
 
 	const { data: encounter } = useEncounterDetailQuery(encounterId, {
 		enabled: isOnline && !!encounterId,
 	})
-	const { data: vitalsData } = useVitalsQuery({ encounterId: isOnline ? encounterId : undefined, limit: 1, page: 1 })
-	const { data: patientSummary } = usePatientSummaryQuery(patientId)
+	const { data: vitalsData } = useVitalsQuery(
+		{ encounterId: isOnline ? encounterId : undefined, limit: 1, page: 1 },
+		{ enabled: isOnline && canViewVitals }
+	)
+	const { data: patientSummary } = usePatientSummaryQuery(patientId, {
+		enabled: isOnline && canViewClinicalSummary,
+	})
 
 	useEffect(() => {
 		if (!isOnline || !encounter || !encounterId) return
 
-		const rawVital = vitalsData?.data?.[0] ?? null
+		const rawVital = canViewVitals ? (vitalsData?.data?.[0] ?? null) : null
 
 		const latestVitals: OfflineVitalSummary | null = rawVital
 			? {
@@ -87,39 +98,57 @@ export function useOfflineEncounter(
 			transfers: encounter.transfers,
 		}
 
-		const activeProblems = (patientSummary?.activeProblems ?? []).map(p => ({
-			id: p.id,
-			description: p.description,
-			icd10Code: p.icd10Code,
-			icd10Display: p.icd10Display,
-			snomedCode: p.snomedCode ?? undefined,
-			snomedDisplay: p.snomedDisplay ?? undefined,
-			onsetDate: p.onsetDate,
-			status: p.status as "active" | "resolved",
-		}))
+		const activeProblems = canViewClinicalSummary
+			? (patientSummary?.activeProblems ?? []).map(p => ({
+					id: p.id,
+					description: p.description,
+					icd10Code: p.icd10Code,
+					icd10Display: p.icd10Display,
+					snomedCode: p.snomedCode ?? undefined,
+					snomedDisplay: p.snomedDisplay ?? undefined,
+					onsetDate: p.onsetDate,
+					status: p.status as "active" | "resolved",
+				}))
+			: []
 
-		const activeAllergies = (patientSummary?.activeAllergies ?? []).map(a => ({
-			id: a.id,
-			allergenName: a.allergenName,
-			allergenType: a.allergenType,
-			reactionType: a.reactionType,
-			severity: a.severity,
-			onsetDate: a.onsetDate,
-			isActive: a.isActive,
-		}))
+		const activeAllergies = canViewClinicalSummary
+			? (patientSummary?.activeAllergies ?? []).map(a => ({
+					id: a.id,
+					allergenName: a.allergenName,
+					allergenType: a.allergenType,
+					reactionType: a.reactionType,
+					severity: a.severity,
+					onsetDate: a.onsetDate,
+					isActive: a.isActive,
+				}))
+			: []
 
 		const summary: OfflineEncounterSummary = {
 			encounter: encounterHeader,
 			latestVitals,
 			activeProblems,
 			activeAllergies,
-			activeProblemCount: patientSummary?.activeProblemCount ?? activeProblems.length,
-			activeAllergyCount: patientSummary?.activeAllergyCount ?? activeAllergies.length,
-			hasSevereAllergies: patientSummary?.hasSevereAllergies ?? false,
+			activeProblemCount: canViewClinicalSummary
+				? (patientSummary?.activeProblemCount ?? activeProblems.length)
+				: 0,
+			activeAllergyCount: canViewClinicalSummary
+				? (patientSummary?.activeAllergyCount ?? activeAllergies.length)
+				: 0,
+			hasSevereAllergies: canViewClinicalSummary
+				? (patientSummary?.hasSevereAllergies ?? false)
+				: false,
 		}
 
 		saveEncounterSummary(encounterId, summary)
-	}, [isOnline, encounter, vitalsData, patientSummary, encounterId])
+	}, [
+		canViewClinicalSummary,
+		canViewVitals,
+		isOnline,
+		encounter,
+		vitalsData,
+		patientSummary,
+		encounterId,
+	])
 
 	if (!isOnline) {
 		const cached = loadEncounterSummary(encounterId)
@@ -131,7 +160,7 @@ export function useOfflineEncounter(
 		}
 	}
 
-	const rawVital = vitalsData?.data?.[0] ?? null
+	const rawVital = canViewVitals ? (vitalsData?.data?.[0] ?? null) : null
 	const latestVital: OfflineVitalSummary | null = rawVital
 		? {
 				id: rawVital.id,
