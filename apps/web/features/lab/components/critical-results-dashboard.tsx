@@ -32,82 +32,82 @@ import { env } from "@/env"
 
 // Mock orders for local development
 const MOCK_ORDERS: LabOrder[] = [
-	{
-		id: "mock-cr-1",
-		facilityId: "mock-facility",
-		encounterId: "enc001",
-		preEncounterId: null,
-		patientId: "MRN000001",
-		patientName: "Garcia, Maria",
-		loincCode: null,
-		panelCode: null,
-		testName: "Potassium",
-		panelName: "Chemistry",
-		priority: "routine",
-		status: "completed",
-		specimenType: null,
-		orderingStaffId: "",
-		orderingStaffName: "Dr. Santos",
-		collectionDatetime: new Date().toISOString(),
-		resultedDatetime: new Date().toISOString(),
-		results: {
-			items: [
-				{
-					testName: "K+",
-					value: "7.2",
-					unit: "mmol/L",
-					referenceRange: "3.5-5.1",
-					flag: "C",
-					isCritical: true,
-					isAbnormal: true,
-				},
-			],
-			reportedBy: null,
-			reportedAt: null,
-			comments: null,
-		},
-		hasCriticalValues: true,
-		createdAt: new Date().toISOString(),
-		updatedAt: new Date().toISOString(),
-	},
-	{
-		id: "mock-cr-2",
-		facilityId: "mock-facility",
-		encounterId: "enc002",
-		preEncounterId: null,
-		patientId: "MRN000002",
-		patientName: "Reyes, Juan",
-		loincCode: null,
-		panelCode: null,
-		testName: "Hemoglobin",
-		panelName: "Hematology",
-		priority: "routine",
-		status: "completed",
-		specimenType: null,
-		orderingStaffId: "",
-		orderingStaffName: "Dr. Lee",
-		collectionDatetime: new Date().toISOString(),
-		resultedDatetime: new Date().toISOString(),
-		results: {
-			items: [
-				{
-					testName: "Hgb",
-					value: "6.1",
-					unit: "g/dL",
-					referenceRange: "13.5-17.5",
-					flag: "C",
-					isCritical: true,
-					isAbnormal: true,
-				},
-			],
-			reportedBy: null,
-			reportedAt: null,
-			comments: null,
-		},
-		hasCriticalValues: true,
-		createdAt: new Date().toISOString(),
-		updatedAt: new Date().toISOString(),
-	},
+	// {
+	// 	id: "mock-cr-1",
+	// 	facilityId: "mock-facility",
+	// 	encounterId: "enc001",
+	// 	preEncounterId: null,
+	// 	patientId: "MRN000001",
+	// 	patientName: "Garcia, Maria",
+	// 	loincCode: null,
+	// 	panelCode: null,
+	// 	testName: "Potassium",
+	// 	panelName: "Chemistry",
+	// 	priority: "routine",
+	// 	status: "completed",
+	// 	specimenType: null,
+	// 	orderingStaffId: "",
+	// 	orderingStaffName: "Dr. Santos",
+	// 	collectionDatetime: new Date().toISOString(),
+	// 	resultedDatetime: new Date().toISOString(),
+	// 	results: {
+	// 		items: [
+	// 			{
+	// 				testName: "K+",
+	// 				value: "7.2",
+	// 				unit: "mmol/L",
+	// 				referenceRange: "3.5-5.1",
+	// 				flag: "C",
+	// 				isCritical: true,
+	// 				isAbnormal: true,
+	// 			},
+	// 		],
+	// 		reportedBy: null,
+	// 		reportedAt: null,
+	// 		comments: null,
+	// 	},
+	// 	hasCriticalValues: true,
+	// 	createdAt: new Date().toISOString(),
+	// 	updatedAt: new Date().toISOString(),
+	// },
+	// {
+	// 	id: "mock-cr-2",
+	// 	facilityId: "mock-facility",
+	// 	encounterId: "enc002",
+	// 	preEncounterId: null,
+	// 	patientId: "MRN000002",
+	// 	patientName: "Reyes, Juan",
+	// 	loincCode: null,
+	// 	panelCode: null,
+	// 	testName: "Hemoglobin",
+	// 	panelName: "Hematology",
+	// 	priority: "routine",
+	// 	status: "completed",
+	// 	specimenType: null,
+	// 	orderingStaffId: "",
+	// 	orderingStaffName: "Dr. Lee",
+	// 	collectionDatetime: new Date().toISOString(),
+	// 	resultedDatetime: new Date().toISOString(),
+	// 	results: {
+	// 		items: [
+	// 			{
+	// 				testName: "Hgb",
+	// 				value: "6.1",
+	// 				unit: "g/dL",
+	// 				referenceRange: "13.5-17.5",
+	// 				flag: "C",
+	// 				isCritical: true,
+	// 				isAbnormal: true,
+	// 			},
+	// 		],
+	// 		reportedBy: null,
+	// 		reportedAt: null,
+	// 		comments: null,
+	// 	},
+	// 	hasCriticalValues: true,
+	// 	createdAt: new Date().toISOString(),
+	// 	updatedAt: new Date().toISOString(),
+	// },
 ]
 
 type QueueStatus = "pending_ack" | "sms_escalated" | "acknowledged"
@@ -294,7 +294,48 @@ function CriticalActionModal({ item, action, children }: CriticalActionModalProp
 
 function FlagCriticalModal() {
 	const [open, setOpen] = useState(false)
-	const [form, setForm] = useState({
+	const [confirmOpen, setConfirmOpen] = useState(false)
+	const { data: profile } = useMyProfile()
+	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+
+	// Fetch all lab orders to populate patient dropdown
+	const allLabOrdersQuery = useLabDashboardQuery({
+		facilityId,
+		limit: 100,
+	})
+
+	const labOrders = allLabOrdersQuery.data?.data ?? []
+
+	// Get unique patients from lab orders
+	const patients = useMemo(() => {
+		const uniquePatients = new Map<string, LabOrder>()
+		labOrders.forEach(order => {
+			if (order.patientId && order.patientName) {
+				uniquePatients.set(order.patientId, order)
+			}
+		})
+		return Array.from(uniquePatients.values())
+	}, [labOrders])
+
+	type FlagForm = {
+		selectedPatientId: string
+		patientName: string
+		mrn: string
+		ward: string
+		accession: string
+		analyte: string
+		value: string
+		unit: string
+		severity: "critical" | "urgent" | "warning"
+		refLow: string
+		refHigh: string
+		physician: string
+		channel: "inbox" | "sms" | "call"
+		notes: string
+	}
+
+	const [form, setForm] = useState<FlagForm>({
+		selectedPatientId: "",
 		patientName: "",
 		mrn: "",
 		ward: "",
@@ -311,8 +352,25 @@ function FlagCriticalModal() {
 	})
 	const [errors, setErrors] = useState<Record<string, string>>({})
 
+	// Handle patient selection
+	const handlePatientSelect = (patientId: string) => {
+		const selectedOrder = labOrders.find(order => order.patientId === patientId)
+		if (selectedOrder) {
+			setForm(prev => ({
+				...prev,
+				selectedPatientId: patientId,
+				patientName: selectedOrder.patientName ?? "",
+				mrn: selectedOrder.patientId?.slice(0, 10) ?? "",
+				ward: selectedOrder.encounterId ? `Ward-${selectedOrder.encounterId.slice(0, 3).toUpperCase()}` : "",
+				accession: `L-${selectedOrder.id.slice(0, 4).toUpperCase()}-${selectedOrder.id.slice(4, 8).toUpperCase()}`,
+				physician: selectedOrder.orderingStaffName ?? "",
+			}))
+		}
+	}
+
 	const validate = () => {
 		const newErrors: Record<string, string> = {}
+		if (!form.selectedPatientId) newErrors.selectedPatientId = "Required"
 		if (!form.patientName.trim()) newErrors.patientName = "Required"
 		if (!form.mrn.trim()) newErrors.mrn = "Required"
 		if (!form.analyte.trim()) newErrors.analyte = "Required"
@@ -325,9 +383,39 @@ function FlagCriticalModal() {
 
 	const handleSubmit = () => {
 		if (!validate()) return
-		// Submit logic here
+		// Show confirmation modal
+		setConfirmOpen(true)
+	}
+
+	const handleConfirm = () => {
+		// Create the critical queue item and trigger parent update
+		const newCriticalItem: CriticalQueueItem = {
+			id: `manual-${Date.now()}`,
+			patientName: form.patientName,
+			mrn: form.mrn,
+			ward: form.ward || "N/A",
+			doctor: form.physician,
+			testName: form.analyte,
+			value: form.value,
+			unit: form.unit,
+			reference: form.refLow && form.refHigh ? `${form.refLow}-${form.refHigh}` : "N/A",
+			status: "pending_ack",
+			elapsedMinutes: 0,
+		}
+
+		// Store in localStorage to persist across renders
+		const existingItems = JSON.parse(localStorage.getItem("manualCriticalItems") || "[]")
+		existingItems.push(newCriticalItem)
+		localStorage.setItem("manualCriticalItems", JSON.stringify(existingItems))
+
+		// Trigger a custom event to notify the parent component
+		window.dispatchEvent(new CustomEvent("criticalItemAdded", { detail: newCriticalItem }))
+
+		// Close modals and reset form
+		setConfirmOpen(false)
 		setOpen(false)
 		setForm({
+			selectedPatientId: "",
 			patientName: "",
 			mrn: "",
 			ward: "",
@@ -369,14 +457,24 @@ function FlagCriticalModal() {
 								<label className="text-muted-foreground text-xs">
 									Patient name <span className="text-rose-600">*</span>
 								</label>
-								<Input
-									placeholder="Last, First"
-									value={form.patientName}
-									onChange={e => setForm({ ...form, patientName: e.target.value })}
-									className={errors.patientName ? "border-rose-500" : ""}
-								/>
-								{errors.patientName && (
-									<p className="text-rose-600 text-xs mt-1">{errors.patientName}</p>
+								<Select value={form.selectedPatientId} onValueChange={handlePatientSelect}>
+									<SelectTrigger className={errors.selectedPatientId ? "border-rose-500" : " w-full"}>
+										<SelectValue>
+										{patients.find(
+											patient => patient.patientId === form.selectedPatientId
+										)?.patientName || "Select patient"}
+										</SelectValue>
+									</SelectTrigger>
+									<SelectContent className="w-auto">
+										{patients.map(patient => (
+											<SelectItem key={patient.patientId} value={patient.patientId!}>
+												{patient.patientName} (MRN: {patient.patientId?.slice(0, 10)})
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								{errors.selectedPatientId && (
+									<p className="text-rose-600 text-xs mt-1">{errors.selectedPatientId}</p>
 								)}
 							</div>
 							<div>
@@ -386,8 +484,8 @@ function FlagCriticalModal() {
 								<Input
 									placeholder="000000"
 									value={form.mrn}
-									onChange={e => setForm({ ...form, mrn: e.target.value })}
-									className={errors.mrn ? "border-rose-500" : ""}
+									readOnly
+									className={`bg-muted/50 ${errors.mrn ? "border-rose-500" : ""}`}
 								/>
 								{errors.mrn && <p className="text-rose-600 text-xs mt-1">{errors.mrn}</p>}
 							</div>
@@ -399,7 +497,8 @@ function FlagCriticalModal() {
 								<Input
 									placeholder="ICU-3"
 									value={form.ward}
-									onChange={e => setForm({ ...form, ward: e.target.value })}
+									readOnly
+									className="bg-muted/50"
 								/>
 							</div>
 							<div>
@@ -407,7 +506,8 @@ function FlagCriticalModal() {
 								<Input
 									placeholder="LAB-..."
 									value={form.accession}
-									onChange={e => setForm({ ...form, accession: e.target.value })}
+									readOnly
+									className="bg-muted/50"
 								/>
 							</div>
 						</div>
@@ -451,7 +551,7 @@ function FlagCriticalModal() {
 							</div>
 							<div>
 								<label className="text-muted-foreground text-xs">Severity</label>
-								<Select value={form.severity} onValueChange={v => setForm({ ...form, severity: v })}>
+								<Select value={form.severity} onValueChange={v => setForm(prev => ({ ...prev, severity: (v ?? "critical") as FlagForm["severity"] }))}>
 									<SelectTrigger className="w-full">
 										<SelectValue />
 									</SelectTrigger>
@@ -491,8 +591,8 @@ function FlagCriticalModal() {
 								<Input
 									placeholder="Dr. Hassan"
 									value={form.physician}
-									onChange={e => setForm({ ...form, physician: e.target.value })}
-									className={errors.physician ? "border-rose-500" : ""}
+									readOnly
+									className={`bg-muted/50 ${errors.physician ? "border-rose-500" : ""}`}
 								/>
 								{errors.physician && (
 									<p className="text-rose-600 text-xs mt-1">{errors.physician}</p>
@@ -500,7 +600,7 @@ function FlagCriticalModal() {
 							</div>
 							<div>
 								<label className="text-muted-foreground text-xs">Initial channel</label>
-								<Select value={form.channel} onValueChange={v => setForm({ ...form, channel: v })}>
+								<Select value={form.channel} onValueChange={v => setForm(prev => ({ ...prev, channel: (v ?? "inbox") as FlagForm["channel"] }))}>
 									<SelectTrigger className="w-full">
 										<SelectValue />
 									</SelectTrigger>
@@ -537,6 +637,57 @@ function FlagCriticalModal() {
 					</div>
 				</DialogFooter>
 			</DialogContent>
+
+			{/* Confirmation Modal */}
+			<Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+				<DialogContent className="max-w-md">
+					<DialogHeader>
+						<DialogTitle>Confirm Critical Result Flag</DialogTitle>
+						<DialogDescription>
+							Are you sure you want to flag this critical result and notify the physician?
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="bg-muted/30 rounded-md border p-3 text-sm space-y-2">
+						<div className="flex justify-between">
+							<span className="text-muted-foreground">Patient:</span>
+							<span className="font-medium">{form.patientName}</span>
+						</div>
+						<div className="flex justify-between">
+							<span className="text-muted-foreground">MRN:</span>
+							<span className="font-medium">{form.mrn}</span>
+						</div>
+						<div className="flex justify-between">
+							<span className="text-muted-foreground">Test:</span>
+							<span className="font-medium">{form.analyte}</span>
+						</div>
+						<div className="flex justify-between">
+							<span className="text-muted-foreground">Value:</span>
+							<span className="font-medium text-rose-700">{form.value} {form.unit}</span>
+						</div>
+						<div className="flex justify-between">
+							<span className="text-muted-foreground">Reference:</span>
+							<span className="font-medium">{form.refLow && form.refHigh ? `${form.refLow}-${form.refHigh}` : "N/A"}</span>
+						</div>
+						<div className="flex justify-between">
+							<span className="text-muted-foreground">Physician:</span>
+							<span className="font-medium">{form.physician}</span>
+						</div>
+						<div className="flex justify-between">
+							<span className="text-muted-foreground">Channel:</span>
+							<span className="font-medium capitalize">{form.channel}</span>
+						</div>
+					</div>
+
+					<DialogFooter>
+						<Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+						<Button onClick={handleConfirm} className="bg-rose-600 text-white hover:bg-rose-700">
+							<Send className="mr-2 size-4" />
+							Confirm & Notify
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</Dialog>
 	)
 }

@@ -13,6 +13,8 @@ import {
 	prescriptions,
 	staffProfiles,
 	users,
+	beds,
+	wards,
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
@@ -466,9 +468,11 @@ export class OrdersService {
 		const offset = (page - 1) * limit
 
 		const conditions: ReturnType<typeof eq>[] = []
+		if (input.facilityId) conditions.push(eq(labOrders.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(labOrders.encounterId, input.encounterId))
 		if (input.preEncounterId) conditions.push(eq(labOrders.preEncounterId, input.preEncounterId))
 		if (input.status) conditions.push(eq(labOrders.status, input.status))
+		if (input.priority) conditions.push(eq(labOrders.priority, input.priority))
 
 		const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 
@@ -489,6 +493,12 @@ export class OrdersService {
 					specimenType: labOrders.specimenType,
 					orderingStaffId: labOrders.orderingStaffId,
 					orderingStaffName: users.name,
+					patientId: patients.id,
+					patientFirstName: patients.firstName,
+					patientLastName: patients.lastName,
+					patientMrn: patients.mrn,
+					wardName: wards.name,
+					bedNumber: beds.bedNumber,
 					collectionDatetime: labOrders.collectionDatetime,
 					resultedDatetime: labOrders.resultedDatetime,
 					results: labOrders.results,
@@ -497,6 +507,10 @@ export class OrdersService {
 					updatedAt: labOrders.updatedAt,
 				})
 				.from(labOrders)
+				.leftJoin(encounters, eq(labOrders.encounterId, encounters.id))
+				.leftJoin(patients, eq(encounters.patientId, patients.id))
+				.leftJoin(beds, eq(encounters.bedId, beds.id))
+				.leftJoin(wards, eq(beds.wardId, wards.id))
 				.leftJoin(staffProfiles, eq(labOrders.orderingStaffId, staffProfiles.id))
 				.leftJoin(users, eq(staffProfiles.userId, users.id))
 				.where(whereClause)
@@ -508,7 +522,13 @@ export class OrdersService {
 		const total = totalResult?.count ?? 0
 
 		return {
-			data: rows,
+			data: rows.map(row => ({
+				...row,
+				patientName:
+					row.patientLastName && row.patientFirstName
+						? `${row.patientLastName}, ${row.patientFirstName}`
+						: null,
+			})),
 			total,
 			page,
 			limit,
@@ -532,6 +552,12 @@ export class OrdersService {
 				specimenType: labOrders.specimenType,
 				orderingStaffId: labOrders.orderingStaffId,
 				orderingStaffName: users.name,
+				patientId: patients.id,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+				patientMrn: patients.mrn,
+				wardName: wards.name,
+				bedNumber: beds.bedNumber,
 				collectionDatetime: labOrders.collectionDatetime,
 				resultedDatetime: labOrders.resultedDatetime,
 				results: labOrders.results,
@@ -542,12 +568,22 @@ export class OrdersService {
 				updatedAt: labOrders.updatedAt,
 			})
 			.from(labOrders)
+			.leftJoin(encounters, eq(labOrders.encounterId, encounters.id))
+			.leftJoin(patients, eq(encounters.patientId, patients.id))
+			.leftJoin(beds, eq(encounters.bedId, beds.id))
+			.leftJoin(wards, eq(beds.wardId, wards.id))
 			.leftJoin(staffProfiles, eq(labOrders.orderingStaffId, staffProfiles.id))
 			.leftJoin(users, eq(staffProfiles.userId, users.id))
 			.where(eq(labOrders.id, id))
 
 		if (!row) throw new NotFoundException(`Lab order ${id} not found`)
-		return row
+		return {
+			...row,
+			patientName:
+				row.patientLastName && row.patientFirstName
+					? `${row.patientLastName}, ${row.patientFirstName}`
+					: null,
+		}
 	}
 
 	async createLabOrder(input: CreateLabOrderInput, userId: string) {

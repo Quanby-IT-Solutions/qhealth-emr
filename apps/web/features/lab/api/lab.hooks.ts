@@ -23,7 +23,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
 	if (entries.length === 0) return ""
-	return "?" + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
+	return `?${entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")}`
 }
 
 // ============================================================================
@@ -54,12 +54,15 @@ export interface LabOrder {
 	preEncounterId: string | null
 	patientId: string | null
 	patientName: string | null
+	patientMrn?: string | null
+	wardName?: string | null
+	bedNumber?: string | null
 	loincCode: string | null
 	panelCode: string | null
 	testName: string
 	panelName: string | null
 	priority: "routine" | "urgent" | "stat"
-	status: "pending" | "in_progress" | "completed" | "cancelled"
+	status: "pending" | "ordered" | "collected" | "in_progress" | "resulted" | "completed" | "cancelled"
 	specimenType: string | null
 	orderingStaffId: string
 	orderingStaffName: string | null
@@ -154,8 +157,8 @@ export const labKeys = {
 
 interface LabDashboardParams {
 	facilityId: string
-	status?: "pending" | "in_progress" | "completed" | "cancelled"
-	priority?: string
+	status?: LabOrder["status"]
+	priority?: LabOrder["priority"]
 	page?: number
 	limit?: number
 }

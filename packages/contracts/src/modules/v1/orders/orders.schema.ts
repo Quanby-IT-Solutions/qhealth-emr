@@ -248,6 +248,11 @@ export const LabOrderSchema = z.object({
 	facilityId: z.string().uuid(),
 	encounterId: z.string().uuid().nullable(),
 	preEncounterId: z.string().uuid().nullable(),
+	patientId: z.string().uuid().nullable().optional(),
+	patientName: z.string().nullable().optional(),
+	patientMrn: z.string().nullable().optional(),
+	wardName: z.string().nullable().optional(),
+	bedNumber: z.string().nullable().optional(),
 	loincCode: z.string().nullable(),
 	panelCode: z.string().nullable(),
 	testName: z.string(),
@@ -297,9 +302,11 @@ export const CreateLabOrderSchema = z.object({
 })
 
 export const LabOrderListSchema = PaginationInputSchema.extend({
+	facilityId: z.string().uuid().optional(),
 	encounterId: z.string().uuid().optional(),
 	preEncounterId: z.string().uuid().optional(),
 	status: LabOrderStatusEnum.optional(),
+	priority: OrderPriorityEnum.optional(),
 })
 
 export const LabOrderListResponseSchema = PaginatedResponseSchema.extend({

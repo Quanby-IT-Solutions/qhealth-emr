@@ -29,7 +29,6 @@ import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { type LabOrder, useLabDashboardQuery } from "@/features/lab/api/lab.hooks"
 import { useWardsQuery } from "@/features/beds/api/beds.hooks"
-import { env } from "@/env"
 
 import { LabResultDetail } from "./lab-result-detail"
 import { Input } from "@/core/components/ui/input"
@@ -67,8 +66,14 @@ function statusBadge(status: LabOrder["status"]) {
 	switch (status) {
 		case "pending":
 			return <Badge variant="outline">Pending</Badge>
+		case "ordered":
+			return <Badge variant="outline">Ordered</Badge>
+		case "collected":
+			return <Badge className="bg-cyan-100 text-cyan-800 hover:bg-cyan-100">Collected</Badge>
 		case "in_progress":
 			return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">In Progress</Badge>
+		case "resulted":
+			return <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100">Resulted</Badge>
 		case "completed":
 			return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Awaiting Validation</Badge>
 		case "cancelled":
@@ -82,78 +87,7 @@ function statusBadge(status: LabOrder["status"]) {
 	}
 }
 
-// Mock orders for local development / storybook
-const MOCK_ORDERS: LabOrder[] = [
-	{
-		id: "mock0001abcd",
-		facilityId: "mock-facility",
-		encounterId: "enc0001",
-		preEncounterId: null,
-		patientId: "MRN000001",
-		patientName: "Garcia, Maria",
-		loincCode: null,
-		panelCode: null,
-		testName: "CBC",
-		panelName: "CBC + Differential",
-		priority: "stat",
-		status: "pending",
-		specimenType: null,
-		orderingStaffId: "",
-		orderingStaffName: null,
-		collectionDatetime: new Date().toISOString(),
-		resultedDatetime: null,
-		results: null,
-		hasCriticalValues: false,
-		createdAt: new Date().toISOString(),
-		updatedAt: new Date().toISOString(),
-	},
-	{
-		id: "mock0002efgh",
-		facilityId: "mock-facility",
-		encounterId: "enc0002",
-		preEncounterId: null,
-		patientId: "MRN000002",
-		patientName: "Reyes, Juan",
-		loincCode: null,
-		panelCode: null,
-		testName: "BMP",
-		panelName: "Basic Metabolic Panel",
-		priority: "urgent",
-		status: "in_progress",
-		specimenType: null,
-		orderingStaffId: "",
-		orderingStaffName: null,
-		collectionDatetime: new Date().toISOString(),
-		resultedDatetime: null,
-		results: null,
-		hasCriticalValues: false,
-		createdAt: new Date().toISOString(),
-		updatedAt: new Date().toISOString(),
-	},
-	{
-		id: "mock0003ijkl",
-		facilityId: "mock-facility",
-		encounterId: "enc0003",
-		preEncounterId: null,
-		patientId: "MRN000003",
-		patientName: "Dela Cruz, Ana",
-		loincCode: null,
-		panelCode: null,
-		testName: "LFT",
-		panelName: "Liver Function Tests",
-		priority: "routine",
-		status: "completed",
-		specimenType: null,
-		orderingStaffId: "",
-		orderingStaffName: null,
-		collectionDatetime: new Date().toISOString(),
-		resultedDatetime: new Date().toISOString(),
-		results: null,
-		hasCriticalValues: false,
-		createdAt: new Date().toISOString(),
-		updatedAt: new Date().toISOString(),
-	},
-]
+
 
 // ============================================================================
 // Lab Order Row
@@ -174,10 +108,16 @@ function LabOrderRow({
 			<TableCell>
 				<div>
 					<p className="font-medium">{order.patientName ?? "—"}</p>
-					<p className="text-xs text-muted-foreground">MRN {order.patientId?.slice(0, 10) ?? "N/A"}</p>
+					<p className="text-xs text-muted-foreground">MRN {order.patientMrn ?? order.patientId?.slice(0, 10) ?? "N/A"}</p>
 				</div>
 			</TableCell>
-			<TableCell>{order.encounterId ? `ENC-${order.encounterId.slice(0, 4).toUpperCase()}` : "—"}</TableCell>
+			<TableCell>
+				{order.wardName
+					? `${order.wardName}${order.bedNumber ? ` / ${order.bedNumber}` : ""}`
+					: order.encounterId
+						? `ENC-${order.encounterId.slice(0, 4).toUpperCase()}`
+						: "—"}
+			</TableCell>
 			<TableCell>{order.panelName ?? order.testName}</TableCell>
 			<TableCell>{priorityBadge(order.priority)}</TableCell>
 			<TableCell>{statusBadge(order.status)}</TableCell>
@@ -257,39 +197,37 @@ export function LabDashboard() {
 	const [selectedOrder, setSelectedOrder] = useState<LabOrder | null>(null)
 	const [detailOpen, setDetailOpen] = useState(false)
 
-	const buildParams = (status: "pending" | "in_progress" | "completed") => ({
+	const dashboardParams = {
 		facilityId,
-		status,
-		priority: priorityFilter !== "all" ? priorityFilter : undefined,
+		priority: priorityFilter !== "all" ? priorityFilter as LabOrder["priority"] : undefined,
 		limit: 50,
-	})
+	}
 
-	const pendingQuery = useLabDashboardQuery(buildParams("pending"))
-	const inProgressQuery = useLabDashboardQuery(buildParams("in_progress"))
-	const completedQuery = useLabDashboardQuery(buildParams("completed"))
+	const labOrdersQuery = useLabDashboardQuery(dashboardParams)
 
 	function handleEnter(order: LabOrder) {
 		setSelectedOrder(order)
 		setDetailOpen(true)
 	}
 
-	let allOrders = [
-		...(pendingQuery.data?.data ?? []),
-		...(inProgressQuery.data?.data ?? []),
-		...(completedQuery.data?.data ?? []),
-	].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+	const allOrders = (labOrdersQuery.data?.data ?? []).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 
-	// If no orders were returned from the API, use mock data during development
-	if (allOrders.length === 0 && env.NODE_ENV === "development") {
-		allOrders = MOCK_ORDERS
-	}
+	// If no orders were returned from the API, show empty state (no mock data)
 
 	// Filter orders by priority
 	const filteredOrders = priorityFilter === "all" 
 		? allOrders 
 		: allOrders.filter(order => order.priority === priorityFilter)
 
-	const releasedTodayCount = (completedQuery.data?.data ?? []).filter((order) => {
+	const pendingCount = allOrders.filter(order =>
+		order.status === "pending" || order.status === "ordered" || order.status === "collected"
+	).length
+	const inProgressCount = allOrders.filter(order => order.status === "in_progress").length
+	const awaitingValidationCount = allOrders.filter(order =>
+		order.status === "resulted" || order.status === "completed"
+	).length
+
+	const releasedTodayCount = allOrders.filter((order) => {
 		if (!order.resultedDatetime) return false
 		const today = new Date()
 		const date = new Date(order.resultedDatetime)
@@ -310,7 +248,19 @@ export function LabDashboard() {
 	const [manualEntryOpen, setManualEntryOpen] = useState(false)
 	const [sex, setSex] = useState<"F" | "M">("F")
 	const [priority, setPriority] = useState<"STAT" | "Urgent" | "Routine">("Routine")
-	const [manualForm, setManualForm] = useState({
+	type ManualForm = {
+		accession: string
+		collectedTime: string
+		patientName: string
+		mrn: string
+		age: string
+		wardId: string
+		panel: string
+		physician: string
+		notes: string
+	}
+
+	const [manualForm, setManualForm] = useState<ManualForm>({
 		accession: "",
 		collectedTime: "",
 		patientName: "",
@@ -522,7 +472,7 @@ export function LabDashboard() {
 												<label className="text-xs text-muted-foreground">
 													Ward / Location <span className="text-rose-600">*</span>
 												</label>
-												<Select value={manualForm.wardId} onValueChange={v => setManualForm({ ...manualForm, wardId: v })}>
+												<Select value={manualForm.wardId} onValueChange={v => setManualForm(prev => ({ ...prev, wardId: v ?? "" }))}>
 													<SelectTrigger className={cn("h-8 text-xs w-full", manualErrors.wardId && "border-rose-500")}>
 														<SelectValue placeholder="Select ward" />
 													</SelectTrigger>
@@ -549,7 +499,7 @@ export function LabDashboard() {
 										<div className="grid grid-cols-2 gap-2">
 											<div className="space-y-1">
 												<label className="text-xs text-muted-foreground">Panel / Test</label>
-												<Select value={manualForm.panel} onValueChange={v => setManualForm({ ...manualForm, panel: v })}>
+												<Select value={manualForm.panel} onValueChange={v => setManualForm(prev => ({ ...prev, panel: v ?? "CBC" }))}>
 													<SelectTrigger className="h-8 text-xs w-full">
 														<SelectValue />
 													</SelectTrigger>
@@ -657,7 +607,7 @@ export function LabDashboard() {
 						<CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Pending</CardTitle>
 					</CardHeader>
 					<CardContent className="flex items-end justify-between">
-						<p className="text-3xl font-semibold text-rose-600">{pendingQuery.data?.total ?? 0}</p>
+						<p className="text-3xl font-semibold text-rose-600">{pendingCount}</p>
 						<Clock3 className="size-4 text-rose-500" />
 					</CardContent>
 				</Card>
@@ -666,7 +616,7 @@ export function LabDashboard() {
 						<CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">In Progress</CardTitle>
 					</CardHeader>
 					<CardContent className="flex items-end justify-between">
-						<p className="text-3xl font-semibold text-blue-600">{inProgressQuery.data?.total ?? 0}</p>
+						<p className="text-3xl font-semibold text-blue-600">{inProgressCount}</p>
 						<FlaskConical className="size-4 text-blue-500" />
 					</CardContent>
 				</Card>
@@ -675,7 +625,7 @@ export function LabDashboard() {
 						<CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Awaiting Validation</CardTitle>
 					</CardHeader>
 					<CardContent className="flex items-end justify-between">
-						<p className="text-3xl font-semibold">{completedQuery.data?.total ?? 0}</p>
+						<p className="text-3xl font-semibold">{awaitingValidationCount}</p>
 						<TriangleAlert className="size-4 text-muted-foreground" />
 					</CardContent>
 				</Card>
@@ -714,7 +664,7 @@ export function LabDashboard() {
 					</div>
 					<LabOrdersTable
 						orders={filteredOrders}
-						isLoading={pendingQuery.isLoading || inProgressQuery.isLoading || completedQuery.isLoading}
+						isLoading={labOrdersQuery.isLoading}
 						onEnter={handleEnter}
 					/>
 				</CardContent>
