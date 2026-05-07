@@ -248,7 +248,10 @@ function getDisabledReasons(params: {
 
 	if (!validationResult.success) {
 		for (const issue of validationResult.error.issues) {
-			const friendlyReason = toFriendlyDisabledReason(issue, params.values)
+			const friendlyReason = toFriendlyDisabledReason(
+					issue as { message: string; path: Array<string | number> },
+					params.values
+				)
 			if (!reasons.includes(friendlyReason)) {
 				reasons.push(friendlyReason)
 			}
@@ -310,7 +313,6 @@ function TemplateDialog({
 					const payload: UpdateClinicTemplateInput & { id: string } = {
 						id: template.id,
 						clinicName: value.clinicName.trim(),
-						clinicianStaffId: value.clinicianStaffId,
 						startTime: period.startTime,
 						endTime: period.endTime,
 						slotDurationMinutes: value.slotDurationMinutes,
@@ -642,7 +644,7 @@ function TemplateDialog({
 
 																{isEditing && day.dayOfWeek !== template?.dayOfWeek ? (
 																	<p className="text-xs text-muted-foreground">
-																		Editing keeps this template on {formatDay(template.dayOfWeek)}. Create a new template to add another day.
+																		Editing keeps this template on {formatDay(template?.dayOfWeek ?? 0)}. Create a new template to add another day.
 																	</p>
 																) : null}
 															</div>
@@ -808,7 +810,6 @@ export function TemplateBuilder({ facilityId }: TemplateBuilderProps) {
 				...template,
 				clinicianName:
 					clinicianNameById.get(template.clinicianStaffId) ??
-					template.clinicianName ??
 					"Unknown clinician",
 			})),
 		[clinicianNameById, templatesQuery.data]

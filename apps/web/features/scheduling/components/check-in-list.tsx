@@ -4,7 +4,7 @@ import { useState } from "react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import { Card, CardContent } from "@/core/components/ui/card"
 import {
 	Select,
 	SelectContent,
@@ -23,7 +23,6 @@ import {
 import {
 	type AppointmentStatus,
 	useAppointmentsQuery,
-	useCancelAppointmentMutation,
 	useCheckInMutation,
 	useUpdateAppointmentStatusMutation,
 } from "@/features/scheduling/api/scheduling.hooks"
@@ -41,21 +40,17 @@ function formatSlotTime(time: string) {
 
 function statusBadge(status: AppointmentStatus) {
 	switch (status) {
-		case "scheduled":
-			return <Badge variant="outline">Scheduled</Badge>
+		case "booked":
+			return <Badge variant="outline">Booked</Badge>
 		case "checked_in":
 			return <Badge variant="default">Checked In</Badge>
 		case "in_progress":
 			return (
-				<Badge className="bg-blue-500 text-white hover:bg-blue-500/80">
-					In Progress
-				</Badge>
+				<Badge className="bg-blue-500 text-white hover:bg-blue-500/80">In Progress</Badge>
 			)
 		case "completed":
 			return (
-				<Badge className="bg-green-600 text-white hover:bg-green-600/80">
-					Completed
-				</Badge>
+				<Badge className="bg-green-600 text-white hover:bg-green-600/80">Completed</Badge>
 			)
 		case "no_show":
 			return <Badge variant="destructive">No Show</Badge>
@@ -77,30 +72,29 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 	const { data, isLoading, refetch } = useAppointmentsQuery({
 		facilityId,
 		date: todayIso(),
-		status: statusFilter === "all" ? undefined : statusFilter,
+		status: statusFilter === "all" ? undefined : (statusFilter as AppointmentStatus),
 		page,
 		limit: 25,
 	})
 
 	const checkInMut = useCheckInMutation()
 	const statusMut = useUpdateAppointmentStatusMutation()
-	const cancelMut = useCancelAppointmentMutation()
 
-	const appointments = data?.appointments ?? []
+	const appointments = data?.items ?? []
 
 	function handleCheckIn(appointmentId: string) {
-		checkInMut.mutate(appointmentId, { onSuccess: () => void refetch() })
+		checkInMut.mutate({ id: appointmentId }, { onSuccess: () => void refetch() })
 	}
 
 	function handleNoShow(appointmentId: string) {
-		statusMut.mutate(
-			{ appointmentId, status: "no_show" },
-			{ onSuccess: () => void refetch() }
-		)
+		statusMut.mutate({ id: appointmentId, status: "no_show" }, { onSuccess: () => void refetch() })
 	}
 
 	function handleCancel(appointmentId: string) {
-		cancelMut.mutate(appointmentId, { onSuccess: () => void refetch() })
+		statusMut.mutate(
+			{ id: appointmentId, status: "cancelled" },
+			{ onSuccess: () => void refetch() }
+		)
 	}
 
 	return (
@@ -108,7 +102,7 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<div>
 					<h2 className="text-lg font-semibold">Today's Appointments</h2>
-					<p className="text-muted-foreground text-sm">
+					<p className="text-sm text-muted-foreground">
 						{new Date().toLocaleDateString("en-PH", {
 							weekday: "long",
 							year: "numeric",
@@ -121,7 +115,7 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 				<div className="flex gap-2">
 					<Select
 						value={statusFilter}
-						onValueChange={(v) => {
+						onValueChange={v => {
 							if (v) {
 								setStatusFilter(v)
 								setPage(1)
@@ -133,7 +127,7 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="all">All Statuses</SelectItem>
-							<SelectItem value="scheduled">Scheduled</SelectItem>
+							<SelectItem value="booked">Booked</SelectItem>
 							<SelectItem value="checked_in">Checked In</SelectItem>
 							<SelectItem value="in_progress">In Progress</SelectItem>
 							<SelectItem value="completed">Completed</SelectItem>
@@ -150,9 +144,9 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 			<Card>
 				<CardContent className="p-0">
 					{isLoading ? (
-						<p className="text-muted-foreground py-8 text-center">Loading appointments…</p>
+						<p className="py-8 text-center text-muted-foreground">Loading appointments…</p>
 					) : appointments.length === 0 ? (
-						<p className="text-muted-foreground py-8 text-center">
+						<p className="py-8 text-center text-muted-foreground">
 							No appointments found for today.
 						</p>
 					) : (
@@ -161,30 +155,34 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 								<TableRow>
 									<TableHead>Time</TableHead>
 									<TableHead>Patient</TableHead>
-									<TableHead>Clinician</TableHead>
-									<TableHead>Clinic</TableHead>
+									<TableHead>Queue #</TableHead>
 									<TableHead>Status</TableHead>
 									<TableHead>Actions</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{appointments.map((appt) => (
+								{appointments.map(appt => (
 									<TableRow key={appt.id}>
 										<TableCell className="font-medium">
-											{formatSlotTime(appt.slotTime)}
+											{formatSlotTime(appt.appointmentTime)}
 										</TableCell>
 										<TableCell>
-											<div className="font-medium">{appt.patientName}</div>
-											<div className="text-muted-foreground text-xs">
-												{appt.patientMrn}
+											<div className="font-medium">{appt.patientName ?? "—"}</div>
+											<div className="text-xs text-muted-foreground">
+												{appt.patientMrn ?? ""}
 											</div>
 										</TableCell>
-										<TableCell>{appt.clinicianName}</TableCell>
-										<TableCell>{appt.clinicName}</TableCell>
+										<TableCell>
+											{appt.queueNumber ? (
+												<span className="font-bold">{appt.queueNumber}</span>
+											) : (
+												"—"
+											)}
+										</TableCell>
 										<TableCell>{statusBadge(appt.status)}</TableCell>
 										<TableCell>
 											<div className="flex flex-wrap gap-1">
-												{appt.status === "scheduled" && (
+												{appt.status === "booked" && (
 													<>
 														<Button
 															size="sm"
@@ -205,7 +203,7 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 															size="sm"
 															variant="ghost"
 															className="text-destructive"
-															disabled={cancelMut.isPending}
+															disabled={statusMut.isPending}
 															onClick={() => handleCancel(appt.id)}
 														>
 															Cancel
@@ -213,9 +211,9 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 													</>
 												)}
 												{appt.status === "checked_in" && (
-													<span className="text-muted-foreground text-xs">
-														{appt.checkInTime
-															? `Checked in at ${appt.checkInTime}`
+													<span className="text-xs text-muted-foreground">
+														{appt.checkedInAt
+															? `Checked in at ${new Date(appt.checkedInAt).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}`
 															: "In queue"}
 													</span>
 												)}
@@ -235,18 +233,18 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 						size="sm"
 						variant="outline"
 						disabled={page <= 1}
-						onClick={() => setPage((p) => p - 1)}
+						onClick={() => setPage(p => p - 1)}
 					>
 						Previous
 					</Button>
-					<span className="text-muted-foreground self-center text-sm">
+					<span className="self-center text-sm text-muted-foreground">
 						Page {page} of {data?.totalPages}
 					</span>
 					<Button
 						size="sm"
 						variant="outline"
 						disabled={page >= (data?.totalPages ?? 1)}
-						onClick={() => setPage((p) => p + 1)}
+						onClick={() => setPage(p => p + 1)}
 					>
 						Next
 					</Button>

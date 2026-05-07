@@ -94,7 +94,7 @@ describe("SurgicalService", () => {
 
 	beforeEach(() => {
 		jest.clearAllMocks()
-		service = new SurgicalService()
+		service = new SurgicalService({ send: jest.fn().mockResolvedValue(undefined) } as never)
 		mockDb = db as unknown as MockDb
 	})
 

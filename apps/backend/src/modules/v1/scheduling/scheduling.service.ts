@@ -261,11 +261,13 @@ export class SchedulingService {
 			conditions.push(eq(clinicSlots.status, input.status))
 		}
 
-		return db
+		const rows = await db
 			.select()
 			.from(clinicSlots)
 			.where(and(...conditions))
 			.orderBy(clinicSlots.slotDate, clinicSlots.slotStartTime)
+
+		return rows.map(row => this.normalizeClinicSlot(row))
 	}
 
 	async updateSlot(input: UpdateSlotInput, actor: SchedulingActor) {
@@ -318,12 +320,12 @@ export class SchedulingService {
 					{ tx }
 				)
 
-				return updated!
+				return this.normalizeClinicSlot(updated!)
 			})
 		}
 
 		if (existing.status === "open") {
-			return existing
+			return this.normalizeClinicSlot(existing)
 		}
 
 		if (existing.status === "booked" || existing.status === "cancelled") {
@@ -368,7 +370,7 @@ export class SchedulingService {
 				{ tx }
 			)
 
-			return updated!
+			return this.normalizeClinicSlot(updated!)
 		})
 	}
 
@@ -1148,9 +1150,21 @@ export class SchedulingService {
 
 		return rows.map(row => ({
 			slotId: row.slotId,
-			time: row.time,
+			time: this.normalizeTime(row.time),
 			available: Boolean(row.available),
 		}))
+	}
+
+	private normalizeClinicSlot(row: typeof clinicSlots.$inferSelect) {
+		return {
+			...row,
+			slotStartTime: this.normalizeTime(row.slotStartTime),
+			slotEndTime: this.normalizeTime(row.slotEndTime),
+		}
+	}
+
+	private normalizeTime(time: string): string {
+		return time.slice(0, 5)
 	}
 
 	private addDays(date: string, days: number): string {

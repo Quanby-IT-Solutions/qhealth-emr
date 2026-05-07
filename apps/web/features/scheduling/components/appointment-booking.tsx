@@ -21,11 +21,12 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/core/components/ui/select"
+import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
 import {
-	type AppointmentSlot,
+	type TimeSlot,
 	useAvailableSlotsQuery,
 	useBookAppointmentMutation,
-	useScheduleTemplatesQuery,
+	useStaffClinicianListQuery,
 } from "@/features/scheduling/api/scheduling.hooks"
 
 interface AppointmentBookingProps {
@@ -43,79 +44,63 @@ function formatSlotTime(time: string) {
 	return `${hour}:${(m ?? 0).toString().padStart(2, "0")} ${period}`
 }
 
-export function AppointmentBooking({ facilityId: _facilityId }: AppointmentBookingProps) {
+export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 	const [date, setDate] = useState(todayIso())
-	const [clinicId, setClinicId] = useState<string>("all")
-	const [clinicianId, setClinicianId] = useState<string>("all")
-	const [selectedSlot, setSelectedSlot] = useState<AppointmentSlot | null>(null)
+	const [clinicianId, setClinicianId] = useState<string>("")
+	const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null)
 	const [bookingOpen, setBookingOpen] = useState(false)
-
-	// patient form
-	const [patientId, setPatientId] = useState("")
+	const [patientSearch, setPatientSearch] = useState("")
+	const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
+	const [selectedPatientLabel, setSelectedPatientLabel] = useState("")
+	const [chiefComplaint, setChiefComplaint] = useState("")
 	const [notes, setNotes] = useState("")
 
-	const templatesQuery = useScheduleTemplatesQuery({ limit: 100 })
-	const clinicians = templatesQuery.data ?? []
-
-	// Unique clinicians from templates
-	const uniqueClinicians = clinicians.reduce<{ id: string; name: string }[]>(
-		(acc, t) => {
-			if (!acc.find((c) => c.id === t.clinicianId)) {
-				acc.push({ id: t.clinicianId, name: t.clinicianName })
-			}
-			return acc
-		},
-		[]
-	)
-
-	// Unique clinics from templates
-	const uniqueClinics = clinicians.reduce<{ id: string; name: string }[]>(
-		(acc, t) => {
-			if (!acc.find((c) => c.id === t.clinicId)) {
-				acc.push({ id: t.clinicId, name: t.clinicName })
-			}
-			return acc
-		},
-		[]
-	)
+	const cliniciansQuery = useStaffClinicianListQuery({ facilityId })
+	const clinicians = cliniciansQuery.data ?? []
 
 	const slotsQuery = useAvailableSlotsQuery(
-		{
-			date,
-			clinicId: clinicId === "all" ? undefined : clinicId,
-			clinicianId: clinicianId === "all" ? undefined : clinicianId,
-		},
-		!!date
+		{ facilityId, clinicianStaffId: clinicianId, date },
+		!!clinicianId
+	)
+
+	const patientSearchQuery = usePatientSearchQuery(
+		{ facilityId, search: patientSearch },
+		{ enabled: bookingOpen && patientSearch.length >= 2 }
 	)
 
 	const bookMut = useBookAppointmentMutation()
 
 	const slots = slotsQuery.data?.slots ?? []
-	const availableSlots = slots.filter((s) => s.isAvailable)
+	const clinicName = slotsQuery.data?.clinicName
+	const availableCount = slots.filter(s => s.available).length
 
-	function openBooking(slot: AppointmentSlot) {
+	function openBooking(slot: TimeSlot) {
 		setSelectedSlot(slot)
-		setPatientId("")
+		setPatientSearch("")
+		setSelectedPatientId(null)
+		setSelectedPatientLabel("")
+		setChiefComplaint("")
 		setNotes("")
 		setBookingOpen(true)
 	}
 
 	function handleBook() {
-		if (!selectedSlot || !patientId.trim()) return
+		if (!selectedSlot || !selectedPatientId || !clinicianId) return
 		bookMut.mutate(
 			{
-				patientId: patientId.trim(),
-				clinicId: selectedSlot.clinicId,
-				clinicianId: selectedSlot.clinicianId,
-				scheduledDate: selectedSlot.date,
-				slotTime: selectedSlot.time,
+				facilityId,
+				patientId: selectedPatientId,
+				clinicianStaffId: clinicianId,
+				appointmentDate: date,
+				appointmentTime: selectedSlot.time,
+				clinicSlotId: selectedSlot.slotId,
+				encounterType: "outpatient",
+				chiefComplaint: chiefComplaint || undefined,
 				notes: notes || undefined,
 			},
 			{
 				onSuccess: () => {
 					setBookingOpen(false)
-					// Refresh slots
-					void slotsQuery.refetch()
 				},
 			}
 		)
@@ -123,65 +108,43 @@ export function AppointmentBooking({ facilityId: _facilityId }: AppointmentBooki
 
 	return (
 		<div className="space-y-4">
-			{/* Search Filters */}
+			{/* Filters */}
 			<Card>
 				<CardHeader>
 					<CardTitle>Find Available Slots</CardTitle>
 				</CardHeader>
 				<CardContent>
-					<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+						<div className="space-y-1">
+							<Label>Clinician</Label>
+							<Select
+								value={clinicianId}
+								onValueChange={v => {
+									if (v) setClinicianId(v)
+								}}
+							>
+								<SelectTrigger>
+									<SelectValue>{clinicianId ? clinicians.find(c => c.id === clinicianId)?.name : "Select clinician"}</SelectValue>
+								</SelectTrigger>
+								<SelectContent>
+									{clinicians.map(c => (
+										<SelectItem key={c.id} value={c.id}>
+											{c.name}
+											{c.department ? ` — ${c.department}` : ""}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+
 						<div className="space-y-1">
 							<Label>Date</Label>
 							<Input
 								type="date"
 								value={date}
 								min={todayIso()}
-								onChange={(e) => setDate(e.target.value)}
+								onChange={e => setDate(e.target.value)}
 							/>
-						</div>
-
-						<div className="space-y-1">
-							<Label>Clinic</Label>
-							<Select
-								value={clinicId}
-								onValueChange={(v) => {
-									if (v) setClinicId(v)
-								}}
-							>
-								<SelectTrigger>
-									<SelectValue placeholder="All clinics" />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="all">All Clinics</SelectItem>
-									{uniqueClinics.map((c) => (
-										<SelectItem key={c.id} value={c.id}>
-											{c.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
-
-						<div className="space-y-1">
-							<Label>Clinician</Label>
-							<Select
-								value={clinicianId}
-								onValueChange={(v) => {
-									if (v) setClinicianId(v)
-								}}
-							>
-								<SelectTrigger>
-									<SelectValue placeholder="All clinicians" />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="all">All Clinicians</SelectItem>
-									{uniqueClinicians.map((c) => (
-										<SelectItem key={c.id} value={c.id}>
-											{c.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
 						</div>
 					</div>
 				</CardContent>
@@ -191,112 +154,140 @@ export function AppointmentBooking({ facilityId: _facilityId }: AppointmentBooki
 			<Card>
 				<CardHeader>
 					<CardTitle>
-						Available Slots
-						{availableSlots.length > 0 && (
+						{clinicName ?? "Available Slots"}
+						{availableCount > 0 && (
 							<span className="ml-2 text-sm font-normal text-muted-foreground">
-								{availableSlots.length} slot{availableSlots.length !== 1 ? "s" : ""} available
+								{availableCount} slot{availableCount !== 1 ? "s" : ""} available
 							</span>
 						)}
 					</CardTitle>
 				</CardHeader>
 				<CardContent>
-					{slotsQuery.isLoading ? (
-						<p className="text-muted-foreground py-6 text-center">Searching for slots…</p>
+					{!clinicianId ? (
+						<p className="py-6 text-center text-muted-foreground">
+							Select a clinician to see available slots.
+						</p>
+					) : slotsQuery.isLoading ? (
+						<p className="py-6 text-center text-muted-foreground">Searching for slots…</p>
 					) : slots.length === 0 ? (
-						<p className="text-muted-foreground py-6 text-center">
-							No slots found for the selected date and filters.
+						<p className="py-6 text-center text-muted-foreground">
+							No slots found for the selected date.
 						</p>
 					) : (
-						<div className="space-y-4">
-							{/* Group by clinician */}
-							{uniqueClinicians
-								.filter(
-									(c) =>
-										clinicianId === "all" || c.id === clinicianId
-								)
-								.map((clinician) => {
-									const clinicianSlots = slots.filter(
-										(s) => s.clinicianId === clinician.id
-									)
-									if (!clinicianSlots.length) return null
-									return (
-										<div key={clinician.id}>
-											<div className="mb-2 text-sm font-medium">
-												{clinician.name}
-											</div>
-											<div className="flex flex-wrap gap-2">
-												{clinicianSlots.map((slot) => (
-													<Button
-														key={`${slot.clinicianId}-${slot.time}`}
-														size="sm"
-														variant={slot.isAvailable ? "outline" : "ghost"}
-														disabled={!slot.isAvailable}
-														className={
-															!slot.isAvailable
-																? "cursor-not-allowed opacity-50"
-																: ""
-														}
-														onClick={() => slot.isAvailable && openBooking(slot)}
-													>
-														{formatSlotTime(slot.time)}
-														{slot.isAvailable && slot.remainingSlots <= 3 && (
-															<Badge
-																variant="destructive"
-																className="ml-1 px-1 text-xs"
-															>
-																{slot.remainingSlots} left
-															</Badge>
-														)}
-													</Button>
-												))}
-											</div>
-										</div>
-									)
-								})}
+						<div className="flex flex-wrap gap-2">
+							{slots.map(slot => (
+								<Button
+									key={slot.slotId}
+									size="sm"
+									variant={slot.available ? "outline" : "ghost"}
+									disabled={!slot.available}
+									className={!slot.available ? "cursor-not-allowed opacity-50" : ""}
+									onClick={() => slot.available && openBooking(slot)}
+								>
+									{formatSlotTime(slot.time)}
+									{!slot.available && (
+										<Badge variant="secondary" className="ml-1 px-1 text-xs">
+											Booked
+										</Badge>
+									)}
+								</Button>
+							))}
 						</div>
 					)}
 				</CardContent>
 			</Card>
 
-			{/* Booking Confirm Dialog */}
+			{/* Booking Dialog */}
 			<Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
-				<DialogContent className="max-w-sm">
+				<DialogContent className="max-w-md">
 					<DialogHeader>
-						<DialogTitle>Confirm Appointment</DialogTitle>
+						<DialogTitle>Book Appointment</DialogTitle>
 					</DialogHeader>
 
 					{selectedSlot && (
-						<div className="space-y-3 text-sm">
+						<div className="space-y-4 text-sm">
 							<div className="rounded-md border p-3 space-y-1">
 								<div className="flex justify-between">
 									<span className="text-muted-foreground">Date</span>
-									<span className="font-medium">{selectedSlot.date}</span>
+									<span className="font-medium">{date}</span>
 								</div>
 								<div className="flex justify-between">
 									<span className="text-muted-foreground">Time</span>
 									<span className="font-medium">{formatSlotTime(selectedSlot.time)}</span>
 								</div>
-								<div className="flex justify-between">
-									<span className="text-muted-foreground">Clinician</span>
-									<span className="font-medium">{selectedSlot.clinicianName}</span>
-								</div>
+								{clinicName && (
+									<div className="flex justify-between">
+										<span className="text-muted-foreground">Clinic</span>
+										<span className="font-medium">{clinicName}</span>
+									</div>
+								)}
 							</div>
 
 							<div className="space-y-1">
-								<Label>Patient ID</Label>
+								<Label>Search Patient</Label>
 								<Input
-									placeholder="Enter patient ID"
-									value={patientId}
-									onChange={(e) => setPatientId(e.target.value)}
+									placeholder="Name or MRN (type at least 2 characters)"
+									value={patientSearch}
+									onChange={e => {
+										setPatientSearch(e.target.value)
+										if (selectedPatientLabel !== e.target.value) {
+											setSelectedPatientId(null)
+											setSelectedPatientLabel("")
+										}
+									}}
+								/>
+								{patientSearch.length >= 2 && !selectedPatientId && (
+									<div className="max-h-40 overflow-y-auto rounded-md border">
+										{patientSearchQuery.isLoading ? (
+											<p className="px-3 py-2 text-xs text-muted-foreground">Searching…</p>
+										) : (patientSearchQuery.data?.data ?? []).length === 0 ? (
+											<p className="px-3 py-2 text-xs text-muted-foreground">
+												No patients found.
+											</p>
+										) : (
+											patientSearchQuery.data?.data.map(p => (
+												<button
+													key={p.id}
+													className="w-full px-3 py-2 text-left text-xs hover:bg-accent"
+													onClick={() => {
+														setSelectedPatientId(p.id)
+														setSelectedPatientLabel(
+															`${p.lastName}, ${p.firstName} (${p.mrn})`
+														)
+														setPatientSearch(
+															`${p.lastName}, ${p.firstName} (${p.mrn})`
+														)
+													}}
+												>
+													<span className="font-medium">
+														{p.lastName}, {p.firstName}
+													</span>
+													<span className="ml-2 text-muted-foreground">{p.mrn}</span>
+												</button>
+											))
+										)}
+									</div>
+								)}
+								{selectedPatientId && (
+									<p className="text-xs text-green-600">Patient selected</p>
+								)}
+							</div>
+
+							<div className="space-y-1">
+								<Label>Chief Complaint</Label>
+								<Input
+									placeholder="Chief complaint"
+									value={chiefComplaint}
+									onChange={e => setChiefComplaint(e.target.value)}
 								/>
 							</div>
 
 							<div className="space-y-1">
 								<Label>Notes (optional)</Label>
 								<Input
-									placeholder="Chief complaint or notes"
+									placeholder="Additional notes"
 									value={notes}
-									onChange={(e) => setNotes(e.target.value)}
+									onChange={e => setNotes(e.target.value)}
 								/>
 							</div>
 						</div>
@@ -308,7 +299,7 @@ export function AppointmentBooking({ facilityId: _facilityId }: AppointmentBooki
 						</Button>
 						<Button
 							onClick={handleBook}
-							disabled={bookMut.isPending || !patientId.trim()}
+							disabled={bookMut.isPending || !selectedPatientId}
 						>
 							{bookMut.isPending ? "Booking…" : "Confirm Booking"}
 						</Button>

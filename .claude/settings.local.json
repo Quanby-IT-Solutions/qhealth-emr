@@ -168,7 +168,9 @@
       "Bash(Find D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\hai-reconciliation\\\\components *)",
       "Bash(Find D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\deficiency-tracking\\\\components *)",
       "Bash(Select-Object -First 10 FullName)",
-      "Bash([ -f \"D:/PROJECTS/qhealth-emr/apps/backend/src/modules/v1/him/$dir/$dir.module.ts\" ])"
+      "Bash([ -f \"D:/PROJECTS/qhealth-emr/apps/backend/src/modules/v1/him/$dir/$dir.module.ts\" ])",
+      "Bash(pnpm -F web tsc --noEmit)",
+      "Bash(pnpm -F @qhealth/web typecheck)"
     ]
   }
 }
