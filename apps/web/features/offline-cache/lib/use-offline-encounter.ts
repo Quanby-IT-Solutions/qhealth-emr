@@ -42,7 +42,7 @@ export function useOfflineEncounter(
 	const { data: encounter } = useEncounterDetailQuery(encounterId, {
 		enabled: isOnline && !!encounterId,
 	})
-	const { data: vitalsData } = useVitalsQuery({ encounterId, limit: 1, page: 1 })
+	const { data: vitalsData } = useVitalsQuery({ encounterId: isOnline ? encounterId : undefined, limit: 1, page: 1 })
 	const { data: patientSummary } = usePatientSummaryQuery(patientId)
 
 	useEffect(() => {
