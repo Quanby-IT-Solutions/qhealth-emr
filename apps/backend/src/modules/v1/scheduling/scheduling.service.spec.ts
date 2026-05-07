@@ -450,7 +450,7 @@ describe("SchedulingService", () => {
 
 	describe("listTemplateSlots()", () => {
 		it("returns slots and lazily generates when requested range exceeds materialized window", async () => {
-			const slot = makeSlot()
+			const slot = makeSlot({ slotStartTime: "08:00:00", slotEndTime: "08:15:00" })
 			;(db.select as jest.Mock)
 				.mockReturnValueOnce(mockSelectChain([{ latestSlotDate: "2026-05-08" }]))
 				.mockReturnValueOnce(mockSelectChain([slot]))
@@ -466,7 +466,13 @@ describe("SchedulingService", () => {
 				"2026-05-07",
 				"2026-05-12"
 			)
-			expect(result).toEqual([slot])
+			expect(result).toEqual([
+				{
+					...slot,
+					slotStartTime: "08:00",
+					slotEndTime: "08:15",
+				},
+			])
 		})
 	})
 
