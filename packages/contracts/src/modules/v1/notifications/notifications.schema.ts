@@ -13,6 +13,7 @@ export const NotificationTopicEnum = z.enum([
 	"ed_queue",
 	"sla_warning",
 	"sla_exceeded",
+	"surgical",
 ])
 
 // ============================================================================

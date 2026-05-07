@@ -138,7 +138,7 @@ export function SurgicalDashboard() {
 						Operating room schedule and surgical cases
 					</p>
 				</div>
-				<Button variant="outline" nativeButton={false} render={<a href="/surgical/schedule" />}>
+				<Button variant="outline" nativeButton={false} render={<a href="/or/schedule" />}>
 					OR Schedule Calendar
 				</Button>
 			</div>
@@ -157,7 +157,7 @@ export function SurgicalDashboard() {
 								{STATUS_TABS.map((tab) => (
 									<TabsTrigger key={tab.value} value={tab.value}>
 										{tab.label}
-										{counts[tab.value] > 0 && (
+										{(counts[tab.value] ?? 0) > 0 && (
 											<Badge
 												variant="secondary"
 												className="ml-1.5 text-[10px]"

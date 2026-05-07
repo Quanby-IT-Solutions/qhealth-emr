@@ -12,7 +12,7 @@ type NotificationListFilter = V1Inputs["notification"]["list"]
 interface SendNotificationInput {
 	facilityId: string
 	recipientStaffId: string
-	topic: "pidsr" | "news" | "pharmacy" | "break_glass" | "system" | "ed_queue"
+	topic: "pidsr" | "news" | "pharmacy" | "break_glass" | "system" | "ed_queue" | "sla_warning" | "sla_exceeded" | "surgical"
 	title: string
 	body: string
 	data?: unknown

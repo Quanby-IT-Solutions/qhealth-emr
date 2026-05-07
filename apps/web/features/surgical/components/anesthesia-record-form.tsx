@@ -136,10 +136,10 @@ function mapMedicationsToLegacyAgents(medications: IntraopMedication[]): Anesthe
 
 function buildInitialState(existing: AnesthesiaRecord | null | undefined): FormState {
 	return {
-		asaClass: existing?.asaClass,
-		anesthesiaType: existing?.anesthesiaType,
-		airwayType: existing?.airwayType,
-		intubationGrade: existing?.intubationGrade,
+		asaClass: existing?.asaClass ?? undefined,
+		anesthesiaType: existing?.anesthesiaType ?? undefined,
+		airwayType: existing?.airwayType ?? undefined,
+		intubationGrade: existing?.intubationGrade ?? undefined,
 		difficultAirway: existing?.difficultAirway ?? false,
 		airwayManagement: existing?.airwayManagement ?? "",
 		intubationAttempts: existing?.intubationAttempts?.toString() ?? "",
@@ -150,7 +150,7 @@ function buildInitialState(existing: AnesthesiaRecord | null | undefined): FormS
 		intraopVitals: existing?.intraopVitals ?? [],
 		reversalAgent: existing?.reversalAgent ?? "",
 		totalAnesthesiaMinutes: existing?.totalAnesthesiaMinutes?.toString() ?? "",
-		emergenceSmooth: existing?.emergenceSmooth,
+		emergenceSmooth: existing?.emergenceSmooth ?? undefined,
 		complications: existing?.complications ?? "",
 		postAnesthesiaCareNotes: existing?.postAnesthesiaCareNotes ?? "",
 	}
@@ -375,7 +375,9 @@ export function AnesthesiaRecordForm({
 							disabled={fieldsDisabled}
 						>
 							<SelectTrigger>
-								<SelectValue placeholder="Select type…" />
+								<SelectValue>
+									{ANESTHESIA_TYPE_OPTIONS.find(o => o.value === form.anesthesiaType)?.label ?? "Select type…"}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								{ANESTHESIA_TYPE_OPTIONS.map((opt) => (
@@ -394,7 +396,9 @@ export function AnesthesiaRecordForm({
 							disabled={fieldsDisabled}
 						>
 							<SelectTrigger>
-								<SelectValue placeholder="Select class…" />
+								<SelectValue>
+									{form.asaClass ?? "Select class…"}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								{ASA_OPTIONS.map((cls) => (
@@ -430,7 +434,9 @@ export function AnesthesiaRecordForm({
 								disabled={fieldsDisabled}
 							>
 								<SelectTrigger>
-									<SelectValue placeholder="Select device…" />
+									<SelectValue>
+									{AIRWAY_OPTIONS.find(o => o.value === form.airwayType)?.label ?? "Select device…"}
+								</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
 									{AIRWAY_OPTIONS.map((opt) => (
@@ -449,7 +455,9 @@ export function AnesthesiaRecordForm({
 								disabled={fieldsDisabled}
 							>
 								<SelectTrigger>
-									<SelectValue placeholder="Select grade…" />
+									<SelectValue>
+									{INTUBATION_GRADE_OPTIONS.find(o => o.value === form.intubationGrade)?.label ?? "Select grade…"}
+								</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
 									{INTUBATION_GRADE_OPTIONS.map((opt) => (

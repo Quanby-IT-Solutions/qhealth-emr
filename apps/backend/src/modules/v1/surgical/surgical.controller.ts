@@ -223,4 +223,16 @@ export class SurgicalController {
 			return this.surgicalService.listOrSlots(input)
 		})
 	}
+
+	// ========================================================================
+	// OR Conflict Check
+	// ========================================================================
+
+	@RequirePermission("surgical", "view")
+	@Implement(v1.surgical.checkOrConflicts)
+	async checkOrConflicts() {
+		return implement(v1.surgical.checkOrConflicts).handler(async ({ input }) => {
+			return this.surgicalService.checkOrConflicts(input)
+		})
+	}
 }

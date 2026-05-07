@@ -8,7 +8,7 @@ import {
 	NotFoundException,
 } from "@nestjs/common"
 import type { UserSession } from "@thallesp/nestjs-better-auth"
-import { and, count, desc, eq, gte, ilike, lt, or, sql } from "drizzle-orm"
+import { and, count, desc, eq, gte, ilike, lt, ne, or, sql } from "drizzle-orm"
 
 import {
 	anesthesiaRecords,
@@ -24,6 +24,7 @@ import {
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs, V1Outputs } from "@/config/contract-types"
+import { NotificationService } from "@/modules/v1/notifications/notification.service"
 
 import { detectProcedureLabels, resolveProcedureLabel } from "./surgical-procedure-utils"
 
@@ -40,8 +41,10 @@ type SuggestRvsCodeInput = V1Inputs["surgical"]["suggestRvsCode"]
 type UpdateRvsStatusInput = V1Inputs["surgical"]["updateRvsStatus"]
 type RemoveRvsAssignmentInput = V1Inputs["surgical"]["removeRvsAssignment"]
 type OrSlotsInput = V1Inputs["surgical"]["listOrSlots"]
+type OrConflictCheckInput = V1Inputs["surgical"]["checkOrConflicts"]
 type SurgicalCaseOutput = V1Outputs["surgical"]["getCase"]
 type SurgicalCaseListOutput = V1Outputs["surgical"]["listCases"]
+type OrConflictCheckOutput = V1Outputs["surgical"]["checkOrConflicts"]
 type SurgicalStatus = SurgicalCaseOutput["status"]
 type AsaClass = SurgicalCaseOutput["asaClass"]
 type BillingPermissionContext = {
@@ -53,6 +56,8 @@ type BillingPermissionContext = {
 @Injectable()
 export class SurgicalService {
 	private readonly logger = new Logger(SurgicalService.name)
+
+	constructor(private readonly notificationService: NotificationService) {}
 
 	// ========================================================================
 	// Private helpers
@@ -76,6 +81,8 @@ export class SurgicalService {
 		status: SurgicalStatus
 		surgicalType: string
 		asaClass: AsaClass
+		estimatedDurationMinutes: number | null
+		requiredEquipment: string[] | null
 		notes: string | null
 		createdAt: Date
 		updatedAt: Date
@@ -88,6 +95,8 @@ export class SurgicalService {
 			scheduledDatetime: row.scheduledDatetime?.toISOString() ?? null,
 			actualStartDatetime: row.actualStartDatetime?.toISOString() ?? null,
 			actualEndDatetime: row.actualEndDatetime?.toISOString() ?? null,
+			estimatedDurationMinutes: row.estimatedDurationMinutes ?? null,
+			requiredEquipment: row.requiredEquipment ?? null,
 		}
 	}
 
@@ -125,6 +134,8 @@ export class SurgicalService {
 				status: surgicalCases.status,
 				surgicalType: surgicalCases.surgicalType,
 				asaClass: surgicalCases.asaClass,
+				estimatedDurationMinutes: surgicalCases.estimatedDurationMinutes,
+				requiredEquipment: surgicalCases.requiredEquipment,
 				notes: surgicalCases.notes,
 				createdAt: surgicalCases.createdAt,
 				updatedAt: surgicalCases.updatedAt,
@@ -358,6 +369,8 @@ export class SurgicalService {
 					status: surgicalCases.status,
 					surgicalType: surgicalCases.surgicalType,
 					asaClass: surgicalCases.asaClass,
+					estimatedDurationMinutes: surgicalCases.estimatedDurationMinutes,
+					requiredEquipment: surgicalCases.requiredEquipment,
 					notes: surgicalCases.notes,
 					createdAt: surgicalCases.createdAt,
 					updatedAt: surgicalCases.updatedAt,
@@ -391,9 +404,134 @@ export class SurgicalService {
 		return this.mapCaseRow(row)
 	}
 
+	private async detectConflicts(
+		facilityId: string,
+		orSuite: string | undefined,
+		scheduledDatetime: Date,
+		estimatedDurationMinutes: number,
+		surgeonStaffId: string | undefined,
+		requiredEquipment: string[] | undefined,
+		excludeCaseId: string | undefined
+	): Promise<OrConflictCheckOutput["conflicts"]> {
+		const endDatetime = new Date(scheduledDatetime.getTime() + estimatedDurationMinutes * 60 * 1000)
+
+		const baseWhere = and(
+			eq(surgicalCases.facilityId, facilityId),
+			ne(surgicalCases.status, "cancelled"),
+			ne(surgicalCases.status, "postponed"),
+			excludeCaseId ? ne(surgicalCases.id, excludeCaseId) : undefined,
+			// Overlap: existing.start < new.end AND existing.end > new.start
+			// existing.end = scheduled_datetime + estimated_duration_minutes (or scheduled_datetime + 2h default)
+			lt(surgicalCases.scheduledDatetime, endDatetime),
+			gte(
+				sql`${surgicalCases.scheduledDatetime} + (COALESCE(${surgicalCases.estimatedDurationMinutes}, 120) * interval '1 minute')`,
+				scheduledDatetime
+			)
+		)
+
+		const overlappingCases = await db
+			.select({
+				id: surgicalCases.id,
+				procedureName: surgicalCases.procedureName,
+				orSuite: surgicalCases.orSuite,
+				scheduledDatetime: surgicalCases.scheduledDatetime,
+				estimatedDurationMinutes: surgicalCases.estimatedDurationMinutes,
+				surgeonStaffId: surgicalCases.surgeonStaffId,
+				requiredEquipment: surgicalCases.requiredEquipment,
+			})
+			.from(surgicalCases)
+			.where(baseWhere)
+
+		const conflicts: OrConflictCheckOutput["conflicts"] = []
+
+		for (const existing of overlappingCases) {
+			if (!existing.scheduledDatetime) continue
+
+			const existingEnd = new Date(
+				existing.scheduledDatetime.getTime() +
+					(existing.estimatedDurationMinutes ?? 120) * 60 * 1000
+			)
+
+			// Room conflict
+			if (orSuite && existing.orSuite === orSuite) {
+				conflicts.push({
+					type: "room",
+					conflictingCaseId: existing.id,
+					conflictingProcedure: existing.procedureName,
+					conflictingOrSuite: existing.orSuite,
+					conflictingStart: existing.scheduledDatetime.toISOString(),
+					conflictingEnd: existingEnd.toISOString(),
+				})
+			}
+
+			// Surgeon conflict
+			if (
+				surgeonStaffId &&
+				existing.surgeonStaffId === surgeonStaffId &&
+				!conflicts.some(c => c.conflictingCaseId === existing.id && c.type === "surgeon")
+			) {
+				conflicts.push({
+					type: "surgeon",
+					conflictingCaseId: existing.id,
+					conflictingProcedure: existing.procedureName,
+					conflictingOrSuite: existing.orSuite,
+					conflictingStart: existing.scheduledDatetime.toISOString(),
+					conflictingEnd: existingEnd.toISOString(),
+				})
+			}
+
+			// Equipment conflicts
+			if (requiredEquipment && existing.requiredEquipment) {
+				for (const item of requiredEquipment) {
+					if (existing.requiredEquipment.includes(item)) {
+						conflicts.push({
+							type: "equipment",
+							conflictingCaseId: existing.id,
+							conflictingProcedure: existing.procedureName,
+							conflictingOrSuite: existing.orSuite,
+							conflictingStart: existing.scheduledDatetime.toISOString(),
+							conflictingEnd: existingEnd.toISOString(),
+							equipmentItem: item,
+						})
+					}
+				}
+			}
+		}
+
+		return conflicts
+	}
+
 	async createCase(input: CreateCaseInput, session: UserSession) {
 		this.logger.log(`Creating surgical case for patient ${input.patientId}`)
 		void session
+
+		// Conflict detection when OR suite and scheduled datetime are provided
+		if (input.orSuite && input.scheduledDatetime) {
+			const scheduledDt = new Date(input.scheduledDatetime)
+			const duration = input.estimatedDurationMinutes ?? 120
+			const conflicts = await this.detectConflicts(
+				input.facilityId,
+				input.orSuite,
+				scheduledDt,
+				duration,
+				input.surgeonStaffId,
+				input.requiredEquipment,
+				undefined
+			)
+
+			if (conflicts.length > 0) {
+				const roomConflict = conflicts.find(c => c.type === "room")
+				const surgeonConflict = conflicts.find(c => c.type === "surgeon")
+				const equipConflict = conflicts.find(c => c.type === "equipment")
+
+				let message = "Scheduling conflict detected:"
+				if (roomConflict) message += ` OR room ${input.orSuite} is already booked.`
+				if (surgeonConflict) message += ` Surgeon has an overlapping case.`
+				if (equipConflict) message += ` Required equipment (${equipConflict.equipmentItem}) is already allocated.`
+
+				throw new ConflictException(message)
+			}
+		}
 
 		const [inserted] = await db
 			.insert(surgicalCases)
@@ -411,11 +549,54 @@ export class SurgicalService {
 				asaClass:
 					(input.asaClass as "ASA I" | "ASA II" | "ASA III" | "ASA IV" | "ASA V" | "ASA VI") ??
 					null,
+				estimatedDurationMinutes: input.estimatedDurationMinutes ?? 120,
+				requiredEquipment: input.requiredEquipment ?? null,
 				notes: input.notes ?? null,
 			})
 			.returning({ id: surgicalCases.id })
 
-		return this.getCase(inserted!.id)
+		const newCase = await this.getCase(inserted!.id)
+
+		// Notify surgeon and anesthesiologist
+		await this.notifyOrTeam(newCase)
+
+		return newCase
+	}
+
+	private async notifyOrTeam(surgicalCase: SurgicalCaseOutput) {
+		const recipients: Array<{ staffId: string; role: string }> = []
+
+		if (surgicalCase.surgeonStaffId) {
+			recipients.push({ staffId: surgicalCase.surgeonStaffId, role: "Surgeon" })
+		}
+		if (surgicalCase.anesthesiologistStaffId) {
+			recipients.push({ staffId: surgicalCase.anesthesiologistStaffId, role: "Anesthesiologist" })
+		}
+
+		const scheduledAt = surgicalCase.scheduledDatetime
+			? new Date(surgicalCase.scheduledDatetime).toLocaleString("en-PH", {
+					month: "short",
+					day: "numeric",
+					year: "numeric",
+					hour: "2-digit",
+					minute: "2-digit",
+				})
+			: "TBD"
+
+		for (const recipient of recipients) {
+			try {
+				await this.notificationService.send({
+					facilityId: surgicalCase.facilityId,
+					recipientStaffId: recipient.staffId,
+					topic: "surgical",
+					title: `OR Case Booked: ${surgicalCase.procedureName}`,
+					body: `You have been assigned as ${recipient.role} for ${surgicalCase.procedureName} on ${scheduledAt}${surgicalCase.orSuite ? ` in ${surgicalCase.orSuite}` : ""}.`,
+					data: { surgicalCaseId: surgicalCase.id },
+				})
+			} catch (err) {
+				this.logger.warn(`Failed to notify ${recipient.role} ${recipient.staffId}: ${err}`)
+			}
+		}
 	}
 
 	async updateCase(input: UpdateCaseInput) {
@@ -1207,6 +1388,23 @@ export class SurgicalService {
 	// ========================================================================
 	// OR Slots
 	// ========================================================================
+
+	async checkOrConflicts(input: OrConflictCheckInput): Promise<OrConflictCheckOutput> {
+		this.logger.debug(`Checking OR conflicts for facility ${input.facilityId}`)
+
+		const scheduledDt = new Date(input.scheduledDatetime)
+		const conflicts = await this.detectConflicts(
+			input.facilityId,
+			input.orSuite,
+			scheduledDt,
+			input.estimatedDurationMinutes,
+			input.surgeonStaffId,
+			input.requiredEquipment,
+			input.excludeCaseId
+		)
+
+		return { hasConflicts: conflicts.length > 0, conflicts }
+	}
 
 	async listOrSlots(input: OrSlotsInput) {
 		this.logger.debug(`Listing OR slots for facility ${input.facilityId}, week: ${input.weekStart}`)

@@ -197,9 +197,9 @@ function RequestForm({
 			<div className="grid grid-cols-2 gap-4">
 				<div className="space-y-2">
 					<Label>Record Type</Label>
-					<Select value={data.recordType} onValueChange={val => onChange({ recordType: val })}>
+					<Select value={data.recordType} onValueChange={val => { if (val) onChange({ recordType: val }) }}>
 						<SelectTrigger>
-							<SelectValue placeholder="Select record type" />
+							<SelectValue>{RECORD_TYPE_LABELS[data.recordType] ?? "Select record type"}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							{Object.entries(RECORD_TYPE_LABELS).map(([val, label]) => (
@@ -212,9 +212,9 @@ function RequestForm({
 				</div>
 				<div className="space-y-2">
 					<Label>Purpose</Label>
-					<Select value={data.purpose} onValueChange={val => onChange({ purpose: val })}>
+					<Select value={data.purpose} onValueChange={val => { if (val) onChange({ purpose: val }) }}>
 						<SelectTrigger>
-							<SelectValue placeholder="Select purpose" />
+							<SelectValue>{data.purpose || "Select purpose"}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="personal">Personal Use</SelectItem>
@@ -238,9 +238,9 @@ function RequestForm({
 				</div>
 				<div className="space-y-2">
 					<Label>Relationship to Patient</Label>
-					<Select value={data.relationship} onValueChange={val => onChange({ relationship: val })}>
+					<Select value={data.relationship} onValueChange={val => { if (val) onChange({ relationship: val }) }}>
 						<SelectTrigger>
-							<SelectValue placeholder="Select relationship" />
+							<SelectValue>{data.relationship || "Select relationship"}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="self">Self</SelectItem>
@@ -292,9 +292,9 @@ function PaymentForm({
 				</div>
 				<div className="space-y-2">
 					<Label>Payment Method</Label>
-					<Select value={data.method} onValueChange={val => onChange({ method: val })}>
+					<Select value={data.method} onValueChange={val => { if (val) onChange({ method: val }) }}>
 						<SelectTrigger>
-							<SelectValue placeholder="Select method" />
+							<SelectValue>{data.method || "Select method"}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="cash">Cash</SelectItem>

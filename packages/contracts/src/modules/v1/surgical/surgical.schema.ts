@@ -74,6 +74,8 @@ export const SurgicalCaseSchema = z.object({
 	status: SurgeryStatusEnum,
 	surgicalType: z.string(),
 	asaClass: AsaClassEnum.nullable(),
+	estimatedDurationMinutes: z.number().int().nullable(),
+	requiredEquipment: z.array(z.string()).nullable(),
 	notes: z.string().nullable(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
@@ -321,6 +323,8 @@ export const CreateSurgicalCaseSchema = z.object({
 	scheduledDatetime: z.string().optional(),
 	surgicalType: z.string().min(1),
 	asaClass: AsaClassEnum.optional(),
+	estimatedDurationMinutes: z.number().int().positive().optional().default(120),
+	requiredEquipment: z.array(z.string()).optional(),
 	notes: z.string().optional(),
 })
 
@@ -470,3 +474,36 @@ export const OrSlotsQuerySchema = z.object({
 	facilityId: z.string().uuid(),
 	weekStart: z.string(),
 })
+
+// ============================================================================
+// OR Conflict Check
+// ============================================================================
+
+export const OrConflictCheckSchema = z.object({
+	facilityId: z.string().uuid(),
+	orSuite: z.string(),
+	scheduledDatetime: z.string(),
+	estimatedDurationMinutes: z.number().int().positive(),
+	surgeonStaffId: z.string().uuid().optional(),
+	requiredEquipment: z.array(z.string()).optional(),
+	excludeCaseId: z.string().uuid().optional(),
+})
+
+export const OrConflictSchema = z.object({
+	type: z.enum(["room", "surgeon", "equipment"]),
+	conflictingCaseId: z.string().uuid(),
+	conflictingProcedure: z.string(),
+	conflictingOrSuite: z.string().nullable(),
+	conflictingStart: z.string(),
+	conflictingEnd: z.string(),
+	equipmentItem: z.string().optional(),
+})
+
+export const OrConflictCheckResponseSchema = z.object({
+	hasConflicts: z.boolean(),
+	conflicts: z.array(OrConflictSchema),
+})
+
+export type OrConflictCheck = z.infer<typeof OrConflictCheckSchema>
+export type OrConflict = z.infer<typeof OrConflictSchema>
+export type OrConflictCheckResponse = z.infer<typeof OrConflictCheckResponseSchema>

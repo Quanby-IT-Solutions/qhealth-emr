@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react"
+import { ChevronLeft, ChevronRight, Calendar, Plus } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 import { type OrSlot, useOrSlotsQuery } from "../api/surgical.hooks"
+import { OrCaseBookingDialog } from "./or-case-booking-dialog"
 
 // ─── Date helpers ──────────────────────────────────────────────────────────
 
@@ -75,6 +76,22 @@ function SlotCard({ slot }: SlotCardProps) {
 	)
 }
 
+// ─── Time slots shown in the calendar rows ──────────────────────────────────
+
+const TIME_SLOTS = [
+	"07:00",
+	"08:00",
+	"09:00",
+	"10:00",
+	"11:00",
+	"12:00",
+	"13:00",
+	"14:00",
+	"15:00",
+	"16:00",
+	"17:00",
+]
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export function SurgicalCalendar() {
@@ -82,9 +99,12 @@ export function SurgicalCalendar() {
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 
 	const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()))
+	const [bookingOpen, setBookingOpen] = useState(false)
+	const [bookingOrSuite, setBookingOrSuite] = useState("")
+	const [bookingDatetime, setBookingDatetime] = useState("")
 
 	const weekStartIso = toIsoDate(weekStart)
-	const { data: slots = [], isLoading } = useOrSlotsQuery(facilityId, weekStartIso)
+	const { data: slots = [], isLoading, refetch } = useOrSlotsQuery(facilityId, weekStartIso)
 
 	const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
@@ -93,15 +113,36 @@ export function SurgicalCalendar() {
 		return slots.filter((s) => s.date === dayStr && s.orSuite === suite)
 	}
 
+	function isSlotOccupied(day: Date, suite: string, timeSlot: string): OrSlot | undefined {
+		const dayStr = toIsoDate(day)
+		const slotHour = parseInt(timeSlot.split(":")[0]!)
+		return slots.find((s) => {
+			if (s.date !== dayStr || s.orSuite !== suite) return false
+			const startHour = parseInt(s.startTime.split(":")[0]!)
+			const endHour = parseInt(s.endTime.split(":")[0]!)
+			return slotHour >= startHour && slotHour < endHour
+		})
+	}
+
+	function openBooking(day: Date, suite: string, timeSlot: string) {
+		const dt = new Date(day)
+		const [h, m] = timeSlot.split(":").map(Number)
+		dt.setHours(h ?? 7, m ?? 0, 0, 0)
+		setBookingOrSuite(suite)
+		setBookingDatetime(dt.toISOString())
+		setBookingOpen(true)
+	}
+
 	const bookedCount = slots.filter((s) => !!s.surgicalCaseId).length
 
 	return (
+		<>
 		<div className="space-y-4 p-6">
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-2xl font-semibold">OR Schedule</h1>
 					<p className="text-muted-foreground text-sm">
-						Operating room slot management
+						Operating room slot management — click an empty cell to book a case
 					</p>
 				</div>
 				<div className="flex items-center gap-2">
@@ -154,57 +195,67 @@ export function SurgicalCalendar() {
 						<table className="w-full border-collapse text-sm">
 							<thead>
 								<tr>
-									<th className="border-b border-r bg-muted/50 px-3 py-2 text-left font-medium">
-										OR Suite
+									<th className="border-b border-r bg-muted/50 px-3 py-2 text-left font-medium w-16">
+										Time
 									</th>
-									{weekDays.map((day, i) => {
-										const isToday =
-											toIsoDate(day) === toIsoDate(new Date())
-										return (
-											<th
-												key={i}
-												className={`border-b px-3 py-2 text-center font-medium ${
-													isToday ? "bg-primary/10" : "bg-muted/50"
-												}`}
-											>
-												<div className="text-xs font-semibold">
-													{DAY_LABELS[day.getDay()]}
-												</div>
-												<div
-													className={`text-base ${isToday ? "text-primary font-bold" : ""}`}
-												>
-													{day.getDate()}
-												</div>
-											</th>
-										)
-									})}
+									{OR_SUITES.map((suite) => (
+										<th
+											key={suite}
+											className="border-b border-r bg-muted/50 px-3 py-2 text-center font-medium"
+										>
+											{suite}
+										</th>
+									))}
 								</tr>
 							</thead>
 							<tbody>
-								{OR_SUITES.map((suite) => (
-									<tr key={suite} className="border-b last:border-0">
-										<td className="border-r px-3 py-2 font-medium">{suite}</td>
-										{weekDays.map((day, di) => {
-											const daySlots = slotsByDayAndSuite(day, suite)
+								{TIME_SLOTS.map((timeSlot) => (
+									<tr key={timeSlot} className="border-b last:border-0">
+										<td className="border-r bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground w-16">
+											{timeSlot}
+										</td>
+										{OR_SUITES.map((suite) => {
+											const today = toIsoDate(new Date())
+											const todayOccupied = weekDays.map((day) => {
+												const occupied = isSlotOccupied(day, suite, timeSlot)
+												const isToday = toIsoDate(day) === today
+												return { day, occupied, isToday }
+											})
+
 											return (
 												<td
-													key={di}
-													className="min-w-[120px] px-2 py-2 align-top"
+													key={suite}
+													className="border-r p-0"
 												>
-													{daySlots.length === 0 ? (
-														<div className="text-muted-foreground py-1 text-center text-xs">
-															—
-														</div>
-													) : (
-														<div className="space-y-1">
-															{daySlots.map((slot) => (
-																<SlotCard
-																	key={slot.id}
-																	slot={slot}
-																/>
-															))}
-														</div>
-													)}
+													<div className="grid grid-cols-7">
+														{todayOccupied.map(({ day, occupied, isToday }, di) => (
+															<div
+																key={di}
+																className={`min-h-[40px] p-1 border-r last:border-r-0 ${isToday ? "bg-primary/5" : ""}`}
+															>
+																{occupied ? (
+																	<div className="bg-primary/10 border-primary/30 rounded border p-1 text-xs h-full">
+																		<p className="font-semibold text-primary truncate">
+																			{occupied.procedureName}
+																		</p>
+																		{occupied.surgeonName && (
+																			<p className="text-muted-foreground truncate">
+																				{occupied.surgeonName}
+																			</p>
+																		)}
+																	</div>
+																) : (
+																	<button
+																		onClick={() => openBooking(day, suite, timeSlot)}
+																		className="w-full h-full min-h-[38px] flex items-center justify-center rounded text-muted-foreground/40 hover:bg-primary/5 hover:text-primary/60 transition-colors"
+																		title={`Book case in ${suite} on ${toIsoDate(day)} at ${timeSlot}`}
+																	>
+																		<Plus className="size-3" />
+																	</button>
+																)}
+															</div>
+														))}
+													</div>
 												</td>
 											)
 										})}
@@ -216,5 +267,17 @@ export function SurgicalCalendar() {
 				</CardContent>
 			</Card>
 		</div>
+
+		{bookingOpen && facilityId && (
+			<OrCaseBookingDialog
+				open={bookingOpen}
+				onClose={() => setBookingOpen(false)}
+				onSuccess={() => void refetch()}
+				facilityId={facilityId}
+				orSuite={bookingOrSuite}
+				scheduledDatetime={bookingDatetime}
+			/>
+		)}
+		</>
 	)
 }
