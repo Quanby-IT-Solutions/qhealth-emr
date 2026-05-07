@@ -197,6 +197,9 @@ function StaffSelectField({
 	placeholder: string
 	value: string
 }) {
+	const selectedOption = options.find(option => option.staffProfileId === value)
+	const selectedLabel = selectedOption?.name ?? null
+
 	return (
 		<div className="space-y-1.5">
 			<Label>
@@ -205,7 +208,7 @@ function StaffSelectField({
 			<Select value={value} onValueChange={onValueChange}>
 				<SelectTrigger className="w-full">
 					<SelectValue>
-						{value ? null : <span className="text-muted-foreground">{placeholder}</span>}
+						{selectedLabel ?? <span className="text-muted-foreground">{placeholder}</span>}
 					</SelectValue>
 				</SelectTrigger>
 				<SelectContent>
