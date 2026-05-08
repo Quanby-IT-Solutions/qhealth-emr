@@ -69,6 +69,9 @@ export const env = createEnv({
 		TELEMEDICINE_API_KEY: z.string().optional(),
 		PIDSR_API_KEY: z.string().optional(),
 		CUSTOM_INTEGRATION_API_KEY: z.string().optional(),
+
+		// Scheduling
+		SCHEDULER_SLOT_WINDOW_DAYS: z.coerce.number().int().positive().default(60),
 	},
 	runtimeEnv: process.env,
 	skipValidation: !!process.env.CI || process.env.npm_lifecycle_event === "lint",

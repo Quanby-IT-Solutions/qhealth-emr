@@ -5,6 +5,7 @@ import { Calendar, ClipboardList, FileText, Pill, Video } from "lucide-react"
 
 import { Card, CardContent } from "@/core/components/ui/card"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { useAppointmentQuery } from "@/features/telemedicine/api/telemedicine.hooks"
 import { EPrescriptionCard } from "@/features/telemedicine/components/e-prescription-card"
 import { TeleAbstractPage } from "@/features/telemedicine/components/tele-abstract-page"
 import { TelemedicineEncounterForm } from "@/features/telemedicine/components/telemedicine-encounter-form"
@@ -61,17 +62,6 @@ const TABS: TabConfig[] = [
 	},
 ]
 
-// Placeholder profile data used for prescription generation
-const DEMO_CLINICIAN = {
-	name: "Dr. Maria Santos",
-	prcNumber: "0123456",
-}
-
-const DEMO_FACILITY = {
-	name: "QHealth Medical Center",
-	address: "123 Healthcare Ave., Manila, Philippines",
-}
-
 // ============================================================================
 // Main Dashboard
 // ============================================================================
@@ -82,15 +72,21 @@ export function TelemedicineDashboard() {
 	const [activeEncounterId, setActiveEncounterId] = useState<string | null>(null)
 
 	const { data: profile } = useMyProfile()
-	const facilityId = profile?.staffProfiles[0]?.facilityId ?? ""
+	const { data: appointment } = useAppointmentQuery(selectedAppointmentId ?? "")
 
-	// Demo patient info for prescription (in real app, would come from selected appointment)
-	const demoPatient = {
-		name: "Sample Patient",
-		mrn: "MRN-00001",
-		age: 35,
-		sex: "Male",
-	}
+	const staffProfile =
+		profile?.staffProfiles?.find(sp => sp.facilityId === (appointment?.facilityId ?? "")) ??
+		profile?.staffProfiles?.[0]
+
+	const facilityId = staffProfile?.facilityId ?? ""
+	const clinicianName = profile?.user?.name ?? ""
+	const clinicianPrcNumber = staffProfile?.prcLicenseNumber ?? ""
+	const clinicianPrcExpiry = staffProfile?.prcExpiry
+	const clinicianPtrExpiry = staffProfile?.ptrExpiry
+	const facilityName = staffProfile?.facility?.name ?? ""
+
+	const patientName = appointment?.patientName ?? ""
+	const patientMrn = appointment?.patientMrn ?? ""
 
 	function handleAppointmentCreated(appointmentId: string) {
 		setSelectedAppointmentId(appointmentId)
@@ -164,8 +160,8 @@ export function TelemedicineDashboard() {
 					{selectedAppointmentId ? (
 						<TelemedicineEncounterForm
 							appointmentId={selectedAppointmentId}
-							patientName={demoPatient.name}
-							clinicianName={DEMO_CLINICIAN.name}
+							patientName={patientName}
+							clinicianName={clinicianName}
 							onEncounterCreated={handleEncounterCreated}
 						/>
 					) : (
@@ -224,14 +220,13 @@ export function TelemedicineDashboard() {
 					{activeEncounterId ? (
 						<EPrescriptionCard
 							encounterId={activeEncounterId}
-							patientName={demoPatient.name}
-							patientMrn={demoPatient.mrn}
-							patientAge={demoPatient.age}
-							patientSex={demoPatient.sex}
-							clinicianName={DEMO_CLINICIAN.name}
-							clinicianPrcNumber={DEMO_CLINICIAN.prcNumber}
-							facilityName={DEMO_FACILITY.name}
-							facilityAddress={DEMO_FACILITY.address}
+							patientName={patientName}
+							patientMrn={patientMrn}
+							clinicianName={clinicianName}
+							clinicianPrcNumber={clinicianPrcNumber}
+							clinicianPrcExpiry={clinicianPrcExpiry}
+							clinicianPtrExpiry={clinicianPtrExpiry}
+							facilityName={facilityName}
 						/>
 					) : (
 						<Card>

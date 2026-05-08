@@ -5,6 +5,8 @@ import {
 	AnesthesiaRecordSchema,
 	CreateSurgicalCaseSchema,
 	OperationRecordSchema,
+	OrConflictCheckResponseSchema,
+	OrConflictCheckSchema,
 	OrSlotSchema,
 	OrSlotsQuerySchema,
 	PreOpChecklistSchema,
@@ -233,4 +235,18 @@ export const surgicalContract = {
 		})
 		.input(OrSlotsQuerySchema)
 		.output(z.array(OrSlotSchema)),
+
+	// ========================================================================
+	// OR Conflict Check
+	// ========================================================================
+
+	checkOrConflicts: oc
+		.route({
+			method: "POST",
+			path: "/or-conflicts/check",
+			summary: "Check for OR scheduling conflicts (room, surgeon, equipment)",
+			tags: ["Surgical"],
+		})
+		.input(OrConflictCheckSchema)
+		.output(OrConflictCheckResponseSchema),
 }

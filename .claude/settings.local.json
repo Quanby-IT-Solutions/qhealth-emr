@@ -182,7 +182,9 @@
       "Bash(Select-Object LineNumber, Line)",
       "Bash(Select-String \"surveillance|reporting|pidsr|ahsr|mm-report|mortality\")",
       "Bash(Sort-Object)",
-      "Bash(npx pnpm *)"
+      "Bash(npx pnpm *)",
+      "Bash(pnpm -F web tsc --noEmit)",
+      "Bash(pnpm -F @qhealth/web typecheck)"
     ]
   }
 }

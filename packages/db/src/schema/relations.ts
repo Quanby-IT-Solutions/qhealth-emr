@@ -65,7 +65,7 @@ import {
 } from "./orders.js"
 import { facilities, rolePermissions, roles, staffProfiles, userRoles } from "./rbac.js"
 import { ahsrSnapshots, fhirExports, pidsrCases, surveillanceFlags } from "./reporting.js"
-import { appointments, clinicTemplates } from "./scheduling.js"
+import { appointments, clinicSlots, clinicTemplates } from "./scheduling.js"
 import {
 	anesthesiaRecords,
 	operationRecords,
@@ -159,6 +159,7 @@ export const relations = defineRelations(
 		// Scheduling
 		clinicTemplates,
 		appointments,
+		clinicSlots,
 		// NBS
 		nbsLogEntries,
 		// Death Reporting
@@ -1226,6 +1227,7 @@ export const relations = defineRelations(
 				to: r.staffProfiles.id,
 			}),
 			appointments: r.many.appointments(),
+			slots: r.many.clinicSlots(),
 		},
 		appointments: {
 			facility: r.one.facilities({
@@ -1240,8 +1242,34 @@ export const relations = defineRelations(
 				from: r.appointments.clinicTemplateId,
 				to: r.clinicTemplates.id,
 			}),
+			clinicSlot: r.one.clinicSlots({
+				from: r.appointments.clinicSlotId,
+				to: r.clinicSlots.id,
+			}),
 			bookedByStaff: r.one.staffProfiles({
 				from: r.appointments.bookedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+		clinicSlots: {
+			clinicTemplate: r.one.clinicTemplates({
+				from: r.clinicSlots.clinicTemplateId,
+				to: r.clinicTemplates.id,
+			}),
+			facility: r.one.facilities({
+				from: r.clinicSlots.facilityId,
+				to: r.facilities.id,
+			}),
+			clinicianStaff: r.one.staffProfiles({
+				from: r.clinicSlots.clinicianStaffId,
+				to: r.staffProfiles.id,
+			}),
+			appointment: r.one.appointments({
+				from: r.clinicSlots.appointmentId,
+				to: r.appointments.id,
+			}),
+			blockedByStaff: r.one.staffProfiles({
+				from: r.clinicSlots.blockedByStaffId,
 				to: r.staffProfiles.id,
 			}),
 		},

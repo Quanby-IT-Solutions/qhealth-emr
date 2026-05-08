@@ -64,6 +64,19 @@ export default function SurgicalCaseDetailPage({
 	const canValidateRvs = can(permSet, "billing", "edit")
 	const canFinalizeRvs = can(permSet, "billing", "sign")
 
+	const roleName = (profile?.activeRole?.name ?? "").toLowerCase()
+	const isSurgeon = roleName === "surgeon"
+	const isAnesthesiologist = roleName === "anesthesiologist"
+
+	const defaultTab = isSurgeon ? "operation" : "anesthesia"
+	const showRvsTab = !isAnesthesiologist
+
+	const canEditPreOp = isAnesthesiologist ? false : canEditSurgical
+	const canEditOperation = isAnesthesiologist ? false : canEditSurgical
+	const canSignOperation = isAnesthesiologist ? false : canSignSurgical
+	const canEditAnesthesia = isSurgeon ? false : canEditSurgical
+	const canSignAnesthesia = isSurgeon ? false : canSignSurgical
+
 	const activeStaffProfile =
 		profile?.staffProfiles?.find((sp: { roles?: { id: string }[] }) =>
 			sp.roles?.some((role: { id: string }) => role.id === profile.activeRole?.id),
@@ -167,12 +180,12 @@ export default function SurgicalCaseDetailPage({
 			</div>
 
 			{/* Tabs */}
-			<Tabs defaultValue="anesthesia">
+			<Tabs defaultValue={defaultTab}>
 				<TabsList>
 					<TabsTrigger value="checklist">Pre-Op Checklist</TabsTrigger>
 					<TabsTrigger value="anesthesia">Anesthesia Record</TabsTrigger>
 					<TabsTrigger value="operation">Operation Record</TabsTrigger>
-					<TabsTrigger value="rvs">RVS Codes</TabsTrigger>
+					{showRvsTab && <TabsTrigger value="rvs">RVS Codes</TabsTrigger>}
 				</TabsList>
 
 				<TabsContent value="checklist" className="mt-6">
@@ -182,7 +195,7 @@ export default function SurgicalCaseDetailPage({
 						<PreOpChecklist
 							caseId={caseId}
 							existing={preOpChecklist}
-							canEdit={canEditSurgical}
+							canEdit={canEditPreOp}
 						/>
 					)}
 				</TabsContent>
@@ -194,8 +207,8 @@ export default function SurgicalCaseDetailPage({
 						<AnesthesiaRecordForm
 							caseId={caseId}
 							existing={anesthesiaRecord}
-							canEdit={canEditSurgical}
-							canSign={canSignSurgical}
+							canEdit={canEditAnesthesia}
+							canSign={canSignAnesthesia}
 						/>
 					)}
 				</TabsContent>
@@ -210,22 +223,24 @@ export default function SurgicalCaseDetailPage({
 							surgeonStaffId={surgicalCase.surgeonStaffId ?? staffId}
 							defaultAnesthesiologistStaffId={surgicalCase.anesthesiologistStaffId}
 							existing={opRecord}
-							canEdit={canEditSurgical}
-							canSign={canSignSurgical}
+							canEdit={canEditOperation}
+							canSign={canSignOperation}
 						/>
 					)}
 				</TabsContent>
 
-				<TabsContent value="rvs" className="mt-6">
-					<RvsCodeSelector
-						caseId={caseId}
-						operationRecord={opRecord}
-						canEdit={canEditSurgical}
-						canValidate={canValidateRvs}
-						canFinalize={canFinalizeRvs}
-						isOperationRecordSigned={isOperationRecordSigned}
-					/>
-				</TabsContent>
+				{showRvsTab && (
+					<TabsContent value="rvs" className="mt-6">
+						<RvsCodeSelector
+							caseId={caseId}
+							operationRecord={opRecord}
+							canEdit={canEditSurgical}
+							canValidate={canValidateRvs}
+							canFinalize={canFinalizeRvs}
+							isOperationRecordSigned={isOperationRecordSigned}
+						/>
+					</TabsContent>
+				)}
 			</Tabs>
 		</div>
 	)

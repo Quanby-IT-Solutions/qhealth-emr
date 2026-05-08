@@ -75,9 +75,26 @@ export interface SurgicalCase {
 	status: SurgeryStatus
 	surgicalType: string
 	asaClass: AsaClass | null
+	estimatedDurationMinutes: number | null
+	requiredEquipment: string[] | null
 	notes: string | null
 	createdAt: string
 	updatedAt: string
+}
+
+export interface OrConflict {
+	type: "room" | "surgeon" | "equipment"
+	conflictingCaseId: string
+	conflictingProcedure: string
+	conflictingOrSuite: string | null
+	conflictingStart: string
+	conflictingEnd: string
+	equipmentItem?: string
+}
+
+export interface OrConflictCheckResponse {
+	hasConflicts: boolean
+	conflicts: OrConflict[]
 }
 
 export interface OperationRecord {
@@ -308,6 +325,8 @@ interface CreateSurgicalCaseData {
 	scheduledDatetime?: string
 	surgicalType: string
 	asaClass?: AsaClass
+	estimatedDurationMinutes?: number
+	requiredEquipment?: string[]
 	notes?: string
 }
 
@@ -596,5 +615,29 @@ export function useOrSlotsQuery(facilityId: string, weekStart: string) {
 		queryFn: () =>
 			fetchJson<OrSlot[]>(`${API_BASE}/or-slots${buildQueryString({ facilityId, weekStart })}`),
 		enabled: !!facilityId,
+	})
+}
+
+// ============================================================================
+// OR Conflict Check
+// ============================================================================
+
+interface CheckOrConflictsData {
+	facilityId: string
+	orSuite: string
+	scheduledDatetime: string
+	estimatedDurationMinutes: number
+	surgeonStaffId?: string
+	requiredEquipment?: string[]
+	excludeCaseId?: string
+}
+
+export function useCheckOrConflictsMutation() {
+	return useMutation({
+		mutationFn: (data: CheckOrConflictsData) =>
+			fetchJson<OrConflictCheckResponse>(`${API_BASE}/or-conflicts/check`, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
 	})
 }

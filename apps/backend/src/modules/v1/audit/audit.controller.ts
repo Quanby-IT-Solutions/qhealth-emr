@@ -80,6 +80,22 @@ export class AuditController {
 		})
 	}
 
+	@RequirePermission("audit", "create")
+	@Implement(v1.audit.breakGlass.myActive)
+	async getMyActiveBreakGlass(
+		@Session()
+		session: UserSession
+	) {
+		return implement(v1.audit.breakGlass.myActive).handler(async ({ input }) => {
+			const clinicianStaffId = await this.auditService.resolveStaffProfileId(session.user.id)
+			return this.auditService.findMyActiveBreakGlassEvent({
+				facilityId: input.facilityId,
+				patientId: input.patientId,
+				clinicianStaffId,
+			})
+		})
+	}
+
 	@RequirePermission("audit", "view")
 	@Implement(v1.audit.breakGlass.patterns)
 	async getBreakGlassPatterns() {

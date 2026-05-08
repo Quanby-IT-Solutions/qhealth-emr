@@ -124,9 +124,85 @@ export function ProblemsAllergiesTab({
 		})
 	}
 
+	function renderProblemActions(problem: Problem, compact = false) {
+		if (!canWrite) return null
+
+		return (
+			<div className={compact ? "grid grid-cols-2 gap-2" : "flex flex-wrap justify-end gap-2"}>
+				<Button
+					size="sm"
+					variant="outline"
+					className={compact ? "justify-center" : ""}
+					onClick={() => setEditingProblem(problem)}
+				>
+					<Pencil className="size-4" />
+					Edit
+				</Button>
+				{problem.status === "active" ? (
+					<Button
+						size="sm"
+						variant="outline"
+						className={compact ? "justify-center" : ""}
+						onClick={() => setResolveProblemId(problem.id)}
+					>
+						<CheckCircle2 className="size-4" />
+						Resolve
+					</Button>
+				) : (
+					<Button
+						size="sm"
+						variant="outline"
+						className={compact ? "justify-center" : ""}
+						onClick={() => reactivateProblem(problem)}
+						disabled={updateProblem.isPending}
+					>
+						<RotateCcw className="size-4" />
+						Reactivate
+					</Button>
+				)}
+				<Button
+					size="sm"
+					variant="outline"
+					className={compact ? "col-span-2 justify-center" : ""}
+					onClick={() => setProblemToDelete(problem)}
+				>
+					<Trash2 className="size-4" />
+					Delete
+				</Button>
+			</div>
+		)
+	}
+
+	function renderAllergyActions(allergy: Allergy, compact = false) {
+		if (!canWrite) return null
+
+		return (
+			<div className={compact ? "grid grid-cols-2 gap-2" : "flex flex-wrap justify-end gap-2"}>
+				<Button
+					size="sm"
+					variant="outline"
+					className={compact ? "justify-center" : ""}
+					onClick={() => setEditingAllergy(allergy)}
+				>
+					<Pencil className="size-4" />
+					Edit
+				</Button>
+				<Button
+					size="sm"
+					variant="outline"
+					className={compact ? "justify-center" : ""}
+					onClick={() => setAllergyToDeactivate(allergy)}
+				>
+					<Ban className="size-4" />
+					Deactivate
+				</Button>
+			</div>
+		)
+	}
+
 	return (
-		<div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
-			<Card>
+		<div className="grid min-w-0 gap-6 2xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+			<Card className="min-w-0 overflow-hidden">
 				<CardHeader className="gap-4">
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 						<div>
@@ -152,103 +228,121 @@ export function ProblemsAllergiesTab({
 						</TabsList>
 					</Tabs>
 				</CardHeader>
-				<CardContent className="p-0">
+				<CardContent className="px-3 pb-3 sm:px-4 sm:pb-4">
 					{problemsLoading ? (
 						<div className="text-muted-foreground py-8 text-center text-sm">
 							Loading problems...
 						</div>
 					) : problemsData?.data.length ? (
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>Problem</TableHead>
-									<TableHead>Codes</TableHead>
-									<TableHead>Onset</TableHead>
-									<TableHead>Status</TableHead>
-									<TableHead>Documented By</TableHead>
-									<TableHead className="text-right">Actions</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
+						<>
+							<div className="divide-y rounded-md border md:hidden">
 								{problemsData.data.map(problem => (
-									<TableRow key={problem.id}>
-										<TableCell className="min-w-56 font-medium">
-											<div>{problem.description}</div>
-											{problem.resolutionDate && (
-												<div className="text-muted-foreground mt-1 text-xs">
-													Resolved {formatDate(problem.resolutionDate)}
-												</div>
-											)}
-										</TableCell>
-										<TableCell className="min-w-40 space-y-1 text-xs">
-											{problem.icd10Code && (
-												<div title={problem.icd10Display ?? undefined}>
-													<span className="font-mono font-medium">{problem.icd10Code}</span>
-													<span className="text-muted-foreground"> ICD-10</span>
-												</div>
-											)}
-											{problem.snomedCode && (
-												<div title={problem.snomedDisplay ?? undefined}>
-													<span className="font-mono font-medium">{problem.snomedCode}</span>
-													<span className="text-muted-foreground"> SNOMED</span>
-												</div>
-											)}
-										</TableCell>
-										<TableCell>{formatDate(problem.onsetDate)}</TableCell>
-										<TableCell>
+									<div key={problem.id} className="space-y-3 p-4">
+										<div className="flex min-w-0 items-start justify-between gap-3">
+											<div className="min-w-0">
+												<p className="font-medium break-words">{problem.description}</p>
+												<p className="text-muted-foreground mt-1 text-xs">
+													Onset {formatDate(problem.onsetDate)}
+												</p>
+											</div>
 											<Badge variant={problem.status === "active" ? "default" : "secondary"}>
 												{problem.status}
 											</Badge>
-										</TableCell>
-										<TableCell className="text-muted-foreground text-sm">
-											{problem.documentingStaffName ?? "-"}
-										</TableCell>
-										<TableCell>
-											{canWrite && (
-												<div className="flex justify-end gap-2">
-													<Button
-														size="sm"
-														variant="outline"
-														onClick={() => setEditingProblem(problem)}
-													>
-														<Pencil className="size-4" />
-														Edit
-													</Button>
-													{problem.status === "active" ? (
-														<Button
-															size="sm"
-															variant="outline"
-															onClick={() => setResolveProblemId(problem.id)}
-														>
-															<CheckCircle2 className="size-4" />
-															Resolve
-														</Button>
+										</div>
+										<div className="grid gap-3 text-sm sm:grid-cols-2">
+											<div className="min-w-0">
+												<p className="text-muted-foreground text-xs">Codes</p>
+												<div className="space-y-1 text-xs break-words">
+													{problem.icd10Code || problem.snomedCode ? (
+														<>
+															{problem.icd10Code && (
+																<div title={problem.icd10Display ?? undefined}>
+																	<span className="font-mono font-medium">{problem.icd10Code}</span>
+																	<span className="text-muted-foreground"> ICD-10</span>
+																</div>
+															)}
+															{problem.snomedCode && (
+																<div title={problem.snomedDisplay ?? undefined}>
+																	<span className="font-mono font-medium">
+																		{problem.snomedCode}
+																	</span>
+																	<span className="text-muted-foreground"> SNOMED</span>
+																</div>
+															)}
+														</>
 													) : (
-														<Button
-															size="sm"
-															variant="outline"
-															onClick={() => reactivateProblem(problem)}
-															disabled={updateProblem.isPending}
-														>
-															<RotateCcw className="size-4" />
-															Reactivate
-														</Button>
+														"-"
 													)}
-													<Button
-														size="sm"
-														variant="outline"
-														onClick={() => setProblemToDelete(problem)}
-													>
-														<Trash2 className="size-4" />
-														Delete
-													</Button>
 												</div>
-											)}
-										</TableCell>
-									</TableRow>
+											</div>
+											<div className="min-w-0">
+												<p className="text-muted-foreground text-xs">Documented By</p>
+												<p className="break-words">{problem.documentingStaffName ?? "-"}</p>
+											</div>
+										</div>
+										{problem.resolutionDate && (
+											<p className="text-muted-foreground text-xs">
+												Resolved {formatDate(problem.resolutionDate)}
+											</p>
+										)}
+										{renderProblemActions(problem, true)}
+									</div>
 								))}
-							</TableBody>
-						</Table>
+							</div>
+
+							<div className="hidden rounded-md border md:block">
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>Problem</TableHead>
+											<TableHead>Codes</TableHead>
+											<TableHead>Onset</TableHead>
+											<TableHead>Status</TableHead>
+											<TableHead>Documented By</TableHead>
+											<TableHead className="text-right">Actions</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{problemsData.data.map(problem => (
+											<TableRow key={problem.id}>
+												<TableCell className="max-w-80 min-w-56 font-medium whitespace-normal">
+													<div className="break-words">{problem.description}</div>
+													{problem.resolutionDate && (
+														<div className="text-muted-foreground mt-1 text-xs">
+															Resolved {formatDate(problem.resolutionDate)}
+														</div>
+													)}
+												</TableCell>
+												<TableCell className="min-w-40 space-y-1 text-xs whitespace-normal">
+													{problem.icd10Code && (
+														<div className="break-words" title={problem.icd10Display ?? undefined}>
+															<span className="font-mono font-medium">{problem.icd10Code}</span>
+															<span className="text-muted-foreground"> ICD-10</span>
+														</div>
+													)}
+													{problem.snomedCode && (
+														<div className="break-words" title={problem.snomedDisplay ?? undefined}>
+															<span className="font-mono font-medium">{problem.snomedCode}</span>
+															<span className="text-muted-foreground"> SNOMED</span>
+														</div>
+													)}
+												</TableCell>
+												<TableCell>{formatDate(problem.onsetDate)}</TableCell>
+												<TableCell>
+													<Badge variant={problem.status === "active" ? "default" : "secondary"}>
+														{problem.status}
+													</Badge>
+												</TableCell>
+												<TableCell className="text-muted-foreground max-w-48 text-sm whitespace-normal">
+													<span className="break-words">{problem.documentingStaffName ?? "-"}</span>
+												</TableCell>
+												<TableCell className="min-w-48">{renderProblemActions(problem)}</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+							</div>
+						</>
 					) : (
 						<div className="text-muted-foreground py-8 text-center text-sm">
 							No {problemStatusFilter} problems recorded.
@@ -257,7 +351,7 @@ export function ProblemsAllergiesTab({
 				</CardContent>
 			</Card>
 
-			<Card>
+			<Card className="min-w-0 overflow-hidden">
 				<CardHeader className="gap-4">
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 						<div>
@@ -288,61 +382,72 @@ export function ProblemsAllergiesTab({
 						</SelectContent>
 					</Select>
 				</CardHeader>
-				<CardContent className="p-0">
+				<CardContent className="px-3 pb-3 sm:px-4 sm:pb-4">
 					{allergiesLoading ? (
 						<div className="text-muted-foreground py-8 text-center text-sm">
 							Loading allergies...
 						</div>
 					) : allergiesData?.data.length ? (
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>Allergen</TableHead>
-									<TableHead>Type</TableHead>
-									<TableHead>Reaction</TableHead>
-									<TableHead>Severity</TableHead>
-									<TableHead>Onset</TableHead>
-									<TableHead className="text-right">Actions</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
+						<>
+							<div className="divide-y rounded-md border md:hidden">
 								{allergiesData.data.map(allergy => (
-									<TableRow key={allergy.id}>
-										<TableCell className="font-medium">{allergy.allergenName}</TableCell>
-										<TableCell className="text-sm">
-											{allergenTypeLabel(allergy.allergenType)}
-										</TableCell>
-										<TableCell className="text-sm">{allergy.reactionType ?? "-"}</TableCell>
-										<TableCell>
+									<div key={allergy.id} className="space-y-3 p-4">
+										<div className="flex min-w-0 items-start justify-between gap-3">
+											<div className="min-w-0">
+												<p className="font-medium break-words">{allergy.allergenName}</p>
+												<p className="text-muted-foreground mt-1 text-xs">
+													{allergenTypeLabel(allergy.allergenType)} · Onset{" "}
+													{formatDate(allergy.onsetDate)}
+												</p>
+											</div>
 											<Badge variant={severityVariant(allergy.severity)}>{allergy.severity}</Badge>
-										</TableCell>
-										<TableCell>{formatDate(allergy.onsetDate)}</TableCell>
-										<TableCell>
-											{canWrite && (
-												<div className="flex justify-end gap-2">
-													<Button
-														size="sm"
-														variant="outline"
-														onClick={() => setEditingAllergy(allergy)}
-													>
-														<Pencil className="size-4" />
-														Edit
-													</Button>
-													<Button
-														size="sm"
-														variant="outline"
-														onClick={() => setAllergyToDeactivate(allergy)}
-													>
-														<Ban className="size-4" />
-														Deactivate
-													</Button>
-												</div>
-											)}
-										</TableCell>
-									</TableRow>
+										</div>
+										<div className="min-w-0 text-sm">
+											<p className="text-muted-foreground text-xs">Reaction</p>
+											<p className="break-words">{allergy.reactionType ?? "-"}</p>
+										</div>
+										{renderAllergyActions(allergy, true)}
+									</div>
 								))}
-							</TableBody>
-						</Table>
+							</div>
+
+							<div className="hidden rounded-md border md:block">
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>Allergen</TableHead>
+											<TableHead>Type</TableHead>
+											<TableHead>Reaction</TableHead>
+											<TableHead>Severity</TableHead>
+											<TableHead>Onset</TableHead>
+											<TableHead className="text-right">Actions</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{allergiesData.data.map(allergy => (
+											<TableRow key={allergy.id}>
+												<TableCell className="max-w-48 font-medium whitespace-normal">
+													<span className="break-words">{allergy.allergenName}</span>
+												</TableCell>
+												<TableCell className="text-sm whitespace-normal">
+													{allergenTypeLabel(allergy.allergenType)}
+												</TableCell>
+												<TableCell className="max-w-48 text-sm whitespace-normal">
+													<span className="break-words">{allergy.reactionType ?? "-"}</span>
+												</TableCell>
+												<TableCell>
+													<Badge variant={severityVariant(allergy.severity)}>
+														{allergy.severity}
+													</Badge>
+												</TableCell>
+												<TableCell>{formatDate(allergy.onsetDate)}</TableCell>
+												<TableCell className="min-w-40">{renderAllergyActions(allergy)}</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+							</div>
+						</>
 					) : (
 						<div className="text-muted-foreground py-8 text-center text-sm">
 							No active allergies documented.

@@ -44,6 +44,8 @@ export const surgicalCases = createTable(
 		asaClass: t
 			.text("asa_class")
 			.$type<"ASA I" | "ASA II" | "ASA III" | "ASA IV" | "ASA V" | "ASA VI">(),
+		estimatedDurationMinutes: t.integer("estimated_duration_minutes").default(120),
+		requiredEquipment: t.jsonb("required_equipment").$type<string[]>(),
 		notes: t.text("notes"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),

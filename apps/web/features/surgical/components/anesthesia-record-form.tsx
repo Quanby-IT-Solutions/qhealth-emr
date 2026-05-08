@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CheckCircle2, Plus, Save, Trash2 } from "lucide-react"
+import { CheckCircle2, Info, Monitor, Plus, Save, Trash2 } from "lucide-react"
 
 import {
 	AlertDialog,
@@ -36,6 +36,7 @@ import {
 	TableRow,
 } from "@/core/components/ui/table"
 import { Textarea } from "@/core/components/ui/textarea"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
 
 import {
 	useSaveAnesthesiaRecordMutation,
@@ -130,10 +131,10 @@ function mapMedicationsToLegacyAgents(medications: IntraopMedication[]): Anesthe
 
 function buildInitialState(existing: AnesthesiaRecord | null | undefined): FormState {
 	return {
-		asaClass: existing?.asaClass,
-		anesthesiaType: existing?.anesthesiaType,
-		airwayType: existing?.airwayType,
-		intubationGrade: existing?.intubationGrade,
+		asaClass: existing?.asaClass ?? undefined,
+		anesthesiaType: existing?.anesthesiaType ?? undefined,
+		airwayType: existing?.airwayType ?? undefined,
+		intubationGrade: existing?.intubationGrade ?? undefined,
 		difficultAirway: existing?.difficultAirway ?? false,
 		airwayManagement: existing?.airwayManagement ?? "",
 		intubationAttempts: existing?.intubationAttempts?.toString() ?? "",
@@ -145,7 +146,7 @@ function buildInitialState(existing: AnesthesiaRecord | null | undefined): FormS
 		intraopVitals: existing?.intraopVitals ?? [],
 		reversalAgent: existing?.reversalAgent ?? "",
 		totalAnesthesiaMinutes: existing?.totalAnesthesiaMinutes?.toString() ?? "",
-		emergenceSmooth: existing?.emergenceSmooth,
+		emergenceSmooth: existing?.emergenceSmooth ?? undefined,
 		complications: existing?.complications ?? "",
 		postAnesthesiaCareNotes: existing?.postAnesthesiaCareNotes ?? "",
 	}
@@ -352,6 +353,26 @@ export function AnesthesiaRecordForm({
 
 	return (
 		<div className="space-y-6">
+			{!canEdit && !canSign && (
+				<div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+					<Info className="mt-0.5 size-4 shrink-0" />
+					<p>You have view-only access to this record. The Anesthesia Record is authored and signed by the assigned anesthesiologist.</p>
+				</div>
+			)}
+			{/* AC3: Compliance notice — bedside monitor auto-capture not available */}
+			<div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+				<Info className="mt-0.5 size-4 shrink-0" />
+				<div>
+					<p className="font-medium">Bedside Monitor Auto-Capture Not Available</p>
+					<p className="mt-0.5 text-blue-700 dark:text-blue-400">
+						Automatic vital signs capture from bedside monitors is not enabled in this
+						environment. All intraoperative vitals must be entered manually using the
+						flowsheet below. Monitor integration is planned for a future release.
+						This note serves as a compliance record confirming manual-entry mode is in use.
+					</p>
+				</div>
+			</div>
+
 			{/* Signed banner */}
 			{isSigned && (
 				<div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-800">
@@ -383,7 +404,9 @@ export function AnesthesiaRecordForm({
 							disabled={fieldsDisabled}
 						>
 							<SelectTrigger>
-								<SelectValue placeholder="Select type…" />
+								<SelectValue>
+									{ANESTHESIA_TYPE_OPTIONS.find(o => o.value === form.anesthesiaType)?.label ?? "Select type…"}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								{ANESTHESIA_TYPE_OPTIONS.map(opt => (
@@ -402,7 +425,9 @@ export function AnesthesiaRecordForm({
 							disabled={fieldsDisabled}
 						>
 							<SelectTrigger>
-								<SelectValue placeholder="Select class…" />
+								<SelectValue>
+									{form.asaClass ?? "Select class…"}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								{ASA_OPTIONS.map(cls => (
@@ -438,7 +463,9 @@ export function AnesthesiaRecordForm({
 								disabled={fieldsDisabled}
 							>
 								<SelectTrigger>
-									<SelectValue placeholder="Select device…" />
+									<SelectValue>
+									{AIRWAY_OPTIONS.find(o => o.value === form.airwayType)?.label ?? "Select device…"}
+								</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
 									{AIRWAY_OPTIONS.map(opt => (
@@ -457,7 +484,9 @@ export function AnesthesiaRecordForm({
 								disabled={fieldsDisabled}
 							>
 								<SelectTrigger>
-									<SelectValue placeholder="Select grade…" />
+									<SelectValue>
+									{INTUBATION_GRADE_OPTIONS.find(o => o.value === form.intubationGrade)?.label ?? "Select grade…"}
+								</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
 									{INTUBATION_GRADE_OPTIONS.map(opt => (
@@ -810,11 +839,40 @@ export function AnesthesiaRecordForm({
 			{/* Intraop Vitals */}
 			<Card>
 				<CardHeader className="flex flex-row items-center justify-between">
-					<CardTitle className="text-base">Intraoperative Vitals Flowsheet</CardTitle>
-					<Button variant="outline" size="sm" onClick={addVital} disabled={fieldsDisabled}>
-						<Plus className="mr-1.5 size-3.5" />
-						Add Entry
-					</Button>
+					<div className="flex items-center gap-2">
+						<CardTitle className="text-base">Intraoperative Vitals Flowsheet</CardTitle>
+						<Badge variant="secondary" className="text-xs font-normal">
+							Manual Entry Only
+						</Badge>
+					</div>
+					<div className="flex items-center gap-2">
+						<Tooltip>
+							<TooltipTrigger>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled
+									className="pointer-events-none"
+									tabIndex={-1}
+								>
+									<Monitor className="mr-1.5 size-3.5" />
+									Connect Monitor
+								</Button>
+							</TooltipTrigger>
+							<TooltipContent side="bottom">
+								Bedside monitor integration is not yet available in this environment
+							</TooltipContent>
+						</Tooltip>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={addVital}
+							disabled={fieldsDisabled}
+						>
+							<Plus className="mr-1.5 size-3.5" />
+							Add Entry
+						</Button>
+					</div>
 				</CardHeader>
 				<CardContent className="p-0">
 					{form.intraopVitals.length === 0 ? (
@@ -984,32 +1042,36 @@ export function AnesthesiaRecordForm({
 				</CardContent>
 			</Card>
 
-			<Separator />
+			{(canEdit || canSign) && (
+				<>
+					<Separator />
 
-			<div className="flex justify-end gap-3">
-				{!isSigned && (
-					<Button
-						onClick={() => {
-							void handleSave()
-						}}
-						disabled={save.isPending || !canEdit || isSigned}
-						variant="outline"
-					>
-						<Save className="mr-2 size-4" />
-						{save.isPending ? "Saving…" : "Save Draft"}
-					</Button>
-				)}
-				{canSign && !isSigned && (
-					<Button
-						className="bg-green-700 hover:bg-green-800"
-						onClick={handleSign}
-						disabled={sign.isPending || save.isPending || (!existing && !canEdit)}
-					>
-						<CheckCircle2 className="mr-2 size-4" />
-						{sign.isPending ? "Signing…" : "Sign Anesthesia Record"}
-					</Button>
-				)}
-			</div>
+					<div className="flex justify-end gap-3">
+						{!isSigned && (
+							<Button
+								onClick={() => {
+									void handleSave()
+								}}
+								disabled={save.isPending || !canEdit || isSigned}
+								variant="outline"
+							>
+								<Save className="mr-2 size-4" />
+								{save.isPending ? "Saving…" : "Save Draft"}
+							</Button>
+						)}
+						{canSign && !isSigned && (
+							<Button
+								className="bg-green-700 hover:bg-green-800"
+								onClick={handleSign}
+								disabled={sign.isPending || save.isPending || (!existing && !canEdit)}
+							>
+								<CheckCircle2 className="mr-2 size-4" />
+								{sign.isPending ? "Signing…" : "Sign Anesthesia Record"}
+							</Button>
+						)}
+					</div>
+				</>
+			)}
 
 			<AlertDialog open={showSignConfirm} onOpenChange={setShowSignConfirm}>
 				<AlertDialogContent>

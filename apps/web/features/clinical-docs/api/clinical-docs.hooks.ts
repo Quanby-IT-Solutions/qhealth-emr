@@ -69,7 +69,7 @@ interface NoteTemplateListResponse {
 	totalPages: number
 }
 
-interface Addendum {
+export interface Addendum {
 	id: string
 	noteId: string
 	content: string
@@ -437,6 +437,10 @@ export function useCreateAddendumMutation() {
 			})
 		},
 	})
+}
+
+export function useAddAddendumMutation() {
+	return useCreateAddendumMutation()
 }
 
 export function useSignAddendumMutation() {

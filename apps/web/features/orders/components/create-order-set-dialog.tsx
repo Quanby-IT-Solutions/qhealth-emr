@@ -115,7 +115,7 @@ export function CreateOrderSetDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={handleOpenChange}>
-			<DialogContent className="max-w-2xl">
+			<DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl lg:max-w-4xl">
 				<DialogHeader>
 					<DialogTitle>Create Order Set</DialogTitle>
 					<DialogDescription>
@@ -123,7 +123,7 @@ export function CreateOrderSetDialog({
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="grid gap-5 py-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+				<div className="grid gap-5 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
 					<div className="space-y-3">
 						<p className="text-sm font-medium">Available Order Sets</p>
 						<RadioGroup
@@ -170,10 +170,10 @@ export function CreateOrderSetDialog({
 							{selectedSet?.orders.map((order, index) => (
 								<div
 									key={`${selectedSet.id}-${index}`}
-									className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+									className="flex flex-col gap-2 rounded-lg border px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
 								>
 									<div className="flex min-w-0 items-center gap-2">
-										<Badge variant={order.type === "lab" ? "secondary" : "outline"}>
+										<Badge variant={order.type === "lab" ? "secondary" : "outline"} className="shrink-0">
 											{order.type === "lab" ? "Lab" : "Imaging"}
 										</Badge>
 										<div className="min-w-0">
@@ -185,7 +185,10 @@ export function CreateOrderSetDialog({
 											) : null}
 										</div>
 									</div>
-									<Badge variant={order.payload.priority === "stat" ? "destructive" : "outline"}>
+									<Badge
+										variant={order.payload.priority === "stat" ? "destructive" : "outline"}
+										className="w-fit shrink-0"
+									>
 										{order.payload.priority ?? "routine"}
 									</Badge>
 								</div>

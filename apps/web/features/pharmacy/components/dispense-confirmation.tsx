@@ -4,6 +4,8 @@ import { useState } from "react"
 
 import { CheckCircle2, Loader2 } from "lucide-react"
 
+import { toast } from "sonner"
+
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
@@ -16,6 +18,7 @@ import { Textarea } from "@/core/components/ui/textarea"
 import {
 	type PharmacyOrderDetail,
 	useDispenseOrderMutation,
+	useVerifyPharmacyOrderMutation,
 } from "../api/pharmacy.hooks"
 
 // ── Patient education checklist ───────────────────────────────────────────────
@@ -41,15 +44,18 @@ const CS_EDUCATION_ITEMS: Array<{ key: string; label: string }> = [
 
 interface DispenseConfirmationProps {
 	order: PharmacyOrderDetail
+	overrideNotes?: string
 	onSuccess: () => void
 	onCancel: () => void
 }
 
 export function DispenseConfirmation({
 	order,
+	overrideNotes,
 	onSuccess,
 	onCancel,
 }: DispenseConfirmationProps) {
+	const verify = useVerifyPharmacyOrderMutation()
 	const dispense = useDispenseOrderMutation()
 
 	const [quantity, setQuantity] = useState<string>("")
@@ -77,19 +83,45 @@ export function DispenseConfirmation({
 	}
 
 	function handleSubmit() {
-		dispense.mutate(
+		verify.mutate(
 			{
 				medicationOrderId: order.id,
-				dispensedQuantity: Number(quantity),
-				quantityUnit,
-				lotNumber: lotNumber || undefined,
-				expiryDate: expiryDate || undefined,
-				counselingNotes: counselingNotes || undefined,
-				patientEducation: Array.from(education),
+				action: "approved",
+				overrideNotes: overrideNotes || undefined,
 			},
-			{ onSuccess }
+			{
+				onSuccess: () => {
+					dispense.mutate(
+						{
+							medicationOrderId: order.id,
+							dispensedQuantity: Number(quantity),
+							quantityUnit,
+							lotNumber: lotNumber || undefined,
+							expiryDate: expiryDate || undefined,
+							counselingNotes: counselingNotes || undefined,
+							patientEducation: Array.from(education),
+						},
+						{
+							onSuccess: () => {
+								toast.success("Order approved and dispensed")
+								onSuccess()
+							},
+							onError: (err) =>
+								toast.error(
+									err instanceof Error ? err.message : "Dispense failed"
+								),
+						}
+					)
+				},
+				onError: (err) =>
+					toast.error(
+						err instanceof Error ? err.message : "Failed to approve order"
+					),
+			}
 		)
 	}
+
+	const isBusy = verify.isPending || dispense.isPending
 
 	const isValid = quantity.trim() !== "" && Number(quantity) > 0
 
@@ -264,16 +296,16 @@ export function DispenseConfirmation({
 			<div className="flex items-center gap-3">
 				<Button
 					onClick={handleSubmit}
-					disabled={!isValid || dispense.isPending}
+					disabled={!isValid || isBusy}
 				>
-					{dispense.isPending ? (
+					{isBusy ? (
 						<Loader2 className="mr-1.5 size-4 animate-spin" />
 					) : (
 						<CheckCircle2 className="mr-1.5 size-4" />
 					)}
-					Confirm Dispense
+					{verify.isPending ? "Approving…" : dispense.isPending ? "Dispensing…" : "Approve & Dispense"}
 				</Button>
-				<Button variant="outline" onClick={onCancel} disabled={dispense.isPending}>
+				<Button variant="outline" onClick={onCancel} disabled={isBusy}>
 					Cancel
 				</Button>
 			</div>

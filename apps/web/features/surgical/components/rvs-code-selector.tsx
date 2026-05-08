@@ -280,7 +280,7 @@ function SearchPanel({
 						onValueChange={value => onAssignmentTypeChange(value as RvsAssignmentType)}
 					>
 						<SelectTrigger>
-							<SelectValue placeholder="Select type" />
+							<SelectValue>{assignmentType || "Select type"}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="primary">Primary</SelectItem>

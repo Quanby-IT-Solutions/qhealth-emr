@@ -115,6 +115,7 @@ export const notifications = createTable(
 				| "ed_queue"
 				| "sla_warning"
 				| "sla_exceeded"
+				| "surgical"
 			>(),
 		title: t.text("title").notNull(),
 		body: t.text("body").notNull(),
