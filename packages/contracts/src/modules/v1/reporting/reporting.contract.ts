@@ -8,8 +8,12 @@ import {
 	AhsrRealTimeMetricsSchema,
 	AhsrRealTimeQuerySchema,
 	AutoDetectionResultSchema,
+	DismissPidsrCaseInputSchema,
+	DismissPidsrCaseResponseSchema,
 	ExportAhsrInputSchema,
 	ExportAhsrResponseSchema,
+	ExportMmPdfInputSchema,
+	ExportMmPdfResponseSchema,
 	GenerateWeeklyReportInputSchema,
 	GetPidsrCaseInputSchema,
 	ListDetectionRulesQuerySchema,
@@ -18,6 +22,12 @@ import {
 	ListPidsrCasesResponseSchema,
 	ListSurveillanceFlagsInputSchema,
 	ListSurveillanceFlagsResponseSchema,
+	LockAhsrPeriodInputSchema,
+	LockAhsrPeriodResponseSchema,
+	MmConditionInputSchema,
+	MmConditionResponseSchema,
+	MmTop10InputSchema,
+	MmTop10ResponseSchema,
 	PidsrCaseDetailSchema,
 	ReviewFlagInputSchema,
 	ReviewFlagResponseSchema,
@@ -26,6 +36,8 @@ import {
 	ScanEncounterResponseSchema,
 	SubmitPidsrCaseInputSchema,
 	SubmitPidsrCaseResponseSchema,
+	ValidateAhsrInputSchema,
+	ValidateAhsrResponseSchema,
 	WeeklyReportSummarySchema,
 } from "./reporting.schema.js"
 
@@ -92,6 +104,16 @@ export const reportingContract = {
 		})
 		.input(SubmitPidsrCaseInputSchema)
 		.output(SubmitPidsrCaseResponseSchema),
+
+	dismissPidsrCase: oc
+		.route({
+			method: "POST",
+			path: "/pidsr/{id}/dismiss",
+			summary: "Dismiss a PIDSR case with a required reason",
+			tags: ["Reporting"],
+		})
+		.input(DismissPidsrCaseInputSchema)
+		.output(DismissPidsrCaseResponseSchema),
 
 	// ========================================================================
 	// PIDSR Weekly Report
@@ -174,4 +196,58 @@ export const reportingContract = {
 		})
 		.input(ExportAhsrInputSchema)
 		.output(ExportAhsrResponseSchema),
+
+	validateAhsr: oc
+		.route({
+			method: "GET",
+			path: "/ahsr/validate",
+			summary: "Validate AHSR period — returns readiness % and issues",
+			tags: ["Reporting"],
+		})
+		.input(ValidateAhsrInputSchema)
+		.output(ValidateAhsrResponseSchema),
+
+	lockAhsrPeriod: oc
+		.route({
+			method: "POST",
+			path: "/ahsr/lock-period",
+			summary: "Lock an AHSR reporting period",
+			tags: ["Reporting"],
+		})
+		.input(LockAhsrPeriodInputSchema)
+		.output(LockAhsrPeriodResponseSchema),
+
+	// ========================================================================
+	// Mortality & Morbidity
+	// ========================================================================
+
+	getMmTop10: oc
+		.route({
+			method: "GET",
+			path: "/mm/top10",
+			summary: "Get Top-10 mortality or morbidity causes",
+			tags: ["Reporting"],
+		})
+		.input(MmTop10InputSchema)
+		.output(MmTop10ResponseSchema),
+
+	getMmCondition: oc
+		.route({
+			method: "GET",
+			path: "/mm/condition/{icdCode}",
+			summary: "Get demographic breakdown for a specific ICD-10 condition",
+			tags: ["Reporting"],
+		})
+		.input(MmConditionInputSchema)
+		.output(MmConditionResponseSchema),
+
+	exportMmPdf: oc
+		.route({
+			method: "POST",
+			path: "/mm/export-pdf",
+			summary: "Export mortality/morbidity report as PDF for DOH",
+			tags: ["Reporting"],
+		})
+		.input(ExportMmPdfInputSchema)
+		.output(ExportMmPdfResponseSchema),
 }

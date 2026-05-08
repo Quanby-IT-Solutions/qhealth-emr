@@ -3,11 +3,34 @@ import type { ContractRouterClient } from "@orpc/contract"
 import { OpenAPILink } from "@orpc/openapi-client/fetch"
 import { createTanstackQueryUtils } from "@orpc/tanstack-query"
 
-import { billingContract, himContract, v1Contract } from "@repo/contracts"
+import {
+	ancillaryClearanceContract,
+	annexSignaturesContract,
+	assessmentsContract,
+	billingContract,
+	coeContract,
+	himContract,
+	malasakitContract,
+	mswBaseContract,
+	reportingContract,
+	v1Contract,
+} from "@repo/contracts"
 
 type V1Contract = typeof v1Contract
 type BillingContract = typeof billingContract
 type HimContract = typeof himContract
+type ReportingContract = typeof reportingContract
+
+// Compose MSW client type from fully-typed individual contracts.
+// v1Msw casts new sub-contracts to `any` to avoid TS7056 on v1Contract,
+// so we rebuild the typed shape here for the frontend client.
+type MswContract = typeof mswBaseContract & {
+	assessments: typeof assessmentsContract
+	coe: typeof coeContract
+	annexSignatures: typeof annexSignaturesContract
+	malasakit: typeof malasakitContract
+	ancillaryClearance: typeof ancillaryClearanceContract
+}
 
 import { env } from "@/env"
 
@@ -128,4 +151,29 @@ export const billingOrpc = createTanstackQueryUtils(
 export const himOrpc = createTanstackQueryUtils(
 	(baseOrpc as unknown as { him: ContractRouterClient<HimContract> }).him,
 	{ path: ["orpc", "him"] }
+)
+
+/**
+ * Typed MSW oRPC utils — uses v1Msw directly for full type inference.
+ *
+ * Usage:
+ *   import { mswOrpc } from "@/services/orpc/client"
+ *   useQuery(mswOrpc.list.queryOptions({ input: { page: 1, limit: 25 } }))
+ *   useQuery(mswOrpc.coe.list.queryOptions({ input: { evaluationId } }))
+ */
+export const mswOrpc = createTanstackQueryUtils(
+	(baseOrpc as unknown as { msw: ContractRouterClient<MswContract> }).msw,
+	{ path: ["orpc", "msw"] }
+)
+
+/**
+ * Typed Reporting oRPC utils — uses reportingContract directly for full type inference.
+ *
+ * Usage:
+ *   import { reportingOrpc } from "@/services/orpc/client"
+ *   useQuery(reportingOrpc.listSurveillanceFlags.queryOptions({ input: { facilityId, page: 1, limit: 50 } }))
+ */
+export const reportingOrpc = createTanstackQueryUtils(
+	(baseOrpc as unknown as { reporting: ContractRouterClient<ReportingContract> }).reporting,
+	{ path: ["orpc", "reporting"] }
 )

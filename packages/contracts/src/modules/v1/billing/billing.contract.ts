@@ -514,7 +514,12 @@ export const billingContract = {
 		.output(ListKonsultaActivitiesResponseSchema),
 
 	listKonsultaTrackerRows: oc
-		.route({ method: "GET", path: "/konsulta/tracker", summary: "List per-patient Konsulta capitation tracker rows", tags: ["Billing"] })
+		.route({
+			method: "GET",
+			path: "/konsulta/tracker",
+			summary: "List per-patient Konsulta capitation tracker rows",
+			tags: ["Billing"],
+		})
 		.input(ListKonsultaTrackerRowsInputSchema)
 		.output(ListKonsultaTrackerRowsResponseSchema),
 

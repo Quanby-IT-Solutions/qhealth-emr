@@ -133,7 +133,19 @@ type ModuleName =
 	| "him.hai"
 	| "notifications"
 
-type ActionName = "view" | "create" | "edit" | "sign" | "delete" | "verify" | "export" | "manage_catalog" | "clinical_policy" | "terminology_admin" | "read" | "write"
+type ActionName =
+	| "view"
+	| "create"
+	| "edit"
+	| "sign"
+	| "delete"
+	| "verify"
+	| "export"
+	| "manage_catalog"
+	| "clinical_policy"
+	| "terminology_admin"
+	| "read"
+	| "write"
 
 interface DemoUser {
 	email: string

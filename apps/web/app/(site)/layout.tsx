@@ -25,7 +25,7 @@ export default async function SiteLayout({
 				<SidebarInset>
 					<AppTopbar />
 					<OfflineModeIndicator />
-					<div className="flex-1 overflow-auto p-4 md:p-6">{children}</div>
+					<div className="relative flex-1 overflow-auto p-4 md:p-6">{children}</div>
 				</SidebarInset>
 			</NotificationProvider>
 		</SidebarProvider>

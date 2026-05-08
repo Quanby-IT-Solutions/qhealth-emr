@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-
 import { CheckCircle2, Plus, Save, Trash2 } from "lucide-react"
 
 import {
@@ -39,10 +38,12 @@ import {
 import { Textarea } from "@/core/components/ui/textarea"
 
 import {
+	useSaveAnesthesiaRecordMutation,
+	useSignAnesthesiaRecordMutation,
+	type AirwayType,
 	type AnesthesiaAgent,
 	type AnesthesiaRecord,
 	type AnesthesiaType,
-	type AirwayType,
 	type AsaClass,
 	type InductionAgent,
 	type IntraopMedication,
@@ -50,18 +51,9 @@ import {
 	type IntubationGrade,
 	type MaintenanceAgent,
 	type MuscleRelaxant,
-	useSaveAnesthesiaRecordMutation,
-	useSignAnesthesiaRecordMutation,
 } from "../api/surgical.hooks"
 
-const ASA_OPTIONS: AsaClass[] = [
-	"ASA I",
-	"ASA II",
-	"ASA III",
-	"ASA IV",
-	"ASA V",
-	"ASA VI",
-]
+const ASA_OPTIONS: AsaClass[] = ["ASA I", "ASA II", "ASA III", "ASA IV", "ASA V", "ASA VI"]
 
 const ASA_DESCRIPTIONS: Record<AsaClass, string> = {
 	"ASA I": "Normal healthy patient",
@@ -115,8 +107,10 @@ interface FormState {
 	postAnesthesiaCareNotes: string
 }
 
-function mapLegacyAgentsToMedications(agents: AnesthesiaAgent[] | null | undefined): IntraopMedication[] {
-	return (agents ?? []).map((agent) => ({
+function mapLegacyAgentsToMedications(
+	agents: AnesthesiaAgent[] | null | undefined
+): IntraopMedication[] {
+	return (agents ?? []).map(agent => ({
 		name: agent.name,
 		dose: agent.dose,
 		route: agent.route,
@@ -126,7 +120,7 @@ function mapLegacyAgentsToMedications(agents: AnesthesiaAgent[] | null | undefin
 }
 
 function mapMedicationsToLegacyAgents(medications: IntraopMedication[]): AnesthesiaAgent[] {
-	return medications.map((medication) => ({
+	return medications.map(medication => ({
 		name: medication.name,
 		dose: medication.dose,
 		route: medication.route,
@@ -146,7 +140,8 @@ function buildInitialState(existing: AnesthesiaRecord | null | undefined): FormS
 		inductionAgents: existing?.inductionAgents ?? [],
 		maintenanceAgents: existing?.maintenanceAgents ?? [],
 		muscleRelaxants: existing?.muscleRelaxants ?? [],
-		intraopMedications: existing?.intraopMedications ?? mapLegacyAgentsToMedications(existing?.agents),
+		intraopMedications:
+			existing?.intraopMedications ?? mapLegacyAgentsToMedications(existing?.agents),
 		intraopVitals: existing?.intraopVitals ?? [],
 		reversalAgent: existing?.reversalAgent ?? "",
 		totalAnesthesiaMinutes: existing?.totalAnesthesiaMinutes?.toString() ?? "",
@@ -159,8 +154,21 @@ function buildInitialState(existing: AnesthesiaRecord | null | undefined): FormS
 const BLANK_INDUCTION: InductionAgent = { agent: "", dose: "", time: "" }
 const BLANK_MAINTENANCE: MaintenanceAgent = { agent: "", dose: "", time: "" }
 const BLANK_RELAXANT: MuscleRelaxant = { agent: "", dose: "", time: "" }
-const BLANK_MEDICATION: IntraopMedication = { name: "", dose: "", route: "", time: "", indication: "" }
-const BLANK_VITAL: IntraopVital = { time: "", bp: "", hr: 0, spo2: 100, etco2: undefined, temp: undefined }
+const BLANK_MEDICATION: IntraopMedication = {
+	name: "",
+	dose: "",
+	route: "",
+	time: "",
+	indication: "",
+}
+const BLANK_VITAL: IntraopVital = {
+	time: "",
+	bp: "",
+	hr: 0,
+	spo2: 100,
+	etco2: undefined,
+	temp: undefined,
+}
 
 interface AnesthesiaRecordFormProps {
 	caseId: string
@@ -172,7 +180,7 @@ interface AnesthesiaRecordFormProps {
 export function AnesthesiaRecordForm({
 	caseId,
 	existing,
-	canEdit = true,
+	canEdit = false,
 	canSign = false,
 }: AnesthesiaRecordFormProps) {
 	const [form, setForm] = useState<FormState>(() => buildInitialState(existing))
@@ -188,7 +196,7 @@ export function AnesthesiaRecordForm({
 	}, [existing])
 
 	function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
-		setForm((prev) => ({ ...prev, [key]: value }))
+		setForm(prev => ({ ...prev, [key]: value }))
 	}
 
 	// ── Induction Agents ───────────────────────────────────────────────────────
@@ -200,14 +208,14 @@ export function AnesthesiaRecordForm({
 	function updateInduction(index: number, field: keyof InductionAgent, value: string) {
 		setField(
 			"inductionAgents",
-			form.inductionAgents.map((a, i) => (i === index ? { ...a, [field]: value } : a)),
+			form.inductionAgents.map((a, i) => (i === index ? { ...a, [field]: value } : a))
 		)
 	}
 
 	function removeInduction(index: number) {
 		setField(
 			"inductionAgents",
-			form.inductionAgents.filter((_, i) => i !== index),
+			form.inductionAgents.filter((_, i) => i !== index)
 		)
 	}
 
@@ -220,14 +228,14 @@ export function AnesthesiaRecordForm({
 	function updateMaintenance(index: number, field: keyof MaintenanceAgent, value: string) {
 		setField(
 			"maintenanceAgents",
-			form.maintenanceAgents.map((a, i) => (i === index ? { ...a, [field]: value } : a)),
+			form.maintenanceAgents.map((a, i) => (i === index ? { ...a, [field]: value } : a))
 		)
 	}
 
 	function removeMaintenance(index: number) {
 		setField(
 			"maintenanceAgents",
-			form.maintenanceAgents.filter((_, i) => i !== index),
+			form.maintenanceAgents.filter((_, i) => i !== index)
 		)
 	}
 
@@ -240,14 +248,14 @@ export function AnesthesiaRecordForm({
 	function updateRelaxant(index: number, field: keyof MuscleRelaxant, value: string) {
 		setField(
 			"muscleRelaxants",
-			form.muscleRelaxants.map((a, i) => (i === index ? { ...a, [field]: value } : a)),
+			form.muscleRelaxants.map((a, i) => (i === index ? { ...a, [field]: value } : a))
 		)
 	}
 
 	function removeRelaxant(index: number) {
 		setField(
 			"muscleRelaxants",
-			form.muscleRelaxants.filter((_, i) => i !== index),
+			form.muscleRelaxants.filter((_, i) => i !== index)
 		)
 	}
 
@@ -260,14 +268,14 @@ export function AnesthesiaRecordForm({
 	function updateMedication(index: number, field: keyof IntraopMedication, value: string) {
 		setField(
 			"intraopMedications",
-			form.intraopMedications.map((m, i) => (i === index ? { ...m, [field]: value } : m)),
+			form.intraopMedications.map((m, i) => (i === index ? { ...m, [field]: value } : m))
 		)
 	}
 
 	function removeMedication(index: number) {
 		setField(
 			"intraopMedications",
-			form.intraopMedications.filter((_, i) => i !== index),
+			form.intraopMedications.filter((_, i) => i !== index)
 		)
 	}
 
@@ -280,18 +288,18 @@ export function AnesthesiaRecordForm({
 	function updateVital(
 		index: number,
 		field: keyof IntraopVital,
-		value: string | number | undefined,
+		value: string | number | undefined
 	) {
 		setField(
 			"intraopVitals",
-			form.intraopVitals.map((v, i) => (i === index ? { ...v, [field]: value } : v)),
+			form.intraopVitals.map((v, i) => (i === index ? { ...v, [field]: value } : v))
 		)
 	}
 
 	function removeVital(index: number) {
 		setField(
 			"intraopVitals",
-			form.intraopVitals.filter((_, i) => i !== index),
+			form.intraopVitals.filter((_, i) => i !== index)
 		)
 	}
 
@@ -371,14 +379,14 @@ export function AnesthesiaRecordForm({
 						<Label>Anesthesia Type</Label>
 						<Select
 							value={form.anesthesiaType ?? ""}
-							onValueChange={(v) => setField("anesthesiaType", v as AnesthesiaType)}
+							onValueChange={v => setField("anesthesiaType", v as AnesthesiaType)}
 							disabled={fieldsDisabled}
 						>
 							<SelectTrigger>
 								<SelectValue placeholder="Select type…" />
 							</SelectTrigger>
 							<SelectContent>
-								{ANESTHESIA_TYPE_OPTIONS.map((opt) => (
+								{ANESTHESIA_TYPE_OPTIONS.map(opt => (
 									<SelectItem key={opt.value} value={opt.value}>
 										{opt.label}
 									</SelectItem>
@@ -390,14 +398,14 @@ export function AnesthesiaRecordForm({
 						<Label>ASA Physical Status Class</Label>
 						<Select
 							value={form.asaClass ?? ""}
-							onValueChange={(v) => setField("asaClass", v as AsaClass)}
+							onValueChange={v => setField("asaClass", v as AsaClass)}
 							disabled={fieldsDisabled}
 						>
 							<SelectTrigger>
 								<SelectValue placeholder="Select class…" />
 							</SelectTrigger>
 							<SelectContent>
-								{ASA_OPTIONS.map((cls) => (
+								{ASA_OPTIONS.map(cls => (
 									<SelectItem key={cls} value={cls}>
 										{cls} — {ASA_DESCRIPTIONS[cls]}
 									</SelectItem>
@@ -426,14 +434,14 @@ export function AnesthesiaRecordForm({
 							<Label>Airway Device</Label>
 							<Select
 								value={form.airwayType ?? ""}
-								onValueChange={(v) => setField("airwayType", v as AirwayType)}
+								onValueChange={v => setField("airwayType", v as AirwayType)}
 								disabled={fieldsDisabled}
 							>
 								<SelectTrigger>
 									<SelectValue placeholder="Select device…" />
 								</SelectTrigger>
 								<SelectContent>
-									{AIRWAY_OPTIONS.map((opt) => (
+									{AIRWAY_OPTIONS.map(opt => (
 										<SelectItem key={opt.value} value={opt.value}>
 											{opt.label}
 										</SelectItem>
@@ -445,14 +453,14 @@ export function AnesthesiaRecordForm({
 							<Label>Cormack-Lehane Grade</Label>
 							<Select
 								value={form.intubationGrade ?? ""}
-								onValueChange={(v) => setField("intubationGrade", v as IntubationGrade)}
+								onValueChange={v => setField("intubationGrade", v as IntubationGrade)}
 								disabled={fieldsDisabled}
 							>
 								<SelectTrigger>
 									<SelectValue placeholder="Select grade…" />
 								</SelectTrigger>
 								<SelectContent>
-									{INTUBATION_GRADE_OPTIONS.map((opt) => (
+									{INTUBATION_GRADE_OPTIONS.map(opt => (
 										<SelectItem key={opt.value} value={opt.value}>
 											{opt.label}
 										</SelectItem>
@@ -466,7 +474,7 @@ export function AnesthesiaRecordForm({
 								type="number"
 								min={1}
 								value={form.intubationAttempts}
-								onChange={(e) => setField("intubationAttempts", e.target.value)}
+								onChange={e => setField("intubationAttempts", e.target.value)}
 								disabled={fieldsDisabled}
 							/>
 						</div>
@@ -475,7 +483,7 @@ export function AnesthesiaRecordForm({
 						<Checkbox
 							id="difficult-airway"
 							checked={form.difficultAirway}
-							onCheckedChange={(v) => setField("difficultAirway", !!v)}
+							onCheckedChange={v => setField("difficultAirway", !!v)}
 							disabled={fieldsDisabled}
 						/>
 						<Label htmlFor="difficult-airway">Difficult airway documented</Label>
@@ -485,7 +493,7 @@ export function AnesthesiaRecordForm({
 						<Textarea
 							rows={2}
 							value={form.airwayManagement}
-							onChange={(e) => setField("airwayManagement", e.target.value)}
+							onChange={e => setField("airwayManagement", e.target.value)}
 							placeholder="Additional airway management notes…"
 							disabled={fieldsDisabled}
 						/>
@@ -501,7 +509,7 @@ export function AnesthesiaRecordForm({
 				<CardContent className="space-y-0 p-0">
 					{/* Induction */}
 					<div className="px-6 pt-4 pb-4">
-						<p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+						<p className="mb-3 text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
 							Induction Agents
 						</p>
 						{form.inductionAgents.length > 0 && (
@@ -520,9 +528,7 @@ export function AnesthesiaRecordForm({
 											<TableCell>
 												<Input
 													value={a.agent}
-													onChange={(e) =>
-														updateInduction(i, "agent", e.target.value)
-													}
+													onChange={e => updateInduction(i, "agent", e.target.value)}
 													placeholder="e.g. Propofol"
 													disabled={fieldsDisabled}
 												/>
@@ -530,9 +536,7 @@ export function AnesthesiaRecordForm({
 											<TableCell>
 												<Input
 													value={a.dose}
-													onChange={(e) =>
-														updateInduction(i, "dose", e.target.value)
-													}
+													onChange={e => updateInduction(i, "dose", e.target.value)}
 													placeholder="e.g. 2 mg/kg"
 													disabled={fieldsDisabled}
 												/>
@@ -540,9 +544,7 @@ export function AnesthesiaRecordForm({
 											<TableCell>
 												<Input
 													value={a.time ?? ""}
-													onChange={(e) =>
-														updateInduction(i, "time", e.target.value)
-													}
+													onChange={e => updateInduction(i, "time", e.target.value)}
 													placeholder="HH:MM"
 													disabled={fieldsDisabled}
 												/>
@@ -554,7 +556,7 @@ export function AnesthesiaRecordForm({
 													onClick={() => removeInduction(i)}
 													disabled={fieldsDisabled}
 												>
-													<Trash2 className="size-3.5 text-destructive" />
+													<Trash2 className="text-destructive size-3.5" />
 												</Button>
 											</TableCell>
 										</TableRow>
@@ -578,7 +580,7 @@ export function AnesthesiaRecordForm({
 
 					{/* Maintenance */}
 					<div className="px-6 pt-4 pb-4">
-						<p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+						<p className="mb-3 text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
 							Maintenance Agents
 						</p>
 						{form.maintenanceAgents.length > 0 && (
@@ -597,9 +599,7 @@ export function AnesthesiaRecordForm({
 											<TableCell>
 												<Input
 													value={a.agent}
-													onChange={(e) =>
-														updateMaintenance(i, "agent", e.target.value)
-													}
+													onChange={e => updateMaintenance(i, "agent", e.target.value)}
 													placeholder="e.g. Sevoflurane"
 													disabled={fieldsDisabled}
 												/>
@@ -607,9 +607,7 @@ export function AnesthesiaRecordForm({
 											<TableCell>
 												<Input
 													value={a.dose}
-													onChange={(e) =>
-														updateMaintenance(i, "dose", e.target.value)
-													}
+													onChange={e => updateMaintenance(i, "dose", e.target.value)}
 													placeholder="e.g. 2% in O₂/Air"
 													disabled={fieldsDisabled}
 												/>
@@ -617,9 +615,7 @@ export function AnesthesiaRecordForm({
 											<TableCell>
 												<Input
 													value={a.time ?? ""}
-													onChange={(e) =>
-														updateMaintenance(i, "time", e.target.value)
-													}
+													onChange={e => updateMaintenance(i, "time", e.target.value)}
 													placeholder="HH:MM"
 													disabled={fieldsDisabled}
 												/>
@@ -631,7 +627,7 @@ export function AnesthesiaRecordForm({
 													onClick={() => removeMaintenance(i)}
 													disabled={fieldsDisabled}
 												>
-													<Trash2 className="size-3.5 text-destructive" />
+													<Trash2 className="text-destructive size-3.5" />
 												</Button>
 											</TableCell>
 										</TableRow>
@@ -655,7 +651,7 @@ export function AnesthesiaRecordForm({
 
 					{/* Muscle Relaxants */}
 					<div className="px-6 pt-4 pb-4">
-						<p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+						<p className="mb-3 text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
 							Muscle Relaxants
 						</p>
 						{form.muscleRelaxants.length > 0 && (
@@ -674,9 +670,7 @@ export function AnesthesiaRecordForm({
 											<TableCell>
 												<Input
 													value={a.agent}
-													onChange={(e) =>
-														updateRelaxant(i, "agent", e.target.value)
-													}
+													onChange={e => updateRelaxant(i, "agent", e.target.value)}
 													placeholder="e.g. Rocuronium"
 													disabled={fieldsDisabled}
 												/>
@@ -684,9 +678,7 @@ export function AnesthesiaRecordForm({
 											<TableCell>
 												<Input
 													value={a.dose}
-													onChange={(e) =>
-														updateRelaxant(i, "dose", e.target.value)
-													}
+													onChange={e => updateRelaxant(i, "dose", e.target.value)}
 													placeholder="e.g. 0.6 mg/kg"
 													disabled={fieldsDisabled}
 												/>
@@ -694,9 +686,7 @@ export function AnesthesiaRecordForm({
 											<TableCell>
 												<Input
 													value={a.time ?? ""}
-													onChange={(e) =>
-														updateRelaxant(i, "time", e.target.value)
-													}
+													onChange={e => updateRelaxant(i, "time", e.target.value)}
 													placeholder="HH:MM"
 													disabled={fieldsDisabled}
 												/>
@@ -708,7 +698,7 @@ export function AnesthesiaRecordForm({
 													onClick={() => removeRelaxant(i)}
 													disabled={fieldsDisabled}
 												>
-													<Trash2 className="size-3.5 text-destructive" />
+													<Trash2 className="text-destructive size-3.5" />
 												</Button>
 											</TableCell>
 										</TableRow>
@@ -734,12 +724,7 @@ export function AnesthesiaRecordForm({
 			<Card>
 				<CardHeader className="flex flex-row items-center justify-between">
 					<CardTitle className="text-base">Intraoperative Medications</CardTitle>
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={addMedication}
-						disabled={fieldsDisabled}
-					>
+					<Button variant="outline" size="sm" onClick={addMedication} disabled={fieldsDisabled}>
 						<Plus className="mr-1.5 size-3.5" />
 						Add Medication
 					</Button>
@@ -767,9 +752,7 @@ export function AnesthesiaRecordForm({
 										<TableCell>
 											<Input
 												value={m.name}
-												onChange={(e) =>
-													updateMedication(i, "name", e.target.value)
-												}
+												onChange={e => updateMedication(i, "name", e.target.value)}
 												placeholder="e.g. Cefazolin"
 												disabled={fieldsDisabled}
 											/>
@@ -777,9 +760,7 @@ export function AnesthesiaRecordForm({
 										<TableCell>
 											<Input
 												value={m.dose}
-												onChange={(e) =>
-													updateMedication(i, "dose", e.target.value)
-												}
+												onChange={e => updateMedication(i, "dose", e.target.value)}
 												placeholder="e.g. 1g"
 												disabled={fieldsDisabled}
 											/>
@@ -787,9 +768,7 @@ export function AnesthesiaRecordForm({
 										<TableCell>
 											<Input
 												value={m.route}
-												onChange={(e) =>
-													updateMedication(i, "route", e.target.value)
-												}
+												onChange={e => updateMedication(i, "route", e.target.value)}
 												placeholder="e.g. IV"
 												disabled={fieldsDisabled}
 											/>
@@ -797,9 +776,7 @@ export function AnesthesiaRecordForm({
 										<TableCell>
 											<Input
 												value={m.time}
-												onChange={(e) =>
-													updateMedication(i, "time", e.target.value)
-												}
+												onChange={e => updateMedication(i, "time", e.target.value)}
 												placeholder="HH:MM"
 												disabled={fieldsDisabled}
 											/>
@@ -807,9 +784,7 @@ export function AnesthesiaRecordForm({
 										<TableCell>
 											<Input
 												value={m.indication ?? ""}
-												onChange={(e) =>
-													updateMedication(i, "indication", e.target.value)
-												}
+												onChange={e => updateMedication(i, "indication", e.target.value)}
 												placeholder="Optional"
 												disabled={fieldsDisabled}
 											/>
@@ -821,7 +796,7 @@ export function AnesthesiaRecordForm({
 												onClick={() => removeMedication(i)}
 												disabled={fieldsDisabled}
 											>
-												<Trash2 className="size-3.5 text-destructive" />
+												<Trash2 className="text-destructive size-3.5" />
 											</Button>
 										</TableCell>
 									</TableRow>
@@ -836,12 +811,7 @@ export function AnesthesiaRecordForm({
 			<Card>
 				<CardHeader className="flex flex-row items-center justify-between">
 					<CardTitle className="text-base">Intraoperative Vitals Flowsheet</CardTitle>
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={addVital}
-						disabled={fieldsDisabled}
-					>
+					<Button variant="outline" size="sm" onClick={addVital} disabled={fieldsDisabled}>
 						<Plus className="mr-1.5 size-3.5" />
 						Add Entry
 					</Button>
@@ -870,9 +840,7 @@ export function AnesthesiaRecordForm({
 										<TableCell>
 											<Input
 												value={vital.time}
-												onChange={(e) =>
-													updateVital(i, "time", e.target.value)
-												}
+												onChange={e => updateVital(i, "time", e.target.value)}
 												placeholder="HH:MM"
 												disabled={fieldsDisabled}
 											/>
@@ -880,9 +848,7 @@ export function AnesthesiaRecordForm({
 										<TableCell>
 											<Input
 												value={vital.bp}
-												onChange={(e) =>
-													updateVital(i, "bp", e.target.value)
-												}
+												onChange={e => updateVital(i, "bp", e.target.value)}
 												placeholder="120/80"
 												disabled={fieldsDisabled}
 											/>
@@ -892,9 +858,7 @@ export function AnesthesiaRecordForm({
 												type="number"
 												min={0}
 												value={vital.hr || ""}
-												onChange={(e) =>
-													updateVital(i, "hr", Number(e.target.value))
-												}
+												onChange={e => updateVital(i, "hr", Number(e.target.value))}
 												placeholder="72"
 												disabled={fieldsDisabled}
 											/>
@@ -905,9 +869,7 @@ export function AnesthesiaRecordForm({
 												min={0}
 												max={100}
 												value={vital.spo2 || ""}
-												onChange={(e) =>
-													updateVital(i, "spo2", Number(e.target.value))
-												}
+												onChange={e => updateVital(i, "spo2", Number(e.target.value))}
 												placeholder="98"
 												disabled={fieldsDisabled}
 											/>
@@ -917,13 +879,11 @@ export function AnesthesiaRecordForm({
 												type="number"
 												min={0}
 												value={vital.etco2 ?? ""}
-												onChange={(e) =>
+												onChange={e =>
 													updateVital(
 														i,
 														"etco2",
-														e.target.value
-															? Number(e.target.value)
-															: undefined,
+														e.target.value ? Number(e.target.value) : undefined
 													)
 												}
 												placeholder="35"
@@ -937,13 +897,11 @@ export function AnesthesiaRecordForm({
 												max={45}
 												step={0.1}
 												value={vital.temp ?? ""}
-												onChange={(e) =>
+												onChange={e =>
 													updateVital(
 														i,
 														"temp",
-														e.target.value
-															? Number(e.target.value)
-															: undefined,
+														e.target.value ? Number(e.target.value) : undefined
 													)
 												}
 												placeholder="36.5"
@@ -957,7 +915,7 @@ export function AnesthesiaRecordForm({
 												onClick={() => removeVital(i)}
 												disabled={fieldsDisabled}
 											>
-												<Trash2 className="size-3.5 text-destructive" />
+												<Trash2 className="text-destructive size-3.5" />
 											</Button>
 										</TableCell>
 									</TableRow>
@@ -978,7 +936,7 @@ export function AnesthesiaRecordForm({
 						<Label>Reversal Agent</Label>
 						<Input
 							value={form.reversalAgent}
-							onChange={(e) => setField("reversalAgent", e.target.value)}
+							onChange={e => setField("reversalAgent", e.target.value)}
 							placeholder="e.g. Neostigmine"
 							disabled={fieldsDisabled}
 						/>
@@ -989,7 +947,7 @@ export function AnesthesiaRecordForm({
 							type="number"
 							min={0}
 							value={form.totalAnesthesiaMinutes}
-							onChange={(e) => setField("totalAnesthesiaMinutes", e.target.value)}
+							onChange={e => setField("totalAnesthesiaMinutes", e.target.value)}
 							placeholder="0"
 							disabled={fieldsDisabled}
 						/>
@@ -998,7 +956,7 @@ export function AnesthesiaRecordForm({
 						<Checkbox
 							id="emergence-smooth"
 							checked={form.emergenceSmooth ?? false}
-							onCheckedChange={(v) => setField("emergenceSmooth", !!v)}
+							onCheckedChange={v => setField("emergenceSmooth", !!v)}
 							disabled={fieldsDisabled}
 						/>
 						<Label htmlFor="emergence-smooth">Smooth emergence from anesthesia</Label>
@@ -1008,7 +966,7 @@ export function AnesthesiaRecordForm({
 						<Textarea
 							rows={2}
 							value={form.complications}
-							onChange={(e) => setField("complications", e.target.value)}
+							onChange={e => setField("complications", e.target.value)}
 							placeholder="Any anesthesia-related complications…"
 							disabled={fieldsDisabled}
 						/>
@@ -1018,7 +976,7 @@ export function AnesthesiaRecordForm({
 						<Textarea
 							rows={2}
 							value={form.postAnesthesiaCareNotes}
-							onChange={(e) => setField("postAnesthesiaCareNotes", e.target.value)}
+							onChange={e => setField("postAnesthesiaCareNotes", e.target.value)}
 							placeholder="Post-anesthesia care unit notes…"
 							disabled={fieldsDisabled}
 						/>
@@ -1063,10 +1021,7 @@ export function AnesthesiaRecordForm({
 					</AlertDialogHeader>
 					<AlertDialogFooter>
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
-						<AlertDialogAction
-							onClick={confirmSign}
-							className="bg-green-700 hover:bg-green-800"
-						>
+						<AlertDialogAction onClick={confirmSign} className="bg-green-700 hover:bg-green-800">
 							Sign Record
 						</AlertDialogAction>
 					</AlertDialogFooter>

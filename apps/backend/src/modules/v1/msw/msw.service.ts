@@ -524,13 +524,17 @@ export class MswService {
 	}
 
 	async addMalasakit(input: AddMalasakitInput) {
-		const totalAmount = input.sources.reduce((sum, source) => sum + source.amount, 0)
+		const totalAmount = (
+			input.sources as Array<{ amount: number; program: string; referenceNumber?: string }>
+		).reduce((sum: number, source) => sum + source.amount, 0)
 
 		await db
 			.update(mswEvaluations)
 			.set({
 				malasakitAmount: totalAmount.toString(),
-				malasakitSource: input.sources.map(source => ({
+				malasakitSource: (
+					input.sources as Array<{ amount: number; program: string; referenceNumber?: string }>
+				).map(source => ({
 					source: source.program,
 					amount: source.amount,
 					referenceNumber: source.referenceNumber,

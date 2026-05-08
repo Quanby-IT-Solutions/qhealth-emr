@@ -7,7 +7,9 @@ import { FormularyManager } from "@/features/formulary/components/formulary-mana
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -20,7 +22,7 @@ export default function PharmacyFormularyPage() {
 
 	if (!can(permSet, "formulary", "view")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access the formulary.
 			</div>
 		)
@@ -33,7 +35,8 @@ export default function PharmacyFormularyPage() {
 			<div>
 				<h1 className="text-2xl font-bold">Formulary</h1>
 				<p className="text-muted-foreground">
-					Review formulary items and manage clinical notes, high-alert designations, and restriction guidance.
+					Review formulary items and manage clinical notes, high-alert designations, and restriction
+					guidance.
 				</p>
 			</div>
 
@@ -41,7 +44,7 @@ export default function PharmacyFormularyPage() {
 				<FormularyManager
 					facilityId={facilityId}
 					canEdit={canEdit}
-					canDelete={false}
+					canDelete={canEdit}
 					canEditFlags={can(permSet, "formulary", "clinical_policy")}
 				/>
 			) : (

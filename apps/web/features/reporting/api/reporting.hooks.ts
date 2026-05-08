@@ -3,6 +3,167 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { env } from "@/env"
+import { reportingOrpc } from "@/services/orpc/client"
+
+// ============================================================================
+// Surveillance Flag Hooks
+// ============================================================================
+
+export function useSurveillanceFlagsQuery(params: {
+	facilityId: string
+	page?: number
+	limit?: number
+	isReviewed?: boolean
+	flagType?: "icd10_match" | "syndromic_keyword"
+	category?: "category_1" | "category_2"
+}) {
+	return useQuery(
+		reportingOrpc.listSurveillanceFlags.queryOptions({
+			input: { ...params, page: params.page ?? 1, limit: params.limit ?? 20 },
+		})
+	)
+}
+
+export function useReviewFlagMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		reportingOrpc.reviewSurveillanceFlag.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: reportingOrpc.listSurveillanceFlags.key() }),
+		})
+	)
+}
+
+export function useScanEncounterMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		reportingOrpc.scanEncounter.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: reportingOrpc.listSurveillanceFlags.key() }),
+		})
+	)
+}
+
+// ============================================================================
+// PIDSR Case Hooks
+// ============================================================================
+
+export function usePidsrCasesQuery(params: {
+	facilityId: string
+	page?: number
+	limit?: number
+	reportStatus?: "draft" | "submitted" | "rejected" | "blocked"
+	category?: "category_1" | "category_2"
+	dateFrom?: string
+	dateTo?: string
+}) {
+	return useQuery(
+		reportingOrpc.listPidsrCases.queryOptions({
+			input: { ...params, page: params.page ?? 1, limit: params.limit ?? 20 },
+		})
+	)
+}
+
+export function usePidsrCaseDetailQuery(id: string) {
+	return useQuery(
+		reportingOrpc.getPidsrCase.queryOptions({
+			input: { id },
+			enabled: !!id,
+		})
+	)
+}
+
+export function useSubmitPidsrCaseMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		reportingOrpc.submitPidsrCase.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: reportingOrpc.listPidsrCases.key() }),
+		})
+	)
+}
+
+export function useDismissPidsrCaseMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		reportingOrpc.dismissPidsrCase.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: reportingOrpc.listPidsrCases.key() }),
+		})
+	)
+}
+
+// ============================================================================
+// Weekly Report Hooks
+// ============================================================================
+
+export function useGenerateWeeklyReportMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		reportingOrpc.generateWeeklyReport.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: reportingOrpc.listPidsrCases.key() }),
+		})
+	)
+}
+
+// ============================================================================
+// AHSR Hooks
+// ============================================================================
+
+export function useAhsrMetricsQuery(params: {
+	facilityId: string
+	year: number
+	quarter?: 1 | 2 | 3 | 4
+}) {
+	return useQuery(
+		reportingOrpc.getAhsrMetrics.queryOptions({
+			input: { ...params },
+			staleTime: 5 * 60 * 1000,
+			refetchInterval: 5 * 60 * 1000,
+		})
+	)
+}
+
+export function useAhsrDrilldownQuery(
+	params: {
+		facilityId: string
+		year: number
+		month?: number
+		metric: string
+		icdCode?: string
+		haiType?: string
+		page?: number
+		limit?: number
+	},
+	enabled = true
+) {
+	return useQuery(
+		reportingOrpc.drilldownAhsr.queryOptions({
+			input: {
+				...params,
+				page: params.page ?? 1,
+				limit: params.limit ?? 20,
+				metric: params.metric as "admissions" | "discharges" | "deaths" | "morbidity" | "mortality" | "hai",
+			},
+			enabled,
+		})
+	)
+}
+
+export function useExportAhsrMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		reportingOrpc.exportAhsr.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: reportingOrpc.getAhsrMetrics.key() }),
+		})
+	)
+}
+
+// ============================================================================
+// HAI Report Types & Hooks (no oRPC contract yet — raw fetch preserved)
+// ============================================================================
 
 const API_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/reporting`
 
@@ -24,314 +185,6 @@ function buildQueryString(params: Record<string, string | number | boolean | und
 	if (entries.length === 0) return ""
 	return "?" + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
 }
-
-// ============================================================================
-// Types
-// ============================================================================
-
-interface SurveillanceFlag {
-	id: string
-	facilityId: string
-	encounterId: string | null
-	noteId: string | null
-	flagType: string
-	triggeredBy: string
-	triggerValue: string
-	category: string | null
-	diseaseName: string | null
-	isReviewed: boolean
-	reviewedByStaffId: string | null
-	reviewedAt: string | null
-	createdAt: string
-	patientName: string | null
-	patientMrn: string | null
-	encounterType: string | null
-}
-
-interface SurveillanceFlagListResponse {
-	total: number
-	page: number
-	limit: number
-	totalPages: number
-	flags: SurveillanceFlag[]
-}
-
-interface ReviewFlagResponse {
-	success: boolean
-	pidsrCaseId: string | null
-}
-
-interface PidsrCase {
-	id: string
-	facilityId: string
-	encounterId: string | null
-	patientId: string
-	diseaseCode: string
-	diseaseName: string
-	caseClassification: "suspected" | "probable" | "confirmed"
-	onsetDate: string | null
-	diagnosisDate: string
-	reportingStaffId: string
-	reportStatus: "draft" | "submitted"
-	submissionData: Record<string, unknown> | null
-	submittedAt: string | null
-	createdAt: string
-	updatedAt: string
-	patientName: string | null
-	patientMrn: string | null
-}
-
-interface PidsrCaseDetail extends PidsrCase {
-	encounterType: string | null
-	chiefComplaint: string | null
-	attendingPhysician: string | null
-}
-
-interface PidsrCaseListResponse {
-	total: number
-	page: number
-	limit: number
-	totalPages: number
-	cases: PidsrCase[]
-}
-
-interface WeeklyReportSummary {
-	weekStartDate: string
-	weekEndDate: string
-	totalCases: number
-	confirmedCases: number
-	diseaseBreakdown: { diseaseCode: string; diseaseName: string; count: number }[]
-	status: "generated" | "submitted"
-}
-
-interface MorbidityMortalityItem {
-	rank: number
-	icdCode: string
-	diseaseName: string
-	count: number
-	percentage: number
-}
-
-interface HaiMetric {
-	haiType: string
-	count: number
-	rate: number
-}
-
-interface AhsrMetricsResponse {
-	facilityId: string
-	year: number
-	month: number | null
-	bedOccupancyRate: number | null
-	totalAdmissions: number
-	totalDischarges: number
-	totalDeaths: number
-	grossDeathRate: number | null
-	netDeathRate: number | null
-	topMorbidities: MorbidityMortalityItem[]
-	topMortalities: MorbidityMortalityItem[]
-	haiMetrics: HaiMetric[]
-}
-
-interface AhsrDrilldownEncounter {
-	encounterId: string
-	patientName: string
-	patientMrn: string
-	encounterType: string
-	admissionDate: string
-	dischargeDate: string | null
-	disposition: string | null
-	diagnosisCodes: string[]
-}
-
-interface AhsrDrilldownResponse {
-	total: number
-	page: number
-	limit: number
-	totalPages: number
-	encounters: AhsrDrilldownEncounter[]
-}
-
-interface ExportAhsrResponse {
-	success: boolean
-	message: string
-	snapshotId: string | null
-}
-
-interface ScanEncounterResponse {
-	flagsCreated: number
-	flags: { id: string; flagType: string; triggeredBy: string; triggerValue: string }[]
-}
-
-// ============================================================================
-// Query Keys
-// ============================================================================
-
-const reportingKeys = {
-	all: ["reporting"] as const,
-	flags: (params: object) => [...reportingKeys.all, "flags", params] as const,
-	pidsrCases: (params: object) => [...reportingKeys.all, "pidsr", params] as const,
-	pidsrCase: (id: string) => [...reportingKeys.all, "pidsr", id] as const,
-	ahsr: (params: object) => [...reportingKeys.all, "ahsr", params] as const,
-	ahsrDrilldown: (params: object) => [...reportingKeys.all, "ahsr-drilldown", params] as const,
-}
-
-// ============================================================================
-// Surveillance Flag Hooks
-// ============================================================================
-
-export function useSurveillanceFlagsQuery(params: {
-	facilityId: string
-	page?: number
-	limit?: number
-	isReviewed?: boolean
-	flagType?: string
-	category?: string
-}) {
-	return useQuery({
-		queryKey: reportingKeys.flags(params),
-		queryFn: () =>
-			fetchJson<SurveillanceFlagListResponse>(
-				`${API_BASE}/surveillance-flags${buildQueryString(params)}`
-			),
-	})
-}
-
-export function useReviewFlagMutation() {
-	const queryClient = useQueryClient()
-	return useMutation({
-		mutationFn: (data: { id: string; action: "confirm" | "dismiss"; dismissReason?: string }) =>
-			fetchJson<ReviewFlagResponse>(`${API_BASE}/surveillance-flags/review`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => queryClient.invalidateQueries({ queryKey: reportingKeys.all }),
-	})
-}
-
-export function useScanEncounterMutation() {
-	const queryClient = useQueryClient()
-	return useMutation({
-		mutationFn: (data: { encounterId: string; facilityId: string }) =>
-			fetchJson<ScanEncounterResponse>(`${API_BASE}/surveillance-flags/scan`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => queryClient.invalidateQueries({ queryKey: reportingKeys.all }),
-	})
-}
-
-// ============================================================================
-// PIDSR Case Hooks
-// ============================================================================
-
-export function usePidsrCasesQuery(params: {
-	facilityId: string
-	page?: number
-	limit?: number
-	reportStatus?: string
-	category?: string
-	dateFrom?: string
-	dateTo?: string
-}) {
-	return useQuery({
-		queryKey: reportingKeys.pidsrCases(params),
-		queryFn: () =>
-			fetchJson<PidsrCaseListResponse>(
-				`${API_BASE}/pidsr${buildQueryString(params)}`
-			),
-	})
-}
-
-export function usePidsrCaseDetailQuery(id: string) {
-	return useQuery({
-		queryKey: reportingKeys.pidsrCase(id),
-		queryFn: () => fetchJson<PidsrCaseDetail>(`${API_BASE}/pidsr/${id}`),
-		enabled: !!id,
-	})
-}
-
-export function useSubmitPidsrCaseMutation() {
-	const queryClient = useQueryClient()
-	return useMutation({
-		mutationFn: (data: { id: string }) =>
-			fetchJson<{ success: boolean; message: string }>(`${API_BASE}/pidsr/${data.id}/submit`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => queryClient.invalidateQueries({ queryKey: reportingKeys.all }),
-	})
-}
-
-// ============================================================================
-// Weekly Report Hooks
-// ============================================================================
-
-export function useGenerateWeeklyReportMutation() {
-	const queryClient = useQueryClient()
-	return useMutation({
-		mutationFn: (data: { facilityId: string; weekStartDate: string }) =>
-			fetchJson<WeeklyReportSummary>(`${API_BASE}/pidsr/weekly`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => queryClient.invalidateQueries({ queryKey: reportingKeys.all }),
-	})
-}
-
-// ============================================================================
-// AHSR Hooks
-// ============================================================================
-
-export function useAhsrMetricsQuery(params: {
-	facilityId: string
-	year: number
-	month?: number
-}) {
-	return useQuery({
-		queryKey: reportingKeys.ahsr(params),
-		queryFn: () =>
-			fetchJson<AhsrMetricsResponse>(
-				`${API_BASE}/ahsr${buildQueryString(params)}`
-			),
-	})
-}
-
-export function useAhsrDrilldownQuery(params: {
-	facilityId: string
-	year: number
-	month?: number
-	metric: string
-	icdCode?: string
-	haiType?: string
-	page?: number
-	limit?: number
-}, enabled: boolean = true) {
-	return useQuery({
-		queryKey: reportingKeys.ahsrDrilldown(params),
-		queryFn: () =>
-			fetchJson<AhsrDrilldownResponse>(
-				`${API_BASE}/ahsr/drilldown${buildQueryString(params)}`
-			),
-		enabled,
-	})
-}
-
-export function useExportAhsrMutation() {
-	const queryClient = useQueryClient()
-	return useMutation({
-		mutationFn: (data: { facilityId: string; year: number; month?: number }) =>
-			fetchJson<ExportAhsrResponse>(`${API_BASE}/ahsr/export`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => queryClient.invalidateQueries({ queryKey: reportingKeys.all }),
-	})
-}
-
-// ============================================================================
-// HAI Report Types & Hooks
-// ============================================================================
 
 export interface HaiTrend {
 	period: string
@@ -380,7 +233,7 @@ export function useHaiReportQuery(params: {
 	month?: number
 }) {
 	return useQuery({
-		queryKey: [...reportingKeys.all, "hai", params] as const,
+		queryKey: ["reporting", "hai", params] as const,
 		queryFn: () =>
 			fetchJson<HaiReportResponse>(
 				`${API_BASE}/hai${buildQueryString(params)}`
@@ -389,16 +242,19 @@ export function useHaiReportQuery(params: {
 	})
 }
 
-export function useHaiCasesQuery(params: {
-	facilityId: string
-	year: number
-	month?: number
-	haiType?: string
-	page?: number
-	limit?: number
-}, enabled = true) {
+export function useHaiCasesQuery(
+	params: {
+		facilityId: string
+		year: number
+		month?: number
+		haiType?: string
+		page?: number
+		limit?: number
+	},
+	enabled = true
+) {
 	return useQuery({
-		queryKey: [...reportingKeys.all, "hai-cases", params] as const,
+		queryKey: ["reporting", "hai-cases", params] as const,
 		queryFn: () =>
 			fetchJson<HaiCaseListResponse>(
 				`${API_BASE}/hai/cases${buildQueryString(params)}`

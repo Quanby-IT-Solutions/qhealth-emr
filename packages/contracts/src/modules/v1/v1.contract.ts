@@ -19,6 +19,7 @@ import { v1FhirEndpoints } from "./fhir-endpoints/v1.fhir-endpoints.js"
 import { v1Fhir } from "./fhir/v1.fhir.js"
 import { v1Formulary } from "./formulary/v1.formulary.js"
 import { healthContract } from "./health/health.contract.js"
+import { himContract } from "./him/v1.him.js"
 import { v1IntegrationRegistry } from "./integration-registry/v1.integration-registry.js"
 import { v1Lab } from "./lab/v1.lab.js"
 import { v1MasterData } from "./master-data/v1.master-data.js"
@@ -42,7 +43,6 @@ import { v1Surgical } from "./surgical/v1.surgical.js"
 import { v1SystemSettings } from "./system-settings/v1.system-settings.js"
 import { v1Telemedicine } from "./telemedicine/v1.telemedicine.js"
 import { v1Terminology } from "./terminology/v1.terminology.js"
-import { himContract } from "./him/v1.him.js"
 
 /**
  * V1 contract router

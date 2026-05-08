@@ -1,0 +1,94 @@
+{
+  "agents": [
+    {
+      "name": "backend-developer",
+      "path": ".claude/agents/backend-developer.md"
+    },
+    {
+      "name": "web-frontend-developer",
+      "path": ".claude/agents/web-frontend-developer.md"
+    },
+    {
+      "name": "fullstack-developer",
+      "path": ".claude/agents/fullstack-developer.md"
+    },
+    {
+      "name": "code-reviewer",
+      "path": ".claude/agents/code-reviewer.md"
+    },
+    {
+      "name": "devops-infra",
+      "path": ".claude/agents/devops-infra.md"
+    },
+    {
+      "name": "flutter-expert",
+      "path": ".claude/agents/flutter-expert.md"
+    }
+  ],
+  "skills": [
+    {
+      "name": "drizzle-postgres",
+      "path": ".claude/skills/drizzle-postgres"
+    },
+    {
+      "name": "orpc-contracts",
+      "path": ".claude/skills/orpc-contracts"
+    },
+    {
+      "name": "nestjs-framework",
+      "path": ".claude/skills/nestjs-framework"
+    },
+    {
+      "name": "better-auth",
+      "path": ".claude/skills/better-auth"
+    },
+    {
+      "name": "nextjs-app-router",
+      "path": ".claude/skills/nextjs-app-router"
+    },
+    {
+      "name": "tailwind-shadcn",
+      "path": ".claude/skills/tailwind-shadcn"
+    },
+    {
+      "name": "tanstack-query-orpc",
+      "path": ".claude/skills/tanstack-query-orpc"
+    },
+    {
+      "name": "turborepo-monorepo",
+      "path": ".claude/skills/turborepo-monorepo"
+    },
+    {
+      "name": "docker-deployment",
+      "path": ".claude/skills/docker-deployment"
+    },
+    {
+      "name": "ci-cd-pipelines",
+      "path": ".claude/skills/ci-cd-pipelines"
+    },
+    {
+      "name": "aws-infrastructure",
+      "path": ".claude/skills/aws-infrastructure"
+    },
+    {
+      "name": "testing-strategies",
+      "path": ".claude/skills/testing-strategies"
+    },
+    {
+      "name": "error-handling-logging",
+      "path": ".claude/skills/error-handling-logging"
+    },
+    {
+      "name": "security-hardening",
+      "path": ".claude/skills/security-hardening"
+    },
+    {
+      "name": "vercel-react-best-practices",
+      "path": ".claude/skills/vercel-react-best-practices"
+    },
+    {
+      "name": "web-design-guidelines",
+      "path": ".claude/skills/web-design-guidelines"
+    }
+  ]
+}

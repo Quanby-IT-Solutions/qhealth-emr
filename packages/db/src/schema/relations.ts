@@ -53,11 +53,15 @@ import {
 } from "./nursing.js"
 import { nutritionAssessments } from "./nutrition.js"
 import {
+	bloodUnits,
+	crossMatchRequests,
+	crossMatchUnitAssignments,
 	imagingOrders,
 	labOrders,
 	medicationOrders,
 	orderVerifications,
 	prescriptions,
+	transfusionVerifications,
 } from "./orders.js"
 import { facilities, rolePermissions, roles, staffProfiles, userRoles } from "./rbac.js"
 import { ahsrSnapshots, fhirExports, pidsrCases, surveillanceFlags } from "./reporting.js"
@@ -115,6 +119,10 @@ export const relations = defineRelations(
 		medicationOrders,
 		labOrders,
 		imagingOrders,
+		bloodUnits,
+		crossMatchRequests,
+		crossMatchUnitAssignments,
+		transfusionVerifications,
 		orderVerifications,
 		prescriptions,
 		// Nursing
@@ -209,6 +217,9 @@ export const relations = defineRelations(
 			medicationOrders: r.many.medicationOrders(),
 			labOrders: r.many.labOrders(),
 			imagingOrders: r.many.imagingOrders(),
+			bloodUnits: r.many.bloodUnits(),
+			crossMatchRequests: r.many.crossMatchRequests(),
+			transfusionVerifications: r.many.transfusionVerifications(),
 			prescriptions: r.many.prescriptions(),
 			vitalSigns: r.many.vitalSigns(),
 			flowsheetEntries: r.many.flowsheetEntries(),
@@ -307,6 +318,8 @@ export const relations = defineRelations(
 			deathReports: r.many.deathReports(),
 			nutritionAssessments: r.many.nutritionAssessments(),
 			mswEvaluations: r.many.mswEvaluations(),
+			crossMatchRequests: r.many.crossMatchRequests(),
+			transfusionVerifications: r.many.transfusionVerifications(),
 		},
 		encounters: {
 			facility: r.one.facilities({
@@ -352,6 +365,8 @@ export const relations = defineRelations(
 			cf4Claims: r.many.cf4Claims(),
 			cf5Claims: r.many.cf5Claims(),
 			prescriptions: r.many.prescriptions(),
+			crossMatchRequests: r.many.crossMatchRequests(),
+			transfusionVerifications: r.many.transfusionVerifications(),
 			pidsrCases: r.many.pidsrCases(),
 			surveillanceFlags: r.many.surveillanceFlags(),
 			// New table many-relations
@@ -632,6 +647,82 @@ export const relations = defineRelations(
 			}),
 			orderingStaff: r.one.staffProfiles({
 				from: r.imagingOrders.orderingStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+		bloodUnits: {
+			facility: r.one.facilities({
+				from: r.bloodUnits.facilityId,
+				to: r.facilities.id,
+			}),
+			assignments: r.many.crossMatchUnitAssignments(),
+			transfusionVerifications: r.many.transfusionVerifications(),
+		},
+		crossMatchRequests: {
+			facility: r.one.facilities({
+				from: r.crossMatchRequests.facilityId,
+				to: r.facilities.id,
+			}),
+			patient: r.one.patients({
+				from: r.crossMatchRequests.patientId,
+				to: r.patients.id,
+			}),
+			encounter: r.one.encounters({
+				from: r.crossMatchRequests.encounterId,
+				to: r.encounters.id,
+			}),
+			sourceLabOrder: r.one.labOrders({
+				from: r.crossMatchRequests.sourceLabOrderId,
+				to: r.labOrders.id,
+			}),
+			requestedByStaff: r.one.staffProfiles({
+				from: r.crossMatchRequests.requestedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+			crossMatchedByStaff: r.one.staffProfiles({
+				from: r.crossMatchRequests.crossMatchedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+			approvedByStaff: r.one.staffProfiles({
+				from: r.crossMatchRequests.approvedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+			issuedByStaff: r.one.staffProfiles({
+				from: r.crossMatchRequests.issuedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+			cancelledByStaff: r.one.staffProfiles({
+				from: r.crossMatchRequests.cancelledByStaffId,
+				to: r.staffProfiles.id,
+			}),
+			assignments: r.many.crossMatchUnitAssignments(),
+			transfusionVerifications: r.many.transfusionVerifications(),
+		},
+		crossMatchUnitAssignments: {
+			crossMatchRequest: r.one.crossMatchRequests({
+				from: r.crossMatchUnitAssignments.crossMatchRequestId,
+				to: r.crossMatchRequests.id,
+			}),
+			bloodUnit: r.one.bloodUnits({
+				from: r.crossMatchUnitAssignments.bloodUnitId,
+				to: r.bloodUnits.id,
+			}),
+		},
+		transfusionVerifications: {
+			crossMatchRequest: r.one.crossMatchRequests({
+				from: r.transfusionVerifications.crossMatchRequestId,
+				to: r.crossMatchRequests.id,
+			}),
+			bloodUnit: r.one.bloodUnits({
+				from: r.transfusionVerifications.bloodUnitId,
+				to: r.bloodUnits.id,
+			}),
+			patient: r.one.patients({
+				from: r.transfusionVerifications.patientId,
+				to: r.patients.id,
+			}),
+			verifiedByStaff: r.one.staffProfiles({
+				from: r.transfusionVerifications.verifiedByStaffId,
 				to: r.staffProfiles.id,
 			}),
 		},

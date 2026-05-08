@@ -63,7 +63,11 @@ interface RequiredPermission {
 	action: string
 }
 
-export type AdminNavGroup = "Identity & Access" | "Clinical Configuration" | "Reporting & Compliance" | "System Settings"
+export type AdminNavGroup =
+	| "Identity & Access"
+	| "Clinical Configuration"
+	| "Reporting & Compliance"
+	| "System Settings"
 
 interface NavItemConfig {
 	title: string
@@ -255,13 +259,15 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		href: "/pharmacy/formulary",
 		iconName: "formulary",
 		// Primary sidebar for Pharmacist — note-editing workflow
-		requiredPermissions: [
-			{ module: "orders", action: "verify" },
-		],
+		requiredPermissions: [{ module: "orders", action: "verify" }],
 		// Admin users access the governance surface at /admin/formulary instead
-		excludePermissions: [
-			{ module: "admin", action: "view" },
-		],
+		excludePermissions: [{ module: "admin", action: "view" }],
+	},
+	{
+		title: "Drug Catalog",
+		href: "/pharmacy/drug-catalog",
+		iconName: "formulary",
+		requiredPermissions: [{ module: "formulary", action: "manage_catalog" }],
 	},
 	{
 		title: "Nursing",
@@ -344,9 +350,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		iconName: "records",
 		// Civil registry operations belong to civil_registry-role staff (Registrar, Nurse/Midwife).
 		// The page gate and backend guard both require civil_registry:view — align nav to match.
-		requiredPermissions: [
-			{ module: "civil_registry", action: "view" },
-		],
+		requiredPermissions: [{ module: "civil_registry", action: "view" }],
 		isSecondary: true,
 	},
 	{
@@ -469,12 +473,8 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "Integration Registry",
 		href: "/admin/integration-registry",
 		iconName: "settings",
-		requiredPermissions: [
-			{ module: "integration_registry", action: "view" },
-		],
-		requireAllPermissions: [
-			{ module: "admin", action: "view" },
-		],
+		requiredPermissions: [{ module: "integration_registry", action: "view" }],
+		requireAllPermissions: [{ module: "admin", action: "view" }],
 		isSecondary: true,
 		adminGroup: "System Settings",
 	},
@@ -530,13 +530,9 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "Formulary",
 		href: "/admin/formulary",
 		iconName: "formulary",
-		requiredPermissions: [
-			{ module: "formulary", action: "view" },
-		],
+		requiredPermissions: [{ module: "formulary", action: "view" }],
 		// Dual-gate: admin governance surface requires admin:view (FORM-005)
-		requireAllPermissions: [
-			{ module: "admin", action: "view" },
-		],
+		requireAllPermissions: [{ module: "admin", action: "view" }],
 		isSecondary: true,
 	},
 	{
@@ -651,35 +647,26 @@ export function filterNavItems(items: NavItemConfig[], permissions: Permission[]
 	})
 }
 
-/**
- * Default widget configurations per role name.
- * Keys are role names (lowercase). Widgets are IDs resolved by DashboardWidgets.
- */
-export const ROLE_DASHBOARD_WIDGETS: Record<string, string[]> = {
-	// TOR: System Admin — governance, config, audit, integration, ARTA/SLA visibility
-	"administrator": [
-		"admin-access-governance",
-		"admin-platform-control",
-		"admin-integrations",
-		"admin-audit",
-		"admin-arta-sla",
-	],
-	"registrar": ["my-patient-list", "quick-stats", "alerts"],
-	"clinician": ["my-patient-list", "pending-orders", "unsigned-notes", "alerts"],
-	"physician": ["my-patient-list", "pending-orders", "unsigned-notes", "alerts"],
-	"nurse": ["my-patient-list", "pending-orders", "alerts", "quick-stats"],
-	"pharmacist": ["pending-orders", "alerts", "quick-stats"],
-	"billing officer": ["quick-stats", "alerts"],
+interface PermissionLike {
+	module: string
+	action: string
 }
 
-export function getDashboardWidgets(roleName: string): string[] {
-	const key = roleName.toLowerCase()
-	return ROLE_DASHBOARD_WIDGETS[key] ?? ["quick-stats", "alerts"]
-}
+export function getDashboardWidgetsForPermissions(permissions: PermissionLike[]): string[] {
+	const permSet = new Set(permissions.map(p => `${p.module}:${p.action}`))
+	const widgetIds = new Set<string>(["quick-stats", "alerts"])
 
-/**
- * Returns true if the given role name resolves to the Administrator widget set.
- */
-export function isAdminRole(roleName: string): boolean {
-	return roleName.toLowerCase() === "administrator"
+	if (permSet.has("patients:view")) {
+		widgetIds.add("my-patient-list")
+	}
+
+	if (permSet.has("orders:create") || permSet.has("orders:sign") || permSet.has("orders:verify")) {
+		widgetIds.add("pending-orders")
+	}
+
+	if (permSet.has("clinical_docs:sign")) {
+		widgetIds.add("unsigned-notes")
+	}
+
+	return [...widgetIds]
 }

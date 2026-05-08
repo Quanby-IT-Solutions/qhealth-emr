@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-
 import { Loader2, Plus, Trash2 } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -27,16 +26,16 @@ import {
 } from "@/core/components/ui/table"
 
 import {
-	type OperationRecord,
-	type RvsAssignment,
-	type RvsAssignmentType,
-	type RvsCode,
-	type RvsCodeStatus,
 	useRemoveRvsAssignmentMutation,
 	useRvsAssignmentsQuery,
 	useRvsCodeSearchQuery,
 	useSuggestRvsCodeMutation,
 	useUpdateRvsStatusMutation,
+	type OperationRecord,
+	type RvsAssignment,
+	type RvsAssignmentType,
+	type RvsCode,
+	type RvsCodeStatus,
 } from "../api/surgical.hooks"
 import { detectProcedures, normalizeProcedureLabel } from "../lib/procedure-mapping"
 
@@ -72,12 +71,7 @@ interface SearchResultRowProps {
 	canSuggest: boolean
 }
 
-function SearchResultRow({
-	code,
-	onSuggest,
-	isSuggesting,
-	canSuggest,
-}: SearchResultRowProps) {
+function SearchResultRow({ code, onSuggest, isSuggesting, canSuggest }: SearchResultRowProps) {
 	return (
 		<TableRow>
 			<TableCell className="font-mono text-sm">{code.code}</TableCell>
@@ -118,7 +112,7 @@ function AssignmentRow({
 	assignment,
 	canValidate,
 	canFinalize,
-	canEdit = true,
+	canEdit = false,
 	isOperationRecordSigned,
 	defaultProcedureLabel,
 	onUpdateStatus,
@@ -191,7 +185,7 @@ interface SearchPanelProps {
 
 function SearchPanel({
 	caseId,
-	canEdit = true,
+	canEdit = false,
 	isOperationRecordSigned,
 	procedureCoverage,
 	selectedProcedureLabel,
@@ -260,8 +254,7 @@ function SearchPanel({
 					</div>
 				) : (
 					<p className="text-muted-foreground text-sm">
-						Add at least one performed procedure to the operative record before mapping RVS
-						codes.
+						Add at least one performed procedure to the operative record before mapping RVS codes.
 					</p>
 				)}
 			</div>
@@ -301,7 +294,11 @@ function SearchPanel({
 				<div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
 					Mapping to <span className="font-medium">{selectedProcedure.label}</span>.
 					{assignmentType === "primary" && hasPrimaryForSelectedProcedure ? (
-						<span> A primary code already exists for this procedure, so add an adjunct or remove the current primary first.</span>
+						<span>
+							{" "}
+							A primary code already exists for this procedure, so add an adjunct or remove the
+							current primary first.
+						</span>
 					) : null}
 				</div>
 			) : null}
@@ -335,9 +332,7 @@ function SearchPanel({
 										code={code}
 										onSuggest={handleSuggest}
 										canSuggest={canSuggest}
-										isSuggesting={
-											suggest.isPending && suggest.variables?.rvsCodeId === code.id
-										}
+										isSuggesting={suggest.isPending && suggest.variables?.rvsCodeId === code.id}
 									/>
 								))}
 							</TableBody>
@@ -376,7 +371,7 @@ interface RvsCodeSelectorProps {
 export function RvsCodeSelector({
 	caseId,
 	operationRecord,
-	canEdit = true,
+	canEdit = false,
 	canValidate,
 	canFinalize,
 	isOperationRecordSigned,
@@ -422,7 +417,7 @@ export function RvsCodeSelector({
 	}, [assignments.data, detectedProcedures])
 
 	const defaultProcedureLabel =
-		procedureCoverage.length === 1 ? procedureCoverage[0]?.label ?? null : null
+		procedureCoverage.length === 1 ? (procedureCoverage[0]?.label ?? null) : null
 
 	const finalizedTotal = useMemo(() => {
 		return (assignments.data ?? [])
@@ -440,8 +435,7 @@ export function RvsCodeSelector({
 
 		const selectedStillExists = procedureCoverage.some(
 			procedure =>
-				normalizeProcedureLabel(procedure.label) ===
-				normalizeProcedureLabel(selectedProcedureLabel)
+				normalizeProcedureLabel(procedure.label) === normalizeProcedureLabel(selectedProcedureLabel)
 		)
 
 		if (!selectedStillExists) {
@@ -543,8 +537,7 @@ export function RvsCodeSelector({
 												updateStatus.variables?.assignmentId === assignment.id
 											}
 											isRemoving={
-												remove.isPending &&
-												remove.variables?.assignmentId === assignment.id
+												remove.isPending && remove.variables?.assignmentId === assignment.id
 											}
 										/>
 									))}
@@ -562,7 +555,7 @@ export function RvsCodeSelector({
 									Validated:{" "}
 									{assignments.data.filter(assignment => assignment.status === "validated").length}
 								</span>
-								<span className="font-medium text-foreground">
+								<span className="text-foreground font-medium">
 									Finalized:{" "}
 									{assignments.data.filter(assignment => assignment.status === "finalized").length}
 								</span>

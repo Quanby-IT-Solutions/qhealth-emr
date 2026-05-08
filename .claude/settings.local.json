@@ -168,7 +168,21 @@
       "Bash(Find D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\hai-reconciliation\\\\components *)",
       "Bash(Find D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\him\\\\deficiency-tracking\\\\components *)",
       "Bash(Select-Object -First 10 FullName)",
-      "Bash([ -f \"D:/PROJECTS/qhealth-emr/apps/backend/src/modules/v1/him/$dir/$dir.module.ts\" ])"
+      "Bash([ -f \"D:/PROJECTS/qhealth-emr/apps/backend/src/modules/v1/him/$dir/$dir.module.ts\" ])",
+      "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\packages\\\\db\\\\src\\\\schema\" | Where-Object { $_.Name -match 'msw|coe|annex|malasakit|ancillary' })",
+      "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\features\\\\msw\" -Recurse -Force | ForEach-Object { $_.FullName })",
+      "PowerShell(Find-Item *)",
+      "PowerShell(Get-ChildItem -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\web\\\\app\\\\\\(site\\)\\\\patients\" -Recurse -Directory | Where-Object { $_.FullName -match 'msw' })",
+      "Bash(Remove-Item *)",
+      "Bash(curl *)",
+      "Bash(Select-String \"error TS\")",
+      "Bash(Select-String \"surveillance|reporting\")",
+      "Bash(pnpm --filter=@repo/contracts build)",
+      "Bash(Select-String -Path \"D:\\\\PROJECTS\\\\qhealth-emr\\\\apps\\\\backend\\\\src\\\\modules\\\\v1\\\\reporting\\\\reporting.service.ts\" -Pattern \"async validateAhsr|async lockAhsrPeriod|async exportAhsr\")",
+      "Bash(Select-Object LineNumber, Line)",
+      "Bash(Select-String \"surveillance|reporting|pidsr|ahsr|mm-report|mortality\")",
+      "Bash(Sort-Object)",
+      "Bash(npx pnpm *)"
     ]
   }
 }

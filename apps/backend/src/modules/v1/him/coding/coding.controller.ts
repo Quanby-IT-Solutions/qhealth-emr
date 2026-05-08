@@ -4,8 +4,8 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { himContract } from "@repo/contracts"
-import { v1 } from "@/config/api-versions.config"
 
+import { v1 } from "@/config/api-versions.config"
 import { RequireAnyPermissions } from "@/modules/v1/rbac/rbac.guard"
 
 import { CodingService } from "./coding.service"

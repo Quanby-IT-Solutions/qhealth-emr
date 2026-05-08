@@ -6,7 +6,6 @@ import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Separator } from "@/core/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import {
 	Table,
 	TableBody,
@@ -15,12 +14,13 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
-import { ConsentRecordsTab } from "@/features/clinical-docs/components/consent-records-tab"
-import { DocumentationTab } from "@/features/clinical-docs/components/documentation-tab"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { useEncounterDetailQuery } from "@/features/encounters/api/encounters.hooks"
 import { BillingTab } from "@/features/billing/components/billing-tab"
 import { CewsEligibilityBadge } from "@/features/billing/components/cews-eligibility-badge"
+import { ConsentRecordsTab } from "@/features/clinical-docs/components/consent-records-tab"
+import { DocumentationTab } from "@/features/clinical-docs/components/documentation-tab"
+import { useEncounterDetailQuery } from "@/features/encounters/api/encounters.hooks"
 import { NursingTab } from "@/features/nursing/components/nursing-tab"
 import { OrdersTab } from "@/features/orders/components/orders-tab"
 import { ProblemsAllergiesTab } from "@/features/problems-allergies/components/problems-allergies-tab"
@@ -62,6 +62,14 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
 	const canWriteNursing = permissions.some(p => p.module === "nursing" && p.action === "create")
+	const canWriteProblemsAllergies = permissions.some(
+		p => p.module === "clinical_docs" && p.action === "sign"
+	)
+	const canManageConsents = permissions.some(
+		p =>
+			(p.module === "clinical_docs" && p.action === "edit") ||
+			(p.module === "adt" && p.action === "edit")
+	)
 
 	if (isLoading) {
 		return (
@@ -98,9 +106,7 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 						<span className="capitalize">{encounter.encounterType}</span>
 					</div>
 					<div className="text-sm">
-						<Badge variant={statusVariant(encounter.status)}>
-							{encounter.status}
-						</Badge>
+						<Badge variant={statusVariant(encounter.status)}>{encounter.status}</Badge>
 					</div>
 					<CewsEligibilityBadge patientId={patientId} />
 					{encounter.wardName && (
@@ -205,7 +211,7 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 					<ProblemsAllergiesTab
 						patientId={patientId}
 						facilityId={encounter.facilityId}
-						canWrite={false}
+						canWrite={canWriteProblemsAllergies}
 					/>
 				</TabsContent>
 
@@ -253,7 +259,7 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 						encounterId={encounterId}
 						facilityId={encounter.facilityId}
 						patientId={patientId}
-						canManageConsents={false}
+						canManageConsents={canManageConsents}
 					/>
 				</TabsContent>
 
@@ -323,7 +329,11 @@ export function EncounterDetail({ encounterId, patientId }: EncounterDetailProps
 
 			{/* Back button */}
 			<div className="flex gap-3">
-				<Button variant="outline" nativeButton={false} render={<Link href={`/patients/${patientId}`} />}>
+				<Button
+					variant="outline"
+					nativeButton={false}
+					render={<Link href={`/patients/${patientId}`} />}
+				>
 					Back to Patient
 				</Button>
 			</div>

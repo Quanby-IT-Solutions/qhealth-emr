@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { CheckCircle, Droplets, XCircle } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -25,13 +24,14 @@ import {
 	TableRow,
 } from "@/core/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
+import { Textarea } from "@/core/components/ui/textarea"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
+	useApproveCrossMatchMutation,
+	useCreateCrossMatchMutation,
+	useCrossMatchListQuery,
 	type BloodType,
 	type CrossMatchRequest,
-	useCreateCrossMatchMutation,
-	useApproveCrossMatchMutation,
-	useCrossMatchListQuery,
 } from "@/features/lab/api/lab.hooks"
 
 // ============================================================================
@@ -100,7 +100,7 @@ function compatibilityIcon(result: CrossMatchRequest["compatibilityResult"]) {
 		case "compatible":
 			return <CheckCircle className="size-4 text-green-600" />
 		case "incompatible":
-			return <XCircle className="size-4 text-destructive" />
+			return <XCircle className="text-destructive size-4" />
 		default:
 			return <span className="text-muted-foreground">—</span>
 	}
@@ -150,7 +150,7 @@ function NewCrossMatchForm({
 					setClinicalIndication("")
 					onSuccess()
 				},
-			},
+			}
 		)
 	}
 
@@ -170,7 +170,7 @@ function NewCrossMatchForm({
 					</Label>
 					<Input
 						value={patientId}
-						onChange={(e) => setPatientId(e.target.value)}
+						onChange={e => setPatientId(e.target.value)}
 						placeholder="Patient MRN / ID"
 					/>
 				</div>
@@ -179,13 +179,13 @@ function NewCrossMatchForm({
 					<Label>Patient Blood Type (if known)</Label>
 					<Select
 						value={bloodType || undefined}
-						onValueChange={(v) => setBloodType(v as BloodType)}
+						onValueChange={v => v && setBloodType(v as BloodType)}
 					>
 						<SelectTrigger>
-							<SelectValue placeholder="Unknown" />
+							<SelectValue>{bloodType || "Unknown"}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
-							{BLOOD_TYPES.map((bt) => (
+							{BLOOD_TYPES.map(bt => (
 								<SelectItem key={bt} value={bt}>
 									{bt}
 								</SelectItem>
@@ -200,12 +200,12 @@ function NewCrossMatchForm({
 					<Label>
 						Blood Component <span className="text-destructive">*</span>
 					</Label>
-					<Select value={componentType} onValueChange={setComponentType}>
+					<Select value={componentType} onValueChange={v => v && setComponentType(v)}>
 						<SelectTrigger>
-							<SelectValue placeholder="Select component" />
+							<SelectValue>{componentType || "Select component"}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
-							{COMPONENT_TYPES.map((c) => (
+							{COMPONENT_TYPES.map(c => (
 								<SelectItem key={c} value={c}>
 									{c}
 								</SelectItem>
@@ -223,17 +223,14 @@ function NewCrossMatchForm({
 						min={1}
 						max={20}
 						value={unitsRequested}
-						onChange={(e) => setUnitsRequested(e.target.value)}
+						onChange={e => setUnitsRequested(e.target.value)}
 					/>
 				</div>
 			</div>
 
 			<div className="space-y-2">
 				<Label>Urgency</Label>
-				<Select
-					value={urgency}
-					onValueChange={(v) => setUrgency(v as CrossMatchRequest["urgency"])}
-				>
+				<Select value={urgency} onValueChange={v => setUrgency(v as CrossMatchRequest["urgency"])}>
 					<SelectTrigger>
 						<SelectValue />
 					</SelectTrigger>
@@ -249,7 +246,7 @@ function NewCrossMatchForm({
 				<Label>Clinical Indication</Label>
 				<Input
 					value={clinicalIndication}
-					onChange={(e) => setClinicalIndication(e.target.value)}
+					onChange={e => setClinicalIndication(e.target.value)}
 					placeholder="e.g., Post-operative hemorrhage, anemia"
 				/>
 			</div>
@@ -277,18 +274,14 @@ function CrossMatchTable({
 	canApprove: boolean
 }) {
 	if (isLoading) {
-		return (
-			<div className="py-12 text-center text-sm text-muted-foreground">
-				Loading requests…
-			</div>
-		)
+		return <div className="text-muted-foreground py-12 text-center text-sm">Loading requests…</div>
 	}
 
 	if (requests.length === 0) {
 		return (
 			<div className="flex flex-col items-center gap-2 py-12">
-				<Droplets className="size-8 text-muted-foreground/40" />
-				<p className="text-sm text-muted-foreground">No requests found.</p>
+				<Droplets className="text-muted-foreground/40 size-8" />
+				<p className="text-muted-foreground text-sm">No requests found.</p>
 			</div>
 		)
 	}
@@ -308,15 +301,13 @@ function CrossMatchTable({
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{requests.map((req) => (
+				{requests.map(req => (
 					<TableRow key={req.id}>
 						<TableCell>
 							<div>
 								<p className="font-medium">{req.patientName}</p>
 								{req.bloodType && (
-									<p className="text-xs text-muted-foreground">
-										Blood type: {req.bloodType}
-									</p>
+									<p className="text-muted-foreground text-xs">Blood type: {req.bloodType}</p>
 								)}
 							</div>
 						</TableCell>
@@ -328,20 +319,14 @@ function CrossMatchTable({
 							<div className="flex items-center gap-1">
 								{compatibilityIcon(req.compatibilityResult)}
 								{req.compatibilityResult && (
-									<span className="text-xs capitalize">
-										{req.compatibilityResult}
-									</span>
+									<span className="text-xs capitalize">{req.compatibilityResult}</span>
 								)}
 							</div>
 						</TableCell>
 						<TableCell>{statusBadge(req.status)}</TableCell>
 						<TableCell>
-							{req.status === "cross_matched" && canApprove && (
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => onApprove(req)}
-								>
+							{["pending", "cross_matched"].includes(req.status) && canApprove && (
+								<Button variant="outline" size="sm" onClick={() => onApprove(req)}>
 									Approve
 								</Button>
 							)}
@@ -369,6 +354,8 @@ function ApproveDialog({
 	const [compatibilityResult, setCompatibilityResult] = useState<
 		"compatible" | "incompatible" | ""
 	>("")
+	const [bloodUnitIds, setBloodUnitIds] = useState("")
+	const [rejectionReason, setRejectionReason] = useState("")
 	const approveMutation = useApproveCrossMatchMutation()
 
 	if (!request) return null
@@ -379,68 +366,105 @@ function ApproveDialog({
 			{
 				id: request.id,
 				compatibilityResult,
-				bloodUnitIds: request.bloodUnits.map((u) => u.id),
+				bloodUnitIds:
+					compatibilityResult === "compatible"
+						? bloodUnitIds
+								.split(/[\n,]/)
+								.map(id => id.trim())
+								.filter(Boolean)
+						: [],
+				rejectionReason: rejectionReason.trim() || undefined,
 			},
-			{ onSuccess: () => onOpenChange(false) },
+			{
+				onSuccess: () => {
+					setCompatibilityResult("")
+					setBloodUnitIds("")
+					setRejectionReason("")
+					onOpenChange(false)
+				},
+			}
 		)
 	}
+
+	const parsedBloodUnitIds = bloodUnitIds
+		.split(/[\n,]/)
+		.map(id => id.trim())
+		.filter(Boolean)
+	const canConfirm =
+		compatibilityResult === "incompatible" ||
+		(compatibilityResult === "compatible" && parsedBloodUnitIds.length >= request.unitsRequested)
 
 	return (
 		<div
 			role="dialog"
 			className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 ${open ? "" : "hidden"}`}
-			onClick={(e) => e.target === e.currentTarget && onOpenChange(false)}
+			onClick={e => e.target === e.currentTarget && onOpenChange(false)}
 		>
-			<div className="w-full max-w-md rounded-lg border bg-background p-6 shadow-xl">
+			<div className="bg-background w-full max-w-md rounded-lg border p-6 shadow-xl">
 				<h2 className="mb-4 text-lg font-semibold">Approve Cross-Match</h2>
 				<div className="space-y-4">
 					<div>
-						<p className="text-sm text-muted-foreground">Patient</p>
+						<p className="text-muted-foreground text-sm">Patient</p>
 						<p className="font-medium">{request.patientName}</p>
 					</div>
 					<div>
-						<p className="text-sm text-muted-foreground">Component</p>
+						<p className="text-muted-foreground text-sm">Component</p>
 						<p className="font-medium">
 							{request.componentType} × {request.unitsRequested}
 						</p>
 					</div>
 					<div className="space-y-2">
 						<Label>
-							Compatibility Result{" "}
-							<span className="text-destructive">*</span>
+							Compatibility Result <span className="text-destructive">*</span>
 						</Label>
 						<Select
 							value={compatibilityResult || undefined}
-							onValueChange={(v) =>
-								setCompatibilityResult(
-									v as "compatible" | "incompatible",
-								)
-							}
+							onValueChange={v => v && setCompatibilityResult(v as "compatible" | "incompatible")}
 						>
 							<SelectTrigger>
-								<SelectValue placeholder="Select result" />
+								<SelectValue>{compatibilityResult || "Select result"}</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="compatible">
-									Compatible ✓
-								</SelectItem>
-								<SelectItem value="incompatible">
-									Incompatible ✗
-								</SelectItem>
+								<SelectItem value="compatible">Compatible ✓</SelectItem>
+								<SelectItem value="incompatible">Incompatible ✗</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
+					{compatibilityResult === "compatible" && (
+						<div className="space-y-2">
+							<Label>
+								Blood Unit IDs <span className="text-destructive">*</span>
+							</Label>
+							<Textarea
+								value={bloodUnitIds}
+								onChange={e => setBloodUnitIds(e.target.value)}
+								placeholder="One unit UUID per line or comma-separated"
+								rows={3}
+							/>
+							<p className="text-muted-foreground text-xs">
+								Enter at least {request.unitsRequested} compatible available unit ID
+								{request.unitsRequested === 1 ? "" : "s"}.
+							</p>
+						</div>
+					)}
+					{compatibilityResult === "incompatible" && (
+						<div className="space-y-2">
+							<Label>Rejection Reason</Label>
+							<Textarea
+								value={rejectionReason}
+								onChange={e => setRejectionReason(e.target.value)}
+								placeholder="Document the incompatibility reason"
+								rows={3}
+							/>
+						</div>
+					)}
 					<div className="flex gap-2 pt-2">
-						<Button
-							variant="outline"
-							className="flex-1"
-							onClick={() => onOpenChange(false)}
-						>
+						<Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
 							Cancel
 						</Button>
 						<Button
 							className="flex-1"
-							disabled={!compatibilityResult || approveMutation.isPending}
+							disabled={!canConfirm || approveMutation.isPending}
 							onClick={handleApprove}
 						>
 							{approveMutation.isPending ? "Saving…" : "Confirm Approval"}
@@ -460,7 +484,9 @@ export function CrossMatchForm() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 	const permissions = profile?.activeRole?.permissions ?? []
-	const permSet = new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	const permSet = new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 	const canCreate = permSet.has("laboratory:create")
 	const canApprove = permSet.has("laboratory:edit")
 
@@ -492,7 +518,7 @@ export function CrossMatchForm() {
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-2xl font-semibold">Blood Bank — Cross-Match</h1>
-				<p className="text-sm text-muted-foreground">
+				<p className="text-muted-foreground text-sm">
 					Submit and manage blood product cross-match requests
 				</p>
 			</div>
@@ -509,6 +535,7 @@ export function CrossMatchForm() {
 					<CardContent>
 						<NewCrossMatchForm
 							facilityId={facilityId}
+							canCreate={canCreate}
 							onSuccess={() => {
 								pendingQuery.refetch()
 							}}
@@ -527,10 +554,7 @@ export function CrossMatchForm() {
 								<TabsTrigger value="pending">
 									Pending
 									{(pendingQuery.data?.total ?? 0) > 0 && (
-										<Badge
-											variant="secondary"
-											className="ml-1.5 text-[10px]"
-										>
+										<Badge variant="secondary" className="ml-1.5 text-[10px]">
 											{pendingQuery.data?.total}
 										</Badge>
 									)}
@@ -538,10 +562,7 @@ export function CrossMatchForm() {
 								<TabsTrigger value="cross_matched">
 									Cross-Matched
 									{(activeQuery.data?.total ?? 0) > 0 && (
-										<Badge
-											variant="secondary"
-											className="ml-1.5 text-[10px]"
-										>
+										<Badge variant="secondary" className="ml-1.5 text-[10px]">
 											{activeQuery.data?.total}
 										</Badge>
 									)}
@@ -578,11 +599,7 @@ export function CrossMatchForm() {
 				</Card>
 			</div>
 
-			<ApproveDialog
-				request={approveTarget}
-				open={approveOpen}
-				onOpenChange={setApproveOpen}
-			/>
+			<ApproveDialog request={approveTarget} open={approveOpen} onOpenChange={setApproveOpen} />
 		</div>
 	)
 }

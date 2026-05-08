@@ -4,7 +4,18 @@ import { createORPCClient } from "@orpc/client"
 import type { ContractRouterClient } from "@orpc/contract"
 import { createTanstackQueryUtils } from "@orpc/tanstack-query"
 
-import { billingContract, himContract, v1Contract } from "@repo/contracts"
+import {
+	ancillaryClearanceContract,
+	annexSignaturesContract,
+	assessmentsContract,
+	billingContract,
+	coeContract,
+	himContract,
+	malasakitContract,
+	mswBaseContract,
+	reportingContract,
+	v1Contract,
+} from "@repo/contracts"
 
 import { getCookieHeader } from "@/core/lib/cookie-utils"
 
@@ -13,6 +24,14 @@ import { createOrpcLink } from "./client"
 type V1Contract = typeof v1Contract
 type BillingContract = typeof billingContract
 type HimContract = typeof himContract
+type ReportingContract = typeof reportingContract
+type MswContract = typeof mswBaseContract & {
+	assessments: typeof assessmentsContract
+	coe: typeof coeContract
+	annexSignatures: typeof annexSignaturesContract
+	malasakit: typeof malasakitContract
+	ancillaryClearance: typeof ancillaryClearanceContract
+}
 
 /**
  * Server-side oRPC client. Use in Server Components, Server Actions, and Route
@@ -83,4 +102,14 @@ export const billingServerOrpc = createTanstackQueryUtils(
 export const himServerOrpc = createTanstackQueryUtils(
 	(baseServerOrpc as unknown as { him: ContractRouterClient<HimContract> }).him,
 	{ path: ["orpc", "him"] }
+)
+
+export const mswServerOrpc = createTanstackQueryUtils(
+	(baseServerOrpc as unknown as { msw: ContractRouterClient<MswContract> }).msw,
+	{ path: ["orpc", "msw"] }
+)
+
+export const reportingServerOrpc = createTanstackQueryUtils(
+	(baseServerOrpc as unknown as { reporting: ContractRouterClient<ReportingContract> }).reporting,
+	{ path: ["orpc", "reporting"] }
 )

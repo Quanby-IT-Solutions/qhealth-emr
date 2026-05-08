@@ -77,7 +77,10 @@ describe("BIL-BE-07 CEWS Eligibility", () => {
 
 	it("accepts hyphenated PIN (12-345678901-2 format)", async () => {
 		const { service } = makeService()
-		const res = await service.verifyCewsMembership({ memberPin: "12-345678901-2", encounterId: "enc-1" })
+		const res = await service.verifyCewsMembership({
+			memberPin: "12-345678901-2",
+			encounterId: "enc-1",
+		})
 		expect(res.memberPin).toBe("12-345678901-2")
 		expect(res.serviceUnavailable).toBe(false)
 	})
@@ -98,7 +101,10 @@ describe("BIL-BE-07 CEWS Eligibility", () => {
 				serviceUnavailable: false,
 			})
 
-		const res = await service.verifyCewsMembership({ memberPin: "12-345678901-2", encounterId: "enc-1" })
+		const res = await service.verifyCewsMembership({
+			memberPin: "12-345678901-2",
+			encounterId: "enc-1",
+		})
 
 		expect(callSpy).toHaveBeenCalledTimes(3)
 		expect(res.status).toBe("active")
@@ -110,7 +116,10 @@ describe("BIL-BE-07 CEWS Eligibility", () => {
 			.spyOn(service as unknown as { callCewsApi: (i: unknown) => Promise<unknown> }, "callCewsApi")
 			.mockRejectedValue(new Error("CEWS down"))
 
-		const res = await service.verifyCewsMembership({ memberPin: "123456789012", encounterId: "enc-1" })
+		const res = await service.verifyCewsMembership({
+			memberPin: "123456789012",
+			encounterId: "enc-1",
+		})
 
 		expect(res.status).toBe("service_unavailable")
 		expect(res.serviceUnavailable).toBe(true)

@@ -56,8 +56,7 @@ export class LabController {
 	@Implement(v1.lab.bedsideVerify)
 	async bedsideVerify(@Session() session: UserSession) {
 		return implement(v1.lab.bedsideVerify).handler(async ({ input }) => {
-			void session
-			return this.labService.bedsideVerify(input)
+			return this.labService.bedsideVerify(input, session.user.id)
 		})
 	}
 }

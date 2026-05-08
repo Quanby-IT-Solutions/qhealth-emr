@@ -1,11 +1,12 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-
 import { Loader2, Lock, Save, Signature } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import { Checkbox } from "@/core/components/ui/checkbox"
 import {
 	Command,
 	CommandEmpty,
@@ -14,23 +15,17 @@ import {
 	CommandItem,
 	CommandList,
 } from "@/core/components/ui/command"
-import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import { Checkbox } from "@/core/components/ui/checkbox"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/core/components/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger } from "@/core/components/ui/popover"
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useListCliniciansQuery } from "@/features/patients/api/patients.hooks"
 
 import {
-	type OperationRecord,
 	useSaveOperationRecordMutation,
 	useSignOperationRecordMutation,
+	type OperationRecord,
 } from "../api/surgical.hooks"
 
 interface OperationRecordFormProps {
@@ -103,12 +98,9 @@ function StaffSearchCombobox({
 			query.length === 0
 				? options
 				: options.filter(option => {
-					const department = option.department?.toLowerCase() ?? ""
-					return (
-						option.name.toLowerCase().includes(query) ||
-						department.includes(query)
-					)
-				})
+						const department = option.department?.toLowerCase() ?? ""
+						return option.name.toLowerCase().includes(query) || department.includes(query)
+					})
 
 		return source.slice(0, 20)
 	}, [inputValue, options])
@@ -169,9 +161,7 @@ function StaffSearchCombobox({
 									<div className="flex min-w-0 flex-1 flex-col">
 										<span className="truncate font-medium">{option.name}</span>
 										{option.department ? (
-											<span className="text-muted-foreground text-xs">
-												{option.department}
-											</span>
+											<span className="text-muted-foreground text-xs">{option.department}</span>
 										) : null}
 									</div>
 								</CommandItem>
@@ -219,7 +209,7 @@ export function OperationRecordForm({
 	surgeonStaffId,
 	defaultAnesthesiologistStaffId,
 	existing,
-	canEdit = true,
+	canEdit = false,
 	canSign = false,
 }: OperationRecordFormProps) {
 	const [form, setForm] = useState<FormState>(() =>
@@ -229,13 +219,9 @@ export function OperationRecordForm({
 	const sign = useSignOperationRecordMutation()
 	const staffDirectory = useListCliniciansQuery(facilityId)
 
-	const staffOptions = useMemo(
-		() => staffDirectory.data?.data ?? [],
-		[staffDirectory.data]
-	)
+	const staffOptions = useMemo(() => staffDirectory.data?.data ?? [], [staffDirectory.data])
 	const surgeonName =
-		staffOptions.find(option => option.staffProfileId === surgeonStaffId)?.name ??
-		surgeonStaffId
+		staffOptions.find(option => option.staffProfileId === surgeonStaffId)?.name ?? surgeonStaffId
 	const isSigned = existing?.status === "signed"
 	const fieldsDisabled = isSigned || !canEdit || save.isPending || sign.isPending
 	const canSubmit = Boolean(
@@ -399,8 +385,8 @@ export function OperationRecordForm({
 							disabled={fieldsDisabled}
 						/>
 						<p className="text-muted-foreground text-xs">
-							Use one line per performed procedure so billing can map a primary RVS code to
-							each procedure.
+							Use one line per performed procedure so billing can map a primary RVS code to each
+							procedure.
 						</p>
 					</div>
 					<div className="space-y-1.5">
@@ -652,10 +638,7 @@ export function OperationRecordForm({
 							void handleSign()
 						}}
 						disabled={
-							!canSignRecord ||
-							sign.isPending ||
-							(canEdit && !canSubmit) ||
-							(!canEdit && !existing)
+							!canSignRecord || sign.isPending || (canEdit && !canSubmit) || (!canEdit && !existing)
 						}
 					>
 						<Signature className="mr-2 size-4" />

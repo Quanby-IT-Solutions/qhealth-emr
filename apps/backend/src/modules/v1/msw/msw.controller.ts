@@ -3,86 +3,91 @@ import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
+import { mswBaseContract } from "@repo/contracts"
+
 import { v1 } from "@/config/api-versions.config"
 import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { MswService } from "./msw.service"
+
+// v1.msw is `any` due to TS7056 workaround in v1.msw.ts; cast back via the flat base contract
+const mswV1 = v1.msw as unknown as typeof mswBaseContract
 
 @Controller()
 export class MswController {
 	constructor(private readonly mswService: MswService) {}
 
 	@RequirePermission("msw", "view")
-	@Implement(v1.msw.list)
+	@Implement(mswV1.list)
 	async list() {
-		return implement(v1.msw.list).handler(async ({ input }) => {
+		return implement(mswV1.list).handler(async ({ input }) => {
 			return this.mswService.list(input)
 		})
 	}
 
 	@RequirePermission("msw", "view")
-	@Implement(v1.msw.get)
+	@Implement(mswV1.get)
 	async get() {
-		return implement(v1.msw.get).handler(async ({ input }) => {
+		return implement(mswV1.get).handler(async ({ input }) => {
 			return this.mswService.get(input.id)
 		})
 	}
 
 	@RequirePermission("msw", "view")
-	@Implement(v1.msw.getByEncounter)
+	@Implement(mswV1.getByEncounter)
 	async getByEncounter() {
-		return implement(v1.msw.getByEncounter).handler(async ({ input }) => {
+		return implement(mswV1.getByEncounter).handler(async ({ input }) => {
 			return this.mswService.getByEncounter(input.encounterId)
 		})
 	}
 
 	@RequirePermission("msw", "create")
-	@Implement(v1.msw.create)
+	@Implement(mswV1.create)
 	async create(@Session() session: UserSession) {
-		return implement(v1.msw.create).handler(async ({ input }) => {
+		return implement(mswV1.create).handler(async ({ input }) => {
 			return this.mswService.create(input, session.user.id)
 		})
 	}
 
 	@RequirePermission("msw", "edit")
-	@Implement(v1.msw.update)
+	@Implement(mswV1.update)
 	async update(@Session() session: UserSession) {
-		return implement(v1.msw.update).handler(async ({ input }) => {
+		return implement(mswV1.update).handler(async ({ input }) => {
 			void session
 			return this.mswService.update(input)
 		})
 	}
 
 	@RequirePermission("msw", "edit")
-	@Implement(v1.msw.issueCoe)
+	@Implement(mswV1.issueCoe)
 	async issueCoe(@Session() session: UserSession) {
-		return implement(v1.msw.issueCoe).handler(async ({ input }) => {
+		return implement(mswV1.issueCoe).handler(async ({ input }) => {
 			return this.mswService.issueCoe(input, session.user.id)
 		})
 	}
 
 	@RequirePermission("msw", "edit")
-	@Implement(v1.msw.addMalasakit)
+	@Implement(mswV1.addMalasakit)
 	async addMalasakit(@Session() session: UserSession) {
-		return implement(v1.msw.addMalasakit).handler(async ({ input }) => {
+		return implement(mswV1.addMalasakit).handler(async ({ input }) => {
 			void session
 			return this.mswService.addMalasakit(input)
 		})
 	}
 
 	@RequirePermission("msw", "edit")
-	@Implement(v1.msw.captureAnnexSignature)
+	@Implement(mswV1.captureAnnexSignature)
 	async captureAnnexSignature(@Session() session: UserSession) {
-		return implement(v1.msw.captureAnnexSignature).handler(async ({ input }) => {
+		return implement(mswV1.captureAnnexSignature).handler(async ({ input }) => {
 			void session
 			return this.mswService.captureAnnexSignature(input)
 		})
 	}
 
 	@RequirePermission("msw", "edit")
-	@Implement(v1.msw.tagBenefits)
+	@Implement(mswV1.tagBenefits)
 	async tagBenefits(@Session() session: UserSession) {
-		return implement(v1.msw.tagBenefits).handler(async ({ input }) => {
+		return implement(mswV1.tagBenefits).handler(async ({ input }) => {
 			void session
 			return this.mswService.tagBenefits(input)
 		})
