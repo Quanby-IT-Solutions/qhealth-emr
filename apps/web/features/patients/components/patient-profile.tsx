@@ -30,7 +30,6 @@ import {
 	DialogTitle,
 } from "@/core/components/ui/dialog"
 import { Separator } from "@/core/components/ui/separator"
-import { SidebarTrigger } from "@/core/components/ui/sidebar"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useMyActiveBreakGlassQuery } from "@/features/audit/api/audit.hooks"
 import { BreakGlassCountdown, BreakGlassForm } from "@/features/audit/components/break-glass-form"
@@ -410,9 +409,6 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 		<div className="bg-background">
 			<div className="w-full">
 				<div className="mb-8 flex items-center gap-3">
-					<div className="md:hidden">
-						<SidebarTrigger className="border-border/60 bg-background size-9 rounded-full border shadow-sm" />
-					</div>
 					<Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleBackToPrevious}>
 						<ArrowLeft className="size-4" />
 						Back to Search

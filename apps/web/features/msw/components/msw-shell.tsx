@@ -48,14 +48,14 @@ export function MswShell({ children }: MswShellProps) {
 	const pathname = usePathname()
 
 	return (
-		<div className="absolute inset-0 flex overflow-hidden">
-			<aside className="hidden w-56 shrink-0 border-r bg-sidebar lg:flex lg:flex-col">
-				<div className="border-b px-4 py-3">
-					<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+		<div className="flex w-full min-h-[calc(100vh-8rem)] overflow-hidden rounded-xl border border-border bg-background shadow-sm">
+			<aside className="hidden w-60 shrink-0 border-r border-border bg-sidebar/30 lg:flex lg:flex-col">
+				<div className="border-b border-border bg-sidebar/50 px-4 py-4">
+					<p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
 						Medical Social Work
 					</p>
 				</div>
-				<nav className="flex-1 space-y-0.5 p-2">
+				<nav className="flex-1 space-y-1 p-3 custom-scrollbar overflow-y-auto">
 					{NAV_ITEMS.map(({ href, label, icon: Icon, Badge: NavBadge }) => {
 						const isActive = href === "/msw" ? pathname === href : pathname.startsWith(href)
 						return (
@@ -63,21 +63,23 @@ export function MswShell({ children }: MswShellProps) {
 								key={href}
 								href={href}
 								className={cn(
-									"flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
+									"flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring",
 									isActive
-										? "bg-primary/10 font-medium text-primary"
-										: "text-muted-foreground hover:bg-accent hover:text-foreground"
+										? "bg-primary/10 font-semibold text-primary shadow-sm"
+										: "text-muted-foreground hover:bg-accent/50 hover:text-foreground font-medium"
 								)}
 							>
-								<Icon className="size-4 shrink-0" />
-								<span className="flex-1">{label}</span>
+								<Icon className={cn("size-4 shrink-0 transition-colors", isActive ? "text-primary" : "opacity-70")} />
+								<span className="flex-1 truncate">{label}</span>
 								{NavBadge && <NavBadge />}
 							</Link>
 						)
 					})}
 				</nav>
 			</aside>
-			<main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
+			<main className="flex-1 overflow-auto bg-background/50 p-6 md:p-8 custom-scrollbar">
+				{children}
+			</main>
 		</div>
 	)
 }

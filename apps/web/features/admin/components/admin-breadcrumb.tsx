@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -74,12 +75,14 @@ export function AdminBreadcrumb() {
 							<BreadcrumbPage>{crumb.label}</BreadcrumbPage>
 						</BreadcrumbItem>
 					) : (
-						<BreadcrumbItem key={crumb.href}>
-							<BreadcrumbLink render={<Link href={crumb.href} />}>
-								{crumb.label}
-							</BreadcrumbLink>
+						<React.Fragment key={crumb.href}>
+							<BreadcrumbItem>
+								<BreadcrumbLink render={<Link href={crumb.href} />}>
+									{crumb.label}
+								</BreadcrumbLink>
+							</BreadcrumbItem>
 							{i < crumbs.length - 1 && <BreadcrumbSeparator />}
-						</BreadcrumbItem>
+						</React.Fragment>
 					)
 				)}
 			</BreadcrumbList>

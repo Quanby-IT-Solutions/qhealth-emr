@@ -1,13 +1,14 @@
 "use client"
 
 import { useState } from "react"
-
-import { ChevronDown, ChevronUp, Terminal } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Terminal } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { useLoginMutation } from "@/features/auth/login/api/login.hooks"
 import { authClient } from "@/services/better-auth/auth-client"
+import { cn } from "@/core/lib/utils"
 
 const DEV_ACCOUNTS = [
 	{ email: "admin@qhealth.local", label: "Administrator", category: "Admin" },
@@ -70,45 +71,82 @@ export function DevQuickLogin() {
 	}
 
 	return (
-		<Card className="border-dashed border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/20">
-			<CardHeader className="cursor-pointer pb-2 pt-3" onClick={() => setOpen(v => !v)}>
-				<CardTitle className="flex items-center justify-between text-sm font-medium text-amber-700 dark:text-amber-400">
+		<Card className="border-dashed border-amber-300 bg-amber-50/50 dark:border-amber-700/50 dark:bg-amber-950/20 overflow-hidden" aria-label="Development Quick Login">
+			<CardHeader 
+				className="cursor-pointer pb-2 pt-3 transition-colors hover:bg-amber-100/50 dark:hover:bg-amber-900/30" 
+				onClick={() => setOpen(v => !v)}
+			>
+				<CardTitle className="flex items-center justify-between text-sm font-medium text-amber-700 dark:text-amber-400 font-sans">
 					<span className="flex items-center gap-2">
 						<Terminal className="size-4" />
 						Dev Quick Login
 					</span>
-					{open ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+					<motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
+						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+							<path d="m6 9 6 6 6-6" />
+						</svg>
+					</motion.div>
 				</CardTitle>
 			</CardHeader>
 
-			{open && (
-				<CardContent className="space-y-3 pb-4 pt-0">
-					<p className="text-muted-foreground text-xs">
-						All accounts use <code className="bg-muted rounded px-1 py-0.5">Password123</code>
-					</p>
-					{grouped.map(({ category, accounts }) => (
-						<div key={category}>
-							<p className="text-muted-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
-								{category}
+			<AnimatePresence initial={false}>
+				{open && (
+					<motion.div
+						initial={{ height: 0, opacity: 0 }}
+						animate={{ height: "auto", opacity: 1 }}
+						exit={{ height: 0, opacity: 0 }}
+						transition={{ duration: 0.3, ease: "easeInOut" }}
+					>
+						<CardContent className="space-y-4 pb-4 pt-0">
+							<p className="text-muted-foreground text-xs font-sans">
+								All accounts use <code className="bg-muted rounded px-1.5 py-0.5 text-[11px]">Password123</code>
 							</p>
-							<div className="flex flex-wrap gap-1.5">
-								{accounts.map(account => (
-									<Button
-										key={account.email}
-										variant="outline"
-										size="sm"
-										disabled={loggingIn !== null}
-										onClick={() => handleQuickLogin(account.email)}
-										className={`h-7 cursor-pointer border px-2.5 text-xs transition-colors ${CATEGORY_COLORS[category]}`}
+							
+							<div className="space-y-3">
+								{grouped.map(({ category, accounts }, idx) => (
+									<motion.div 
+										key={category}
+										initial={{ opacity: 0, x: -10 }}
+										animate={{ opacity: 1, x: 0 }}
+										transition={{ delay: 0.1 + (idx * 0.05) }}
 									>
-										{loggingIn === account.email ? "…" : account.label}
-									</Button>
+										<p className="text-muted-foreground mb-1.5 text-[10px] font-medium uppercase tracking-wider font-sans">
+											{category}
+										</p>
+										<div className="flex flex-wrap gap-1.5">
+											{accounts.map(account => (
+												<Button
+													key={account.email}
+													variant="outline"
+													size="sm"
+													disabled={loggingIn !== null}
+													onClick={() => handleQuickLogin(account.email)}
+													className={cn(
+														"h-7 cursor-pointer border px-2.5 text-xs transition-colors font-sans",
+														CATEGORY_COLORS[category]
+													)}
+												>
+													{loggingIn === account.email ? (
+														<motion.span
+															initial={{ opacity: 0 }}
+															animate={{ opacity: 1 }}
+															transition={{ repeat: Infinity, duration: 0.8, direction: "alternate" }}
+														>
+															...
+														</motion.span>
+													) : (
+														account.label
+													)}
+												</Button>
+											))}
+										</div>
+									</motion.div>
 								))}
 							</div>
-						</div>
-					))}
-				</CardContent>
-			)}
+						</CardContent>
+					</motion.div>
+				)}
+			</AnimatePresence>
 		</Card>
 	)
 }

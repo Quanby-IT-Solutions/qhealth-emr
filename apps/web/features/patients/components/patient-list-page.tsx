@@ -16,7 +16,6 @@ import {
 	DialogTitle,
 } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
-import { SidebarTrigger } from "@/core/components/ui/sidebar"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { BreakGlassForm } from "@/features/audit/components/break-glass-form"
 import { useOfflinePatients } from "@/features/offline-cache/lib/use-offline-patients"
@@ -129,7 +128,6 @@ export function PatientListPage() {
 			{/* Header */}
 			<header className="border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60 sticky top-0 z-10">
 				<div className="flex h-14 items-center gap-3 px-4">
-					<SidebarTrigger />
 					<div className="flex-1">
 						<h1 className="text-base font-semibold tracking-tight">Patients</h1>
 					</div>

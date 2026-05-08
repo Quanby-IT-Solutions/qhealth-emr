@@ -28,7 +28,7 @@ export function AppTopbar() {
 
 	return (
 		<>
-			<header className="bg-background flex h-12 shrink-0 items-center gap-2 border-b px-4">
+			<header className="bg-background flex h-14 shrink-0 items-center gap-2 border-b px-4">
 				<SidebarTrigger className="-ml-1" />
 				<Separator orientation="vertical" className="mr-2 h-4" />
 
@@ -37,10 +37,10 @@ export function AppTopbar() {
 					{canSearchPatients && (
 						<Link
 							href={patientSearchHref}
-							className="bg-muted/40 hover:bg-muted/60 flex h-8 w-full max-w-sm items-center gap-2 rounded-md border px-3 text-sm transition-colors"
+							className="bg-muted/40 hover:bg-muted/60 flex h-9 w-full max-w-sm items-center gap-2 rounded-md border px-3 text-sm transition-colors"
 						>
 							<HugeiconsIcon icon={Search01FreeIcons} className="text-muted-foreground size-4" />
-							<span className="text-muted-foreground">Search patients, orders…</span>
+							<span className="text-muted-foreground text-[13px]">Search patients, orders…</span>
 						</Link>
 					)}
 				</div>
