@@ -116,6 +116,9 @@ describe("BIL-BE-02 Charge Capture", () => {
 			totalAmount: "500.00",
 			sourceType: "manual",
 		}
+		;(db.select as jest.Mock).mockReturnValue({
+			from: () => ({ where: () => Promise.resolve([{ status: "active" }]) }),
+		})
 		;(db.insert as jest.Mock).mockReturnValue({
 			values: () => ({ returning: () => Promise.resolve([inserted]) }),
 		})
@@ -146,6 +149,9 @@ describe("BIL-BE-02 Charge Capture", () => {
 
 	it("addChargeFromEvent uses ON CONFLICT DO NOTHING for idempotent auto-pull", async () => {
 		const onConflictDoNothing = jest.fn().mockResolvedValue(undefined)
+		;(db.select as jest.Mock).mockReturnValue({
+			from: () => ({ where: () => Promise.resolve([{ status: "active" }]) }),
+		})
 		;(db.insert as jest.Mock).mockReturnValue({
 			values: () => ({ onConflictDoNothing }),
 		})
