@@ -59,6 +59,10 @@ export function BedManagement() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 
+	const permissions = profile?.activeRole?.permissions ?? []
+	const permSet = new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	const canCreate = permSet.has("adt:create")
+
 	const { data: bedData, isLoading } = useBedListQuery({ facilityId })
 	const { data: census } = useBedCensusQuery({ facilityId })
 	const createWard = useCreateWardMutation()
@@ -92,7 +96,7 @@ export function BedManagement() {
 			{census && <BedCensusMetrics census={census} />}
 
 			{/* Actions */}
-			<div className="flex flex-wrap gap-2">
+			{canCreate && <div className="flex flex-wrap gap-2">
 				<Dialog>
 					<DialogTrigger render={<Button size="sm">Add Ward</Button>} />
 					<DialogContent>
@@ -111,7 +115,9 @@ export function BedManagement() {
 								<Label>Ward Type</Label>
 								<Select value={newWard.wardType} onValueChange={v => setNewWard(prev => ({ ...prev, wardType: v ?? "general" }))}>
 									<SelectTrigger className="w-full">
-										<SelectValue />
+										<SelectValue>
+											{{ general: "General", icu: "ICU", er: "ER", or: "OR", nursery: "Nursery" }[newWard.wardType] ?? newWard.wardType}
+										</SelectValue>
 									</SelectTrigger>
 									<SelectContent>
 										<SelectItem value="general">General</SelectItem>
@@ -153,7 +159,11 @@ export function BedManagement() {
 								<Label>Ward</Label>
 								<Select value={newBed.wardId} onValueChange={v => setNewBed(prev => ({ ...prev, wardId: v ?? "" }))}>
 									<SelectTrigger className="w-full">
-										<SelectValue />
+										<SelectValue>
+											{newBed.wardId
+												? (wards.find(w => w.id === newBed.wardId)?.name ?? newBed.wardId)
+												: <span className="text-muted-foreground">Select a ward</span>}
+										</SelectValue>
 									</SelectTrigger>
 									<SelectContent>
 										{wards.map(w => (
@@ -190,7 +200,7 @@ export function BedManagement() {
 						</DialogFooter>
 					</DialogContent>
 				</Dialog>
-			</div>
+			</div>}
 
 			{/* Bed Status Legend */}
 			<BedStatusLegend />

@@ -82,6 +82,11 @@ export function EdDashboard() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 	const staffProfileId = profile?.staffProfiles?.[0]?.id ?? ""
+	const permissions = profile?.activeRole?.permissions ?? []
+	const permSet = new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
+	const canCreate = permSet.has("ed:create")
 
 	const { data: queue, isLoading } = useEdQueueQuery(facilityId)
 
@@ -145,32 +150,36 @@ export function EdDashboard() {
 					</p>
 				</div>
 				<div className="flex items-center gap-2">
-					<Dialog open={triageOpen} onOpenChange={setTriageOpen}>
-						<DialogTrigger render={<Button variant="outline">New Triage</Button>} />
-						<DialogContent className="max-w-lg">
-							<DialogHeader>
-								<DialogTitle>New Triage Pre-Encounter</DialogTitle>
-							</DialogHeader>
-							<TriageForm
-								facilityId={facilityId}
-								triageStaffId={staffProfileId}
-								onSuccess={() => setTriageOpen(false)}
-							/>
-						</DialogContent>
-					</Dialog>
-					<Dialog open={preEncounterOpen} onOpenChange={setPreEncounterOpen}>
-						<DialogTrigger render={<Button>Fast Track (Pre-Encounter)</Button>} />
-						<DialogContent className="max-w-lg">
-							<DialogHeader>
-								<DialogTitle>Fast Track — Pre-Encounter</DialogTitle>
-							</DialogHeader>
-							<PreEncounterForm
-								facilityId={facilityId}
-								triageStaffId={staffProfileId}
-								onSuccess={() => setPreEncounterOpen(false)}
-							/>
-						</DialogContent>
-					</Dialog>
+					{canCreate && (
+						<Dialog open={triageOpen} onOpenChange={setTriageOpen}>
+							<DialogTrigger render={<Button variant="outline">New Triage</Button>} />
+							<DialogContent className="max-w-lg">
+								<DialogHeader>
+									<DialogTitle>New Triage Pre-Encounter</DialogTitle>
+								</DialogHeader>
+								<TriageForm
+									facilityId={facilityId}
+									triageStaffId={staffProfileId}
+									onSuccess={() => setTriageOpen(false)}
+								/>
+							</DialogContent>
+						</Dialog>
+					)}
+					{canCreate && (
+						<Dialog open={preEncounterOpen} onOpenChange={setPreEncounterOpen}>
+							<DialogTrigger render={<Button>Fast Track (Pre-Encounter)</Button>} />
+							<DialogContent className="max-w-lg">
+								<DialogHeader>
+									<DialogTitle>Fast Track — Pre-Encounter</DialogTitle>
+								</DialogHeader>
+								<PreEncounterForm
+									facilityId={facilityId}
+									triageStaffId={staffProfileId}
+									onSuccess={() => setPreEncounterOpen(false)}
+								/>
+							</DialogContent>
+						</Dialog>
+					)}
 				</div>
 			</div>
 
