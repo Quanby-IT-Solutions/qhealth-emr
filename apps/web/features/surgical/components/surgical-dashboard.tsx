@@ -132,26 +132,55 @@ export function SurgicalDashboard() {
 
 	const [activeTab, setActiveTab] = useState<SurgeryStatus>("scheduled")
 
-	const { data, isLoading } = useSurgicalCaseListQuery({
+	const { data, isLoading, isError } = useSurgicalCaseListQuery({
 		facilityId,
 		status: activeTab,
 		...ownCaseFilter,
 	})
+	const scheduledCountQuery = useSurgicalCaseListQuery({
+		facilityId,
+		status: "scheduled",
+		limit: 1,
+		...ownCaseFilter,
+	})
+	const inProgressCountQuery = useSurgicalCaseListQuery({
+		facilityId,
+		status: "in_progress",
+		limit: 1,
+		...ownCaseFilter,
+	})
+	const completedCountQuery = useSurgicalCaseListQuery({
+		facilityId,
+		status: "completed",
+		limit: 1,
+		...ownCaseFilter,
+	})
+	const cancelledCountQuery = useSurgicalCaseListQuery({
+		facilityId,
+		status: "cancelled",
+		limit: 1,
+		...ownCaseFilter,
+	})
 	const caseScopeLabel = isSurgeon || isAnesthesiologist ? "My Cases" : "All Cases"
+	const caseScopeDescription = isSurgeon
+		? "Showing cases where you are assigned as surgeon"
+		: isAnesthesiologist
+			? "Showing cases where you are assigned as anesthesiologist"
+			: "Showing all surgical cases for this facility"
 
-	const counts = STATUS_TABS.reduce<Record<string, number>>((acc, tab) => {
-		acc[tab.value] = 0
-		return acc
-	}, {})
+	const counts: Record<string, number> = {
+		scheduled: scheduledCountQuery.data?.total ?? 0,
+		in_progress: inProgressCountQuery.data?.total ?? 0,
+		completed: completedCountQuery.data?.total ?? 0,
+		cancelled: cancelledCountQuery.data?.total ?? 0,
+	}
 
 	return (
 		<div className="space-y-4 p-6">
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-2xl font-semibold">Surgical Services</h1>
-					<p className="text-muted-foreground text-sm">
-						Operating room schedule and surgical cases
-					</p>
+					<p className="text-muted-foreground text-sm">{caseScopeDescription}</p>
 				</div>
 				<div className="flex items-center gap-2">
 					<Badge variant="secondary">{caseScopeLabel}</Badge>
@@ -184,6 +213,10 @@ export function SurgicalDashboard() {
 					</div>
 					{isLoading ? (
 						<div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
+					) : isError ? (
+						<div className="text-destructive py-8 text-center text-sm">
+							Unable to load surgical cases. Please try again.
+						</div>
 					) : (
 						<SurgicalTable
 							cases={data?.data ?? []}

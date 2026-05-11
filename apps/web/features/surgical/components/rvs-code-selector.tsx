@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Loader2, Plus, Trash2 } from "lucide-react"
+import { Loader2, Lock, Plus, ShieldAlert, Trash2 } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -48,7 +48,12 @@ interface ProcedureCoverage {
 
 function statusBadge(status: RvsCodeStatus) {
 	if (status === "finalized") {
-		return <Badge variant="default">{formatStatus(status)}</Badge>
+		return (
+			<Badge variant="default" className="gap-1">
+				<Lock className="size-3" />
+				{formatStatus(status)}
+			</Badge>
+		)
 	}
 	if (status === "validated") {
 		return <Badge variant="secondary">{formatStatus(status)}</Badge>
@@ -339,7 +344,7 @@ function SearchPanel({
 						</Table>
 					) : (
 						<p className="text-muted-foreground p-4 text-sm">
-							No codes matched "{debouncedQuery}".
+							No codes matched &quot;{debouncedQuery}&quot;.
 						</p>
 					)}
 				</div>
@@ -426,22 +431,13 @@ export function RvsCodeSelector({
 	}, [assignments.data])
 
 	const missingPrimaryCount = procedureCoverage.filter(procedure => !procedure.isReady).length
-
-	useEffect(() => {
-		if (procedureCoverage.length === 0) {
-			setSelectedProcedureLabel("")
-			return
-		}
-
-		const selectedStillExists = procedureCoverage.some(
-			procedure =>
-				normalizeProcedureLabel(procedure.label) === normalizeProcedureLabel(selectedProcedureLabel)
-		)
-
-		if (!selectedStillExists) {
-			setSelectedProcedureLabel(procedureCoverage[0]!.label)
-		}
-	}, [procedureCoverage, selectedProcedureLabel])
+	const selectedStillExists = procedureCoverage.some(
+		procedure =>
+			normalizeProcedureLabel(procedure.label) === normalizeProcedureLabel(selectedProcedureLabel)
+	)
+	const effectiveSelectedProcedureLabel = selectedStillExists
+		? selectedProcedureLabel
+		: (procedureCoverage[0]?.label ?? "")
 
 	function handleUpdateStatus(id: string, status: RvsCodeStatus) {
 		updateStatus.mutate({ caseId, assignmentId: id, status })
@@ -466,16 +462,30 @@ export function RvsCodeSelector({
 				</CardHeader>
 				<CardContent className="space-y-4">
 					{!isOperationRecordSigned ? (
-						<div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-							Sign the operative record first. RVS search remains available, but suggesting,
-							validating, finalizing, and removing codes stays locked until the record is signed.
+						<div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+							<Lock className="mt-0.5 size-4 shrink-0 text-amber-600" />
+							<p>
+								Sign the operative record first. RVS search remains available, but suggesting,
+								validating, finalizing, and removing codes stays locked until the record is signed.
+							</p>
 						</div>
 					) : null}
 					{procedureCoverage.length > 0 ? (
-						<div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-							{missingPrimaryCount === 0
-								? "All listed procedures already have a primary RVS code."
-								: `${missingPrimaryCount} procedure${missingPrimaryCount === 1 ? "" : "s"} still need a primary RVS code before surgical billing is ready.`}
+						<div
+							className={
+								missingPrimaryCount === 0
+									? "rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
+									: "flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+							}
+						>
+							{missingPrimaryCount === 0 ? null : (
+								<ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+							)}
+							<p>
+								{missingPrimaryCount === 0
+									? "All listed procedures already have a primary RVS code. Surgical billing is ready for validation/finalization."
+									: `${missingPrimaryCount} procedure${missingPrimaryCount === 1 ? "" : "s"} still need a primary RVS code before surgical billing is ready.`}
+							</p>
 						</div>
 					) : null}
 					<SearchPanel
@@ -483,7 +493,7 @@ export function RvsCodeSelector({
 						canEdit={canEdit}
 						isOperationRecordSigned={isOperationRecordSigned}
 						procedureCoverage={procedureCoverage}
-						selectedProcedureLabel={selectedProcedureLabel}
+						selectedProcedureLabel={effectiveSelectedProcedureLabel}
 						onSelectProcedure={setSelectedProcedureLabel}
 						assignmentType={assignmentType}
 						onAssignmentTypeChange={setAssignmentType}

@@ -2,8 +2,9 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Printer } from "lucide-react"
+import { AlertTriangle, Printer } from "lucide-react"
 
+import { Alert, AlertDescription, AlertTitle } from "@/core/components/ui/alert"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
@@ -89,6 +90,18 @@ export function DischargePanel({
 		!!patientDateOfBirth &&
 		(isMaternalDeathCandidate(patientSex ?? "", patientDateOfBirth) ||
 			isNeonatalDeathCandidate(patientDateOfBirth))
+	const requiredDeathReportType =
+		needsDeathReport && isMaternalDeathCandidate(patientSex ?? "", patientDateOfBirth ?? "")
+			? "fmdrf"
+			: needsDeathReport && isNeonatalDeathCandidate(patientDateOfBirth ?? "")
+				? "fndrf"
+				: null
+	const requiredDeathReportLabel =
+		requiredDeathReportType === "fmdrf"
+			? "FMDRF"
+			: requiredDeathReportType === "fndrf"
+				? "FNDRF"
+				: null
 
 	const deathReportComplete =
 		!needsDeathReport ||
@@ -230,6 +243,29 @@ export function DischargePanel({
 									</SelectContent>
 								</Select>
 							</div>
+
+							{needsDeathReport && requiredDeathReportType && requiredDeathReportLabel && (
+								<Alert className="border-amber-300 bg-amber-50">
+									<AlertTriangle className="size-4 text-amber-700" />
+									<AlertTitle className="text-amber-900">Death review form required</AlertTitle>
+									<AlertDescription className="space-y-3 text-amber-800">
+										<p>
+											This patient requires completion of the {requiredDeathReportLabel} before discharge can be finalized.
+										</p>
+										<Button
+											type="button"
+											variant="outline"
+											onClick={() =>
+												router.push(
+													`/patients/${patientId}/encounters/${encounterId}/death-report?type=${requiredDeathReportType}`
+												)
+											}
+										>
+											Complete Death Report
+										</Button>
+									</AlertDescription>
+								</Alert>
+							)}
 						</>
 					)}
 
@@ -239,6 +275,7 @@ export function DischargePanel({
 							!checklist?.allComplete ||
 							(!isOutpatient && !mayGoHomeSigned) ||
 							(!isOutpatient && !disposition) ||
+							(!isOutpatient && needsDeathReport && !deathReportComplete) ||
 							// PS-017: require release documents to be opened before OPD close
 							(isOutpatient && signedNoteCount > 0 && !abstractOpened) ||
 							(isOutpatient && prescriptionCount > 0 && !rxOpened) ||

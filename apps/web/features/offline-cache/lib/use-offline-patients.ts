@@ -61,8 +61,9 @@ export function useOfflinePatients(): UseOfflinePatientsResult {
 		savePatientSummaries(facilityId, summaries)
 	}, [facilityId, isOnline, searchResult])
 
-	// When offline, serve from cache
-	if (!isOnline && facilityId) {
+	// Serve cached metadata in both online and offline modes. Online screens use
+	// the live API for lists, but still need cache age/count for readiness notices.
+	if (facilityId) {
 		const cached = loadPatientSummaries(facilityId)
 		return {
 			isOnline,

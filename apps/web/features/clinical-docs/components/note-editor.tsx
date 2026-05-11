@@ -11,13 +11,24 @@ import {
 	ListPlus,
 	Save,
 	ShieldAlert,
+	Stethoscope,
+	X,
 } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Command,
+	CommandEmpty,
+	CommandGroup,
+	CommandInput,
+	CommandItem,
+	CommandList,
+} from "@/core/components/ui/command"
 import { Label } from "@/core/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/core/components/ui/popover"
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
@@ -28,6 +39,10 @@ import {
 	type NoteContext,
 	type TemplateSection,
 } from "@/features/clinical-docs/api/clinical-docs.hooks"
+import {
+	useIcd10ProblemSearchQuery,
+	type Icd10SearchResult,
+} from "@/features/problems-allergies/api/problems-allergies.hooks"
 
 import { NOTE_TYPE_LABELS } from "./template-selector"
 import type { AuthoringTemplate } from "./template-selector-page"
@@ -39,6 +54,14 @@ interface NoteEditorProps {
 	onBack: () => void
 	onDone: () => void
 }
+
+interface Icd10Diagnosis {
+	icd10Code: string
+	icd10Display: string
+}
+
+type StructuredDataValue = string | Icd10Diagnosis | undefined
+type StructuredData = Record<string, StructuredDataValue>
 
 function sectionKeyFromLabel(label: string) {
 	return (
@@ -69,15 +92,20 @@ function ensureRequiredSections(sections: TemplateSection[]) {
 	return next
 }
 
-function initialStructuredData(sections: TemplateSection[]) {
+function initialStructuredData(sections: TemplateSection[]): StructuredData {
 	return Object.fromEntries(
 		sections.map(section => [section.key, section.defaultContent ?? ""])
-	) as Record<string, string>
+	)
 }
 
-function composeNoteContent(sections: TemplateSection[], data: Record<string, string>) {
+function sectionText(data: StructuredData, key: string) {
+	const value = data[key]
+	return typeof value === "string" ? value : ""
+}
+
+function composeNoteContent(sections: TemplateSection[], data: StructuredData) {
 	return sections
-		.map(section => `## ${section.label}\n\n${data[section.key]?.trim() ?? ""}`)
+		.map(section => `## ${section.label}\n\n${sectionText(data, section.key).trim()}`)
 		.join("\n\n")
 }
 
@@ -165,6 +193,127 @@ function labLine(context: NoteContext) {
 	].join("\n")
 }
 
+function isIcd10Diagnosis(value: StructuredDataValue): value is Icd10Diagnosis {
+	return (
+		!!value &&
+		typeof value === "object" &&
+		"icd10Code" in value &&
+		"icd10Display" in value
+	)
+}
+
+function shouldRenderIcd10Field(template: AuthoringTemplate, sections: TemplateSection[]) {
+	if (template.category === "fpe" || template.category === "consultation") return true
+	const sectionKeys = new Set(sections.map(section => section.key.toLowerCase()))
+	return (
+		sectionKeys.has("subjective") &&
+		sectionKeys.has("objective") &&
+		sectionKeys.has("assessment") &&
+		sectionKeys.has("plan")
+	)
+}
+
+function Icd10DiagnosisField({
+	value,
+	onChange,
+}: {
+	value: Icd10Diagnosis | null
+	onChange: (value: Icd10Diagnosis | null) => void
+}) {
+	const [open, setOpen] = useState(false)
+	const [inputValue, setInputValue] = useState(
+		value ? `${value.icd10Code} - ${value.icd10Display}` : ""
+	)
+	const searchTerm = inputValue.trim()
+	const query = useIcd10ProblemSearchQuery({ search: searchTerm, limit: 10 })
+	const results = query.data?.data ?? []
+
+	useEffect(() => {
+		setInputValue(value ? `${value.icd10Code} - ${value.icd10Display}` : "")
+	}, [value])
+
+	function selectResult(result: Icd10SearchResult) {
+		onChange({ icd10Code: result.code, icd10Display: result.description })
+		setInputValue(`${result.code} - ${result.description}`)
+		setOpen(false)
+	}
+
+	return (
+		<Card className="rounded-lg">
+			<CardHeader className="pb-2">
+				<CardTitle className="text-sm">
+					ICD-10 Diagnosis <span className="text-destructive">*</span>
+				</CardTitle>
+			</CardHeader>
+			<CardContent className="space-y-2">
+				<p className="text-muted-foreground text-xs">
+					Search by keyword or ICD-10 code, for example pneumonia or J18.
+				</p>
+				<Popover open={open} onOpenChange={setOpen}>
+					<Command shouldFilter={false} className="h-auto w-full overflow-visible bg-transparent p-0">
+						<PopoverTrigger render={<div className="w-full" />}>
+							<CommandInput
+								data-element-id="icd10-search"
+								value={inputValue}
+								onValueChange={nextValue => {
+									setInputValue(nextValue)
+									if (value) onChange(null)
+									setOpen(nextValue.trim().length >= 2)
+								}}
+								onFocus={() => setOpen(searchTerm.length >= 2)}
+								placeholder="Search ICD-10 codes..."
+							/>
+						</PopoverTrigger>
+						<PopoverContent align="start" className="w-(--anchor-width) p-0">
+							<CommandList>
+								{query.isFetching ? (
+									<div className="text-muted-foreground px-3 py-4 text-sm">Searching ICD-10...</div>
+								) : (
+									<>
+										<CommandEmpty>No ICD-10 matches</CommandEmpty>
+										<CommandGroup>
+											{results.map(result => (
+												<CommandItem
+													key={result.id}
+													value={result.id}
+													onSelect={() => selectResult(result)}
+													className="items-start py-2"
+												>
+													<div className="flex min-w-0 flex-col">
+														<span className="font-mono text-xs font-semibold">{result.code}</span>
+														<span className="text-sm">{result.description}</span>
+														{result.category && (
+															<span className="text-muted-foreground text-xs">{result.category}</span>
+														)}
+													</div>
+												</CommandItem>
+											))}
+										</CommandGroup>
+									</>
+								)}
+							</CommandList>
+						</PopoverContent>
+					</Command>
+				</Popover>
+				{value && (
+					<Badge variant="secondary" className="gap-1.5">
+						<span className="font-mono">{value.icd10Code}</span>
+						<span>- {value.icd10Display}</span>
+						<button
+							type="button"
+							aria-label="Clear ICD-10 diagnosis"
+							onClick={() => onChange(null)}
+							className="text-muted-foreground hover:text-foreground"
+						>
+							<X className="size-3" />
+						</button>
+					</Badge>
+				)}
+			</CardContent>
+		</Card>
+	)
+}
+
 function InsertButton({
 	label,
 	disabled,
@@ -196,7 +345,7 @@ function InsertButton({
 
 export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }: NoteEditorProps) {
 	const sections = useMemo(() => ensureRequiredSections(template.sections), [template.sections])
-	const [structuredData, setStructuredData] = useState<Record<string, string>>(() =>
+	const [structuredData, setStructuredData] = useState<StructuredData>(() =>
 		initialStructuredData(sections)
 	)
 	const [noteId, setNoteId] = useState<string | null>(null)
@@ -216,8 +365,12 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 	const objectiveKey = findSectionKey(sections, ["objective", "physical", "examination"])
 	const subjectiveKey = findSectionKey(sections, ["subjective", "chief", "history"])
 
-	const assessmentText = assessmentKey ? structuredData[assessmentKey]?.trim() : ""
-	const planText = planKey ? structuredData[planKey]?.trim() : ""
+	const assessmentText = assessmentKey ? sectionText(structuredData, assessmentKey).trim() : ""
+	const planText = planKey ? sectionText(structuredData, planKey).trim() : ""
+	const selectedIcd10 = isIcd10Diagnosis(structuredData.icd10_diagnosis)
+		? structuredData.icd10_diagnosis
+		: null
+	const showIcd10Field = shouldRenderIcd10Field(template, sections)
 	const canSave = !!assessmentText && !!planText && !createNote.isPending && !updateNote.isPending
 
 	function updateSection(key: string, value: string) {
@@ -225,11 +378,24 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 		setHasLocalChanges(true)
 	}
 
+	function updateIcd10Diagnosis(value: Icd10Diagnosis | null) {
+		setStructuredData(prev => {
+			const next = { ...prev }
+			if (value) {
+				next.icd10_diagnosis = value
+			} else {
+				delete next.icd10_diagnosis
+			}
+			return next
+		})
+		setHasLocalChanges(true)
+	}
+
 	function insertIntoSection(key: string | undefined, text: string) {
 		if (!key) return
 		setStructuredData(prev => ({
 			...prev,
-			[key]: [prev[key]?.trim(), text.trim()].filter(Boolean).join("\n\n"),
+			[key]: [sectionText(prev, key).trim(), text.trim()].filter(Boolean).join("\n\n"),
 		}))
 		setHasLocalChanges(true)
 	}
@@ -338,23 +504,28 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 			<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
 				<div className="space-y-3">
 					{sections.map(section => (
-						<Card key={section.key} className="rounded-lg">
-							<CardHeader className="pb-2">
-								<CardTitle className="text-sm">{section.label}</CardTitle>
-							</CardHeader>
-							<CardContent>
-								<Label className="sr-only" htmlFor={`note-section-${section.key}`}>
-									{section.label}
-								</Label>
-								<Textarea
-									id={`note-section-${section.key}`}
-									value={structuredData[section.key] ?? ""}
-									onChange={event => updateSection(section.key, event.target.value)}
-									rows={section.key === "assessment" || section.key === "plan" ? 5 : 4}
-									className="min-h-28 resize-y"
-								/>
-							</CardContent>
-						</Card>
+						<div key={section.key} className="space-y-3">
+							{showIcd10Field && section.key === assessmentKey && (
+								<Icd10DiagnosisField value={selectedIcd10} onChange={updateIcd10Diagnosis} />
+							)}
+							<Card className="rounded-lg">
+								<CardHeader className="pb-2">
+									<CardTitle className="text-sm">{section.label}</CardTitle>
+								</CardHeader>
+								<CardContent>
+									<Label className="sr-only" htmlFor={`note-section-${section.key}`}>
+										{section.label}
+									</Label>
+									<Textarea
+										id={`note-section-${section.key}`}
+										value={sectionText(structuredData, section.key)}
+										onChange={event => updateSection(section.key, event.target.value)}
+										rows={section.key === "assessment" || section.key === "plan" ? 5 : 4}
+										className="min-h-28 resize-y"
+									/>
+								</CardContent>
+							</Card>
+						</div>
 					))}
 				</div>
 
@@ -392,6 +563,27 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 								</div>
 
 								<Separator />
+
+								{showIcd10Field && (
+									<>
+										<div className="space-y-2">
+											<div className="flex items-center gap-2 text-sm font-medium">
+												<Stethoscope className="size-4 text-blue-600" />
+												ICD-10 Diagnosis
+											</div>
+											{selectedIcd10 ? (
+												<Badge variant="secondary" className="max-w-full justify-start gap-1.5 whitespace-normal text-left">
+													<span className="font-mono">{selectedIcd10.icd10Code}</span>
+													<span>- {selectedIcd10.icd10Display}</span>
+												</Badge>
+											) : (
+												<p className="text-muted-foreground text-sm">No ICD-10 diagnosis selected.</p>
+											)}
+										</div>
+
+										<Separator />
+									</>
+								)}
 
 								<div className="space-y-2">
 									<div className="flex items-center justify-between gap-2">
