@@ -29,6 +29,7 @@ import {
 	type OpdPrescription,
 	type OpdPrescriptionItem,
 	useOpdDispenseMutation,
+	useOpdPrescriptionQueueQuery,
 	useOpdPrescriptionSearchQuery,
 } from "../api/pharmacy.hooks"
 
@@ -85,14 +86,16 @@ function StepIndicator({ current }: StepIndicatorProps) {
 // ── Step 1: Rx Verification ───────────────────────────────────────────────────
 
 interface RxVerifyStepProps {
+	facilityId: string
 	onPrescriptionFound: (rx: OpdPrescription) => void
 }
 
-function RxVerifyStep({ onPrescriptionFound }: RxVerifyStepProps) {
+function RxVerifyStep({ facilityId, onPrescriptionFound }: RxVerifyStepProps) {
 	const [input, setInput] = useState("")
 	const [submitted, setSubmitted] = useState("")
 
-	const { data, isLoading, error, isFetching } = useOpdPrescriptionSearchQuery(submitted)
+	const queue = useOpdPrescriptionQueueQuery({ facilityId, status: "signed" })
+	const { data, isLoading: searchLoading, error, isFetching } = useOpdPrescriptionSearchQuery(submitted)
 
 	function handleSearch() {
 		setSubmitted(input.trim())
@@ -105,6 +108,78 @@ function RxVerifyStep({ onPrescriptionFound }: RxVerifyStepProps) {
 
 	return (
 		<div className="space-y-4">
+			{/* Queue list */}
+			<Card>
+				<CardHeader>
+					<CardTitle className="text-base">Pending Prescriptions</CardTitle>
+				</CardHeader>
+				<CardContent>
+					{queue.isLoading ? (
+						<div className="flex items-center justify-center py-8">
+							<Loader2 className="text-muted-foreground size-5 animate-spin" />
+						</div>
+					) : queue.data?.data?.length === 0 ? (
+						<p className="text-muted-foreground py-6 text-center text-sm">
+							No pending prescriptions at this time.
+						</p>
+					) : (
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>Patient</TableHead>
+									<TableHead>MRN</TableHead>
+									<TableHead>Medication</TableHead>
+									<TableHead>Prescriber</TableHead>
+									<TableHead>Date</TableHead>
+									<TableHead>Status</TableHead>
+									<TableHead />
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{queue.data?.data?.map((rx) => (
+									<TableRow
+										key={rx.id}
+										className="cursor-pointer hover:bg-muted/50"
+										onClick={() => setSubmitted(rx.patientMrn)}
+									>
+										<TableCell className="font-medium">{rx.patientName}</TableCell>
+										<TableCell className="text-muted-foreground text-sm">{rx.patientMrn}</TableCell>
+										<TableCell className="text-sm">{rx.medicationSummary}</TableCell>
+										<TableCell className="text-muted-foreground text-sm">
+											{rx.prescriberName ?? "—"}
+										</TableCell>
+										<TableCell className="text-muted-foreground text-sm">
+											{new Date(rx.prescribedAt).toLocaleDateString("en-PH")}
+										</TableCell>
+										<TableCell>
+											<Badge
+												variant={rx.status === "signed" ? "default" : "secondary"}
+												className="text-xs"
+											>
+												{rx.status}
+											</Badge>
+										</TableCell>
+										<TableCell>
+											<Button
+												size="sm"
+												variant="outline"
+												onClick={(e) => {
+													e.stopPropagation()
+													setSubmitted(rx.patientMrn)
+												}}
+											>
+												Select
+											</Button>
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					)}
+				</CardContent>
+			</Card>
+
+			{/* Manual search */}
 			<Card>
 				<CardHeader>
 					<CardTitle className="text-base">Step 1 — Scan or Enter Prescription</CardTitle>
@@ -161,11 +236,9 @@ function RxVerifyStep({ onPrescriptionFound }: RxVerifyStepProps) {
 								</div>
 								<Badge
 									variant={
-										data.status === "active"
-											? "default"
-											: data.status === "expired"
-												? "destructive"
-												: "secondary"
+										data.status === "issued" ? "secondary"
+											: data.status === "signed" ? "default"
+											: "secondary"
 									}
 								>
 									{data.status}
@@ -176,7 +249,7 @@ function RxVerifyStep({ onPrescriptionFound }: RxVerifyStepProps) {
 
 							<div>
 								<p className="text-xs text-muted-foreground mb-1">
-									Prescriber: {data.prescriberName} · PRC {data.prescriberPrc}
+									Prescriber: {data.prescriberName ?? "—"} · PRC {data.prescriberPrc}
 								</p>
 								<p className="text-xs text-muted-foreground">
 									Rx #{data.prescriptionNumber} · Prescribed:{" "}
@@ -212,7 +285,7 @@ function RxVerifyStep({ onPrescriptionFound }: RxVerifyStepProps) {
 												{item.quantity} {item.doseForm}
 											</TableCell>
 											<TableCell className="text-right text-sm">
-												₱{item.totalPrice.toFixed(2)}
+												₱{(item.totalPrice ?? 0).toFixed(2)}
 											</TableCell>
 											<TableCell>
 												{item.dispensed && (
@@ -234,7 +307,7 @@ function RxVerifyStep({ onPrescriptionFound }: RxVerifyStepProps) {
 							<div className="flex justify-end">
 								<Button
 									onClick={() => onPrescriptionFound(data)}
-									disabled={data.status === "expired" || data.status === "dispensed"}
+									disabled={data.status === "draft"}
 								>
 									Proceed to Billing
 									<ChevronRight className="ml-1.5 size-4" />
@@ -267,20 +340,20 @@ function BillingStep({ prescription, onConfirm, onBack }: BillingStepProps) {
 					<div className="rounded-md bg-muted p-4 space-y-2">
 						<div className="flex justify-between text-sm">
 							<span>Estimated Total</span>
-							<span className="font-medium">₱{prescription.estimatedTotal.toFixed(2)}</span>
+							<span className="font-medium">₱{(prescription.estimatedTotal ?? 0).toFixed(2)}</span>
 						</div>
 						{prescription.philhealthPin && (
 							<div className="flex justify-between text-sm text-green-700">
 								<span>PhilHealth Coverage (PIN: {prescription.philhealthPin})</span>
 								<span className="font-medium">
-									−₱{prescription.philhealthCoverage.toFixed(2)}
+									−₱{(prescription.philhealthCoverage ?? 0).toFixed(2)}
 								</span>
 							</div>
 						)}
 						<Separator />
 						<div className="flex justify-between font-semibold">
 							<span>Patient Out-of-Pocket</span>
-							<span>₱{prescription.outOfPocket.toFixed(2)}</span>
+							<span>₱{(prescription.outOfPocket ?? 0).toFixed(2)}</span>
 						</div>
 					</div>
 
@@ -582,6 +655,7 @@ export function OpdDispensing() {
 
 			{step === "verify" && (
 				<RxVerifyStep
+					facilityId={facilityId}
 					onPrescriptionFound={(rx) => {
 						setPrescription(rx)
 						setStep("billing")

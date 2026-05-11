@@ -36,6 +36,7 @@ import {
 	patients,
 	payments,
 	pidsrCases,
+	prescriptions,
 	preEncounters,
 	problems,
 	rolePermissions,
@@ -1263,6 +1264,40 @@ async function ensureNursingAndOrders(params: {
 				orderingStaffId: params.doctorStaffId,
 			})
 			.returning()
+	}
+
+	// OPD Dispensing seed — signed prescription tied to the Paracetamol order
+	const [existingPrescription] = await db
+		.select()
+		.from(prescriptions)
+		.where(eq(prescriptions.medicationOrderId, medOrder!.id))
+	if (!existingPrescription) {
+		await db.insert(prescriptions).values({
+			facilityId: params.facilityId,
+			encounterId: params.encounterId,
+			medicationOrderId: medOrder!.id,
+			patientId: params.patientId,
+			prescriberStaffId: params.doctorStaffId,
+			prcLicenseNumber: "PRC-100001",
+			ptrNumber: "PTR-100001",
+			prescriptionContent: {
+				medications: [
+					{
+						genericName: "Paracetamol",
+						brandName: "Biogesic",
+						dose: "500 mg",
+						doseUnit: "mg",
+						doseForm: "tablet",
+						route: "oral",
+						frequency: "q6h",
+						durationDays: 3,
+						quantity: 12,
+					},
+				],
+			},
+			status: "signed",
+			signedAt: new Date(),
+		})
 	}
 
 	// Pending-verification order — feeds the Pharmacy Verification Queue (Story 10.1)

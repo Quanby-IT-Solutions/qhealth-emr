@@ -126,7 +126,7 @@
   - **So that** non-admitted emergency cases are routed to the correct PhilHealth outpatient billing workflow
   - **Pages**: ER Disposition Page, OECB Tag Page
 
-for rechecking - KARL
+DONE - KARL
 - **Story 3.3 – ER Patient Tracker**
   - **As a** Nurse
   - **I want to** view all active ER patients with acuity, status, and elapsed time

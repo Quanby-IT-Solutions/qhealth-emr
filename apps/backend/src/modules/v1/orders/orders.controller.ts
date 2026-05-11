@@ -297,6 +297,14 @@ export class OrdersController {
 	// ========================================================================
 
 	@RequirePermission("orders", "verify")
+	@Implement(v1.orders.listOpdPrescriptions)
+	async listOpdPrescriptions() {
+		return implement(v1.orders.listOpdPrescriptions).handler(async ({ input }) => {
+			return this.ordersService.listOpdPrescriptions(input)
+		})
+	}
+
+	@RequirePermission("orders", "verify")
 	@Implement(v1.orders.searchOpdPrescription)
 	async searchOpdPrescription() {
 		return implement(v1.orders.searchOpdPrescription).handler(async ({ input }) => {

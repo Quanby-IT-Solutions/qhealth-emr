@@ -667,10 +667,14 @@ export const OpdPrescriptionItemSchema = z.object({
 	doseForm: z.string(),
 	route: z.string(),
 	frequency: z.string(),
+	quantity: z.number(),
 	durationDays: z.number().nullable(),
 	isControlledSubstance: z.boolean(),
 	pdeaSchedule: z.string().nullable(),
 	status: z.string(),
+	unitPrice: z.number(),
+	totalPrice: z.number(),
+	dispensed: z.boolean(),
 })
 
 export const OpdPrescriptionSchema = z.object({
@@ -683,14 +687,42 @@ export const OpdPrescriptionSchema = z.object({
 	patientDateOfBirth: z.string().nullable(),
 	prescriberName: z.string().nullable(),
 	prescriberPrc: z.string(),
+	prescriptionNumber: z.string(),
 	prescribedAt: dateOrString,
 	status: PrescriptionStatusEnum,
 	items: z.array(OpdPrescriptionItemSchema),
+	estimatedTotal: z.number(),
+	philhealthPin: z.string().nullable(),
+	philhealthCoverage: z.number(),
+	outOfPocket: z.number(),
 })
 
 export const OpdPrescriptionSearchSchema = z.object({
 	q: z.string().min(1),
 	facilityId: z.string().uuid().optional(),
+})
+
+export const OpdPrescriptionQueueItemSchema = z.object({
+	id: z.string().uuid(),
+	prescriptionNumber: z.string(),
+	patientName: z.string(),
+	patientMrn: z.string(),
+	patientDateOfBirth: z.string().nullable(),
+	prescriberName: z.string().nullable(),
+	prescribedAt: dateOrString,
+	status: PrescriptionStatusEnum,
+	medicationSummary: z.string(),
+})
+
+export const OpdPrescriptionListInputSchema = z.object({
+	facilityId: z.string().uuid().optional(),
+	status: z.enum(["signed", "issued", "all"]).optional().default("signed"),
+	page: z.coerce.number().int().positive().optional().default(1),
+	limit: z.coerce.number().int().positive().max(100).optional().default(20),
+})
+
+export const OpdPrescriptionListResponseSchema = PaginatedResponseSchema.extend({
+	data: z.array(OpdPrescriptionQueueItemSchema),
 })
 
 // ============================================================================

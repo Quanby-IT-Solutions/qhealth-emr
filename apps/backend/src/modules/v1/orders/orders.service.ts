@@ -50,6 +50,7 @@ type CreateTranchedOrdersInput = V1Inputs["orders"]["createTranchedOrders"]
 type DispenseOrderInput = V1Inputs["orders"]["dispenseOrder"]
 type DispenseLogListInput = V1Inputs["orders"]["listDispenseLogs"]
 type OpdPrescriptionSearchInput = V1Inputs["orders"]["searchOpdPrescription"]
+type OpdPrescriptionListInput = V1Inputs["orders"]["listOpdPrescriptions"]
 type OpdDispenseInput = V1Inputs["orders"]["opdDispense"]
 type OpdDispenseHistoryInput = V1Inputs["orders"]["listOpdDispenseHistory"]
 type SaveCounselingLogInput = V1Inputs["orders"]["saveCounselingLog"]
@@ -2098,6 +2099,100 @@ export class OrdersService {
 	// OPD Dispensing
 	// ========================================================================
 
+	async listOpdPrescriptions(input: OpdPrescriptionListInput) {
+		const page = Number(input.page) || 1
+		const limit = Number(input.limit) || 20
+		const offset = (page - 1) * limit
+
+		const statusFilter =
+			input.status === "all"
+				? or(eq(prescriptions.status, "signed"), eq(prescriptions.status, "issued"))
+				: eq(prescriptions.status, input.status ?? "signed")
+
+		const facilityFilter = input.facilityId
+			? eq(prescriptions.facilityId, input.facilityId)
+			: undefined
+
+		const whereClause = and(facilityFilter, statusFilter)
+
+		const [totalRow] = await db
+			.select({ count: count() })
+			.from(prescriptions)
+			.leftJoin(patients, eq(prescriptions.patientId, patients.id))
+			.where(whereClause)
+
+		const rows = await db
+			.select({
+				id: prescriptions.id,
+				facilityId: prescriptions.facilityId,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+				patientMrn: patients.mrn,
+				patientDateOfBirth: patients.dateOfBirth,
+				prescriberName: users.name,
+				prescribedAt: prescriptions.createdAt,
+				status: prescriptions.status,
+				medicationOrderId: prescriptions.medicationOrderId,
+			})
+			.from(prescriptions)
+			.leftJoin(patients, eq(prescriptions.patientId, patients.id))
+			.leftJoin(staffProfiles, eq(prescriptions.prescriberStaffId, staffProfiles.id))
+			.leftJoin(users, eq(staffProfiles.userId, users.id))
+			.where(whereClause)
+			.orderBy(desc(prescriptions.createdAt))
+			.limit(limit)
+			.offset(offset)
+
+		// Batch-fetch medication orders to build a summary string
+		const medOrderIds = rows.map(r => r.medicationOrderId).filter(Boolean) as string[]
+		const medOrderMap = new Map<string, { genericName: string; dose: string; doseUnit: string }>()
+		if (medOrderIds.length > 0) {
+			const medOrders = await db
+				.select({
+					id: medicationOrders.id,
+					genericName: medicationOrders.genericName,
+					dose: medicationOrders.dose,
+					doseUnit: medicationOrders.doseUnit,
+				})
+				.from(medicationOrders)
+				.where(inArray(medicationOrders.id, medOrderIds))
+			for (const mo of medOrders) {
+				medOrderMap.set(mo.id, mo)
+			}
+		}
+
+		const data = rows.map(row => {
+			const patientName =
+				row.patientLastName && row.patientFirstName
+					? `${row.patientLastName}, ${row.patientFirstName}`
+					: "Unknown"
+
+			const mo = row.medicationOrderId ? medOrderMap.get(row.medicationOrderId) : undefined
+			const medicationSummary = mo ? `${mo.genericName} ${mo.dose} ${mo.doseUnit}` : "—"
+
+			return {
+				id: row.id,
+				prescriptionNumber: "RX-" + row.id.slice(-8).toUpperCase(),
+				patientName,
+				patientMrn: row.patientMrn ?? "-",
+				patientDateOfBirth: row.patientDateOfBirth ? String(row.patientDateOfBirth) : null,
+				prescriberName: row.prescriberName ?? null,
+				prescribedAt: row.prescribedAt,
+				status: row.status,
+				medicationSummary,
+			}
+		})
+
+		const total = Number(totalRow?.count ?? 0)
+		return {
+			data,
+			total,
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit),
+		}
+	}
+
 	async searchOpdPrescription(input: OpdPrescriptionSearchInput) {
 		const search = input.q.trim().toLowerCase()
 
@@ -2125,6 +2220,7 @@ export class OrdersService {
 			.where(
 				and(
 					input.facilityId ? eq(prescriptions.facilityId, input.facilityId) : undefined,
+					or(eq(prescriptions.status, "signed"), eq(prescriptions.status, "issued")),
 					or(
 						ilike(patients.mrn, `%${search}%`),
 						ilike(patients.firstName, `%${search}%`),
@@ -2159,10 +2255,15 @@ export class OrdersService {
 			patientDateOfBirth: prescription.patientDateOfBirth
 				? String(prescription.patientDateOfBirth)
 				: null,
-			prescriberName: prescription.prescriberName,
-			prescriberPrc: prescription.prcLicenseNumber,
+			prescriberName: prescription.prescriberName ?? null,
+			prescriberPrc: prescription.prcLicenseNumber ?? "",
+			prescriptionNumber: "RX-" + prescription.id.slice(-8).toUpperCase(),
 			prescribedAt: prescription.prescribedAt,
 			status: prescription.status,
+			estimatedTotal: 0,
+			philhealthPin: null,
+			philhealthCoverage: 0,
+			outOfPocket: 0,
 			items: medOrder
 				? [
 						{
@@ -2174,10 +2275,14 @@ export class OrdersService {
 							doseForm: medOrder.doseForm,
 							route: medOrder.route,
 							frequency: medOrder.frequency,
+							quantity: medOrder.durationDays ?? 30,
 							durationDays: medOrder.durationDays,
 							isControlledSubstance: medOrder.isControlledSubstance,
 							pdeaSchedule: medOrder.pdeaSchedule,
 							status: medOrder.status,
+							unitPrice: 0,
+							totalPrice: 0,
+							dispensed: false,
 						},
 					]
 				: [],
@@ -2255,6 +2360,14 @@ export class OrdersService {
 					lotNumber: item.lotNumber ?? null,
 				})
 			}
+		}
+
+		// Mark prescription as issued now that it has been dispensed
+		if (createdItems.length > 0) {
+			await db
+				.update(prescriptions)
+				.set({ status: "issued" })
+				.where(eq(prescriptions.id, input.prescriptionId))
 		}
 
 		return {

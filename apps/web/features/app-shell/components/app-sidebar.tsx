@@ -58,6 +58,22 @@ export function AppSidebar() {
 	const hasAdminItems = ADMIN_GROUPS.some(g => (adminGroupMap.get(g)?.length ?? 0) > 0)
 	const isAdminPath = pathname.startsWith("/admin")
 
+	// All visible nav hrefs — used to prevent a short href (e.g. /pharmacy) from
+	// stealing the active highlight when a more specific item (/pharmacy/opd) is visible.
+	const allNavHrefs = new Set([
+		...primaryItems.map(i => i.href),
+		...allSecondaryItems.map(i => i.href),
+	])
+
+	function isNavActive(href: string): boolean {
+		if (pathname === href) return true
+		if (!pathname.startsWith(href + "/")) return false
+		// Only highlight the prefix if no more-specific item also matches
+		return ![...allNavHrefs].some(
+			other => other !== href && other.startsWith(href) && pathname.startsWith(other)
+		)
+	}
+
 	return (
 		<Sidebar collapsible="icon" variant="sidebar">
 			<SidebarHeader>
@@ -79,7 +95,7 @@ export function AppSidebar() {
 						<SidebarMenu>
 							{primaryItems.map(item => {
 								const Icon = NAV_ICONS[item.iconName]
-								const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+								const isActive = isNavActive(item.href)
 								return (
 									<SidebarMenuItem key={`primary-${item.href}`}>
 										<SidebarMenuButton isActive={isActive} tooltip={item.title}>
@@ -114,7 +130,7 @@ export function AppSidebar() {
 										<SidebarMenu>
 											{secondaryItems.map(item => {
 												const Icon = NAV_ICONS[item.iconName]
-												const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+											const isActive = isNavActive(item.href)
 												return (
 													<SidebarMenuItem key={`secondary-${item.href}`}>
 														<SidebarMenuButton isActive={isActive} tooltip={item.title}>
@@ -157,7 +173,7 @@ export function AppSidebar() {
 												<SidebarMenu>
 													{items.map(item => {
 														const Icon = NAV_ICONS[item.iconName]
-														const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+												const isActive = isNavActive(item.href)
 														return (
 															<SidebarMenuItem key={`admin-${item.href}`}>
 																<SidebarMenuButton isActive={isActive} tooltip={item.title}>

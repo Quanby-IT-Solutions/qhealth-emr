@@ -39,6 +39,8 @@ import {
 	OpdDispenseHistorySchema,
 	OpdDispenseInputSchema,
 	OpdDispenseRecordSchema,
+	OpdPrescriptionListInputSchema,
+	OpdPrescriptionListResponseSchema,
 	OpdPrescriptionSchema,
 	OpdPrescriptionSearchSchema,
 	ParentOrderIdSchema,
@@ -408,6 +410,16 @@ export const ordersContract = {
 	// ========================================================================
 	// OPD Dispensing
 	// ========================================================================
+
+	listOpdPrescriptions: oc
+		.route({
+			method: "GET",
+			path: "/pharmacy/opd/prescriptions",
+			summary: "List signed/issued OPD prescriptions awaiting dispensing",
+			tags: ["Orders — OPD Dispensing"],
+		})
+		.input(OpdPrescriptionListInputSchema)
+		.output(OpdPrescriptionListResponseSchema),
 
 	searchOpdPrescription: oc
 		.route({

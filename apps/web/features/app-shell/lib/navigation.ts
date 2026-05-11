@@ -631,7 +631,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 	},
 	{
 		title: "Patients",
-		href: "/patients/register",
+		href: "/patients/search",
 		iconName: "patient",
 		// Lab Techs, Radiologists, and Pharmacists access patients from SECONDARY for contextual lookup
 		requiredPermissions: [
@@ -649,14 +649,6 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		requiredPermissions: [{ module: "formulary", action: "view" }],
 		// Dual-gate: admin governance surface requires admin:view (FORM-005)
 		requireAllPermissions: [{ module: "admin", action: "view" }],
-		isSecondary: true,
-	},
-	{
-		title: "OPD Dispensing",
-		href: "/pharmacy/opd",
-		iconName: "pill",
-		// OPD dispensing for outpatient prescription processing
-		requiredPermissions: [{ module: "orders", action: "verify" }],
 		isSecondary: true,
 	},
 	{

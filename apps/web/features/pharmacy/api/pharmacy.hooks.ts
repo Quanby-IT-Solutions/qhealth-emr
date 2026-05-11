@@ -139,10 +139,10 @@ export interface OpdPrescription {
 	patientName: string
 	patientMrn: string
 	patientDateOfBirth: string | null
-	prescriberName: string
+	prescriberName: string | null
 	prescriberPrc: string
-	prescribedAt: string
-	status: "active" | "partially_dispensed" | "dispensed" | "expired" | "cancelled"
+	prescribedAt: string | Date
+	status: "draft" | "signed" | "issued"
 	items: OpdPrescriptionItem[]
 	philhealthPin: string | null
 	philhealthCoverage: number
@@ -377,7 +377,7 @@ export function usePharmacyQueueQuery(params: PharmacyQueueParams) {
 export function usePharmacyOrderDetailQuery(id: string | null) {
 	return useQuery({
 		...orpc.orders.getMedOrder.queryOptions({
-			input: id ? { id } : undefined,
+			input: { id: id ?? "" },
 			enabled: !!id,
 			select: mapPharmacyOrderDetail,
 		}),
@@ -455,6 +455,40 @@ export function useDispenseOrderMutation() {
 // OPD Dispensing
 // ============================================================================
 
+export interface OpdPrescriptionQueueItem {
+	id: string
+	prescriptionNumber: string
+	patientName: string
+	patientMrn: string
+	patientDateOfBirth: string | null
+	prescriberName: string | null
+	prescribedAt: string
+	status: "draft" | "signed" | "issued"
+	medicationSummary: string
+}
+
+export interface OpdPrescriptionListParams {
+	facilityId?: string
+	status?: "signed" | "issued" | "all"
+	page?: number
+	limit?: number
+}
+
+export function useOpdPrescriptionQueueQuery(params: OpdPrescriptionListParams) {
+	return useQuery({
+		...orpc.orders.listOpdPrescriptions.queryOptions({
+			input: {
+				facilityId: params.facilityId,
+				status: params.status ?? "signed",
+				page: params.page ?? 1,
+				limit: params.limit ?? 20,
+			},
+		}),
+		queryKey: [...pharmacyKeys.all, "opd-queue", params] as const,
+		refetchInterval: 30 * 1000,
+	})
+}
+
 export function useOpdPrescriptionSearchQuery(search: string) {
 	return useQuery({
 		...orpc.orders.searchOpdPrescription.queryOptions({
@@ -530,7 +564,7 @@ export interface SaveCounselingLogInput {
 	encounterId?: string
 	patientId?: string
 	medicationOrderId?: string
-	checklistItems: Array<{ label: string; checked: boolean }>
+	checklistItems: Array<{ item: string; checked: boolean }>
 	patientSignature?: string
 }
 

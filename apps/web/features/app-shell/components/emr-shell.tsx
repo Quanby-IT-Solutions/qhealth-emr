@@ -367,6 +367,16 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 		}))
 		.filter(g => g.items.length > 0)
 
+	const allNavHrefs = new Set(allAllowedItems.map(i => i.href))
+
+	function isNavActive(href: string): boolean {
+		if (pathname === href) return true
+		if (!pathname.startsWith(href + "/")) return false
+		return ![...allNavHrefs].some(
+			other => other !== href && other.startsWith(href) && pathname.startsWith(other)
+		)
+	}
+
 	const [showSyncing, setShowSyncing] = useState(false)
 	const [prevOnline, setPrevOnline] = useState(true)
 	const [isCollapsed, setIsCollapsed] = useState(false)
@@ -445,7 +455,7 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 						)}
 						<div className="flex flex-col gap-0.5">
 							{group.items.map((item, i) => (
-								<SidebarItem key={i} item={item} isActive={pathname === item.href || pathname.startsWith(item.href + '/')} isCollapsed={isCollapsed} />
+								<SidebarItem key={i} item={item} isActive={isNavActive(item.href)} isCollapsed={isCollapsed} />
 							))}
 						</div>
 					</div>
