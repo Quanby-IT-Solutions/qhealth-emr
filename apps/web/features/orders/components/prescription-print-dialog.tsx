@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { Link2, Loader2, Mail, MonitorSmartphone, Printer, QrCode } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
+import { Badge } from "@/core/components/ui/badge"
 import {
 	Dialog,
 	DialogContent,
@@ -67,6 +68,7 @@ interface RxPrintItem {
 	prcNumber: string
 	ptrNumber: string
 	pdeaS2License: string | null
+	noRefill: boolean
 	signedAt: string
 	genericName: string
 	brandName: string | null
@@ -110,6 +112,7 @@ function openPrintWindow(data: PrintData): void {
         ${rx.durationDays ? `<tr><td class="label">Duration</td><td>${rx.durationDays} day(s)</td></tr>` : ""}
         ${rx.specialInstructions ? `<tr><td class="label">Instructions</td><td>${rx.specialInstructions}</td></tr>` : ""}
       </table>
+      ${rx.noRefill ? `<div class="no-refill-stamp">NO REFILL</div>` : ""}
       <div class="rx-sig">
         <div>
           <div class="sig-line">&nbsp;</div>
@@ -118,7 +121,7 @@ function openPrintWindow(data: PrintData): void {
           <div class="sig-label">PTR No.: ${rx.ptrNumber}</div>
           ${rx.pdeaS2License ? `<div class="sig-label">S2 Lic.: ${rx.pdeaS2License}</div>` : ""}
         </div>
-        <div class="dispensing-note">For single dispensing only unless otherwise indicated.</div>
+        <div class="dispensing-note">${rx.noRefill ? "For single dispensing only. PDEA controlled substance." : "For single dispensing only unless otherwise indicated."}</div>
       </div>
       <div class="signed-note">Electronically signed: ${rx.signedAt}</div>
     </div>`
@@ -149,6 +152,7 @@ function openPrintWindow(data: PrintData): void {
     .rx-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
     .rx-table td { padding: 3px 6px; font-size: 10.5pt; vertical-align: top; }
     .rx-table .label { font-weight: bold; width: 120px; color: #444; }
+    .no-refill-stamp { display: inline-block; border: 2px solid #dc2626; color: #dc2626; font-weight: 900; font-size: 10pt; letter-spacing: 2px; padding: 3px 9px; text-transform: uppercase; margin-top: 4px; }
     .rx-sig { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px; padding-top: 10px; border-top: 1px solid #bbb; }
     .sig-line { border-bottom: 1px solid #000; min-width: 180px; margin-bottom: 4px; height: 30px; }
     .sig-label { font-size: 9.5pt; }
@@ -239,6 +243,7 @@ export function PrescriptionPrintDialog({
 						prcNumber: rx.prcLicenseNumber ?? "--",
 						ptrNumber: rx.ptrNumber ?? "--",
 						pdeaS2License: rx.pdeaS2License ?? null,
+						noRefill: !!rx.pdeaS2License,
 						signedAt: formatDateTime(rx.signedAt),
 						genericName: content.genericName ?? "--",
 						brandName: content.brandName ?? null,
@@ -371,6 +376,7 @@ export function PrescriptionPrintDialog({
 								<div className="space-y-2">
 									{signedPrescriptions.map(rx => {
 										const content = parsePrescriptionContent(rx.prescriptionContent)
+										const noRefill = !!rx.pdeaS2License
 										return (
 											<div key={rx.id} className="space-y-1 rounded-md border p-3 text-sm">
 												<div className="flex items-start justify-between">
@@ -392,6 +398,11 @@ export function PrescriptionPrintDialog({
 														<p>{rx.prescriberStaffName ?? "--"}</p>
 														<p>PRC: {rx.prcLicenseNumber}</p>
 														<p>PTR: {rx.ptrNumber}</p>
+														{noRefill && (
+															<Badge variant="destructive" className="mt-1">
+																NO REFILL
+															</Badge>
+														)}
 													</div>
 												</div>
 											</div>

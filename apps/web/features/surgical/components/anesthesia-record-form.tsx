@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { CheckCircle2, Info, Monitor, Plus, Save, Trash2 } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { CheckCircle2, Info, Monitor, Plus, Save, ShieldAlert, Trash2 } from "lucide-react"
 
 import {
 	AlertDialog,
@@ -191,6 +191,30 @@ export function AnesthesiaRecordForm({
 
 	const isSigned = existing?.status === "signed"
 	const fieldsDisabled = isSigned || !canEdit || save.isPending || sign.isPending
+	const signChecklistMissing = useMemo(() => {
+		const missingFields: string[] = []
+		const hasCompleteVital = form.intraopVitals.some(
+			vital => vital.time.trim() && vital.bp.trim() && vital.hr > 0 && vital.spo2 > 0
+		)
+
+		if (!form.anesthesiaType) missingFields.push("anesthesia type")
+		if (!form.asaClass) missingFields.push("ASA physical status class")
+		if (!form.airwayType) missingFields.push("airway device")
+		if (!form.airwayManagement.trim()) missingFields.push("airway notes")
+		if (!form.totalAnesthesiaMinutes || Number(form.totalAnesthesiaMinutes) <= 0) {
+			missingFields.push("total anesthesia time")
+		}
+		if (!hasCompleteVital) missingFields.push("at least one complete intraoperative vital")
+
+		return missingFields
+	}, [form])
+	const canSignRecord =
+		canSign &&
+		!isSigned &&
+		signChecklistMissing.length === 0 &&
+		(Boolean(existing) || canEdit) &&
+		!sign.isPending &&
+		!save.isPending
 
 	useEffect(() => {
 		setForm(buildInitialState(existing))
@@ -337,6 +361,7 @@ export function AnesthesiaRecordForm({
 	}
 
 	function handleSign() {
+		if (!canSignRecord) return
 		setShowSignConfirm(true)
 	}
 
@@ -1043,6 +1068,13 @@ export function AnesthesiaRecordForm({
 				<>
 					<Separator />
 
+					{canSign && !isSigned && signChecklistMissing.length > 0 ? (
+						<div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+							<ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+							<p>Complete these fields before signing: {signChecklistMissing.join(", ")}.</p>
+						</div>
+					) : null}
+
 					<div className="flex justify-end gap-3">
 						{!isSigned && (
 							<Button
@@ -1060,7 +1092,7 @@ export function AnesthesiaRecordForm({
 							<Button
 								className="bg-green-700 hover:bg-green-800"
 								onClick={handleSign}
-								disabled={sign.isPending || save.isPending || (!existing && !canEdit)}
+								disabled={!canSignRecord}
 							>
 								<CheckCircle2 className="mr-2 size-4" />
 								{sign.isPending ? "Signing…" : "Sign Anesthesia Record"}

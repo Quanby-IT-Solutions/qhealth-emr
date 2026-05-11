@@ -88,6 +88,7 @@ export function SurgicalCalendar({
 	const {
 		data: slots = [],
 		isLoading,
+		isError,
 		refetch,
 	} = useOrSlotsQuery({
 		facilityId,
@@ -119,6 +120,7 @@ export function SurgicalCalendar({
 	}
 
 	const bookedCount = slots.filter(s => !!s.surgicalCaseId).length
+	const openSlotCount = OR_SUITES.length * weekDays.length * TIME_SLOTS.length - bookedCount
 
 	return (
 		<>
@@ -127,11 +129,14 @@ export function SurgicalCalendar({
 					<div>
 						<h1 className="text-2xl font-semibold">OR Schedule</h1>
 						<p className="text-muted-foreground text-sm">
-							Operating room slot management — click an empty cell to book a case
+							{readOnly
+								? "Read-only operating room schedule for your assigned cases"
+								: "Operating room slot management - click an open cell to book a case"}
 						</p>
 					</div>
 					<div className="flex items-center gap-2">
 						<Badge variant="secondary">{bookedCount} booked this week</Badge>
+						<Badge variant="outline">{openSlotCount} open slots</Badge>
 						{readOnly && <Badge variant="outline">Read Only</Badge>}
 						<Button variant="outline" size="sm" nativeButton={false} render={<a href={backHref} />}>
 							← {backLabel}
@@ -177,19 +182,43 @@ export function SurgicalCalendar({
 							<div className="text-muted-foreground py-12 text-center text-sm">
 								Loading schedule…
 							</div>
+						) : isError ? (
+							<div className="text-destructive py-12 text-center text-sm">
+								Unable to load the OR schedule. Please try again.
+							</div>
 						) : (
-							<table className="w-full border-collapse text-sm">
+							<table className="w-full min-w-[1040px] border-collapse text-sm">
 								<thead>
 									<tr>
-										<th className="bg-muted/50 w-16 border-r border-b px-3 py-2 text-left font-medium">
+										<th className="bg-muted/50 w-20 border-r border-b px-3 py-2 text-left align-bottom font-medium">
 											Time
 										</th>
 										{OR_SUITES.map(suite => (
 											<th
 												key={suite}
-												className="bg-muted/50 border-r border-b px-3 py-2 text-center font-medium"
+												className="bg-muted/50 border-r border-b p-0 text-center font-medium"
 											>
-												{suite}
+												<div className="border-b px-3 py-2">{suite}</div>
+												<div className="text-muted-foreground grid grid-cols-7 text-[11px] font-normal">
+													{weekDays.map(day => {
+														const isToday = toIsoDate(day) === toIsoDate(new Date())
+
+														return (
+															<div
+																key={`${suite}-${toIsoDate(day)}`}
+																className={`border-r px-2 py-1 last:border-r-0 ${isToday ? "bg-primary/10 text-primary font-medium" : ""}`}
+															>
+																<div>{day.toLocaleDateString("en-PH", { weekday: "short" })}</div>
+																<div>
+																	{day.toLocaleDateString("en-PH", {
+																		month: "short",
+																		day: "numeric",
+																	})}
+																</div>
+															</div>
+														)
+													})}
+												</div>
 											</th>
 										))}
 									</tr>
@@ -217,7 +246,13 @@ export function SurgicalCalendar({
 																	className={`min-h-[40px] border-r p-1 last:border-r-0 ${isToday ? "bg-primary/5" : ""}`}
 																>
 																	{occupied ? (
-																		<div className="bg-primary/10 border-primary/30 h-full rounded border p-1 text-xs">
+																		<div className="bg-primary/10 border-primary/30 h-full rounded border p-1.5 text-xs">
+																			<Badge
+																				variant="secondary"
+																				className="mb-1 h-4 px-1 text-[10px]"
+																			>
+																				Booked
+																			</Badge>
 																			<p className="text-primary truncate font-semibold">
 																				{occupied.procedureName}
 																			</p>
@@ -231,12 +266,12 @@ export function SurgicalCalendar({
 																		<div className="flex h-full min-h-[38px] items-center justify-center">
 																			{readOnly ? (
 																				<span className="text-muted-foreground/30 text-xs">
-																					Open
+																					Available
 																				</span>
 																			) : (
 																				<button
 																					onClick={() => openBooking(day, suite, timeSlot)}
-																					className="text-muted-foreground/40 hover:bg-primary/5 hover:text-primary/60 flex h-full min-h-[38px] w-full items-center justify-center rounded transition-colors"
+																					className="text-muted-foreground/50 hover:bg-primary/5 hover:text-primary hover:border-primary/30 flex h-full min-h-[38px] w-full items-center justify-center rounded border border-dashed border-transparent transition-colors"
 																					title={`Book case in ${suite} on ${toIsoDate(day)} at ${timeSlot}`}
 																				>
 																					<Plus className="size-3" />

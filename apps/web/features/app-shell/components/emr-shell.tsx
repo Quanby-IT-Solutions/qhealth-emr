@@ -222,7 +222,7 @@ const GROUP_MAPPING: Record<string, string> = {
 type NavItem = {
 	title: string
 	href: string
-	icon: (props: any) => JSX.Element
+	icon: React.ComponentType<any>
 	badge?: { text: string | number; variant: "destructive" | "primary" | "warning" }
 }
 
@@ -359,6 +359,18 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 			icon: NAV_ICON_MAP[item.iconName] || Icons.List,
 		})
 	})
+
+	if (!isOnline && permissions.some(permission => permission.module === "patients" && permission.action === "view")) {
+		const groupName = "PATIENT LIFECYCLE"
+		if (!groupsMap.has(groupName)) {
+			groupsMap.set(groupName, [])
+		}
+		groupsMap.get(groupName)!.push({
+			title: "Offline Cache",
+			href: "/patients/offline",
+			icon: Icons.CloudOff,
+		})
+	}
 	
 	const filteredGroups: NavGroup[] = groupOrder
 		.map(label => ({

@@ -47,7 +47,7 @@ describe("AnesthesiaRecordForm", () => {
 					asaClass: "ASA II",
 					anesthesiaType: "general",
 					airwayType: "oral_ett",
-					airwayManagement: null,
+					airwayManagement: "Direct laryngoscopy with oral ETT secured at 21 cm.",
 					intubationAttempts: 1,
 					intubationGrade: "CL1",
 					difficultAirway: false,
@@ -101,7 +101,7 @@ describe("AnesthesiaRecordForm", () => {
 					asaClass: "ASA II",
 					anesthesiaType: "general",
 					airwayType: "oral_ett",
-					airwayManagement: null,
+					airwayManagement: "Direct laryngoscopy with oral ETT secured at 21 cm.",
 					intubationAttempts: 1,
 					intubationGrade: "CL1",
 					difficultAirway: false,
@@ -159,5 +159,59 @@ describe("AnesthesiaRecordForm", () => {
 		})
 
 		expect(callOrder).toEqual(["save", "sign"])
+	})
+
+	it("blocks signing until required anesthesia fields are complete", async () => {
+		const user = userEvent.setup()
+
+		render(
+			<AnesthesiaRecordForm
+				caseId="case-1"
+				canEdit
+				canSign
+				existing={{
+					id: "anes-1",
+					surgicalCaseId: "case-1",
+					asaClass: null,
+					anesthesiaType: null,
+					airwayType: null,
+					airwayManagement: null,
+					intubationAttempts: null,
+					intubationGrade: null,
+					difficultAirway: false,
+					agents: null,
+					inductionAgents: null,
+					maintenanceAgents: null,
+					muscleRelaxants: null,
+					intraopMedications: null,
+					intraopVitals: [],
+					reversalAgent: null,
+					totalAnesthesiaMinutes: null,
+					emergenceSmooth: null,
+					complications: null,
+					postAnesthesiaCareNotes: null,
+					status: "draft",
+					signedAt: null,
+					signedByStaffId: null,
+					createdAt: "2026-05-05T00:00:00.000Z",
+					updatedAt: "2026-05-05T00:00:00.000Z",
+				}}
+			/>
+		)
+
+		expect(screen.getByText(/complete these fields before signing/i)).toHaveTextContent(
+			"anesthesia type"
+		)
+		expect(screen.getByText(/complete these fields before signing/i)).toHaveTextContent(
+			"at least one complete intraoperative vital"
+		)
+
+		await user.click(screen.getByRole("button", { name: /save draft/i }))
+
+		await waitFor(() => {
+			expect(saveMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ caseId: "case-1" }))
+		})
+		expect(screen.getByRole("button", { name: /sign anesthesia record/i })).toBeDisabled()
+		expect(signMutateAsync).not.toHaveBeenCalled()
 	})
 })
