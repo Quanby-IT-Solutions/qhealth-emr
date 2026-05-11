@@ -8,11 +8,12 @@ Tickets organized by role and layer. Source-of-truth documents:
 
 ## Roles in Scope
 
-Only the six roles below are covered. All other roles defined in the TOR (Registrar, Triage, Physician, Surgeon, Anesthesiologist, Nurse, Dietitian, Pharmacist, Lab Tech, Radiologist, Blood Bank, Scheduler, Patient/Proxy, Break-Glass Clinician) are out of scope for this batch.
+The roles below are covered. All other roles defined in the TOR (Triage, Physician, Surgeon, Anesthesiologist, Nurse, Dietitian, Pharmacist, Lab Tech, Radiologist, Blood Bank, Scheduler, Patient/Proxy, Break-Glass Clinician) are out of scope for this batch.
 
 | Role | Stories Covered | Folder |
 |------|-----------------|--------|
 | Admin | 1.2, 1.3, 1.4, 2.5, 17.1, 17.2, 19.1, 19.2, 20.1, 20.2, 20.3 | `admin/` |
+| Registrar | 2.6, 2.9 | `registrar/` |
 | Billing Officer | 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7 | `billing-officer/` |
 | Social Worker | 12.8, 12.9, 12.10, 12.11 | `social-worker/` |
 | HIM Coder | 15.1, 15.2, 15.3, 15.4 | `him-coder/` |
@@ -47,6 +48,9 @@ tickets/
 ├── admin/
 │   ├── frontend/
 │   └── backend/
+├── registrar/
+│   ├── frontend/
+│   └── backend/
 ├── billing-officer/
 │   ├── frontend/
 │   └── backend/
@@ -70,10 +74,11 @@ tickets/
 |------|----|----|
 | Shared (auth) | 1 | 0 (auth backend lives in ADM-BE-02) |
 | Admin | 12 | 12 |
+| Registrar | 7 | 6 |
 | Billing Officer | 10 | 8 |
 | Social Worker | 6 | 5 |
 | HIM Coder | 6 | 5 |
 | Surveillance | 5 | 4 |
 | Auditor | 4 | 3 |
-| **Total** | **44** | **37** |
-| **Grand total** | **81 tickets + 1 README = 82 ticket files** | |
+| **Total** | **51** | **43** |
+| **Grand total** | **94 tickets + 1 README = 95 ticket files** | |

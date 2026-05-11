@@ -43,6 +43,9 @@ import { v1Surgical } from "./surgical/v1.surgical.js"
 import { v1SystemSettings } from "./system-settings/v1.system-settings.js"
 import { v1Telemedicine } from "./telemedicine/v1.telemedicine.js"
 import { v1Terminology } from "./terminology/v1.terminology.js"
+import { v1DischargeClearances } from "./discharge-clearances/v1.discharge-clearances.js"
+import { v1GatePasses } from "./gate-passes/v1.gate-passes.js"
+import { v1Housekeeping } from "./housekeeping/v1.housekeeping.js"
 
 /**
  * V1 contract router
@@ -62,6 +65,9 @@ export const v1Contract = oc.prefix("/v1").router(
 		encounter: v1Encounter,
 		fhir: v1Fhir,
 		bed: v1Bed,
+		dischargeClearances: v1DischargeClearances,
+		gatePasses: v1GatePasses,
+		housekeeping: v1Housekeeping,
 		rbac: v1Rbac,
 		ed: v1Ed,
 		problemsAllergies: v1ProblemsAllergies,

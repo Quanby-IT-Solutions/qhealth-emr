@@ -30,6 +30,9 @@ import {
 	preEncounters,
 	wards,
 } from "./core.js"
+import { dischargeClearances } from "./discharge-clearances.js"
+import { gatePasses } from "./gate-passes.js"
+import { bedCleaningLog } from "./bed-cleaning-log.js"
 import { deathReports } from "./death-reporting.js"
 import {
 	drugBrands,
@@ -100,6 +103,9 @@ export const relations = defineRelations(
 		wards,
 		beds,
 		bedCensusSnapshots,
+		dischargeClearances,
+		gatePasses,
+		bedCleaningLog,
 		// Clinical
 		clinicalNotes,
 		noteAddenda,
@@ -323,6 +329,8 @@ export const relations = defineRelations(
 			transfusionVerifications: r.many.transfusionVerifications(),
 		},
 		encounters: {
+			dischargeClearances: r.many.dischargeClearances(),
+			gatePasses: r.many.gatePasses(),
 			facility: r.one.facilities({
 				from: r.encounters.facilityId,
 				to: r.facilities.id,
@@ -450,6 +458,7 @@ export const relations = defineRelations(
 				from: r.beds.currentEncounterId,
 				to: r.encounters.id,
 			}),
+			bedCleaningLog: r.many.bedCleaningLog(),
 		},
 		bedCensusSnapshots: {
 			facility: r.one.facilities({

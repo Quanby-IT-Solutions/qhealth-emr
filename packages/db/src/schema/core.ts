@@ -78,7 +78,7 @@ export const beds = createTable(
 			.text("status")
 			.notNull()
 			.default("available")
-			.$type<"available" | "occupied" | "reserved" | "cleaning" | "out_of_service">(),
+			.$type<"available" | "occupied" | "reserved" | "cleaning" | "dirty_for_cleaning" | "out_of_service">(),
 		currentEncounterId: t
 			.uuid("current_encounter_id")
 			.references((): AnyPgColumn => encounters.id, { onDelete: "set null" }),
@@ -157,6 +157,9 @@ export const encounters = createTable(
 		dischargeDatetime: t.timestamp("discharge_datetime"),
 		disposition: t.text("disposition").$type<"home" | "transfer" | "deceased" | "ama">(),
 		oecbEligible: t.boolean("oecb_eligible").notNull().default(false),
+		// Additional metrics for registrar reporting
+		lengthOfStayMinutes: t.integer("length_of_stay_minutes"),
+		deathRateClassification: t.text("death_rate_classification").$type<"gross" | "net" | null>(),
 		mergedFromPreEncounterId: t
 			.uuid("merged_from_pre_encounter_id")
 			.references(() => preEncounters.id, { onDelete: "set null" }),

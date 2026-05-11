@@ -40,6 +40,9 @@ import { SurgicalModule } from "./surgical/surgical.module"
 import { SystemSettingsModule } from "./system-settings/system-settings.module"
 import { TelemedicineModule } from "./telemedicine/telemedicine.module"
 import { TerminologyModule } from "./terminology/terminology.module"
+import { DischargeClearancesModule } from "./discharge-clearances/discharge-clearances.module"
+import { GatePassesModule } from "./gate-passes/gate-passes.module"
+import { HousekeepingModule } from "./housekeeping/housekeeping.module"
 
 @Module({
 	imports: [
@@ -92,6 +95,10 @@ import { TerminologyModule } from "./terminology/terminology.module"
 		AuditorModule,
 		// HIM-BE-01..05: Health Information Management
 		HimModule,
+		// Registrar features
+		DischargeClearancesModule,
+		GatePassesModule,
+		HousekeepingModule,
 	],
 })
 export class V1Module {}
