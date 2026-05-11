@@ -279,6 +279,14 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		excludePermissions: [{ module: "audit", action: "view" }],
 	},
 	{
+		title: "OR Schedule",
+		href: "/or/schedule",
+		iconName: "surgical",
+		// Surgeon/Anesthesiologist read-only schedule for assigned cases.
+		requiredPermissions: [{ module: "surgical", action: "view" }],
+		excludePermissions: [{ module: "scheduling", action: "view" }],
+	},
+	{
 		title: "Bed Management",
 		href: "/beds",
 		iconName: "bed",

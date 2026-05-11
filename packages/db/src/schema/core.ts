@@ -144,7 +144,7 @@ export const encounters = createTable(
 			.text("status")
 			.notNull()
 			.default("active")
-			.$type<"active" | "discharged" | "closed" | "cancelled">(),
+			.$type<"active" | "pending_discharge" | "discharged" | "closed" | "cancelled">(),
 		chiefComplaint: t.text("chief_complaint"),
 		admittingStaffId: t
 			.uuid("admitting_staff_id")

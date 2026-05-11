@@ -113,9 +113,17 @@ interface ChecklistGroupProps {
 	checks: CheckMap
 	onChange: (key: string, checked: boolean) => void
 	serverItems: PreOpChecklistData["items"]
+	canEdit: boolean
 }
 
-function ChecklistGroup({ category, items, checks, onChange, serverItems }: ChecklistGroupProps) {
+function ChecklistGroup({
+	category,
+	items,
+	checks,
+	onChange,
+	serverItems,
+	canEdit,
+}: ChecklistGroupProps) {
 	return (
 		<div>
 			<p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
@@ -132,6 +140,7 @@ function ChecklistGroup({ category, items, checks, onChange, serverItems }: Chec
 								id={item.key}
 								checked={isChecked}
 								onCheckedChange={v => onChange(item.key, !!v)}
+								disabled={!canEdit}
 								className="mt-0.5"
 							/>
 							<div className="flex-1">
@@ -209,6 +218,7 @@ export function PreOpChecklist({ caseId, existing, canEdit = false }: PreOpCheck
 					<div className="flex items-center justify-between">
 						<CardTitle className="text-base">Pre-Operative Checklist</CardTitle>
 						<div className="flex items-center gap-3">
+							{!canEdit && <Badge variant="outline">View Only</Badge>}
 							<span className="text-muted-foreground text-sm">
 								{checkedCount} / {totalCount} items
 							</span>
@@ -243,6 +253,7 @@ export function PreOpChecklist({ caseId, existing, canEdit = false }: PreOpCheck
 									checks={checks}
 									onChange={handleChange}
 									serverItems={existing?.items ?? []}
+									canEdit={canEdit}
 								/>
 							</div>
 						))}

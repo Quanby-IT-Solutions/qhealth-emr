@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { ArrowRightLeft, BedDouble, HeartOff, LogOut } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -14,7 +13,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/core/components/ui/select"
-import { useWardsQuery, useBedListQuery } from "@/features/beds/api/beds.hooks"
+import { useBedListQuery, useWardsQuery } from "@/features/beds/api/beds.hooks"
 import { useNotesQuery } from "@/features/clinical-docs/api/clinical-docs.hooks"
 import {
 	isMaternalDeathCandidate,
@@ -87,6 +86,7 @@ export function DispositionForm({
 
 	const [disposition, setDisposition] = useState<DispositionType | "">("")
 	const [oecbChecklist, setOecbChecklist] = useState<boolean[]>(OECB_CRITERIA.map(() => false))
+	const [tagAsOecb, setTagAsOecb] = useState(false)
 	const [admitWardId, setAdmitWardId] = useState("")
 	const [admitBedId, setAdmitBedId] = useState("")
 	const [deathReportOpen, setDeathReportOpen] = useState(false)
@@ -104,7 +104,8 @@ export function DispositionForm({
 	const availableBeds =
 		bedData?.wards?.flatMap(w => w.beds.filter(b => b.status === "available")) ?? []
 	const hasSignedNote = (notesData?.data ?? []).some(n => n.status === "signed")
-	const oecbEligible = oecbChecklist.every(Boolean)
+	const oecbCriteriaMet = oecbChecklist.every(Boolean)
+	const oecbEligible = oecbCriteriaMet && tagAsOecb
 
 	const patientSex = encounter?.patientSex ?? ""
 	const patientDateOfBirth = encounter?.patientDateOfBirth ?? ""
@@ -158,8 +159,7 @@ export function DispositionForm({
 				{/* Documentation completeness gate */}
 				{!hasSignedNote && (
 					<div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-400">
-						No signed clinical notes. Sign at least one note before dispositioning this
-						patient.
+						No signed clinical notes. Sign at least one note before dispositioning this patient.
 					</div>
 				)}
 
@@ -178,11 +178,12 @@ export function DispositionForm({
 										setDisposition(opt.value)
 										if (opt.value !== "discharge" && opt.value !== "transfer") {
 											setOecbChecklist(OECB_CRITERIA.map(() => false))
+											setTagAsOecb(false)
 										}
 									}}
 									className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all ${
 										selected
-											? "border-primary bg-primary/5 ring-2 ring-primary"
+											? "border-primary bg-primary/5 ring-primary ring-2"
 											: "border-border hover:border-primary/50"
 									}`}
 								>
@@ -225,10 +226,7 @@ export function DispositionForm({
 						{admitWardId && (
 							<div className="space-y-2">
 								<Label>Bed</Label>
-								<Select
-									value={admitBedId || null}
-									onValueChange={v => setAdmitBedId(v ?? "")}
-								>
+								<Select value={admitBedId || null} onValueChange={v => setAdmitBedId(v ?? "")}>
 									<SelectTrigger className="w-full">
 										<SelectValue />
 									</SelectTrigger>
@@ -250,6 +248,25 @@ export function DispositionForm({
 					<div className="space-y-2">
 						<Label>OECB Eligibility Checklist</Label>
 						<div className="space-y-2 rounded-md border p-3">
+							<div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+								<div className="flex items-start gap-2">
+									<Checkbox
+										id="tag-oecb"
+										checked={tagAsOecb}
+										disabled={!oecbCriteriaMet}
+										onCheckedChange={v => setTagAsOecb(v === true)}
+									/>
+									<div className="space-y-1">
+										<Label htmlFor="tag-oecb" className="text-sm font-medium">
+											Tag as OECB (Outpatient Emergency Care Benefit)
+										</Label>
+										<p className="text-xs text-blue-800">
+											Routes eligible ED discharge or transfer cases to PhilHealth outpatient
+											billing.
+										</p>
+									</div>
+								</div>
+							</div>
 							{OECB_CRITERIA.map((criterion, i) => (
 								<div key={i} className="flex items-center gap-2">
 									<Checkbox
@@ -279,9 +296,7 @@ export function DispositionForm({
 					{dispose.isPending ? "Processing…" : "Confirm Disposition"}
 				</Button>
 
-				{dispose.isError && (
-					<p className="text-destructive text-sm">{dispose.error.message}</p>
-				)}
+				{dispose.isError && <p className="text-destructive text-sm">{dispose.error.message}</p>}
 			</form>
 
 			{patientId && (

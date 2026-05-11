@@ -17,7 +17,7 @@ export function useEncounterListQuery(
 	params: {
 		facilityId: string
 		patientId: string
-		status?: "active" | "discharged" | "closed" | "cancelled"
+		status?: "active" | "pending_discharge" | "discharged" | "closed" | "cancelled"
 		page?: number
 		limit?: number
 	},
@@ -64,6 +64,15 @@ export function useDischargeEncounterMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.encounter.discharge.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.encounter.key() }),
+		})
+	)
+}
+
+export function useSignMayGoHomeOrderMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.encounter.signMayGoHomeOrder.mutationOptions({
 			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.encounter.key() }),
 		})
 	)

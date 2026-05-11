@@ -25,7 +25,13 @@ const PaginatedResponseSchema = z.object({
 // ============================================================================
 
 export const EncounterTypeEnum = z.enum(["inpatient", "outpatient", "emergency", "telemedicine"])
-export const EncounterStatusEnum = z.enum(["active", "discharged", "closed", "cancelled"])
+export const EncounterStatusEnum = z.enum([
+	"active",
+	"pending_discharge",
+	"discharged",
+	"closed",
+	"cancelled",
+])
 export const DispositionEnum = z.enum(["home", "transfer", "deceased", "ama"])
 
 // ============================================================================
@@ -248,6 +254,16 @@ export const DischargeEncounterSchema = z.object({
 })
 
 export type DischargeEncounterInput = z.infer<typeof DischargeEncounterSchema>
+
+// ============================================================================
+// May Go Home Order (Inpatient)
+// ============================================================================
+
+export const SignMayGoHomeOrderSchema = z.object({
+	encounterId: z.string().uuid(),
+})
+
+export type SignMayGoHomeOrderInput = z.infer<typeof SignMayGoHomeOrderSchema>
 
 // ============================================================================
 // Close Encounter (Outpatient)

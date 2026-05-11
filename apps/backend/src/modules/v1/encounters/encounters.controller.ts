@@ -64,6 +64,14 @@ export class EncountersController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
+	@Implement(v1.encounter.signMayGoHomeOrder)
+	async signMayGoHomeOrder(@Session() session: UserSession) {
+		return implement(v1.encounter.signMayGoHomeOrder).handler(async ({ input }) => {
+			return this.encountersService.signMayGoHomeOrder(input, session.user.id)
+		})
+	}
+
 	@RequirePermission("adt", "edit")
 	@Implement(v1.encounter.close)
 	async close(@Session() session: UserSession) {

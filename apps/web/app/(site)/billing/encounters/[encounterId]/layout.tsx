@@ -27,6 +27,8 @@ export default function BillingEncounterLayout({
 				facilityId: encounter?.facilityId,
 				activeAllergyCount: summary?.activeAllergyCount ?? 0,
 				hasSevereAllergies: summary?.hasSevereAllergies ?? false,
+				canViewClinicalSummary: true,
+				canViewVitals: false,
 			}}
 		>
 			{children}
