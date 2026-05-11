@@ -40,7 +40,10 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
 	if (entries.length === 0) return ""
-	return "?" + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
+	return (
+		"?" +
+		entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
+	)
 }
 
 // ============================================================================
@@ -279,7 +282,7 @@ export const surgicalKeys = {
 	preOpChecklist: (caseId: string) => [...surgicalKeys.all, "pre-op-checklist", caseId] as const,
 	rvsAssignments: (caseId: string) => [...surgicalKeys.all, "rvs-assignments", caseId] as const,
 	rvsCodes: (search: string) => [...surgicalKeys.all, "rvs-codes", search] as const,
-	orSlots: (facilityId: string, date: string) => [...surgicalKeys.all, "or-slots", facilityId, date] as const,
+	orSlots: (params: object) => [...surgicalKeys.all, "or-slots", params] as const,
 }
 
 // ============================================================================
@@ -291,6 +294,8 @@ interface SurgicalCaseListParams {
 	encounterId?: string
 	status?: SurgeryStatus
 	date?: string
+	surgeonStaffId?: string
+	anesthesiologistStaffId?: string
 	page?: number
 	limit?: number
 }
@@ -371,7 +376,8 @@ export function useUpdateSurgicalCaseMutation() {
 export function useOperationRecordQuery(caseId: string | undefined) {
 	return useQuery({
 		queryKey: surgicalKeys.operationRecord(caseId ?? ""),
-		queryFn: () => fetchJson<OperationRecord | null>(`${API_BASE}/cases/${caseId}/operation-record`),
+		queryFn: () =>
+			fetchJson<OperationRecord | null>(`${API_BASE}/cases/${caseId}/operation-record`),
 		enabled: !!caseId,
 	})
 }
@@ -439,7 +445,8 @@ export function useSignOperationRecordMutation() {
 export function useAnesthesiaRecordQuery(caseId: string | undefined) {
 	return useQuery({
 		queryKey: surgicalKeys.anesthesiaRecord(caseId ?? ""),
-		queryFn: () => fetchJson<AnesthesiaRecord | null>(`${API_BASE}/cases/${caseId}/anesthesia-record`),
+		queryFn: () =>
+			fetchJson<AnesthesiaRecord | null>(`${API_BASE}/cases/${caseId}/anesthesia-record`),
 		enabled: !!caseId,
 	})
 }
@@ -609,12 +616,21 @@ export function useRemoveRvsAssignmentMutation() {
 // OR Slots
 // ============================================================================
 
-export function useOrSlotsQuery(facilityId: string, weekStart: string) {
+interface OrSlotsParams {
+	facilityId: string
+	weekStart: string
+	surgeonStaffId?: string
+	anesthesiologistStaffId?: string
+}
+
+export function useOrSlotsQuery(params: OrSlotsParams) {
 	return useQuery({
-		queryKey: surgicalKeys.orSlots(facilityId, weekStart),
+		queryKey: surgicalKeys.orSlots(params),
 		queryFn: () =>
-			fetchJson<OrSlot[]>(`${API_BASE}/or-slots${buildQueryString({ facilityId, weekStart })}`),
-		enabled: !!facilityId,
+			fetchJson<OrSlot[]>(
+				`${API_BASE}/or-slots${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
+			),
+		enabled: !!params.facilityId,
 	})
 }
 

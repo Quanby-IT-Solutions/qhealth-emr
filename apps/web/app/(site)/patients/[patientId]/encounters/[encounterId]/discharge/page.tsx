@@ -14,7 +14,7 @@ export default function DischargePage() {
 		)
 	}
 
-	if (encounter.status !== "active") {
+	if (encounter.status !== "active" && encounter.status !== "pending_discharge") {
 		return (
 			<div className="text-muted-foreground py-8 text-center text-sm">
 				This encounter has already been {encounter.encounterType === "outpatient" ? "closed" : "discharged"}.

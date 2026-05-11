@@ -226,7 +226,7 @@ export type PatientIdInput = z.infer<typeof PatientIdSchema>
 export const PatientEncounterSummarySchema = z.object({
 	id: z.string().uuid(),
 	encounterType: z.enum(["inpatient", "outpatient", "emergency", "telemedicine"]),
-	status: z.enum(["active", "discharged", "closed", "cancelled"]),
+	status: z.enum(["active", "pending_discharge", "discharged", "closed", "cancelled"]),
 	chiefComplaint: z.string().nullable(),
 	admissionDatetime: dateOrString,
 	dischargeDatetime: dateOrString.nullable(),

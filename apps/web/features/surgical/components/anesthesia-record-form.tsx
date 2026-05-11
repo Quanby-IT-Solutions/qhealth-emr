@@ -356,19 +356,20 @@ export function AnesthesiaRecordForm({
 			{!canEdit && !canSign && (
 				<div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
 					<Info className="mt-0.5 size-4 shrink-0" />
-					<p>You have view-only access to this record. The Anesthesia Record is authored and signed by the assigned anesthesiologist.</p>
+					<p>
+						You have view-only access to this record. The Anesthesia Record is authored and signed
+						by the assigned anesthesiologist.
+					</p>
 				</div>
 			)}
 			{/* AC3: Compliance notice — bedside monitor auto-capture not available */}
 			<div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
 				<Info className="mt-0.5 size-4 shrink-0" />
 				<div>
-					<p className="font-medium">Bedside Monitor Auto-Capture Not Available</p>
+					<p className="font-medium">Manual Intraoperative Vitals Entry</p>
 					<p className="mt-0.5 text-blue-700 dark:text-blue-400">
-						Automatic vital signs capture from bedside monitors is not enabled in this
-						environment. All intraoperative vitals must be entered manually using the
-						flowsheet below. Monitor integration is planned for a future release.
-						This note serves as a compliance record confirming manual-entry mode is in use.
+						Intraoperative vitals are entered manually. Monitor integration is handled by the
+						facility&apos;s external systems.
 					</p>
 				</div>
 			</div>
@@ -405,7 +406,8 @@ export function AnesthesiaRecordForm({
 						>
 							<SelectTrigger>
 								<SelectValue>
-									{ANESTHESIA_TYPE_OPTIONS.find(o => o.value === form.anesthesiaType)?.label ?? "Select type…"}
+									{ANESTHESIA_TYPE_OPTIONS.find(o => o.value === form.anesthesiaType)?.label ??
+										"Select type…"}
 								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
@@ -425,9 +427,7 @@ export function AnesthesiaRecordForm({
 							disabled={fieldsDisabled}
 						>
 							<SelectTrigger>
-								<SelectValue>
-									{form.asaClass ?? "Select class…"}
-								</SelectValue>
+								<SelectValue>{form.asaClass ?? "Select class…"}</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								{ASA_OPTIONS.map(cls => (
@@ -464,8 +464,9 @@ export function AnesthesiaRecordForm({
 							>
 								<SelectTrigger>
 									<SelectValue>
-									{AIRWAY_OPTIONS.find(o => o.value === form.airwayType)?.label ?? "Select device…"}
-								</SelectValue>
+										{AIRWAY_OPTIONS.find(o => o.value === form.airwayType)?.label ??
+											"Select device…"}
+									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
 									{AIRWAY_OPTIONS.map(opt => (
@@ -485,8 +486,9 @@ export function AnesthesiaRecordForm({
 							>
 								<SelectTrigger>
 									<SelectValue>
-									{INTUBATION_GRADE_OPTIONS.find(o => o.value === form.intubationGrade)?.label ?? "Select grade…"}
-								</SelectValue>
+										{INTUBATION_GRADE_OPTIONS.find(o => o.value === form.intubationGrade)?.label ??
+											"Select grade…"}
+									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
 									{INTUBATION_GRADE_OPTIONS.map(opt => (
@@ -863,12 +865,7 @@ export function AnesthesiaRecordForm({
 								Bedside monitor integration is not yet available in this environment
 							</TooltipContent>
 						</Tooltip>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={addVital}
-							disabled={fieldsDisabled}
-						>
+						<Button variant="outline" size="sm" onClick={addVital} disabled={fieldsDisabled}>
 							<Plus className="mr-1.5 size-3.5" />
 							Add Entry
 						</Button>

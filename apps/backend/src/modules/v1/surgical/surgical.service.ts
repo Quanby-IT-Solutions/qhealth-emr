@@ -332,6 +332,10 @@ export class SurgicalService {
 			input.facilityId ? eq(surgicalCases.facilityId, input.facilityId) : undefined,
 			input.encounterId ? eq(surgicalCases.encounterId, input.encounterId) : undefined,
 			input.status ? eq(surgicalCases.status, input.status) : undefined,
+			input.surgeonStaffId ? eq(surgicalCases.surgeonStaffId, input.surgeonStaffId) : undefined,
+			input.anesthesiologistStaffId
+				? eq(surgicalCases.anesthesiologistStaffId, input.anesthesiologistStaffId)
+				: undefined,
 			input.date
 				? sql`date(${surgicalCases.scheduledDatetime} AT TIME ZONE 'UTC') = ${input.date}::date`
 				: undefined
@@ -529,7 +533,8 @@ export class SurgicalService {
 				let message = "Scheduling conflict detected:"
 				if (roomConflict) message += ` OR room ${input.orSuite} is already booked.`
 				if (surgeonConflict) message += ` Surgeon has an overlapping case.`
-				if (equipConflict) message += ` Required equipment (${equipConflict.equipmentItem}) is already allocated.`
+				if (equipConflict)
+					message += ` Required equipment (${equipConflict.equipmentItem}) is already allocated.`
 
 				throw new ConflictException(message)
 			}
@@ -1439,6 +1444,10 @@ export class SurgicalService {
 			.where(
 				and(
 					eq(surgicalCases.facilityId, input.facilityId),
+					input.surgeonStaffId ? eq(surgicalCases.surgeonStaffId, input.surgeonStaffId) : undefined,
+					input.anesthesiologistStaffId
+						? eq(surgicalCases.anesthesiologistStaffId, input.anesthesiologistStaffId)
+						: undefined,
 					gte(surgicalCases.scheduledDatetime, weekStart),
 					lt(surgicalCases.scheduledDatetime, weekEnd)
 				)

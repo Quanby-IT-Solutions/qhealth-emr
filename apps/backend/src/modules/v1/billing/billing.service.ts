@@ -579,6 +579,16 @@ export class BillingService {
 	}
 
 	async createCharge(input: CreateChargeInput, userId: string) {
+		const [encounter] = await db
+			.select({ status: encounters.status })
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+		if (encounter?.status === "pending_discharge") {
+			throw new UnprocessableEntityException(
+				"Ward charges are frozen — a May Go Home order has been signed for this encounter."
+			)
+		}
+
 		const staffProfileId = await this.getStaffProfileId(userId)
 		const totalAmount = (input.quantity * input.unitPrice).toFixed(2)
 
@@ -623,6 +633,14 @@ export class BillingService {
 
 	/** Idempotent insert for auto-pulled domain events. Duplicate (sourceType, sourceOrderId, encounterId) rows are silently ignored. */
 	async addChargeFromEvent(input: AddChargeFromEventInput) {
+		const [encounter] = await db
+			.select({ status: encounters.status })
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+		if (encounter?.status === "pending_discharge") {
+			return
+		}
+
 		const totalAmount = (input.quantity * input.unitPrice).toFixed(2)
 
 		await db
@@ -645,6 +663,16 @@ export class BillingService {
 		const [existing] = await db.select().from(charges).where(eq(charges.id, input.id))
 
 		if (!existing) throw new NotFoundException("Charge not found")
+
+		const [encounter] = await db
+			.select({ status: encounters.status })
+			.from(encounters)
+			.where(eq(encounters.id, existing.encounterId))
+		if (encounter?.status === "pending_discharge") {
+			throw new UnprocessableEntityException(
+				"Ward charges are frozen — a May Go Home order has been signed for this encounter."
+			)
+		}
 
 		const staffProfileId = await this.getStaffProfileId(userId)
 		const newQuantity = input.quantity !== undefined ? String(input.quantity) : existing.quantity

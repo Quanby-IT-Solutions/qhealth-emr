@@ -72,12 +72,14 @@ export default function EncounterChartLayout({
 	const { data: encounter, isLoading, isError, error, refetch: refetchEncounter } = encounterQuery
 	const pathname = usePathname()
 	const permSet = usePermissionSet()
+	const { data: profile } = useMyProfile()
+	const activeRoleName = (profile?.activeRole?.name ?? "").toLowerCase()
+	const isAnesthesiologist = activeRoleName === "anesthesiologist"
 	const canViewClinicalSummary = can(permSet, "clinical_docs", "view")
-	const canViewVitals = can(permSet, "nursing", "view")
+	const canViewVitals = can(permSet, "nursing", "view") || can(permSet, "surgical", "view")
 	const { data: summary } = usePatientSummaryQuery(encounter?.patientId ?? "", {
 		enabled: !!encounter?.patientId && canViewClinicalSummary,
 	})
-	const { data: profile } = useMyProfile()
 	const { isOnline } = useOfflineSync()
 	const activeStaffProfile = getActiveStaffProfile(profile)
 	const activeFacilityId = activeStaffProfile?.facilityId
@@ -160,8 +162,8 @@ export default function EncounterChartLayout({
 		{
 			label: "e-Prescription",
 			href: `${base}/e-prescription`,
-			// e-Prescription is for Physicians only — Surgeons and Anesthesiologists use surgical workflows
-			show: can(permSet, "orders", "sign") && !can(permSet, "surgical", "view"),
+			// Surgeons may author post-op prescriptions; anesthesiologists stay in surgical workflows.
+			show: can(permSet, "orders", "sign") && !isAnesthesiologist,
 		},
 		{
 			label: "Surgical",
@@ -224,7 +226,7 @@ export default function EncounterChartLayout({
 		can(permSet, "adt", "edit")
 			? [{ label: "Transfer Patient", href: `${base}/transfer`, show: true }]
 			: []),
-		...(encounter?.status === "active" &&
+		...((encounter?.status === "active" || encounter?.status === "pending_discharge") &&
 		(can(permSet, "adt", "edit") || can(permSet, "clinical_docs", "sign"))
 			? [
 					{
