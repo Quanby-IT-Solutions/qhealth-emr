@@ -7,6 +7,7 @@ import { Stethoscope } from "lucide-react"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import { Skeleton } from "@/core/components/ui/skeleton"
 import {
 	Table,
 	TableBody,
@@ -51,6 +52,55 @@ function statusVariant(status: SurgeryStatus) {
 
 function statusLabel(status: SurgeryStatus): string {
 	return status.replace(/_/g, " ")
+}
+
+function SurgicalTableSkeleton() {
+	return (
+		<Table>
+			<TableHeader>
+				<TableRow>
+					<TableHead>Patient</TableHead>
+					<TableHead>Procedure</TableHead>
+					<TableHead>Type</TableHead>
+					<TableHead>OR Suite</TableHead>
+					<TableHead>Surgeon</TableHead>
+					<TableHead>Anesthesiologist</TableHead>
+					<TableHead>Scheduled</TableHead>
+					<TableHead>Status</TableHead>
+				</TableRow>
+			</TableHeader>
+			<TableBody aria-busy aria-label="Loading surgical cases">
+				{Array.from({ length: 6 }).map((_, i) => (
+					<TableRow key={i}>
+						<TableCell>
+							<Skeleton className="h-4 w-32" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-4 w-40" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-4 w-16" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-4 w-20" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-4 w-28" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-4 w-28" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-4 w-36" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-5 w-20 rounded-full" />
+						</TableCell>
+					</TableRow>
+				))}
+			</TableBody>
+		</Table>
+	)
 }
 
 const STATUS_TABS: { value: SurgeryStatus | "all"; label: string }[] = [
@@ -212,7 +262,7 @@ export function SurgicalDashboard() {
 						</Tabs>
 					</div>
 					{isLoading ? (
-						<div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
+						<SurgicalTableSkeleton />
 					) : isError ? (
 						<div className="text-destructive py-8 text-center text-sm">
 							Unable to load surgical cases. Please try again.
