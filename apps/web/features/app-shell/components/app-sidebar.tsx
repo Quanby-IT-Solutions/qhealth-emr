@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ArrowRight01FreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
+import { WifiOff } from "lucide-react"
 
 import {
 	Collapsible,
@@ -27,6 +28,7 @@ import {
 } from "@/core/components/ui/sidebar"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { NAV_ICONS } from "@/features/app-shell/lib/nav-icons"
+import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 import {
 	type AdminNavGroup,
 	filterNavItems,
@@ -46,6 +48,7 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
 export function AppSidebar() {
 	const pathname = usePathname()
 	const { data: profile } = useMyProfile()
+	const { isOnline } = useOfflineSync()
 
 	const permissions = profile?.activeRole?.permissions ?? []
 	const primaryItems = filterNavItems(PRIMARY_NAV_ITEMS, permissions)
@@ -91,6 +94,19 @@ export function AppSidebar() {
 									</SidebarMenuItem>
 								)
 							})}
+							{!isOnline && permissions.some(permission => permission.module === "patients" && permission.action === "view") && (
+								<SidebarMenuItem key="primary-offline-cache">
+									<SidebarMenuButton
+										isActive={pathname === "/patients/offline"}
+										tooltip="Offline Cache"
+									>
+										<Link href="/patients/offline" className="flex items-center gap-2">
+											<WifiOff className="size-4" />
+											<span>Offline Cache</span>
+										</Link>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+							)}
 						</SidebarMenu>
 					</SidebarGroupContent>
 				</SidebarGroup>

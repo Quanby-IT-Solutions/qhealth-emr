@@ -25,6 +25,94 @@ import {
 	useSignAbstractMutation,
 } from "@/features/telemedicine/api/telemedicine.hooks"
 
+function escapeHtml(value: string | null | undefined): string {
+	return (value ?? "")
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;")
+}
+
+function formatPrintDate(value: string | null | undefined): string {
+	if (!value) return "--"
+	return new Date(value).toLocaleString("en-PH", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	})
+}
+
+export function openAbstractPrintWindow(abstract: TeleAbstract): void {
+	const win = window.open("", "_blank", "width=870,height=1100")
+	if (!win) return
+
+	const sentNotice =
+		abstract.status === "sent"
+			? `<div class="notice">Sent to patient${abstract.sentToEmail ? `: ${escapeHtml(abstract.sentToEmail)}` : ""}${abstract.sentAt ? ` on ${escapeHtml(formatPrintDate(abstract.sentAt))}` : ""}</div>`
+			: ""
+
+	const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Telemedicine Encounter Abstract - ${escapeHtml(abstract.patientName)}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #111; padding: 2cm; font-size: 11pt; }
+    .header { text-align: center; margin-bottom: 18px; }
+    .facility { font-size: 13pt; font-weight: 700; }
+    .title { margin-top: 4px; font-size: 15pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; border: 1px solid #bbb; padding: 10px 12px; margin-bottom: 16px; }
+    .label { color: #555; font-size: 9pt; font-weight: 700; text-transform: uppercase; }
+    .value { display: block; min-height: 18px; border-bottom: 1px solid #ddd; padding-top: 1px; }
+    .section { border: 1px solid #ddd; padding: 10px 12px; margin-bottom: 10px; page-break-inside: avoid; }
+    .section h2 { color: #333; font-size: 9pt; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .section p { white-space: pre-wrap; line-height: 1.45; }
+    .signature { margin-top: 28px; display: flex; justify-content: flex-end; }
+    .signature-box { width: 260px; text-align: center; }
+    .sig-line { border-bottom: 1px solid #000; height: 34px; margin-bottom: 5px; }
+    .notice { margin-top: 14px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1e40af; padding: 8px 10px; font-size: 9.5pt; }
+    @media print { @page { size: A4; margin: 2cm; } body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="facility">${escapeHtml(abstract.facilityName)}</div>
+    <div class="title">Telemedicine Encounter Abstract</div>
+  </div>
+  <div class="meta">
+    <div><span class="label">Patient</span><span class="value">${escapeHtml(abstract.patientName)}</span></div>
+    <div><span class="label">Clinician</span><span class="value">${escapeHtml(abstract.clinicianName)}</span></div>
+    <div><span class="label">PRC Number</span><span class="value">${escapeHtml(abstract.clinicianPrcNumber ?? "--")}</span></div>
+    <div><span class="label">Date</span><span class="value">${escapeHtml(formatPrintDate(abstract.createdAt))}</span></div>
+  </div>
+  <div class="section"><h2>Chief Complaint</h2><p>${escapeHtml(abstract.chiefComplaint) || "--"}</p></div>
+  <div class="section"><h2>Subjective</h2><p>${escapeHtml(abstract.subjectiveNotes) || "--"}</p></div>
+  <div class="section"><h2>Objective</h2><p>${escapeHtml(abstract.objectiveNotes) || "--"}</p></div>
+  <div class="section"><h2>Assessment</h2><p>${escapeHtml(abstract.assessmentNotes) || "--"}</p></div>
+  <div class="section"><h2>Plan</h2><p>${escapeHtml(abstract.planNotes) || "--"}</p></div>
+  <div class="section"><h2>Diagnosis</h2><p>${escapeHtml(abstract.diagnosis) || "--"}${abstract.icdCode ? `\nICD-10: ${escapeHtml(abstract.icdCode)}` : ""}</p></div>
+  <div class="signature">
+    <div class="signature-box">
+      <div class="sig-line"></div>
+      <div><strong>${escapeHtml(abstract.clinicianName)}</strong></div>
+      <div>PRC Lic. No.: ${escapeHtml(abstract.clinicianPrcNumber ?? "--")}</div>
+      <div>Signed: ${escapeHtml(formatPrintDate(abstract.signedAt))}</div>
+    </div>
+  </div>
+  ${sentNotice}
+  <script>window.addEventListener("load", function () { setTimeout(function () { window.print() }, 250) })</script>
+</body>
+</html>`
+
+	win.document.write(html)
+	win.document.close()
+	win.focus()
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -241,6 +329,24 @@ export function TeleAbstractPage({
 		}
 	}
 
+	function handlePrint() {
+		if (!abstract) return
+		const style = document.createElement("style")
+		style.media = "print"
+		style.dataset.teleAbstractPrint = "true"
+		style.textContent = `
+			@media print {
+				body * { visibility: hidden !important; }
+				[data-tele-abstract-preview], [data-tele-abstract-preview] * { visibility: visible !important; }
+				[data-tele-abstract-preview] { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; padding: 24px !important; }
+				[data-tele-abstract-actions] { display: none !important; }
+			}
+		`
+		document.head.appendChild(style)
+		window.print()
+		window.setTimeout(() => style.remove(), 1000)
+	}
+
 	if (isLoading) {
 		return (
 			<Card>
@@ -320,19 +426,21 @@ export function TeleAbstractPage({
 					</div>
 				) : (
 					<div className="space-y-5">
-						<AbstractPreview abstract={abstract} />
+						<div data-tele-abstract-preview>
+							<AbstractPreview abstract={abstract} />
+						</div>
 
 						{error && (
 							<p className="text-destructive rounded-md bg-red-50 px-3 py-2 text-sm">{error}</p>
 						)}
 
 						{/* Actions */}
-						<div className="flex flex-wrap gap-3">
-							<Button variant="outline" size="sm">
+						<div data-tele-abstract-actions className="flex flex-wrap gap-3">
+							<Button variant="outline" size="sm" onClick={handlePrint}>
 								<Printer className="mr-1.5 size-3.5" />
 								Print
 							</Button>
-							<Button variant="outline" size="sm">
+							<Button variant="outline" size="sm" onClick={() => openAbstractPrintWindow(abstract)}>
 								<Download className="mr-1.5 size-3.5" />
 								Download PDF
 							</Button>

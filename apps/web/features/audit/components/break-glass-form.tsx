@@ -40,6 +40,7 @@ const DURATION_OPTIONS: { value: number; label: string }[] = [
 	{ value: 12, label: "12 hours" },
 	{ value: 24, label: "24 hours" },
 ]
+const MIN_JUSTIFICATION_LENGTH = 50
 
 // ============================================================================
 // Countdown display for an active break-glass session
@@ -162,7 +163,11 @@ export function BreakGlassForm({
 	}
 
 	const canSubmit =
-		reasonCategory && durationHours !== "" && justification.trim().length >= 10 && acknowledged && !createBreakGlassMutation.isPending
+		reasonCategory &&
+		durationHours !== "" &&
+		justification.trim().length >= MIN_JUSTIFICATION_LENGTH &&
+		acknowledged &&
+		!createBreakGlassMutation.isPending
 
 	const handleSubmit = useCallback(() => {
 		if (!canSubmit) return
@@ -245,18 +250,20 @@ export function BreakGlassForm({
 				</Label>
 				<Textarea
 					id="justification"
-					placeholder="Describe the clinical necessity for accessing this record (minimum 10 characters)…"
+					placeholder={`Describe the clinical necessity for accessing this record (minimum ${MIN_JUSTIFICATION_LENGTH} characters)...`}
 					value={justification}
 					onChange={e => setJustification(e.target.value)}
 					rows={3}
 					className="resize-none"
 				/>
-				{justification.length > 0 && justification.length < 10 && (
-					<p className="text-xs text-destructive">Minimum 10 characters required.</p>
-				)}
-				{justification.length >= 10 && (
-					<p className="text-xs text-muted-foreground text-right">{justification.trim().length} characters</p>
-				)}
+				<div className="flex items-center justify-between gap-3 text-xs">
+					<p className={justification.trim().length < MIN_JUSTIFICATION_LENGTH ? "text-destructive" : "text-muted-foreground"}>
+						Minimum {MIN_JUSTIFICATION_LENGTH} characters required.
+					</p>
+					<p className="text-muted-foreground text-right">
+						{justification.trim().length} / {MIN_JUSTIFICATION_LENGTH} characters
+					</p>
+				</div>
 			</div>
 
 			<Separator />
@@ -310,3 +317,4 @@ export function BreakGlassForm({
 		</div>
 	)
 }
+
