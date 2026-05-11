@@ -378,6 +378,7 @@ DONE - KARL
   - **So that** prescribers receive guidance without inventory-level coupling
   - **Pages**: Formulary Management Page, Formulary Note Editor
 
+DONE - KARL
 - **Story 10.3 – Outpatient Pharmacy Dispensing**
   - **As a** Pharmacist
   - **I want to** scan an e-Prescription barcode/MRN to retrieve valid CPOE prescriptions and dispense medications
