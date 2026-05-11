@@ -24,6 +24,53 @@ function getBadgeVariant(status: LicenseStatus | null | undefined): StatusVarian
 	return "inactive"
 }
 
+function ClinicianLicenseTableHeader() {
+	return (
+		<TableHeader>
+			<TableRow>
+				<TableHead>Clinician</TableHead>
+				<TableHead>PRC</TableHead>
+				<TableHead>PTR</TableHead>
+				<TableHead>S2</TableHead>
+				<TableHead>Next Expiry</TableHead>
+				<TableHead />
+			</TableRow>
+		</TableHeader>
+	)
+}
+
+function ClinicianLicenseTableSkeleton() {
+	return (
+		<Table>
+			<ClinicianLicenseTableHeader />
+			<TableBody aria-busy aria-label="Loading clinician licenses">
+				{Array.from({ length: 5 }).map((_, i) => (
+					<TableRow key={i}>
+						<TableCell>
+							<Skeleton className="h-4 w-36" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-5 w-16 rounded-full" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-5 w-16 rounded-full" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-5 w-16 rounded-full" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-4 w-12" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-4 w-14" />
+						</TableCell>
+					</TableRow>
+				))}
+			</TableBody>
+		</Table>
+	)
+}
+
 export function ClinicianLicenseList() {
 	const [search, setSearch] = useState("")
 	const [statusFilter, setStatusFilter] = useState<LicenseStatus | "all">("all")
@@ -75,11 +122,7 @@ export function ClinicianLicenseList() {
 			</div>
 
 			{isLoading && (
-				<div className="space-y-2">
-					{Array.from({ length: 5 }).map((_, i) => (
-						<Skeleton key={i} className="h-12 w-full" />
-					))}
-				</div>
+				<ClinicianLicenseTableSkeleton />
 			)}
 
 			{isError && (
@@ -93,16 +136,7 @@ export function ClinicianLicenseList() {
 			{!isLoading && !isError && data && data.data.length > 0 && (
 				<>
 					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead>Clinician</TableHead>
-								<TableHead>PRC</TableHead>
-								<TableHead>PTR</TableHead>
-								<TableHead>S2</TableHead>
-								<TableHead>Next Expiry</TableHead>
-								<TableHead />
-							</TableRow>
-						</TableHeader>
+						<ClinicianLicenseTableHeader />
 						<TableBody>
 							{data.data.map(row => {
 								const prc = getLicenseByType(row.licenses, "PRC")
