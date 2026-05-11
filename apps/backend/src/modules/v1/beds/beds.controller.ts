@@ -4,7 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions, RequirePermission, RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
 
 import { BedsService } from "./beds.service"
 
@@ -20,7 +20,7 @@ export class BedsController {
 		})
 	}
 
-	@RequirePermission("adt", "create")
+	@RequirePermissions([{ module: "adt", action: "create" }, { module: "adt", action: "edit" }])
 	@Implement(v1.bed.createWard)
 	async createWard(@Session() session: UserSession) {
 		return implement(v1.bed.createWard).handler(async ({ input }) => {
@@ -37,7 +37,7 @@ export class BedsController {
 		})
 	}
 
-	@RequirePermission("adt", "create")
+	@RequirePermissions([{ module: "adt", action: "create" }, { module: "adt", action: "edit" }])
 	@Implement(v1.bed.createBed)
 	async createBed(@Session() session: UserSession) {
 		return implement(v1.bed.createBed).handler(async ({ input }) => {

@@ -211,7 +211,9 @@ export function DispositionForm({
 								}}
 							>
 								<SelectTrigger className="w-full">
-									<SelectValue />
+									<SelectValue placeholder="Select ward...">
+									        {admitWardId ? (wards ?? []).find(w => w.id === admitWardId)?.name : undefined}
+									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
 									{(wards ?? []).map(ward => (
@@ -228,7 +230,9 @@ export function DispositionForm({
 								<Label>Bed</Label>
 								<Select value={admitBedId || null} onValueChange={v => setAdmitBedId(v ?? "")}>
 									<SelectTrigger className="w-full">
-										<SelectValue />
+										<SelectValue placeholder="Select bed...">
+										        {admitBedId ? availableBeds.find(b => b.id === admitBedId)?.bedNumber : undefined}
+										</SelectValue>
 									</SelectTrigger>
 									<SelectContent>
 										{availableBeds.map(bed => (

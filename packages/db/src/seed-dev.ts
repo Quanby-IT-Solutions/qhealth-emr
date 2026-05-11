@@ -456,7 +456,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["reporting", ["view", "create"]],
 		["opd", ["view"]], // OPD dashboard access
 		["telemedicine", ["view", "create", "edit"]], // Virtual consultation access
-		["ed", ["view"]], // Emergency department patient viewing
+		["ed", ["view", "edit"]], // Emergency department patient viewing + disposition (C2)
 		["death_reporting", ["view", "create", "edit"]], // Physician authors FMDRF/FNDRF forms
 		["audit", ["create"]], // Break-glass emergency access invocation
 		["notifications", ["view"]], // All staff receive system notifications
@@ -468,7 +468,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["orders", ["view"]],
 		["nursing", ["view", "create", "edit", "sign"]],
 		["formulary", ["view"]],
-		["ed", ["view"]], // Emergency department access
+		["ed", ["view", "edit"]], // Emergency department access + ER tracker board actions (C3)
 		["nbs", ["view", "create", "edit"]], // Newborn screening workflows
 		["opd", ["view"]], // TOR: Nurses participate in OPD triage and vital-sign capture
 		["notifications", ["view"]], // All staff receive system notifications
@@ -517,7 +517,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["patients", ["view"]], // Patient record access for triage intake lookup
 		["clinical_docs", ["view"]], // TOR: Triage needs allergy/problem history for patient safety
 		["nursing", ["view", "create"]],
-		["ed", ["view", "create"]], // Emergency department triage workflows
+		["ed", ["view", "create", "edit"]], // Emergency department triage workflows + queue/pre-encounter updates (C1)
 		["opd", ["view"]], // TOR: Triage Officers staff the OPD triage desk
 		["notifications", ["view"]], // All staff receive system notifications
 	],
