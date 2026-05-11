@@ -1,10 +1,9 @@
 "use client"
 
 import { use, useState } from "react"
-
-import { ArrowUpDown, ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { ArrowUpDown, ChevronLeft, ChevronRight, Plus } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button, buttonVariants } from "@/core/components/ui/button"
@@ -22,13 +21,14 @@ import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { useEncounterListQuery } from "@/features/encounters/api/encounters.hooks"
 import { usePatientProfileQuery } from "@/features/patients/api/patients.hooks"
 
-type EncounterStatus = "active" | "discharged" | "closed" | "cancelled"
+type EncounterStatus = "active" | "pending_discharge" | "discharged" | "closed" | "cancelled"
 type EncounterType = "inpatient" | "outpatient" | "emergency" | "telemedicine"
 type SortDir = "asc" | "desc"
 
 const STATUS_FILTERS: { label: string; value: EncounterStatus | undefined }[] = [
 	{ label: "All", value: undefined },
 	{ label: "Active", value: "active" },
+	{ label: "Pending Discharge", value: "pending_discharge" },
 	{ label: "Discharged", value: "discharged" },
 	{ label: "Closed", value: "closed" },
 ]
@@ -39,7 +39,10 @@ function typeBadge(type: EncounterType) {
 	switch (type) {
 		case "outpatient":
 			return (
-				<Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+				<Badge
+					variant="secondary"
+					className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+				>
 					OPD
 				</Badge>
 			)
@@ -58,6 +61,8 @@ function statusBadgeVariant(
 	switch (status) {
 		case "active":
 			return "default"
+		case "pending_discharge":
+			return "outline"
 		case "discharged":
 			return "secondary"
 		case "cancelled":
@@ -89,11 +94,7 @@ function TableSkeleton() {
 	)
 }
 
-export default function EncounterListPage({
-	params,
-}: {
-	params: Promise<{ patientId: string }>
-}) {
+export default function EncounterListPage({ params }: { params: Promise<{ patientId: string }> }) {
 	const { patientId } = use(params)
 	const router = useRouter()
 	const facilityId = useActiveFacilityId()
@@ -104,7 +105,13 @@ export default function EncounterListPage({
 	const [sortDir, setSortDir] = useState<SortDir>("desc")
 
 	const { data, isLoading } = useEncounterListQuery(
-		{ facilityId: facilityId ?? "", patientId, status: statusFilter, page: currentPage, limit: LIMIT },
+		{
+			facilityId: facilityId ?? "",
+			patientId,
+			status: statusFilter,
+			page: currentPage,
+			limit: LIMIT,
+		},
 		{ enabled: !!facilityId }
 	)
 
@@ -166,7 +173,7 @@ export default function EncounterListPage({
 								<TableHead>
 									<button
 										type="button"
-										className="flex items-center gap-1 hover:text-foreground"
+										className="hover:text-foreground flex items-center gap-1"
 										onClick={() => setSortDir(d => (d === "desc" ? "asc" : "desc"))}
 									>
 										Admission Date
@@ -182,31 +189,24 @@ export default function EncounterListPage({
 								<TableRow
 									key={encounter.id}
 									className="cursor-pointer"
-									onClick={() =>
-										router.push(`/patients/${patientId}/encounters/${encounter.id}`)
-									}
+									onClick={() => router.push(`/patients/${patientId}/encounters/${encounter.id}`)}
 								>
 									<TableCell>{typeBadge(encounter.encounterType)}</TableCell>
 									<TableCell>
-										<Badge
-											variant={statusBadgeVariant(encounter.status)}
-											className="capitalize"
-										>
+										<Badge variant={statusBadgeVariant(encounter.status)} className="capitalize">
 											{encounter.status}
 										</Badge>
 									</TableCell>
 									<TableCell className="max-w-48 truncate text-sm">
 										{encounter.chiefComplaint
 											? encounter.chiefComplaint.slice(0, 60) +
-											  (encounter.chiefComplaint.length > 60 ? "…" : "")
+												(encounter.chiefComplaint.length > 60 ? "…" : "")
 											: "—"}
 									</TableCell>
 									<TableCell className="text-sm">
 										{formatDate(encounter.admissionDatetime)}
 									</TableCell>
-									<TableCell className="text-sm">
-										{encounter.attendingStaffName ?? "—"}
-									</TableCell>
+									<TableCell className="text-sm">{encounter.attendingStaffName ?? "—"}</TableCell>
 									<TableCell className="text-right font-mono text-sm">
 										{encounter.queueNumber ?? "—"}
 									</TableCell>

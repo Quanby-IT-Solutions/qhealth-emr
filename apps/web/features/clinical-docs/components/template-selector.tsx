@@ -31,9 +31,18 @@ export const NOTE_TYPE_LABELS: Record<string, string> = {
 	consultation: "SOAP / Consultation",
 	discharge_summary: "Discharge Summary",
 	fpe: "FPE / Konsulta",
+	operative: "Post-Operative Note",
+	anesthesia: "Anesthesia Note",
 }
 
-export type NoteTypeValue = "admission" | "progress" | "consultation" | "discharge_summary" | "fpe"
+export type NoteTypeValue =
+	| "admission"
+	| "progress"
+	| "consultation"
+	| "discharge_summary"
+	| "fpe"
+	| "operative"
+	| "anesthesia"
 
 interface TemplateSection {
 	key: string
@@ -79,8 +88,9 @@ export function TemplateSelector({
 	const isRequired = noteType ? TEMPLATE_REQUIRED_TYPES.has(noteType) : false
 	const selectedTemplate = templates.find(t => t.id === templateId) ?? null
 
-	function handleNoteTypeChange(val: string) {
-		onNoteTypeChange(val as NoteTypeValue)
+	function handleNoteTypeChange(val: NoteTypeValue | "" | null) {
+		if (!val) return
+		onNoteTypeChange(val)
 		// Clear template when type changes
 		onTemplateChange("", null)
 	}

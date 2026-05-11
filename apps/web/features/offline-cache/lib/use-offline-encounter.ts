@@ -4,6 +4,7 @@ import { useEffect } from "react"
 
 import { useEncounterDetailQuery } from "@/features/encounters/api/encounters.hooks"
 import { useVitalsQuery } from "@/features/nursing/api/nursing.hooks"
+import { useActiveOrdersQuery } from "@/features/orders/api/orders.hooks"
 import { usePatientSummaryQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
 
 import {
@@ -11,6 +12,7 @@ import {
 	saveEncounterSummary,
 	type OfflineEncounterHeader,
 	type OfflineEncounterSummary,
+	type OfflineMedicationSummary,
 	type OfflineVitalSummary,
 } from "./offline-cache"
 import { useOfflineSync } from "./use-offline-sync"
@@ -55,6 +57,7 @@ export function useOfflineEncounter(
 	const { data: patientSummary } = usePatientSummaryQuery(patientId, {
 		enabled: isOnline && canViewClinicalSummary,
 	})
+	const { data: activeOrders } = useActiveOrdersQuery(isOnline ? encounterId : "")
 
 	useEffect(() => {
 		if (!isOnline || !encounter || !encounterId) return
@@ -122,12 +125,24 @@ export function useOfflineEncounter(
 					isActive: a.isActive,
 				}))
 			: []
+		const activeMedications: OfflineMedicationSummary[] = (
+			activeOrders?.medicationOrders ?? []
+		).map(order => ({
+			id: order.id,
+			genericName: order.genericName,
+			dose: order.dose,
+			doseUnit: order.doseUnit,
+			route: order.route,
+			frequency: order.frequency,
+			status: order.status,
+		}))
 
 		const summary: OfflineEncounterSummary = {
 			encounter: encounterHeader,
 			latestVitals,
 			activeProblems,
 			activeAllergies,
+			activeMedications,
 			activeProblemCount: canViewClinicalSummary
 				? (patientSummary?.activeProblemCount ?? activeProblems.length)
 				: 0,
@@ -147,6 +162,7 @@ export function useOfflineEncounter(
 		encounter,
 		vitalsData,
 		patientSummary,
+		activeOrders,
 		encounterId,
 	])
 

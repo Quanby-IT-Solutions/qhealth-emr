@@ -59,7 +59,17 @@ const TIME_SLOTS = [
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
-export function SurgicalCalendar() {
+interface SurgicalCalendarProps {
+	readOnly?: boolean
+	surgeonStaffId?: string
+	anesthesiologistStaffId?: string
+}
+
+export function SurgicalCalendar({
+	readOnly = false,
+	surgeonStaffId,
+	anesthesiologistStaffId,
+}: SurgicalCalendarProps) {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 	const permissions = profile?.activeRole?.permissions ?? []
@@ -75,7 +85,16 @@ export function SurgicalCalendar() {
 	const [bookingDatetime, setBookingDatetime] = useState("")
 
 	const weekStartIso = toIsoDate(weekStart)
-	const { data: slots = [], isLoading, refetch } = useOrSlotsQuery(facilityId, weekStartIso)
+	const {
+		data: slots = [],
+		isLoading,
+		refetch,
+	} = useOrSlotsQuery({
+		facilityId,
+		weekStart: weekStartIso,
+		surgeonStaffId,
+		anesthesiologistStaffId,
+	})
 
 	const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
@@ -113,6 +132,7 @@ export function SurgicalCalendar() {
 					</div>
 					<div className="flex items-center gap-2">
 						<Badge variant="secondary">{bookedCount} booked this week</Badge>
+						{readOnly && <Badge variant="outline">Read Only</Badge>}
 						<Button variant="outline" size="sm" nativeButton={false} render={<a href={backHref} />}>
 							← {backLabel}
 						</Button>
@@ -208,13 +228,21 @@ export function SurgicalCalendar() {
 																			)}
 																		</div>
 																	) : (
-																		<button
-																			onClick={() => openBooking(day, suite, timeSlot)}
-																			className="text-muted-foreground/40 hover:bg-primary/5 hover:text-primary/60 flex h-full min-h-[38px] w-full items-center justify-center rounded transition-colors"
-																			title={`Book case in ${suite} on ${toIsoDate(day)} at ${timeSlot}`}
-																		>
-																			<Plus className="size-3" />
-																		</button>
+																		<div className="flex h-full min-h-[38px] items-center justify-center">
+																			{readOnly ? (
+																				<span className="text-muted-foreground/30 text-xs">
+																					Open
+																				</span>
+																			) : (
+																				<button
+																					onClick={() => openBooking(day, suite, timeSlot)}
+																					className="text-muted-foreground/40 hover:bg-primary/5 hover:text-primary/60 flex h-full min-h-[38px] w-full items-center justify-center rounded transition-colors"
+																					title={`Book case in ${suite} on ${toIsoDate(day)} at ${timeSlot}`}
+																				>
+																					<Plus className="size-3" />
+																				</button>
+																			)}
+																		</div>
 																	)}
 																</div>
 															))}
@@ -231,7 +259,7 @@ export function SurgicalCalendar() {
 				</Card>
 			</div>
 
-			{bookingOpen && facilityId && (
+			{!readOnly && bookingOpen && facilityId && (
 				<OrCaseBookingDialog
 					open={bookingOpen}
 					onClose={() => setBookingOpen(false)}

@@ -9,7 +9,7 @@
 const CACHE_KEY_PREFIX = "qhealth_offline_patients_"
 const CACHE_VERSION = 2
 const ENCOUNTER_CACHE_KEY_PREFIX = "qhealth_offline_encounter_summary_"
-const ENCOUNTER_CACHE_VERSION = 1
+const ENCOUNTER_CACHE_VERSION = 2
 
 export interface OfflinePatientSummary {
 	id: string
@@ -56,6 +56,16 @@ export interface OfflineAllergySummary {
 	isActive: boolean
 }
 
+export interface OfflineMedicationSummary {
+	id: string
+	genericName: string
+	dose: string
+	doseUnit: string
+	route: string
+	frequency: string
+	status: string
+}
+
 export interface OfflineEncounterHeader {
 	id: string
 	facilityId: string
@@ -65,7 +75,7 @@ export interface OfflineEncounterHeader {
 	patientDateOfBirth: string
 	patientSex: "male" | "female" | "other"
 	encounterType: "inpatient" | "outpatient" | "emergency" | "telemedicine"
-	status: "active" | "discharged" | "closed" | "cancelled"
+	status: "active" | "pending_discharge" | "discharged" | "closed" | "cancelled"
 	chiefComplaint: string | null
 	admissionDatetime: string | Date
 	dischargeDatetime: string | Date | null
@@ -83,6 +93,7 @@ export interface OfflineEncounterSummary {
 	latestVitals: OfflineVitalSummary | null
 	activeProblems: OfflineProblemSummary[]
 	activeAllergies: OfflineAllergySummary[]
+	activeMedications: OfflineMedicationSummary[]
 	activeProblemCount: number
 	activeAllergyCount: number
 	hasSevereAllergies: boolean

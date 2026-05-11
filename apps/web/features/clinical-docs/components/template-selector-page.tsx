@@ -47,6 +47,8 @@ const CATEGORY_ORDER: NoteTypeValue[] = [
 	"progress",
 	"admission",
 	"discharge_summary",
+	"operative",
+	"anesthesia",
 	"fpe",
 ]
 
@@ -76,6 +78,18 @@ const DEFAULT_SECTIONS: Record<NoteTypeValue, TemplateSection[]> = {
 		{ key: "assessment", label: "Assessment", type: "structured" },
 		{ key: "plan", label: "Discharge Plan", type: "structured" },
 	],
+	operative: [
+		{ key: "procedure", label: "Procedure Performed", type: "structured" },
+		{ key: "post_op_diagnosis", label: "Post-Operative Diagnosis", type: "structured" },
+		{ key: "findings", label: "Operative Findings", type: "structured" },
+		{ key: "post_op_plan", label: "Post-Operative Plan", type: "structured" },
+	],
+	anesthesia: [
+		{ key: "pre_anesthesia_assessment", label: "Pre-Anesthesia Assessment", type: "structured" },
+		{ key: "anesthesia_course", label: "Anesthesia Course", type: "structured" },
+		{ key: "intraop_vitals_summary", label: "Intraoperative Vitals Summary", type: "structured" },
+		{ key: "post_anesthesia_plan", label: "Post-Anesthesia Plan", type: "structured" },
+	],
 	fpe: [
 		{ key: "screening_findings", label: "Screening Findings", type: "structured" },
 		{ key: "risk_factors", label: "Risk Factors", type: "structured" },
@@ -89,6 +103,8 @@ const DEFAULT_NAMES: Record<NoteTypeValue, string> = {
 	progress: "Progress Note",
 	admission: "Admission Note",
 	discharge_summary: "Discharge Summary",
+	operative: "Post-Operative Note",
+	anesthesia: "Anesthesia Note",
 	fpe: "FPE / Konsulta",
 }
 
@@ -102,6 +118,10 @@ function categoryIcon(category: NoteTypeValue) {
 			return <ClipboardList className="size-4" />
 		case "discharge_summary":
 			return <FileCheck2 className="size-4" />
+		case "operative":
+			return <Stethoscope className="size-4" />
+		case "anesthesia":
+			return <FileText className="size-4" />
 		case "fpe":
 			return <FileBadge className="size-4" />
 		default:

@@ -23,7 +23,10 @@ import {
 	medicationOrders,
 	opdTriageIntakes,
 	patients,
+	rolePermissions,
+	roles,
 	staffProfiles,
+	userRoles,
 	users,
 	vitalSigns,
 	wards,
@@ -33,6 +36,7 @@ import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
 import { ChartAccessService, type ChartAccessActor } from "@/modules/v1/audit/chart-access.service"
+import { NotificationService } from "@/modules/v1/notifications/notification.service"
 import { resolveStepTarget } from "@/utils/sla-step-target"
 
 type WorkflowType = "opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing"
@@ -41,6 +45,7 @@ type EncounterListInput = V1Inputs["encounter"]["list"]
 type CreateEncounterInput = V1Inputs["encounter"]["create"]
 type TransferEncounterInput = V1Inputs["encounter"]["transfer"]
 type DischargeEncounterInput = V1Inputs["encounter"]["discharge"]
+type SignMayGoHomeOrderInput = V1Inputs["encounter"]["signMayGoHomeOrder"]
 type CloseEncounterInput = V1Inputs["encounter"]["close"]
 type EncounterIdInput = V1Inputs["encounter"]["get"]
 type LinkedEncountersInput = V1Inputs["encounter"]["getLinked"]
@@ -52,7 +57,8 @@ export class EncountersService {
 	constructor(
 		private readonly auditService: AuditService,
 		private readonly chartAccessService: ChartAccessService,
-		private readonly eventEmitter: EventEmitter2
+		private readonly eventEmitter: EventEmitter2,
+		private readonly notificationService?: NotificationService
 	) {}
 
 	// ========================================================================
@@ -862,6 +868,98 @@ export class EncountersService {
 		}
 	}
 
+	private async notifyDischargeQueues(encounter: typeof encounters.$inferSelect) {
+		if (!this.notificationService) return
+
+		const recipients = await db
+			.selectDistinct({ staffId: staffProfiles.id })
+			.from(staffProfiles)
+			.innerJoin(userRoles, eq(userRoles.staffProfileId, staffProfiles.id))
+			.innerJoin(roles, eq(userRoles.roleId, roles.id))
+			.innerJoin(rolePermissions, eq(rolePermissions.roleId, roles.id))
+			.where(
+				and(
+					eq(staffProfiles.facilityId, encounter.facilityId),
+					eq(staffProfiles.isActive, true),
+					sql`(
+						(${rolePermissions.module} = 'orders' and ${rolePermissions.action} = 'verify')
+						or (${rolePermissions.module} = 'billing' and ${rolePermissions.action} in ('view', 'create', 'edit'))
+					)`
+				)
+			)
+
+		await Promise.all(
+			recipients.map(recipient =>
+				this.notificationService?.send({
+					facilityId: encounter.facilityId,
+					recipientStaffId: recipient.staffId,
+					topic: "system",
+					title: "May Go Home order signed",
+					body: "Ward charges are frozen. Review discharge pharmacy and billing tasks.",
+					data: {
+						encounterId: encounter.id,
+						patientId: encounter.patientId,
+						status: "pending_discharge",
+					},
+				})
+			)
+		)
+	}
+
+	async signMayGoHomeOrder(input: SignMayGoHomeOrderInput, userId?: string) {
+		const [encounter] = await db
+			.select()
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+
+		if (!encounter) {
+			throw new NotFoundException(`Encounter ${input.encounterId} not found`)
+		}
+
+		if (encounter.encounterType === "outpatient") {
+			throw new BadRequestException("May Go Home orders are only for inpatient discharge")
+		}
+
+		if (encounter.status === "pending_discharge") {
+			return {
+				...encounter,
+				slaStatus: null,
+				slaElapsedMinutes: null,
+				slaTargetMinutes: null,
+			}
+		}
+
+		if (encounter.status !== "active") {
+			throw new BadRequestException("Can only sign May Go Home order for active encounters")
+		}
+
+		const [updated] = await db
+			.update(encounters)
+			.set({ status: "pending_discharge", updatedAt: new Date() })
+			.where(eq(encounters.id, input.encounterId))
+			.returning()
+
+		const staffId = userId ? await this.getOptionalStaffProfileId(userId) : null
+		await this.logSlaEvent({
+			facilityId: encounter.facilityId,
+			encounterId: encounter.id,
+			fromStatus: "active",
+			toStatus: "pending_discharge",
+			workflowType: "discharge",
+			staffId,
+			notes: "May Go Home order signed; ward charges frozen and Pharmacy/Billing notified",
+		})
+
+		await this.notifyDischargeQueues(updated!)
+
+		return {
+			...updated!,
+			slaStatus: null,
+			slaElapsedMinutes: null,
+			slaTargetMinutes: null,
+		}
+	}
+
 	// ========================================================================
 	// Discharge (inpatient)
 	// ========================================================================
@@ -876,8 +974,12 @@ export class EncountersService {
 			throw new NotFoundException(`Encounter ${input.encounterId} not found`)
 		}
 
-		if (encounter.status !== "active") {
-			throw new BadRequestException("Can only discharge active encounters")
+		if (encounter.status !== "active" && encounter.status !== "pending_discharge") {
+			throw new BadRequestException("Can only discharge active or pending-discharge encounters")
+		}
+
+		if (encounter.encounterType === "inpatient" && encounter.status !== "pending_discharge") {
+			throw new BadRequestException("May Go Home order must be signed before discharge")
 		}
 
 		if (encounter.encounterType === "outpatient") {
@@ -892,13 +994,13 @@ export class EncountersService {
 				.where(
 					and(
 						eq(deathReports.encounterId, input.encounterId),
-						inArray(deathReports.status, ["completed", "submitted"]),
-					),
+						inArray(deathReports.status, ["completed", "submitted"])
+					)
 				)
 				.limit(1)
 			if (completedDeathReport.length === 0) {
 				throw new BadRequestException(
-					"A completed death report (FMDRF or FNDRF) must be submitted before discharging a deceased patient.",
+					"A completed death report (FMDRF or FNDRF) must be submitted before discharging a deceased patient."
 				)
 			}
 		}
@@ -926,7 +1028,7 @@ export class EncountersService {
 		await this.logSlaEvent({
 			facilityId: encounter.facilityId,
 			encounterId: encounter.id,
-			fromStatus: "active",
+			fromStatus: encounter.status,
 			toStatus: "discharged",
 			workflowType: "discharge",
 			staffId: null,

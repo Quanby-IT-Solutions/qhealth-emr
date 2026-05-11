@@ -1,24 +1,22 @@
 "use client"
 
 import { use } from "react"
-
 import { Loader2 } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { AnesthesiaRecordForm } from "@/features/surgical/components/anesthesia-record-form"
-import { OperationRecordForm } from "@/features/surgical/components/operation-record-form"
-import { PreOpChecklist } from "@/features/surgical/components/pre-op-checklist"
-import { RvsCodeSelector } from "@/features/surgical/components/rvs-code-selector"
 import {
 	useAnesthesiaRecordQuery,
 	useOperationRecordQuery,
 	usePreOpChecklistQuery,
 	useSurgicalCaseDetailQuery,
+	type SurgeryStatus,
 } from "@/features/surgical/api/surgical.hooks"
-
-import type { SurgeryStatus } from "@/features/surgical/api/surgical.hooks"
+import { AnesthesiaRecordForm } from "@/features/surgical/components/anesthesia-record-form"
+import { OperationRecordForm } from "@/features/surgical/components/operation-record-form"
+import { PreOpChecklist } from "@/features/surgical/components/pre-op-checklist"
+import { RvsCodeSelector } from "@/features/surgical/components/rvs-code-selector"
 
 function statusVariant(status: SurgeryStatus) {
 	switch (status) {
@@ -42,7 +40,7 @@ function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
 	return new Set(
-		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`),
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
 	)
 }
 
@@ -79,15 +77,14 @@ export default function SurgicalCaseDetailPage({
 
 	const activeStaffProfile =
 		profile?.staffProfiles?.find((sp: { roles?: { id: string }[] }) =>
-			sp.roles?.some((role: { id: string }) => role.id === profile.activeRole?.id),
+			sp.roles?.some((role: { id: string }) => role.id === profile.activeRole?.id)
 		) ?? profile?.staffProfiles?.[0]
 	const staffId = activeStaffProfile?.id ?? ""
 	const facilityId = activeStaffProfile?.facilityId ?? ""
 
 	const { data: surgicalCase, isLoading: caseLoading } = useSurgicalCaseDetailQuery(caseId)
 	const { data: opRecord, isLoading: opLoading } = useOperationRecordQuery(caseId)
-	const { data: anesthesiaRecord, isLoading: anesthesiaLoading } =
-		useAnesthesiaRecordQuery(caseId)
+	const { data: anesthesiaRecord, isLoading: anesthesiaLoading } = useAnesthesiaRecordQuery(caseId)
 	const { data: preOpChecklist, isLoading: checklistLoading } = usePreOpChecklistQuery(caseId)
 
 	const isOperationRecordSigned = opRecord?.status === "signed"
@@ -144,36 +141,36 @@ export default function SurgicalCaseDetailPage({
 			</div>
 
 			{/* Info grid */}
-			<div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 text-sm">
+			<div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
 				<div>
-					<span className="text-muted-foreground text-xs uppercase tracking-wide">Patient</span>
+					<span className="text-muted-foreground text-xs tracking-wide uppercase">Patient</span>
 					<p className="font-medium">{surgicalCase.patientName ?? "—"}</p>
 				</div>
 				<div>
-					<span className="text-muted-foreground text-xs uppercase tracking-wide">Surgeon</span>
+					<span className="text-muted-foreground text-xs tracking-wide uppercase">Surgeon</span>
 					<p className="font-medium">{surgicalCase.surgeonName ?? "—"}</p>
 				</div>
 				<div>
-					<span className="text-muted-foreground text-xs uppercase tracking-wide">
+					<span className="text-muted-foreground text-xs tracking-wide uppercase">
 						Anesthesiologist
 					</span>
 					<p className="font-medium">{surgicalCase.anesthesiologistName ?? "—"}</p>
 				</div>
 				<div>
-					<span className="text-muted-foreground text-xs uppercase tracking-wide">
+					<span className="text-muted-foreground text-xs tracking-wide uppercase">
 						Surgical Type
 					</span>
 					<p className="font-medium capitalize">{surgicalCase.surgicalType}</p>
 				</div>
 				{surgicalCase.asaClass && (
 					<div>
-						<span className="text-muted-foreground text-xs uppercase tracking-wide">ASA Class</span>
+						<span className="text-muted-foreground text-xs tracking-wide uppercase">ASA Class</span>
 						<p className="font-medium">{surgicalCase.asaClass}</p>
 					</div>
 				)}
 				{surgicalCase.orSuite && (
 					<div>
-						<span className="text-muted-foreground text-xs uppercase tracking-wide">OR Suite</span>
+						<span className="text-muted-foreground text-xs tracking-wide uppercase">OR Suite</span>
 						<p className="font-medium">{surgicalCase.orSuite}</p>
 					</div>
 				)}
@@ -183,8 +180,8 @@ export default function SurgicalCaseDetailPage({
 			<Tabs defaultValue={defaultTab}>
 				<TabsList>
 					<TabsTrigger value="checklist">Pre-Op Checklist</TabsTrigger>
-					<TabsTrigger value="anesthesia">Anesthesia Record</TabsTrigger>
 					<TabsTrigger value="operation">Operation Record</TabsTrigger>
+					<TabsTrigger value="anesthesia">Anesthesia Record</TabsTrigger>
 					{showRvsTab && <TabsTrigger value="rvs">RVS Codes</TabsTrigger>}
 				</TabsList>
 
@@ -192,24 +189,7 @@ export default function SurgicalCaseDetailPage({
 					{checklistLoading ? (
 						<Loader2 className="size-4 animate-spin" />
 					) : (
-						<PreOpChecklist
-							caseId={caseId}
-							existing={preOpChecklist}
-							canEdit={canEditPreOp}
-						/>
-					)}
-				</TabsContent>
-
-				<TabsContent value="anesthesia" className="mt-6">
-					{anesthesiaLoading ? (
-						<Loader2 className="size-4 animate-spin" />
-					) : (
-						<AnesthesiaRecordForm
-							caseId={caseId}
-							existing={anesthesiaRecord}
-							canEdit={canEditAnesthesia}
-							canSign={canSignAnesthesia}
-						/>
+						<PreOpChecklist caseId={caseId} existing={preOpChecklist} canEdit={canEditPreOp} />
 					)}
 				</TabsContent>
 
@@ -225,6 +205,19 @@ export default function SurgicalCaseDetailPage({
 							existing={opRecord}
 							canEdit={canEditOperation}
 							canSign={canSignOperation}
+						/>
+					)}
+				</TabsContent>
+
+				<TabsContent value="anesthesia" className="mt-6">
+					{anesthesiaLoading ? (
+						<Loader2 className="size-4 animate-spin" />
+					) : (
+						<AnesthesiaRecordForm
+							caseId={caseId}
+							existing={anesthesiaRecord}
+							canEdit={canEditAnesthesia}
+							canSign={canSignAnesthesia}
 						/>
 					)}
 				</TabsContent>

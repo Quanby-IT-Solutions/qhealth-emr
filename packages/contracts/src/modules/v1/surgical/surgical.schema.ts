@@ -302,6 +302,8 @@ export const SurgicalCaseListSchema = PaginationInputSchema.extend({
 	encounterId: z.string().uuid().optional(),
 	status: SurgeryStatusEnum.optional(),
 	date: z.string().optional(),
+	surgeonStaffId: z.string().uuid().optional(),
+	anesthesiologistStaffId: z.string().uuid().optional(),
 })
 
 export const SurgicalCaseListResponseSchema = PaginatedResponseSchema.extend({
@@ -473,6 +475,8 @@ export const RemoveRvsAssignmentSchema = z.object({
 export const OrSlotsQuerySchema = z.object({
 	facilityId: z.string().uuid(),
 	weekStart: z.string(),
+	surgeonStaffId: z.string().uuid().optional(),
+	anesthesiologistStaffId: z.string().uuid().optional(),
 })
 
 // ============================================================================
