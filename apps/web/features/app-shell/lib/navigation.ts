@@ -334,6 +334,13 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		requireAllPermissions: REGISTRAR_ROLE_BUNDLE,
 	},
 	{
+		title: "Discharge Processing",
+		href: "/registrar/discharge",
+		iconName: "bed",
+		requiredPermissions: [{ module: "adt", action: "edit" }],
+		requireAllPermissions: REGISTRAR_ROLE_BUNDLE,
+	},
+	{
 		title: "Laboratory",
 		href: "/laboratory",
 		iconName: "laboratory",

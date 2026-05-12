@@ -11,6 +11,7 @@ import { v1ClinicianLicenses } from "./clinician-licenses/v1.clinician-licenses.
 import { v1Consent } from "./consent/v1.consent.js"
 import { v1DeathReporting } from "./death-reporting/v1.death-reporting.js"
 import { v1Departments } from "./departments/v1.departments.js"
+import { v1Discharge } from "./discharge/v1.discharge.js"
 import { v1Ed } from "./ed/v1.ed.js"
 import { v1Encounter } from "./encounters/v1.encounter.js"
 import { v1FacilityProfile } from "./facility-profile/v1.facility-profile.js"
@@ -102,5 +103,7 @@ export const v1Contract = oc.prefix("/v1").router(
 		masterData: v1MasterData,
 		// HIM-BE-01..05: Health Information Management
 		him: himContract,
+		// Flow B6 / Story 2.6: Registrar discharge processing
+		discharge: v1Discharge,
 	})
 )
