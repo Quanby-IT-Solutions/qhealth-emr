@@ -21,6 +21,9 @@ import {
 	UpdateBedStatusSchema,
 	WardListSchema,
 	WardSchema,
+	BedStatusHistorySchema,
+	CleaningQueueItemSchema,
+	MarkCleanedInputSchema,
 } from "./beds.schema.js"
 
 export const bedContract = {
@@ -73,6 +76,36 @@ export const bedContract = {
 		})
 		.input(UpdateBedStatusSchema)
 		.output(BedSchema),
+
+	markCleaned: oc
+		.route({
+			method: "PATCH",
+			path: "/beds/{id}/mark-cleaned",
+			summary: "Mark a bed cleaned (housekeeping)",
+			tags: ["Beds"],
+		})
+		.input(MarkCleanedInputSchema)
+		.output(BedSchema),
+
+	getStatusHistory: oc
+		.route({
+			method: "GET",
+			path: "/beds/{id}/status-history",
+			summary: "Get bed status history timeline",
+			tags: ["Beds"],
+		})
+		.input(z.object({ id: z.string().uuid() }))
+		.output(z.array(BedStatusHistorySchema)),
+
+	cleaningQueue: oc
+		.route({
+			method: "GET",
+			path: "/beds/cleaning-queue",
+			summary: "List beds dirty for cleaning",
+			tags: ["Beds"],
+		})
+		.input(z.object({ facilityId: z.string().uuid() }))
+		.output(z.array(CleaningQueueItemSchema)),
 
 	suggestBeds: oc
 		.route({

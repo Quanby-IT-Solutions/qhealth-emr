@@ -5,9 +5,10 @@ import {
 	NotFoundException,
 	OnApplicationBootstrap,
 } from "@nestjs/common"
+import { EventEmitter2 } from "@nestjs/event-emitter"
 import { and, between, count, eq, sql } from "drizzle-orm"
 
-import { bedCensusDaily, beds, encounters, patients, wards } from "@repo/db/schema"
+import { bedCensusDaily, beds, encounters, patients, wards, bedStatusHistory, bedCleaningLog } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
@@ -28,6 +29,7 @@ type WardType = (typeof wards.$inferSelect)["wardType"]
 @Injectable()
 export class BedsService implements OnApplicationBootstrap {
 	private readonly logger = new Logger(BedsService.name)
+	constructor(private readonly eventEmitter: EventEmitter2) {}
 
 	onApplicationBootstrap() {
 		const scheduleMidnightCron = () => {
@@ -41,6 +43,15 @@ export class BedsService implements OnApplicationBootstrap {
 			}, next.getTime() - now.getTime())
 		}
 		scheduleMidnightCron()
+
+		// Subscribe to gate-pass.released events for bed dirtied lifecycle
+		this.eventEmitter.on("gate-pass.released", async payload => {
+			try {
+				await this.handleGatePassReleased(payload)
+			} catch (err) {
+				this.logger.error("Error handling gate-pass.released", err)
+			}
+		})
 	}
 
 	async runMidnightCensusSnapshot() {
@@ -702,5 +713,129 @@ export class BedsService implements OnApplicationBootstrap {
 
 		this.logger.log(`Deleted ward ${input.wardId}`)
 		return { success: true }
+	}
+
+	// ========================================================================
+	// Gate-pass listener: mark bed dirty_for_cleaning and insert cleaning log
+	// ========================================================================
+
+	private async handleGatePassReleased(payload: { gatePassId: string; encounterId: string; bedId?: string | null }) {
+		const { gatePassId, encounterId } = payload
+		let bedId = payload.bedId ?? null
+
+		if (!bedId) {
+			const [enc] = await db.select({ bedId: encounters.bedId }).from(encounters).where(eq(encounters.id, encounterId))
+			bedId = enc?.bedId ?? null
+		}
+
+		if (!bedId) return
+
+		await db.transaction(async tx => {
+			const [bedRow] = await tx.select().from(beds).where(eq(beds.id, bedId))
+			if (!bedRow) return
+
+			if (bedRow.status !== "occupied") {
+				this.logger.log(`Bed ${bedId} not occupied; skipping dirtied transition`)
+				return
+			}
+
+			// Update bed to dirty_for_cleaning and release encounter link
+			await tx
+				.update(beds)
+				.set({ status: "dirty_for_cleaning", currentEncounterId: null, updatedAt: new Date() })
+				.where(eq(beds.id, bedId))
+
+			// Write status history
+			await tx.insert(bedStatusHistory).values({
+				bedId,
+				previousStatus: "occupied",
+				newStatus: "dirty_for_cleaning",
+				changedAt: new Date(),
+				changedBy: null,
+			})
+
+			// Insert cleaning log
+			await tx.insert(bedCleaningLog).values({
+				bedId,
+				dirtiedAt: new Date(),
+				dirtiedByEncounterId: encounterId,
+			})
+		})
+
+		this.logger.log(`Bed ${bedId} marked dirty_for_cleaning from gate-pass ${gatePassId}`)
+		this.eventEmitter.emit("bed.dirtied", { bedId, gatePassId, encounterId })
+	}
+
+	// ========================================================================
+	// Mark cleaned, status history and queue endpoints
+	// ========================================================================
+
+	async markCleaned(input: { id: string }, staffProfileId: string) {
+		const [bedRow] = await db.select().from(beds).where(eq(beds.id, input.id))
+		if (!bedRow) throw new NotFoundException(`Bed ${input.id} not found`)
+		if (bedRow.status !== "dirty_for_cleaning") throw new BadRequestException("Bed is not dirty_for_cleaning")
+
+		await db.transaction(async tx => {
+			// Update bed to available
+			await tx
+				.update(beds)
+				.set({ status: "available", currentEncounterId: null, updatedAt: new Date() })
+				.where(eq(beds.id, input.id))
+
+			// Write status history
+			await tx.insert(bedStatusHistory).values({
+				bedId: input.id,
+				previousStatus: "dirty_for_cleaning",
+				newStatus: "available",
+				changedAt: new Date(),
+				changedBy: staffProfileId,
+			})
+
+			// Update latest cleaning log (cleanedAt null)
+			const [logRow] = await tx
+				.select()
+				.from(bedCleaningLog)
+				.where(eq(bedCleaningLog.bedId, input.id))
+				.orderBy(bedCleaningLog.dirtiedAt, "desc")
+				.limit(1)
+
+			if (logRow && !logRow.cleanedAt) {
+				await tx
+					.update(bedCleaningLog)
+					.set({ cleanedAt: new Date(), cleanedBy: staffProfileId, updatedAt: new Date() })
+					.where(eq(bedCleaningLog.id, logRow.id))
+			}
+		})
+
+		const [updated] = await db.select().from(beds).where(eq(beds.id, input.id))
+		return updated
+	}
+
+	async getStatusHistory(bedId: string) {
+		return db
+			.select()
+			.from(bedStatusHistory)
+			.where(eq(bedStatusHistory.bedId, bedId))
+			.orderBy(bedStatusHistory.changedAt)
+	}
+
+	async getCleaningQueue(input: { facilityId: string }) {
+		// Select pending cleaning logs (cleanedAt is null) and include bed/ward info
+		const rows = await db
+			.select({
+				bedId: bedCleaningLog.bedId,
+				wardId: beds.wardId,
+				wardName: wards.name,
+				bedNumber: beds.bedNumber,
+				dirtiedAt: bedCleaningLog.dirtiedAt,
+				dirtiedByEncounterId: bedCleaningLog.dirtiedByEncounterId,
+			})
+			.from(bedCleaningLog)
+			.innerJoin(beds, eq(bedCleaningLog.bedId, beds.id))
+			.innerJoin(wards, eq(beds.wardId, wards.id))
+			.where(and(eq(bedCleaningLog.cleanedAt, null), eq(beds.facilityId, input.facilityId)))
+			.orderBy(bedCleaningLog.dirtiedAt)
+
+		return rows
 	}
 }

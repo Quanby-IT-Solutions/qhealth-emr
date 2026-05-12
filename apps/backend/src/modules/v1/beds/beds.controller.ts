@@ -55,6 +55,31 @@ export class BedsController {
 		})
 	}
 
+	@RequirePermission("housekeeping", "mark_cleaned")
+	@Implement(v1.bed.markCleaned)
+	async markCleaned(@Session() session: UserSession) {
+		return implement(v1.bed.markCleaned).handler(async ({ input }) => {
+			const staffId = session?.staffProfileId ?? null
+			return this.bedsService.markCleaned(input, staffId)
+		})
+	}
+
+	@RequirePermission("housekeeping", "view_queue")
+	@Implement(v1.bed.cleaningQueue)
+	async cleaningQueue() {
+		return implement(v1.bed.cleaningQueue).handler(async ({ input }) => {
+			return this.bedsService.getCleaningQueue(input)
+		})
+	}
+
+	@RequirePermission("adt", "view")
+	@Implement(v1.bed.getStatusHistory)
+	async getStatusHistory() {
+		return implement(v1.bed.getStatusHistory).handler(async ({ input }) => {
+			return this.bedsService.getStatusHistory(input.id)
+		})
+	}
+
 	@RequirePermission("adt", "view")
 	@Implement(v1.bed.suggestBeds)
 	async suggestBeds() {

@@ -68,6 +68,21 @@ export const BedSchema = z.object({
 export type Bed = z.infer<typeof BedSchema>
 
 // ============================================================================
+// Bed Status History
+// ============================================================================
+
+export const BedStatusHistorySchema = z.object({
+	id: z.string().uuid(),
+	bedId: z.string().uuid(),
+	previousStatus: BedStatusEnum.optional(),
+	newStatus: BedStatusEnum,
+	changedAt: dateOrString,
+	changedBy: z.string().uuid().nullable(),
+})
+
+export type BedStatusHistory = z.infer<typeof BedStatusHistorySchema>
+
+// ============================================================================
 // Bed with Ward & Patient info (for bed management grid)
 // ============================================================================
 
@@ -220,6 +235,27 @@ export const BedSuggestionResponseSchema = z.object({
 	suggestedBeds: z.array(SuggestedBedSchema),
 	totalAvailable: z.number(),
 })
+
+// ============================================================================
+// Cleaning Queue and Mark-Cleaned
+// ============================================================================
+
+export const CleaningQueueItemSchema = z.object({
+	bedId: z.string().uuid(),
+	wardId: z.string().uuid(),
+	wardName: z.string(),
+	bedNumber: z.string(),
+	dirtiedAt: dateOrString,
+	dirtiedByEncounterId: z.string().uuid().nullable(),
+})
+
+export type CleaningQueueItem = z.infer<typeof CleaningQueueItemSchema>
+
+export const MarkCleanedInputSchema = z.object({
+	id: z.string().uuid(),
+})
+
+export type MarkCleanedInput = z.infer<typeof MarkCleanedInputSchema>
 
 // ============================================================================
 // BOR Trend

@@ -295,11 +295,15 @@ export const bedStatusHistory = createTable(
 			.references(() => beds.id, { onDelete: "cascade" }),
 		previousStatus: t
 			.text("previous_status")
-			.$type<"available" | "occupied" | "reserved" | "cleaning" | "out_of_service">(),
+			.$type<
+				"available" | "occupied" | "reserved" | "cleaning" | "dirty_for_cleaning" | "out_of_service"
+			>(),
 		newStatus: t
 			.text("new_status")
 			.notNull()
-			.$type<"available" | "occupied" | "reserved" | "cleaning" | "out_of_service">(),
+			.$type<
+				"available" | "occupied" | "reserved" | "cleaning" | "dirty_for_cleaning" | "out_of_service"
+			>(),
 		changedAt: t.timestamp("changed_at").notNull().defaultNow(),
 		changedBy: t.uuid("changed_by").references(() => staffProfiles.id, { onDelete: "set null" }),
 	}),
