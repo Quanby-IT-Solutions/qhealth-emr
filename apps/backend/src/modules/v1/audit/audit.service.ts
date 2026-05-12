@@ -96,6 +96,7 @@ export class AuditService {
 	async log(entry: LogAuditEntry, options?: { tx?: DBTransaction }) {
 		const client = options?.tx ?? db
 		try {
+			if (!entry.facilityId) throw new Error("facilityId is required for audit logs")
 			const [created] = await client
 				.insert(auditLogs)
 				.values({

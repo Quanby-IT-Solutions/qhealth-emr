@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
-import { ArrowRight, Baby, Loader2, Search, ShieldAlert, UserRound, WifiOff } from "lucide-react"
+import { ArrowRight, Baby, Loader2, Search, ShieldAlert, UserRound, UserRoundPlus, WifiOff } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -15,6 +15,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/core/components/ui/dialog"
+import { PatientRegisterPageContent } from "@/features/patients/components/patient-register-page"
 import { Input } from "@/core/components/ui/input"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { BreakGlassForm } from "@/features/audit/components/break-glass-form"
@@ -80,6 +81,7 @@ export function PatientListPage() {
 	const facilityId = useActiveFacilityId() ?? ""
 	const [filter, setFilter] = useState("")
 	const [breakGlassPatientId, setBreakGlassPatientId] = useState<string | null>(null)
+	const [dialogOpen, setDialogOpen] = useState(false)
 	const [checkingPatientId, setCheckingPatientId] = useState<string | null>(null)
 	const router = useRouter()
 	const queryClient = useQueryClient()
@@ -125,11 +127,18 @@ export function PatientListPage() {
 
 	return (
 		<div className="flex flex-col min-h-svh">
-			{/* Header */}
+			{/* Header: removed plain 'Patients' text; add Register button */}
 			<header className="border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60 sticky top-0 z-10">
 				<div className="flex h-14 items-center gap-3 px-4">
-					<div className="flex-1">
-						<h1 className="text-base font-semibold tracking-tight">Patients</h1>
+					<div className="flex-1" />
+					<div className="flex items-center gap-2">
+						<Button
+							className="bg-foreground text-background hover:bg-foreground/90"
+							onClick={() => setDialogOpen(true)}
+						>
+							<span className="mr-2">Register New Patient</span>
+							<UserRoundPlus className="size-4" />
+						</Button>
 					</div>
 				</div>
 			</header>
@@ -257,6 +266,12 @@ export function PatientListPage() {
 						)}
 					</CardContent>
 				</Card>
+
+				<Dialog open={dialogOpen} onOpenChange={open => setDialogOpen(open)}>
+					<DialogContent className="!max-w-7xl max-h-[90vh] w-full overflow-y-auto">
+						<PatientRegisterPageContent />
+					</DialogContent>
+				</Dialog>
 			</main>
 
 			<Dialog open={!!breakGlassPatientId} onOpenChange={open => { if (!open) setBreakGlassPatientId(null) }}>

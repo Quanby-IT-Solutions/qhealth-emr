@@ -161,18 +161,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 			{ module: "ed", action: "create" },
 		],
 	},
-	{
-		// Registrar patient list: search records, create encounters, then access
-		// encounter transfer and discharge tabs from the patient chart.
-		title: "Patients & Encounters",
-		href: "/patients/search",
-		iconName: "patient",
-		requiredPermissions: [{ module: "patients", action: "view" }],
-		requireAllPermissions: [
-			{ module: "adt", action: "create" },
-			{ module: "patients", action: "edit" },
-		],
-	},
+    
 	{
 		// Nurse-specific patient list: browse & filter all active patients without
 		// the strict Name+DOB dedup requirement of the registrar workflow.

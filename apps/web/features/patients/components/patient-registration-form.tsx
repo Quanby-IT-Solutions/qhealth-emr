@@ -54,6 +54,9 @@ import { PatientRegistrationShell } from "@/features/patients/components/patient
 
 interface PatientRegistrationFormProps {
 	mode?: "standalone" | "triage-linked"
+	pendingTriageId?: string
+	onBack?: () => void
+	onClose?: () => void
 }
 
 function buildBackToSearchHref({ pendingTriageId }: { pendingTriageId: string }) {
@@ -138,10 +141,14 @@ function FormSection({
 	)
 }
 
-export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegistrationFormProps) {
+export function PatientRegistrationForm({
+	mode = "triage-linked",
+	pendingTriageId: pendingTriageIdProp,
+	onBack,
+	onClose,
+}: PatientRegistrationFormProps) {
 	const router = useRouter()
-	const searchParams = useSearchParams()
-	const pendingTriageId = searchParams.get("pendingTriageId") ?? ""
+	const pendingTriageId = pendingTriageIdProp ?? ""
 	const isStandaloneRegistration = mode === "standalone"
 	const backToSearchHref = buildBackToSearchHref({ pendingTriageId })
 	const fieldClassName = "h-11 rounded-xl border-border/60 bg-background"
@@ -350,7 +357,7 @@ export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegis
 							<Button
 								variant="outline"
 								className="border-border/60 bg-background"
-								onClick={() => router.push("/patients/register")}
+								onClick={() => (onClose ? onClose() : router.push("/patients/register"))}
 							>
 								Register another
 							</Button>
@@ -382,7 +389,7 @@ export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegis
 						<Button
 							variant="outline"
 							className="border-border/60 bg-background"
-							onClick={() => router.push("/patients/register")}
+							onClick={() => (onBack ? onBack() : router.push("/patients/register"))}
 						>
 							Back to patient search
 						</Button>
@@ -441,7 +448,7 @@ export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegis
 							<Button
 								variant="outline"
 								className="border-border/60 bg-background"
-								onClick={() => router.push("/patients/register")}
+								onClick={() => (onClose ? onClose() : router.push("/patients/register"))}
 							>
 								Register another
 							</Button>
@@ -781,7 +788,7 @@ export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegis
 								type="button"
 								variant="ghost"
 								className="justify-start sm:justify-center"
-								onClick={() => router.push(backToSearchHref)}
+								onClick={() => (onBack ? onBack() : router.push(backToSearchHref))}
 							>
 								<ArrowLeft className="size-4" />
 								Back to search
@@ -800,14 +807,14 @@ export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegis
 								<BadgeCheck className="size-4" />
 								{isSubmitting ? "Saving..." : "Save & assign MRN"}
 							</Button>
-						</div>
+							</div>
 
-						{submissionError && (
-							<p className="text-destructive text-sm">
-								Failed to register patient: {submissionError}
-							</p>
-						)}
-					</CardFooter>
+							{submissionError && (
+								<p className="text-destructive text-sm">
+									Failed to register patient: {submissionError}
+								</p>
+							)}
+						</CardFooter>
 				</Card>
 			</form>
 		</PatientRegistrationShell>

@@ -17,6 +17,7 @@ interface PatientRegistrationShellProps {
 	subtitle: string
 	notice?: ReactNode
 	children: ReactNode
+    variant?: "page" | "dialog"
 }
 
 function StepBadge({
@@ -46,8 +47,63 @@ export function PatientRegistrationShell({
 	subtitle,
 	notice,
 	children,
+	variant = "page",
 }: PatientRegistrationShellProps) {
 	const currentIndex = REGISTRATION_STEPS.findIndex(item => item.id === step)
+	const content = (
+		<div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 pt-2 pb-12 sm:px-6 lg:px-8">
+			<div className="space-y-3">
+				<p className="text-muted-foreground text-[0.68rem] font-medium tracking-[0.24em] uppercase">
+					Step {currentIndex + 1} of {REGISTRATION_STEPS.length}
+				</p>
+				<div className="space-y-2">
+					<h2 className="text-foreground text-3xl font-semibold tracking-tight">{title}</h2>
+					<p className="text-muted-foreground max-w-3xl text-base">{subtitle}</p>
+				</div>
+			</div>
+
+			<div className="border-border/60 bg-background/80 rounded-2xl border px-4 py-4 shadow-sm backdrop-blur">
+				<div className="grid grid-cols-[minmax(0,1fr)_minmax(1.5rem,1fr)_minmax(0,1fr)_minmax(1.5rem,1fr)_minmax(0,1fr)] items-start gap-2 sm:gap-4">
+					{REGISTRATION_STEPS.map((item, index) => {
+						const status = index < currentIndex ? "completed" : index === currentIndex ? "current" : "pending"
+
+						return (
+							<div key={item.id} className="contents">
+								<div className="flex min-w-0 flex-col items-center gap-2 text-center">
+									<StepBadge index={index} status={status} />
+									<p
+										className={cn(
+											"text-xs font-medium tracking-tight",
+											status === "pending" ? "text-muted-foreground" : "text-foreground"
+										)}
+									>
+										{item.label}
+									</p>
+								</div>
+
+								{index < REGISTRATION_STEPS.length - 1 && (
+									<div
+										className={cn(
+											"mt-5 h-px w-full",
+											index < currentIndex ? "bg-foreground/20" : "bg-border/60"
+										)}
+									/>
+								)}
+							</div>
+						)
+					})}
+				</div>
+			</div>
+
+			{notice}
+
+			<div className="pb-2">{children}</div>
+		</div>
+	)
+
+	if (variant === "dialog") {
+		return content
+	}
 
 	return (
 		<div className="relative min-h-full">
@@ -56,55 +112,7 @@ export function PatientRegistrationShell({
 				className="from-background via-background to-secondary/30 pointer-events-none absolute inset-0 -z-10 bg-linear-to-b"
 			/>
 
-			<div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 pt-2 pb-12 sm:px-6 lg:px-8">
-				<div className="space-y-3">
-					<p className="text-muted-foreground text-[0.68rem] font-medium tracking-[0.24em] uppercase">
-						Step {currentIndex + 1} of {REGISTRATION_STEPS.length}
-					</p>
-					<div className="space-y-2">
-						<h2 className="text-foreground text-3xl font-semibold tracking-tight">{title}</h2>
-						<p className="text-muted-foreground max-w-3xl text-base">{subtitle}</p>
-					</div>
-				</div>
-
-				<div className="border-border/60 bg-background/80 rounded-2xl border px-4 py-4 shadow-sm backdrop-blur">
-					<div className="grid grid-cols-[minmax(0,1fr)_minmax(1.5rem,1fr)_minmax(0,1fr)_minmax(1.5rem,1fr)_minmax(0,1fr)] items-start gap-2 sm:gap-4">
-						{REGISTRATION_STEPS.map((item, index) => {
-							const status =
-								index < currentIndex ? "completed" : index === currentIndex ? "current" : "pending"
-
-							return (
-								<div key={item.id} className="contents">
-									<div className="flex min-w-0 flex-col items-center gap-2 text-center">
-										<StepBadge index={index} status={status} />
-										<p
-											className={cn(
-												"text-xs font-medium tracking-tight",
-												status === "pending" ? "text-muted-foreground" : "text-foreground"
-											)}
-										>
-											{item.label}
-										</p>
-									</div>
-
-									{index < REGISTRATION_STEPS.length - 1 && (
-										<div
-											className={cn(
-												"mt-5 h-px w-full",
-												index < currentIndex ? "bg-foreground/20" : "bg-border/60"
-											)}
-										/>
-									)}
-								</div>
-							)
-						})}
-					</div>
-				</div>
-
-				{notice}
-
-				<div className="pb-2">{children}</div>
-			</div>
+			{content}
 		</div>
 	)
 }
