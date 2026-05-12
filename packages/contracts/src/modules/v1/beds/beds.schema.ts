@@ -31,6 +31,8 @@ export const BedStatusEnum = z.enum([
 	"reserved",
 	"cleaning",
 	"out_of_service",
+	"pending_transfer",
+	"dirty",
 ])
 
 // ============================================================================

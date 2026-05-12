@@ -327,6 +327,13 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		requireAllPermissions: REGISTRAR_ROLE_BUNDLE,
 	},
 	{
+		title: "Patient Transfers",
+		href: "/registrar/transfers",
+		iconName: "bed",
+		requiredPermissions: [{ module: "adt", action: "edit" }],
+		requireAllPermissions: REGISTRAR_ROLE_BUNDLE,
+	},
+	{
 		title: "Laboratory",
 		href: "/laboratory",
 		iconName: "laboratory",
@@ -375,6 +382,13 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		requiredPermissions: [{ module: "nursing", action: "view" }],
 		// Physicians have nursing:view to read nursing notes, not to manage the nursing dashboard
 		excludePermissions: [{ module: "clinical_docs", action: "sign" }],
+		excludeAllPermissions: TRIAGE_ROLE_BUNDLE,
+	},
+	{
+		title: "Pending Transfers",
+		href: "/nursing/transfers",
+		iconName: "bed",
+		requiredPermissions: [{ module: "nursing", action: "create" }],
 		excludeAllPermissions: TRIAGE_ROLE_BUNDLE,
 	},
 	{

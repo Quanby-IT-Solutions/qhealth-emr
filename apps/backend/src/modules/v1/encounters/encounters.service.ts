@@ -43,7 +43,9 @@ type WorkflowType = "opd" | "ed" | "admission" | "discharge" | "ancillary" | "ph
 
 type EncounterListInput = V1Inputs["encounter"]["list"]
 type CreateEncounterInput = V1Inputs["encounter"]["create"]
-type TransferEncounterInput = V1Inputs["encounter"]["transfer"]
+type InitiateTransferInput = V1Inputs["encounter"]["initiateTransfer"]
+type ReceiveTransferInput = V1Inputs["encounter"]["receiveTransfer"]
+type ListPendingTransfersInput = V1Inputs["encounter"]["listPendingTransfers"]
 type DischargeEncounterInput = V1Inputs["encounter"]["discharge"]
 type SignMayGoHomeOrderInput = V1Inputs["encounter"]["signMayGoHomeOrder"]
 type CloseEncounterInput = V1Inputs["encounter"]["close"]
@@ -145,22 +147,29 @@ export class EncountersService {
 	// ========================================================================
 
 	async list(filter: EncounterListInput, actor?: ChartAccessActor) {
-		await this.chartAccessService.ensurePatientChartReadAccess(actor, filter.patientId, {
-			entityType: "encounter_list",
-			entityId: filter.patientId,
-		})
+		if (filter.patientId) {
+			await this.chartAccessService.ensurePatientChartReadAccess(actor, filter.patientId, {
+				entityType: "encounter_list",
+				entityId: filter.patientId,
+			})
+		}
 
 		const page = Number(filter.page) || 1
 		const limit = Number(filter.limit) || 50
 		const offset = (page - 1) * limit
 
-		const conditions = [
-			eq(encounters.patientId, filter.patientId),
-			eq(encounters.facilityId, filter.facilityId),
-		]
+		const conditions = [eq(encounters.facilityId, filter.facilityId)]
+
+		if (filter.patientId) {
+			conditions.push(eq(encounters.patientId, filter.patientId))
+		}
 
 		if (filter.status) {
 			conditions.push(eq(encounters.status, filter.status))
+		}
+
+		if (filter.encounterType) {
+			conditions.push(eq(encounters.encounterType, filter.encounterType))
 		}
 
 		const whereClause = and(...conditions)
@@ -310,6 +319,8 @@ export class EncountersService {
 				transferReason: encounterTransfers.transferReason,
 				orderingStaffId: encounterTransfers.orderingStaffId,
 				transferredAt: encounterTransfers.transferredAt,
+				status: encounterTransfers.status,
+				receivedAt: encounterTransfers.receivedAt,
 				fromWardName: fromWardsSq.name,
 				fromBedNumber: fromBedsSq.bedNumber,
 				toWardName: toWardsSq.name,
@@ -770,10 +781,10 @@ export class EncountersService {
 	}
 
 	// ========================================================================
-	// Transfer
+	// Initiate Transfer (Registrar)
 	// ========================================================================
 
-	async transfer(input: TransferEncounterInput) {
+	async initiateTransfer(input: InitiateTransferInput) {
 		const [encounter] = await db
 			.select()
 			.from(encounters)
@@ -789,6 +800,22 @@ export class EncountersService {
 
 		if (encounter.encounterType !== "inpatient") {
 			throw new BadRequestException("Transfers are only for inpatient encounters")
+		}
+
+		// Block if there is already a pending transfer for this encounter
+		const [existingPending] = await db
+			.select({ id: encounterTransfers.id })
+			.from(encounterTransfers)
+			.where(
+				and(
+					eq(encounterTransfers.encounterId, encounter.id),
+					eq(encounterTransfers.status, "pending")
+				)
+			)
+		if (existingPending) {
+			throw new ConflictException(
+				"There is already a pending transfer for this encounter. Wait for Ward Nurse confirmation before initiating another."
+			)
 		}
 
 		// Validate destination bed
@@ -811,42 +838,47 @@ export class EncountersService {
 			currentWardId = currentBed?.wardId ?? null
 		}
 
-		// Wrap all 4 mutation steps in a transaction — partial failure rolls back entirely,
-		// preventing inconsistent bed/encounter state (e.g. occupied bed with no encounter).
-		const updated = await db.transaction(async tx => {
+		// Transaction: source bed → pending_transfer, dest bed → reserved, insert pending transfer record
+		const [updated, transferRow] = await db.transaction(async tx => {
 			if (currentBedId) {
 				await tx
 					.update(beds)
-					.set({ status: "available", currentEncounterId: null, updatedAt: new Date() })
+					.set({ status: "pending_transfer", updatedAt: new Date() })
 					.where(eq(beds.id, currentBedId))
 			}
 
 			await tx
 				.update(beds)
-				.set({ status: "occupied", currentEncounterId: encounter.id, updatedAt: new Date() })
+				.set({ status: "reserved", updatedAt: new Date() })
 				.where(eq(beds.id, input.toBedId))
 
 			const [enc] = await tx
 				.update(encounters)
-				.set({ bedId: input.toBedId, updatedAt: new Date() })
+				.set({ updatedAt: new Date() })
 				.where(eq(encounters.id, input.encounterId))
 				.returning()
 
-			await tx.insert(encounterTransfers).values({
-				facilityId: encounter.facilityId,
-				encounterId: encounter.id,
-				fromWardId: currentWardId,
-				fromBedId: currentBedId,
-				toWardId: input.toWardId,
-				toBedId: input.toBedId,
-				transferReason: input.transferReason ?? null,
-				orderingStaffId: input.orderingStaffId,
-			})
+			const [transfer] = await tx
+				.insert(encounterTransfers)
+				.values({
+					facilityId: encounter.facilityId,
+					encounterId: encounter.id,
+					fromWardId: currentWardId,
+					fromBedId: currentBedId,
+					toWardId: input.toWardId,
+					toBedId: input.toBedId,
+					transferReason: input.transferReason ?? null,
+					orderingStaffId: input.orderingStaffId,
+					status: "pending",
+				})
+				.returning()
 
-			return enc!
+			return [enc!, transfer!] as const
 		})
 
-		// Log SLA event for transfer (use 'admission' workflow for inpatient transitions)
+		// Notify ward nurses at destination ward
+		void this.notifyTransferDestinationNurses(encounter, transferRow.id, input.toWardId)
+
 		await this.logSlaEvent({
 			facilityId: encounter.facilityId,
 			encounterId: encounter.id,
@@ -854,18 +886,216 @@ export class EncountersService {
 			toStatus: "active",
 			workflowType: "admission",
 			staffId: input.orderingStaffId,
-			notes: `Transferred to bed ${input.toBedId}`,
+			notes: `Transfer initiated to ward ${input.toWardId}, bed ${input.toBedId}`,
 		})
 
-		this.logger.log(`Transferred encounter ${input.encounterId} to bed ${input.toBedId}`)
+		this.logger.log(
+			`Transfer initiated for encounter ${input.encounterId} to bed ${input.toBedId}`
+		)
 
-		// Return with SLA tracking fields (computed based on last event)
 		return {
 			...updated,
 			slaStatus: null,
 			slaElapsedMinutes: null,
 			slaTargetMinutes: null,
 		}
+	}
+
+	// ========================================================================
+	// Receive Transfer (Ward Nurse confirms patient arrival)
+	// ========================================================================
+
+	async receiveTransfer(input: ReceiveTransferInput) {
+		const [transfer] = await db
+			.select()
+			.from(encounterTransfers)
+			.where(eq(encounterTransfers.id, input.transferId))
+
+		if (!transfer) {
+			throw new NotFoundException(`Transfer ${input.transferId} not found`)
+		}
+
+		if (transfer.status !== "pending") {
+			throw new BadRequestException("Transfer is already completed")
+		}
+
+		const [encounter] = await db
+			.select()
+			.from(encounters)
+			.where(eq(encounters.id, transfer.encounterId))
+
+		if (!encounter || encounter.status !== "active") {
+			throw new BadRequestException("Associated encounter is not active")
+		}
+
+		const now = new Date()
+
+		const updated = await db.transaction(async tx => {
+			// Source bed → dirty (vacated but needs cleaning)
+			if (transfer.fromBedId) {
+				await tx
+					.update(beds)
+					.set({ status: "dirty", currentEncounterId: null, updatedAt: now })
+					.where(eq(beds.id, transfer.fromBedId))
+			}
+
+			// Destination bed → occupied, link to encounter
+			if (transfer.toBedId) {
+				await tx
+					.update(beds)
+					.set({ status: "occupied", currentEncounterId: encounter.id, updatedAt: now })
+					.where(eq(beds.id, transfer.toBedId))
+			}
+
+			// Move encounter to destination bed
+			const [enc] = await tx
+				.update(encounters)
+				.set({ bedId: transfer.toBedId, updatedAt: now })
+				.where(eq(encounters.id, encounter.id))
+				.returning()
+
+			// Mark transfer as completed
+			await tx
+				.update(encounterTransfers)
+				.set({
+					status: "completed",
+					receivedAt: now,
+					receivingStaffId: input.receivingStaffId,
+				})
+				.where(eq(encounterTransfers.id, input.transferId))
+
+			return enc!
+		})
+
+		await this.logSlaEvent({
+			facilityId: encounter.facilityId,
+			encounterId: encounter.id,
+			fromStatus: "active",
+			toStatus: "active",
+			workflowType: "admission",
+			staffId: input.receivingStaffId,
+			notes: `Transfer received at destination bed ${transfer.toBedId ?? ""}`,
+		})
+
+		this.logger.log(
+			`Transfer ${input.transferId} received for encounter ${encounter.id} at bed ${transfer.toBedId}`
+		)
+
+		return {
+			...updated,
+			slaStatus: null,
+			slaElapsedMinutes: null,
+			slaTargetMinutes: null,
+		}
+	}
+
+	// ========================================================================
+	// List Pending Transfers (Ward Nurse view)
+	// ========================================================================
+
+	async listPendingTransfers(input: ListPendingTransfersInput) {
+		const fromWardsSq = db.select({ id: wards.id, name: wards.name }).from(wards).as("from_wards")
+		const toWardsSq = db.select({ id: wards.id, name: wards.name }).from(wards).as("to_wards")
+		const fromBedsSq = db
+			.select({ id: beds.id, bedNumber: beds.bedNumber })
+			.from(beds)
+			.as("from_beds")
+		const toBedsSq = db.select({ id: beds.id, bedNumber: beds.bedNumber }).from(beds).as("to_beds")
+		const orderingStaffSq = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("ordering_staff")
+
+		const conditions = [
+			eq(encounterTransfers.facilityId, input.facilityId),
+			eq(encounterTransfers.status, "pending"),
+		]
+
+		if (input.toWardId) {
+			conditions.push(eq(encounterTransfers.toWardId, input.toWardId))
+		}
+
+		const rows = await db
+			.select({
+				transferId: encounterTransfers.id,
+				encounterId: encounterTransfers.encounterId,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+				patientMrn: patients.mrn,
+				fromWardName: fromWardsSq.name,
+				fromBedNumber: fromBedsSq.bedNumber,
+				toWardName: toWardsSq.name,
+				toBedNumber: toBedsSq.bedNumber,
+				transferReason: encounterTransfers.transferReason,
+				orderingStaffName: orderingStaffSq.name,
+				transferredAt: encounterTransfers.transferredAt,
+			})
+			.from(encounterTransfers)
+			.innerJoin(encounters, eq(encounterTransfers.encounterId, encounters.id))
+			.innerJoin(patients, eq(encounters.patientId, patients.id))
+			.leftJoin(fromWardsSq, eq(encounterTransfers.fromWardId, fromWardsSq.id))
+			.leftJoin(fromBedsSq, eq(encounterTransfers.fromBedId, fromBedsSq.id))
+			.leftJoin(toWardsSq, eq(encounterTransfers.toWardId, toWardsSq.id))
+			.leftJoin(toBedsSq, eq(encounterTransfers.toBedId, toBedsSq.id))
+			.leftJoin(orderingStaffSq, eq(encounterTransfers.orderingStaffId, orderingStaffSq.id))
+			.where(and(...conditions))
+			.orderBy(desc(encounterTransfers.transferredAt))
+
+		return rows.map(row => ({
+			transferId: row.transferId,
+			encounterId: row.encounterId,
+			patientName: `${row.patientLastName}, ${row.patientFirstName}`,
+			patientMrn: row.patientMrn,
+			fromWardName: row.fromWardName ?? null,
+			fromBedNumber: row.fromBedNumber ?? null,
+			toWardName: row.toWardName ?? null,
+			toBedNumber: row.toBedNumber ?? null,
+			transferReason: row.transferReason ?? null,
+			orderingStaffName: row.orderingStaffName ?? null,
+			transferredAt: row.transferredAt,
+		}))
+	}
+
+	private async notifyTransferDestinationNurses(
+		encounter: typeof encounters.$inferSelect,
+		transferId: string,
+		toWardId: string
+	) {
+		if (!this.notificationService) return
+
+		const recipients = await db
+			.selectDistinct({ staffId: staffProfiles.id })
+			.from(staffProfiles)
+			.innerJoin(userRoles, eq(userRoles.staffProfileId, staffProfiles.id))
+			.innerJoin(roles, eq(userRoles.roleId, roles.id))
+			.innerJoin(rolePermissions, eq(rolePermissions.roleId, roles.id))
+			.where(
+				and(
+					eq(staffProfiles.facilityId, encounter.facilityId),
+					eq(staffProfiles.isActive, true),
+					eq(rolePermissions.module, "nursing"),
+					eq(rolePermissions.action, "create")
+				)
+			)
+
+		await Promise.all(
+			recipients.map(recipient =>
+				this.notificationService?.send({
+					facilityId: encounter.facilityId,
+					recipientStaffId: recipient.staffId,
+					topic: "system",
+					title: "Patient Transfer Incoming",
+					body: "A patient has been transferred to your ward. Please confirm receipt.",
+					data: {
+						encounterId: encounter.id,
+						patientId: encounter.patientId,
+						transferId,
+						toWardId,
+					},
+				})
+			)
+		)
 	}
 
 	private async notifyDischargeQueues(encounter: typeof encounters.$inferSelect) {
