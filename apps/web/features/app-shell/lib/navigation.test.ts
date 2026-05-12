@@ -72,6 +72,7 @@ describe("filterNavItems", () => {
 			"Chart Merge",
 			"Civil Registry",
 			"Patient Transfers",
+			"Discharge Processing"
 		])
 		expect(secondaryTitles).toEqual([])
 	})
