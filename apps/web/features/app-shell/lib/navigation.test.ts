@@ -67,7 +67,6 @@ describe("filterNavItems", () => {
 		expect(primaryTitles).toEqual([
 			"Dashboard",
 			"Register Patient",
-			"Patients & Encounters",
 			"Bed Management",
 			"OPD",
 			"Chart Merge",
