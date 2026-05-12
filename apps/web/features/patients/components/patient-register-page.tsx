@@ -43,13 +43,17 @@ import { useCreateEncounterMutation } from "@/features/encounters/api/encounters
 import { useOfflinePatients } from "@/features/offline-cache/lib/use-offline-patients"
 import { LinkTriageBanner } from "@/features/opd-triage/components/link-triage-banner"
 import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
+import { PatientListCard } from "@/features/patients/components/patient-list-page"
 import { PatientRegistrationForm } from "@/features/patients/components/patient-registration-form"
 import { PatientRegistrationShell } from "@/features/patients/components/patient-registration-shell"
+
+// ============================================================================
+// Helpers
+// ============================================================================
 
 function formatDate(dateVal: Date | string | null) {
 	if (!dateVal) return "—"
 	const date = dateVal instanceof Date ? dateVal : new Date(dateVal)
-
 	return date.toLocaleDateString("en-PH", {
 		year: "numeric",
 		month: "short",
@@ -88,31 +92,11 @@ function matchesPatientNameSearch(
 	search: string
 ) {
 	const tokens = normalizeSearchTokens(search)
-
-	if (tokens.length === 0) {
-		return true
-	}
-
+	if (tokens.length === 0) return true
 	const fields = [patient.firstName, patient.middleName ?? "", patient.lastName, patient.mrn].map(
 		value => value.toLowerCase()
 	)
-
 	return tokens.every(token => fields.some(field => field.includes(token)))
-}
-
-function buildRegisterHref({ pendingTriageId, mode }: { pendingTriageId?: string; mode?: "new" }) {
-	const params = new URLSearchParams()
-
-	if (mode) {
-		params.set("mode", mode)
-	}
-
-	if (pendingTriageId) {
-		params.set("pendingTriageId", pendingTriageId)
-	}
-
-	const query = params.toString()
-	return query ? `/patients/register?${query}` : "/patients/register"
 }
 
 function SearchField({
@@ -165,11 +149,14 @@ function SearchStateCard({
 	)
 }
 
-export function PatientRegisterPageContent() {
+// ============================================================================
+// RegistrationWizard — full search → register → MRN issued flow inside dialog
+// ============================================================================
+
+function RegistrationWizard({ onClose }: { onClose: () => void }) {
 	const router = useRouter()
 	const searchParams = useSearchParams()
 	const pendingTriageId = searchParams.get("pendingTriageId") ?? ""
-	const showRegistrationForm = searchParams.get("mode") === "new"
 	const facilityId = useActiveFacilityId() ?? ""
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
@@ -196,9 +183,11 @@ export function PatientRegisterPageContent() {
 	const isBreakGlassEnforced = permissions.some(
 		permission => permission.module === "audit" && permission.action === "create"
 	)
-	const canAccessPage = canSearchPatients || canOpenRegistrationWorkflow
-	const shouldFallbackToForm = canOpenRegistrationWorkflow && !canSearchPatients
+	const shouldStartAtForm = canOpenRegistrationWorkflow && !canSearchPatients
 
+	const [wizardStep, setWizardStep] = useState<"search" | "form">(
+		shouldStartAtForm ? "form" : "search"
+	)
 	const [nameFilter, setNameFilter] = useState("")
 	const [birthdateFilter, setBirthdateFilter] = useState("")
 	const [philhealthFilter, setPhilhealthFilter] = useState("")
@@ -244,20 +233,12 @@ export function PatientRegisterPageContent() {
 	const hasSearched = !!committedParams
 	const selectedPatient = results.find(patient => patient.id === selectedForTriage) ?? null
 	const selectedPatientName = selectedPatient ? formatPatientName(selectedPatient) : null
-	const newPatientHref = buildRegisterHref({
-		mode: "new",
-		pendingTriageId: pendingTriageId || undefined,
-	})
 	const primaryButtonClassName = "bg-foreground text-background hover:bg-foreground/90"
 
 	const filteredOfflinePatients = useMemo(() => {
-		if (isOnline || !committedParams || committedParams.philhealthMemberId) {
-			return []
-		}
-
+		if (isOnline || !committedParams || committedParams.philhealthMemberId) return []
 		const searchTerm = (committedParams.search ?? "").toLowerCase()
 		const dateOfBirth = committedParams.dateOfBirth
-
 		return offlinePatients.filter(patient => {
 			const nameMatch = matchesPatientNameSearch(patient, searchTerm)
 			const dobMatch = !dateOfBirth || patient.dateOfBirth === dateOfBirth
@@ -267,16 +248,11 @@ export function PatientRegisterPageContent() {
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault()
-
-		if (!facilityId || !canSearchPatients) {
-			return
-		}
-
+		if (!facilityId || !canSearchPatients) return
 		if (!hasPhilhealthFilter && !hasNameFilter) {
 			toast.error("Enter a patient name or PhilHealth number to search. Date of birth is optional.")
 			return
 		}
-
 		setSelectedForTriage(null)
 		setCommittedParams({
 			facilityId,
@@ -303,7 +279,6 @@ export function PatientRegisterPageContent() {
 		chiefComplaint: string | undefined
 	) => {
 		if (!facilityId || !pendingTriageId || !staffId) return
-
 		const encounter = await createEncounter.mutateAsync({
 			facilityId,
 			patientId,
@@ -314,7 +289,6 @@ export function PatientRegisterPageContent() {
 			clinicianStaffId,
 			consentCaptured: true,
 		})
-
 		if (encounter.queueNumber !== null) {
 			setTriageQueueResult({
 				queueNumber: encounter.queueNumber,
@@ -326,47 +300,32 @@ export function PatientRegisterPageContent() {
 		}
 	}
 
-	if (!canAccessPage) {
+	// Form step
+	if (wizardStep === "form") {
 		return (
-			<PatientRegistrationShell
-				step="search"
-				title="Patient access is unavailable"
-				subtitle="Your current role does not have access to search patients or open the registration workflow."
-			>
-				<Card className="border-border/60 bg-card shadow-sm">
-					<CardContent className="text-muted-foreground flex min-h-56 items-center justify-center px-6 py-16 text-center text-sm">
-						You do not have permission to search or register patients.
-					</CardContent>
-				</Card>
-			</PatientRegistrationShell>
+			<PatientRegistrationForm
+				mode={pendingTriageId ? "triage-linked" : "standalone"}
+				onBack={() => setWizardStep("search")}
+			/>
 		)
 	}
 
-	if (showRegistrationForm || shouldFallbackToForm) {
-		return <PatientRegistrationForm mode={pendingTriageId ? "triage-linked" : "standalone"} />
-	}
-
-	const title = pendingTriageId
+	// Search step
+	const searchTitle = pendingTriageId
 		? "Link the triage intake to the right patient record"
-		: canOpenRegistrationWorkflow
-			? "Find an existing record before you register"
-			: "Search the patient registry"
-	const subtitle = pendingTriageId
+		: "Find an existing record before you register"
+	const searchSubtitle = pendingTriageId
 		? "Search for an existing patient to reconcile this walk-in triage intake, or continue to new-patient registration when no record exists."
-		: canOpenRegistrationWorkflow
-			? "Search by patient name, optionally add date of birth to narrow the results, or use a PhilHealth number to avoid duplicate charts before issuing a new MRN."
-			: "Search by patient name, optionally add date of birth to narrow the results, or use a PhilHealth number to open an existing patient record."
+		: "Search by patient name, optionally add date of birth to narrow the results, or use a PhilHealth number to avoid duplicate charts before issuing a new MRN."
 	const helperCopy = pendingTriageId
 		? "Search for the patient who already has a chart, or continue with new-patient registration if this is the first visit."
-		: canOpenRegistrationWorkflow
-			? "Check the registry first so we only create a chart when a match does not already exist."
-			: "Use the registry search below to find and open an existing patient record."
+		: "Check the registry first so we only create a chart when a match does not already exist."
 
 	return (
 		<PatientRegistrationShell
 			step="search"
-			title={title}
-			subtitle={subtitle}
+			title={searchTitle}
+			subtitle={searchSubtitle}
 			notice={
 				pendingTriageId || !isOnline ? (
 					<div className="space-y-4">
@@ -379,7 +338,6 @@ export function PatientRegisterPageContent() {
 								onLinked={handleLinkedTriage}
 							/>
 						)}
-
 						{!isOnline && (
 							<Alert className="border-border/60 bg-secondary/40">
 								<WifiOff className="size-4" />
@@ -452,11 +410,7 @@ export function PatientRegisterPageContent() {
 									<Separator className="bg-border/60 flex-1" />
 								</div>
 
-								<SearchField
-									htmlFor="philhealth-number"
-									label="PhilHealth number"
-									icon={ShieldCheck}
-								>
+								<SearchField htmlFor="philhealth-number" label="PhilHealth number" icon={ShieldCheck}>
 									<Input
 										id="philhealth-number"
 										placeholder="Enter the PhilHealth number"
@@ -603,26 +557,16 @@ export function PatientRegisterPageContent() {
 									title="No matching patient found"
 									description={
 										pendingTriageId
-											? "No existing record matched the triage details you entered. Continue with new-patient registration if this is the patient’s first visit."
+											? "No existing record matched the triage details you entered. Continue with new-patient registration if this is the patient's first visit."
 											: canOpenRegistrationWorkflow
 												? "No existing record matched the details you entered. You can continue and register a new patient record now."
 												: "No existing record matched the details you entered."
 									}
 									action={
-										pendingTriageId && canCreatePatient ? (
+										canCreatePatient ? (
 											<Button
 												className={primaryButtonClassName}
-												nativeButton={false}
-												render={<Link href={newPatientHref} />}
-											>
-												<UserRoundPlus className="size-4" />
-												Register new patient
-											</Button>
-										) : !pendingTriageId && canCreatePatient ? (
-											<Button
-												className={primaryButtonClassName}
-												nativeButton={false}
-												render={<Link href={newPatientHref} />}
+												onClick={() => setWizardStep("form")}
 											>
 												<UserRoundPlus className="size-4" />
 												Register new patient
@@ -715,9 +659,7 @@ export function PatientRegisterPageContent() {
 			<Dialog
 				open={!!triageQueueResult}
 				onOpenChange={open => {
-					if (!open) {
-						setTriageQueueResult(null)
-					}
+					if (!open) setTriageQueueResult(null)
 				}}
 			>
 				<DialogContent>
@@ -737,7 +679,7 @@ export function PatientRegisterPageContent() {
 						<Button
 							variant="outline"
 							className="border-border/60 bg-background"
-							onClick={() => router.push("/patients/register")}
+							onClick={onClose}
 						>
 							Next patient
 						</Button>
@@ -755,5 +697,57 @@ export function PatientRegisterPageContent() {
 				</DialogContent>
 			</Dialog>
 		</PatientRegistrationShell>
+	)
+}
+
+// ============================================================================
+// PatientRegisterPageContent — page layout: patient list + registration dialog
+// ============================================================================
+
+export function PatientRegisterPageContent() {
+	const searchParams = useSearchParams()
+	const pendingTriageId = searchParams.get("pendingTriageId") ?? ""
+
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	const canCreatePatient = permissions.some(
+		permission => permission.module === "patients" && permission.action === "create"
+	)
+
+	// Auto-open the wizard when a triage intake is pending
+	const [isDialogOpen, setIsDialogOpen] = useState(!!pendingTriageId)
+
+	const primaryButtonClassName = "bg-foreground text-background hover:bg-foreground/90"
+
+	return (
+		<div className="flex flex-col min-h-svh">
+			<header className="border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60 sticky top-0 z-10">
+				<div className="flex h-14 items-center gap-3 px-4">
+					<div className="flex-1">
+						<h1 className="text-base font-semibold tracking-tight">Patient Management</h1>
+					</div>
+					{canCreatePatient && (
+						<Button
+							className={primaryButtonClassName}
+							size="sm"
+							onClick={() => setIsDialogOpen(true)}
+						>
+							<UserRoundPlus className="size-4" />
+							Register new patient
+						</Button>
+					)}
+				</div>
+			</header>
+
+			<main className="flex-1 p-4 md:p-6 space-y-5">
+				<PatientListCard />
+			</main>
+
+			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+				<DialogContent size="stepper">
+					<RegistrationWizard onClose={() => setIsDialogOpen(false)} />
+				</DialogContent>
+			</Dialog>
+		</div>
 	)
 }

@@ -121,8 +121,7 @@ const REGISTRAR_ROLE_BUNDLE: RequiredPermission[] = [
  * Visibility rules (per TOR role bundles in seed-dev.ts):
  *
  * Dashboard          — always visible
- * Register Patient   — registrar/admin full MRN registration (triage uses /triage)
- * Patients & Encounters — registrar patient search, encounter creation, transfer, discharge
+ * Patient Management — registrar unified page: dedup search + patient list + MRN registration dialog
  * Bed Management     — registrar bed assignment and post-discharge bed status
  * Chart Merge        — registrar trauma-alias merge into permanent MRN
  * Civil Registry     — registrar birth/death certificate generation and tracking
@@ -139,7 +138,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		requiredPermissions: [],
 	},
 	{
-		title: "Register Patient",
+		title: "Patient Management",
 		href: "/patients/register",
 		iconName: "patient",
 		requiredPermissions: [{ module: "adt", action: "create" }],
@@ -159,18 +158,6 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		requireAllPermissions: [
 			{ module: "nursing", action: "create" },
 			{ module: "ed", action: "create" },
-		],
-	},
-	{
-		// Registrar patient list: search records, create encounters, then access
-		// encounter transfer and discharge tabs from the patient chart.
-		title: "Patients & Encounters",
-		href: "/patients/search",
-		iconName: "patient",
-		requiredPermissions: [{ module: "patients", action: "view" }],
-		requireAllPermissions: [
-			{ module: "adt", action: "create" },
-			{ module: "patients", action: "edit" },
 		],
 	},
 	{
