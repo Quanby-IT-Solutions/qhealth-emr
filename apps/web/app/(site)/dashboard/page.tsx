@@ -5,6 +5,7 @@ import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { DashboardWidgets } from "@/features/app-shell/components/dashboard-widgets"
 import { getDashboardWidgetsForPermissions } from "@/features/app-shell/lib/navigation"
 import { NursingDashboard } from "@/features/nursing/components/nursing-dashboard"
+import { PharmacyDashboard } from "@/features/pharmacy/components/pharmacy-dashboard"
 
 export default function DashboardPage() {
 	const { data: profile, isLoading } = useMyProfile()
@@ -15,6 +16,7 @@ export default function DashboardPage() {
 	const widgetIds = getDashboardWidgetsForPermissions(permissions)
 	const canViewAdminDashboard = permSet.has("admin:view")
 	const canViewNursingDashboard = permSet.has("nursing:view")
+	const canViewPharmacyDashboard = permSet.has("orders:verify")
 
 	if (isLoading) {
 		return (
@@ -41,6 +43,10 @@ export default function DashboardPage() {
 
 	if (canViewNursingDashboard) {
 		return <NursingDashboard />
+	}
+
+	if (canViewPharmacyDashboard) {
+		return <PharmacyDashboard />
 	}
 
 	return (
