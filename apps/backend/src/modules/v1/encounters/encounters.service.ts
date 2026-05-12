@@ -15,7 +15,8 @@ import {
 	beds,
 	clinicalNotes,
 	consentRecords,
-	deathReports,
+		deathReports,
+		dischargeClearances,
 	encounters,
 	encounterStatusEvents,
 	encounterTransfers,
@@ -986,7 +987,23 @@ export class EncountersService {
 			throw new BadRequestException("Use the close endpoint for outpatient encounters")
 		}
 
-		// Enforce death report mandate before discharge
+		// Clearance gate: ensure required discharge clearances exist before mutating state
+		const requiredClearances = ["pharmacy", "nurse", "billing"]
+		const clearanceRows = await db
+			.select()
+			.from(dischargeClearances)
+			.where(eq(dischargeClearances.encounterId, input.encounterId))
+
+		const present = new Set(clearanceRows.map(r => r.type))
+		const missing = requiredClearances.filter(c => !present.has(c))
+		if (missing.length > 0) {
+			throw new BadRequestException(
+				`Missing discharge clearances: ${missing.join(", ")}`
+			)
+		}
+
+		// Enforce death report mandate before discharge (and capture deathDatetime for classification)
+		let deathDatetime: Date | null = null
 		if (input.disposition === "deceased") {
 			const completedDeathReport = await db
 				.select()
@@ -1003,24 +1020,34 @@ export class EncountersService {
 					"A completed death report (FMDRF or FNDRF) must be submitted before discharging a deceased patient."
 				)
 			}
+			deathDatetime = completedDeathReport[0].deathDatetime ?? null
 		}
 
-		// Release bed
-		if (encounter.bedId) {
-			await db
-				.update(beds)
-				.set({ status: "available", currentEncounterId: null, updatedAt: new Date() })
-				.where(eq(beds.id, encounter.bedId))
+		// Compute discharge datetime and length of stay
+		const dischargeDt = input.dischargeDatetime ? new Date(input.dischargeDatetime) : new Date()
+		if (!encounter.admissionDatetime) {
+			throw new BadRequestException("Encounter is missing admissionDatetime; cannot compute length of stay")
+		}
+		const lengthOfStayMinutes = Math.floor((dischargeDt.getTime() - new Date(encounter.admissionDatetime).getTime()) / 60000)
+
+		// Prepare update payload
+		const updatePayload: Record<string, any> = {
+			status: "discharged",
+			disposition: input.disposition,
+			dischargeDatetime: dischargeDt,
+			lengthOfStayMinutes,
+			updatedAt: new Date(),
+		}
+
+		// For deceased patients, compute deathRateClassification and persist
+		if (input.disposition === "deceased" && deathDatetime) {
+			const hours = (new Date(deathDatetime).getTime() - new Date(encounter.admissionDatetime).getTime()) / 3600000
+			updatePayload.deathRateClassification = hours <= 48 ? "gross" : "net"
 		}
 
 		const [updated] = await db
 			.update(encounters)
-			.set({
-				status: "discharged",
-				disposition: input.disposition,
-				dischargeDatetime: input.dischargeDatetime ? new Date(input.dischargeDatetime) : new Date(),
-				updatedAt: new Date(),
-			})
+			.set(updatePayload)
 			.where(eq(encounters.id, input.encounterId))
 			.returning()
 
@@ -1040,6 +1067,14 @@ export class EncountersService {
 		)
 
 		this.eventEmitter.emit("encounter.discharged", {
+			facilityId: encounter.facilityId,
+			encounterId: encounter.id,
+			encounterType: encounter.encounterType,
+			disposition: input.disposition,
+		})
+
+		// Emit gate-pass eligibility event for downstream gate/pass release workflows
+		this.eventEmitter.emit("encounter.gate-pass-eligible", {
 			facilityId: encounter.facilityId,
 			encounterId: encounter.id,
 			encounterType: encounter.encounterType,
