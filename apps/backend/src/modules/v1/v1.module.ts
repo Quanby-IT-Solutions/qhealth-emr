@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common"
 
 import { AdminDashboardModule } from "./admin-dashboard/admin-dashboard.module"
+import { DischargeModule } from "./discharge/discharge.module"
 import { AuditModule } from "./audit/audit.module"
 import { AuditorModule } from "./auditor/auditor.module"
 import { BedsModule } from "./beds/beds.module"
@@ -92,6 +93,8 @@ import { TerminologyModule } from "./terminology/terminology.module"
 		AuditorModule,
 		// HIM-BE-01..05: Health Information Management
 		HimModule,
+		// Flow B6 / Story 2.6: Registrar discharge processing (clearances + gate pass)
+		DischargeModule,
 	],
 })
 export class V1Module {}

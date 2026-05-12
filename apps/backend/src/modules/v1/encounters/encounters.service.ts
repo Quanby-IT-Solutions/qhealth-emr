@@ -13,16 +13,20 @@ import { and, count, desc, eq, gte, inArray, isNull, lt, max, sql } from "drizzl
 
 import {
 	beds,
+	charges,
 	clinicalNotes,
 	consentRecords,
 	deathReports,
+	dischargeClearances,
 	encounters,
 	encounterStatusEvents,
 	encounterTransfers,
 	flowsheetEntries,
+	invoices,
 	medicationOrders,
 	opdTriageIntakes,
 	patients,
+	payments,
 	rolePermissions,
 	roles,
 	staffProfiles,
@@ -197,8 +201,11 @@ export class EncountersService {
 					wardName: wards.name,
 					bedNumber: beds.bedNumber,
 					queueNumber: encounters.queueNumber,
+					patientFirstName: patients.firstName,
+					patientLastName: patients.lastName,
 				})
 				.from(encounters)
+				.innerJoin(patients, eq(encounters.patientId, patients.id))
 				.leftJoin(attendingStaff, eq(encounters.attendingStaffId, attendingStaff.id))
 				.leftJoin(beds, eq(encounters.bedId, beds.id))
 				.leftJoin(wards, eq(beds.wardId, wards.id))
@@ -214,6 +221,7 @@ export class EncountersService {
 		return {
 			data: data.map(row => ({
 				...row,
+				patientName: `${row.patientLastName}, ${row.patientFirstName}`,
 				attendingStaffName: row.attendingStaffName ?? null,
 				wardName: row.wardName ?? null,
 				bedNumber: row.bedNumber ?? null,
@@ -707,14 +715,14 @@ export class EncountersService {
 
 				if (triage) {
 					const hasVitals =
-						triage.systolicBp != null ||
-						triage.diastolicBp != null ||
-						triage.temperatureCelsius != null ||
-						triage.heartRateBpm != null ||
-						triage.respiratoryRate != null ||
-						triage.oxygenSatPct != null ||
-						triage.heightCm != null ||
-						triage.weightKg != null
+						triage.systolicBp !== null ||
+						triage.diastolicBp !== null ||
+						triage.temperatureCelsius !== null ||
+						triage.heartRateBpm !== null ||
+						triage.respiratoryRate !== null ||
+						triage.oxygenSatPct !== null ||
+						triage.heightCm !== null ||
+						triage.weightKg !== null
 
 					if (hasVitals) {
 						const recordedByStaffId = triage.triageNurseStaffId ?? input.admittingStaffId
@@ -747,7 +755,7 @@ export class EncountersService {
 						]
 
 						const entriesToInsert = vitalsMap
-							.filter(v => v.value != null)
+							.filter(v => v.value !== null)
 							.map(v => ({
 								facilityId: input.facilityId,
 								encounterId: created.id,
@@ -1235,11 +1243,11 @@ export class EncountersService {
 			}
 		}
 
-		// Release bed
+		// Release bed — mark dirty (needs housekeeping before next admission)
 		if (encounter.bedId) {
 			await db
 				.update(beds)
-				.set({ status: "available", currentEncounterId: null, updatedAt: new Date() })
+				.set({ status: "dirty", currentEncounterId: null, updatedAt: new Date() })
 				.where(eq(beds.id, encounter.bedId))
 		}
 
@@ -1376,57 +1384,114 @@ export class EncountersService {
 			status: ChecklistStatus
 			responsibleRole: string
 		}[] = isInpatient
-			? [
-					{
-						key: "discharge_summary_signed",
-						label: "Discharge summary signed",
-						category: "clinical",
-						status: "incomplete",
-						responsibleRole: "Clinician",
-					},
-					{
-						key: "final_diagnosis_coded",
-						label: "Final diagnosis coded (ICD-10)",
-						category: "clinical",
-						status: "incomplete",
-						responsibleRole: "Clinician",
-					},
-					{
-						key: "discharge_medications",
-						label: "Discharge medications documented",
-						category: "clinical",
-						status: "incomplete",
-						responsibleRole: "Clinician",
-					},
-					{
-						key: "followup_instructions",
-						label: "Follow-up instructions entered",
-						category: "clinical",
-						status: "incomplete",
-						responsibleRole: "Clinician",
-					},
-					{
-						key: "charges_captured",
-						label: "All charges captured",
-						category: "billing",
-						status: "incomplete",
-						responsibleRole: "Biller",
-					},
-					{
-						key: "invoice_generated",
-						label: "Invoice generated",
-						category: "billing",
-						status: "incomplete",
-						responsibleRole: "Biller",
-					},
-					{
-						key: "payment_recorded",
-						label: "Payment recorded or plan established",
-						category: "billing",
-						status: "incomplete",
-						responsibleRole: "Biller",
-					},
-				]
+			? await (async () => {
+					// Resolve billing items from DB
+					const [chargesRow] = await db
+						.select({ n: count() })
+						.from(charges)
+						.where(eq(charges.encounterId, encounter.id))
+					const chargesCaptured = (chargesRow?.n ?? 0) > 0
+
+					const [invoiceRow] = await db
+						.select({ n: count() })
+						.from(invoices)
+						.where(
+							and(
+								eq(invoices.encounterId, encounter.id),
+								inArray(invoices.status, ["finalized", "paid"])
+							)
+						)
+					const invoiceGenerated = (invoiceRow?.n ?? 0) > 0
+
+					let paymentRecorded: ChecklistStatus = "incomplete"
+					if (invoiceGenerated) {
+						const [paymentRow] = await db
+							.select({ n: count() })
+							.from(payments)
+							.innerJoin(invoices, eq(payments.invoiceId, invoices.id))
+							.where(eq(invoices.encounterId, encounter.id))
+						paymentRecorded = (paymentRow?.n ?? 0) > 0 ? "complete" : "incomplete"
+					}
+
+					// Resolve clearance items from discharge_clearances table
+					const [clearances] = await db
+						.select()
+						.from(dischargeClearances)
+						.where(eq(dischargeClearances.encounterId, encounter.id))
+
+					return [
+						{
+							key: "discharge_summary_signed",
+							label: "Discharge summary signed",
+							category: "clinical" as ChecklistCategory,
+							status: "incomplete" as ChecklistStatus,
+							responsibleRole: "Clinician",
+						},
+						{
+							key: "final_diagnosis_coded",
+							label: "Final diagnosis coded (ICD-10)",
+							category: "clinical" as ChecklistCategory,
+							status: "incomplete" as ChecklistStatus,
+							responsibleRole: "Clinician",
+						},
+						{
+							key: "discharge_medications",
+							label: "Discharge medications documented",
+							category: "clinical" as ChecklistCategory,
+							status: "incomplete" as ChecklistStatus,
+							responsibleRole: "Clinician",
+						},
+						{
+							key: "followup_instructions",
+							label: "Follow-up instructions entered",
+							category: "clinical" as ChecklistCategory,
+							status: "incomplete" as ChecklistStatus,
+							responsibleRole: "Clinician",
+						},
+						{
+							key: "charges_captured",
+							label: "All charges captured",
+							category: "billing" as ChecklistCategory,
+							status: (chargesCaptured ? "complete" : "incomplete") as ChecklistStatus,
+							responsibleRole: "Biller",
+						},
+						{
+							key: "invoice_generated",
+							label: "Invoice generated",
+							category: "billing" as ChecklistCategory,
+							status: (invoiceGenerated ? "complete" : "incomplete") as ChecklistStatus,
+							responsibleRole: "Biller",
+						},
+						{
+							key: "payment_recorded",
+							label: "Payment recorded or plan established",
+							category: "billing" as ChecklistCategory,
+							status: paymentRecorded,
+							responsibleRole: "Biller",
+						},
+						{
+							key: "pharmacy_clearance",
+							label: "Pharmacy clearance confirmed",
+							category: "billing" as ChecklistCategory,
+							status: (clearances?.pharmacyClearedAt ? "complete" : "incomplete") as ChecklistStatus,
+							responsibleRole: "Pharmacist",
+						},
+						{
+							key: "nursing_clearance",
+							label: "Nurse ward clearance confirmed",
+							category: "clinical" as ChecklistCategory,
+							status: (clearances?.nursingClearedAt ? "complete" : "incomplete") as ChecklistStatus,
+							responsibleRole: "Nurse",
+						},
+						{
+							key: "billing_sign_off",
+							label: "Billing sign-off received",
+							category: "billing" as ChecklistCategory,
+							status: (clearances?.billingSignedOffAt ? "complete" : "incomplete") as ChecklistStatus,
+							responsibleRole: "Biller",
+						},
+					]
+				})()
 			: [
 					// Outpatient close checklist — computed from real chart state
 					{
