@@ -4,7 +4,6 @@ import { useState } from "react"
 
 import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Button } from "@/core/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Label } from "@/core/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
@@ -15,9 +14,10 @@ import { useInitiateTransferMutation } from "@/features/encounters/api/encounter
 interface TransferFormProps {
 	encounterId: string
 	hasPendingTransfer?: boolean
+	onSuccess?: () => void
 }
 
-export function TransferForm({ encounterId, hasPendingTransfer }: TransferFormProps) {
+export function TransferForm({ encounterId, hasPendingTransfer, onSuccess }: TransferFormProps) {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 	const staffId = profile?.staffProfiles?.[0]?.id ?? ""
@@ -28,28 +28,17 @@ export function TransferForm({ encounterId, hasPendingTransfer }: TransferFormPr
 	const [wardId, setWardId] = useState("")
 	const [bedId, setBedId] = useState("")
 	const [reason, setReason] = useState("")
-	const [initiated, setInitiated] = useState(false)
 
 	const wards = bedData?.wards ?? []
 	const selectedWard = wards.find(w => w.id === wardId)
 	const availableBeds = selectedWard?.beds.filter(b => b.status === "available") ?? []
+	const selectedBed = availableBeds.find(b => b.id === bedId)
 
 	if (hasPendingTransfer) {
 		return (
 			<Alert>
 				<AlertDescription>
 					A transfer is already in progress for this patient. Awaiting Ward Nurse confirmation.
-				</AlertDescription>
-			</Alert>
-		)
-	}
-
-	if (initiated) {
-		return (
-			<Alert>
-				<AlertDescription>
-					Transfer initiated. Source bed is now Pending Transfer. Ward Nurse at the destination has
-					been notified.
 				</AlertDescription>
 			</Alert>
 		)
@@ -67,70 +56,86 @@ export function TransferForm({ encounterId, hasPendingTransfer }: TransferFormPr
 			orderingStaffId: staffId,
 		})
 
-		setInitiated(true)
+		onSuccess?.()
 	}
 
 	return (
-		<form onSubmit={handleSubmit}>
-			<Card>
-				<CardHeader>
-					<CardTitle>Initiate Transfer</CardTitle>
-				</CardHeader>
-				<CardContent className="grid gap-4 sm:grid-cols-2">
-					<div className="space-y-1.5">
-						<Label>Destination Ward *</Label>
-						<Select
-							value={wardId}
-							onValueChange={v => {
-								setWardId(v ?? "")
-								setBedId("")
-							}}
-						>
-							<SelectTrigger className="w-full">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{wards.map(w => (
-									<SelectItem key={w.id} value={w.id}>
-										{w.name} ({w.availableCount} available)
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
+		<form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
+			<div className="space-y-1.5">
+				<Label>Destination Ward *</Label>
+							<Select
+				value={wardId}
+				onValueChange={v => {
+					setWardId(v ?? "")
+					setBedId("")
+				}}
+			>
+				<SelectTrigger className="w-full">
+					<SelectValue placeholder="Select ward…">
+						{selectedWard
+							? `${selectedWard.name} (${selectedWard.availableCount} available)`
+							: "Select ward…"}
+					</SelectValue>
+				</SelectTrigger>
 
-					<div className="space-y-1.5">
-						<Label>Destination Bed *</Label>
-						<Select value={bedId} onValueChange={v => setBedId(v ?? "")}>
-							<SelectTrigger className="w-full">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{availableBeds.map(b => (
-									<SelectItem key={b.id} value={b.id}>
-										{b.bedNumber}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
+				<SelectContent>
+					{wards.map(w => (
+						<SelectItem key={w.id} value={w.id}>
+							{w.name} ({w.availableCount} available)
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
+			</div>
 
-					<div className="space-y-1.5 sm:col-span-2">
-						<Label>Transfer Reason</Label>
-						<Textarea
-							rows={3}
-							value={reason}
-							onChange={e => setReason(e.target.value)}
-						/>
-					</div>
+			<div className="space-y-1.5">
+				<Label>Destination Bed *</Label>
+				<Select
+	value={bedId}
+	onValueChange={v => setBedId(v ?? "")}
+	disabled={!wardId}
+>
+	<SelectTrigger className="w-full">
+		<SelectValue placeholder={wardId ? "Select bed…" : "Select ward first"}>
+			{selectedBed
+				? `Bed ${selectedBed.bedNumber}`
+				: wardId
+					? "Select bed…"
+					: "Select ward first"}
+		</SelectValue>
+	</SelectTrigger>
 
-					<div className="sm:col-span-2">
-						<Button type="submit" disabled={!wardId || !bedId || transfer.isPending}>
-							{transfer.isPending ? "Initiating…" : "Initiate Transfer"}
-						</Button>
-					</div>
-				</CardContent>
-			</Card>
+	<SelectContent>
+		{availableBeds.length === 0 ? (
+			<div className="text-muted-foreground px-3 py-2 text-sm">
+				No available beds in this ward
+			</div>
+		) : (
+			availableBeds.map(b => (
+				<SelectItem key={b.id} value={b.id}>
+					Bed {b.bedNumber}
+				</SelectItem>
+			))
+		)}
+	</SelectContent>
+</Select>
+			</div>
+
+			<div className="space-y-1.5 sm:col-span-2">
+				<Label>Transfer Reason</Label>
+				<Textarea
+					rows={3}
+					value={reason}
+					placeholder="Optional reason for transfer…"
+					onChange={e => setReason(e.target.value)}
+				/>
+			</div>
+
+			<div className="sm:col-span-2">
+				<Button type="submit" disabled={!wardId || !bedId || transfer.isPending} className="w-full">
+					{transfer.isPending ? "Initiating…" : "Initiate Transfer"}
+				</Button>
+			</div>
 		</form>
 	)
 }

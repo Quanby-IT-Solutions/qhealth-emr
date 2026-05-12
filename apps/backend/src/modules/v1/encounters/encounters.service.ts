@@ -205,10 +205,10 @@ export class EncountersService {
 					patientLastName: patients.lastName,
 				})
 				.from(encounters)
+				.innerJoin(patients, eq(encounters.patientId, patients.id))
 				.leftJoin(attendingStaff, eq(encounters.attendingStaffId, attendingStaff.id))
 				.leftJoin(beds, eq(encounters.bedId, beds.id))
 				.leftJoin(wards, eq(beds.wardId, wards.id))
-				.leftJoin(patients, eq(encounters.patientId, patients.id))
 				.where(whereClause)
 				.orderBy(desc(encounters.admissionDatetime))
 				.limit(limit)
@@ -221,9 +221,7 @@ export class EncountersService {
 		return {
 			data: data.map(row => ({
 				...row,
-				patientName: row.patientFirstName && row.patientLastName
-					? `${row.patientLastName}, ${row.patientFirstName}`
-					: null,
+				patientName: `${row.patientLastName}, ${row.patientFirstName}`,
 				attendingStaffName: row.attendingStaffName ?? null,
 				wardName: row.wardName ?? null,
 				bedNumber: row.bedNumber ?? null,
@@ -717,14 +715,14 @@ export class EncountersService {
 
 				if (triage) {
 					const hasVitals =
-						triage.systolicBp != null ||
-						triage.diastolicBp != null ||
-						triage.temperatureCelsius != null ||
-						triage.heartRateBpm != null ||
-						triage.respiratoryRate != null ||
-						triage.oxygenSatPct != null ||
-						triage.heightCm != null ||
-						triage.weightKg != null
+						triage.systolicBp !== null ||
+						triage.diastolicBp !== null ||
+						triage.temperatureCelsius !== null ||
+						triage.heartRateBpm !== null ||
+						triage.respiratoryRate !== null ||
+						triage.oxygenSatPct !== null ||
+						triage.heightCm !== null ||
+						triage.weightKg !== null
 
 					if (hasVitals) {
 						const recordedByStaffId = triage.triageNurseStaffId ?? input.admittingStaffId
@@ -757,7 +755,7 @@ export class EncountersService {
 						]
 
 						const entriesToInsert = vitalsMap
-							.filter(v => v.value != null)
+							.filter(v => v.value !== null)
 							.map(v => ({
 								facilityId: input.facilityId,
 								encounterId: created.id,
