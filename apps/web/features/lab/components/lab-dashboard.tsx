@@ -474,7 +474,9 @@ export function LabDashboard() {
 												</label>
 												<Select value={manualForm.wardId} onValueChange={v => setManualForm(prev => ({ ...prev, wardId: v ?? "" }))}>
 													<SelectTrigger className={cn("h-8 text-xs w-full", manualErrors.wardId && "border-rose-500")}>
-														<SelectValue placeholder="Select ward" />
+														<SelectValue placeholder="Select ward">
+														{manualForm.wardId ? wardsData?.find(w => w.id === manualForm.wardId)?.name : "Select ward"}
+													</SelectValue>
 													</SelectTrigger>
 													<SelectContent>
 														{wardsData?.filter(w => w.isActive).map(ward => (

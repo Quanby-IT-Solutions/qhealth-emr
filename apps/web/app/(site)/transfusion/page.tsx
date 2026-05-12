@@ -2,6 +2,8 @@
 
 import React, { useState } from "react"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { useVerifyMrnMutation } from "@/features/patients/api/patients.hooks"
+import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Button } from "@/core/components/ui/button"
 import { Input } from "@/core/components/ui/input"
@@ -31,7 +33,12 @@ function can(permSet: Set<string>, module: string, action: string) {
 
 export default function TransfusionPage() {
     const permSet = usePermissionSet()
+    const facilityId = useActiveFacilityId()
+    const verifyMrnMutation = useVerifyMrnMutation()
     const [modalOpen, setModalOpen] = useState(false)
+    const [mrnModalOpen, setMrnModalOpen] = useState(false)
+    const [mrnInput, setMrnInput] = useState("")
+    const [verifiedPatient, setVerifiedPatient] = useState<{ mrn: string; firstName: string; lastName: string } | null>(null)
     const [witness, setWitness] = useState("")
     const [bp, setBp] = useState("")
     const [hr, setHr] = useState("")
@@ -55,7 +62,48 @@ export default function TransfusionPage() {
         : `Awaiting all three scans — ${completedCount} of 3 completed.`
 
     const toggleScan = (key: keyof typeof scanned) => {
-        setScanned(prev => ({ ...prev, [key]: !prev[key] }))
+        if (key === "wristband") {
+            if (!scanned.wristband) {
+                setMrnModalOpen(true)
+            } else {
+                setScanned(prev => ({ ...prev, [key]: false }))
+                setVerifiedPatient(null)
+            }
+        } else {
+            setScanned(prev => ({ ...prev, [key]: !prev[key] }))
+        }
+    }
+
+    async function handleVerifyMrn() {
+        if (!mrnInput.trim()) {
+            toast.error("Please enter an MRN")
+            return
+        }
+        
+        if (!facilityId) {
+            toast.error("Facility not found. Please ensure you have an active facility.")
+            return
+        }
+
+        verifyMrnMutation.mutate(
+            { facilityId, mrn: mrnInput.trim() },
+            {
+                onSuccess: (data) => {
+                    setVerifiedPatient({
+                        mrn: data.mrn,
+                        firstName: data.firstName,
+                        lastName: data.lastName,
+                    })
+                    setScanned(prev => ({ ...prev, wristband: true }))
+                    setMrnModalOpen(false)
+                    setMrnInput("")
+                    toast.success("MRN verified successfully")
+                },
+                onError: () => {
+                    toast.error("Cannot find the MRN of the patient.")
+                },
+            }
+        )
     }
 
     function handleStartTransfusion() {
@@ -146,7 +194,11 @@ export default function TransfusionPage() {
                                         {scanned.wristband ? "Scanned successfully" : "Tap to scan barcode on patient ID band"}
                                     </div>
                                 </div>
-                                {!scanned.wristband && (
+                                {scanned.wristband && verifiedPatient ? (
+                                    <div className="text-sm font-mono text-muted-foreground">
+                                        MRN: {verifiedPatient.mrn}
+                                    </div>
+                                ) : (
                                     <div className="text-xs text-muted-foreground/50 font-mono tracking-wide uppercase">
                                         Upload
                                     </div>
@@ -296,6 +348,40 @@ export default function TransfusionPage() {
                 </div>
             </div>
 
+            {/* MRN Verification Modal */}
+            <Dialog open={mrnModalOpen} onOpenChange={setMrnModalOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Verify Patient MRN</DialogTitle>
+                        <DialogDescription>
+                            Enter the patient's Medical Record Number to verify identity.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div>
+                            <Label htmlFor="mrn" className="text-sm">Medical Record Number (MRN)</Label>
+                            <Input
+                                id="mrn"
+                                placeholder="Enter MRN"
+                                value={mrnInput}
+                                onChange={(e) => setMrnInput(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleVerifyMrn()}
+                                className="mt-2"
+                                autoFocus
+                                disabled={verifyMrnMutation.isPending}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
+                        <Button onClick={handleVerifyMrn} disabled={verifyMrnMutation.isPending}>
+                            {verifyMrnMutation.isPending ? "Verifying..." : "Verify"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Start Transfusion Modal */}
             <Dialog open={modalOpen} onOpenChange={setModalOpen}>
                 <DialogContent className="max-w-lg p-0 gap-0 max-h-[85vh] flex flex-col overflow-hidden">
                     <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">

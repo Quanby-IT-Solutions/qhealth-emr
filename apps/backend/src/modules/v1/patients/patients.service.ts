@@ -21,6 +21,7 @@ type CreatePatientInput = V1Inputs["patient"]["create"]
 type UpdatePatientInput = V1Inputs["patient"]["update"]
 type RegisterPatientWithOpdEncounterInput = V1Inputs["patient"]["registerWithOpdEncounter"]
 type ListCliniciansInput = V1Inputs["patient"]["listClinicians"]
+type VerifyMrnInput = V1Inputs["patient"]["verifyMrn"]
 
 @Injectable()
 export class PatientsService {
@@ -636,5 +637,38 @@ export class PatientsService {
 
 		const sequence = (result?.count ?? 0) + 1
 		return `${prefix}${sequence.toString().padStart(4, "0")}`
+	}
+
+	// ========================================================================
+	// Verify MRN
+	// ========================================================================
+
+	async verifyMrn(input: VerifyMrnInput) {
+		const [patient] = await db
+			.select({
+				id: patients.id,
+				mrn: patients.mrn,
+				firstName: patients.firstName,
+				lastName: patients.lastName,
+				middleName: patients.middleName,
+				dateOfBirth: patients.dateOfBirth,
+				sex: patients.sex,
+			})
+			.from(patients)
+			.where(and(eq(patients.facilityId, input.facilityId), eq(patients.mrn, input.mrn)))
+
+		if (!patient) {
+			throw new NotFoundException("Cannot find the MRN of the patient.")
+		}
+
+		return {
+			patientId: patient.id,
+			mrn: patient.mrn,
+			firstName: patient.firstName,
+			lastName: patient.lastName,
+			middleName: patient.middleName,
+			dateOfBirth: this.formatDateOnly(patient.dateOfBirth),
+			sex: patient.sex,
+		}
 	}
 }

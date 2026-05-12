@@ -12,6 +12,8 @@ import {
 	RegisterPatientWithOpdEncounterInputSchema,
 	RegisterPatientWithOpdEncounterResponseSchema,
 	UpdatePatientSchema,
+	VerifyMrnInputSchema,
+	VerifyMrnResponseSchema,
 } from "./patients.schema.js"
 
 export const patientContract = {
@@ -78,4 +80,14 @@ export const patientContract = {
 		})
 		.input(RegisterPatientWithOpdEncounterInputSchema)
 		.output(RegisterPatientWithOpdEncounterResponseSchema),
+
+	verifyMrn: oc
+		.route({
+			method: "GET",
+			path: "/verify-mrn",
+			summary: "Verify patient MRN and return basic patient information",
+			tags: ["Patients"],
+		})
+		.input(VerifyMrnInputSchema)
+		.output(VerifyMrnResponseSchema),
 }
