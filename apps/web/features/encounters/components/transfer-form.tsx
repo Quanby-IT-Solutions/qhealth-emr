@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 
+import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Label } from "@/core/components/ui/label"
@@ -9,27 +10,50 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/core/components/ui/textarea"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useBedListQuery } from "@/features/beds/api/beds.hooks"
-import { useTransferEncounterMutation } from "@/features/encounters/api/encounters.hooks"
+import { useInitiateTransferMutation } from "@/features/encounters/api/encounters.hooks"
 
 interface TransferFormProps {
 	encounterId: string
+	hasPendingTransfer?: boolean
 }
 
-export function TransferForm({ encounterId }: TransferFormProps) {
+export function TransferForm({ encounterId, hasPendingTransfer }: TransferFormProps) {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 	const staffId = profile?.staffProfiles?.[0]?.id ?? ""
 
 	const { data: bedData } = useBedListQuery({ facilityId })
-	const transfer = useTransferEncounterMutation()
+	const transfer = useInitiateTransferMutation()
 
 	const [wardId, setWardId] = useState("")
 	const [bedId, setBedId] = useState("")
 	const [reason, setReason] = useState("")
+	const [initiated, setInitiated] = useState(false)
 
 	const wards = bedData?.wards ?? []
 	const selectedWard = wards.find(w => w.id === wardId)
 	const availableBeds = selectedWard?.beds.filter(b => b.status === "available") ?? []
+
+	if (hasPendingTransfer) {
+		return (
+			<Alert>
+				<AlertDescription>
+					A transfer is already in progress for this patient. Awaiting Ward Nurse confirmation.
+				</AlertDescription>
+			</Alert>
+		)
+	}
+
+	if (initiated) {
+		return (
+			<Alert>
+				<AlertDescription>
+					Transfer initiated. Source bed is now Pending Transfer. Ward Nurse at the destination has
+					been notified.
+				</AlertDescription>
+			</Alert>
+		)
+	}
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
@@ -43,16 +67,14 @@ export function TransferForm({ encounterId }: TransferFormProps) {
 			orderingStaffId: staffId,
 		})
 
-		setWardId("")
-		setBedId("")
-		setReason("")
+		setInitiated(true)
 	}
 
 	return (
 		<form onSubmit={handleSubmit}>
 			<Card>
 				<CardHeader>
-					<CardTitle>Transfer Patient</CardTitle>
+					<CardTitle>Initiate Transfer</CardTitle>
 				</CardHeader>
 				<CardContent className="grid gap-4 sm:grid-cols-2">
 					<div className="space-y-1.5">
@@ -104,7 +126,7 @@ export function TransferForm({ encounterId }: TransferFormProps) {
 
 					<div className="sm:col-span-2">
 						<Button type="submit" disabled={!wardId || !bedId || transfer.isPending}>
-							{transfer.isPending ? "Transferring…" : "Confirm Transfer"}
+							{transfer.isPending ? "Initiating…" : "Initiate Transfer"}
 						</Button>
 					</div>
 				</CardContent>

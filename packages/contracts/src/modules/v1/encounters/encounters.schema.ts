@@ -103,6 +103,8 @@ export const EncounterTransferSchema = z.object({
 	transferReason: z.string().nullable(),
 	orderingStaffId: z.string().uuid().nullable(),
 	transferredAt: dateOrString,
+	status: z.enum(["pending", "completed"]),
+	receivedAt: dateOrString.nullable(),
 	fromWardName: z.string().nullable(),
 	fromBedNumber: z.string().nullable(),
 	toWardName: z.string().nullable(),
@@ -199,9 +201,10 @@ export type CreateEncounterInput = z.infer<typeof CreateEncounterSchema>
 // ============================================================================
 
 export const EncounterListSchema = PaginationInputSchema.extend({
-	patientId: z.string().uuid(),
+	patientId: z.string().uuid().optional(),
 	facilityId: z.string().uuid(),
 	status: EncounterStatusEnum.optional(),
+	encounterType: EncounterTypeEnum.optional(),
 })
 
 export const EncounterListItemSchema = z.object({
@@ -311,3 +314,39 @@ export const LinkedEncounterListSchema = z.object({
 	sourceEncounterId: z.string().uuid(),
 	linkedEncounters: z.array(LinkedEncounterItemSchema),
 })
+
+// ============================================================================
+// Receive Transfer (Ward Nurse confirms patient arrival)
+// ============================================================================
+
+export const ReceiveTransferSchema = z.object({
+	transferId: z.string().uuid(),
+	receivingStaffId: z.string().uuid(),
+})
+
+export type ReceiveTransferInput = z.infer<typeof ReceiveTransferSchema>
+
+// ============================================================================
+// List Pending Transfers (Ward Nurse view)
+// ============================================================================
+
+export const ListPendingTransfersSchema = z.object({
+	facilityId: z.string().uuid(),
+	toWardId: z.string().uuid().optional(),
+})
+
+export const PendingTransferItemSchema = z.object({
+	transferId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	patientName: z.string(),
+	patientMrn: z.string(),
+	fromWardName: z.string().nullable(),
+	fromBedNumber: z.string().nullable(),
+	toWardName: z.string().nullable(),
+	toBedNumber: z.string().nullable(),
+	transferReason: z.string().nullable(),
+	orderingStaffName: z.string().nullable(),
+	transferredAt: dateOrString,
+})
+
+export const PendingTransferListResponseSchema = z.array(PendingTransferItemSchema)

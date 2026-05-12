@@ -16,8 +16,9 @@ function shouldRetryDetailQuery(error: unknown, failureCount: number) {
 export function useEncounterListQuery(
 	params: {
 		facilityId: string
-		patientId: string
+		patientId?: string
 		status?: "active" | "pending_discharge" | "discharged" | "closed" | "cancelled"
+		encounterType?: "inpatient" | "outpatient" | "emergency" | "telemedicine"
 		page?: number
 		limit?: number
 	},
@@ -51,11 +52,36 @@ export function useCreateEncounterMutation() {
 	)
 }
 
-export function useTransferEncounterMutation() {
+export function useInitiateTransferMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
-		orpc.encounter.transfer.mutationOptions({
+		orpc.encounter.initiateTransfer.mutationOptions({
 			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.encounter.key() }),
+		})
+	)
+}
+
+export function useReceiveTransferMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.encounter.receiveTransfer.mutationOptions({
+			onSuccess: () => {
+				void queryClient.invalidateQueries({ queryKey: orpc.encounter.key() })
+				void queryClient.invalidateQueries({ queryKey: orpc.bed.key() })
+			},
+		})
+	)
+}
+
+export function usePendingTransfersQuery(
+	params: { facilityId: string; toWardId?: string },
+	options?: { enabled?: boolean }
+) {
+	return useQuery(
+		orpc.encounter.listPendingTransfers.queryOptions({
+			input: params,
+			enabled: (options?.enabled ?? true) && !!params.facilityId,
+			staleTime: 30_000,
 		})
 	)
 }
