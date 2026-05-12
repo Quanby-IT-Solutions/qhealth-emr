@@ -620,15 +620,6 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		isSecondary: true,
 	},
 	{
-		title: "Nutrition",
-		href: "/nutrition",
-		iconName: "nutrition",
-		// nutrition:view is the dedicated module permission (seeded for Clinical Dietitian)
-		// Nurses access dietary information via clinical notes, not the Nutrition module
-		requiredPermissions: [{ module: "nutrition", action: "view" }],
-		isSecondary: true,
-	},
-	{
 		title: "Blood Bank",
 		href: "/blood-bank",
 		iconName: "blood-bank",
