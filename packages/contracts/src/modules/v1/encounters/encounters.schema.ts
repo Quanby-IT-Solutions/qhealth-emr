@@ -214,6 +214,7 @@ export const EncounterListItemSchema = z.object({
 	chiefComplaint: z.string().nullable(),
 	admissionDatetime: dateOrString,
 	dischargeDatetime: dateOrString.nullable(),
+	patientName: z.string().nullable(),
 	attendingStaffName: z.string().nullable(),
 	wardName: z.string().nullable(),
 	bedNumber: z.string().nullable(),

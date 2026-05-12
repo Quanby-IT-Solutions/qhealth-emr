@@ -201,11 +201,14 @@ export class EncountersService {
 					wardName: wards.name,
 					bedNumber: beds.bedNumber,
 					queueNumber: encounters.queueNumber,
+					patientFirstName: patients.firstName,
+					patientLastName: patients.lastName,
 				})
 				.from(encounters)
 				.leftJoin(attendingStaff, eq(encounters.attendingStaffId, attendingStaff.id))
 				.leftJoin(beds, eq(encounters.bedId, beds.id))
 				.leftJoin(wards, eq(beds.wardId, wards.id))
+				.leftJoin(patients, eq(encounters.patientId, patients.id))
 				.where(whereClause)
 				.orderBy(desc(encounters.admissionDatetime))
 				.limit(limit)
@@ -218,6 +221,9 @@ export class EncountersService {
 		return {
 			data: data.map(row => ({
 				...row,
+				patientName: row.patientFirstName && row.patientLastName
+					? `${row.patientLastName}, ${row.patientFirstName}`
+					: null,
 				attendingStaffName: row.attendingStaffName ?? null,
 				wardName: row.wardName ?? null,
 				bedNumber: row.bedNumber ?? null,

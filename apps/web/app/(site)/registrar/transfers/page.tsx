@@ -51,6 +51,7 @@ export default function RegistrarTransfersPage() {
 		? encounters.filter(e => {
 				const q = search.toLowerCase()
 				return (
+					(e.patientName ?? "").toLowerCase().includes(q) ||
 					(e.wardName ?? "").toLowerCase().includes(q) ||
 					(e.bedNumber ?? "").toLowerCase().includes(q) ||
 					(e.attendingStaffName ?? "").toLowerCase().includes(q)
@@ -83,7 +84,7 @@ export default function RegistrarTransfersPage() {
 					<CardHeader>
 						<CardTitle>Active Inpatients</CardTitle>
 						<Input
-							placeholder="Filter by ward, bed, or physician…"
+							placeholder="Filter by patient, ward, bed, or physician…"
 							value={search}
 							onChange={e => setSearch(e.target.value)}
 							className="mt-2"
@@ -93,6 +94,7 @@ export default function RegistrarTransfersPage() {
 						<Table>
 							<TableHeader>
 								<TableRow>
+									<TableHead>Patient</TableHead>
 									<TableHead>Ward / Bed</TableHead>
 									<TableHead>Attending</TableHead>
 									<TableHead>Admitted</TableHead>
@@ -103,14 +105,14 @@ export default function RegistrarTransfersPage() {
 								{isLoading ? (
 									Array.from({ length: 5 }).map((_, i) => (
 										<TableRow key={i}>
-											<TableCell colSpan={4}>
+											<TableCell colSpan={5}>
 												<Skeleton className="h-5 w-full" />
 											</TableCell>
 										</TableRow>
 									))
 								) : filtered.length === 0 ? (
 									<TableRow>
-										<TableCell colSpan={4} className="text-muted-foreground py-8 text-center">
+										<TableCell colSpan={5} className="text-muted-foreground py-8 text-center">
 											No active inpatients found.
 										</TableCell>
 									</TableRow>
@@ -120,8 +122,11 @@ export default function RegistrarTransfersPage() {
 											key={enc.id}
 											className={selectedEncounterId === enc.id ? "bg-muted" : undefined}
 										>
+											<TableCell className="font-medium">
+												{enc.patientName ?? "-"}
+											</TableCell>
 											<TableCell>
-												<div className="font-medium">{enc.wardName ?? "-"}</div>
+												<div className="text-sm">{enc.wardName ?? "-"}</div>
 												{enc.bedNumber ? (
 													<Badge variant="outline" className="mt-0.5 text-xs">
 														Bed {enc.bedNumber}
@@ -140,7 +145,7 @@ export default function RegistrarTransfersPage() {
 													variant={selectedEncounterId === enc.id ? "default" : "outline"}
 													onClick={() => {
 														setSelectedEncounterId(enc.id)
-														setSelectedPatientName(`Encounter ${enc.id.slice(0, 8)}`)
+														setSelectedPatientName(enc.patientName ?? `Encounter ${enc.id.slice(0, 8)}`)
 													}}
 												>
 													Select
