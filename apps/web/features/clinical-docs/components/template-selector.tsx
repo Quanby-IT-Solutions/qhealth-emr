@@ -4,7 +4,13 @@ import { AlertCircle, CheckCircle2, FileText } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/core/components/ui/card"
 import { Label } from "@/core/components/ui/label"
 import {
 	Select,
@@ -22,12 +28,21 @@ const TEMPLATE_REQUIRED_TYPES = new Set(["admission", "discharge_summary", "fpe"
 export const NOTE_TYPE_LABELS: Record<string, string> = {
 	admission: "Admission Note (H&P)",
 	progress: "Progress Note",
-	consultation: "Consultation (SOAP)",
+	consultation: "SOAP / Consultation",
 	discharge_summary: "Discharge Summary",
 	fpe: "FPE / Konsulta",
+	operative: "Post-Operative Note",
+	anesthesia: "Anesthesia Note",
 }
 
-export type NoteTypeValue = "admission" | "progress" | "consultation" | "discharge_summary" | "fpe"
+export type NoteTypeValue =
+	| "admission"
+	| "progress"
+	| "consultation"
+	| "discharge_summary"
+	| "fpe"
+	| "operative"
+	| "anesthesia"
 
 interface TemplateSection {
 	key: string
@@ -73,8 +88,9 @@ export function TemplateSelector({
 	const isRequired = noteType ? TEMPLATE_REQUIRED_TYPES.has(noteType) : false
 	const selectedTemplate = templates.find(t => t.id === templateId) ?? null
 
-	function handleNoteTypeChange(val: string) {
-		onNoteTypeChange(val as NoteTypeValue)
+	function handleNoteTypeChange(val: NoteTypeValue | "" | null) {
+		if (!val) return
+		onNoteTypeChange(val)
 		// Clear template when type changes
 		onTemplateChange("", null)
 	}
@@ -159,20 +175,18 @@ export function TemplateSelector({
 								{templates.map(tpl => (
 									<Card
 										key={tpl.id}
-										className={`cursor-pointer transition-colors hover:border-primary ${
-											templateId === tpl.id
-												? "border-primary bg-primary/5"
-												: ""
+										className={`hover:border-primary cursor-pointer transition-colors ${
+											templateId === tpl.id ? "border-primary bg-primary/5" : ""
 										}`}
 										onClick={() => handleTemplateChange(tpl.id)}
 									>
-										<CardHeader className="pb-1 pt-3">
+										<CardHeader className="pt-3 pb-1">
 											<CardTitle className="flex items-center justify-between text-sm">
 												<span className="flex items-center gap-2">
 													{templateId === tpl.id ? (
-														<CheckCircle2 className="size-4 text-primary" />
+														<CheckCircle2 className="text-primary size-4" />
 													) : (
-														<FileText className="size-4 text-muted-foreground" />
+														<FileText className="text-muted-foreground size-4" />
 													)}
 													{tpl.name}
 												</span>

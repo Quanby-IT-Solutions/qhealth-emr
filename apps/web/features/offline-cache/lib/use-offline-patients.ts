@@ -6,9 +6,9 @@ import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
 
 import {
-	type OfflinePatientSummary,
 	loadPatientSummaries,
 	savePatientSummaries,
+	type OfflinePatientSummary,
 } from "./offline-cache"
 import { useOfflineSync } from "./use-offline-sync"
 
@@ -37,7 +37,7 @@ export function useOfflinePatients(): UseOfflinePatientsResult {
 
 	// Load live patients when online so we can keep the cache fresh
 	const { data: searchResult } = usePatientSearchQuery(
-		{ facilityId: facilityId ?? "", isActive: true, limit: 500 },
+		{ facilityId: facilityId ?? "", isActive: true, limit: 100 },
 		{ enabled: isOnline && !!facilityId }
 	)
 
@@ -51,6 +51,7 @@ export function useOfflinePatients(): UseOfflinePatientsResult {
 			id: p.id,
 			mrn: p.mrn,
 			firstName: p.firstName,
+			middleName: p.middleName,
 			lastName: p.lastName,
 			dateOfBirth: p.dateOfBirth,
 			sex: p.sex,

@@ -1,11 +1,11 @@
 import { createEnv } from "@t3-oss/env-core"
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
-import { openAPI } from "better-auth/plugins"
+import { openAPI, twoFactor } from "better-auth/plugins"
 import { z } from "zod"
 
 import { createDBClient } from "@repo/db/client"
-import { accounts, sessions, users, verifications } from "@repo/db/schema"
+import { accounts, sessions, twoFactors, users, verifications } from "@repo/db/schema"
 
 /**
  * Type-safe environment variable validation for Auth package
@@ -57,6 +57,7 @@ export function createAuth(): ReturnType<typeof betterAuth> {
 				sessions,
 				accounts,
 				verifications,
+				twoFactors,
 			},
 			usePlural: true,
 		}),
@@ -74,6 +75,16 @@ export function createAuth(): ReturnType<typeof betterAuth> {
 			},
 		},
 		trustedOrigins: authEnv.BETTER_AUTH_TRUSTED_ORIGINS?.split(",") ?? [],
+		rateLimit: {
+			enabled: true,
+			window: 3600,
+			max: 200,
+			customRules: {
+				"/sign-in/email": { window: 900, max: 10 },
+				"/reset-password": { window: 3600, max: 3 },
+				"/forget-password": { window: 3600, max: 3 },
+			},
+		},
 		advanced: {
 			...(authEnv.BETTER_AUTH_COOKIE_DOMAIN && {
 				crossSubDomainCookies: {
@@ -85,6 +96,15 @@ export function createAuth(): ReturnType<typeof betterAuth> {
 		plugins: [
 			openAPI({
 				path: "/reference",
+			}),
+			twoFactor({
+				// TOTP issuer shown in authenticator apps
+				issuer: "QHealth EMR",
+				// Backup codes provide recovery when TOTP device is lost
+				backupCodes: {
+					enabled: true,
+					amount: 10,
+				},
 			}),
 		],
 	})

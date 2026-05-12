@@ -25,7 +25,13 @@ const PaginatedResponseSchema = z.object({
 // ============================================================================
 
 export const WardTypeEnum = z.enum(["general", "icu", "er", "or", "nursery"])
-export const BedStatusEnum = z.enum(["available", "occupied", "reserved", "cleaning", "out_of_service"])
+export const BedStatusEnum = z.enum([
+	"available",
+	"occupied",
+	"reserved",
+	"cleaning",
+	"out_of_service",
+])
 
 // ============================================================================
 // Ward Schema
@@ -90,6 +96,10 @@ export const WardWithBedsSchema = WardSchema.extend({
 
 export const WardListSchema = z.object({
 	facilityId: z.string().uuid(),
+})
+
+export const DeleteWardSchema = z.object({
+	wardId: z.string().uuid(),
 })
 
 // ============================================================================
@@ -208,6 +218,62 @@ export const SuggestedBedSchema = z.object({
 export const BedSuggestionResponseSchema = z.object({
 	suggestedBeds: z.array(SuggestedBedSchema),
 	totalAvailable: z.number(),
+})
+
+// ============================================================================
+// BOR Trend
+// ============================================================================
+
+export const BorTrendQuerySchema = z.object({
+	facilityId: z.string(),
+	wardId: z.string().optional(),
+	period: z.enum(["7d", "30d", "90d", "1y"]).default("30d"),
+})
+
+export const BorTrendPointSchema = z.object({
+	date: z.string(),
+	borPercentage: z.number(),
+	midnightCensus: z.number(),
+	availableBeds: z.number(),
+})
+
+export const BorTrendResponseSchema = z.object({
+	facilityId: z.string(),
+	period: z.string(),
+	points: z.array(BorTrendPointSchema),
+})
+
+// ============================================================================
+// AHSR Export
+// ============================================================================
+
+export const AhsrExportQuerySchema = z.object({
+	facilityId: z.string(),
+	startDate: z.string(), // YYYY-MM-DD
+	endDate: z.string(),
+	wardId: z.string().optional(),
+	format: z.enum(["json", "csv"]).default("json"),
+})
+
+export const AhsrRowSchema = z.object({
+	censusDate: z.string(),
+	midnightCensus: z.number(),
+	admissions: z.number(),
+	discharges: z.number(),
+	availableBeds: z.number(),
+	deathsWithin48h: z.number(),
+	deathsAfter48h: z.number(),
+	grossDeathRate: z.number(),
+	netDeathRate: z.number(),
+	borPercentage: z.number(),
+})
+
+export const AhsrExportResponseSchema = z.object({
+	facilityId: z.string(),
+	startDate: z.string(),
+	endDate: z.string(),
+	rows: z.array(AhsrRowSchema),
+	csvContent: z.string().optional(),
 })
 
 // ============================================================================

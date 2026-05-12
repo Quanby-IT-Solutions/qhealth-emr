@@ -1,11 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { Calendar, ClipboardList, Pill, Video } from "lucide-react"
+import { Calendar, ClipboardList, FileText, Pill, Video } from "lucide-react"
 
 import { Card, CardContent } from "@/core/components/ui/card"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { useAppointmentQuery } from "@/features/telemedicine/api/telemedicine.hooks"
 import { EPrescriptionCard } from "@/features/telemedicine/components/e-prescription-card"
+import { TeleAbstractPage } from "@/features/telemedicine/components/tele-abstract-page"
 import { TelemedicineEncounterForm } from "@/features/telemedicine/components/telemedicine-encounter-form"
 import { VideoCallPanel } from "@/features/telemedicine/components/video-call-panel"
 import { VirtualVisitScheduler } from "@/features/telemedicine/components/virtual-visit-scheduler"
@@ -14,7 +16,7 @@ import { VirtualVisitScheduler } from "@/features/telemedicine/components/virtua
 // Types
 // ============================================================================
 
-type ActiveTab = "scheduler" | "encounter" | "video" | "prescription"
+type ActiveTab = "scheduler" | "encounter" | "video" | "abstract" | "prescription"
 
 interface TabConfig {
 	id: ActiveTab
@@ -47,23 +49,18 @@ const TABS: TabConfig[] = [
 		description: "Join or share video call link with patient",
 	},
 	{
+		id: "abstract",
+		label: "Abstract",
+		icon: FileText,
+		description: "Generate and sign encounter abstract for patient",
+	},
+	{
 		id: "prescription",
 		label: "E-Prescription",
 		icon: Pill,
 		description: "Generate and share e-prescription",
 	},
 ]
-
-// Placeholder profile data used for prescription generation
-const DEMO_CLINICIAN = {
-	name: "Dr. Maria Santos",
-	prcNumber: "0123456",
-}
-
-const DEMO_FACILITY = {
-	name: "QHealth Medical Center",
-	address: "123 Healthcare Ave., Manila, Philippines",
-}
 
 // ============================================================================
 // Main Dashboard
@@ -75,15 +72,21 @@ export function TelemedicineDashboard() {
 	const [activeEncounterId, setActiveEncounterId] = useState<string | null>(null)
 
 	const { data: profile } = useMyProfile()
-	const facilityId = profile?.staffProfiles[0]?.facilityId ?? ""
+	const { data: appointment } = useAppointmentQuery(selectedAppointmentId ?? "")
 
-	// Demo patient info for prescription (in real app, would come from selected appointment)
-	const demoPatient = {
-		name: "Sample Patient",
-		mrn: "MRN-00001",
-		age: 35,
-		sex: "Male",
-	}
+	const staffProfile =
+		profile?.staffProfiles?.find(sp => sp.facilityId === (appointment?.facilityId ?? "")) ??
+		profile?.staffProfiles?.[0]
+
+	const facilityId = staffProfile?.facilityId ?? ""
+	const clinicianName = profile?.user?.name ?? ""
+	const clinicianPrcNumber = staffProfile?.prcLicenseNumber ?? ""
+	const clinicianPrcExpiry = staffProfile?.prcExpiry
+	const clinicianPtrExpiry = staffProfile?.ptrExpiry
+	const facilityName = staffProfile?.facility?.name ?? ""
+
+	const patientName = appointment?.patientName ?? ""
+	const patientMrn = appointment?.patientMrn ?? ""
 
 	function handleAppointmentCreated(appointmentId: string) {
 		setSelectedAppointmentId(appointmentId)
@@ -93,7 +96,12 @@ export function TelemedicineDashboard() {
 
 	function handleEncounterCreated(encounterId: string) {
 		setActiveEncounterId(encounterId)
-		// Auto-advance to prescription tab
+		// Auto-advance to abstract tab
+		setActiveTab("abstract")
+	}
+
+	function handleAbstractSigned() {
+		// Auto-advance to prescription tab after signing abstract
 		setActiveTab("prescription")
 	}
 
@@ -108,7 +116,7 @@ export function TelemedicineDashboard() {
 			</div>
 
 			{/* Tab Navigation */}
-			<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+			<div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
 				{TABS.map(({ id, label, icon: Icon, description }) => (
 					<button
 						key={id}
@@ -152,8 +160,8 @@ export function TelemedicineDashboard() {
 					{selectedAppointmentId ? (
 						<TelemedicineEncounterForm
 							appointmentId={selectedAppointmentId}
-							patientName={demoPatient.name}
-							clinicianName={DEMO_CLINICIAN.name}
+							patientName={patientName}
+							clinicianName={clinicianName}
 							onEncounterCreated={handleEncounterCreated}
 						/>
 					) : (
@@ -180,19 +188,45 @@ export function TelemedicineDashboard() {
 				<VideoCallPanel appointmentId={selectedAppointmentId ?? undefined} />
 			)}
 
+			{activeTab === "abstract" && (
+				<>
+					{activeEncounterId ? (
+						<TeleAbstractPage
+							encounterId={activeEncounterId}
+							onAbstractSigned={handleAbstractSigned}
+						/>
+					) : (
+						<Card>
+							<CardContent className="py-10 text-center">
+								<FileText className="text-muted-foreground mx-auto mb-3 size-10" />
+								<p className="text-muted-foreground text-sm">
+									Please complete a clinical encounter first to generate an abstract.
+								</p>
+								<button
+									type="button"
+									onClick={() => setActiveTab("encounter")}
+									className="text-primary mt-2 text-sm underline underline-offset-2"
+								>
+									Go to Clinical Note
+								</button>
+							</CardContent>
+						</Card>
+					)}
+				</>
+			)}
+
 			{activeTab === "prescription" && (
 				<>
 					{activeEncounterId ? (
 						<EPrescriptionCard
 							encounterId={activeEncounterId}
-							patientName={demoPatient.name}
-							patientMrn={demoPatient.mrn}
-							patientAge={demoPatient.age}
-							patientSex={demoPatient.sex}
-							clinicianName={DEMO_CLINICIAN.name}
-							clinicianPrcNumber={DEMO_CLINICIAN.prcNumber}
-							facilityName={DEMO_FACILITY.name}
-							facilityAddress={DEMO_FACILITY.address}
+							patientName={patientName}
+							patientMrn={patientMrn}
+							clinicianName={clinicianName}
+							clinicianPrcNumber={clinicianPrcNumber}
+							clinicianPrcExpiry={clinicianPrcExpiry}
+							clinicianPtrExpiry={clinicianPtrExpiry}
+							facilityName={facilityName}
 						/>
 					) : (
 						<Card>

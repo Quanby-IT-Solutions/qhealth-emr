@@ -1,6 +1,37 @@
 import { Injectable, Logger } from "@nestjs/common"
-import { and, count, countDistinct, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm"
+import {
+	and,
+	count,
+	countDistinct,
+	desc,
+	eq,
+	gt,
+	gte,
+	inArray,
+	isNotNull,
+	isNull,
+	lt,
+	or,
+	sql,
+} from "drizzle-orm"
 
+import type {
+	AccessGovernanceSection,
+	AdminDashboardAlert,
+	AdminDashboardSummary,
+	AdminSummaryCard,
+	ArtaSlaSection,
+	AuditSummarySection,
+	CivilRegistryOpsSection,
+	ExportComplianceList,
+	ExportComplianceQuery,
+	HimOpsSection,
+	IntegrationHealthSection,
+	MedicationComplianceSection,
+	OfflineReadinessSection,
+	PlatformControlSection,
+	RecentChange,
+} from "@repo/contracts"
 import {
 	ahsrSnapshots,
 	auditLogs,
@@ -10,8 +41,8 @@ import {
 	clinicalNotes,
 	dataExports,
 	deathReports,
-	encounterStatusEvents,
 	encounters,
+	encounterStatusEvents,
 	facilityProfiles,
 	featureFlags,
 	featureFlagTargets,
@@ -35,29 +66,9 @@ import {
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
+
 import { ReportingService } from "../reporting/reporting.service"
 import { SlaService } from "../sla/sla.service"
-
-import type {
-	AdminDashboardAlert,
-	AdminDashboardSummary,
-	AdminSummaryCard,
-	ArtaSlaSection,
-	AccessGovernanceSection,
-	AuditSummarySection,
-	CivilRegistryOpsSection,
-	DataQualitySection,
-	ExportComplianceList,
-	ExportComplianceQuery,
-	HimOpsSection,
-	IntegrationHealthSection,
-	MedicationComplianceSection,
-	OfflineReadinessSection,
-	PlatformControlSection,
-	RecentChange,
-	StatutoryOpsSection,
-	StatutoryReadinessSection,
-} from "@repo/contracts"
 
 function isMissingDatabaseObjectError(error: unknown): boolean {
 	if (!error || typeof error !== "object") return false
@@ -90,76 +101,28 @@ const EMPTY_OFFLINE_READINESS: OfflineReadinessSection = {
 	lastFailureMessage: null,
 }
 
-const EMPTY_STATUTORY_READINESS: StatutoryReadinessSection = {
-	fhirNhdr: { name: "FHIR / NHDR", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
-	philhealth: { name: "PhilHealth / CF4", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
-	hai: { name: "HAI Reporting", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
-	pidsr: { name: "PIDSR", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
-	civilRegistry: { name: "Civil Registry", status: "not_configured", detail: "Data unavailable", link: "/admin/integration-registry" },
-}
-
-const EMPTY_STATUTORY_OPS: StatutoryOpsSection = {
-	pidsr: {
-		category1Count: 0,
-		category2Count: 0,
-		draftCount: 0,
-		submittedCount: 0,
-		rejectedCount: 0,
-		blockedCount: 0,
-		lastSubmittedAt: null,
-		blockedOrRejected: false,
-	},
-	hai: {
-		openSurveillanceCount: 0,
-		reviewedCount: 0,
-		pendingCount: 0,
-		byType: [],
-	},
-	ahsr: {
-		snapshotCount: 0,
-		lastSnapshotMonth: null,
-		currentMonthReady: false,
-		currentYearBor: null,
-		currentYearGrossDeathRate: null,
-		currentYearNetDeathRate: null,
-		topMorbidities: [],
-		topMortalities: [],
-	},
-}
-
-const EMPTY_DATA_QUALITY: DataQualitySection = {
-	cf4DraftCount: 0,
-	cf4SubmittedThisMonth: 0,
-	missingIcd10Count: 0,
-	missingRvsCount: 0,
-	ahsrLastSnapshotMonth: null,
-	ahsrCurrentMonthReady: false,
-	cf4WithExtractedData: 0,
-	cf4MissingExtractedData: 0,
-	cf4ExtractionCompletePct: 100,
-	cf4SectionCompleteness: [],
-}
-
 @Injectable()
 export class AdminDashboardService {
 	private readonly logger = new Logger(AdminDashboardService.name)
 
 	constructor(
 		private readonly slaService: SlaService,
-		private readonly reportingService: ReportingService,
+		private readonly reportingService: ReportingService
 	) {}
 
 	private async withMissingSchemaFallback<T>(
 		sectionName: string,
 		facilityId: string,
 		action: () => Promise<T>,
-		fallback: T,
+		fallback: T
 	): Promise<T> {
 		try {
 			return await action()
 		} catch (error) {
 			if (isMissingDatabaseObjectError(error)) {
-				this.logger.warn(`${sectionName} data unavailable for facility ${facilityId}: database schema is behind the current code`)
+				this.logger.warn(
+					`${sectionName} data unavailable for facility ${facilityId}: database schema is behind the current code`
+				)
 				return fallback
 			}
 
@@ -178,12 +141,19 @@ export class AdminDashboardService {
 			this.getAuditSummary(facilityId),
 		])
 
-		const [artaSla, offlineReadiness, statutoryReadiness, statutoryOps, dataQuality] = await Promise.all([
-			this.withMissingSchemaFallback("ARTA/SLA", facilityId, () => this.getArtaSla(facilityId), EMPTY_ARTA_SLA),
-			this.withMissingSchemaFallback("offline readiness", facilityId, () => this.getOfflineReadiness(facilityId), EMPTY_OFFLINE_READINESS),
-			this.withMissingSchemaFallback("statutory readiness", facilityId, () => this.getStatutoryReadiness(facilityId), EMPTY_STATUTORY_READINESS),
-			this.withMissingSchemaFallback("statutory operations", facilityId, () => this.getStatutoryOps(facilityId), EMPTY_STATUTORY_OPS),
-			this.withMissingSchemaFallback("data quality", facilityId, () => this.getDataQuality(facilityId), EMPTY_DATA_QUALITY),
+		const [artaSla, offlineReadiness] = await Promise.all([
+			this.withMissingSchemaFallback(
+				"ARTA/SLA",
+				facilityId,
+				() => this.getArtaSla(facilityId),
+				EMPTY_ARTA_SLA
+			),
+			this.withMissingSchemaFallback(
+				"offline readiness",
+				facilityId,
+				() => this.getOfflineReadiness(facilityId),
+				EMPTY_OFFLINE_READINESS
+			),
 		])
 
 		// Strip FHIR-specific telemetry when the caller lacks fhir:view — TOR §4.2 least-privilege
@@ -191,8 +161,20 @@ export class AdminDashboardService {
 			? integrationHealth
 			: { ...integrationHealth, fhirFailures: 0 }
 
-		const alerts = this.buildAlerts(governance, platform, effectiveIntegrationHealth, audit, artaSla, offlineReadiness, statutoryOps, dataQuality)
-		const summaryCards = this.buildSummaryCards(governance, effectiveIntegrationHealth, audit, artaSla)
+		const alerts = this.buildAlerts(
+			governance,
+			platform,
+			effectiveIntegrationHealth,
+			audit,
+			artaSla,
+			offlineReadiness
+		)
+		const summaryCards = this.buildSummaryCards(
+			governance,
+			effectiveIntegrationHealth,
+			audit,
+			artaSla
+		)
 		const recentChanges = [
 			...governance.recentRoleChanges,
 			...platform.recentFlagChanges,
@@ -211,9 +193,6 @@ export class AdminDashboardService {
 			audit,
 			artaSla,
 			offlineReadiness,
-			statutoryReadiness,
-			statutoryOps,
-			dataQuality,
 		}
 	}
 
@@ -439,7 +418,7 @@ export class AdminDashboardService {
 					gte(auditLogs.createdAt, sevenDaysAgo),
 					or(
 						eq(auditLogs.entityType, "feature_flag"),
-					eq(auditLogs.entityType, "system_setting"),
+						eq(auditLogs.entityType, "system_setting"),
 						eq(auditLogs.entityType, "integration")
 					)
 				)
@@ -496,12 +475,7 @@ export class AdminDashboardService {
 		const [eventsRow] = await db
 			.select({ totalRecentEvents: count() })
 			.from(auditLogs)
-			.where(
-				and(
-					eq(auditLogs.facilityId, facilityId),
-					gte(auditLogs.createdAt, sevenDaysAgo)
-				)
-			)
+			.where(and(eq(auditLogs.facilityId, facilityId), gte(auditLogs.createdAt, sevenDaysAgo)))
 
 		// Total count of all privileged changes in last 7d (for anomaly detection, AD-006)
 		const [privilegedCountRow] = await db
@@ -552,7 +526,13 @@ export class AdminDashboardService {
 
 			if (activeConfigs.length === 0) {
 				// No SLA targets configured yet — keep the "data unavailable" state
-				return { activeBreaches: 0, overdueQueues: 0, topBreachedWorkflows: [], queueBreakdown: [], dataAvailable: false }
+				return {
+					activeBreaches: 0,
+					overdueQueues: 0,
+					topBreachedWorkflows: [],
+					queueBreakdown: [],
+					dataAvailable: false,
+				}
 			}
 
 			// Use full status breakdown (AD-004: populate real onTime/approaching counts)
@@ -601,7 +581,9 @@ export class AdminDashboardService {
 				if (!openStepsByWorkflow.has(row.workflowType)) {
 					openStepsByWorkflow.set(row.workflowType, [])
 				}
-				openStepsByWorkflow.get(row.workflowType)!.push({ step: row.toStatus, count: Number(row.n) })
+				openStepsByWorkflow
+					.get(row.workflowType)!
+					.push({ step: row.toStatus, count: Number(row.n) })
 			}
 
 			// AD-001 + AD-014: Build per-queue breakdown for ALL configured workflows.
@@ -645,7 +627,9 @@ export class AdminDashboardService {
 			}
 		} catch (error) {
 			if (isMissingDatabaseObjectError(error)) {
-				this.logger.warn(`SLA dashboard data unavailable for facility ${facilityId}: database schema is behind the current code`)
+				this.logger.warn(
+					`SLA dashboard data unavailable for facility ${facilityId}: database schema is behind the current code`
+				)
 				return {
 					activeBreaches: 0,
 					overdueQueues: 0,
@@ -667,9 +651,7 @@ export class AdminDashboardService {
 		integrationHealth: IntegrationHealthSection,
 		audit: AuditSummarySection,
 		artaSla: ArtaSlaSection,
-		offlineReadiness: OfflineReadinessSection,
-		statutoryOps: StatutoryOpsSection,
-		dataQuality: DataQualitySection
+		offlineReadiness: OfflineReadinessSection
 	): AdminDashboardAlert[] {
 		const alerts: AdminDashboardAlert[] = []
 
@@ -767,7 +749,8 @@ export class AdminDashboardService {
 				severity: "critical",
 				category: "audit",
 				title: `${audit.flaggedBreakGlassEvents} break-glass event(s) flagged in the last 7 days`,
-				description: "Flagged emergency access may indicate a policy violation. Immediate review required.",
+				description:
+					"Flagged emergency access may indicate a policy violation. Immediate review required.",
 				link: "/audit/break-glass",
 			})
 		}
@@ -778,7 +761,8 @@ export class AdminDashboardService {
 				severity: "warning",
 				category: "audit",
 				title: "DPA consent enforcement is disabled",
-				description: "Patient data exports are not gated by consent. Review your privacy policy settings.",
+				description:
+					"Patient data exports are not gated by consent. Review your privacy policy settings.",
 				link: "/admin/settings",
 			})
 		}
@@ -789,7 +773,8 @@ export class AdminDashboardService {
 				severity: "warning",
 				category: "platform",
 				title: "Offline continuity mode is disabled",
-				description: "Patients cannot be served without network connectivity. Enable offline summary cache in System Settings.",
+				description:
+					"Patients cannot be served without network connectivity. Enable offline summary cache in System Settings.",
 				link: "/admin/offline",
 			})
 		}
@@ -800,7 +785,8 @@ export class AdminDashboardService {
 				severity: "warning",
 				category: "platform",
 				title: "Offline summary cache is stale",
-				description: "The offline readiness cache has not been refreshed recently. Continuity may be impaired.",
+				description:
+					"The offline readiness cache has not been refreshed recently. Continuity may be impaired.",
 				link: "/admin/offline",
 			})
 		}
@@ -818,87 +804,6 @@ export class AdminDashboardService {
 			})
 		}
 
-		// ── Statutory Ops (AD-001) ─────────────────────────────────────────────
-
-		if (statutoryOps.pidsr.blockedOrRejected) {
-			alerts.push({
-				id: "pidsr-blocked",
-				severity: "critical",
-				category: "statutory",
-				title: "PIDSR submission blocked or rejected",
-				description: "One or more PIDSR case reports are blocked or rejected by DOH. Immediate action required.",
-				link: "/reporting/pidsr",
-			})
-		}
-
-		if (statutoryOps.pidsr.draftCount > 5) {
-			alerts.push({
-				id: "pidsr-draft-backlog",
-				severity: "warning",
-				category: "statutory",
-				title: `${statutoryOps.pidsr.draftCount} PIDSR draft reports pending submission`,
-				description: "A large number of PIDSR reports remain in draft. Review and submit to DOH.",
-				link: "/reporting/pidsr",
-			})
-		}
-
-		if (statutoryOps.hai.pendingCount > 0) {
-			alerts.push({
-				id: "hai-pending",
-				severity: "warning",
-				category: "statutory",
-				title: `${statutoryOps.hai.pendingCount} HAI surveillance case(s) need review`,
-				description: "Healthcare-associated infection cases are awaiting infection control review.",
-				link: "/reporting/hai",
-			})
-		}
-
-		if (!statutoryOps.ahsr.currentMonthReady) {
-			alerts.push({
-				id: "ahsr-not-ready",
-				severity: "info",
-				category: "statutory",
-				title: "Annual Hospital Statistical Report not yet ready for current month",
-				description: "AHSR snapshot for this month has not been generated. Ensure monthly close activities are complete.",
-				link: "/reporting",
-			})
-		}
-
-		// ── Data Quality (AD-003) ─────────────────────────────────────────────
-
-		if (dataQuality.missingIcd10Count > 0) {
-			alerts.push({
-				id: "missing-icd10",
-				severity: "warning",
-				category: "data_quality",
-				title: `${dataQuality.missingIcd10Count} resolved problem(s) missing ICD-10 code`,
-				description: "Resolved diagnoses without ICD-10 codes affect PhilHealth billing and statutory reports.",
-				link: "/admin/data-quality",
-			})
-		}
-
-		if (dataQuality.missingRvsCount > 0) {
-			alerts.push({
-				id: "missing-rvs",
-				severity: "warning",
-				category: "data_quality",
-				title: `${dataQuality.missingRvsCount} surgical procedure(s) missing RVS code`,
-				description: "Surgical procedures without RVS codes cannot be billed correctly.",
-				link: "/admin/data-quality",
-			})
-		}
-
-		if (dataQuality.cf4DraftCount > 10) {
-			alerts.push({
-				id: "cf4-draft-backlog",
-				severity: "warning",
-				category: "data_quality",
-				title: `${dataQuality.cf4DraftCount} CF4 claims in draft`,
-				description: "High CF4 draft count may indicate billing workflow bottlenecks.",
-				link: "/billing",
-			})
-		}
-
 		// ── Governance anomaly detection (AD-006) ─────────────────────────────
 
 		if (audit.privilegedChangeCount7d > 20) {
@@ -907,7 +812,8 @@ export class AdminDashboardService {
 				severity: "warning",
 				category: "anomaly",
 				title: `Unusual privileged change volume: ${audit.privilegedChangeCount7d} changes in 7 days`,
-				description: "A high number of role, flag, settings, or integration changes were made this week. Review for unauthorized activity.",
+				description:
+					"A high number of role, flag, settings, or integration changes were made this week. Review for unauthorized activity.",
 				link: "/audit",
 			})
 		}
@@ -918,7 +824,8 @@ export class AdminDashboardService {
 				severity: "critical",
 				category: "anomaly",
 				title: `Break-glass volume spike: ${audit.breakGlassEventCount} events in 7 days`,
-				description: "Unusually high emergency access volume may indicate a privacy or security incident. Immediate review required.",
+				description:
+					"Unusually high emergency access volume may indicate a privacy or security incident. Immediate review required.",
 				link: "/audit/break-glass",
 			})
 		}
@@ -929,7 +836,8 @@ export class AdminDashboardService {
 				severity: "critical",
 				category: "anomaly",
 				title: "FHIR export failures with consent enforcement disabled",
-				description: "Export failures are occurring while DPA consent is not enforced. Data governance risk is elevated.",
+				description:
+					"Export failures are occurring while DPA consent is not enforced. Data governance risk is elevated.",
 				link: "/admin/fhir",
 			})
 		}
@@ -940,7 +848,8 @@ export class AdminDashboardService {
 				severity: "warning",
 				category: "anomaly",
 				title: `${governance.multiFacilityUsers} users have cross-facility access`,
-				description: "A large number of users are active across multiple facilities. Verify these assignments are intentional.",
+				description:
+					"A large number of users are active across multiple facilities. Verify these assignments are intentional.",
 				link: "/admin/users",
 			})
 		}
@@ -974,17 +883,16 @@ export class AdminDashboardService {
 			.where(
 				and(
 					eq(offlineCacheJobs.facilityId, facilityId),
-					or(
-						eq(offlineCacheJobs.status, "completed"),
-						eq(offlineCacheJobs.status, "failed")
-					)
+					or(eq(offlineCacheJobs.status, "completed"), eq(offlineCacheJobs.status, "failed"))
 				)
 			)
 			.orderBy(desc(offlineCacheJobs.startedAt))
 			.limit(1)
 
-		const lastCachePreparedAt = lastJob?.status === "completed" ? (lastJob.completedAt ?? lastJob.startedAt) : null
-		const activePatientsCount = lastJob?.status === "completed" ? (lastJob.cachedPatientCount ?? 0) : 0
+		const lastCachePreparedAt =
+			lastJob?.status === "completed" ? (lastJob.completedAt ?? lastJob.startedAt) : null
+		const activePatientsCount =
+			lastJob?.status === "completed" ? (lastJob.cachedPatientCount ?? 0) : 0
 
 		let status: OfflineReadinessSection["status"]
 		if (!enabled) {
@@ -1029,56 +937,6 @@ export class AdminDashboardService {
 		}
 	}
 
-	// ── Statutory Reporting Readiness ─────────────────────────────────────────
-
-	private async getStatutoryReadiness(facilityId: string): Promise<StatutoryReadinessSection> {
-		const integrationRows = await db
-			.select({
-				kind: integrations.kind,
-				name: integrations.name,
-				enabled: integrations.enabled,
-				lastSyncAt: integrations.lastSyncAt,
-				lastSyncStatus: integrations.lastSyncStatus,
-				credentialsRef: integrations.credentialsRef,
-			})
-			.from(integrations)
-			.where(eq(integrations.facilityId, facilityId))
-
-		const byKind = new Map(integrationRows.map(r => [r.kind, r]))
-
-		type DomainStatus = "ready" | "warning" | "blocked" | "degraded" | "not_configured"
-
-		function computeDomainStatus(
-			integration: (typeof integrationRows)[0] | undefined
-		): { status: DomainStatus; detail: string | null } {
-			if (!integration) return { status: "not_configured", detail: "No integration configured" }
-			if (!integration.enabled) return { status: "blocked", detail: "Integration is disabled" }
-			if (!integration.credentialsRef) return { status: "warning", detail: "Missing credential reference" }
-			if (integration.lastSyncStatus === "error") return { status: "degraded", detail: "Last sync failed" }
-			if (!integration.lastSyncAt) return { status: "warning", detail: "Never synced — verify endpoint is reachable" }
-			return { status: "ready", detail: null }
-		}
-
-		const fhir = computeDomainStatus(byKind.get("fhir"))
-		const philhealth = computeDomainStatus(byKind.get("philhealth"))
-		const hai = computeDomainStatus(byKind.get("hai"))
-		// PIDSR is modeled through a dedicated custom integration entry when configured.
-		// Fall back to civil_registry to preserve existing facilities that still share the endpoint.
-		const pidsrIntegration = integrationRows.find(
-			integration => integration.kind === "custom" && integration.name.toLowerCase().includes("pidsr")
-		)
-		const pidsr = computeDomainStatus(pidsrIntegration ?? byKind.get("civil_registry"))
-		const civilRegistry = computeDomainStatus(byKind.get("civil_registry"))
-
-		return {
-			fhirNhdr: { name: "FHIR / NHDR", ...fhir, link: "/admin/integration-registry" },
-			philhealth: { name: "PhilHealth / CF4", ...philhealth, link: "/admin/integration-registry" },
-			hai: { name: "HAI Reporting", ...hai, link: "/admin/integration-registry" },
-			pidsr: { name: "PIDSR", ...pidsr, link: "/admin/integration-registry" },
-			civilRegistry: { name: "Civil Registry", ...civilRegistry, link: "/admin/integration-registry" },
-		}
-	}
-
 	// ── Summary cards ──────────────────────────────────────────────────────────
 
 	private buildSummaryCards(
@@ -1117,255 +975,6 @@ export class AdminDashboardService {
 				link: "/admin/sla",
 			},
 		]
-	}
-
-	// ── Statutory Operations (AD-001) ──────────────────────────────────────────
-
-	private async getStatutoryOps(facilityId: string): Promise<StatutoryOpsSection> {
-		const now = new Date()
-		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-
-		// ── PIDSR ─────────────────────────────────────────────────────────────
-		const pidsrRows = await db
-			.select({
-				category: pidsrCases.category,
-				reportStatus: pidsrCases.reportStatus,
-				updatedAt: pidsrCases.updatedAt,
-			})
-			.from(pidsrCases)
-			.where(and(eq(pidsrCases.facilityId, facilityId), gte(pidsrCases.updatedAt, startOfMonth)))
-
-		const category1Count = pidsrRows.filter(r => r.category === "category_1").length
-		const category2Count = pidsrRows.filter(r => r.category === "category_2").length
-		const draftCount = pidsrRows.filter(r => r.reportStatus === "draft").length
-		const submittedCount = pidsrRows.filter(r => r.reportStatus === "submitted").length
-		// AD-004: derive blocked/rejected from real schema states
-		const rejectedCount = pidsrRows.filter(r => r.reportStatus === "rejected").length
-		const blockedCount = pidsrRows.filter(r => r.reportStatus === "blocked").length
-		const blockedOrRejected = rejectedCount > 0 || blockedCount > 0
-
-		// Last submitted timestamp (across all time)
-		const [lastSubmittedRow] = await db
-			.select({ submittedAt: pidsrCases.updatedAt })
-			.from(pidsrCases)
-			.where(and(eq(pidsrCases.facilityId, facilityId), eq(pidsrCases.reportStatus, "submitted")))
-			.orderBy(desc(pidsrCases.updatedAt))
-			.limit(1)
-
-		// ── HAI Surveillance ──────────────────────────────────────────────────
-		const surveillanceRows = await db
-			.select({
-				isReviewed: surveillanceFlags.isReviewed,
-				flagType: surveillanceFlags.flagType,
-			})
-			.from(surveillanceFlags)
-			.where(and(eq(surveillanceFlags.facilityId, facilityId), gte(surveillanceFlags.createdAt, startOfMonth)))
-
-		const openSurveillanceCount = surveillanceRows.length
-		const reviewedCount = surveillanceRows.filter(r => r.isReviewed).length
-		const pendingCount = surveillanceRows.filter(r => !r.isReviewed).length
-
-		// Group by flagType
-		const byTypeMap = new Map<string, number>()
-		for (const row of surveillanceRows) {
-			const key = row.flagType ?? "unknown"
-			byTypeMap.set(key, (byTypeMap.get(key) ?? 0) + 1)
-		}
-		const byType = Array.from(byTypeMap.entries()).map(([type, count]) => ({ type, count }))
-
-		// ── AHSR Snapshot ─────────────────────────────────────────────────────
-		const currentYear = now.getFullYear()
-		const currentMonth = now.getMonth() + 1
-
-		const [ahsrSnapshotCountRow] = await db
-			.select({ n: count() })
-			.from(ahsrSnapshots)
-			.where(eq(ahsrSnapshots.facilityId, facilityId))
-
-		const [latestAhsr] = await db
-			.select({ reportYear: ahsrSnapshots.reportYear, reportMonth: ahsrSnapshots.reportMonth })
-			.from(ahsrSnapshots)
-			.where(eq(ahsrSnapshots.facilityId, facilityId))
-			.orderBy(desc(ahsrSnapshots.reportYear), desc(ahsrSnapshots.reportMonth))
-			.limit(1)
-
-		const ahsrLastSnapshotMonth = latestAhsr
-			? `${latestAhsr.reportYear}-${String(latestAhsr.reportMonth).padStart(2, "0")}`
-			: null
-		const ahsrCurrentMonthReady =
-			latestAhsr?.reportYear === currentYear && latestAhsr?.reportMonth === currentMonth
-
-		// Fetch current-year AHSR metrics for admin oversight (AD-003)
-		let ahsrMetrics: Awaited<ReturnType<typeof this.reportingService.getAhsrMetrics>> | null = null
-		try {
-			ahsrMetrics = await this.reportingService.getAhsrMetrics({ facilityId, year: currentYear })
-		} catch {
-			// Non-fatal: AHSR metrics may not be available if no clinical data exists yet
-		}
-
-		return {
-			pidsr: {
-				category1Count,
-				category2Count,
-				draftCount,
-				submittedCount,
-				rejectedCount,
-				blockedCount,
-				lastSubmittedAt: lastSubmittedRow?.submittedAt ?? null,
-				blockedOrRejected,
-			},
-			hai: {
-				openSurveillanceCount,
-				reviewedCount,
-				pendingCount,
-				byType,
-			},
-			ahsr: {
-				snapshotCount: ahsrSnapshotCountRow?.n ?? 0,
-				lastSnapshotMonth: ahsrLastSnapshotMonth,
-				currentMonthReady: ahsrCurrentMonthReady,
-				currentYearBor: ahsrMetrics?.bedOccupancyRate ?? null,
-				currentYearGrossDeathRate: ahsrMetrics?.grossDeathRate ?? null,
-				currentYearNetDeathRate: ahsrMetrics?.netDeathRate ?? null,
-				topMorbidities: ahsrMetrics?.topMorbidities ?? [],
-				topMortalities: ahsrMetrics?.topMortalities ?? [],
-			},
-		}
-	}
-
-	// ── Data Quality (AD-002) ──────────────────────────────────────────────────
-
-	private async getDataQuality(facilityId: string): Promise<DataQualitySection> {
-		const now = new Date()
-		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-
-		// ── CF4 claims ────────────────────────────────────────────────────────
-		const [cf4DraftRow] = await db
-			.select({ n: count() })
-			.from(cf4Claims)
-			.where(and(eq(cf4Claims.facilityId, facilityId), eq(cf4Claims.status, "draft")))
-
-		const [cf4SubmittedRow] = await db
-			.select({ n: count() })
-			.from(cf4Claims)
-			.where(
-				and(
-					eq(cf4Claims.facilityId, facilityId),
-					eq(cf4Claims.status, "submitted"),
-					gte(cf4Claims.submittedAt, startOfMonth)
-				)
-			)
-
-		// ── Missing ICD-10 codes ───────────────────────────────────────────────
-		// Count RESOLVED problems with no icd10Code: these are encounters that
-		// have closed but coding was never completed (AD-003: more accurate completeness metric)
-		const [missingIcd10Row] = await db
-			.select({ n: count() })
-			.from(problems)
-			.where(
-				and(
-					eq(problems.facilityId, facilityId),
-					isNull(problems.icd10Code),
-					eq(problems.status, "resolved")
-				)
-			)
-
-		// ── Missing RVS codes ─────────────────────────────────────────────────
-		const [missingRvsRow] = await db
-			.select({ n: count() })
-			.from(surgicalRvsAssignments)
-			.innerJoin(operationRecords, eq(surgicalRvsAssignments.operationRecordId, operationRecords.id))
-			.where(
-				and(
-					eq(operationRecords.facilityId, facilityId),
-					isNull(surgicalRvsAssignments.rvsCode)
-				)
-			)
-
-		// ── AHSR snapshot ─────────────────────────────────────────────────────
-		const currentYear = now.getFullYear()
-		const currentMonth = now.getMonth() + 1
-
-		const [latestSnapshot] = await db
-			.select({ reportYear: ahsrSnapshots.reportYear, reportMonth: ahsrSnapshots.reportMonth })
-			.from(ahsrSnapshots)
-			.where(eq(ahsrSnapshots.facilityId, facilityId))
-			.orderBy(desc(ahsrSnapshots.reportYear), desc(ahsrSnapshots.reportMonth))
-			.limit(1)
-
-		const ahsrLastSnapshotMonth = latestSnapshot
-			? `${latestSnapshot.reportYear}-${String(latestSnapshot.reportMonth).padStart(2, "0")}`
-			: null
-		const ahsrCurrentMonthReady =
-			latestSnapshot?.reportYear === currentYear && latestSnapshot?.reportMonth === currentMonth
-
-		// ── AD-016: CF4 extraction completeness ───────────────────────────────
-		// For non-draft claims, assess whether the auto-extracted clinical payload
-		// is complete enough for compliant PhilHealth CF4 submission.
-		const nonDraftClaims = await db
-			.select({ extractedData: cf4Claims.extractedData })
-			.from(cf4Claims)
-			.where(
-				and(
-					eq(cf4Claims.facilityId, facilityId),
-					sql`${cf4Claims.status} != 'draft'`
-				)
-			)
-
-		const CF4_REQUIRED_SECTIONS = [
-			"chiefComplaint",
-			"historyOfPresentIllness",
-			"physicalExamFindings",
-			"finalDiagnosis",
-		] as const
-
-		const CF4_SECTION_LABELS: Record<string, string> = {
-			chiefComplaint: "Chief Complaint",
-			historyOfPresentIllness: "History of Present Illness",
-			physicalExamFindings: "Physical Exam Findings",
-			finalDiagnosis: "Final Diagnosis",
-		}
-
-		const nonDraftTotal = nonDraftClaims.length
-		const sectionMissingCounts = new Map<string, number>(
-			CF4_REQUIRED_SECTIONS.map(s => [s, 0])
-		)
-
-		let extractedDataPresentCount = 0
-		for (const claim of nonDraftClaims) {
-			const data = claim.extractedData as Record<string, unknown> | null
-			if (!data) continue
-			extractedDataPresentCount++
-			for (const section of CF4_REQUIRED_SECTIONS) {
-				const val = data[section]
-				if (!val || (typeof val === "string" && val.trim() === "")) {
-					sectionMissingCounts.set(section, (sectionMissingCounts.get(section) ?? 0) + 1)
-				}
-			}
-		}
-
-		const cf4MissingExtractedData = nonDraftTotal - extractedDataPresentCount
-		const cf4WithExtractedData = extractedDataPresentCount
-		const cf4ExtractionCompletePct =
-			nonDraftTotal > 0 ? Math.round((cf4WithExtractedData / nonDraftTotal) * 100) : 100
-
-		const cf4SectionCompleteness = CF4_REQUIRED_SECTIONS.map(section => ({
-			section: CF4_SECTION_LABELS[section] ?? section,
-			missingCount: sectionMissingCounts.get(section) ?? 0,
-		}))
-
-		return {
-			cf4DraftCount: cf4DraftRow?.n ?? 0,
-			cf4SubmittedThisMonth: cf4SubmittedRow?.n ?? 0,
-			missingIcd10Count: missingIcd10Row?.n ?? 0,
-			missingRvsCount: missingRvsRow?.n ?? 0,
-			ahsrLastSnapshotMonth,
-			ahsrCurrentMonthReady,
-			cf4WithExtractedData,
-			cf4MissingExtractedData,
-			cf4ExtractionCompletePct,
-			cf4SectionCompleteness,
-		}
 	}
 
 	// ── HIM Operations (AD-004) ────────────────────────────────────────────────
@@ -1437,7 +1046,10 @@ export class AdminDashboardService {
 
 	// ── Export Compliance (AD-002) ─────────────────────────────────────────────
 
-	async getExportCompliance(facilityId: string, query: ExportComplianceQuery): Promise<ExportComplianceList> {
+	async getExportCompliance(
+		facilityId: string,
+		query: ExportComplianceQuery
+	): Promise<ExportComplianceList> {
 		const page = query.page ?? 1
 		const limit = query.limit ?? 50
 		const offset = (page - 1) * limit
@@ -1484,7 +1096,11 @@ export class AdminDashboardService {
 
 	async getCivilRegistryOps(facilityId: string): Promise<CivilRegistryOpsSection> {
 		const rows = await db
-			.select({ reportType: deathReports.reportType, status: deathReports.status, submittedAt: deathReports.submittedAt })
+			.select({
+				reportType: deathReports.reportType,
+				status: deathReports.status,
+				submittedAt: deathReports.submittedAt,
+			})
 			.from(deathReports)
 			.where(eq(deathReports.facilityId, facilityId))
 
@@ -1537,13 +1153,13 @@ export class AdminDashboardService {
 		const pendingScreeningCount = nbsRows.filter(r => r.status === "pending").length
 		const screenedCount = nbsRows.filter(r => r.status !== "pending").length
 		const lastScreeningAt =
-			nbsRows
-				.map(r => r.birthDatetime)
-				.sort((a, b) => b.getTime() - a.getTime())[0] ?? null
+			nbsRows.map(r => r.birthDatetime).sort((a, b) => b.getTime() - a.getTime())[0] ?? null
 
 		// AD-012: Timing-window compliance — RA 9288 mandates screening within 24–48h post-birth.
 		const screenedRows = nbsRows.filter(r => r.status !== "pending" && r.hoursElapsed !== null)
-		const onTimeCount = screenedRows.filter(r => r.hoursElapsed! >= 24 && r.hoursElapsed! <= 48).length
+		const onTimeCount = screenedRows.filter(
+			r => r.hoursElapsed! >= 24 && r.hoursElapsed! <= 48
+		).length
 		const earlyCount = screenedRows.filter(r => r.hoursElapsed! < 24).length
 		const lateScreenedCount = screenedRows.filter(r => r.hoursElapsed! > 48).length
 		const overdueCount = nbsRows.filter(
@@ -1635,7 +1251,8 @@ export class AdminDashboardService {
 		// Generics Act compliance: orders prescribed without a brand name (generic-only)
 		const genericsPrescribedCount = orders.filter(o => !o.brandName).length
 		const brandsPrescribedCount = orders.filter(o => !!o.brandName).length
-		const genericsPrescribedPct = total > 0 ? Math.round((genericsPrescribedCount / total) * 100) : 100
+		const genericsPrescribedPct =
+			total > 0 ? Math.round((genericsPrescribedCount / total) * 100) : 100
 
 		// PDEA S-2 (controlled substance) tranche compliance
 		const controlledSubstancesCount = orders.filter(o => o.isControlledSubstance).length
@@ -1648,7 +1265,8 @@ export class AdminDashboardService {
 
 		// CDS alert verification rate
 		const ordersWithCdsAlerts = orders.filter(
-			o => o.cdsAlerts !== null && Array.isArray(o.cdsAlerts) && (o.cdsAlerts as unknown[]).length > 0
+			o =>
+				o.cdsAlerts !== null && Array.isArray(o.cdsAlerts) && (o.cdsAlerts as unknown[]).length > 0
 		).length
 		const cdsAlertsVerifiedCount = orders.filter(
 			o =>
@@ -1671,10 +1289,7 @@ export class AdminDashboardService {
 			})
 			.from(prescriptions)
 			.where(
-				and(
-					eq(prescriptions.facilityId, facilityId),
-					gte(prescriptions.createdAt, thirtyDaysAgo)
-				)
+				and(eq(prescriptions.facilityId, facilityId), gte(prescriptions.createdAt, thirtyDaysAgo))
 			)
 
 		const prescriptionsLast30d = prescriptionRows.length
@@ -1723,10 +1338,7 @@ export class AdminDashboardService {
 			.from(prescriptions)
 			.innerJoin(staffProfiles, eq(prescriptions.prescriberStaffId, staffProfiles.id))
 			.where(
-				and(
-					eq(prescriptions.facilityId, facilityId),
-					gte(prescriptions.createdAt, thirtyDaysAgo)
-				)
+				and(eq(prescriptions.facilityId, facilityId), gte(prescriptions.createdAt, thirtyDaysAgo))
 			)
 
 		// Helper: check if a date string (or null) represents an active credential at given time
@@ -1763,10 +1375,11 @@ export class AdminDashboardService {
 				: 100
 
 		// Count prescriptions where any credential was expired at time of signing
-		const expiredCredentialPrescriptionCount = validityRows.filter(r =>
-			!isActive(r.prcExpiry, r.createdAt) ||
-			!isActive(r.ptrExpiry, r.createdAt) ||
-			(!!r.pdeaS2License?.trim() && !isActive(r.pdeaS2Expiry, r.createdAt))
+		const expiredCredentialPrescriptionCount = validityRows.filter(
+			r =>
+				!isActive(r.prcExpiry, r.createdAt) ||
+				!isActive(r.ptrExpiry, r.createdAt) ||
+				(!!r.pdeaS2License?.trim() && !isActive(r.pdeaS2Expiry, r.createdAt))
 		).length
 
 		// AD-003: High-alert medication safeguards.

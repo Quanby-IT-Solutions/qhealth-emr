@@ -25,7 +25,13 @@ const PaginatedResponseSchema = z.object({
 // ============================================================================
 
 export const EncounterTypeEnum = z.enum(["inpatient", "outpatient", "emergency", "telemedicine"])
-export const EncounterStatusEnum = z.enum(["active", "discharged", "closed", "cancelled"])
+export const EncounterStatusEnum = z.enum([
+	"active",
+	"pending_discharge",
+	"discharged",
+	"closed",
+	"cancelled",
+])
 export const DispositionEnum = z.enum(["home", "transfer", "deceased", "ama"])
 
 // ============================================================================
@@ -122,46 +128,69 @@ export type EncounterDetail = z.infer<typeof EncounterDetailSchema>
 // Create Encounter
 // ============================================================================
 
-export const CreateEncounterSchema = z.object({
-	facilityId: z.string().uuid(),
-	patientId: z.string().uuid(),
-	encounterType: EncounterTypeEnum,
-	chiefComplaint: z.string().max(2000).optional(),
-	admittingStaffId: z.string().uuid(),
-	attendingStaffId: z.string().uuid().optional(),
-	bedId: z.string().uuid().optional(),
-	admissionDatetime: z.string().optional(),
+export const CreateEncounterSchema = z
+	.object({
+		facilityId: z.string().uuid(),
+		patientId: z.string().uuid(),
+		encounterType: EncounterTypeEnum,
+		chiefComplaint: z.string().max(2000).optional(),
+		admittingStaffId: z.string().uuid(),
+		attendingStaffId: z.string().uuid().optional(),
+		bedId: z.string().uuid().optional(),
+		admissionDatetime: z.string().optional(),
 
-	// Link to parent encounter (telemedicine follow-up)
-	linkedEncounterId: z.string().uuid().optional(),
+		// Link to parent encounter (telemedicine follow-up)
+		linkedEncounterId: z.string().uuid().optional(),
 
-	// Link to scheduling appointment
-	appointmentId: z.string().uuid().optional(),
+		// Link to scheduling appointment
+		appointmentId: z.string().uuid().optional(),
 
-	// PS-002: Clinic for OPD queue scoping
-	clinicianStaffId: z.string().uuid().optional(),
+		// PS-002: Clinic for OPD queue scoping
+		clinicianStaffId: z.string().uuid().optional(),
 
-	// PS-001: Link to triage intake record (pre-registration vitals)
-	triageIntakeId: z.string().uuid().optional(),
-}).superRefine((data, ctx) => {
-	// PS-036: clinicianStaffId required for outpatient encounters to ensure clinic-scoped queue assignment
-	if (data.encounterType === "outpatient" && !data.clinicianStaffId) {
-		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
-			message: "clinicianStaffId is required for outpatient encounter registration",
-			path: ["clinicianStaffId"],
-		})
-	}
-	// PS-044: triageIntakeId required for outpatient encounters (TOR Flow 1 Step 1 mandatory)
-	if (data.encounterType === "outpatient" && !data.triageIntakeId) {
-		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
-			message:
-				"triageIntakeId is required for outpatient encounter registration (TOR Flow 1 Step 1)",
-			path: ["triageIntakeId"],
-		})
-	}
-})
+		// PS-001: Link to triage intake record (pre-registration vitals)
+		triageIntakeId: z.string().uuid().optional(),
+
+		consentCaptured: z.boolean(),
+	})
+	.superRefine((data, ctx) => {
+		// PS-036: clinicianStaffId required for outpatient encounters to ensure clinic-scoped queue assignment
+		if (data.encounterType === "outpatient" && !data.clinicianStaffId) {
+			ctx.addIssue({
+				code: "custom",
+				message: "clinicianStaffId is required for outpatient encounter registration",
+				path: ["clinicianStaffId"],
+			})
+		}
+		// PS-044: triageIntakeId required for outpatient encounters (TOR Flow 1 Step 1 mandatory)
+		if (data.encounterType === "outpatient" && !data.triageIntakeId) {
+			ctx.addIssue({
+				code: "custom",
+				message:
+					"triageIntakeId is required for outpatient encounter registration (TOR Flow 1 Step 1)",
+				path: ["triageIntakeId"],
+			})
+		}
+		// ER and IPD require attendingStaffId
+		if (
+			(data.encounterType === "emergency" || data.encounterType === "inpatient") &&
+			!data.attendingStaffId
+		) {
+			ctx.addIssue({
+				code: "custom",
+				message: "attendingStaffId is required for emergency and inpatient encounters",
+				path: ["attendingStaffId"],
+			})
+		}
+		// IPD requires bedId
+		if (data.encounterType === "inpatient" && !data.bedId) {
+			ctx.addIssue({
+				code: "custom",
+				message: "bedId is required for inpatient encounters",
+				path: ["bedId"],
+			})
+		}
+	})
 
 export type CreateEncounterInput = z.infer<typeof CreateEncounterSchema>
 
@@ -225,6 +254,16 @@ export const DischargeEncounterSchema = z.object({
 })
 
 export type DischargeEncounterInput = z.infer<typeof DischargeEncounterSchema>
+
+// ============================================================================
+// May Go Home Order (Inpatient)
+// ============================================================================
+
+export const SignMayGoHomeOrderSchema = z.object({
+	encounterId: z.string().uuid(),
+})
+
+export type SignMayGoHomeOrderInput = z.infer<typeof SignMayGoHomeOrderSchema>
 
 // ============================================================================
 // Close Encounter (Outpatient)

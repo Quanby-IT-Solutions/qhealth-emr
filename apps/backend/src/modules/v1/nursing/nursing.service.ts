@@ -1,7 +1,8 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm"
 
 import {
+	consentRecords,
 	encounters,
 	flowsheetEntries,
 	haiTags,
@@ -166,6 +167,33 @@ interface UpdateHaiTagInput {
 	id: string
 	status?: "suspected" | "confirmed" | "resolved"
 	notes?: string
+}
+
+interface ConsentRecordListInput {
+	page: number
+	limit: number
+	facilityId?: string
+	encounterId?: string
+	preEncounterId?: string
+	consentType?: string
+}
+
+interface CreateConsentRecordInput {
+	facilityId: string
+	encounterId: string
+	patientId: string
+	preEncounterId?: string
+	consentType: string
+	signedByName: string
+	relationship: string
+	content?: string
+	signatureData?: unknown
+	signedAt?: Date
+	witnessStaffId?: string
+	consentText?: string
+	patientSignature?: string
+	guardianSignature?: string
+	witnessSignature?: string
 }
 
 @Injectable()
@@ -379,8 +407,10 @@ export class NursingService {
 		if (input.encounterId) conditions.push(eq(marEntries.encounterId, input.encounterId))
 		if (input.preEncounterId) conditions.push(eq(marEntries.preEncounterId, input.preEncounterId))
 		if (input.status) conditions.push(eq(marEntries.status, input.status))
-		if (input.scheduledFrom) conditions.push(gte(marEntries.scheduledTime, new Date(input.scheduledFrom)))
-		if (input.scheduledTo) conditions.push(lte(marEntries.scheduledTime, new Date(input.scheduledTo)))
+		if (input.scheduledFrom)
+			conditions.push(gte(marEntries.scheduledTime, new Date(input.scheduledFrom)))
+		if (input.scheduledTo)
+			conditions.push(lte(marEntries.scheduledTime, new Date(input.scheduledTo)))
 
 		const where = and(...conditions)
 		const offset = (input.page - 1) * input.limit
@@ -606,11 +636,10 @@ export class NursingService {
 	// ========================================================================
 
 	async findFlowsheetEntries(input: FlowsheetListInput) {
-		const conditions = [
-			eq(flowsheetEntries.encounterId, input.encounterId),
-		]
+		const conditions = [eq(flowsheetEntries.encounterId, input.encounterId)]
 		if (input.facilityId) conditions.push(eq(flowsheetEntries.facilityId, input.facilityId))
-		if (input.parameterName) conditions.push(eq(flowsheetEntries.parameterName, input.parameterName))
+		if (input.parameterName)
+			conditions.push(eq(flowsheetEntries.parameterName, input.parameterName))
 		if (input.dateFrom) conditions.push(gte(flowsheetEntries.recordedAt, new Date(input.dateFrom)))
 		if (input.dateTo) conditions.push(lte(flowsheetEntries.recordedAt, new Date(input.dateTo)))
 
@@ -646,7 +675,8 @@ export class NursingService {
 		const conditions = []
 		if (input.facilityId) conditions.push(eq(shiftHandoffs.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(shiftHandoffs.encounterId, input.encounterId))
-		if (input.outgoingStaffId) conditions.push(eq(shiftHandoffs.outgoingStaffId, input.outgoingStaffId))
+		if (input.outgoingStaffId)
+			conditions.push(eq(shiftHandoffs.outgoingStaffId, input.outgoingStaffId))
 
 		const where = and(...conditions)
 		const offset = (input.page - 1) * input.limit
@@ -853,13 +883,102 @@ export class NursingService {
 		if (input.status === "confirmed") updates.confirmedAt = new Date()
 		if (input.status === "resolved") updates.resolvedAt = new Date()
 
-		const [row] = await db
-			.update(haiTags)
-			.set(updates)
-			.where(eq(haiTags.id, input.id))
-			.returning()
+		const [row] = await db.update(haiTags).set(updates).where(eq(haiTags.id, input.id)).returning()
 
 		if (!row) throw new NotFoundException("HAI tag not found")
+		return row
+	}
+
+	// ========================================================================
+	// Consent Records
+	// ========================================================================
+
+	async findConsentRecords(input: ConsentRecordListInput) {
+		const conditions = []
+		if (input.facilityId) conditions.push(eq(consentRecords.facilityId, input.facilityId))
+		if (input.encounterId) conditions.push(eq(consentRecords.encounterId, input.encounterId))
+		if (input.preEncounterId)
+			conditions.push(eq(consentRecords.preEncounterId, input.preEncounterId))
+		if (input.consentType)
+			conditions.push(
+				eq(
+					consentRecords.consentType,
+					input.consentType as (typeof consentRecords.consentType)["_"]["data"]
+				)
+			)
+
+		const where = and(...conditions)
+		const offset = (input.page - 1) * input.limit
+
+		const [rows, [totalRow]] = await Promise.all([
+			db
+				.select()
+				.from(consentRecords)
+				.where(where)
+				.orderBy(desc(consentRecords.signedAt))
+				.limit(input.limit)
+				.offset(offset),
+			db.select({ count: count() }).from(consentRecords).where(where),
+		])
+
+		const total = totalRow?.count ?? 0
+		return {
+			data: rows,
+			total,
+			page: input.page,
+			limit: input.limit,
+			totalPages: Math.ceil(total / input.limit),
+		}
+	}
+
+	async findConsentRecord(id: string) {
+		const [row] = await db.select().from(consentRecords).where(eq(consentRecords.id, id)).limit(1)
+		if (!row) throw new NotFoundException("Consent record not found")
+		return row
+	}
+
+	async createConsentRecord(input: CreateConsentRecordInput, userId: string) {
+		const staffProfileId = await this.getStaffProfileId(userId)
+
+		if (!input.encounterId) {
+			throw new BadRequestException("encounterId is required to create a consent record")
+		}
+
+		// Resolve patientId from the encounter
+		const [enc] = await db
+			.select({ patientId: encounters.patientId })
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+			.limit(1)
+
+		if (!enc) throw new NotFoundException("Encounter not found")
+		if (enc.patientId !== input.patientId) {
+			throw new BadRequestException("patientId does not match the encounter patient")
+		}
+
+		const [row] = await db
+			.insert(consentRecords)
+			.values({
+				facilityId: input.facilityId,
+				encounterId: input.encounterId,
+				patientId: enc.patientId,
+				preEncounterId: input.preEncounterId,
+				consentType: input.consentType as (typeof consentRecords.consentType)["_"]["data"],
+				signedByName: input.signedByName,
+				relationship: input.relationship as (typeof consentRecords.relationship)["_"]["data"],
+				content: input.content ?? null,
+				signatureData: input.signatureData ?? null,
+				signedAt: input.signedAt ?? new Date(),
+				witnessStaffId: input.witnessStaffId ?? null,
+				consentText: input.consentText ?? "",
+				patientSignature: input.patientSignature,
+				guardianSignature: input.guardianSignature,
+				witnessSignature: input.witnessSignature,
+				capturedByStaffId: staffProfileId,
+			})
+			.returning()
+
+		if (!row) throw new NotFoundException("Failed to create consent record")
 		return row
 	}
 }

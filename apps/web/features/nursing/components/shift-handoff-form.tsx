@@ -11,7 +11,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/core/components/ui/dialog"
-import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Separator } from "@/core/components/ui/separator"
 import {
@@ -46,9 +45,10 @@ function formatDateTime(dateStr: string | null | undefined) {
 interface ShiftHandoffFormProps {
 	encounterId: string
 	facilityId: string
+	readOnly?: boolean
 }
 
-export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormProps) {
+export function ShiftHandoffForm({ encounterId, facilityId, readOnly }: ShiftHandoffFormProps) {
 	const [createOpen, setCreateOpen] = useState(false)
 	const [notes, setNotes] = useState("")
 
@@ -63,13 +63,11 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 
 	function handleCreate(e: React.FormEvent<HTMLFormElement>) {
 		e.preventDefault()
-		const fd = new FormData(e.currentTarget)
 		createHandoff.mutate(
 			{
 				facilityId,
 				encounterId,
 				handoffNotes: notes || undefined,
-				incomingStaffId: (fd.get("incomingStaffId") as string) || undefined,
 			},
 			{
 				onSuccess: () => {
@@ -84,8 +82,8 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 
 	return (
 		<div className="space-y-4">
-			{/* Generate summary card */}
-			<Card>
+			{/* Generate summary card — nurses only */}
+			{!readOnly && <Card>
 				<CardHeader className="flex flex-row items-center justify-between">
 					<CardTitle>Handoff Summary Generator</CardTitle>
 					<Button
@@ -153,10 +151,10 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 						</div>
 					</CardContent>
 				)}
-			</Card>
+			</Card>}
 
-			{/* New handoff dialog */}
-			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
+			{/* New handoff dialog — nurses only */}
+			{!readOnly && <Dialog open={createOpen} onOpenChange={setCreateOpen}>
 				<DialogContent className="sm:max-w-lg">
 					<DialogHeader>
 						<DialogTitle>Create Shift Handoff</DialogTitle>
@@ -164,7 +162,7 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 					<form onSubmit={handleCreate} className="grid gap-3">
 						{/* Pre-fill notes if generated */}
 						{generated && !notes && (
-							<div>
+							<div className="mb-2">
 								<Button
 									type="button"
 									size="sm"
@@ -196,7 +194,7 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 								</Button>
 							</div>
 						)}
-						<div>
+						<div className="space-y-1.5">
 							<Label htmlFor="handoffNotes">Handoff Notes</Label>
 							<Textarea
 								id="handoffNotes"
@@ -205,10 +203,6 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 								onChange={e => setNotes(e.target.value)}
 								placeholder="Clinical summary for incoming nurse…"
 							/>
-						</div>
-						<div>
-							<Label htmlFor="incomingStaffId">Incoming Staff ID (optional)</Label>
-							<Input id="incomingStaffId" name="incomingStaffId" />
 						</div>
 						<div className="flex justify-end gap-2 pt-2">
 							<Button
@@ -224,14 +218,16 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 						</div>
 					</form>
 				</DialogContent>
-			</Dialog>
+			</Dialog>}
 
 			{/* Handoff history */}
 			<div className="flex items-center justify-between">
 				<h3 className="font-semibold">Shift Handoffs</h3>
-				<Button size="sm" onClick={() => setCreateOpen(true)}>
-					New Handoff
-				</Button>
+				{!readOnly && (
+					<Button size="sm" onClick={() => setCreateOpen(true)}>
+						New Handoff
+					</Button>
+				)}
 			</div>
 
 			{handoffs.isLoading ? (
@@ -270,7 +266,7 @@ export function ShiftHandoffForm({ encounterId, facilityId }: ShiftHandoffFormPr
 										{formatDateTime(h.signedAt)}
 									</TableCell>
 									<TableCell>
-										{h.status === "draft" && (
+										{!readOnly && h.status === "draft" && (
 											<Button
 												size="sm"
 												variant="outline"

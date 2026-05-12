@@ -120,9 +120,10 @@ function AdministerForm({ marId, onClose }: AdministerFormProps) {
 interface MarScreenProps {
 	encounterId: string
 	facilityId: string
+	readOnly?: boolean
 }
 
-export function MarScreen({ encounterId, facilityId }: MarScreenProps) {
+export function MarScreen({ encounterId, facilityId, readOnly }: MarScreenProps) {
 	const [administeringId, setAdministeringId] = useState<string | null>(null)
 	const marEntries = useMarEntriesQuery({ encounterId, facilityId })
 
@@ -185,7 +186,7 @@ export function MarScreen({ encounterId, facilityId }: MarScreenProps) {
 										{m.notes ?? "—"}
 									</TableCell>
 									<TableCell>
-										{m.status === "due" && (
+										{!readOnly && m.status === "due" && (
 											<Button
 												size="sm"
 												variant="outline"

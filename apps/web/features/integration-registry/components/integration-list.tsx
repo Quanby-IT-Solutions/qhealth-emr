@@ -4,7 +4,7 @@ import { useState } from "react"
 
 import Link from "next/link"
 
-import { Plus, Search } from "lucide-react"
+import { Info, Plus, Search } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -22,9 +22,14 @@ import { useIntegrationsListQuery } from "@/features/integration-registry/api/in
 
 const KIND_LABELS: Record<string, string> = {
 	fhir: "FHIR",
-	civil_registry: "Civil Registry",
 	hai: "HAI",
 	philhealth: "PhilHealth",
+	erp: "ERP",
+	lis: "LIS",
+	pacs: "PACS",
+	telemedicine: "Telemedicine",
+	nhdr: "NHDR",
+	pidsr: "PIDSR",
 	custom: "Custom",
 }
 
@@ -69,9 +74,27 @@ export function IntegrationList() {
 		return matchesSearch && matchesKind
 	})
 
+	const hasFhirOrNhdr = (integrations ?? []).some(
+		i => i.kind === "fhir" || i.kind === "nhdr"
+	)
+
 	return (
 		<div className="space-y-4">
-			{/* Toolbar */}
+			{/* FHIR / NHDR ownership notice */}
+			{hasFhirOrNhdr && (
+				<div className="flex items-start gap-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm dark:border-blue-800 dark:bg-blue-950">
+					<Info className="mt-0.5 size-4 shrink-0 text-blue-600 dark:text-blue-400" />
+					<p className="text-blue-700 dark:text-blue-300">
+						FHIR and NHDR rows in this registry configure the connection endpoint and
+						credential reference only. For FHIR R4 bundle exports, patient consent
+						management, and NHDR submissions, go to{" "}
+						<a href="/admin/fhir" className="font-medium underline">
+							Admin → FHIR / NHDR
+						</a>
+						.
+					</p>
+				</div>
+			)}
 			<div className="flex items-center justify-between gap-3">
 				<div className="flex items-center gap-2">
 					<div className="relative">
@@ -90,10 +113,15 @@ export function IntegrationList() {
 					>
 						<option value="all">All kinds</option>
 						<option value="fhir">FHIR</option>
-						<option value="civil_registry">Civil Registry</option>
+
 						<option value="hai">HAI</option>
-						<option value="philhealth">PhilHealth</option>
-						<option value="custom">Custom</option>
+						<option value="philhealth">PhilHealth</option>					<option value="erp">ERP</option>
+					<option value="lis">LIS</option>
+					<option value="pacs">PACS</option>
+					<option value="telemedicine">Telemedicine</option>
+					<option value="nhdr">NHDR</option>
+					<option value="pidsr">PIDSR</option>
+					<option value="custom">Custom</option>
 					</select>
 				</div>
 				<Link href="/admin/integration-registry/new">

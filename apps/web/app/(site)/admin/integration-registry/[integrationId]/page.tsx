@@ -23,6 +23,14 @@ export default function IntegrationDetailPage() {
 	if (!can(permSet, "admin", "view")) {
 		return (
 			<div className="flex items-center justify-center p-8 text-muted-foreground">
+				You do not have permission to access this page.
+			</div>
+		)
+	}
+
+	if (!can(permSet, "integration_registry", "view")) {
+		return (
+			<div className="flex items-center justify-center p-8 text-muted-foreground">
 				You do not have permission to access integration registry management.
 			</div>
 		)

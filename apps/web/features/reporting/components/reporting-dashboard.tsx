@@ -1,7 +1,7 @@
 "use client"
 
-import { useRouter, useSearchParams } from "next/navigation"
 import { useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -34,15 +34,15 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
-	useSurveillanceFlagsQuery,
-	useReviewFlagMutation,
-	usePidsrCasesQuery,
-	usePidsrCaseDetailQuery,
-	useSubmitPidsrCaseMutation,
-	useGenerateWeeklyReportMutation,
-	useAhsrMetricsQuery,
 	useAhsrDrilldownQuery,
+	useAhsrMetricsQuery,
 	useExportAhsrMutation,
+	useGenerateWeeklyReportMutation,
+	usePidsrCaseDetailQuery,
+	usePidsrCasesQuery,
+	useReviewFlagMutation,
+	useSubmitPidsrCaseMutation,
+	useSurveillanceFlagsQuery,
 } from "@/features/reporting/api/reporting.hooks"
 import { AhsrDashboard } from "@/features/reporting/components/ahsr-dashboard"
 import { HaiReport } from "@/features/reporting/components/hai-report"
@@ -83,17 +83,29 @@ function statusBadge(status: string) {
 // Main Dashboard
 // ============================================================================
 
-export function ReportingDashboard() {
+export function ReportingDashboard({
+	canEdit = false,
+	canExport = false,
+}: {
+	canEdit?: boolean
+	canExport?: boolean
+}) {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 
 	const router = useRouter()
 	const searchParams = useSearchParams()
-	const currentTab = searchParams.get("tab") ?? "surveillance"
+	const defaultTab = canEdit ? "surveillance" : "ahsr"
+	const rawTab = searchParams.get("tab") ?? defaultTab
+
+	// Oversight-only users must not land on operator tabs.
+	const oversightTabs = ["ahsr", ...(canExport ? ["export"] : [])]
+	const visibleTab = !canEdit && !oversightTabs.includes(rawTab) ? "ahsr" : rawTab
 
 	function handleTabChange(value: string) {
 		const params = new URLSearchParams(searchParams.toString())
-		if (value === "surveillance") {
+		const isDefault = value === defaultTab
+		if (isDefault) {
 			params.delete("tab")
 		} else {
 			params.set("tab", value)
@@ -109,43 +121,56 @@ export function ReportingDashboard() {
 		)
 	}
 
+	const heading = canEdit ? "Statutory Reporting" : "Reporting Oversight"
+	const description = canEdit
+		? "PIDSR surveillance, case management, weekly reports, AHSR metrics, and HAI reporting"
+		: "AHSR metrics and oversight reporting. Contact the Reporting Officer for PIDSR operations, weekly reporting, and AHSR exports."
+
 	return (
 		<div className="space-y-6">
 			<div>
-				<h1 className="text-2xl font-bold">Statutory Reporting</h1>
-				<p className="text-muted-foreground">
-					PIDSR surveillance, case management, weekly reports, AHSR metrics, and HAI reporting
-				</p>
+				<h1 className="text-2xl font-bold">{heading}</h1>
+				<p className="text-muted-foreground">{description}</p>
 			</div>
 
-			<Tabs value={currentTab} onValueChange={handleTabChange}>
+			<Tabs value={visibleTab} onValueChange={handleTabChange}>
 				<TabsList variant="line">
-					<TabsTrigger value="surveillance">Surveillance Flags</TabsTrigger>
-					<TabsTrigger value="pidsr">PIDSR</TabsTrigger>
-					<TabsTrigger value="weekly">Weekly Report</TabsTrigger>
+					{canEdit && <TabsTrigger value="surveillance">Surveillance Flags</TabsTrigger>}
+					{canEdit && <TabsTrigger value="pidsr">PIDSR</TabsTrigger>}
+					{canEdit && <TabsTrigger value="weekly">Weekly Report</TabsTrigger>}
 					<TabsTrigger value="ahsr">AHSR Dashboard</TabsTrigger>
-					<TabsTrigger value="hai">HAI Report</TabsTrigger>
-					<TabsTrigger value="export">Export</TabsTrigger>
+					{canEdit && <TabsTrigger value="hai">HAI Report</TabsTrigger>}
+					{canExport && <TabsTrigger value="export">Export</TabsTrigger>}
 				</TabsList>
 
-				<TabsContent value="surveillance">
-					<SurveillancePanel facilityId={facilityId} />
-				</TabsContent>
-				<TabsContent value="pidsr">
-					<PidsrDashboard facilityId={facilityId} />
-				</TabsContent>
-				<TabsContent value="weekly">
-					<WeeklyReportPanel facilityId={facilityId} />
-				</TabsContent>
+				{canEdit && (
+					<TabsContent value="surveillance">
+						<SurveillancePanel facilityId={facilityId} />
+					</TabsContent>
+				)}
+				{canEdit && (
+					<TabsContent value="pidsr">
+						<PidsrDashboard facilityId={facilityId} />
+					</TabsContent>
+				)}
+				{canEdit && (
+					<TabsContent value="weekly">
+						<WeeklyReportPanel facilityId={facilityId} />
+					</TabsContent>
+				)}
 				<TabsContent value="ahsr">
-					<AhsrDashboard facilityId={facilityId} />
+					<AhsrDashboard facilityId={facilityId} canEdit={canEdit} canExport={canExport} />
 				</TabsContent>
-				<TabsContent value="hai">
-					<HaiReport facilityId={facilityId} />
-				</TabsContent>
-				<TabsContent value="export">
-					<ReportExport facilityId={facilityId} />
-				</TabsContent>
+				{canEdit && (
+					<TabsContent value="hai">
+						<HaiReport facilityId={facilityId} />
+					</TabsContent>
+				)}
+				{canExport && (
+					<TabsContent value="export">
+						<ReportExport facilityId={facilityId} />
+					</TabsContent>
+				)}
 			</Tabs>
 		</div>
 	)
@@ -165,7 +190,7 @@ function SurveillancePanel({ facilityId }: { facilityId: string }) {
 		page,
 		limit: 20,
 		isReviewed: reviewed === "all" ? undefined : reviewed === "true",
-		category: category === "all" ? undefined : category,
+		category: category === "all" ? undefined : (category as "category_1" | "category_2"),
 	})
 
 	const reviewMut = useReviewFlagMutation()
@@ -200,7 +225,7 @@ function SurveillancePanel({ facilityId }: { facilityId: string }) {
 					<div className="flex gap-2">
 						<Select
 							value={reviewed}
-							onValueChange={(v) => {
+							onValueChange={v => {
 								if (v) setReviewed(v)
 							}}
 						>
@@ -215,7 +240,7 @@ function SurveillancePanel({ facilityId }: { facilityId: string }) {
 						</Select>
 						<Select
 							value={category}
-							onValueChange={(v) => {
+							onValueChange={v => {
 								if (v) setCategory(v)
 							}}
 						>
@@ -252,7 +277,7 @@ function SurveillancePanel({ facilityId }: { facilityId: string }) {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{data.flags.map((flag) => (
+								{data.flags.map(flag => (
 									<TableRow key={flag.id}>
 										<TableCell>
 											<div className="font-medium">{flag.patientName ?? "—"}</div>
@@ -292,7 +317,7 @@ function SurveillancePanel({ facilityId }: { facilityId: string }) {
 									size="sm"
 									variant="outline"
 									disabled={page <= 1}
-									onClick={() => setPage((p) => p - 1)}
+									onClick={() => setPage(p => p - 1)}
 								>
 									Previous
 								</Button>
@@ -303,7 +328,7 @@ function SurveillancePanel({ facilityId }: { facilityId: string }) {
 									size="sm"
 									variant="outline"
 									disabled={page >= data.totalPages}
-									onClick={() => setPage((p) => p + 1)}
+									onClick={() => setPage(p => p + 1)}
 								>
 									Next
 								</Button>
@@ -328,7 +353,7 @@ function SurveillancePanel({ facilityId }: { facilityId: string }) {
 							<Label>Action</Label>
 							<Select
 								value={reviewAction}
-								onValueChange={(v) => {
+								onValueChange={v => {
 									if (v) setReviewAction(v as "confirm" | "dismiss")
 								}}
 							>
@@ -347,7 +372,7 @@ function SurveillancePanel({ facilityId }: { facilityId: string }) {
 								<Label>Dismiss Reason</Label>
 								<Input
 									value={dismissReason}
-									onChange={(e) => setDismissReason(e.target.value)}
+									onChange={e => setDismissReason(e.target.value)}
 									placeholder="e.g., False positive, duplicate, etc."
 								/>
 							</div>
@@ -381,8 +406,12 @@ function PidsrCasesPanel({ facilityId }: { facilityId: string }) {
 		facilityId,
 		page,
 		limit: 20,
-		reportStatus: statusFilter === "all" ? undefined : statusFilter,
-		category: categoryFilter === "all" ? undefined : categoryFilter,
+		reportStatus:
+			statusFilter === "all"
+				? undefined
+				: (statusFilter as "draft" | "submitted" | "rejected" | "blocked"),
+		category:
+			categoryFilter === "all" ? undefined : (categoryFilter as "category_1" | "category_2"),
 	})
 
 	const submitMut = useSubmitPidsrCaseMutation()
@@ -404,7 +433,7 @@ function PidsrCasesPanel({ facilityId }: { facilityId: string }) {
 					<div className="flex gap-2">
 						<Select
 							value={statusFilter}
-							onValueChange={(v) => {
+							onValueChange={v => {
 								if (v) setStatusFilter(v)
 							}}
 						>
@@ -419,7 +448,7 @@ function PidsrCasesPanel({ facilityId }: { facilityId: string }) {
 						</Select>
 						<Select
 							value={categoryFilter}
-							onValueChange={(v) => {
+							onValueChange={v => {
 								if (v) setCategoryFilter(v)
 							}}
 						>
@@ -454,7 +483,7 @@ function PidsrCasesPanel({ facilityId }: { facilityId: string }) {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{data.cases.map((c) => (
+								{data.cases.map(c => (
 									<TableRow key={c.id}>
 										<TableCell>
 											<div className="font-medium">{c.patientName ?? "—"}</div>
@@ -496,7 +525,7 @@ function PidsrCasesPanel({ facilityId }: { facilityId: string }) {
 									size="sm"
 									variant="outline"
 									disabled={page <= 1}
-									onClick={() => setPage((p) => p - 1)}
+									onClick={() => setPage(p => p - 1)}
 								>
 									Previous
 								</Button>
@@ -507,7 +536,7 @@ function PidsrCasesPanel({ facilityId }: { facilityId: string }) {
 									size="sm"
 									variant="outline"
 									disabled={page >= data.totalPages}
-									onClick={() => setPage((p) => p + 1)}
+									onClick={() => setPage(p => p + 1)}
 								>
 									Next
 								</Button>
@@ -532,16 +561,13 @@ function PidsrCasesPanel({ facilityId }: { facilityId: string }) {
 									{caseDetail.patientName ?? "—"}
 								</div>
 								<div>
-									<span className="text-muted-foreground">MRN:</span>{" "}
-									{caseDetail.patientMrn ?? "—"}
+									<span className="text-muted-foreground">MRN:</span> {caseDetail.patientMrn ?? "—"}
 								</div>
 								<div>
-									<span className="text-muted-foreground">Disease:</span>{" "}
-									{caseDetail.diseaseName}
+									<span className="text-muted-foreground">Disease:</span> {caseDetail.diseaseName}
 								</div>
 								<div>
-									<span className="text-muted-foreground">ICD-10:</span>{" "}
-									{caseDetail.diseaseCode}
+									<span className="text-muted-foreground">ICD-10:</span> {caseDetail.diseaseCode}
 								</div>
 								<div>
 									<span className="text-muted-foreground">Classification:</span>{" "}
@@ -624,11 +650,7 @@ function WeeklyReportPanel({ facilityId }: { facilityId: string }) {
 				<div className="flex items-end gap-4">
 					<div className="space-y-1">
 						<Label>Week Starting</Label>
-						<Input
-							type="date"
-							value={weekStart}
-							onChange={(e) => setWeekStart(e.target.value)}
-						/>
+						<Input type="date" value={weekStart} onChange={e => setWeekStart(e.target.value)} />
 					</div>
 					<Button onClick={handleGenerate} disabled={generateMut.isPending}>
 						{generateMut.isPending ? "Generating…" : "Generate Report"}
@@ -649,8 +671,7 @@ function WeeklyReportPanel({ facilityId }: { facilityId: string }) {
 									<span className="text-muted-foreground">Total Cases:</span> {report.totalCases}
 								</div>
 								<div>
-									<span className="text-muted-foreground">Confirmed:</span>{" "}
-									{report.confirmedCases}
+									<span className="text-muted-foreground">Confirmed:</span> {report.confirmedCases}
 								</div>
 							</div>
 						</div>
@@ -665,7 +686,7 @@ function WeeklyReportPanel({ facilityId }: { facilityId: string }) {
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{report.diseaseBreakdown.map((d) => (
+									{report.diseaseBreakdown.map(d => (
 										<TableRow key={d.diseaseCode}>
 											<TableCell>{d.diseaseName}</TableCell>
 											<TableCell className="text-muted-foreground">{d.diseaseCode}</TableCell>
@@ -686,15 +707,23 @@ function WeeklyReportPanel({ facilityId }: { facilityId: string }) {
 // AHSR Panel
 // ============================================================================
 
-function AhsrPanel({ facilityId }: { facilityId: string }) {
+function AhsrPanel({
+	facilityId,
+	canEdit = false,
+	canExport = false,
+}: {
+	facilityId: string
+	canEdit?: boolean
+	canExport?: boolean
+}) {
 	const currentYear = new Date().getFullYear()
 	const [year, setYear] = useState(currentYear)
-	const [month, setMonth] = useState<string>("all")
+	const [quarter, setQuarter] = useState<string>("all")
 
 	const { data: metrics, isLoading } = useAhsrMetricsQuery({
 		facilityId,
 		year,
-		month: month === "all" ? undefined : Number(month),
+		quarter: quarter === "all" ? undefined : (Number(quarter) as 1 | 2 | 3 | 4),
 	})
 
 	const exportMut = useExportAhsrMutation()
@@ -708,7 +737,7 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 		{
 			facilityId,
 			year,
-			month: month === "all" ? undefined : Number(month),
+			month: quarter === "all" ? undefined : Number(quarter) * 3,
 			metric: drillMetric,
 			icdCode: drillIcd,
 			haiType: drillHai,
@@ -728,24 +757,16 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 		exportMut.mutate({
 			facilityId,
 			year,
-			month: month === "all" ? undefined : Number(month),
+			month: quarter === "all" ? undefined : Number(quarter) * 3,
 		})
 	}
 
-	const months = [
-		{ value: "all", label: "Full Year" },
-		{ value: "1", label: "January" },
-		{ value: "2", label: "February" },
-		{ value: "3", label: "March" },
-		{ value: "4", label: "April" },
-		{ value: "5", label: "May" },
-		{ value: "6", label: "June" },
-		{ value: "7", label: "July" },
-		{ value: "8", label: "August" },
-		{ value: "9", label: "September" },
-		{ value: "10", label: "October" },
-		{ value: "11", label: "November" },
-		{ value: "12", label: "December" },
+	const quarters = [
+		{ value: "all", label: "Annual" },
+		{ value: "1", label: "Q1 (Jan–Mar)" },
+		{ value: "2", label: "Q2 (Apr–Jun)" },
+		{ value: "3", label: "Q3 (Jul–Sep)" },
+		{ value: "4", label: "Q4 (Oct–Dec)" },
 	]
 
 	return (
@@ -758,7 +779,7 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 						<div className="flex gap-2">
 							<Select
 								value={String(year)}
-								onValueChange={(v) => {
+								onValueChange={v => {
 									if (v) setYear(Number(v))
 								}}
 							>
@@ -766,7 +787,7 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{[currentYear, currentYear - 1, currentYear - 2].map((y) => (
+									{[currentYear, currentYear - 1, currentYear - 2].map(y => (
 										<SelectItem key={y} value={String(y)}>
 											{y}
 										</SelectItem>
@@ -774,25 +795,27 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 								</SelectContent>
 							</Select>
 							<Select
-								value={month}
-								onValueChange={(v) => {
-									if (v) setMonth(v)
+								value={quarter}
+								onValueChange={v => {
+									if (v) setQuarter(v)
 								}}
 							>
-								<SelectTrigger className="w-36">
+								<SelectTrigger className="w-40">
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{months.map((m) => (
-										<SelectItem key={m.value} value={m.value}>
-											{m.label}
+									{quarters.map(q => (
+										<SelectItem key={q.value} value={q.value}>
+											{q.label}
 										</SelectItem>
 									))}
 								</SelectContent>
 							</Select>
-							<Button variant="outline" onClick={handleExport} disabled={exportMut.isPending}>
-								{exportMut.isPending ? "Exporting…" : "Export Snapshot"}
-							</Button>
+							{canExport && (
+								<Button variant="outline" onClick={handleExport} disabled={exportMut.isPending}>
+									{exportMut.isPending ? "Exporting…" : "Export Snapshot"}
+								</Button>
+							)}
 						</div>
 					</div>
 				</CardHeader>
@@ -823,7 +846,9 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 						/>
 						<SummaryCard
 							title="Bed Occupancy"
-							value={metrics.bedOccupancyRate != null ? `${metrics.bedOccupancyRate.toFixed(1)}%` : "—"}
+							value={
+								metrics.bedOccupancyRate != null ? `${metrics.bedOccupancyRate.toFixed(1)}%` : "—"
+							}
 						/>
 					</div>
 
@@ -863,11 +888,11 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 											<TableHead>ICD-10</TableHead>
 											<TableHead className="text-right">Count</TableHead>
 											<TableHead className="text-right">%</TableHead>
-											<TableHead />
+											{canEdit && <TableHead />}
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{metrics.topMorbidities.map((m) => (
+										{metrics.topMorbidities.map(m => (
 											<TableRow key={m.icdCode}>
 												<TableCell>{m.rank}</TableCell>
 												<TableCell>{m.diseaseName}</TableCell>
@@ -875,13 +900,15 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 												<TableCell className="text-right">{m.count}</TableCell>
 												<TableCell className="text-right">{m.percentage.toFixed(1)}%</TableCell>
 												<TableCell className="text-right">
-													<Button
-														size="sm"
-														variant="ghost"
-														onClick={() => openDrilldown("morbidity", m.icdCode)}
-													>
-														Drilldown
-													</Button>
+													{canEdit && (
+														<Button
+															size="sm"
+															variant="ghost"
+															onClick={() => openDrilldown("morbidity", m.icdCode)}
+														>
+															Drilldown
+														</Button>
+													)}
 												</TableCell>
 											</TableRow>
 										))}
@@ -908,11 +935,11 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 											<TableHead>ICD-10</TableHead>
 											<TableHead className="text-right">Count</TableHead>
 											<TableHead className="text-right">%</TableHead>
-											<TableHead />
+											{canEdit && <TableHead />}
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{metrics.topMortalities.map((m) => (
+										{metrics.topMortalities.map(m => (
 											<TableRow key={m.icdCode}>
 												<TableCell>{m.rank}</TableCell>
 												<TableCell>{m.diseaseName}</TableCell>
@@ -920,13 +947,15 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 												<TableCell className="text-right">{m.count}</TableCell>
 												<TableCell className="text-right">{m.percentage.toFixed(1)}%</TableCell>
 												<TableCell className="text-right">
-													<Button
-														size="sm"
-														variant="ghost"
-														onClick={() => openDrilldown("mortality", m.icdCode)}
-													>
-														Drilldown
-													</Button>
+													{canEdit && (
+														<Button
+															size="sm"
+															variant="ghost"
+															onClick={() => openDrilldown("mortality", m.icdCode)}
+														>
+															Drilldown
+														</Button>
+													)}
 												</TableCell>
 											</TableRow>
 										))}
@@ -951,23 +980,25 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 											<TableHead>HAI Type</TableHead>
 											<TableHead className="text-right">Count</TableHead>
 											<TableHead className="text-right">Rate / 1000 Admissions</TableHead>
-											<TableHead />
+											{canEdit && <TableHead />}
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{metrics.haiMetrics.map((h) => (
+										{metrics.haiMetrics.map(h => (
 											<TableRow key={h.haiType}>
 												<TableCell className="font-medium uppercase">{h.haiType}</TableCell>
 												<TableCell className="text-right">{h.count}</TableCell>
 												<TableCell className="text-right">{h.rate.toFixed(2)}</TableCell>
 												<TableCell className="text-right">
-													<Button
-														size="sm"
-														variant="ghost"
-														onClick={() => openDrilldown("hai", undefined, h.haiType)}
-													>
-														Drilldown
-													</Button>
+													{canEdit && (
+														<Button
+															size="sm"
+															variant="ghost"
+															onClick={() => openDrilldown("hai", undefined, h.haiType)}
+														>
+															Drilldown
+														</Button>
+													)}
 												</TableCell>
 											</TableRow>
 										))}
@@ -1003,7 +1034,7 @@ function AhsrPanel({ facilityId }: { facilityId: string }) {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{drilldown.encounters.map((enc) => (
+								{drilldown.encounters.map(enc => (
 									<TableRow key={enc.encounterId}>
 										<TableCell>{enc.patientName}</TableCell>
 										<TableCell>{enc.patientMrn}</TableCell>
@@ -1044,7 +1075,10 @@ function SummaryCard({
 	onClick?: () => void
 }) {
 	return (
-		<Card className={onClick ? "cursor-pointer transition-shadow hover:shadow-md" : ""} onClick={onClick}>
+		<Card
+			className={onClick ? "cursor-pointer transition-shadow hover:shadow-md" : ""}
+			onClick={onClick}
+		>
 			<CardContent className="pt-4">
 				<div className="text-muted-foreground text-sm">{title}</div>
 				<div className="text-2xl font-bold">{value}</div>

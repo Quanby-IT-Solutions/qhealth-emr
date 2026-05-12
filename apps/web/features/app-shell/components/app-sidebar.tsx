@@ -28,6 +28,7 @@ import {
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { NAV_ICONS } from "@/features/app-shell/lib/nav-icons"
 import {
+	type AdminNavGroup,
 	filterNavItems,
 	PRIMARY_NAV_ITEMS,
 	SECONDARY_NAV_ITEMS,
@@ -35,13 +36,27 @@ import {
 
 import { UserMenu } from "./user-menu"
 
+const ADMIN_GROUPS: AdminNavGroup[] = [
+	"Identity & Access",
+	"Clinical Configuration",
+	"Reporting & Compliance",
+	"System Settings",
+]
+
 export function AppSidebar() {
 	const pathname = usePathname()
 	const { data: profile } = useMyProfile()
 
 	const permissions = profile?.activeRole?.permissions ?? []
 	const primaryItems = filterNavItems(PRIMARY_NAV_ITEMS, permissions)
-	const secondaryItems = filterNavItems(SECONDARY_NAV_ITEMS, permissions)
+	const allSecondaryItems = filterNavItems(SECONDARY_NAV_ITEMS, permissions)
+	const secondaryItems = allSecondaryItems.filter(item => !item.adminGroup)
+
+	const adminGroupMap = new Map(
+		ADMIN_GROUPS.map(g => [g, allSecondaryItems.filter(item => item.adminGroup === g)])
+	)
+	const hasAdminItems = ADMIN_GROUPS.some(g => (adminGroupMap.get(g)?.length ?? 0) > 0)
+	const isAdminPath = pathname.startsWith("/admin")
 
 	return (
 		<Sidebar collapsible="icon" variant="sidebar">
@@ -89,7 +104,7 @@ export function AppSidebar() {
 									<CollapsibleTrigger className="flex w-full items-center justify-between">
 										<span>More Modules</span>
 										<HugeiconsIcon
-										icon={ArrowRight01FreeIcons}
+											icon={ArrowRight01FreeIcons}
 											className="size-3 transition-transform [[data-panel-open]_&]:rotate-90"
 										/>
 									</CollapsibleTrigger>
@@ -116,6 +131,51 @@ export function AppSidebar() {
 								</CollapsibleContent>
 							</Collapsible>
 						</SidebarGroup>
+					</>
+				)}
+
+				{hasAdminItems && (
+					<>
+						<SidebarSeparator />
+						{ADMIN_GROUPS.map(group => {
+							const items = adminGroupMap.get(group) ?? []
+							if (items.length === 0) return null
+							return (
+								<SidebarGroup key={group}>
+									<Collapsible defaultOpen={isAdminPath}>
+										<SidebarGroupLabel>
+											<CollapsibleTrigger className="flex w-full items-center justify-between">
+												<span>{group}</span>
+												<HugeiconsIcon
+													icon={ArrowRight01FreeIcons}
+													className="size-3 transition-transform [[data-panel-open]_&]:rotate-90"
+												/>
+											</CollapsibleTrigger>
+										</SidebarGroupLabel>
+										<CollapsibleContent>
+											<SidebarGroupContent>
+												<SidebarMenu>
+													{items.map(item => {
+														const Icon = NAV_ICONS[item.iconName]
+														const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+														return (
+															<SidebarMenuItem key={`admin-${item.href}`}>
+																<SidebarMenuButton isActive={isActive} tooltip={item.title}>
+																	<Link href={item.href as never} className="flex items-center gap-2">
+																		<HugeiconsIcon icon={Icon} className="size-4" />
+																		<span>{item.title}</span>
+																	</Link>
+																</SidebarMenuButton>
+															</SidebarMenuItem>
+														)
+													})}
+												</SidebarMenu>
+											</SidebarGroupContent>
+										</CollapsibleContent>
+									</Collapsible>
+								</SidebarGroup>
+							)
+						})}
 					</>
 				)}
 			</SidebarContent>

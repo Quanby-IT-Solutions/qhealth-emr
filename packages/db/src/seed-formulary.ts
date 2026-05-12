@@ -52,7 +52,11 @@ async function seedDrugBrands(generics: { id: string; genericName: string }[]) {
 
 	const data = [
 		{ drugGenericId: getGenericId("Paracetamol")!, brandName: "Biogesic", manufacturer: "Unilab" },
-		{ drugGenericId: getGenericId("Paracetamol")!, brandName: "Tylenol", manufacturer: "Johnson & Johnson" },
+		{
+			drugGenericId: getGenericId("Paracetamol")!,
+			brandName: "Tylenol",
+			manufacturer: "Johnson & Johnson",
+		},
 		{ drugGenericId: getGenericId("Amoxicillin")!, brandName: "Amoxil", manufacturer: "GSK" },
 		{ drugGenericId: getGenericId("Metformin")!, brandName: "Glucophage", manufacturer: "Merck" },
 		{ drugGenericId: getGenericId("Amlodipine")!, brandName: "Norvasc", manufacturer: "Pfizer" },
@@ -61,7 +65,11 @@ async function seedDrugBrands(generics: { id: string; genericName: string }[]) {
 		{ drugGenericId: getGenericId("Salbutamol")!, brandName: "Ventolin", manufacturer: "GSK" },
 		{ drugGenericId: getGenericId("Ibuprofen")!, brandName: "Advil", manufacturer: "Pfizer" },
 		{ drugGenericId: getGenericId("Atorvastatin")!, brandName: "Lipitor", manufacturer: "Pfizer" },
-		{ drugGenericId: getGenericId("Insulin Glargine")!, brandName: "Lantus", manufacturer: "Sanofi" },
+		{
+			drugGenericId: getGenericId("Insulin Glargine")!,
+			brandName: "Lantus",
+			manufacturer: "Sanofi",
+		},
 		{ drugGenericId: getGenericId("Furosemide")!, brandName: "Lasix", manufacturer: "Sanofi" },
 	].filter(d => d.drugGenericId)
 
@@ -71,23 +79,91 @@ async function seedDrugBrands(generics: { id: string; genericName: string }[]) {
 
 async function seedIcd10Codes() {
 	const data = [
-		{ code: "A09", description: "Infectious gastroenteritis and colitis, unspecified", category: "Certain infectious and parasitic diseases" },
-		{ code: "A15.0", description: "Tuberculosis of lung", category: "Certain infectious and parasitic diseases" },
-		{ code: "B20", description: "Human immunodeficiency virus [HIV] disease", category: "Certain infectious and parasitic diseases" },
-		{ code: "E11", description: "Type 2 diabetes mellitus", category: "Endocrine, nutritional and metabolic diseases" },
-		{ code: "E11.65", description: "Type 2 diabetes mellitus with hyperglycemia", category: "Endocrine, nutritional and metabolic diseases" },
-		{ code: "E78.5", description: "Dyslipidemia, unspecified", category: "Endocrine, nutritional and metabolic diseases" },
-		{ code: "I10", description: "Essential (primary) hypertension", category: "Diseases of the circulatory system" },
-		{ code: "I25.10", description: "Atherosclerotic heart disease of native coronary artery", category: "Diseases of the circulatory system" },
-		{ code: "I50.9", description: "Heart failure, unspecified", category: "Diseases of the circulatory system" },
-		{ code: "J06.9", description: "Acute upper respiratory infection, unspecified", category: "Diseases of the respiratory system" },
-		{ code: "J18.9", description: "Pneumonia, unspecified organism", category: "Diseases of the respiratory system" },
-		{ code: "J45.909", description: "Unspecified asthma, uncomplicated", category: "Diseases of the respiratory system" },
-		{ code: "K21.0", description: "Gastro-esophageal reflux disease with esophagitis", category: "Diseases of the digestive system" },
-		{ code: "M54.5", description: "Low back pain", category: "Diseases of the musculoskeletal system" },
-		{ code: "N18.3", description: "Chronic kidney disease, stage 3", category: "Diseases of the genitourinary system" },
-		{ code: "R50.9", description: "Fever, unspecified", category: "Symptoms, signs and abnormal clinical findings" },
-		{ code: "Z00.00", description: "Encounter for general adult medical examination without abnormal findings", category: "Factors influencing health status" },
+		{
+			code: "A09",
+			description: "Infectious gastroenteritis and colitis, unspecified",
+			category: "Certain infectious and parasitic diseases",
+		},
+		{
+			code: "A15.0",
+			description: "Tuberculosis of lung",
+			category: "Certain infectious and parasitic diseases",
+		},
+		{
+			code: "B20",
+			description: "Human immunodeficiency virus [HIV] disease",
+			category: "Certain infectious and parasitic diseases",
+		},
+		{
+			code: "E11",
+			description: "Type 2 diabetes mellitus",
+			category: "Endocrine, nutritional and metabolic diseases",
+		},
+		{
+			code: "E11.65",
+			description: "Type 2 diabetes mellitus with hyperglycemia",
+			category: "Endocrine, nutritional and metabolic diseases",
+		},
+		{
+			code: "E78.5",
+			description: "Dyslipidemia, unspecified",
+			category: "Endocrine, nutritional and metabolic diseases",
+		},
+		{
+			code: "I10",
+			description: "Essential (primary) hypertension",
+			category: "Diseases of the circulatory system",
+		},
+		{
+			code: "I25.10",
+			description: "Atherosclerotic heart disease of native coronary artery",
+			category: "Diseases of the circulatory system",
+		},
+		{
+			code: "I50.9",
+			description: "Heart failure, unspecified",
+			category: "Diseases of the circulatory system",
+		},
+		{
+			code: "J06.9",
+			description: "Acute upper respiratory infection, unspecified",
+			category: "Diseases of the respiratory system",
+		},
+		{
+			code: "J18.9",
+			description: "Pneumonia, unspecified organism",
+			category: "Diseases of the respiratory system",
+		},
+		{
+			code: "J45.909",
+			description: "Unspecified asthma, uncomplicated",
+			category: "Diseases of the respiratory system",
+		},
+		{
+			code: "K21.0",
+			description: "Gastro-esophageal reflux disease with esophagitis",
+			category: "Diseases of the digestive system",
+		},
+		{
+			code: "M54.5",
+			description: "Low back pain",
+			category: "Diseases of the musculoskeletal system",
+		},
+		{
+			code: "N18.3",
+			description: "Chronic kidney disease, stage 3",
+			category: "Diseases of the genitourinary system",
+		},
+		{
+			code: "R50.9",
+			description: "Fever, unspecified",
+			category: "Symptoms, signs and abnormal clinical findings",
+		},
+		{
+			code: "Z00.00",
+			description: "Encounter for general adult medical examination without abnormal findings",
+			category: "Factors influencing health status",
+		},
 	]
 
 	await db.insert(icd10Codes).values(data).onConflictDoNothing()
@@ -96,16 +172,86 @@ async function seedIcd10Codes() {
 
 async function seedLoincCodes() {
 	const data = [
-		{ loincNum: "2160-0", component: "Creatinine", property: "MCnc", system: "Ser/Plas", scale: "Qn", longCommonName: "Creatinine [Mass/volume] in Serum or Plasma" },
-		{ loincNum: "2345-7", component: "Glucose", property: "MCnc", system: "Ser/Plas", scale: "Qn", longCommonName: "Glucose [Mass/volume] in Serum or Plasma" },
-		{ loincNum: "718-7", component: "Hemoglobin", property: "MCnc", system: "Bld", scale: "Qn", longCommonName: "Hemoglobin [Mass/volume] in Blood" },
-		{ loincNum: "4548-4", component: "Hemoglobin A1c/Hemoglobin.total", property: "MFr", system: "Bld", scale: "Qn", longCommonName: "Hemoglobin A1c/Hemoglobin.total in Blood" },
-		{ loincNum: "2093-3", component: "Cholesterol.total", property: "MCnc", system: "Ser/Plas", scale: "Qn", longCommonName: "Cholesterol [Mass/volume] in Serum or Plasma" },
-		{ loincNum: "6690-2", component: "Leukocytes", property: "NCnc", system: "Bld", scale: "Qn", longCommonName: "Leukocytes [#/volume] in Blood by Automated count" },
-		{ loincNum: "777-3", component: "Platelets", property: "NCnc", system: "Bld", scale: "Qn", longCommonName: "Platelets [#/volume] in Blood by Automated count" },
-		{ loincNum: "2951-2", component: "Sodium", property: "SCnc", system: "Ser/Plas", scale: "Qn", longCommonName: "Sodium [Moles/volume] in Serum or Plasma" },
-		{ loincNum: "2823-3", component: "Potassium", property: "SCnc", system: "Ser/Plas", scale: "Qn", longCommonName: "Potassium [Moles/volume] in Serum or Plasma" },
-		{ loincNum: "1742-6", component: "Alanine aminotransferase", property: "CCnc", system: "Ser/Plas", scale: "Qn", longCommonName: "Alanine aminotransferase [Enzymatic activity/volume] in Serum or Plasma" },
+		{
+			loincNum: "2160-0",
+			component: "Creatinine",
+			property: "MCnc",
+			system: "Ser/Plas",
+			scale: "Qn",
+			longCommonName: "Creatinine [Mass/volume] in Serum or Plasma",
+		},
+		{
+			loincNum: "2345-7",
+			component: "Glucose",
+			property: "MCnc",
+			system: "Ser/Plas",
+			scale: "Qn",
+			longCommonName: "Glucose [Mass/volume] in Serum or Plasma",
+		},
+		{
+			loincNum: "718-7",
+			component: "Hemoglobin",
+			property: "MCnc",
+			system: "Bld",
+			scale: "Qn",
+			longCommonName: "Hemoglobin [Mass/volume] in Blood",
+		},
+		{
+			loincNum: "4548-4",
+			component: "Hemoglobin A1c/Hemoglobin.total",
+			property: "MFr",
+			system: "Bld",
+			scale: "Qn",
+			longCommonName: "Hemoglobin A1c/Hemoglobin.total in Blood",
+		},
+		{
+			loincNum: "2093-3",
+			component: "Cholesterol.total",
+			property: "MCnc",
+			system: "Ser/Plas",
+			scale: "Qn",
+			longCommonName: "Cholesterol [Mass/volume] in Serum or Plasma",
+		},
+		{
+			loincNum: "6690-2",
+			component: "Leukocytes",
+			property: "NCnc",
+			system: "Bld",
+			scale: "Qn",
+			longCommonName: "Leukocytes [#/volume] in Blood by Automated count",
+		},
+		{
+			loincNum: "777-3",
+			component: "Platelets",
+			property: "NCnc",
+			system: "Bld",
+			scale: "Qn",
+			longCommonName: "Platelets [#/volume] in Blood by Automated count",
+		},
+		{
+			loincNum: "2951-2",
+			component: "Sodium",
+			property: "SCnc",
+			system: "Ser/Plas",
+			scale: "Qn",
+			longCommonName: "Sodium [Moles/volume] in Serum or Plasma",
+		},
+		{
+			loincNum: "2823-3",
+			component: "Potassium",
+			property: "SCnc",
+			system: "Ser/Plas",
+			scale: "Qn",
+			longCommonName: "Potassium [Moles/volume] in Serum or Plasma",
+		},
+		{
+			loincNum: "1742-6",
+			component: "Alanine aminotransferase",
+			property: "CCnc",
+			system: "Ser/Plas",
+			scale: "Qn",
+			longCommonName: "Alanine aminotransferase [Enzymatic activity/volume] in Serum or Plasma",
+		},
 	]
 
 	await db.insert(loincCodes).values(data).onConflictDoNothing()
@@ -137,16 +283,76 @@ async function seedRxnormCodes() {
 
 async function seedRvsCodes() {
 	const data = [
-		{ rvsCode: "99201", procedureName: "Office or other outpatient visit, new patient, minimal", category: "Evaluation and Management", rvsValue: "0.48", effectiveDate: "2024-01-01" },
-		{ rvsCode: "99213", procedureName: "Office or other outpatient visit, established patient, low complexity", category: "Evaluation and Management", rvsValue: "1.30", effectiveDate: "2024-01-01" },
-		{ rvsCode: "99214", procedureName: "Office or other outpatient visit, established patient, moderate complexity", category: "Evaluation and Management", rvsValue: "1.92", effectiveDate: "2024-01-01" },
-		{ rvsCode: "99281", procedureName: "Emergency department visit, self-limited or minor", category: "Emergency Medicine", rvsValue: "0.63", effectiveDate: "2024-01-01" },
-		{ rvsCode: "99285", procedureName: "Emergency department visit, high complexity", category: "Emergency Medicine", rvsValue: "4.00", effectiveDate: "2024-01-01" },
-		{ rvsCode: "36415", procedureName: "Collection of venous blood by venipuncture", category: "Pathology and Laboratory", rvsValue: "0.17", effectiveDate: "2024-01-01" },
-		{ rvsCode: "80053", procedureName: "Comprehensive metabolic panel", category: "Pathology and Laboratory", rvsValue: "0.00", effectiveDate: "2024-01-01" },
-		{ rvsCode: "85025", procedureName: "Complete blood count with automated differential", category: "Pathology and Laboratory", rvsValue: "0.00", effectiveDate: "2024-01-01" },
-		{ rvsCode: "71046", procedureName: "Radiologic examination, chest, 2 views", category: "Radiology", rvsValue: "0.60", effectiveDate: "2024-01-01" },
-		{ rvsCode: "93000", procedureName: "Electrocardiogram, 12-lead with interpretation and report", category: "Cardiology", rvsValue: "0.34", effectiveDate: "2024-01-01" },
+		{
+			rvsCode: "99201",
+			procedureName: "Office or other outpatient visit, new patient, minimal",
+			category: "Evaluation and Management",
+			rvsValue: "0.48",
+			effectiveDate: "2024-01-01",
+		},
+		{
+			rvsCode: "99213",
+			procedureName: "Office or other outpatient visit, established patient, low complexity",
+			category: "Evaluation and Management",
+			rvsValue: "1.30",
+			effectiveDate: "2024-01-01",
+		},
+		{
+			rvsCode: "99214",
+			procedureName: "Office or other outpatient visit, established patient, moderate complexity",
+			category: "Evaluation and Management",
+			rvsValue: "1.92",
+			effectiveDate: "2024-01-01",
+		},
+		{
+			rvsCode: "99281",
+			procedureName: "Emergency department visit, self-limited or minor",
+			category: "Emergency Medicine",
+			rvsValue: "0.63",
+			effectiveDate: "2024-01-01",
+		},
+		{
+			rvsCode: "99285",
+			procedureName: "Emergency department visit, high complexity",
+			category: "Emergency Medicine",
+			rvsValue: "4.00",
+			effectiveDate: "2024-01-01",
+		},
+		{
+			rvsCode: "36415",
+			procedureName: "Collection of venous blood by venipuncture",
+			category: "Pathology and Laboratory",
+			rvsValue: "0.17",
+			effectiveDate: "2024-01-01",
+		},
+		{
+			rvsCode: "80053",
+			procedureName: "Comprehensive metabolic panel",
+			category: "Pathology and Laboratory",
+			rvsValue: "0.00",
+			effectiveDate: "2024-01-01",
+		},
+		{
+			rvsCode: "85025",
+			procedureName: "Complete blood count with automated differential",
+			category: "Pathology and Laboratory",
+			rvsValue: "0.00",
+			effectiveDate: "2024-01-01",
+		},
+		{
+			rvsCode: "71046",
+			procedureName: "Radiologic examination, chest, 2 views",
+			category: "Radiology",
+			rvsValue: "0.60",
+			effectiveDate: "2024-01-01",
+		},
+		{
+			rvsCode: "93000",
+			procedureName: "Electrocardiogram, 12-lead with interpretation and report",
+			category: "Cardiology",
+			rvsValue: "0.34",
+			effectiveDate: "2024-01-01",
+		},
 	]
 
 	await db.insert(rvsCodes).values(data).onConflictDoNothing()

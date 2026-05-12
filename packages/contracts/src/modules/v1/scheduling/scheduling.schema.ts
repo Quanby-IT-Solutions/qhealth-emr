@@ -34,6 +34,7 @@ export const AppointmentStatusEnum = z.enum([
 ])
 
 export const AppointmentEncounterTypeEnum = z.enum(["outpatient", "telemedicine"])
+export const ClinicSlotStatusEnum = z.enum(["open", "blocked", "booked", "cancelled"])
 
 // ============================================================================
 // Clinic Template Schema
@@ -64,6 +65,7 @@ export const AppointmentSchema = z.object({
 	id: z.string().uuid(),
 	facilityId: z.string().uuid(),
 	clinicTemplateId: z.string().uuid().nullable(),
+	clinicSlotId: z.string().uuid().nullable(),
 	patientId: z.string().uuid(),
 	clinicianStaffId: z.string().uuid(),
 	appointmentDate: z.string(), // YYYY-MM-DD format
@@ -82,6 +84,31 @@ export const AppointmentSchema = z.object({
 })
 
 export type Appointment = z.infer<typeof AppointmentSchema>
+export type CreateClinicTemplateInput = z.infer<typeof CreateClinicTemplateSchema>
+export type UpdateClinicTemplateInput = z.infer<typeof UpdateClinicTemplateSchema>
+
+// ============================================================================
+// Clinic Slot Schema
+// ============================================================================
+
+export const ClinicSlotSchema = z.object({
+	id: z.string().uuid(),
+	clinicTemplateId: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	clinicianStaffId: z.string().uuid(),
+	slotDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+	slotStartTime: z.string().regex(/^\d{2}:\d{2}$/),
+	slotEndTime: z.string().regex(/^\d{2}:\d{2}$/),
+	status: ClinicSlotStatusEnum,
+	blockReason: z.string().nullable(),
+	appointmentId: z.string().uuid().nullable(),
+	blockedByStaffId: z.string().uuid().nullable(),
+	blockedAt: dateOrString.nullable(),
+	createdAt: dateOrString,
+	updatedAt: dateOrString,
+})
+
+export type ClinicSlot = z.infer<typeof ClinicSlotSchema>
 
 // ============================================================================
 // Appointment with Patient & Clinician info (for listing)
@@ -132,8 +159,14 @@ export const CreateClinicTemplateSchema = z.object({
 export const UpdateClinicTemplateSchema = z.object({
 	id: z.string().uuid(),
 	clinicName: z.string().min(1).max(255).optional(),
-	startTime: z.string().regex(/^\d{2}:\d{2}$/, "Must be HH:mm format").optional(),
-	endTime: z.string().regex(/^\d{2}:\d{2}$/, "Must be HH:mm format").optional(),
+	startTime: z
+		.string()
+		.regex(/^\d{2}:\d{2}$/, "Must be HH:mm format")
+		.optional(),
+	endTime: z
+		.string()
+		.regex(/^\d{2}:\d{2}$/, "Must be HH:mm format")
+		.optional(),
 	maxPatients: z.number().int().positive().optional(),
 	slotDurationMinutes: z.number().int().positive().optional(),
 	isActive: z.boolean().optional(),
@@ -159,6 +192,8 @@ export const AppointmentListResponseSchema = PaginatedResponseSchema.extend({
 		})
 	),
 })
+export type AppointmentListResponse = z.infer<typeof AppointmentListResponseSchema>
+export type AppointmentListItem = AppointmentListResponse["items"][number]
 
 // ============================================================================
 // Create Appointment
@@ -167,6 +202,7 @@ export const AppointmentListResponseSchema = PaginatedResponseSchema.extend({
 export const CreateAppointmentSchema = z.object({
 	facilityId: z.string().uuid(),
 	clinicTemplateId: z.string().uuid().optional(),
+	clinicSlotId: z.string().uuid().optional(),
 	patientId: z.string().uuid(),
 	clinicianStaffId: z.string().uuid(),
 	appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format"),
@@ -212,13 +248,29 @@ export const AvailableSlotsQuerySchema = z.object({
 })
 
 export const TimeSlotSchema = z.object({
+	slotId: z.string().uuid(),
 	time: z.string(), // HH:mm
 	available: z.boolean(),
 })
+export type TimeSlot = z.infer<typeof TimeSlotSchema>
 
 export const AvailableSlotsResponseSchema = z.object({
 	slots: z.array(TimeSlotSchema),
 	clinicName: z.string().nullable(),
+})
+export type AvailableSlotsResponse = z.infer<typeof AvailableSlotsResponseSchema>
+
+export const ListTemplateSlotsQuerySchema = z.object({
+	id: z.string().uuid(),
+	fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+	toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+	status: ClinicSlotStatusEnum.optional(),
+})
+
+export const UpdateSlotSchema = z.object({
+	id: z.string().uuid(),
+	action: z.enum(["block", "unblock"]),
+	reason: z.string().max(500).optional(),
 })
 
 // ============================================================================
@@ -234,6 +286,7 @@ export const ClinicQueueQuerySchema = z.object({
 
 // Unified queue status — maps appointment statuses + encounter walk-in statuses
 export const QueueEntryStatusEnum = z.enum(["waiting", "in_progress", "completed"])
+export type QueueEntryStatus = z.infer<typeof QueueEntryStatusEnum>
 
 // A single entry in the unified clinic queue — can be either a booked appointment
 // (checked in) or a walk-in OPD encounter (created from /patients/search).
@@ -267,6 +320,7 @@ export const ClinicQueueResponseSchema = z.object({
 		total: z.number(),
 	}),
 })
+export type ClinicQueueResponse = z.infer<typeof ClinicQueueResponseSchema>
 
 // PS-003: Update walk-in encounter queue status
 export const UpdateEncounterQueueStatusSchema = z.object({
@@ -278,6 +332,9 @@ export const UpdateEncounterQueueStatusResponseSchema = z.object({
 	id: z.string().uuid(),
 	queueStatus: z.enum(["waiting", "in_progress", "completed"]),
 })
+export type UpdateEncounterQueueStatusResponse = z.infer<
+	typeof UpdateEncounterQueueStatusResponseSchema
+>
 
 // ============================================================================
 // Type Exports
@@ -289,4 +346,6 @@ export type CheckInAppointmentInput = z.infer<typeof CheckInAppointmentSchema>
 export type UpdateAppointmentStatusInput = z.infer<typeof UpdateAppointmentStatusSchema>
 export type AvailableSlotsQuery = z.infer<typeof AvailableSlotsQuerySchema>
 export type ClinicQueueQuery = z.infer<typeof ClinicQueueQuerySchema>
+export type ListTemplateSlotsQuery = z.infer<typeof ListTemplateSlotsQuerySchema>
+export type UpdateSlotInput = z.infer<typeof UpdateSlotSchema>
 export type UpdateEncounterQueueStatusInput = z.infer<typeof UpdateEncounterQueueStatusSchema>

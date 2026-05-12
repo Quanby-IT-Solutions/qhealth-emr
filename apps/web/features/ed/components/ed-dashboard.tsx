@@ -29,7 +29,9 @@ import { useEdQueueQuery } from "@/features/ed/api/ed.hooks"
 import { acuityColor, acuityLabel } from "@/features/ed/lib/acuity-utils"
 import { orpc } from "@/services/orpc/client"
 import { useNotifications } from "@/services/notifications/notification-provider"
+import { toast } from "sonner"
 
+import { DischargeInstructionsDialog } from "./discharge-instructions-dialog"
 import { DispositionForm } from "./disposition-form"
 import { MergeDialog } from "./merge-dialog"
 import { PreEncounterForm } from "./pre-encounter-form"
@@ -80,6 +82,11 @@ export function EdDashboard() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 	const staffProfileId = profile?.staffProfiles?.[0]?.id ?? ""
+	const permissions = profile?.activeRole?.permissions ?? []
+	const permSet = new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
+	const canCreate = permSet.has("ed:create")
 
 	const { data: queue, isLoading } = useEdQueueQuery(facilityId)
 
@@ -97,6 +104,10 @@ export function EdDashboard() {
 		traumaAlias: string
 	} | null>(null)
 	const [disposeItem, setDisposeItem] = useState<{
+		encounterId: string
+		patientName: string
+	} | null>(null)
+	const [dischargeInstructionsItem, setDischargeInstructionsItem] = useState<{
 		encounterId: string
 		patientName: string
 	} | null>(null)
@@ -139,32 +150,36 @@ export function EdDashboard() {
 					</p>
 				</div>
 				<div className="flex items-center gap-2">
-					<Dialog open={triageOpen} onOpenChange={setTriageOpen}>
-						<DialogTrigger render={<Button variant="outline">New Triage</Button>} />
-						<DialogContent className="max-w-lg">
-							<DialogHeader>
-								<DialogTitle>New Triage Pre-Encounter</DialogTitle>
-							</DialogHeader>
-							<TriageForm
-								facilityId={facilityId}
-								triageStaffId={staffProfileId}
-								onSuccess={() => setTriageOpen(false)}
-							/>
-						</DialogContent>
-					</Dialog>
-					<Dialog open={preEncounterOpen} onOpenChange={setPreEncounterOpen}>
-						<DialogTrigger render={<Button>Fast Track (Pre-Encounter)</Button>} />
-						<DialogContent className="max-w-lg">
-							<DialogHeader>
-								<DialogTitle>Fast Track — Pre-Encounter</DialogTitle>
-							</DialogHeader>
-							<PreEncounterForm
-								facilityId={facilityId}
-								triageStaffId={staffProfileId}
-								onSuccess={() => setPreEncounterOpen(false)}
-							/>
-						</DialogContent>
-					</Dialog>
+					{canCreate && (
+						<Dialog open={triageOpen} onOpenChange={setTriageOpen}>
+							<DialogTrigger render={<Button variant="outline">New Triage</Button>} />
+							<DialogContent className="max-w-lg">
+								<DialogHeader>
+									<DialogTitle>New Triage Pre-Encounter</DialogTitle>
+								</DialogHeader>
+								<TriageForm
+									facilityId={facilityId}
+									triageStaffId={staffProfileId}
+									onSuccess={() => setTriageOpen(false)}
+								/>
+							</DialogContent>
+						</Dialog>
+					)}
+					{canCreate && (
+						<Dialog open={preEncounterOpen} onOpenChange={setPreEncounterOpen}>
+							<DialogTrigger render={<Button>Fast Track (Pre-Encounter)</Button>} />
+							<DialogContent className="max-w-lg">
+								<DialogHeader>
+									<DialogTitle>Fast Track — Pre-Encounter</DialogTitle>
+								</DialogHeader>
+								<PreEncounterForm
+									facilityId={facilityId}
+									triageStaffId={staffProfileId}
+									onSuccess={() => setPreEncounterOpen(false)}
+								/>
+							</DialogContent>
+						</Dialog>
+					)}
 				</div>
 			</div>
 
@@ -385,9 +400,31 @@ export function EdDashboard() {
 							encounterId={disposeItem.encounterId}
 							facilityId={facilityId}
 							onSuccess={() => setDisposeItem(null)}
+							onDischargeSuccess={result => {
+								if (result.oecbEligible) {
+									toast(
+										"Patient tagged as OECB-eligible — routed to PhilHealth outpatient billing track."
+									)
+								}
+								setDischargeInstructionsItem({
+									encounterId: result.encounterId,
+									patientName: disposeItem.patientName,
+								})
+							}}
 						/>
 					</DialogContent>
 				</Dialog>
+			)}
+
+			{/* Discharge Instructions Dialog */}
+			{dischargeInstructionsItem && (
+				<DischargeInstructionsDialog
+					open={!!dischargeInstructionsItem}
+					onOpenChange={open => {
+						if (!open) setDischargeInstructionsItem(null)
+					}}
+					encounterId={dischargeInstructionsItem.encounterId}
+				/>
 			)}
 		</div>
 	)

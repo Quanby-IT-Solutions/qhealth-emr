@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-
+import { useRouter } from "next/navigation"
 import { Stethoscope } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -19,9 +19,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 import {
+	useSurgicalCaseListQuery,
 	type SurgeryStatus,
 	type SurgicalCase,
-	useSurgicalCaseListQuery,
 } from "../api/surgical.hooks"
 
 function formatDateTime(dateStr: string | null | undefined): string {
@@ -62,9 +62,10 @@ const STATUS_TABS: { value: SurgeryStatus | "all"; label: string }[] = [
 
 interface SurgicalTableProps {
 	cases: SurgicalCase[]
+	onRowClick: (caseId: string) => void
 }
 
-function SurgicalTable({ cases }: SurgicalTableProps) {
+function SurgicalTable({ cases, onRowClick }: SurgicalTableProps) {
 	if (cases.length === 0) {
 		return (
 			<div className="flex flex-col items-center gap-2 py-10 text-center">
@@ -89,8 +90,12 @@ function SurgicalTable({ cases }: SurgicalTableProps) {
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{cases.map((c) => (
-					<TableRow key={c.id}>
+				{cases.map(c => (
+					<TableRow
+						key={c.id}
+						className="hover:bg-muted/50 cursor-pointer"
+						onClick={() => onRowClick(c.id)}
+					>
 						<TableCell className="font-medium">{c.patientName ?? "—"}</TableCell>
 						<TableCell>{c.procedureName}</TableCell>
 						<TableCell className="capitalize">{c.surgicalType}</TableCell>
@@ -109,12 +114,30 @@ function SurgicalTable({ cases }: SurgicalTableProps) {
 }
 
 export function SurgicalDashboard() {
+	const router = useRouter()
 	const { data: profile } = useMyProfile()
-	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+	const activeStaffProfile =
+		profile?.staffProfiles?.find(staffProfile =>
+			staffProfile.roles?.some(role => role.id === profile.activeRole?.id)
+		) ?? profile?.staffProfiles?.[0]
+	const facilityId = activeStaffProfile?.facilityId ?? ""
+	const roleName = (profile?.activeRole?.name ?? "").toLowerCase()
+	const isSurgeon = roleName === "surgeon"
+	const isAnesthesiologist = roleName === "anesthesiologist"
+	const ownCaseFilter = isSurgeon
+		? { surgeonStaffId: activeStaffProfile?.id }
+		: isAnesthesiologist
+			? { anesthesiologistStaffId: activeStaffProfile?.id }
+			: {}
 
 	const [activeTab, setActiveTab] = useState<SurgeryStatus>("scheduled")
 
-	const { data, isLoading } = useSurgicalCaseListQuery({ facilityId, status: activeTab })
+	const { data, isLoading } = useSurgicalCaseListQuery({
+		facilityId,
+		status: activeTab,
+		...ownCaseFilter,
+	})
+	const caseScopeLabel = isSurgeon || isAnesthesiologist ? "My Cases" : "All Cases"
 
 	const counts = STATUS_TABS.reduce<Record<string, number>>((acc, tab) => {
 		acc[tab.value] = 0
@@ -130,9 +153,12 @@ export function SurgicalDashboard() {
 						Operating room schedule and surgical cases
 					</p>
 				</div>
-				<Button variant="outline" nativeButton={false} render={<a href="/surgical/schedule" />}>
-					OR Schedule Calendar
-				</Button>
+				<div className="flex items-center gap-2">
+					<Badge variant="secondary">{caseScopeLabel}</Badge>
+					<Button variant="outline" nativeButton={false} render={<a href="/or/schedule" />}>
+						OR Schedule Calendar
+					</Button>
+				</div>
 			</div>
 
 			<Card>
@@ -140,20 +166,14 @@ export function SurgicalDashboard() {
 					<CardTitle>Surgical Cases</CardTitle>
 				</CardHeader>
 				<CardContent className="p-0">
-					<div className="border-b px-4 pb-0 pt-1">
-						<Tabs
-							value={activeTab}
-							onValueChange={(v) => setActiveTab(v as SurgeryStatus)}
-						>
+					<div className="border-b px-4 pt-1 pb-0">
+						<Tabs value={activeTab} onValueChange={v => setActiveTab(v as SurgeryStatus)}>
 							<TabsList variant="line">
-								{STATUS_TABS.map((tab) => (
+								{STATUS_TABS.map(tab => (
 									<TabsTrigger key={tab.value} value={tab.value}>
 										{tab.label}
-										{counts[tab.value] > 0 && (
-											<Badge
-												variant="secondary"
-												className="ml-1.5 text-[10px]"
-											>
+										{(counts[tab.value] ?? 0) > 0 && (
+											<Badge variant="secondary" className="ml-1.5 text-[10px]">
 												{counts[tab.value]}
 											</Badge>
 										)}
@@ -163,11 +183,12 @@ export function SurgicalDashboard() {
 						</Tabs>
 					</div>
 					{isLoading ? (
-						<div className="text-muted-foreground py-8 text-center text-sm">
-							Loading…
-						</div>
+						<div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
 					) : (
-						<SurgicalTable cases={data?.data ?? []} />
+						<SurgicalTable
+							cases={data?.data ?? []}
+							onRowClick={id => router.push(`/surgical/${id}`)}
+						/>
 					)}
 				</CardContent>
 			</Card>

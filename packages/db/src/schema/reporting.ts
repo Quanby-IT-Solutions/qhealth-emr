@@ -17,9 +17,7 @@ export const pidsrCases = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
 		patientId: t
 			.uuid("patient_id")
 			.notNull()
@@ -27,9 +25,7 @@ export const pidsrCases = createTable(
 		diseaseCode: t.text("disease_code").notNull(),
 		diseaseName: t.text("disease_name").notNull(),
 		// PIDSR Category: Category 1 = immediate (within 24 hrs), Category 2 = weekly
-		category: t
-			.text("category")
-			.$type<"category_1" | "category_2">(),
+		category: t.text("category").$type<"category_1" | "category_2">(),
 		caseClassification: t
 			.text("case_classification")
 			.notNull()
@@ -66,12 +62,8 @@ export const surveillanceFlags = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "cascade" }),
-		noteId: t
-			.uuid("note_id")
-			.references(() => clinicalNotes.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
+		noteId: t.uuid("note_id").references(() => clinicalNotes.id, { onDelete: "set null" }),
 		flagType: t.text("flag_type").notNull(),
 		triggeredBy: t.text("triggered_by").notNull(),
 		triggerValue: t.text("trigger_value").notNull(),
@@ -114,6 +106,83 @@ export const ahsrSnapshots = createTable(
 )
 
 // ============================================================================
+// AHSR PERIODS — Reporting period lifecycle (open → validating → locked)
+// ============================================================================
+
+export const ahsrPeriods = createTable(
+	"ahsr_periods",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		year: t.integer("year").notNull(),
+		quarter: t.integer("quarter").$type<1 | 2 | 3 | 4>(),
+		status: t.text("status").notNull().default("open").$type<"open" | "validating" | "locked">(),
+		lockedAt: t.timestamp("locked_at"),
+		lockedByStaffId: t
+			.uuid("locked_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("ahsr_periods_facility_id_idx").on(t.facilityId),
+		index("ahsr_periods_year_quarter_idx").on(t.year, t.quarter),
+	]
+)
+
+export const ahsrValidationIssues = createTable(
+	"ahsr_validation_issues",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		periodId: t.uuid("period_id").references(() => ahsrPeriods.id, { onDelete: "cascade" }),
+		issueType: t
+			.text("issue_type")
+			.notNull()
+			.$type<"missing_icd10" | "deprecated_code" | "no_finalized_note">(),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "cascade" }),
+		detail: t.text("detail"),
+		status: t.text("status").notNull().default("open").$type<"open" | "resolved">(),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("ahsr_validation_issues_facility_id_idx").on(t.facilityId),
+		index("ahsr_validation_issues_period_id_idx").on(t.periodId),
+		index("ahsr_validation_issues_issue_type_idx").on(t.issueType),
+	]
+)
+
+export const mortalityMorbiditySnapshots = createTable(
+	"mortality_morbidity_snapshots",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		period: t.text("period").notNull(), // e.g. "2024-Q1" or "2024"
+		type: t.text("type").notNull().$type<"mortality" | "morbidity">(),
+		top10Json: t.jsonb("top10_json").notNull(),
+		generatedByStaffId: t
+			.uuid("generated_by_staff_id")
+			.notNull()
+			.references(() => staffProfiles.id, { onDelete: "restrict" }),
+		generatedAt: t.timestamp("generated_at").notNull().defaultNow(),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("mm_snapshots_facility_id_idx").on(t.facilityId),
+		index("mm_snapshots_period_type_idx").on(t.period, t.type),
+	]
+)
+
+// ============================================================================
 // FHIR EXPORT — FHIR/NHDR Export Tracking
 // ============================================================================
 
@@ -138,7 +207,11 @@ export const fhirExports = createTable(
 			warnings?: Array<{ resourceType: string; resourceId: string; warning: string }>
 			summary?: Record<string, { total: number; valid: number; invalid: number }>
 		}>(),
-		exportFormat: t.text("export_format").notNull().default("ndjson").$type<"ndjson" | "json_bundle">(),
+		exportFormat: t
+			.text("export_format")
+			.notNull()
+			.default("ndjson")
+			.$type<"ndjson" | "json_bundle">(),
 		exportFileUrl: t.text("export_file_url"),
 		/** NDJSON or JSON bundle content stored in-database pending file-storage migration. */
 		bundleData: t.text("bundle_data"),
@@ -167,4 +240,57 @@ export const fhirExports = createTable(
 		index("fhir_exports_submission_status_idx").on(t.submissionStatus),
 		index("fhir_exports_created_at_idx").on(t.createdAt),
 	]
+)
+
+// ============================================================================
+// PIDSR SUBMISSIONS — Batched Cat-2 transmission tracking
+// ============================================================================
+
+export const pidsrSubmissions = createTable(
+	"pidsr_submissions",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		alertIds: t.jsonb("alert_ids").$type<string[]>().notNull().default([]),
+		transmittedAt: t.timestamp("transmitted_at"),
+		dohRef: t.text("doh_ref"),
+		status: t
+			.text("status")
+			.notNull()
+			.default("pending")
+			.$type<"pending" | "transmitted" | "failed">(),
+		payloadHash: t.text("payload_hash"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("pidsr_submissions_facility_id_idx").on(t.facilityId),
+		index("pidsr_submissions_status_idx").on(t.status),
+	]
+)
+
+// ============================================================================
+// AHSR EXPORTS — AHSR export bundle tracking
+// ============================================================================
+
+export const ahsrExports = createTable(
+	"ahsr_exports",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		periodId: t.uuid("period_id").references(() => ahsrPeriods.id, { onDelete: "set null" }),
+		payloadUri: t.text("payload_uri"),
+		exportedAt: t.timestamp("exported_at"),
+		exportedByStaffId: t
+			.uuid("exported_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [index("ahsr_exports_facility_id_idx").on(t.facilityId)]
 )

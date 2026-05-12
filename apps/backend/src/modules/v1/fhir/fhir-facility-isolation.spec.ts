@@ -23,8 +23,8 @@ import { db } from "@/common/database/database.client"
 
 import { FhirBundleBuilderService } from "./fhir-bundle-builder.service"
 import { FhirCanonicalValidatorService } from "./fhir-canonical-validator.service"
-import { FhirService } from "./fhir.service"
 import { FhirValidatorService } from "./fhir-validator.service"
+import { FhirService } from "./fhir.service"
 import { NhdrAdapterService } from "./nhdr-adapter.service"
 
 // ---------------------------------------------------------------------------
@@ -40,11 +40,7 @@ jest.mock("@/common/database/database.client", () => ({
 }))
 
 jest.mock("@repo/db/schema", () => {
-	const proxy = () =>
-		new Proxy(
-			{},
-			{ get: (_t, p) => String(p) }
-		)
+	const proxy = () => new Proxy({}, { get: (_t, p) => String(p) })
 	return {
 		fhirExports: proxy(),
 		staffProfiles: proxy(),
@@ -244,9 +240,9 @@ describe("FhirService — facility isolation (FHIR-002)", () => {
 			const builder = makeSelectBuilder([])
 			mockDb.select.mockReturnValue(builder)
 
-			await expect(
-				service.submitToNhdr(EXPORT_ID, "user-id", "User Name")
-			).rejects.toThrow(NotFoundException)
+			await expect(service.submitToNhdr(EXPORT_ID, "user-id", "User Name")).rejects.toThrow(
+				NotFoundException
+			)
 		})
 	})
 
@@ -277,7 +273,8 @@ describe("FhirService — facility isolation (FHIR-002)", () => {
 		it("returns exports when no facilityId is supplied in the query", async () => {
 			const result = await service.listExports({ page: 1, limit: 20 })
 			expect(result.total).toBe(1)
-			expect(result.data[0].id).toBe(EXPORT_ID)
+			expect(result.data).toHaveLength(1)
+			expect(result.data[0]!.id).toBe(EXPORT_ID)
 		})
 
 		it("still returns active-facility exports when caller supplies a different facilityId", async () => {
@@ -290,7 +287,8 @@ describe("FhirService — facility isolation (FHIR-002)", () => {
 				facilityId: OTHER_FACILITY_ID,
 			})
 			expect(result.total).toBe(1)
-			expect(result.data[0].facilityId).toBe(FACILITY_ID)
+			expect(result.data).toHaveLength(1)
+			expect(result.data[0]!.facilityId).toBe(FACILITY_ID)
 		})
 	})
 
@@ -317,7 +315,7 @@ describe("FhirService — facility isolation (FHIR-002)", () => {
 		it("returns submissions for the active facility", async () => {
 			const result = await service.listNhdrSubmissions({})
 			expect(result).toHaveLength(1)
-			expect(result[0].facilityId).toBe(FACILITY_ID)
+			expect(result[0]!.facilityId).toBe(FACILITY_ID)
 		})
 
 		it("still returns active-facility submissions when caller supplies a different facilityId", async () => {
@@ -325,7 +323,7 @@ describe("FhirService — facility isolation (FHIR-002)", () => {
 				facilityId: OTHER_FACILITY_ID,
 			})
 			expect(result).toHaveLength(1)
-			expect(result[0].facilityId).toBe(FACILITY_ID)
+			expect(result[0]!.facilityId).toBe(FACILITY_ID)
 		})
 	})
 })

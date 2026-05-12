@@ -23,8 +23,8 @@ import { db } from "@/common/database/database.client"
 
 import { FhirBundleBuilderService } from "./fhir-bundle-builder.service"
 import { FhirCanonicalValidatorService } from "./fhir-canonical-validator.service"
-import { FhirService } from "./fhir.service"
 import { FhirValidatorService } from "./fhir-validator.service"
+import { FhirService } from "./fhir.service"
 import { NhdrAdapterService } from "./nhdr-adapter.service"
 
 // ---------------------------------------------------------------------------
@@ -41,11 +41,7 @@ jest.mock("@/common/database/database.client", () => ({
 }))
 
 jest.mock("@repo/db/schema", () => {
-	const proxy = () =>
-		new Proxy(
-			{},
-			{ get: (_t, p) => String(p) }
-		)
+	const proxy = () => new Proxy({}, { get: (_t, p) => String(p) })
 	return {
 		fhirExports: proxy(),
 		staffProfiles: proxy(),
@@ -53,6 +49,7 @@ jest.mock("@repo/db/schema", () => {
 		auditLogs: proxy(),
 		dataExports: proxy(),
 		facilities: proxy(),
+		integrations: proxy(),
 	}
 })
 
@@ -79,10 +76,9 @@ type MockDb = {
 function makeLimitBuilder(rows: unknown[]) {
 	const b: Record<string, unknown> = {}
 	for (const m of ["from", "leftJoin", "where"]) {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		;(b as any)[m] = jest.fn().mockReturnValue(b)
 	}
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 	;(b as any)["limit"] = jest.fn().mockImplementation(() => ({
 		then: (resolve: (v: unknown) => unknown) => Promise.resolve(rows).then(resolve),
 	}))
@@ -153,7 +149,10 @@ describe("FhirService — audit trails (FHIR-001)", () => {
 				FhirService,
 				{ provide: FhirBundleBuilderService, useValue: bundleBuilder },
 				{ provide: FhirValidatorService, useValue: validator },
-				{ provide: FhirCanonicalValidatorService, useValue: { validateCanonical: jest.fn().mockResolvedValue([]) } },
+				{
+					provide: FhirCanonicalValidatorService,
+					useValue: { validateCanonical: jest.fn().mockResolvedValue([]) },
+				},
 				{ provide: NhdrAdapterService, useValue: nhdrAdapter },
 			],
 		}).compile()
@@ -237,13 +236,20 @@ describe("FhirService — audit trails (FHIR-001)", () => {
 			submissionDate: "2024-12-01",
 		}
 
+		const NHDR_REGISTRY_ROW = {
+			endpointUrl: "https://nhdr.gov.ph/fhir",
+			credentialsRef: null,
+		}
+
 		function setupHappyPath() {
 			let selectCount = 0
 			mockDb.select.mockImplementation(() => {
 				selectCount++
 				// Call 1: getExportRow
 				if (selectCount === 1) return makeLimitBuilder([EXPORT_ROW])
-				// Call 2: staff profile lookup for submittedByStaff
+				// Call 2: Integration Registry lookup for enabled NHDR row
+				if (selectCount === 2) return makeLimitBuilder([NHDR_REGISTRY_ROW])
+				// Call 3: staff profile lookup for submittedByStaff
 				return makeLimitBuilder([STAFF_ROW])
 			})
 			nhdrAdapter.submit.mockResolvedValue(ACK)
@@ -292,7 +298,9 @@ describe("FhirService — audit trails (FHIR-001)", () => {
 		it("does not write audit records when the export is not found", async () => {
 			mockDb.select.mockReturnValue(makeLimitBuilder([]))
 
-			await expect(service.submitToNhdr(EXPORT_ID, USER_ID, "Test User")).rejects.toThrow(NotFoundException)
+			await expect(service.submitToNhdr(EXPORT_ID, USER_ID, "Test User")).rejects.toThrow(
+				NotFoundException
+			)
 			expect(mockDb.insert).not.toHaveBeenCalled()
 		})
 	})
@@ -357,7 +365,6 @@ describe("FhirService — audit trails (FHIR-001)", () => {
 			const auditValuesMock = jest.fn().mockResolvedValue([])
 			setupHappyPath(auditValuesMock)
 
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			await service.createExport(INPUT as any, USER_ID, "Test User")
 
 			expect(auditValuesMock).toHaveBeenCalledWith(
@@ -376,7 +383,6 @@ describe("FhirService — audit trails (FHIR-001)", () => {
 			const auditValuesMock = jest.fn().mockResolvedValue([])
 			setupHappyPath(auditValuesMock)
 
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			await service.createExport(INPUT as any, USER_ID, "Test User")
 
 			expect(auditValuesMock).toHaveBeenCalledWith(

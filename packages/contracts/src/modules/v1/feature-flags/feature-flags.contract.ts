@@ -13,6 +13,25 @@ import {
 	UpdateFeatureFlagTargetingSchema,
 } from "./feature-flags.schema.js"
 
+const FeatureFlagHistoryItemSchema = z.object({
+	id: z.string().uuid(),
+	flagId: z.string().uuid(),
+	flagName: z.string(),
+	previousValue: z.boolean().nullable(),
+	newValue: z.boolean(),
+	changedBy: z.string().uuid().nullable(),
+	changedAt: z
+		.union([z.date(), z.string()])
+		.transform(v => (typeof v === "string" ? new Date(v) : v)),
+	reason: z.string().nullable(),
+})
+
+const FeatureFlagHistoryQuerySchema = z.object({
+	flagId: z.string().uuid(),
+	page: z.number().int().positive().optional().default(1),
+	limit: z.number().int().min(1).max(100).optional().default(20),
+})
+
 const EvaluateResponseSchema = z.object({
 	key: z.string(),
 	enabled: z.boolean(),
@@ -105,4 +124,24 @@ export const featureFlagsContract = {
 		})
 		.input(FeatureFlagKeySchema)
 		.output(EvaluateResponseSchema),
+
+	/**
+	 * Paginated history of changes for a specific feature flag.
+	 */
+	history: oc
+		.route({
+			method: "GET",
+			path: "/{flagId}/history",
+			summary: "Get paginated change history for a feature flag",
+			tags: ["Feature Flags"],
+		})
+		.input(FeatureFlagHistoryQuerySchema)
+		.output(
+			z.object({
+				data: z.array(FeatureFlagHistoryItemSchema),
+				total: z.number().int(),
+				page: z.number().int(),
+				limit: z.number().int(),
+			})
+		),
 }

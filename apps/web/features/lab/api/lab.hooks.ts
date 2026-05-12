@@ -2,10 +2,22 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import type {
+	ApproveCrossMatch,
+	BedsideVerifyInput as ContractBedsideVerifyInput,
+	BedsideVerifyResult as ContractBedsideVerifyResult,
+	BloodType as ContractBloodType,
+	BloodUnit as ContractBloodUnit,
+	CrossMatchRequest as ContractCrossMatchRequest,
+	CreateCrossMatch,
+	CrossMatchListQuery,
+	CrossMatchListResponse,
+} from "@repo/contracts"
+
+import { orpc } from "@/services/orpc/client"
 import { env } from "@/env"
 
 const ORDERS_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/orders`
-const LAB_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/lab`
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 	const res = await fetch(url, {
@@ -23,7 +35,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
 	if (entries.length === 0) return ""
-	return `?${entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")}`
+	return "?" + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
 }
 
 // ============================================================================
@@ -82,62 +94,12 @@ export interface PaginatedLabOrders {
 	totalPages: number
 }
 
-export type BloodType = "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-"
-
-export interface BloodUnit {
-	id: string
-	unitBarcode: string
-	bloodType: BloodType
-	componentType: string
-	expiryDate: string
-	status: "available" | "reserved" | "transfused" | "discarded"
-	donorId: string | null
-}
-
-export interface CrossMatchRequest {
-	id: string
-	facilityId: string
-	patientId: string
-	patientName: string
-	bloodType: BloodType | null
-	componentType: string
-	unitsRequested: number
-	urgency: "routine" | "urgent" | "emergency"
-	clinicalIndication: string | null
-	compatibilityResult: "compatible" | "incompatible" | "pending" | null
-	status: "pending" | "cross_matched" | "approved" | "issued" | "transfused" | "cancelled"
-	requestedBy: string
-	requestedAt: string
-	crossMatchedBy: string | null
-	crossMatchedAt: string | null
-	approvedBy: string | null
-	approvedAt: string | null
-	issuedBy: string | null
-	issuedAt: string | null
-	bloodUnits: BloodUnit[]
-	createdAt: string
-}
-
-export interface PaginatedCrossMatches {
-	data: CrossMatchRequest[]
-	total: number
-	page: number
-	limit: number
-	totalPages: number
-}
-
-export interface BedsideVerifyInput {
-	crossMatchId: string
-	unitBarcode: string
-	patientWristbandBarcode: string
-}
-
-export interface BedsideVerifyResult {
-	verified: boolean
-	patientMatch: boolean
-	unitMatch: boolean
-	message: string
-}
+export type BloodType = ContractBloodType
+export type BloodUnit = ContractBloodUnit
+export type CrossMatchRequest = ContractCrossMatchRequest
+export type PaginatedCrossMatches = CrossMatchListResponse
+export type BedsideVerifyInput = ContractBedsideVerifyInput
+export type BedsideVerifyResult = ContractBedsideVerifyResult
 
 // ============================================================================
 // Query Keys
@@ -168,7 +130,7 @@ export function useLabDashboardQuery(params: LabDashboardParams) {
 		queryKey: labKeys.dashboard(params),
 		queryFn: () =>
 			fetchJson<PaginatedLabOrders>(
-				`${ORDERS_BASE}/labs${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`,
+				`${ORDERS_BASE}/labs${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
 			),
 		enabled: !!params.facilityId,
 	})
@@ -186,89 +148,70 @@ export function useLabOrderDetailQuery(id: string) {
 // Blood Bank — Cross-Match
 // ============================================================================
 
-interface CrossMatchListParams {
-	facilityId: string
-	status?: string
-	page?: number
-	limit?: number
-}
+type CrossMatchListParams = Omit<CrossMatchListQuery, "page" | "limit"> &
+	Partial<Pick<CrossMatchListQuery, "page" | "limit">>
 
 export function useCrossMatchListQuery(params: CrossMatchListParams) {
-	return useQuery({
-		queryKey: labKeys.crossMatches(params),
-		queryFn: () =>
-			fetchJson<PaginatedCrossMatches>(
-				`${LAB_BASE}/blood-bank/cross-matches${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`,
-			),
-		enabled: !!params.facilityId,
-	})
+	return useQuery(
+		orpc.lab.listCrossMatches.queryOptions({
+			input: {
+				...params,
+				page: params.page ?? 1,
+				limit: params.limit ?? 50,
+			},
+			enabled: !!params.facilityId,
+		})
+	)
 }
 
 export function useCrossMatchDetailQuery(id: string) {
-	return useQuery({
-		queryKey: labKeys.crossMatch(id),
-		queryFn: () => fetchJson<CrossMatchRequest>(`${LAB_BASE}/blood-bank/cross-matches/${id}`),
-		enabled: !!id,
-	})
+	return useQuery(
+		orpc.lab.getCrossMatch.queryOptions({
+			input: { id },
+			enabled: !!id,
+		})
+	)
 }
 
-interface CreateCrossMatchData {
-	facilityId: string
-	patientId: string
-	bloodType?: BloodType
-	componentType: string
-	unitsRequested: number
-	urgency: "routine" | "urgent" | "emergency"
-	clinicalIndication?: string
-}
+export type CreateCrossMatchData = CreateCrossMatch
 
 export function useCreateCrossMatchMutation() {
 	const queryClient = useQueryClient()
 
-	return useMutation({
-		mutationFn: (data: CreateCrossMatchData) =>
-			fetchJson<CrossMatchRequest>(`${LAB_BASE}/blood-bank/cross-matches`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: labKeys.all })
-		},
-	})
+	return useMutation(
+		orpc.lab.createCrossMatch.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({ queryKey: orpc.lab.listCrossMatches.key() })
+				queryClient.invalidateQueries({ queryKey: labKeys.all })
+			},
+		})
+	)
 }
 
-interface ApproveCrossMatchData {
-	id: string
-	compatibilityResult: "compatible" | "incompatible"
-	bloodUnitIds: string[]
-}
+export type ApproveCrossMatchData = ApproveCrossMatch
 
 export function useApproveCrossMatchMutation() {
 	const queryClient = useQueryClient()
 
-	return useMutation({
-		mutationFn: (data: ApproveCrossMatchData) =>
-			fetchJson<CrossMatchRequest>(`${LAB_BASE}/blood-bank/cross-matches/${data.id}/approve`, {
-				method: "PUT",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: labKeys.all })
-		},
-	})
+	return useMutation(
+		orpc.lab.approveCrossMatch.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({ queryKey: orpc.lab.listCrossMatches.key() })
+				queryClient.invalidateQueries({ queryKey: labKeys.all })
+			},
+		})
+	)
 }
 
 export function useBedsideVerifyMutation() {
 	const queryClient = useQueryClient()
 
-	return useMutation({
-		mutationFn: (data: BedsideVerifyInput) =>
-			fetchJson<BedsideVerifyResult>(`${LAB_BASE}/blood-bank/bedside-verify`, {
-				method: "POST",
-				body: JSON.stringify(data),
-			}),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: labKeys.all })
-		},
-	})
+	return useMutation(
+		orpc.lab.bedsideVerify.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({ queryKey: orpc.lab.listCrossMatches.key() })
+				queryClient.invalidateQueries({ queryKey: labKeys.all })
+			},
+		})
+	)
 }

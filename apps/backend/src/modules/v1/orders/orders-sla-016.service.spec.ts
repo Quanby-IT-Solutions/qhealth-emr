@@ -11,7 +11,7 @@
  */
 
 import { NotFoundException } from "@nestjs/common"
-import { Test, TestingModule } from "@nestjs/testing"
+import { Test, type TestingModule } from "@nestjs/testing"
 
 import { OrdersService } from "./orders.service"
 
@@ -45,7 +45,9 @@ jest.mock("@/common/database/database.client", () => ({
 
 // ProblemsAllergiesService mock (required constructor dep)
 jest.mock("../problems-allergies/problems-allergies.service")
-const { ProblemsAllergiesService } = jest.requireMock("../problems-allergies/problems-allergies.service")
+const { ProblemsAllergiesService } = jest.requireMock(
+	"../problems-allergies/problems-allergies.service"
+)
 
 // Builds a chainable Drizzle select mock: any of from/leftJoin/where/orderBy
 // return the same chain; .limit() resolves the provided rows.
@@ -135,10 +137,7 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 		mockUpdate.mockReturnValue({ set: mockSet })
 
 		const module: TestingModule = await Test.createTestingModule({
-			providers: [
-				OrdersService,
-				{ provide: ProblemsAllergiesService, useValue: {} },
-			],
+			providers: [OrdersService, { provide: ProblemsAllergiesService, useValue: {} }],
 		}).compile()
 
 		service = module.get<OrdersService>(OrdersService)
@@ -177,7 +176,9 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 			let capturedSet: Record<string, unknown> = {}
 			mockSet.mockImplementation((data: Record<string, unknown>) => {
 				capturedSet = data
-				return { where: jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([order]) }) }
+				return {
+					where: jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([order]) }),
+				}
 			})
 
 			await service.updateLabOrder({ id: order.id as string, status: "collected" })
@@ -195,7 +196,9 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 			let capturedSet: Record<string, unknown> = {}
 			mockSet.mockImplementation((data: Record<string, unknown>) => {
 				capturedSet = data
-				return { where: jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([order]) }) }
+				return {
+					where: jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([order]) }),
+				}
 			})
 
 			await service.updateLabOrder({ id: order.id as string, billingClearedAt: billingTs })
@@ -206,9 +209,9 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 		it("throws NotFoundException when lab order does not exist", async () => {
 			mockSelect.mockImplementation(() => buildSelectChain([]))
 
-			await expect(service.updateLabOrder({ id: "non-existent", status: "collected" })).rejects.toThrow(
-				NotFoundException
-			)
+			await expect(
+				service.updateLabOrder({ id: "non-existent", status: "collected" })
+			).rejects.toThrow(NotFoundException)
 		})
 	})
 
@@ -225,7 +228,9 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 			let capturedSet: Record<string, unknown> = {}
 			mockSet.mockImplementation((data: Record<string, unknown>) => {
 				capturedSet = data
-				return { where: jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([order]) }) }
+				return {
+					where: jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([order]) }),
+				}
 			})
 
 			await service.updateImagingOrder({ id: order.id as string, status: "in_progress" })
@@ -243,7 +248,9 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 			let capturedSet: Record<string, unknown> = {}
 			mockSet.mockImplementation((data: Record<string, unknown>) => {
 				capturedSet = data
-				return { where: jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([order]) }) }
+				return {
+					where: jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([order]) }),
+				}
 			})
 
 			await service.updateImagingOrder({ id: order.id as string, status: "in_progress" })
@@ -260,7 +267,9 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 			let capturedSet: Record<string, unknown> = {}
 			mockSet.mockImplementation((data: Record<string, unknown>) => {
 				capturedSet = data
-				return { where: jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([order]) }) }
+				return {
+					where: jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([order]) }),
+				}
 			})
 
 			await service.updateImagingOrder({ id: order.id as string, billingClearedAt: billingTs })
@@ -271,9 +280,9 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 		it("throws NotFoundException when imaging order does not exist", async () => {
 			mockSelect.mockImplementation(() => buildSelectChain([]))
 
-			await expect(service.updateImagingOrder({ id: "non-existent", status: "in_progress" })).rejects.toThrow(
-				NotFoundException
-			)
+			await expect(
+				service.updateImagingOrder({ id: "non-existent", status: "in_progress" })
+			).rejects.toThrow(NotFoundException)
 		})
 	})
 })

@@ -313,8 +313,8 @@ function ExportHistoryTable({
 // NHDR Status Panel (FHIR-003)
 // ============================================================================
 
-function NhdrStatusPanel() {
-	const { data, isLoading } = useNhdrSystemStatusQuery()
+function NhdrStatusPanel({ facilityId }: { facilityId: string }) {
+	const { data, isLoading } = useNhdrSystemStatusQuery(facilityId)
 
 	if (isLoading || !data) return null
 
@@ -420,7 +420,7 @@ export function FhirExportDashboard({ canEdit }: FhirExportDashboardProps) {
 			</div>
 
 			{/* NHDR System Status (FHIR-003) */}
-			<NhdrStatusPanel />
+			<NhdrStatusPanel facilityId={facilityId} />
 
 			{/* Stats */}
 			{!isLoading && <StatsRow exports={exports} />}

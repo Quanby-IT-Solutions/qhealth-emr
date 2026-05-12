@@ -6,8 +6,8 @@ import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 import { v1 } from "@/config/api-versions.config"
 import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
-import { AuditService } from "./audit.service"
 import { NotificationService } from "../notifications/notification.service"
+import { AuditService } from "./audit.service"
 
 @Controller()
 export class AuditController {
@@ -56,6 +56,14 @@ export class AuditController {
 	// Break Glass
 	// ===========================================================================
 
+	@RequirePermission("audit", "export")
+	@Implement(v1.audit.breakGlass.exportCsv)
+	async exportBreakGlass() {
+		return implement(v1.audit.breakGlass.exportCsv).handler(async ({ input }) => {
+			return this.auditService.exportBreakGlassEvents(input)
+		})
+	}
+
 	@RequirePermission("audit", "view")
 	@Implement(v1.audit.breakGlass.list)
 	async listBreakGlass() {
@@ -69,6 +77,22 @@ export class AuditController {
 	async getBreakGlass() {
 		return implement(v1.audit.breakGlass.get).handler(async ({ input }) => {
 			return this.auditService.findBreakGlassEvent(input.id)
+		})
+	}
+
+	@RequirePermission("audit", "create")
+	@Implement(v1.audit.breakGlass.myActive)
+	async getMyActiveBreakGlass(
+		@Session()
+		session: UserSession
+	) {
+		return implement(v1.audit.breakGlass.myActive).handler(async ({ input }) => {
+			const clinicianStaffId = await this.auditService.resolveStaffProfileId(session.user.id)
+			return this.auditService.findMyActiveBreakGlassEvent({
+				facilityId: input.facilityId,
+				patientId: input.patientId,
+				clinicianStaffId,
+			})
 		})
 	}
 
@@ -95,18 +119,27 @@ export class AuditController {
 				userId: session.user.id,
 			})
 
-			await this.notificationService.send({
-				facilityId: input.facilityId,
-				recipientStaffId: staffProfileId,
-				topic: "break_glass",
-				title: "Break-Glass Access Requested",
-				body: `Emergency access requested for patient. Reason: ${input.reasonCategory}`,
-				data: {
-					breakGlassEventId: event.id,
-					patientId: input.patientId,
-					reasonCategory: input.reasonCategory,
-				},
-			})
+			const reviewerStaffIds = await this.auditService.findBreakGlassReviewerStaffIds(
+				input.facilityId,
+				{ excludeStaffId: staffProfileId }
+			)
+			await Promise.allSettled(
+				reviewerStaffIds.map(reviewerStaffId =>
+					this.notificationService.send({
+						facilityId: input.facilityId,
+						recipientStaffId: reviewerStaffId,
+						topic: "break_glass",
+						title: "Break-Glass Access Requested",
+						body: `Emergency access requested for patient. Reason: ${input.reasonCategory}`,
+						data: {
+							breakGlassEventId: event.id,
+							patientId: input.patientId,
+							reasonCategory: input.reasonCategory,
+							requestingStaffId: staffProfileId,
+						},
+					})
+				)
+			)
 
 			return event
 		})

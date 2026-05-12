@@ -17,7 +17,7 @@ import {
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 
-import type { CreateMealPlanInput, UpdateMealPlanInput } from "@/features/nutrition/api/nutrition.hooks"
+import type { CreateMealPlanInput } from "@/features/nutrition/api/nutrition.hooks"
 import {
 	useMealPlanQuery,
 	useSaveMealPlanMutation,
@@ -65,22 +65,22 @@ const RESTRICTION_OPTIONS = [
 
 interface FormState {
 	caloricTarget: string
-	proteinGoalGrams: string
-	carbGoalGrams: string
-	fatGoalGrams: string
+	proteinTarget: string
+	carbTarget: string
+	fatTarget: string
 	dietType: string
 	restrictions: string[]
-	notes: string
+	specialInstructions: string
 }
 
 const EMPTY_FORM: FormState = {
 	caloricTarget: "",
-	proteinGoalGrams: "",
-	carbGoalGrams: "",
-	fatGoalGrams: "",
+	proteinTarget: "",
+	carbTarget: "",
+	fatTarget: "",
 	dietType: "regular",
 	restrictions: [],
-	notes: "",
+	specialInstructions: "",
 }
 
 // ============================================================================
@@ -93,9 +93,10 @@ interface MealPlanEditorProps {
 	onSaved?: () => void
 }
 
-export function MealPlanEditor({ encounterId, patientId, onSaved }: MealPlanEditorProps) {
-	const { data: existing, isLoading } = useMealPlanQuery(encounterId)
+export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
+	const { data: assessment, isLoading } = useMealPlanQuery(encounterId)
 	const saveMutation = useSaveMealPlanMutation()
+	const existingMealPlan = assessment?.mealPlan ?? null
 
 	const [editing, setEditing] = useState(false)
 	const [form, setForm] = useState<FormState>(EMPTY_FORM)
@@ -113,15 +114,15 @@ export function MealPlanEditor({ encounterId, patientId, onSaved }: MealPlanEdit
 	}
 
 	const startEditing = () => {
-		if (existing) {
+		if (existingMealPlan) {
 			setForm({
-				caloricTarget: String(existing.caloricTarget),
-				proteinGoalGrams: String(existing.proteinGoalGrams),
-				carbGoalGrams: String(existing.carbGoalGrams),
-				fatGoalGrams: String(existing.fatGoalGrams),
-				dietType: existing.dietType,
-				restrictions: existing.restrictions,
-				notes: existing.notes ?? "",
+				caloricTarget: String(existingMealPlan.caloricTarget ?? ""),
+				proteinTarget: String(existingMealPlan.proteinTarget ?? ""),
+				carbTarget: String(existingMealPlan.carbTarget ?? ""),
+				fatTarget: String(existingMealPlan.fatTarget ?? ""),
+				dietType: existingMealPlan.dietType,
+				restrictions: existingMealPlan.restrictions ?? [],
+				specialInstructions: existingMealPlan.specialInstructions ?? "",
 			})
 		} else {
 			setForm(EMPTY_FORM)
@@ -131,18 +132,19 @@ export function MealPlanEditor({ encounterId, patientId, onSaved }: MealPlanEdit
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault()
+		if (!assessment) return
 
-		const payload: CreateMealPlanInput | UpdateMealPlanInput = {
-			...(existing ? { id: existing.id } : {}),
-			encounterId,
-			patientId,
-			caloricTarget: Number(form.caloricTarget),
-			proteinGoalGrams: Number(form.proteinGoalGrams),
-			carbGoalGrams: Number(form.carbGoalGrams),
-			fatGoalGrams: Number(form.fatGoalGrams),
-			dietType: form.dietType,
-			restrictions: form.restrictions,
-			notes: form.notes.trim() || undefined,
+		const payload: CreateMealPlanInput = {
+			assessmentId: assessment.id,
+			mealPlan: {
+				dietType: form.dietType,
+				caloricTarget: form.caloricTarget ? Number(form.caloricTarget) : undefined,
+				proteinTarget: form.proteinTarget ? Number(form.proteinTarget) : undefined,
+				carbTarget: form.carbTarget ? Number(form.carbTarget) : undefined,
+				fatTarget: form.fatTarget ? Number(form.fatTarget) : undefined,
+				restrictions: form.restrictions.length > 0 ? form.restrictions : undefined,
+				specialInstructions: form.specialInstructions.trim() || undefined,
+			},
 		}
 
 		saveMutation.mutate(payload, {
@@ -164,10 +166,21 @@ export function MealPlanEditor({ encounterId, patientId, onSaved }: MealPlanEdit
 		)
 	}
 
+	// ── No assessment yet ────────────────────────────────────────────────────
+	if (!assessment) {
+		return (
+			<Card>
+				<CardContent className="py-8 text-center text-sm text-muted-foreground">
+					Complete a nutrition assessment before creating a meal plan.
+				</CardContent>
+			</Card>
+		)
+	}
+
 	// ── Display mode (meal plan exists, not editing) ─────────────────────────
-	if (existing && !editing) {
+	if (existingMealPlan && !editing) {
 		const dietLabel =
-			DIET_TYPES.find((d) => d.value === existing.dietType)?.label ?? existing.dietType
+			DIET_TYPES.find((d) => d.value === existingMealPlan.dietType)?.label ?? existingMealPlan.dietType
 
 		return (
 			<Card>
@@ -195,25 +208,25 @@ export function MealPlanEditor({ encounterId, patientId, onSaved }: MealPlanEdit
 						<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
 							Caloric Target
 						</p>
-						<p className="text-sm font-medium">{existing.caloricTarget} kcal/day</p>
+						<p className="text-sm font-medium">{existingMealPlan.caloricTarget ?? "—"} kcal/day</p>
 					</div>
 					<div>
 						<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
 							Macronutrient Goals
 						</p>
 						<p className="text-sm">
-							Protein: <span className="font-medium">{existing.proteinGoalGrams}g</span>
-							{" · "}Carbs: <span className="font-medium">{existing.carbGoalGrams}g</span>
-							{" · "}Fat: <span className="font-medium">{existing.fatGoalGrams}g</span>
+							Protein: <span className="font-medium">{existingMealPlan.proteinTarget ?? "—"}g</span>
+							{" · "}Carbs: <span className="font-medium">{existingMealPlan.carbTarget ?? "—"}g</span>
+							{" · "}Fat: <span className="font-medium">{existingMealPlan.fatTarget ?? "—"}g</span>
 						</p>
 					</div>
-					{existing.restrictions.length > 0 && (
+					{(existingMealPlan.restrictions ?? []).length > 0 && (
 						<div className="sm:col-span-2">
 							<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
 								Dietary Restrictions
 							</p>
 							<div className="flex flex-wrap gap-1.5">
-								{existing.restrictions.map((r) => (
+								{(existingMealPlan.restrictions ?? []).map((r) => (
 									<span
 										key={r}
 										className="rounded-full border bg-muted px-2.5 py-0.5 text-xs"
@@ -224,17 +237,17 @@ export function MealPlanEditor({ encounterId, patientId, onSaved }: MealPlanEdit
 							</div>
 						</div>
 					)}
-					{existing.notes && (
+					{existingMealPlan.specialInstructions && (
 						<div className="sm:col-span-2">
 							<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-								Notes
+								Special Instructions
 							</p>
-							<p className="text-sm text-muted-foreground">{existing.notes}</p>
+							<p className="text-sm text-muted-foreground">{existingMealPlan.specialInstructions}</p>
 						</div>
 					)}
 					<div className="sm:col-span-2 text-xs text-muted-foreground border-t pt-3 mt-1">
-						Last updated by {existing.createdByName} ·{" "}
-						{new Date(existing.updatedAt).toLocaleDateString(undefined, {
+						Last updated by {assessment.assessedByStaffName} ·{" "}
+						{new Date(assessment.updatedAt).toLocaleDateString(undefined, {
 							day: "numeric",
 							month: "short",
 							year: "numeric",
@@ -251,9 +264,9 @@ export function MealPlanEditor({ encounterId, patientId, onSaved }: MealPlanEdit
 			<Card>
 				<CardHeader className="flex flex-row items-start justify-between">
 					<CardTitle className="text-base">
-						{existing ? "Edit Meal Plan" : "Create Meal Plan"}
+							{existingMealPlan ? "Edit Meal Plan" : "Create Meal Plan"}
 					</CardTitle>
-					{existing && (
+					{existingMealPlan && (
 						<Button
 							type="button"
 							variant="ghost"
@@ -305,9 +318,8 @@ export function MealPlanEditor({ encounterId, patientId, onSaved }: MealPlanEdit
 								type="number"
 								min={0}
 								placeholder="e.g. 80"
-								value={form.proteinGoalGrams}
-								onChange={(e) => update("proteinGoalGrams", e.target.value)}
-								required
+							value={form.proteinTarget}
+							onChange={(e) => update("proteinTarget", e.target.value)}
 							/>
 						</div>
 						<div className="space-y-1.5">
@@ -317,8 +329,8 @@ export function MealPlanEditor({ encounterId, patientId, onSaved }: MealPlanEdit
 								type="number"
 								min={0}
 								placeholder="e.g. 250"
-								value={form.carbGoalGrams}
-								onChange={(e) => update("carbGoalGrams", e.target.value)}
+						value={form.carbTarget}
+						onChange={(e) => update("carbTarget", e.target.value)}
 								required
 							/>
 						</div>
@@ -329,8 +341,8 @@ export function MealPlanEditor({ encounterId, patientId, onSaved }: MealPlanEdit
 								type="number"
 								min={0}
 								placeholder="e.g. 65"
-								value={form.fatGoalGrams}
-								onChange={(e) => update("fatGoalGrams", e.target.value)}
+						value={form.fatTarget}
+						onChange={(e) => update("fatTarget", e.target.value)}
 								required
 							/>
 						</div>
@@ -362,13 +374,13 @@ export function MealPlanEditor({ encounterId, patientId, onSaved }: MealPlanEdit
 
 					{/* Notes */}
 					<div className="space-y-1.5">
-						<Label htmlFor="mealPlanNotes">Notes (optional)</Label>
+						<Label htmlFor="mealPlanNotes">Special Instructions (optional)</Label>
 						<Textarea
 							id="mealPlanNotes"
 							placeholder="Add any relevant dietary guidance or clinical notes…"
 							rows={3}
-							value={form.notes}
-							onChange={(e) => update("notes", e.target.value)}
+							value={form.specialInstructions}
+							onChange={(e) => update("specialInstructions", e.target.value)}
 						/>
 					</div>
 
@@ -390,7 +402,7 @@ export function MealPlanEditor({ encounterId, patientId, onSaved }: MealPlanEdit
 						<Button type="submit" disabled={saveMutation.isPending}>
 							{saveMutation.isPending ? "Saving…" : "Save Meal Plan"}
 						</Button>
-						{!existing && (
+					{!existingMealPlan && (
 							<Button
 								type="button"
 								variant="ghost"

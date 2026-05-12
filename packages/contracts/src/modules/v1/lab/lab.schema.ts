@@ -27,10 +27,17 @@ export const CompatibilityResultEnum = z.enum(["compatible", "incompatible", "pe
 
 export const BloodUnitSchema = z.object({
 	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
 	unitBarcode: z.string().min(1).max(50),
 	bloodType: BloodTypeEnum,
 	componentType: z.string().min(1).max(100),
-	expiryDate: z.union([z.date(), z.string()]).transform((val) => (typeof val === "string" ? val : val.toISOString())),
+	collectionDate: z
+		.union([z.date(), z.string()])
+		.transform(val => (typeof val === "string" ? val : val.toISOString()))
+		.nullable(),
+	expiryDate: z
+		.union([z.date(), z.string()])
+		.transform(val => (typeof val === "string" ? val : val.toISOString())),
 	status: BloodUnitStatusEnum,
 	donorId: z.string().uuid().nullable(),
 })
@@ -43,6 +50,9 @@ export const CrossMatchRequestSchema = z.object({
 	id: z.string().uuid(),
 	facilityId: z.string().uuid(),
 	patientId: z.string().uuid(),
+	encounterId: z.string().uuid().nullable(),
+	sourceLabOrderId: z.string().uuid().nullable(),
+	patientMrn: z.string().nullable(),
 	patientName: z.string().min(1).max(255),
 	bloodType: BloodTypeEnum.nullable(),
 	componentType: z.string().min(1).max(100),
@@ -52,24 +62,37 @@ export const CrossMatchRequestSchema = z.object({
 	compatibilityResult: CompatibilityResultEnum.nullable(),
 	status: CrossMatchStatusEnum,
 	requestedBy: z.string().min(1).max(255),
-	requestedAt: z.union([z.date(), z.string()]).transform((val) => (typeof val === "string" ? val : val.toISOString())),
+	requestedAt: z
+		.union([z.date(), z.string()])
+		.transform(val => (typeof val === "string" ? val : val.toISOString())),
 	crossMatchedBy: z.string().max(255).nullable(),
 	crossMatchedAt: z
 		.union([z.date(), z.string()])
-		.transform((val) => (typeof val === "string" ? val : val.toISOString()))
+		.transform(val => (typeof val === "string" ? val : val.toISOString()))
 		.nullable(),
 	approvedBy: z.string().max(255).nullable(),
 	approvedAt: z
 		.union([z.date(), z.string()])
-		.transform((val) => (typeof val === "string" ? val : val.toISOString()))
+		.transform(val => (typeof val === "string" ? val : val.toISOString()))
 		.nullable(),
 	issuedBy: z.string().max(255).nullable(),
 	issuedAt: z
 		.union([z.date(), z.string()])
-		.transform((val) => (typeof val === "string" ? val : val.toISOString()))
+		.transform(val => (typeof val === "string" ? val : val.toISOString()))
 		.nullable(),
+	cancelledBy: z.string().max(255).nullable(),
+	cancelledAt: z
+		.union([z.date(), z.string()])
+		.transform(val => (typeof val === "string" ? val : val.toISOString()))
+		.nullable(),
+	rejectionReason: z.string().max(500).nullable(),
 	bloodUnits: z.array(BloodUnitSchema),
-	createdAt: z.union([z.date(), z.string()]).transform((val) => (typeof val === "string" ? val : val.toISOString())),
+	createdAt: z
+		.union([z.date(), z.string()])
+		.transform(val => (typeof val === "string" ? val : val.toISOString())),
+	updatedAt: z
+		.union([z.date(), z.string()])
+		.transform(val => (typeof val === "string" ? val : val.toISOString())),
 })
 
 // ============================================================================
@@ -98,6 +121,8 @@ export const CrossMatchIdSchema = z.object({
 export const CreateCrossMatchSchema = z.object({
 	facilityId: z.string().uuid(),
 	patientId: z.string().uuid(),
+	encounterId: z.string().uuid().optional(),
+	sourceLabOrderId: z.string().uuid().optional(),
 	bloodType: BloodTypeEnum.optional(),
 	componentType: z.string().min(1).max(100),
 	unitsRequested: z.number().int().positive(),
@@ -108,7 +133,8 @@ export const CreateCrossMatchSchema = z.object({
 export const ApproveCrossMatchSchema = z.object({
 	id: z.string().uuid(),
 	compatibilityResult: z.enum(["compatible", "incompatible"]),
-	bloodUnitIds: z.array(z.string().uuid()),
+	bloodUnitIds: z.array(z.string().uuid()).default([]),
+	rejectionReason: z.string().max(500).optional(),
 })
 
 // ============================================================================
@@ -141,10 +167,10 @@ export type CompatibilityResult = z.infer<typeof CompatibilityResultEnum>
 export type BloodUnit = z.infer<typeof BloodUnitSchema>
 export type CrossMatchRequest = z.infer<typeof CrossMatchRequestSchema>
 
-export type CrossMatchListQuery = z.infer<typeof CrossMatchListQuerySchema>
+export type CrossMatchListQuery = z.input<typeof CrossMatchListQuerySchema>
 export type CrossMatchListResponse = z.infer<typeof CrossMatchListResponseSchema>
-export type CreateCrossMatch = z.infer<typeof CreateCrossMatchSchema>
-export type ApproveCrossMatch = z.infer<typeof ApproveCrossMatchSchema>
+export type CreateCrossMatch = z.input<typeof CreateCrossMatchSchema>
+export type ApproveCrossMatch = z.input<typeof ApproveCrossMatchSchema>
 
-export type BedsideVerifyInput = z.infer<typeof BedsideVerifyInputSchema>
+export type BedsideVerifyInput = z.input<typeof BedsideVerifyInputSchema>
 export type BedsideVerifyResult = z.infer<typeof BedsideVerifyResultSchema>

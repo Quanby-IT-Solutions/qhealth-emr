@@ -3,6 +3,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 
 import { DietOrderCard } from "@/features/nutrition/components/diet-order-card"
+import { FhirNutritionOrderEditor } from "@/features/nutrition/components/fhir-nutrition-order-editor"
 import { MalnutritionRiskBadge } from "@/features/nutrition/components/malnutrition-risk-badge"
 import { MealPlanEditor } from "@/features/nutrition/components/meal-plan-editor"
 import { NutritionAssessmentForm } from "@/features/nutrition/components/nutrition-assessment-form"
@@ -15,9 +16,9 @@ interface NutritionTabProps {
 	facilityId: string
 }
 
-export function NutritionTab({ encounterId, patientId }: NutritionTabProps) {
+export function NutritionTab({ encounterId, patientId, facilityId }: NutritionTabProps) {
 	const { data: assessments } = useNutritionAssessmentsQuery(encounterId, { limit: 1 })
-	const latestAssessment = assessments?.assessments[0]
+	const latestAssessment = assessments?.data[0]
 
 	return (
 		<div className="space-y-4 p-6">
@@ -32,7 +33,7 @@ export function NutritionTab({ encounterId, patientId }: NutritionTabProps) {
 				{latestAssessment && (
 					<div className="flex items-center gap-2 text-sm text-muted-foreground">
 						<span>Malnutrition risk:</span>
-						<MalnutritionRiskBadge risk={latestAssessment.riskLevel} />
+						<MalnutritionRiskBadge risk={latestAssessment.malnutritionRisk} />
 					</div>
 				)}
 			</div>
@@ -46,7 +47,7 @@ export function NutritionTab({ encounterId, patientId }: NutritionTabProps) {
 				</TabsList>
 
 				<TabsContent value="assessment" className="mt-4">
-					<NutritionAssessmentForm encounterId={encounterId} patientId={patientId} />
+					<NutritionAssessmentForm encounterId={encounterId} patientId={patientId} facilityId={facilityId} />
 				</TabsContent>
 
 				<TabsContent value="meal-plan" className="mt-4">
@@ -54,7 +55,15 @@ export function NutritionTab({ encounterId, patientId }: NutritionTabProps) {
 				</TabsContent>
 
 				<TabsContent value="diet-orders" className="mt-4">
-					<DietOrderCard encounterId={encounterId} />
+					{latestAssessment ? (
+						<FhirNutritionOrderEditor
+							assessmentId={latestAssessment.id}
+							encounterId={encounterId}
+							patientId={patientId}
+						/>
+					) : (
+						<DietOrderCard encounterId={encounterId} />
+					)}
 				</TabsContent>
 			</Tabs>
 		</div>

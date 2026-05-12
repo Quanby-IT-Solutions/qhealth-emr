@@ -248,3 +248,58 @@ export const NutritionByEncounterSchema = z.object({
 })
 
 export type NutritionByEncounter = z.infer<typeof NutritionByEncounterSchema>
+
+// ============================================================================
+// Screening Tool Score Input — discriminated by tool type
+// ============================================================================
+
+export const Nrs2002InputSchema = z.object({
+	tool: z.literal("nrs_2002"),
+	/** 0–3: degree of nutritional impairment */
+	nutritionalImpairmentScore: z.number().int().min(0).max(3),
+	/** 0–3: severity of disease (metabolic stress) */
+	severityOfDiseaseScore: z.number().int().min(0).max(3),
+	/** Patient age — adds 1 point if ≥ 70 */
+	age: z.number().int().positive(),
+})
+export type Nrs2002Input = z.infer<typeof Nrs2002InputSchema>
+
+export const MustInputSchema = z.object({
+	tool: z.literal("must"),
+	/** 0 = BMI >20, 1 = BMI 18.5–20, 2 = BMI <18.5 */
+	bmiScore: z.number().int().min(0).max(2),
+	/** 0 = loss <5%, 1 = loss 5–10%, 2 = loss >10% */
+	weightLossScore: z.number().int().min(0).max(2),
+	/** 2 if acutely ill with no nutritional intake ≥5 days; 0 otherwise */
+	acuteDiseaseEffect: z.number().int().min(0).max(2),
+})
+export type MustInput = z.infer<typeof MustInputSchema>
+
+export const SgaInputSchema = z.object({
+	tool: z.literal("sga"),
+	/** A = well-nourished, B = mild/moderate malnutrition, C = severe malnutrition */
+	rating: z.enum(["A", "B", "C"]),
+})
+export type SgaInput = z.infer<typeof SgaInputSchema>
+
+export const ScreeningScoreInputSchema = z.discriminatedUnion("tool", [
+	Nrs2002InputSchema,
+	MustInputSchema,
+	SgaInputSchema,
+])
+export type ScreeningScoreInput = z.infer<typeof ScreeningScoreInputSchema>
+
+// ============================================================================
+// Screening Tool Score Result
+// ============================================================================
+
+export const ScreeningScoreResultSchema = z.object({
+	tool: ScreeningToolEnum,
+	score: z.number().int().nonnegative(),
+	risk: MalnutritionRiskEnum,
+	/** Human-readable interpretation for clinical display */
+	interpretation: z.string(),
+	/** Recommended action based on risk level */
+	recommendation: z.string(),
+})
+export type ScreeningScoreResult = z.infer<typeof ScreeningScoreResultSchema>

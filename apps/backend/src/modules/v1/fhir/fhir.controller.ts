@@ -16,7 +16,10 @@ export class FhirController {
 	// Exports
 	// ========================================================================
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "fhir", action: "view" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "fhir", action: "view" },
+	])
 	@Implement(v1.fhir.listExports)
 	async listExports() {
 		return implement(v1.fhir.listExports).handler(async ({ input }) => {
@@ -24,7 +27,10 @@ export class FhirController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "fhir", action: "view" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "fhir", action: "view" },
+	])
 	@Implement(v1.fhir.getExport)
 	async getExport() {
 		return implement(v1.fhir.getExport).handler(async ({ input }) => {
@@ -32,7 +38,10 @@ export class FhirController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "fhir", action: "export" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "fhir", action: "export" },
+	])
 	@Implement(v1.fhir.createExport)
 	async createExport(@Session() session: UserSession) {
 		return implement(v1.fhir.createExport).handler(async ({ input }) => {
@@ -40,7 +49,10 @@ export class FhirController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "fhir", action: "view" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "fhir", action: "view" },
+	])
 	@Implement(v1.fhir.getValidationReport)
 	async getValidationReport() {
 		return implement(v1.fhir.getValidationReport).handler(async ({ input }) => {
@@ -48,7 +60,10 @@ export class FhirController {
 		})
 	}
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "fhir", action: "export" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "fhir", action: "export" },
+	])
 	@Implement(v1.fhir.submitToNhdr)
 	async submitToNhdr(@Session() session: UserSession) {
 		return implement(v1.fhir.submitToNhdr).handler(async ({ input }) => {
@@ -60,7 +75,10 @@ export class FhirController {
 	// NHDR Submissions
 	// ========================================================================
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "fhir", action: "view" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "fhir", action: "view" },
+	])
 	@Implement(v1.fhir.listNhdrSubmissions)
 	async listNhdrSubmissions() {
 		return implement(v1.fhir.listNhdrSubmissions).handler(async ({ input }) => {
@@ -72,7 +90,10 @@ export class FhirController {
 	// Bundle download
 	// ========================================================================
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "fhir", action: "export" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "fhir", action: "export" },
+	])
 	@Implement(v1.fhir.downloadBundle)
 	async downloadBundle(@Session() session: UserSession) {
 		return implement(v1.fhir.downloadBundle).handler(async ({ input }) => {
@@ -84,11 +105,14 @@ export class FhirController {
 	// System status
 	// ========================================================================
 
-	@RequirePermissions([{ module: "admin", action: "view" }, { module: "fhir", action: "view" }])
+	@RequirePermissions([
+		{ module: "admin", action: "view" },
+		{ module: "fhir", action: "view" },
+	])
 	@Implement(v1.fhir.getSystemStatus)
 	async getSystemStatus() {
-		return implement(v1.fhir.getSystemStatus).handler(async () => {
-			return this.fhirService.getSystemStatus()
+		return implement(v1.fhir.getSystemStatus).handler(async ({ input }) => {
+			return this.fhirService.getSystemStatus(input.facilityId)
 		})
 	}
 }

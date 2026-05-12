@@ -1,18 +1,25 @@
 import { defineRelations } from "drizzle-orm"
 
-import { accounts, sessions, users, verifications } from "./auth.js"
 import { auditLogs, breakGlassEvents, notifications } from "./audit.js"
+import { accounts, sessions, twoFactors, users, verifications } from "./auth.js"
 import {
-	charges,
-	chargeMasterItems,
 	cf4Claims,
 	cf5Claims,
+	chargeMasterItems,
+	charges,
 	eligibilityChecks,
 	invoiceLineItems,
 	invoices,
 	payments,
 } from "./billing.js"
-import { allergies, clinicalNotes, consentRecords, noteAddenda, noteTemplates, problems } from "./clinical.js"
+import {
+	allergies,
+	clinicalNotes,
+	consentRecords,
+	noteAddenda,
+	noteTemplates,
+	problems,
+} from "./clinical.js"
 import {
 	bedCensusSnapshots,
 	beds,
@@ -24,15 +31,41 @@ import {
 	wards,
 } from "./core.js"
 import { deathReports } from "./death-reporting.js"
-import { drugBrands, drugGenerics, formularyItems, icd10Codes, loincCodes, rxnormCodes, rvsCodes } from "./formulary.js"
+import {
+	drugBrands,
+	drugGenerics,
+	formularyItems,
+	icd10Codes,
+	loincCodes,
+	rvsCodes,
+	rxnormCodes,
+} from "./formulary.js"
 import { mswEvaluations } from "./msw.js"
 import { nbsLogEntries } from "./nbs.js"
-import { flowsheetEntries, haiTags, ioEntries, marEntries, shiftHandoffs, tarEntries, vitalSigns } from "./nursing.js"
+import {
+	flowsheetEntries,
+	haiTags,
+	ioEntries,
+	marEntries,
+	shiftHandoffs,
+	tarEntries,
+	vitalSigns,
+} from "./nursing.js"
 import { nutritionAssessments } from "./nutrition.js"
-import { imagingOrders, labOrders, medicationOrders, orderVerifications, prescriptions } from "./orders.js"
+import {
+	bloodUnits,
+	crossMatchRequests,
+	crossMatchUnitAssignments,
+	imagingOrders,
+	labOrders,
+	medicationOrders,
+	orderVerifications,
+	prescriptions,
+	transfusionVerifications,
+} from "./orders.js"
 import { facilities, rolePermissions, roles, staffProfiles, userRoles } from "./rbac.js"
 import { ahsrSnapshots, fhirExports, pidsrCases, surveillanceFlags } from "./reporting.js"
-import { appointments, clinicTemplates } from "./scheduling.js"
+import { appointments, clinicSlots, clinicTemplates } from "./scheduling.js"
 import {
 	anesthesiaRecords,
 	operationRecords,
@@ -51,6 +84,7 @@ export const relations = defineRelations(
 		sessions,
 		accounts,
 		verifications,
+		twoFactors,
 		// RBAC
 		facilities,
 		staffProfiles,
@@ -85,6 +119,10 @@ export const relations = defineRelations(
 		medicationOrders,
 		labOrders,
 		imagingOrders,
+		bloodUnits,
+		crossMatchRequests,
+		crossMatchUnitAssignments,
+		transfusionVerifications,
 		orderVerifications,
 		prescriptions,
 		// Nursing
@@ -121,6 +159,7 @@ export const relations = defineRelations(
 		// Scheduling
 		clinicTemplates,
 		appointments,
+		clinicSlots,
 		// NBS
 		nbsLogEntries,
 		// Death Reporting
@@ -137,6 +176,7 @@ export const relations = defineRelations(
 		users: {
 			sessions: r.many.sessions(),
 			accounts: r.many.accounts(),
+			twoFactors: r.many.twoFactors(),
 			staffProfiles: r.many.staffProfiles(),
 			auditLogs: r.many.auditLogs(),
 		},
@@ -149,6 +189,12 @@ export const relations = defineRelations(
 		accounts: {
 			user: r.one.users({
 				from: r.accounts.userId,
+				to: r.users.id,
+			}),
+		},
+		twoFactors: {
+			user: r.one.users({
+				from: r.twoFactors.userId,
 				to: r.users.id,
 			}),
 		},
@@ -172,6 +218,9 @@ export const relations = defineRelations(
 			medicationOrders: r.many.medicationOrders(),
 			labOrders: r.many.labOrders(),
 			imagingOrders: r.many.imagingOrders(),
+			bloodUnits: r.many.bloodUnits(),
+			crossMatchRequests: r.many.crossMatchRequests(),
+			transfusionVerifications: r.many.transfusionVerifications(),
 			prescriptions: r.many.prescriptions(),
 			vitalSigns: r.many.vitalSigns(),
 			flowsheetEntries: r.many.flowsheetEntries(),
@@ -270,6 +319,8 @@ export const relations = defineRelations(
 			deathReports: r.many.deathReports(),
 			nutritionAssessments: r.many.nutritionAssessments(),
 			mswEvaluations: r.many.mswEvaluations(),
+			crossMatchRequests: r.many.crossMatchRequests(),
+			transfusionVerifications: r.many.transfusionVerifications(),
 		},
 		encounters: {
 			facility: r.one.facilities({
@@ -315,6 +366,8 @@ export const relations = defineRelations(
 			cf4Claims: r.many.cf4Claims(),
 			cf5Claims: r.many.cf5Claims(),
 			prescriptions: r.many.prescriptions(),
+			crossMatchRequests: r.many.crossMatchRequests(),
+			transfusionVerifications: r.many.transfusionVerifications(),
 			pidsrCases: r.many.pidsrCases(),
 			surveillanceFlags: r.many.surveillanceFlags(),
 			// New table many-relations
@@ -595,6 +648,82 @@ export const relations = defineRelations(
 			}),
 			orderingStaff: r.one.staffProfiles({
 				from: r.imagingOrders.orderingStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+		bloodUnits: {
+			facility: r.one.facilities({
+				from: r.bloodUnits.facilityId,
+				to: r.facilities.id,
+			}),
+			assignments: r.many.crossMatchUnitAssignments(),
+			transfusionVerifications: r.many.transfusionVerifications(),
+		},
+		crossMatchRequests: {
+			facility: r.one.facilities({
+				from: r.crossMatchRequests.facilityId,
+				to: r.facilities.id,
+			}),
+			patient: r.one.patients({
+				from: r.crossMatchRequests.patientId,
+				to: r.patients.id,
+			}),
+			encounter: r.one.encounters({
+				from: r.crossMatchRequests.encounterId,
+				to: r.encounters.id,
+			}),
+			sourceLabOrder: r.one.labOrders({
+				from: r.crossMatchRequests.sourceLabOrderId,
+				to: r.labOrders.id,
+			}),
+			requestedByStaff: r.one.staffProfiles({
+				from: r.crossMatchRequests.requestedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+			crossMatchedByStaff: r.one.staffProfiles({
+				from: r.crossMatchRequests.crossMatchedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+			approvedByStaff: r.one.staffProfiles({
+				from: r.crossMatchRequests.approvedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+			issuedByStaff: r.one.staffProfiles({
+				from: r.crossMatchRequests.issuedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+			cancelledByStaff: r.one.staffProfiles({
+				from: r.crossMatchRequests.cancelledByStaffId,
+				to: r.staffProfiles.id,
+			}),
+			assignments: r.many.crossMatchUnitAssignments(),
+			transfusionVerifications: r.many.transfusionVerifications(),
+		},
+		crossMatchUnitAssignments: {
+			crossMatchRequest: r.one.crossMatchRequests({
+				from: r.crossMatchUnitAssignments.crossMatchRequestId,
+				to: r.crossMatchRequests.id,
+			}),
+			bloodUnit: r.one.bloodUnits({
+				from: r.crossMatchUnitAssignments.bloodUnitId,
+				to: r.bloodUnits.id,
+			}),
+		},
+		transfusionVerifications: {
+			crossMatchRequest: r.one.crossMatchRequests({
+				from: r.transfusionVerifications.crossMatchRequestId,
+				to: r.crossMatchRequests.id,
+			}),
+			bloodUnit: r.one.bloodUnits({
+				from: r.transfusionVerifications.bloodUnitId,
+				to: r.bloodUnits.id,
+			}),
+			patient: r.one.patients({
+				from: r.transfusionVerifications.patientId,
+				to: r.patients.id,
+			}),
+			verifiedByStaff: r.one.staffProfiles({
+				from: r.transfusionVerifications.verifiedByStaffId,
 				to: r.staffProfiles.id,
 			}),
 		},
@@ -1098,6 +1227,7 @@ export const relations = defineRelations(
 				to: r.staffProfiles.id,
 			}),
 			appointments: r.many.appointments(),
+			slots: r.many.clinicSlots(),
 		},
 		appointments: {
 			facility: r.one.facilities({
@@ -1112,8 +1242,34 @@ export const relations = defineRelations(
 				from: r.appointments.clinicTemplateId,
 				to: r.clinicTemplates.id,
 			}),
+			clinicSlot: r.one.clinicSlots({
+				from: r.appointments.clinicSlotId,
+				to: r.clinicSlots.id,
+			}),
 			bookedByStaff: r.one.staffProfiles({
 				from: r.appointments.bookedByStaffId,
+				to: r.staffProfiles.id,
+			}),
+		},
+		clinicSlots: {
+			clinicTemplate: r.one.clinicTemplates({
+				from: r.clinicSlots.clinicTemplateId,
+				to: r.clinicTemplates.id,
+			}),
+			facility: r.one.facilities({
+				from: r.clinicSlots.facilityId,
+				to: r.facilities.id,
+			}),
+			clinicianStaff: r.one.staffProfiles({
+				from: r.clinicSlots.clinicianStaffId,
+				to: r.staffProfiles.id,
+			}),
+			appointment: r.one.appointments({
+				from: r.clinicSlots.appointmentId,
+				to: r.appointments.id,
+			}),
+			blockedByStaff: r.one.staffProfiles({
+				from: r.clinicSlots.blockedByStaffId,
 				to: r.staffProfiles.id,
 			}),
 		},

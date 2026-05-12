@@ -51,6 +51,12 @@ const ADMIN_AREAS = [
 				href: "/admin/integration-registry",
 				status: "New",
 			},
+			{
+				title: "Offline Operations",
+				description: "Offline cache readiness, job history, and continuity status for disconnected operations.",
+				href: "/admin/offline",
+				status: "New",
+			},
 		],
 	},
 	{
@@ -83,16 +89,10 @@ const ADMIN_AREAS = [
 				description: "Manage charter turnaround targets and escalation thresholds.",
 				href: "/admin/sla",
 			},
-		],
-	},
-	{
-		title: "Clinical Information Management",
-		description: "HIM operations oversight — discharge documentation, ICD-10 coding backlogs, and records release.",
-		pages: [
 			{
-				title: "HIM Operations",
-				description: "Monitor pending discharge summaries, ICD-10 coding backlogs, and medical records release requests.",
-				href: "/admin/him-ops",
+				title: "Configuration History",
+				description: "Audit trail of all configuration changes for governance forensics and compliance review.",
+				href: "/admin/config-history",
 				status: "New",
 			},
 		],
@@ -147,7 +147,7 @@ export function AdminOverview() {
 											</p>
 											<p className="text-muted-foreground text-sm">{page.description}</p>
 										</div>
-										{page.status ? <Badge>{page.status}</Badge> : null}
+										{"status" in page && page.status ? <Badge>{page.status as string}</Badge> : null}
 									</div>
 								</Link>
 							))}

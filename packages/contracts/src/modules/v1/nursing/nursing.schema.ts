@@ -296,7 +296,9 @@ export const GenerateHandoffSchema = z.object({
 
 export const GeneratedHandoffResponseSchema = z.object({
 	activeProblems: z.array(z.object({ description: z.string(), icd10Code: z.string().nullable() })),
-	currentMedications: z.array(z.object({ genericName: z.string(), dose: z.string(), frequency: z.string() })),
+	currentMedications: z.array(
+		z.object({ genericName: z.string(), dose: z.string(), frequency: z.string() })
+	),
 	recentVitals: VitalSignSchema.nullable(),
 	newsScore: z.number().int().nullable(),
 	newsRiskLevel: NewsRiskLevelEnum.nullable(),
@@ -361,6 +363,81 @@ export const HaiTagListResponseSchema = PaginatedResponseSchema.extend({
 })
 
 // ============================================================================
+// Consent Records
+// ============================================================================
+
+export const ConsentTypeEnum = z.enum([
+	"general",
+	"dpa",
+	"nbs",
+	"transfusion",
+	"surgery",
+	"anesthesia",
+	"philhealth",
+	"do_not_resuscitate",
+	"hiv_testing",
+	"organ_donation",
+	"research",
+	"telemedicine",
+])
+
+export const ConsentRecordSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid().nullable(),
+	patientId: z.string().uuid(),
+	preEncounterId: z.string().uuid().nullable(),
+	consentType: z.string(),
+	signedByName: z.string(),
+	relationship: z.string(),
+	content: z.string().nullable(),
+	signatureData: z.unknown().nullable(),
+	signedAt: dateOrString.nullable(),
+	witnessStaffId: z.string().uuid().nullable(),
+	isActive: z.boolean(),
+	revokedAt: dateOrString.nullable(),
+	revocationReason: z.string().nullable(),
+	createdAt: dateOrString,
+	updatedAt: dateOrString,
+	consentText: z.string(),
+	patientSignature: z.string().nullable(),
+	guardianSignature: z.string().nullable(),
+	witnessSignature: z.string().nullable(),
+	capturedByStaffId: z.string().uuid().nullable(),
+})
+
+export const CreateConsentRecordSchema = z.object({
+	facilityId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	preEncounterId: z.string().uuid().optional(),
+	consentType: z.string().min(1),
+	signedByName: z.string().min(1),
+	relationship: z.string().min(1),
+	content: z.string().optional(),
+	signatureData: z.unknown().optional(),
+	signedAt: dateOrString.optional(),
+	witnessStaffId: z.string().uuid().optional(),
+	consentText: z.string().optional(),
+	patientSignature: z.string().optional(),
+	guardianSignature: z.string().optional(),
+	witnessSignature: z.string().optional(),
+})
+
+export const ConsentRecordListSchema = PaginationInputSchema.extend({
+	encounterId: z.string().uuid().optional(),
+	preEncounterId: z.string().uuid().optional(),
+	facilityId: z.string().uuid().optional(),
+	consentType: z.string().optional(),
+})
+
+export const ConsentRecordListResponseSchema = PaginatedResponseSchema.extend({
+	data: z.array(ConsentRecordSchema),
+})
+
+export const ConsentRecordIdSchema = z.object({ id: z.string().uuid() })
+
+// ============================================================================
 // Inferred Types
 // ============================================================================
 
@@ -378,3 +455,5 @@ export type ShiftHandoff = z.infer<typeof ShiftHandoffSchema>
 export type CreateShiftHandoff = z.infer<typeof CreateShiftHandoffSchema>
 export type HaiTag = z.infer<typeof HaiTagSchema>
 export type CreateHaiTag = z.infer<typeof CreateHaiTagSchema>
+export type ConsentRecord = z.infer<typeof ConsentRecordSchema>
+export type CreateConsentRecord = z.infer<typeof CreateConsentRecordSchema>

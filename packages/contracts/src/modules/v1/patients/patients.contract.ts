@@ -19,11 +19,22 @@ export const patientContract = {
 		.route({
 			method: "GET",
 			path: "/patients",
-			summary: "Search patients by name, MRN, or date of birth",
+			summary: "Search patients by name, MRN, date of birth, or PhilHealth number",
 			tags: ["Patients"],
 		})
 		.input(PatientSearchSchema)
 		.output(PatientSearchResponseSchema),
+
+	listClinicians: oc
+		.route({
+			method: "GET",
+			path: "/patients/clinicians",
+			summary:
+				"List active clinicians for a facility — accessible to registrar (opd:view), no admin permission required",
+			tags: ["Patients"],
+		})
+		.input(ListCliniciansInputSchema)
+		.output(ClinicianListResponseSchema),
 
 	get: oc
 		.route({
@@ -62,21 +73,9 @@ export const patientContract = {
 		.route({
 			method: "POST",
 			path: "/patients/register-with-opd-encounter",
-			summary:
-				"Atomically register a new patient and create an OPD encounter (TOR Flow 1 Step 2)",
+			summary: "Atomically register a new patient and create an OPD encounter (TOR Flow 1 Step 2)",
 			tags: ["Patients"],
 		})
 		.input(RegisterPatientWithOpdEncounterInputSchema)
 		.output(RegisterPatientWithOpdEncounterResponseSchema),
-
-	listClinicians: oc
-		.route({
-			method: "GET",
-			path: "/patients/clinicians",
-			summary:
-				"List active clinicians for a facility — accessible to registrar (opd:view), no admin permission required",
-			tags: ["Patients"],
-		})
-		.input(ListCliniciansInputSchema)
-		.output(ClinicianListResponseSchema),
 }

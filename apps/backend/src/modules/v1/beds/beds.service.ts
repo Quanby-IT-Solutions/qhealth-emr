@@ -1,7 +1,13 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, count, eq, sql } from "drizzle-orm"
+import {
+	BadRequestException,
+	Injectable,
+	Logger,
+	NotFoundException,
+	OnApplicationBootstrap,
+} from "@nestjs/common"
+import { and, between, count, eq, sql } from "drizzle-orm"
 
-import { beds, encounters, patients, wards } from "@repo/db/schema"
+import { bedCensusDaily, beds, encounters, patients, wards } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
@@ -14,11 +20,71 @@ type UpdateBedStatusInput = V1Inputs["bed"]["updateBedStatus"]
 type SuggestBedsInput = V1Inputs["bed"]["suggestBeds"]
 type BedCensusInput = V1Inputs["bed"]["census"]
 type DashboardInput = V1Inputs["bed"]["dashboard"]
+type BorTrendInput = V1Inputs["bed"]["borTrend"]
+type AhsrExportInput = V1Inputs["bed"]["exportAhsr"]
+type DeleteWardInput = V1Inputs["bed"]["deleteWard"]
 type WardType = (typeof wards.$inferSelect)["wardType"]
 
 @Injectable()
-export class BedsService {
+export class BedsService implements OnApplicationBootstrap {
 	private readonly logger = new Logger(BedsService.name)
+
+	onApplicationBootstrap() {
+		const scheduleMidnightCron = () => {
+			const now = new Date()
+			const next = new Date(now)
+			next.setHours(0, 5, 0, 0)
+			if (next <= now) next.setDate(next.getDate() + 1)
+			setTimeout(() => {
+				void this.runMidnightCensusSnapshot()
+				setInterval(() => void this.runMidnightCensusSnapshot(), 24 * 60 * 60 * 1000)
+			}, next.getTime() - now.getTime())
+		}
+		scheduleMidnightCron()
+	}
+
+	async runMidnightCensusSnapshot() {
+		this.logger.log("Running midnight bed census snapshot")
+		try {
+			const today = new Date().toISOString().split("T")[0]!
+			const allWards = await db.select().from(wards).where(eq(wards.isActive, true))
+			for (const ward of allWards) {
+				const [totalResult] = await db
+					.select({ count: count() })
+					.from(beds)
+					.where(eq(beds.wardId, ward.id))
+				const [occupiedResult] = await db
+					.select({ count: count() })
+					.from(beds)
+					.where(and(eq(beds.wardId, ward.id), eq(beds.status, "occupied")))
+				const [availableResult] = await db
+					.select({ count: count() })
+					.from(beds)
+					.where(and(eq(beds.wardId, ward.id), eq(beds.status, "available")))
+
+				await db
+					.insert(bedCensusDaily)
+					.values({
+						facilityId: ward.facilityId,
+						wardId: ward.id,
+						censusDate: today,
+						midnightCensus: occupiedResult?.count ?? 0,
+						availableBeds: availableResult?.count ?? 0,
+					})
+					.onConflictDoUpdate({
+						target: [bedCensusDaily.facilityId, bedCensusDaily.wardId, bedCensusDaily.censusDate],
+						set: {
+							midnightCensus: occupiedResult?.count ?? 0,
+							availableBeds: availableResult?.count ?? 0,
+						},
+					})
+
+				void totalResult
+			}
+		} catch (err) {
+			this.logger.error("Midnight census snapshot failed", err)
+		}
+	}
 
 	// ========================================================================
 	// List Wards
@@ -56,10 +122,7 @@ export class BedsService {
 	// ========================================================================
 
 	async listBeds(input: BedListInput) {
-		const wardConditions = [
-			eq(wards.facilityId, input.facilityId),
-			eq(wards.isActive, true),
-		]
+		const wardConditions = [eq(wards.facilityId, input.facilityId), eq(wards.isActive, true)]
 
 		if (input.wardId) {
 			wardConditions.push(eq(wards.id, input.wardId))
@@ -93,10 +156,7 @@ export class BedsService {
 						patientMrn: patients.mrn,
 					})
 					.from(beds)
-					.leftJoin(
-						encounters,
-						eq(beds.currentEncounterId, encounters.id)
-					)
+					.leftJoin(encounters, eq(beds.currentEncounterId, encounters.id))
 					.leftJoin(patients, eq(encounters.patientId, patients.id))
 					.where(and(...bedConditions))
 					.orderBy(beds.bedNumber)
@@ -112,9 +172,7 @@ export class BedsService {
 					updatedAt: b.updatedAt,
 					wardName: ward.name,
 					wardType: ward.wardType,
-					patientName: b.patientFirstName
-						? `${b.patientLastName}, ${b.patientFirstName}`
-						: null,
+					patientName: b.patientFirstName ? `${b.patientLastName}, ${b.patientFirstName}` : null,
 					patientMrn: b.patientMrn ?? null,
 				}))
 
@@ -172,9 +230,7 @@ export class BedsService {
 			.set({
 				status: input.status,
 				currentEncounterId:
-					input.status === "available" || input.status === "out_of_service"
-						? null
-						: undefined,
+					input.status === "available" || input.status === "out_of_service" ? null : undefined,
 				updatedAt: new Date(),
 			})
 			.where(eq(beds.id, input.id))
@@ -210,8 +266,8 @@ export class BedsService {
 				and(
 					eq(beds.facilityId, input.facilityId),
 					eq(wards.isActive, true),
-					eq(beds.status, "available"),
-				),
+					eq(beds.status, "available")
+				)
 			)
 			.orderBy(wards.name, beds.bedNumber)
 
@@ -236,7 +292,9 @@ export class BedsService {
 				}
 
 				if (input.genderPreference && input.genderPreference !== "any") {
-					warnings.push(`Gender preference ${input.genderPreference} requires ward-level validation`)
+					warnings.push(
+						`Gender preference ${input.genderPreference} requires ward-level validation`
+					)
 					matchScore -= 5
 				}
 
@@ -327,6 +385,20 @@ export class BedsService {
 	}
 
 	// ========================================================================
+	// Death Rate Computation Helpers (static, pure)
+	// ========================================================================
+
+	static grossDeathRate(deathsWithin48h: number, totalDischarges: number): number {
+		if (totalDischarges === 0) return 0
+		return Math.round((deathsWithin48h / totalDischarges) * 100 * 100) / 100
+	}
+
+	static netDeathRate(deathsAfter48h: number, totalDischarges: number): number {
+		if (totalDischarges === 0) return 0
+		return Math.round((deathsAfter48h / totalDischarges) * 100 * 100) / 100
+	}
+
+	// ========================================================================
 	// Real-time Census Dashboard
 	// ========================================================================
 
@@ -342,14 +414,17 @@ export class BedsService {
 			.leftJoin(beds, eq(beds.wardId, wards.id))
 			.where(and(eq(wards.facilityId, input.facilityId), eq(wards.isActive, true)))
 
-		const byWardMap = new Map<string, {
-			wardId: string
-			wardName: string
-			wardType: WardType
-			totalBeds: number
-			occupiedBeds: number
-			availableBeds: number
-		}>()
+		const byWardMap = new Map<
+			string,
+			{
+				wardId: string
+				wardName: string
+				wardType: WardType
+				totalBeds: number
+				occupiedBeds: number
+				availableBeds: number
+			}
+		>()
 
 		let totalBeds = 0
 		let occupiedBeds = 0
@@ -398,15 +473,19 @@ export class BedsService {
 
 		const byWard = Array.from(byWardMap.values()).map(ward => ({
 			...ward,
-			borPercentage: ward.totalBeds > 0 ? Number(((ward.occupiedBeds / ward.totalBeds) * 100).toFixed(2)) : 0,
+			borPercentage:
+				ward.totalBeds > 0 ? Number(((ward.occupiedBeds / ward.totalBeds) * 100).toFixed(2)) : 0,
 		}))
 
-		const byWardTypeMap = new Map<WardType, {
-			wardType: WardType
-			totalBeds: number
-			occupiedBeds: number
-			availableBeds: number
-		}>()
+		const byWardTypeMap = new Map<
+			WardType,
+			{
+				wardType: WardType
+				totalBeds: number
+				occupiedBeds: number
+				availableBeds: number
+			}
+		>()
 		for (const ward of byWard) {
 			const existing = byWardTypeMap.get(ward.wardType) ?? {
 				wardType: ward.wardType,
@@ -422,13 +501,30 @@ export class BedsService {
 
 		const byWardType = Array.from(byWardTypeMap.values()).map(item => ({
 			...item,
-			borPercentage: item.totalBeds > 0 ? Number(((item.occupiedBeds / item.totalBeds) * 100).toFixed(2)) : 0,
+			borPercentage:
+				item.totalBeds > 0 ? Number(((item.occupiedBeds / item.totalBeds) * 100).toFixed(2)) : 0,
 		}))
 
 		const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
 		const [recentAdmissions, recentDischarges] = await Promise.all([
-			db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), sql`${encounters.admissionDatetime} >= ${since}`)),
-			db.select({ count: count() }).from(encounters).where(and(eq(encounters.facilityId, input.facilityId), sql`${encounters.dischargeDatetime} >= ${since}`)),
+			db
+				.select({ count: count() })
+				.from(encounters)
+				.where(
+					and(
+						eq(encounters.facilityId, input.facilityId),
+						sql`${encounters.admissionDatetime} >= ${since}`
+					)
+				),
+			db
+				.select({ count: count() })
+				.from(encounters)
+				.where(
+					and(
+						eq(encounters.facilityId, input.facilityId),
+						sql`${encounters.dischargeDatetime} >= ${since}`
+					)
+				),
 		])
 
 		return {
@@ -451,5 +547,160 @@ export class BedsService {
 				transfersLast24h: 0,
 			},
 		}
+	}
+
+	// ========================================================================
+	// BOR Trend
+	// ========================================================================
+
+	async getBorTrend(input: BorTrendInput) {
+		const period = input.period ?? "30d"
+		const periodDays: Record<string, number> = { "7d": 7, "30d": 30, "90d": 90, "1y": 365 }
+		const days = periodDays[period] ?? 30
+		const endDate = new Date()
+		const startDate = new Date(endDate.getTime() - days * 24 * 60 * 60 * 1000)
+		const startStr = startDate.toISOString().split("T")[0]!
+		const endStr = endDate.toISOString().split("T")[0]!
+
+		const conditions = [
+			eq(bedCensusDaily.facilityId, input.facilityId),
+			between(bedCensusDaily.censusDate, startStr, endStr),
+		]
+		if (input.wardId) {
+			conditions.push(eq(bedCensusDaily.wardId, input.wardId))
+		}
+
+		const rows = await db
+			.select({
+				censusDate: bedCensusDaily.censusDate,
+				midnightCensus: sql<number>`sum(${bedCensusDaily.midnightCensus})`,
+				availableBeds: sql<number>`sum(${bedCensusDaily.availableBeds})`,
+			})
+			.from(bedCensusDaily)
+			.where(and(...conditions))
+			.groupBy(bedCensusDaily.censusDate)
+			.orderBy(bedCensusDaily.censusDate)
+
+		const points = rows.map(row => {
+			const midnight = Number(row.midnightCensus)
+			const available = Number(row.availableBeds)
+			const total = available + midnight
+			const borPercentage = total > 0 ? Math.round((midnight / total) * 100 * 100) / 100 : 0
+			return {
+				date: row.censusDate,
+				borPercentage,
+				midnightCensus: midnight,
+				availableBeds: available,
+			}
+		})
+
+		return { facilityId: input.facilityId, period, points }
+	}
+
+	// ========================================================================
+	// AHSR Export
+	// ========================================================================
+
+	async exportAhsr(input: AhsrExportInput) {
+		const conditions = [
+			eq(bedCensusDaily.facilityId, input.facilityId),
+			between(bedCensusDaily.censusDate, input.startDate, input.endDate),
+		]
+		if (input.wardId) {
+			conditions.push(eq(bedCensusDaily.wardId, input.wardId))
+		}
+
+		const rows = await db
+			.select({
+				censusDate: bedCensusDaily.censusDate,
+				midnightCensus: sql<number>`sum(${bedCensusDaily.midnightCensus})`,
+				admissions: sql<number>`sum(${bedCensusDaily.admissions})`,
+				discharges: sql<number>`sum(${bedCensusDaily.discharges})`,
+				availableBeds: sql<number>`sum(${bedCensusDaily.availableBeds})`,
+				deathsWithin48h: sql<number>`sum(${bedCensusDaily.deathsWithin48h})`,
+				deathsAfter48h: sql<number>`sum(${bedCensusDaily.deathsAfter48h})`,
+			})
+			.from(bedCensusDaily)
+			.where(and(...conditions))
+			.groupBy(bedCensusDaily.censusDate)
+			.orderBy(bedCensusDaily.censusDate)
+
+		const ahsrRows = rows.map(row => {
+			const midnight = Number(row.midnightCensus)
+			const available = Number(row.availableBeds)
+			const discharges = Number(row.discharges)
+			const within48h = Number(row.deathsWithin48h)
+			const after48h = Number(row.deathsAfter48h)
+			const total = available + midnight
+			const borPercentage = total > 0 ? Math.round((midnight / total) * 100 * 100) / 100 : 0
+			return {
+				censusDate: row.censusDate,
+				midnightCensus: midnight,
+				admissions: Number(row.admissions),
+				discharges,
+				availableBeds: available,
+				deathsWithin48h: within48h,
+				deathsAfter48h: after48h,
+				grossDeathRate: BedsService.grossDeathRate(within48h, discharges),
+				netDeathRate: BedsService.netDeathRate(after48h, discharges),
+				borPercentage,
+			}
+		})
+
+		const response: {
+			facilityId: string
+			startDate: string
+			endDate: string
+			rows: typeof ahsrRows
+			csvContent?: string
+		} = {
+			facilityId: input.facilityId,
+			startDate: input.startDate,
+			endDate: input.endDate,
+			rows: ahsrRows,
+		}
+
+		if (input.format === "csv") {
+			const header =
+				"Census Date,Midnight Census,Admissions,Discharges,Available Beds,Deaths <48h,Deaths >48h,Gross Death Rate,Net Death Rate,BOR %"
+			const csvLines = ahsrRows.map(r =>
+				[
+					r.censusDate,
+					r.midnightCensus,
+					r.admissions,
+					r.discharges,
+					r.availableBeds,
+					r.deathsWithin48h,
+					r.deathsAfter48h,
+					r.grossDeathRate,
+					r.netDeathRate,
+					r.borPercentage,
+				].join(",")
+			)
+			response.csvContent = [header, ...csvLines].join("\n")
+		}
+
+		return response
+	}
+
+	// ========================================================================
+	// Delete Ward
+	// ========================================================================
+
+	async deleteWard(input: DeleteWardInput) {
+		const occupiedCount = await db
+			.select({ count: count() })
+			.from(beds)
+			.where(and(eq(beds.wardId, input.wardId), eq(beds.status, "occupied")))
+
+		if ((occupiedCount[0]?.count ?? 0) > 0) {
+			throw new BadRequestException("Cannot delete ward: occupied beds exist")
+		}
+
+		await db.delete(beds).where(eq(beds.wardId, input.wardId))
+		await db.delete(wards).where(eq(wards.id, input.wardId))
+
+		this.logger.log(`Deleted ward ${input.wardId}`)
+		return { success: true }
 	}
 }

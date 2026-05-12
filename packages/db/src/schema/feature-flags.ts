@@ -1,7 +1,7 @@
 import { index, uniqueIndex } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
-import { facilities, roles } from "./rbac.js"
+import { facilities, roles, staffProfiles } from "./rbac.js"
 
 // ============================================================================
 // Feature Flags — definitions and per-dimension targeting overrides
@@ -17,11 +17,8 @@ export const featureFlags = createTable(
 		group: t
 			.text("group")
 			.notNull()
-			.$type<"platform-control" | "compliance" | "integration">(),
-		riskLevel: t
-			.text("risk_level")
-			.notNull()
-			.$type<"low" | "moderate" | "high">(),
+			.$type<"platform-control" | "financial" | "compliance" | "integration">(),
+		riskLevel: t.text("risk_level").notNull().$type<"low" | "moderate" | "high">(),
 		ownerTeam: t.text("owner_team"),
 		defaultEnabled: t.boolean("default_enabled").notNull().default(false),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
@@ -39,15 +36,9 @@ export const featureFlagTargets = createTable(
 			.notNull()
 			.references(() => featureFlags.id, { onDelete: "cascade" }),
 		// NULL = wildcard (applies to all values of this dimension)
-		environment: t
-			.text("environment")
-			.$type<"dev" | "staging" | "prod">(),
-		facilityId: t
-			.uuid("facility_id")
-			.references(() => facilities.id, { onDelete: "cascade" }),
-		roleId: t
-			.uuid("role_id")
-			.references(() => roles.id, { onDelete: "cascade" }),
+		environment: t.text("environment").$type<"dev" | "staging" | "prod">(),
+		facilityId: t.uuid("facility_id").references(() => facilities.id, { onDelete: "cascade" }),
+		roleId: t.uuid("role_id").references(() => roles.id, { onDelete: "cascade" }),
 		enabled: t.boolean("enabled").notNull(),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
@@ -64,4 +55,25 @@ export const featureFlagTargets = createTable(
 			t.roleId
 		),
 	]
+)
+
+// ============================================================================
+// Feature Flag History — audit diff log per flag change
+// ============================================================================
+
+export const featureFlagHistory = createTable(
+	"feature_flag_history",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		flagId: t
+			.uuid("flag_id")
+			.notNull()
+			.references(() => featureFlags.id, { onDelete: "cascade" }),
+		previousValue: t.boolean("previous_value"),
+		newValue: t.boolean("new_value").notNull(),
+		changedBy: t.uuid("changed_by").references(() => staffProfiles.id, { onDelete: "set null" }),
+		changedAt: t.timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
+		reason: t.text("reason"),
+	}),
+	t => [index("ffh_flag_id_idx").on(t.flagId), index("ffh_changed_at_idx").on(t.changedAt)]
 )

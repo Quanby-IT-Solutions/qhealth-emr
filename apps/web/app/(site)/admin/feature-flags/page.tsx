@@ -1,28 +1,17 @@
-"use client"
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query"
 
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { FeatureFlagsPanel } from "@/features/admin/components/feature-flags-panel"
+import { createQueryClient } from "@/services/tanstack-query/query-client"
+import { orpc } from "@/services/orpc/client"
+import "@/services/orpc/orpc-server"
+import { FeatureFlagsPageClient } from "@/features/admin/components/feature-flags-page-client"
 
-function usePermissionSet() {
-	const { data: profile } = useMyProfile()
-	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
-}
+export default async function AdminFeatureFlagsPage() {
+	const queryClient = createQueryClient()
+	await queryClient.prefetchQuery(orpc.featureFlags.list.queryOptions())
 
-function can(permSet: Set<string>, module: string, action: string) {
-	return permSet.has(`${module}:${action}`)
-}
-
-export default function AdminFeatureFlagsPage() {
-	const permSet = usePermissionSet()
-
-	if (!can(permSet, "admin", "view") || !can(permSet, "feature_flags", "view")) {
-		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
-				You do not have permission to access feature flags.
-			</div>
-		)
-	}
-
-	return <FeatureFlagsPanel canEdit={can(permSet, "feature_flags", "edit")} />
+	return (
+		<HydrationBoundary state={dehydrate(queryClient)}>
+			<FeatureFlagsPageClient />
+		</HydrationBoundary>
+	)
 }

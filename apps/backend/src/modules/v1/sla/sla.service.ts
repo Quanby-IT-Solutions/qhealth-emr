@@ -1,30 +1,57 @@
-import { Injectable, NotFoundException } from "@nestjs/common"
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, sql } from "drizzle-orm"
-
-import { birthRegistrations, deathReports, encounterStatusEvents, encounters, imagingOrders, invoices, labOrders, medicalRecordsRequests, operationRecords, patients, slaConfigs, slaStepConfigs } from "@repo/db/schema"
-import type { SlaWorkflowType } from "@repo/db/schema"
-
-import { db } from "@/common/database/database.client"
+import { Injectable, Logger, NotFoundException, OnModuleInit } from "@nestjs/common"
+import {
+	and,
+	asc,
+	count,
+	desc,
+	eq,
+	gte,
+	inArray,
+	isNotNull,
+	isNull,
+	lte,
+	ne,
+	sql,
+} from "drizzle-orm"
 
 import type {
-	SlaEventsQuery,
-	SlaEventsResponse,
-	SlaConfigsQuery,
-	SlaConfigsResponse,
 	CreateSlaConfig,
-	UpdateSlaConfig,
+	CreateSlaStepConfig,
 	SlaComplianceQuery,
 	SlaComplianceReport,
 	SlaConfig,
+	SlaConfigsQuery,
+	SlaConfigsResponse,
 	SlaEvent,
-	SlaStepMetric,
+	SlaEventsQuery,
+	SlaEventsResponse,
+	SlaStepConfig,
 	SlaStepConfigsQuery,
 	SlaStepConfigsResponse,
-	CreateSlaStepConfig,
+	SlaStepMetric,
+	UpdateSlaConfig,
 	UpdateSlaStepConfig,
-	SlaStepConfig,
 } from "@repo/contracts"
+import {
+	birthRegistrations,
+	deathReports,
+	encounters,
+	encounterStatusEvents,
+	facilities,
+	imagingOrders,
+	invoices,
+	labOrders,
+	medicalRecordsRequests,
+	operationRecords,
+	patients,
+	slaConfigs,
+	slaStepConfigs,
+	workflowStatusLog,
+	type SlaStepType,
+	type SlaWorkflowType,
+} from "@repo/db/schema"
 
+import { db } from "@/common/database/database.client"
 import { resolveStepTargetByType } from "@/utils/sla-step-target"
 
 // Map encounter types to SLA workflow types
@@ -91,15 +118,92 @@ type WorkflowMetrics = {
 	stepMetrics?: SlaStepMetric[]
 }
 
+// ARTA default SLA workflow configs (Philippine DOH ARTA requirements)
+const ARTA_DEFAULT_CONFIGS: Array<{
+	workflowType: SlaWorkflowType
+	targetMinutes: number
+	hardCapMinutes: number
+	description: string
+}> = [
+	{
+		workflowType: "opd_consultation",
+		targetMinutes: 30,
+		hardCapMinutes: 60,
+		description: "ARTA Flow 1: OPD Consultation",
+	},
+	{
+		workflowType: "admission",
+		targetMinutes: 60,
+		hardCapMinutes: 120,
+		description: "ARTA Flow 4: Admission Routing",
+	},
+	{
+		workflowType: "lab_result",
+		targetMinutes: 60,
+		hardCapMinutes: 120,
+		description: "ARTA Flow 3: Laboratory Result",
+	},
+	{
+		workflowType: "radiology_result",
+		targetMinutes: 60,
+		hardCapMinutes: 120,
+		description: "ARTA Flow 3: Radiology Result",
+	},
+	{
+		workflowType: "medication_dispensing",
+		targetMinutes: 15,
+		hardCapMinutes: 30,
+		description: "ARTA Flow 6: Pharmacy Dispensing",
+	},
+	{
+		workflowType: "medical_records",
+		targetMinutes: 1440,
+		hardCapMinutes: 2880,
+		description: "ARTA Flow 7: Medical Records Release",
+	},
+	{
+		workflowType: "emergency_triage",
+		targetMinutes: 5,
+		hardCapMinutes: 10,
+		description: "ARTA Flow 2: Emergency Triage",
+	},
+]
+
 @Injectable()
-export class SlaService {
+export class SlaService implements OnModuleInit {
+	private readonly logger = new Logger(SlaService.name)
+
+	async onModuleInit() {
+		// ADM-BE-09 AC1: Seed ARTA default SLA configs for all existing facilities
+		try {
+			const allFacilities = await db.select({ id: facilities.id }).from(facilities)
+			for (const facility of allFacilities) {
+				await db
+					.insert(slaConfigs)
+					.values(
+						ARTA_DEFAULT_CONFIGS.map(cfg => ({
+							facilityId: facility.id,
+							workflowType: cfg.workflowType,
+							targetMinutes: cfg.targetMinutes,
+							hardCapMinutes: cfg.hardCapMinutes,
+							warningThresholdPct: 80,
+							description: cfg.description,
+						}))
+					)
+					.onConflictDoNothing()
+			}
+		} catch (err) {
+			this.logger.warn("ARTA default SLA config seed failed (non-fatal)", err)
+		}
+	}
+
 	// ========================================================================
 	// SLA Events
 	// ========================================================================
 
 	async listEvents(query: SlaEventsQuery): Promise<SlaEventsResponse> {
 		const page = query.page ?? 1
-		const limit = query.limit ?? 50
+		const limit = Math.min(query.limit ?? 50, 200)
 		const offset = (page - 1) * limit
 
 		// SLA-001: no workflow filter → unified active-work view across all sources
@@ -178,7 +282,10 @@ export class SlaService {
 						.orderBy(desc(encounterStatusEvents.occurredAt))
 				: []
 
-		const latestStepByEncounter = new Map<string, { occurredAt: Date; escalatedAt: Date | null; toStatus: string | null }>()
+		const latestStepByEncounter = new Map<
+			string,
+			{ occurredAt: Date; escalatedAt: Date | null; toStatus: string | null }
+		>()
 		for (const evt of latestStepRows) {
 			if (!latestStepByEncounter.has(evt.encounterId)) {
 				latestStepByEncounter.set(evt.encounterId, {
@@ -242,7 +349,7 @@ export class SlaService {
 		query: SlaEventsQuery,
 		page: number,
 		limit: number,
-		offset: number,
+		offset: number
 	): Promise<SlaEventsResponse> {
 		if (!query.facilityId) {
 			return { data: [], total: 0, page, limit, totalPages: 0 }
@@ -269,7 +376,12 @@ export class SlaService {
 				and(
 					eq(encounters.facilityId, query.facilityId),
 					eq(encounters.status, "active"),
-					inArray(encounters.encounterType, ["outpatient", "telemedicine", "emergency", "inpatient"])
+					inArray(encounters.encounterType, [
+						"outpatient",
+						"telemedicine",
+						"emergency",
+						"inpatient",
+					])
 				)
 			)
 			.orderBy(desc(encounters.admissionDatetime))
@@ -296,7 +408,10 @@ export class SlaService {
 						.orderBy(desc(encounterStatusEvents.occurredAt))
 				: []
 
-		const latestStepByEncounter = new Map<string, { occurredAt: Date; escalatedAt: Date | null; toStatus: string | null }>()
+		const latestStepByEncounter = new Map<
+			string,
+			{ occurredAt: Date; escalatedAt: Date | null; toStatus: string | null }
+		>()
 		for (const evt of latestStepRows) {
 			if (!latestStepByEncounter.has(evt.encounterId)) {
 				latestStepByEncounter.set(evt.encounterId, {
@@ -345,12 +460,14 @@ export class SlaService {
 
 		// ── Non-encounter workflows (SLA-001: fetch active items from each source) ─
 		const PER_SOURCE_LIMIT = 200
-		const nonEncounterPromises = ([...NON_ENCOUNTER_WORKFLOW_SOURCES] as SlaWorkflowType[]).map(wt => {
-			if (!configByWorkflow.has(wt)) return Promise.resolve<SlaEvent[]>([])
-			return this.listNonEncounterEvents({ ...query, workflowType: wt }, 1, PER_SOURCE_LIMIT, 0)
-				.then(r => r.data)
-				.catch(() => [] as SlaEvent[])
-		})
+		const nonEncounterPromises = ([...NON_ENCOUNTER_WORKFLOW_SOURCES] as SlaWorkflowType[]).map(
+			wt => {
+				if (!configByWorkflow.has(wt)) return Promise.resolve<SlaEvent[]>([])
+				return this.listNonEncounterEvents({ ...query, workflowType: wt }, 1, PER_SOURCE_LIMIT, 0)
+					.then(r => r.data)
+					.catch(() => [] as SlaEvent[])
+			}
+		)
 		const nonEncounterEvents = (await Promise.all(nonEncounterPromises)).flat()
 
 		// ── Merge, filter by status, sort by urgency, paginate ──────────────────
@@ -376,10 +493,10 @@ export class SlaService {
 		query: SlaEventsQuery,
 		page: number,
 		limit: number,
-		offset: number,
+		offset: number
 	): Promise<SlaEventsResponse> {
 		const facilityId = query.facilityId
-		// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+
 		const workflowType = query.workflowType!
 		if (!facilityId) {
 			return { data: [], total: 0, page, limit, totalPages: 0 }
@@ -388,7 +505,13 @@ export class SlaService {
 		const [slaConfig] = await db
 			.select()
 			.from(slaConfigs)
-			.where(and(eq(slaConfigs.facilityId, facilityId), eq(slaConfigs.workflowType, workflowType), eq(slaConfigs.isActive, true)))
+			.where(
+				and(
+					eq(slaConfigs.facilityId, facilityId),
+					eq(slaConfigs.workflowType, workflowType),
+					eq(slaConfigs.isActive, true)
+				)
+			)
 		if (!slaConfig) {
 			return { data: [], total: 0, page, limit, totalPages: 0 }
 		}
@@ -407,7 +530,7 @@ export class SlaService {
 			])
 			const where = and(
 				eq(labOrders.facilityId, facilityId),
-				inArray(labOrders.status, ["pending", "ordered", "collected", "in_progress"]),
+				inArray(labOrders.status, ["pending", "ordered", "collected", "in_progress"])
 			)
 			const rows = await db
 				.select({
@@ -441,28 +564,39 @@ export class SlaService {
 					currentStep = "ancillary_procedure"
 					startedAt = row.billingClearedAt
 					stepTarget = procedureTgt
-					stepNote = "Timing source: billing cleared datetime (TOR Flow 3 Step 2->3 authoritative checkpoint)"
+					stepNote =
+						"Timing source: billing cleared datetime (TOR Flow 3 Step 2->3 authoritative checkpoint)"
 				} else if (row.specimenReceivedAt !== null) {
 					currentStep = "ancillary_payment_clearance"
 					startedAt = row.specimenReceivedAt
 					stepTarget = paymentTgt
-					stepNote = "Timing source: specimen received at lab (TOR Flow 3 Step 1->2 authoritative checkpoint)"
+					stepNote =
+						"Timing source: specimen received at lab (TOR Flow 3 Step 1->2 authoritative checkpoint)"
 				} else {
 					currentStep = "ancillary_order_receipt"
 					startedAt = row.createdAt
 					stepTarget = orderReceiptTgt
-					stepNote = "Timing source: lab order creation (TOR Flow 3 Step 1 - awaiting specimen receipt)"
+					stepNote =
+						"Timing source: lab order creation (TOR Flow 3 Step 1 - awaiting specimen receipt)"
 				}
 				const elapsed = Math.floor((now.getTime() - startedAt.getTime()) / 60000)
 				const status = computeSlaStatus(elapsed, stepTarget, slaConfig.warningThresholdPct)
 				if (statusFilter && status !== statusFilter) continue
 				// SLA-014: currentStep reflects which of the 4 Flow 3 steps is currently in progress
 				events.push({
-					id: row.id, facilityId: row.facilityId, encounterId: row.encounterId,
-					patientId: null, patientName: null,
-					workflowType, startedAt, completedAt: null,
-					targetMinutes: stepTarget, elapsedMinutes: elapsed, status,
-					escalatedAt: null, escalatedToStaffId: null,
+					id: row.id,
+					facilityId: row.facilityId,
+					encounterId: row.encounterId,
+					patientId: null,
+					patientName: null,
+					workflowType,
+					startedAt,
+					completedAt: null,
+					targetMinutes: stepTarget,
+					elapsedMinutes: elapsed,
+					status,
+					escalatedAt: null,
+					escalatedToStaffId: null,
 					notes: stepNote,
 					createdAt: row.createdAt,
 					currentStep,
@@ -482,7 +616,7 @@ export class SlaService {
 			])
 			const where = and(
 				eq(imagingOrders.facilityId, facilityId),
-				inArray(imagingOrders.status, ["ordered", "scheduled", "in_progress"]),
+				inArray(imagingOrders.status, ["ordered", "scheduled", "in_progress"])
 			)
 			const rows = await db
 				.select({
@@ -513,40 +647,53 @@ export class SlaService {
 					currentStep = "ancillary_release"
 					startedAt = row.studyStartedAt
 					stepTarget = releaseTgt
-					stepNote = "Timing source: study started datetime (TOR Flow 3 Step 3->4 authoritative checkpoint)"
+					stepNote =
+						"Timing source: study started datetime (TOR Flow 3 Step 3->4 authoritative checkpoint)"
 				} else if (row.billingClearedAt !== null) {
 					currentStep = "ancillary_procedure"
 					startedAt = row.billingClearedAt
 					stepTarget = procedureTgt
-					stepNote = "Timing source: billing cleared datetime (TOR Flow 3 Step 2->3 authoritative checkpoint)"
+					stepNote =
+						"Timing source: billing cleared datetime (TOR Flow 3 Step 2->3 authoritative checkpoint)"
 				} else if (row.imagingOrderReceivedAt !== null) {
 					// SLA-019: use authoritative receipt timestamp (radiology acknowledged receipt)
 					currentStep = "ancillary_payment_clearance"
 					startedAt = row.imagingOrderReceivedAt
 					stepTarget = paymentTgt
-					stepNote = "Timing source: imaging order received at radiology (TOR Flow 3 Step 1->2 authoritative checkpoint)"
+					stepNote =
+						"Timing source: imaging order received at radiology (TOR Flow 3 Step 1->2 authoritative checkpoint)"
 				} else if (row.scheduledDatetime !== null) {
 					// Proxy fallback when imagingOrderReceivedAt not yet captured
 					currentStep = "ancillary_payment_clearance"
 					startedAt = row.scheduledDatetime
 					stepTarget = paymentTgt
-					stepNote = "Timing source: procedure scheduled datetime (TOR Flow 3 Step 1->2 proxy — imagingOrderReceivedAt not set)"
+					stepNote =
+						"Timing source: procedure scheduled datetime (TOR Flow 3 Step 1->2 proxy — imagingOrderReceivedAt not set)"
 				} else {
 					currentStep = "ancillary_order_receipt"
 					startedAt = row.createdAt
 					stepTarget = orderReceiptTgt
-					stepNote = "Timing source: imaging order creation (TOR Flow 3 Step 1 - awaiting radiology receipt acknowledgment)"
+					stepNote =
+						"Timing source: imaging order creation (TOR Flow 3 Step 1 - awaiting radiology receipt acknowledgment)"
 				}
 				const elapsed = Math.floor((now.getTime() - startedAt.getTime()) / 60000)
 				const status = computeSlaStatus(elapsed, stepTarget, slaConfig.warningThresholdPct)
 				if (statusFilter && status !== statusFilter) continue
 				// SLA-014: currentStep reflects which of the 4 Flow 3 steps is currently in progress
 				events.push({
-					id: row.id, facilityId: row.facilityId, encounterId: row.encounterId,
-					patientId: null, patientName: null,
-					workflowType, startedAt, completedAt: null,
-					targetMinutes: stepTarget, elapsedMinutes: elapsed, status,
-					escalatedAt: null, escalatedToStaffId: null,
+					id: row.id,
+					facilityId: row.facilityId,
+					encounterId: row.encounterId,
+					patientId: null,
+					patientName: null,
+					workflowType,
+					startedAt,
+					completedAt: null,
+					targetMinutes: stepTarget,
+					elapsedMinutes: elapsed,
+					status,
+					escalatedAt: null,
+					escalatedToStaffId: null,
 					notes: stepNote,
 					createdAt: row.createdAt,
 					currentStep,
@@ -557,13 +704,16 @@ export class SlaService {
 		}
 		if (workflowType === "medical_records") {
 			// SLA-006: resolve effective step target (facility override > TOR default for records_processing_release)
-			const effectiveTarget = await resolveStepTargetByType(facilityId, "records_processing_release")
+			const effectiveTarget = await resolveStepTargetByType(
+				facilityId,
+				"records_processing_release"
+			)
 			const where = and(
 				eq(medicalRecordsRequests.facilityId, facilityId),
 				inArray(medicalRecordsRequests.status, ["pending", "processing"]),
 				// SLA-022: exclude medical_certificate requests — they are tracked under certificate_issuance
 				// to prevent double-counting the same Flow 7 request across two admin SLA workflows
-				ne(medicalRecordsRequests.requestType, "medical_certificate"),
+				ne(medicalRecordsRequests.requestType, "medical_certificate")
 			)
 			const rows = await db
 				.select({
@@ -585,7 +735,10 @@ export class SlaService {
 				.orderBy(desc(medicalRecordsRequests.createdAt))
 				.limit(limit)
 				.offset(offset)
-			const [countRow] = await db.select({ total: count() }).from(medicalRecordsRequests).where(where)
+			const [countRow] = await db
+				.select({ total: count() })
+				.from(medicalRecordsRequests)
+				.where(where)
 			for (const row of rows) {
 				const elapsed = Math.floor((now.getTime() - row.createdAt.getTime()) / 60000)
 				const status = computeSlaStatus(elapsed, effectiveTarget, slaConfig.warningThresholdPct)
@@ -593,17 +746,30 @@ export class SlaService {
 				// SLA-022: derive current step from releasedAt > processing > paidAt > default
 				const currentStep = row.releasedAt
 					? "records_processing_release"
-					: (row.status === "processing" ? "records_processing_release" : (row.paidAt ? "records_payment" : "records_request"))
+					: row.status === "processing"
+						? "records_processing_release"
+						: row.paidAt
+							? "records_payment"
+							: "records_request"
 				// SLA-020: annotate note with evidence state so monitoring staff can see gaps
-				const evidenceNote = row.identityVerified && row.dpaConsentObtained
-					? "Evidence: identity verified ✓, DPA consent ✓ — authoritative Step 1 checkpoint"
-					: `Evidence gaps: ${!row.identityVerified ? "identity not verified" : ""}${!row.identityVerified && !row.dpaConsentObtained ? ", " : ""}${!row.dpaConsentObtained ? "DPA consent not captured" : ""} — Step 1 proxy until resolved`
+				const evidenceNote =
+					row.identityVerified && row.dpaConsentObtained
+						? "Evidence: identity verified ✓, DPA consent ✓ — authoritative Step 1 checkpoint"
+						: `Evidence gaps: ${!row.identityVerified ? "identity not verified" : ""}${!row.identityVerified && !row.dpaConsentObtained ? ", " : ""}${!row.dpaConsentObtained ? "DPA consent not captured" : ""} — Step 1 proxy until resolved`
 				events.push({
-					id: row.id, facilityId: row.facilityId, encounterId: row.encounterId,
-					patientId: null, patientName: null,
-					workflowType, startedAt: row.createdAt, completedAt: null,
-					targetMinutes: effectiveTarget, elapsedMinutes: elapsed, status,
-					escalatedAt: null, escalatedToStaffId: null,
+					id: row.id,
+					facilityId: row.facilityId,
+					encounterId: row.encounterId,
+					patientId: null,
+					patientName: null,
+					workflowType,
+					startedAt: row.createdAt,
+					completedAt: null,
+					targetMinutes: effectiveTarget,
+					elapsedMinutes: elapsed,
+					status,
+					escalatedAt: null,
+					escalatedToStaffId: null,
 					notes: evidenceNote,
 					createdAt: row.createdAt,
 					currentStep,
@@ -618,7 +784,7 @@ export class SlaService {
 			const where = and(
 				eq(encounterStatusEvents.facilityId, facilityId),
 				eq(encounterStatusEvents.workflowType, evtWorkflow as "discharge" | "pharmacy"),
-				isNull(encounterStatusEvents.actualMinutes),
+				isNull(encounterStatusEvents.actualMinutes)
 			)
 			const rows = await db
 				.select({
@@ -641,14 +807,26 @@ export class SlaService {
 				.where(where)
 			for (const row of rows) {
 				const elapsed = Math.floor((now.getTime() - row.occurredAt.getTime()) / 60000)
-				const status = computeSlaStatus(elapsed, slaConfig.targetMinutes, slaConfig.warningThresholdPct)
+				const status = computeSlaStatus(
+					elapsed,
+					slaConfig.targetMinutes,
+					slaConfig.warningThresholdPct
+				)
 				if (statusFilter && status !== statusFilter) continue
 				events.push({
-					id: row.id, facilityId: row.facilityId, encounterId: row.encounterId,
-					patientId: null, patientName: null,
-					workflowType, startedAt: row.occurredAt, completedAt: null,
-					targetMinutes: slaConfig.targetMinutes, elapsedMinutes: elapsed, status,
-					escalatedAt: row.escalatedAt, escalatedToStaffId: row.escalatedToStaffId,
+					id: row.id,
+					facilityId: row.facilityId,
+					encounterId: row.encounterId,
+					patientId: null,
+					patientName: null,
+					workflowType,
+					startedAt: row.occurredAt,
+					completedAt: null,
+					targetMinutes: slaConfig.targetMinutes,
+					elapsedMinutes: elapsed,
+					status,
+					escalatedAt: row.escalatedAt,
+					escalatedToStaffId: row.escalatedToStaffId,
 					notes: row.notes ?? "Timing source: workflow step event occurrence (checkpoint-accurate)",
 					createdAt: row.occurredAt,
 				})
@@ -664,7 +842,7 @@ export class SlaService {
 			const where = and(
 				eq(encounterStatusEvents.facilityId, facilityId),
 				eq(encounterStatusEvents.workflowType, "billing"),
-				isNull(encounterStatusEvents.actualMinutes),
+				isNull(encounterStatusEvents.actualMinutes)
 			)
 			const rows = await db
 				.select({
@@ -681,18 +859,34 @@ export class SlaService {
 				.orderBy(desc(encounterStatusEvents.occurredAt))
 				.limit(limit)
 				.offset(offset)
-			const [countRow] = await db.select({ total: count() }).from(encounterStatusEvents).where(where)
+			const [countRow] = await db
+				.select({ total: count() })
+				.from(encounterStatusEvents)
+				.where(where)
 			for (const row of rows) {
 				const elapsed = Math.floor((now.getTime() - row.occurredAt.getTime()) / 60000)
-				const status = computeSlaStatus(elapsed, slaConfig.targetMinutes, slaConfig.warningThresholdPct)
+				const status = computeSlaStatus(
+					elapsed,
+					slaConfig.targetMinutes,
+					slaConfig.warningThresholdPct
+				)
 				if (statusFilter && status !== statusFilter) continue
 				events.push({
-					id: row.id, facilityId: row.facilityId, encounterId: row.encounterId,
-					patientId: null, patientName: null,
-					workflowType, startedAt: row.occurredAt, completedAt: null,
-					targetMinutes: slaConfig.targetMinutes, elapsedMinutes: elapsed, status,
-					escalatedAt: row.escalatedAt, escalatedToStaffId: row.staffId,
-					notes: row.notes ?? "Timing source: billing workflow event occurrence (checkpoint-accurate)",
+					id: row.id,
+					facilityId: row.facilityId,
+					encounterId: row.encounterId,
+					patientId: null,
+					patientName: null,
+					workflowType,
+					startedAt: row.occurredAt,
+					completedAt: null,
+					targetMinutes: slaConfig.targetMinutes,
+					elapsedMinutes: elapsed,
+					status,
+					escalatedAt: row.escalatedAt,
+					escalatedToStaffId: row.staffId,
+					notes:
+						row.notes ?? "Timing source: billing workflow event occurrence (checkpoint-accurate)",
 					createdAt: row.occurredAt,
 				})
 			}
@@ -708,7 +902,7 @@ export class SlaService {
 			// until a surgical-scheduling-request event stream is instrumented.
 			const where = and(
 				eq(operationRecords.facilityId, facilityId),
-				eq(operationRecords.status, "draft"),
+				eq(operationRecords.status, "draft")
 			)
 			const rows = await db
 				.select({
@@ -724,23 +918,32 @@ export class SlaService {
 				.orderBy(desc(operationRecords.createdAt))
 				.limit(limit)
 				.offset(offset)
-			const [countRow] = await db
-				.select({ total: count() })
-				.from(operationRecords)
-				.where(where)
-				for (const row of rows) {
+			const [countRow] = await db.select({ total: count() }).from(operationRecords).where(where)
+			for (const row of rows) {
 				// SLA-005: prefer schedulingRequestedAt as start when available
 				const startedAt = row.schedulingRequestedAt ?? row.createdAt
 				const isCheckpoint = row.schedulingRequestedAt !== null
 				const elapsed = Math.floor((now.getTime() - startedAt.getTime()) / 60000)
-				const status = computeSlaStatus(elapsed, slaConfig.targetMinutes, slaConfig.warningThresholdPct)
+				const status = computeSlaStatus(
+					elapsed,
+					slaConfig.targetMinutes,
+					slaConfig.warningThresholdPct
+				)
 				if (statusFilter && status !== statusFilter) continue
 				events.push({
-					id: row.id, facilityId: row.facilityId, encounterId: row.encounterId,
-					patientId: null, patientName: null,
-					workflowType, startedAt, completedAt: null,
-					targetMinutes: slaConfig.targetMinutes, elapsedMinutes: elapsed, status,
-					escalatedAt: null, escalatedToStaffId: null,
+					id: row.id,
+					facilityId: row.facilityId,
+					encounterId: row.encounterId,
+					patientId: null,
+					patientName: null,
+					workflowType,
+					startedAt,
+					completedAt: null,
+					targetMinutes: slaConfig.targetMinutes,
+					elapsedMinutes: elapsed,
+					status,
+					escalatedAt: null,
+					escalatedToStaffId: null,
 					notes: isCheckpoint
 						? "Timing source: scheduling request datetime (TOR Flow 5 Step 1 authoritative checkpoint — accurate)"
 						: "Timing source: OR record creation (proxy — schedulingRequestedAt not yet set)",
@@ -757,11 +960,14 @@ export class SlaService {
 			//   2. Birth registration certificates (draft/completed)
 			//   3. Death report certificates (draft/completed)
 			// SLA-006: resolve effective step target (facility override > TOR default for records_processing_release)
-			const effectiveTarget = await resolveStepTargetByType(facilityId, "records_processing_release")
+			const effectiveTarget = await resolveStepTargetByType(
+				facilityId,
+				"records_processing_release"
+			)
 			const medCertWhere = and(
 				eq(medicalRecordsRequests.facilityId, facilityId),
 				eq(medicalRecordsRequests.requestType, "medical_certificate"),
-				inArray(medicalRecordsRequests.status, ["pending", "processing"]),
+				inArray(medicalRecordsRequests.status, ["pending", "processing"])
 			)
 			const medCertRows = await db
 				.select({
@@ -784,7 +990,7 @@ export class SlaService {
 				eq(birthRegistrations.facilityId, facilityId),
 				// SLA-021: only show birth registrations that are genuinely in-progress (draft).
 				// "completed" means the certificate was issued and there is no open SLA window.
-				inArray(birthRegistrations.status, ["draft"]),
+				inArray(birthRegistrations.status, ["draft"])
 			)
 			const birthRows = await db
 				.select({
@@ -808,7 +1014,7 @@ export class SlaService {
 				// SLA-018: only show death reports that are genuinely in-progress (draft).
 				// "completed" status means the certificate was issued in a single write
 				// and there is no open SLA window to monitor — exclude them from active monitoring.
-				inArray(deathReports.status, ["draft"]),
+				inArray(deathReports.status, ["draft"])
 			)
 			const deathRows = await db
 				.select({
@@ -867,22 +1073,34 @@ export class SlaService {
 				// SLA-021: birth/death cert notes reflect requestedAt checkpoint availability
 				const certNote =
 					row.source === "medical_certificate"
-						? (row.identityVerified && row.dpaConsentObtained
+						? row.identityVerified && row.dpaConsentObtained
 							? "Evidence: identity verified ✓, DPA consent ✓ — TOR Flow 7 Step 1 authoritative checkpoint"
-							: `Evidence gaps: ${!row.identityVerified ? "identity not verified" : ""}${!row.identityVerified && !row.dpaConsentObtained ? ", " : ""}${!row.dpaConsentObtained ? "DPA consent not captured" : ""} — Step 1 proxy until resolved`)
+							: `Evidence gaps: ${!row.identityVerified ? "identity not verified" : ""}${!row.identityVerified && !row.dpaConsentObtained ? ", " : ""}${!row.dpaConsentObtained ? "DPA consent not captured" : ""} — Step 1 proxy until resolved`
 						: isCheckpoint
 							? `Timing source: ${row.source === "birth_registration" ? "birth" : "death"} cert request receipt (TOR Flow 7, Step 1 checkpoint — accurate)`
 							: `Timing source: ${row.source === "birth_registration" ? "birth registration" : "death report"} creation (proxy — requestedAt not yet set)`
 				// SLA-021/SLA-022: derive current step from releasedAt > paidAt > default
 				const certStep: string = row.releasedAt
 					? "records_processing_release"
-					: (row.paidAt ? "records_payment" : "records_request")
+					: row.paidAt
+						? "records_payment"
+						: "records_request"
 				events.push({
-					id: row.id, facilityId: row.facilityId, encounterId: row.encounterId ?? null,
-					patientId: null, patientName: null,
-					workflowType, startedAt, completedAt: null,
-					targetMinutes: effectiveTarget, elapsedMinutes: elapsed, status,
-					escalatedAt: null, escalatedToStaffId: null, notes: certNote, createdAt: row.createdAt,
+					id: row.id,
+					facilityId: row.facilityId,
+					encounterId: row.encounterId ?? null,
+					patientId: null,
+					patientName: null,
+					workflowType,
+					startedAt,
+					completedAt: null,
+					targetMinutes: effectiveTarget,
+					elapsedMinutes: elapsed,
+					status,
+					escalatedAt: null,
+					escalatedToStaffId: null,
+					notes: certNote,
+					createdAt: row.createdAt,
 					currentStep: certStep,
 				})
 			}
@@ -912,7 +1130,8 @@ export class SlaService {
 
 		if (!encounterRow) return []
 
-		const workflowType = ENCOUNTER_TYPE_TO_WORKFLOW[encounterRow.encounterType] ?? "opd_consultation"
+		const workflowType =
+			ENCOUNTER_TYPE_TO_WORKFLOW[encounterRow.encounterType] ?? "opd_consultation"
 		const [config] = await db
 			.select()
 			.from(slaConfigs)
@@ -1016,7 +1235,8 @@ export class SlaService {
 		const updates: Partial<typeof slaConfigs.$inferInsert> = { updatedAt: new Date() }
 		if (input.workflowType !== undefined) updates.workflowType = input.workflowType
 		if (input.targetMinutes !== undefined) updates.targetMinutes = input.targetMinutes
-		if (input.warningThresholdPct !== undefined) updates.warningThresholdPct = input.warningThresholdPct
+		if (input.warningThresholdPct !== undefined)
+			updates.warningThresholdPct = input.warningThresholdPct
 		if (input.description !== undefined) updates.description = input.description
 		if (input.isActive !== undefined) updates.isActive = input.isActive
 
@@ -1042,7 +1262,10 @@ export class SlaService {
 	}
 
 	async deleteConfig(id: string): Promise<{ success: boolean }> {
-		const [row] = await db.delete(slaConfigs).where(eq(slaConfigs.id, id)).returning({ id: slaConfigs.id })
+		const [row] = await db
+			.delete(slaConfigs)
+			.where(eq(slaConfigs.id, id))
+			.returning({ id: slaConfigs.id })
 		if (!row) throw new NotFoundException(`SLA config with id ${id} not found`)
 		return { success: true }
 	}
@@ -1079,9 +1302,14 @@ export class SlaService {
 			.where(
 				and(
 					eq(encounters.facilityId, query.facilityId),
-					inArray(encounters.encounterType, ["outpatient", "telemedicine", "emergency", "inpatient"]),
+					inArray(encounters.encounterType, [
+						"outpatient",
+						"telemedicine",
+						"emergency",
+						"inpatient",
+					]),
 					gte(encounters.admissionDatetime, periodStart),
-					lte(encounters.admissionDatetime, periodEnd),
+					lte(encounters.admissionDatetime, periodEnd)
 				)
 			)
 
@@ -1095,7 +1323,7 @@ export class SlaService {
 			if (workflowType === "admission") continue
 
 			const elapsed = Math.floor(
-				((row.dischargeDatetime ?? now).getTime() - row.admissionDatetime.getTime()) / 60000,
+				((row.dischargeDatetime ?? now).getTime() - row.admissionDatetime.getTime()) / 60000
 			)
 			const status = computeSlaStatus(elapsed, config.targetMinutes, config.warningThresholdPct)
 
@@ -1121,7 +1349,11 @@ export class SlaService {
 			const config = configByWorkflow.get(workflowType)
 			if (!config) continue
 			const nonEncounterMetrics = await this.complianceMetricsForNonEncounterWorkflow(
-				query.facilityId, workflowType, config, periodStart, periodEnd,
+				query.facilityId,
+				workflowType,
+				config,
+				periodStart,
+				periodEnd
 			)
 			if (nonEncounterMetrics.total > 0) {
 				metricsByWorkflow.set(workflowType, nonEncounterMetrics)
@@ -1133,7 +1365,10 @@ export class SlaService {
 		const admissionConfig = configByWorkflow.get("admission")
 		if (admissionConfig) {
 			const admissionMetrics = await this.complianceMetricsForAdmissionWorkflow(
-				query.facilityId, admissionConfig, periodStart, periodEnd,
+				query.facilityId,
+				admissionConfig,
+				periodStart,
+				periodEnd
 			)
 			if (admissionMetrics.total > 0) {
 				metricsByWorkflow.set("admission", admissionMetrics)
@@ -1144,7 +1379,12 @@ export class SlaService {
 		// SLA-013: lab_result and radiology_result use per-order step metrics generated by
 		// complianceMetricsForNonEncounterWorkflow. Removing them here prevents the shared
 		// ancillary event stream from producing mixed lab+radiology drilldown rows.
-		const SLA_TO_EVENT_WORKFLOW: Partial<Record<SlaWorkflowType, "opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing">> = {
+		const SLA_TO_EVENT_WORKFLOW: Partial<
+			Record<
+				SlaWorkflowType,
+				"opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing"
+			>
+		> = {
 			opd_consultation: "opd",
 			emergency_triage: "ed",
 			admission: "admission",
@@ -1161,7 +1401,11 @@ export class SlaService {
 				const evtWorkflow = SLA_TO_EVENT_WORKFLOW[wt]!
 				const config = configByWorkflow.get(wt)
 				const steps = await this.getStepComplianceForEncounterWorkflow(
-					query.facilityId, evtWorkflow, periodStart, periodEnd, config?.warningThresholdPct ?? 80,
+					query.facilityId,
+					evtWorkflow,
+					periodStart,
+					periodEnd,
+					config?.warningThresholdPct ?? 80
 				)
 				if (steps.length > 0) stepMetricsByWorkflow.set(wt, steps)
 			})
@@ -1207,9 +1451,14 @@ export class SlaService {
 		// backed by a real workflow-event timestamp and eligible for ARTA compliance evidence.
 		const authoritativeMetrics = metrics.filter(m => m.timingAccuracy === "checkpoint")
 		const authoritativeCount = authoritativeMetrics.reduce((s, m) => s + m.totalCount, 0)
-		const authoritativeOnTimeCount = authoritativeMetrics.reduce((s, m) => s + m.onTimeCount + m.approachingCount, 0)
+		const authoritativeOnTimeCount = authoritativeMetrics.reduce(
+			(s, m) => s + m.onTimeCount + m.approachingCount,
+			0
+		)
 		const authoritativeCompliancePct =
-			authoritativeCount > 0 ? Math.round((authoritativeOnTimeCount / authoritativeCount) * 100) : 100
+			authoritativeCount > 0
+				? Math.round((authoritativeOnTimeCount / authoritativeCount) * 100)
+				: 100
 
 		return {
 			facilityId: query.facilityId,
@@ -1232,11 +1481,15 @@ export class SlaService {
 		workflowType: SlaWorkflowType,
 		config: typeof slaConfigs.$inferSelect,
 		periodStart: Date,
-		periodEnd: Date,
+		periodEnd: Date
 	): Promise<WorkflowMetrics> {
 		const now = new Date()
 		const metrics: WorkflowMetrics = {
-			total: 0, onTime: 0, approaching: 0, exceeded: 0, totalElapsed: 0,
+			total: 0,
+			onTime: 0,
+			approaching: 0,
+			exceeded: 0,
+			totalElapsed: 0,
 			targetMinutes: config.targetMinutes,
 			checkpointCount: 0,
 		}
@@ -1272,7 +1525,13 @@ export class SlaService {
 					resultedDatetime: labOrders.resultedDatetime,
 				})
 				.from(labOrders)
-				.where(and(eq(labOrders.facilityId, facilityId), gte(labOrders.createdAt, periodStart), lte(labOrders.createdAt, periodEnd)))
+				.where(
+					and(
+						eq(labOrders.facilityId, facilityId),
+						gte(labOrders.createdAt, periodStart),
+						lte(labOrders.createdAt, periodEnd)
+					)
+				)
 			// SLA-014: step accumulators for all 4 ancillary steps
 			const receiptStep = { n: 0, onTime: 0, approaching: 0, exceeded: 0, totalElapsed: 0 }
 			const paymentStep = { n: 0, onTime: 0, approaching: 0, exceeded: 0, totalElapsed: 0 }
@@ -1280,7 +1539,8 @@ export class SlaService {
 			const releaseStep = { n: 0, onTime: 0, approaching: 0, exceeded: 0, totalElapsed: 0 }
 			const accumAncStep = (acc: typeof receiptStep, elapsed: number, tgt: number) => {
 				const s = computeSlaStatus(elapsed, tgt, config.warningThresholdPct)
-				acc.n++; acc.totalElapsed += elapsed
+				acc.n++
+				acc.totalElapsed += elapsed
 				if (s === "on_time") acc.onTime++
 				else if (s === "approaching") acc.approaching++
 				else acc.exceeded++
@@ -1290,23 +1550,46 @@ export class SlaService {
 				const startedAt = row.specimenReceivedAt ?? row.collectionDatetime ?? row.createdAt
 				if (row.specimenReceivedAt !== null) metrics.checkpointCount++
 				// Overall end-to-end metric (existing behaviour)
-				accumulateStatus(Math.floor(((row.resultedDatetime ?? now).getTime() - startedAt.getTime()) / 60000))
+				accumulateStatus(
+					Math.floor(((row.resultedDatetime ?? now).getTime() - startedAt.getTime()) / 60000)
+				)
 				// SLA-014: Step 1 — order created -> specimen received at lab
 				if (row.specimenReceivedAt) {
-					accumAncStep(receiptStep, Math.floor((row.specimenReceivedAt.getTime() - row.createdAt.getTime()) / 60000), receiptTgt)
+					accumAncStep(
+						receiptStep,
+						Math.floor((row.specimenReceivedAt.getTime() - row.createdAt.getTime()) / 60000),
+						receiptTgt
+					)
 				}
 				// SLA-014: Step 2 — specimen received -> billing cleared
 				if (row.specimenReceivedAt && row.billingClearedAt) {
-					accumAncStep(paymentStep, Math.floor((row.billingClearedAt.getTime() - row.specimenReceivedAt.getTime()) / 60000), paymentTgt)
+					accumAncStep(
+						paymentStep,
+						Math.floor((row.billingClearedAt.getTime() - row.specimenReceivedAt.getTime()) / 60000),
+						paymentTgt
+					)
 				}
 				// SLA-014: Step 3 — billing cleared -> specimen collected
 				if (row.billingClearedAt && row.collectionDatetime) {
-					accumAncStep(procedureStep, Math.floor((row.collectionDatetime.getTime() - row.billingClearedAt.getTime()) / 60000), procedureTgt)
+					accumAncStep(
+						procedureStep,
+						Math.floor((row.collectionDatetime.getTime() - row.billingClearedAt.getTime()) / 60000),
+						procedureTgt
+					)
 				}
 				// SLA-014: Step 4 — overall release timing (all orders)
-				accumAncStep(releaseStep, Math.floor(((row.resultedDatetime ?? now).getTime() - startedAt.getTime()) / 60000), releaseTgt)
+				accumAncStep(
+					releaseStep,
+					Math.floor(((row.resultedDatetime ?? now).getTime() - startedAt.getTime()) / 60000),
+					releaseTgt
+				)
 			}
-			const makeLabStep = (stepStatus: string, stepLabel: string, acc: typeof receiptStep, tgt: number): SlaStepMetric => ({
+			const makeLabStep = (
+				stepStatus: string,
+				stepLabel: string,
+				acc: typeof receiptStep,
+				tgt: number
+			): SlaStepMetric => ({
 				stepStatus,
 				stepLabel,
 				totalCount: acc.n,
@@ -1318,11 +1601,43 @@ export class SlaService {
 				avgTargetMinutes: tgt,
 			})
 			const labStepMetrics: SlaStepMetric[] = []
-			if (receiptStep.n > 0) labStepMetrics.push(makeLabStep("ancillary_order_receipt", "Lab Order Receipt (Flow 3, Step 1 - Lab)", receiptStep, receiptTgt))
-			if (paymentStep.n > 0) labStepMetrics.push(makeLabStep("ancillary_payment_clearance", "Lab Payment Clearance (Flow 3, Step 2 - Lab)", paymentStep, paymentTgt))
-			if (procedureStep.n > 0) labStepMetrics.push(makeLabStep("ancillary_procedure", "Lab Specimen Procedure (Flow 3, Step 3 - Lab)", procedureStep, procedureTgt))
+			if (receiptStep.n > 0)
+				labStepMetrics.push(
+					makeLabStep(
+						"ancillary_order_receipt",
+						"Lab Order Receipt (Flow 3, Step 1 - Lab)",
+						receiptStep,
+						receiptTgt
+					)
+				)
+			if (paymentStep.n > 0)
+				labStepMetrics.push(
+					makeLabStep(
+						"ancillary_payment_clearance",
+						"Lab Payment Clearance (Flow 3, Step 2 - Lab)",
+						paymentStep,
+						paymentTgt
+					)
+				)
+			if (procedureStep.n > 0)
+				labStepMetrics.push(
+					makeLabStep(
+						"ancillary_procedure",
+						"Lab Specimen Procedure (Flow 3, Step 3 - Lab)",
+						procedureStep,
+						procedureTgt
+					)
+				)
 			// SLA-013: always emit release step (overall lab result timing)
-			if (metrics.total > 0) labStepMetrics.push(makeLabStep("ancillary_release", "Lab Result Release (Flow 3, Step 4 - Lab)", releaseStep, releaseTgt))
+			if (metrics.total > 0)
+				labStepMetrics.push(
+					makeLabStep(
+						"ancillary_release",
+						"Lab Result Release (Flow 3, Step 4 - Lab)",
+						releaseStep,
+						releaseTgt
+					)
+				)
 			if (labStepMetrics.length > 0) metrics.stepMetrics = labStepMetrics
 			return metrics
 		}
@@ -1347,7 +1662,13 @@ export class SlaService {
 					completedDatetime: imagingOrders.completedDatetime,
 				})
 				.from(imagingOrders)
-				.where(and(eq(imagingOrders.facilityId, facilityId), gte(imagingOrders.createdAt, periodStart), lte(imagingOrders.createdAt, periodEnd)))
+				.where(
+					and(
+						eq(imagingOrders.facilityId, facilityId),
+						gte(imagingOrders.createdAt, periodStart),
+						lte(imagingOrders.createdAt, periodEnd)
+					)
+				)
 			// SLA-014: step accumulators for all 4 ancillary steps
 			const receiptStep = { n: 0, onTime: 0, approaching: 0, exceeded: 0, totalElapsed: 0 }
 			const paymentStep = { n: 0, onTime: 0, approaching: 0, exceeded: 0, totalElapsed: 0 }
@@ -1355,38 +1676,67 @@ export class SlaService {
 			const releaseStep = { n: 0, onTime: 0, approaching: 0, exceeded: 0, totalElapsed: 0 }
 			const accumAncStep = (acc: typeof receiptStep, elapsed: number, tgt: number) => {
 				const s = computeSlaStatus(elapsed, tgt, config.warningThresholdPct)
-				acc.n++; acc.totalElapsed += elapsed
+				acc.n++
+				acc.totalElapsed += elapsed
 				if (s === "on_time") acc.onTime++
 				else if (s === "approaching") acc.approaching++
 				else acc.exceeded++
 			}
 			// SLA-019: prefer imagingOrderReceivedAt (radiology acknowledges receipt) > studyStartedAt > scheduledDatetime > createdAt
 			for (const row of rows) {
-				const startedAt = row.imagingOrderReceivedAt ?? row.studyStartedAt ?? row.scheduledDatetime ?? row.createdAt
+				const startedAt =
+					row.imagingOrderReceivedAt ?? row.studyStartedAt ?? row.scheduledDatetime ?? row.createdAt
 				// SLA-019: checkpointCount requires imagingOrderReceivedAt to be authoritative for ARTA Step 1 classification
 				if (row.imagingOrderReceivedAt !== null) metrics.checkpointCount++
 				// Overall end-to-end metric (existing behaviour)
-				accumulateStatus(Math.floor(((row.completedDatetime ?? now).getTime() - startedAt.getTime()) / 60000))
+				accumulateStatus(
+					Math.floor(((row.completedDatetime ?? now).getTime() - startedAt.getTime()) / 60000)
+				)
 				// SLA-014/SLA-019: Step 1 — order created -> received at radiology (authoritative) or scheduled (proxy)
 				if (row.imagingOrderReceivedAt) {
-					accumAncStep(receiptStep, Math.floor((row.imagingOrderReceivedAt.getTime() - row.createdAt.getTime()) / 60000), receiptTgt)
+					accumAncStep(
+						receiptStep,
+						Math.floor((row.imagingOrderReceivedAt.getTime() - row.createdAt.getTime()) / 60000),
+						receiptTgt
+					)
 				} else if (row.scheduledDatetime) {
 					// Proxy fallback for orders without imagingOrderReceivedAt
-					accumAncStep(receiptStep, Math.floor((row.scheduledDatetime.getTime() - row.createdAt.getTime()) / 60000), receiptTgt)
+					accumAncStep(
+						receiptStep,
+						Math.floor((row.scheduledDatetime.getTime() - row.createdAt.getTime()) / 60000),
+						receiptTgt
+					)
 				}
 				// SLA-014: Step 2 — received/scheduled -> billing cleared
 				const step1Ts = row.imagingOrderReceivedAt ?? row.scheduledDatetime
 				if (step1Ts && row.billingClearedAt) {
-					accumAncStep(paymentStep, Math.floor((row.billingClearedAt.getTime() - step1Ts.getTime()) / 60000), paymentTgt)
+					accumAncStep(
+						paymentStep,
+						Math.floor((row.billingClearedAt.getTime() - step1Ts.getTime()) / 60000),
+						paymentTgt
+					)
 				}
 				// SLA-014: Step 3 — billing cleared -> study started
 				if (row.billingClearedAt && row.studyStartedAt) {
-					accumAncStep(procedureStep, Math.floor((row.studyStartedAt.getTime() - row.billingClearedAt.getTime()) / 60000), procedureTgt)
+					accumAncStep(
+						procedureStep,
+						Math.floor((row.studyStartedAt.getTime() - row.billingClearedAt.getTime()) / 60000),
+						procedureTgt
+					)
 				}
 				// SLA-014: Step 4 — overall release timing (all orders)
-				accumAncStep(releaseStep, Math.floor(((row.completedDatetime ?? now).getTime() - startedAt.getTime()) / 60000), releaseTgt)
+				accumAncStep(
+					releaseStep,
+					Math.floor(((row.completedDatetime ?? now).getTime() - startedAt.getTime()) / 60000),
+					releaseTgt
+				)
 			}
-			const makeRadStep = (stepStatus: string, stepLabel: string, acc: typeof receiptStep, tgt: number): SlaStepMetric => ({
+			const makeRadStep = (
+				stepStatus: string,
+				stepLabel: string,
+				acc: typeof receiptStep,
+				tgt: number
+			): SlaStepMetric => ({
 				stepStatus,
 				stepLabel,
 				totalCount: acc.n,
@@ -1398,11 +1748,43 @@ export class SlaService {
 				avgTargetMinutes: tgt,
 			})
 			const radStepMetrics: SlaStepMetric[] = []
-			if (receiptStep.n > 0) radStepMetrics.push(makeRadStep("ancillary_order_receipt", "Radiology Order Receipt (Flow 3, Step 1 - Radiology)", receiptStep, receiptTgt))
-			if (paymentStep.n > 0) radStepMetrics.push(makeRadStep("ancillary_payment_clearance", "Radiology Payment Clearance (Flow 3, Step 2 - Radiology)", paymentStep, paymentTgt))
-			if (procedureStep.n > 0) radStepMetrics.push(makeRadStep("ancillary_procedure", "Radiology Study Procedure (Flow 3, Step 3 - Radiology)", procedureStep, procedureTgt))
+			if (receiptStep.n > 0)
+				radStepMetrics.push(
+					makeRadStep(
+						"ancillary_order_receipt",
+						"Radiology Order Receipt (Flow 3, Step 1 - Radiology)",
+						receiptStep,
+						receiptTgt
+					)
+				)
+			if (paymentStep.n > 0)
+				radStepMetrics.push(
+					makeRadStep(
+						"ancillary_payment_clearance",
+						"Radiology Payment Clearance (Flow 3, Step 2 - Radiology)",
+						paymentStep,
+						paymentTgt
+					)
+				)
+			if (procedureStep.n > 0)
+				radStepMetrics.push(
+					makeRadStep(
+						"ancillary_procedure",
+						"Radiology Study Procedure (Flow 3, Step 3 - Radiology)",
+						procedureStep,
+						procedureTgt
+					)
+				)
 			// SLA-013: always emit release step (overall radiology result timing)
-			if (metrics.total > 0) radStepMetrics.push(makeRadStep("ancillary_release", "Radiology Result Release (Flow 3, Step 4 - Radiology)", releaseStep, releaseTgt))
+			if (metrics.total > 0)
+				radStepMetrics.push(
+					makeRadStep(
+						"ancillary_release",
+						"Radiology Result Release (Flow 3, Step 4 - Radiology)",
+						releaseStep,
+						releaseTgt
+					)
+				)
 			if (radStepMetrics.length > 0) metrics.stepMetrics = radStepMetrics
 			return metrics
 		}
@@ -1426,14 +1808,16 @@ export class SlaService {
 					releasedByStaffId: medicalRecordsRequests.releasedByStaffId,
 				})
 				.from(medicalRecordsRequests)
-				.where(and(
-					eq(medicalRecordsRequests.facilityId, facilityId),
-					gte(medicalRecordsRequests.createdAt, periodStart),
-					lte(medicalRecordsRequests.createdAt, periodEnd),
-					// SLA-022: exclude medical_certificate to prevent double-counting
-					// (those are tracked exclusively under certificate_issuance)
-					ne(medicalRecordsRequests.requestType, "medical_certificate"),
-				))
+				.where(
+					and(
+						eq(medicalRecordsRequests.facilityId, facilityId),
+						gte(medicalRecordsRequests.createdAt, periodStart),
+						lte(medicalRecordsRequests.createdAt, periodEnd),
+						// SLA-022: exclude medical_certificate to prevent double-counting
+						// (those are tracked exclusively under certificate_issuance)
+						ne(medicalRecordsRequests.requestType, "medical_certificate")
+					)
+				)
 			// SLA-007/SLA-012: step metric accumulators for payment and release steps
 			const payStep = { n: 0, onTime: 0, approaching: 0, exceeded: 0, totalElapsed: 0 }
 			const relStep = { n: 0, onTime: 0, approaching: 0, exceeded: 0, totalElapsed: 0 }
@@ -1444,9 +1828,11 @@ export class SlaService {
 				accumulateStatus(elapsed)
 				// SLA-020/SLA-022: checkpoint only when Step 1 evidence (identity/DPA) AND
 				// Step 3 release audit (releasedAt) are both present — required for ARTA-authoritative classification
-				if (row.identityVerified && row.dpaConsentObtained && row.releasedAt !== null) metrics.checkpointCount++
+				if (row.identityVerified && row.dpaConsentObtained && row.releasedAt !== null)
+					metrics.checkpointCount++
 				const rs = computeSlaStatus(elapsed, releaseTgt, config.warningThresholdPct)
-				relStep.n++; relStep.totalElapsed += elapsed
+				relStep.n++
+				relStep.totalElapsed += elapsed
 				if (rs === "on_time") relStep.onTime++
 				else if (rs === "approaching") relStep.approaching++
 				else relStep.exceeded++
@@ -1454,7 +1840,8 @@ export class SlaService {
 				if (row.paidAt) {
 					const payElapsed = Math.floor((row.paidAt.getTime() - row.createdAt.getTime()) / 60000)
 					const ps = computeSlaStatus(payElapsed, paymentTgt, config.warningThresholdPct)
-					payStep.n++; payStep.totalElapsed += payElapsed
+					payStep.n++
+					payStep.totalElapsed += payElapsed
 					if (ps === "on_time") payStep.onTime++
 					else if (ps === "approaching") payStep.approaching++
 					else payStep.exceeded++
@@ -1494,18 +1881,24 @@ export class SlaService {
 		if (workflowType === "discharge" || workflowType === "medication_dispensing") {
 			const evtWorkflow = workflowType === "discharge" ? "discharge" : "pharmacy"
 			const rows = await db
-				.select({ occurredAt: encounterStatusEvents.occurredAt, actualMinutes: encounterStatusEvents.actualMinutes })
+				.select({
+					occurredAt: encounterStatusEvents.occurredAt,
+					actualMinutes: encounterStatusEvents.actualMinutes,
+				})
 				.from(encounterStatusEvents)
-				.where(and(
-					eq(encounterStatusEvents.facilityId, facilityId),
-					eq(encounterStatusEvents.workflowType, evtWorkflow as "discharge" | "pharmacy"),
-					gte(encounterStatusEvents.occurredAt, periodStart),
-					lte(encounterStatusEvents.occurredAt, periodEnd),
-				))
+				.where(
+					and(
+						eq(encounterStatusEvents.facilityId, facilityId),
+						eq(encounterStatusEvents.workflowType, evtWorkflow as "discharge" | "pharmacy"),
+						gte(encounterStatusEvents.occurredAt, periodStart),
+						lte(encounterStatusEvents.occurredAt, periodEnd)
+					)
+				)
 			for (const row of rows) {
-				const elapsed = row.actualMinutes !== null
-					? row.actualMinutes
-					: Math.floor((now.getTime() - row.occurredAt.getTime()) / 60000)
+				const elapsed =
+					row.actualMinutes !== null
+						? row.actualMinutes
+						: Math.floor((now.getTime() - row.occurredAt.getTime()) / 60000)
 				accumulateStatus(elapsed)
 			}
 			return metrics
@@ -1513,11 +1906,22 @@ export class SlaService {
 
 		if (workflowType === "billing_processing") {
 			const rows = await db
-				.select({ createdAt: invoices.createdAt, finalizedAt: invoices.finalizedAt, status: invoices.status })
+				.select({
+					createdAt: invoices.createdAt,
+					finalizedAt: invoices.finalizedAt,
+					status: invoices.status,
+				})
 				.from(invoices)
-				.where(and(eq(invoices.facilityId, facilityId), gte(invoices.createdAt, periodStart), lte(invoices.createdAt, periodEnd)))
+				.where(
+					and(
+						eq(invoices.facilityId, facilityId),
+						gte(invoices.createdAt, periodStart),
+						lte(invoices.createdAt, periodEnd)
+					)
+				)
 			for (const row of rows) {
-				const isFinalized = row.status === "finalized" || row.status === "paid" || row.status === "partially_paid"
+				const isFinalized =
+					row.status === "finalized" || row.status === "paid" || row.status === "partially_paid"
 				const end = isFinalized && row.finalizedAt ? row.finalizedAt : now
 				accumulateStatus(Math.floor((end.getTime() - row.createdAt.getTime()) / 60000))
 			}
@@ -1526,14 +1930,26 @@ export class SlaService {
 
 		if (workflowType === "surgical_scheduling") {
 			const rows = await db
-				.select({ createdAt: operationRecords.createdAt, schedulingRequestedAt: operationRecords.schedulingRequestedAt, signedAt: operationRecords.signedAt })
+				.select({
+					createdAt: operationRecords.createdAt,
+					schedulingRequestedAt: operationRecords.schedulingRequestedAt,
+					signedAt: operationRecords.signedAt,
+				})
 				.from(operationRecords)
-				.where(and(eq(operationRecords.facilityId, facilityId), gte(operationRecords.createdAt, periodStart), lte(operationRecords.createdAt, periodEnd)))
+				.where(
+					and(
+						eq(operationRecords.facilityId, facilityId),
+						gte(operationRecords.createdAt, periodStart),
+						lte(operationRecords.createdAt, periodEnd)
+					)
+				)
 			// SLA-005: prefer schedulingRequestedAt (formal scheduling request) as start checkpoint
 			for (const row of rows) {
 				const startedAt = row.schedulingRequestedAt ?? row.createdAt
 				if (row.schedulingRequestedAt !== null) metrics.checkpointCount++
-				accumulateStatus(Math.floor(((row.signedAt ?? now).getTime() - startedAt.getTime()) / 60000))
+				accumulateStatus(
+					Math.floor(((row.signedAt ?? now).getTime() - startedAt.getTime()) / 60000)
+				)
 			}
 			return metrics
 		}
@@ -1547,13 +1963,20 @@ export class SlaService {
 			metrics.targetMinutes = releaseTgt
 
 			// SLA-007/SLA-012: step metric accumulators (request + payment + release)
-			type StepAcc = { n: number; onTime: number; approaching: number; exceeded: number; totalElapsed: number }
+			type StepAcc = {
+				n: number
+				onTime: number
+				approaching: number
+				exceeded: number
+				totalElapsed: number
+			}
 			const reqStep: StepAcc = { n: 0, onTime: 0, approaching: 0, exceeded: 0, totalElapsed: 0 }
 			const payStep: StepAcc = { n: 0, onTime: 0, approaching: 0, exceeded: 0, totalElapsed: 0 }
 			const relStep: StepAcc = { n: 0, onTime: 0, approaching: 0, exceeded: 0, totalElapsed: 0 }
 			const accumStep = (acc: StepAcc, elapsed: number, tgt: number) => {
 				const s = computeSlaStatus(elapsed, tgt, config.warningThresholdPct)
-				acc.n++; acc.totalElapsed += elapsed
+				acc.n++
+				acc.totalElapsed += elapsed
 				if (s === "on_time") acc.onTime++
 				else if (s === "approaching") acc.approaching++
 				else acc.exceeded++
@@ -1571,23 +1994,30 @@ export class SlaService {
 					dpaConsentObtained: medicalRecordsRequests.dpaConsentObtained,
 				})
 				.from(medicalRecordsRequests)
-				.where(and(
-					eq(medicalRecordsRequests.facilityId, facilityId),
-					eq(medicalRecordsRequests.requestType, "medical_certificate"),
-					gte(medicalRecordsRequests.createdAt, periodStart),
-					lte(medicalRecordsRequests.createdAt, periodEnd),
-				))
+				.where(
+					and(
+						eq(medicalRecordsRequests.facilityId, facilityId),
+						eq(medicalRecordsRequests.requestType, "medical_certificate"),
+						gte(medicalRecordsRequests.createdAt, periodStart),
+						lte(medicalRecordsRequests.createdAt, periodEnd)
+					)
+				)
 			for (const row of medCerts) {
 				// SLA-022: use releasedAt (authoritative) > completedAt > now for Step 3 end
 				const releaseEnd = row.releasedAt ?? row.completedAt ?? now
 				const elapsed = Math.floor((releaseEnd.getTime() - row.createdAt.getTime()) / 60000)
 				accumulateStatus(elapsed)
 				// SLA-022: checkpoint only when identity/DPA evidence AND release audit are both present
-				if (row.identityVerified && row.dpaConsentObtained && row.releasedAt !== null) metrics.checkpointCount++
+				if (row.identityVerified && row.dpaConsentObtained && row.releasedAt !== null)
+					metrics.checkpointCount++
 				accumStep(relStep, elapsed, releaseTgt)
 				// SLA-012: payment step for medical certificates
 				if (row.paidAt) {
-					accumStep(payStep, Math.floor((row.paidAt.getTime() - row.createdAt.getTime()) / 60000), paymentTgt)
+					accumStep(
+						payStep,
+						Math.floor((row.paidAt.getTime() - row.createdAt.getTime()) / 60000),
+						paymentTgt
+					)
 				}
 			}
 
@@ -1602,11 +2032,13 @@ export class SlaService {
 					releasedAt: birthRegistrations.releasedAt,
 				})
 				.from(birthRegistrations)
-				.where(and(
-					eq(birthRegistrations.facilityId, facilityId),
-					gte(birthRegistrations.createdAt, periodStart),
-					lte(birthRegistrations.createdAt, periodEnd),
-				))
+				.where(
+					and(
+						eq(birthRegistrations.facilityId, facilityId),
+						gte(birthRegistrations.createdAt, periodStart),
+						lte(birthRegistrations.createdAt, periodEnd)
+					)
+				)
 			// SLA-005: prefer requestedAt (family submits request) as start checkpoint for birth registrations
 			for (const row of birthRows) {
 				const startedAt = row.requestedAt ?? row.createdAt
@@ -1618,11 +2050,19 @@ export class SlaService {
 				accumulateStatus(totalElapsed)
 				// SLA-007: step 1 - createdAt -> requestedAt
 				if (row.requestedAt) {
-					accumStep(reqStep, Math.floor((row.requestedAt.getTime() - row.createdAt.getTime()) / 60000), requestTgt)
+					accumStep(
+						reqStep,
+						Math.floor((row.requestedAt.getTime() - row.createdAt.getTime()) / 60000),
+						requestTgt
+					)
 				}
 				// SLA-015: payment step - requestedAt|createdAt -> paidAt
 				if (row.paidAt) {
-					accumStep(payStep, Math.floor((row.paidAt.getTime() - startedAt.getTime()) / 60000), paymentTgt)
+					accumStep(
+						payStep,
+						Math.floor((row.paidAt.getTime() - startedAt.getTime()) / 60000),
+						paymentTgt
+					)
 				}
 				// SLA-021: release step - requestedAt|createdAt -> releasedAt|completedAt
 				accumStep(relStep, totalElapsed, releaseTgt)
@@ -1639,11 +2079,13 @@ export class SlaService {
 					releasedAt: deathReports.releasedAt,
 				})
 				.from(deathReports)
-				.where(and(
-					eq(deathReports.facilityId, facilityId),
-					gte(deathReports.createdAt, periodStart),
-					lte(deathReports.createdAt, periodEnd),
-				))
+				.where(
+					and(
+						eq(deathReports.facilityId, facilityId),
+						gte(deathReports.createdAt, periodStart),
+						lte(deathReports.createdAt, periodEnd)
+					)
+				)
 			// SLA-005: prefer requestedAt (family submits certificate request) as start checkpoint for death reports
 			for (const row of deathRows) {
 				const startedAt = row.requestedAt ?? row.createdAt
@@ -1658,11 +2100,19 @@ export class SlaService {
 				accumulateStatus(totalElapsed)
 				// SLA-007: step 1 - createdAt -> requestedAt
 				if (row.requestedAt) {
-					accumStep(reqStep, Math.floor((row.requestedAt.getTime() - row.createdAt.getTime()) / 60000), requestTgt)
+					accumStep(
+						reqStep,
+						Math.floor((row.requestedAt.getTime() - row.createdAt.getTime()) / 60000),
+						requestTgt
+					)
 				}
 				// SLA-015: payment step - requestedAt|createdAt -> paidAt
 				if (row.paidAt) {
-					accumStep(payStep, Math.floor((row.paidAt.getTime() - startedAt.getTime()) / 60000), paymentTgt)
+					accumStep(
+						payStep,
+						Math.floor((row.paidAt.getTime() - startedAt.getTime()) / 60000),
+						paymentTgt
+					)
 				}
 				// SLA-021: release step - requestedAt|createdAt -> releasedAt|completedAt
 				accumStep(relStep, totalElapsed, releaseTgt)
@@ -1682,7 +2132,8 @@ export class SlaService {
 					onTimeCount: acc.onTime,
 					approachingCount: acc.approaching,
 					exceededCount: acc.exceeded,
-					compliancePct: acc.n > 0 ? Math.round(((acc.onTime + acc.approaching) / acc.n) * 100) : 100,
+					compliancePct:
+						acc.n > 0 ? Math.round(((acc.onTime + acc.approaching) / acc.n) * 100) : 100,
 					avgElapsedMinutes: acc.n > 0 ? Math.round(acc.totalElapsed / acc.n) : 0,
 					avgTargetMinutes: tgt,
 				}
@@ -1690,7 +2141,8 @@ export class SlaService {
 			const stepMetrics: SlaStepMetric[] = []
 			if (reqStep.n > 0) stepMetrics.push(makeStep("records_request", reqStep, requestTgt))
 			if (payStep.n > 0) stepMetrics.push(makeStep("records_payment", payStep, paymentTgt))
-			if (relStep.n > 0) stepMetrics.push(makeStep("records_processing_release", relStep, releaseTgt))
+			if (relStep.n > 0)
+				stepMetrics.push(makeStep("records_processing_release", relStep, releaseTgt))
 			if (stepMetrics.length > 0) metrics.stepMetrics = stepMetrics
 
 			return metrics
@@ -1709,11 +2161,15 @@ export class SlaService {
 		facilityId: string,
 		config: typeof slaConfigs.$inferSelect,
 		periodStart: Date,
-		periodEnd: Date,
+		periodEnd: Date
 	): Promise<WorkflowMetrics> {
 		const now = new Date()
 		const metrics: WorkflowMetrics = {
-			total: 0, onTime: 0, approaching: 0, exceeded: 0, totalElapsed: 0,
+			total: 0,
+			onTime: 0,
+			approaching: 0,
+			exceeded: 0,
+			totalElapsed: 0,
 			targetMinutes: config.targetMinutes,
 			checkpointCount: 0,
 		}
@@ -1729,12 +2185,14 @@ export class SlaService {
 				transferredAt: sql<Date | null>`MAX(CASE WHEN ${encounterStatusEvents.toStatus} = 'transferred_to_ward' AND ${encounterStatusEvents.actualMinutes} IS NOT NULL THEN ${encounterStatusEvents.occurredAt} ELSE NULL END)`,
 			})
 			.from(encounterStatusEvents)
-			.where(and(
-				eq(encounterStatusEvents.facilityId, facilityId),
-				eq(encounterStatusEvents.workflowType, "admission" as const),
-				gte(encounterStatusEvents.occurredAt, periodStart),
-				lte(encounterStatusEvents.occurredAt, periodEnd),
-			))
+			.where(
+				and(
+					eq(encounterStatusEvents.facilityId, facilityId),
+					eq(encounterStatusEvents.workflowType, "admission" as const),
+					gte(encounterStatusEvents.occurredAt, periodStart),
+					lte(encounterStatusEvents.occurredAt, periodEnd)
+				)
+			)
 			.groupBy(encounterStatusEvents.encounterId)
 
 		for (const row of admissionRows) {
@@ -1761,11 +2219,29 @@ export class SlaService {
 
 	private async getStepComplianceForEncounterWorkflow(
 		facilityId: string,
-		eventWorkflowType: "opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing",
+		eventWorkflowType:
+			| "opd"
+			| "ed"
+			| "admission"
+			| "discharge"
+			| "ancillary"
+			| "pharmacy"
+			| "billing",
 		periodStart: Date,
 		periodEnd: Date,
-		warningThresholdPct: number,
-	): Promise<Array<{ stepStatus: string; totalCount: number; onTimeCount: number; approachingCount: number; exceededCount: number; compliancePct: number; avgElapsedMinutes: number; avgTargetMinutes: number }>> {
+		warningThresholdPct: number
+	): Promise<
+		Array<{
+			stepStatus: string
+			totalCount: number
+			onTimeCount: number
+			approachingCount: number
+			exceededCount: number
+			compliancePct: number
+			avgElapsedMinutes: number
+			avgTargetMinutes: number
+		}>
+	> {
 		// Query closed step events (actualMinutes IS NOT NULL) grouped by toStatus
 		const rows = await db
 			.select({
@@ -1778,14 +2254,16 @@ export class SlaService {
 				exceededCount: sql<number>`SUM(CASE WHEN ${encounterStatusEvents.actualMinutes} >= ${encounterStatusEvents.slaTargetMinutes} THEN 1 ELSE 0 END)`,
 			})
 			.from(encounterStatusEvents)
-			.where(and(
-				eq(encounterStatusEvents.facilityId, facilityId),
-				eq(encounterStatusEvents.workflowType, eventWorkflowType),
-				isNotNull(encounterStatusEvents.actualMinutes),
-				isNotNull(encounterStatusEvents.slaTargetMinutes),
-				gte(encounterStatusEvents.occurredAt, periodStart),
-				lte(encounterStatusEvents.occurredAt, periodEnd),
-			))
+			.where(
+				and(
+					eq(encounterStatusEvents.facilityId, facilityId),
+					eq(encounterStatusEvents.workflowType, eventWorkflowType),
+					isNotNull(encounterStatusEvents.actualMinutes),
+					isNotNull(encounterStatusEvents.slaTargetMinutes),
+					gte(encounterStatusEvents.occurredAt, periodStart),
+					lte(encounterStatusEvents.occurredAt, periodEnd)
+				)
+			)
 			.groupBy(encounterStatusEvents.toStatus)
 			.orderBy(asc(encounterStatusEvents.toStatus))
 
@@ -1811,9 +2289,11 @@ export class SlaService {
 	// Public helper for admin-dashboard integration
 	// ========================================================================
 
-	async getActiveSlaBreaches(
-		facilityId: string
-	): Promise<{ activeBreaches: number; overdueQueues: number; topBreachedWorkflows: Array<{ workflow: string; count: number }> }> {
+	async getActiveSlaBreaches(facilityId: string): Promise<{
+		activeBreaches: number
+		overdueQueues: number
+		topBreachedWorkflows: Array<{ workflow: string; count: number }>
+	}> {
 		const summary = await this.getActiveSlaStatusBreakdown(facilityId)
 		return {
 			activeBreaches: summary.activeBreaches,
@@ -1844,7 +2324,12 @@ export class SlaService {
 			.where(and(eq(slaConfigs.facilityId, facilityId), eq(slaConfigs.isActive, true)))
 
 		if (facilityConfigRows.length === 0) {
-			return { activeBreaches: 0, overdueQueues: 0, topBreachedWorkflows: [], workflowBreakdown: [] }
+			return {
+				activeBreaches: 0,
+				overdueQueues: 0,
+				topBreachedWorkflows: [],
+				workflowBreakdown: [],
+			}
 		}
 
 		const configByWorkflow = new Map(facilityConfigRows.map(c => [c.workflowType, c]))
@@ -1917,7 +2402,11 @@ export class SlaService {
 			const radCounts: StatusCounts = { onTime: 0, approaching: 0, exceeded: 0 }
 			for (const row of activeImaging) {
 				const elapsed = Math.floor((now.getTime() - row.createdAt.getTime()) / 60000)
-				const s = computeSlaStatus(elapsed, radiologyConfig.targetMinutes, radiologyConfig.warningThresholdPct)
+				const s = computeSlaStatus(
+					elapsed,
+					radiologyConfig.targetMinutes,
+					radiologyConfig.warningThresholdPct
+				)
 				if (s === "on_time") radCounts.onTime++
 				else if (s === "approaching") radCounts.approaching++
 				else radCounts.exceeded++
@@ -1940,7 +2429,11 @@ export class SlaService {
 			const recCounts: StatusCounts = { onTime: 0, approaching: 0, exceeded: 0 }
 			for (const row of activeRequests) {
 				const elapsed = Math.floor((now.getTime() - row.createdAt.getTime()) / 60000)
-				const s = computeSlaStatus(elapsed, medRecordsConfig.targetMinutes, medRecordsConfig.warningThresholdPct)
+				const s = computeSlaStatus(
+					elapsed,
+					medRecordsConfig.targetMinutes,
+					medRecordsConfig.warningThresholdPct
+				)
 				if (s === "on_time") recCounts.onTime++
 				else if (s === "approaching") recCounts.approaching++
 				else recCounts.exceeded++
@@ -1966,7 +2459,11 @@ export class SlaService {
 			const dischargeCounts: StatusCounts = { onTime: 0, approaching: 0, exceeded: 0 }
 			for (const row of activeDischargeEvents) {
 				const elapsed = Math.floor((now.getTime() - row.occurredAt.getTime()) / 60000)
-				const s = computeSlaStatus(elapsed, dischargeConfig.targetMinutes, dischargeConfig.warningThresholdPct)
+				const s = computeSlaStatus(
+					elapsed,
+					dischargeConfig.targetMinutes,
+					dischargeConfig.warningThresholdPct
+				)
 				if (s === "on_time") dischargeCounts.onTime++
 				else if (s === "approaching") dischargeCounts.approaching++
 				else dischargeCounts.exceeded++
@@ -1991,7 +2488,11 @@ export class SlaService {
 			const billingCounts: StatusCounts = { onTime: 0, approaching: 0, exceeded: 0 }
 			for (const row of activeInvoices) {
 				const elapsed = Math.floor((now.getTime() - row.createdAt.getTime()) / 60000)
-				const s = computeSlaStatus(elapsed, billingConfig.targetMinutes, billingConfig.warningThresholdPct)
+				const s = computeSlaStatus(
+					elapsed,
+					billingConfig.targetMinutes,
+					billingConfig.warningThresholdPct
+				)
 				if (s === "on_time") billingCounts.onTime++
 				else if (s === "approaching") billingCounts.approaching++
 				else billingCounts.exceeded++
@@ -2019,7 +2520,11 @@ export class SlaService {
 			const dispensingCounts: StatusCounts = { onTime: 0, approaching: 0, exceeded: 0 }
 			for (const row of activePharmacyEvents) {
 				const elapsed = Math.floor((now.getTime() - row.occurredAt.getTime()) / 60000)
-				const s = computeSlaStatus(elapsed, dispensingConfig.targetMinutes, dispensingConfig.warningThresholdPct)
+				const s = computeSlaStatus(
+					elapsed,
+					dispensingConfig.targetMinutes,
+					dispensingConfig.warningThresholdPct
+				)
 				if (s === "on_time") dispensingCounts.onTime++
 				else if (s === "approaching") dispensingCounts.approaching++
 				else dispensingCounts.exceeded++
@@ -2035,15 +2540,16 @@ export class SlaService {
 				.select({ createdAt: operationRecords.createdAt })
 				.from(operationRecords)
 				.where(
-					and(
-						eq(operationRecords.facilityId, facilityId),
-						eq(operationRecords.status, "draft")
-					)
+					and(eq(operationRecords.facilityId, facilityId), eq(operationRecords.status, "draft"))
 				)
 			const surgicalCounts: StatusCounts = { onTime: 0, approaching: 0, exceeded: 0 }
 			for (const row of activeSurgicalOps) {
 				const elapsed = Math.floor((now.getTime() - row.createdAt.getTime()) / 60000)
-				const s = computeSlaStatus(elapsed, surgicalConfig.targetMinutes, surgicalConfig.warningThresholdPct)
+				const s = computeSlaStatus(
+					elapsed,
+					surgicalConfig.targetMinutes,
+					surgicalConfig.warningThresholdPct
+				)
 				if (s === "on_time") surgicalCounts.onTime++
 				else if (s === "approaching") surgicalCounts.approaching++
 				else surgicalCounts.exceeded++
@@ -2058,14 +2564,20 @@ export class SlaService {
 			const activeMedCerts = await db
 				.select({ createdAt: medicalRecordsRequests.createdAt })
 				.from(medicalRecordsRequests)
-				.where(and(
-					eq(medicalRecordsRequests.facilityId, facilityId),
-					eq(medicalRecordsRequests.requestType, "medical_certificate"),
-					inArray(medicalRecordsRequests.status, ["pending", "processing"]),
-				))
+				.where(
+					and(
+						eq(medicalRecordsRequests.facilityId, facilityId),
+						eq(medicalRecordsRequests.requestType, "medical_certificate"),
+						inArray(medicalRecordsRequests.status, ["pending", "processing"])
+					)
+				)
 			for (const row of activeMedCerts) {
 				const elapsed = Math.floor((now.getTime() - row.createdAt.getTime()) / 60000)
-				const s = computeSlaStatus(elapsed, certConfig.targetMinutes, certConfig.warningThresholdPct)
+				const s = computeSlaStatus(
+					elapsed,
+					certConfig.targetMinutes,
+					certConfig.warningThresholdPct
+				)
 				if (s === "on_time") certCounts.onTime++
 				else if (s === "approaching") certCounts.approaching++
 				else certCounts.exceeded++
@@ -2075,10 +2587,19 @@ export class SlaService {
 			const activeBirths = await db
 				.select({ createdAt: birthRegistrations.createdAt })
 				.from(birthRegistrations)
-				.where(and(eq(birthRegistrations.facilityId, facilityId), inArray(birthRegistrations.status, ["draft"])))
+				.where(
+					and(
+						eq(birthRegistrations.facilityId, facilityId),
+						inArray(birthRegistrations.status, ["draft"])
+					)
+				)
 			for (const row of activeBirths) {
 				const elapsed = Math.floor((now.getTime() - row.createdAt.getTime()) / 60000)
-				const s = computeSlaStatus(elapsed, certConfig.targetMinutes, certConfig.warningThresholdPct)
+				const s = computeSlaStatus(
+					elapsed,
+					certConfig.targetMinutes,
+					certConfig.warningThresholdPct
+				)
 				if (s === "on_time") certCounts.onTime++
 				else if (s === "approaching") certCounts.approaching++
 				else certCounts.exceeded++
@@ -2088,10 +2609,16 @@ export class SlaService {
 			const activeDeaths = await db
 				.select({ createdAt: deathReports.createdAt })
 				.from(deathReports)
-				.where(and(eq(deathReports.facilityId, facilityId), inArray(deathReports.status, ["draft"])))
+				.where(
+					and(eq(deathReports.facilityId, facilityId), inArray(deathReports.status, ["draft"]))
+				)
 			for (const row of activeDeaths) {
 				const elapsed = Math.floor((now.getTime() - row.createdAt.getTime()) / 60000)
-				const s = computeSlaStatus(elapsed, certConfig.targetMinutes, certConfig.warningThresholdPct)
+				const s = computeSlaStatus(
+					elapsed,
+					certConfig.targetMinutes,
+					certConfig.warningThresholdPct
+				)
 				if (s === "on_time") certCounts.onTime++
 				else if (s === "approaching") certCounts.approaching++
 				else certCounts.exceeded++
@@ -2194,7 +2721,8 @@ export class SlaService {
 	async updateStepConfig(input: UpdateSlaStepConfig): Promise<SlaStepConfig> {
 		const updates: Partial<typeof slaStepConfigs.$inferInsert> = { updatedAt: new Date() }
 		if (input.targetMinutes !== undefined) updates.targetMinutes = input.targetMinutes
-		if (input.warningThresholdPct !== undefined) updates.warningThresholdPct = input.warningThresholdPct
+		if (input.warningThresholdPct !== undefined)
+			updates.warningThresholdPct = input.warningThresholdPct
 		if (input.description !== undefined) updates.description = input.description
 		if (input.isActive !== undefined) updates.isActive = input.isActive
 
@@ -2226,5 +2754,348 @@ export class SlaService {
 			.returning({ id: slaStepConfigs.id })
 		if (!row) throw new NotFoundException(`SLA step config with id ${id} not found`)
 		return { success: true }
+	}
+
+	// ========================================================================
+	// Workflow Status Log (ADM-BE-09)
+	// Idempotent on (encounterId, workflow, step, startedAt)
+	// ========================================================================
+
+	async appendStatusLog(input: {
+		facilityId: string
+		encounterId: string
+		workflow: string
+		step: string
+		startedAt: string
+		endedAt?: string
+		durationMinutes?: number
+		isBreached?: boolean
+		isHardCapBreached?: boolean
+	}) {
+		const [existing] = await db
+			.select()
+			.from(workflowStatusLog)
+			.where(
+				and(
+					eq(workflowStatusLog.encounterId, input.encounterId),
+					eq(workflowStatusLog.workflow, input.workflow as SlaWorkflowType),
+					eq(workflowStatusLog.step, input.step as SlaStepType),
+					eq(workflowStatusLog.startedAt, new Date(input.startedAt))
+				)
+			)
+
+		if (existing) return existing
+
+		// ADM-BE-09 AC5: auto-detect breach from sla_step_configs when endedAt + durationMinutes are provided
+		let isBreached = input.isBreached ?? false
+		let isHardCapBreached = input.isHardCapBreached ?? false
+
+		if (input.endedAt && input.durationMinutes != null) {
+			const [stepConfig] = await db
+				.select()
+				.from(slaStepConfigs)
+				.where(
+					and(
+						eq(slaStepConfigs.facilityId, input.facilityId),
+						eq(slaStepConfigs.stepType, input.step as SlaStepType),
+						eq(slaStepConfigs.isActive, true)
+					)
+				)
+				.limit(1)
+
+			if (stepConfig) {
+				isBreached = input.durationMinutes > stepConfig.targetMinutes
+				isHardCapBreached =
+					stepConfig.hardCapMinutes != null && input.durationMinutes > stepConfig.hardCapMinutes
+
+				if (isHardCapBreached) {
+					this.logger.warn(
+						`audit.sla.hard-cap-breach facilityId=${input.facilityId} encounterId=${input.encounterId} workflow=${input.workflow} step=${input.step} durationMinutes=${input.durationMinutes} hardCapMinutes=${stepConfig.hardCapMinutes}`
+					)
+				}
+			}
+		}
+
+		const [row] = await db
+			.insert(workflowStatusLog)
+			.values({
+				facilityId: input.facilityId,
+				encounterId: input.encounterId,
+				workflow: input.workflow as SlaWorkflowType,
+				step: input.step as SlaStepType,
+				startedAt: new Date(input.startedAt),
+				endedAt: input.endedAt ? new Date(input.endedAt) : null,
+				durationMinutes: input.durationMinutes ?? null,
+				isBreached,
+				isHardCapBreached,
+			})
+			.returning()
+
+		return row!
+	}
+
+	// ========================================================================
+	// SLA Analytics (ADM-BE-10)
+	// ========================================================================
+
+	async getSlaDashboard(facilityId: string) {
+		const now = new Date()
+		const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+		// Get all workflow types from workflowStatusLog for this facility this month
+		const allRows = await db
+			.select({
+				workflow: workflowStatusLog.workflow,
+				isBreached: workflowStatusLog.isBreached,
+				durationMinutes: workflowStatusLog.durationMinutes,
+			})
+			.from(workflowStatusLog)
+			.where(
+				and(
+					eq(workflowStatusLog.facilityId, facilityId),
+					gte(workflowStatusLog.startedAt, monthStart),
+					isNotNull(workflowStatusLog.durationMinutes)
+				)
+			)
+
+		type RowStats = { total: number; breachCount: number; totalDuration: number }
+		const byWorkflow: Record<string, RowStats> = {}
+
+		for (const row of allRows) {
+			if (!byWorkflow[row.workflow]) {
+				byWorkflow[row.workflow] = { total: 0, breachCount: 0, totalDuration: 0 }
+			}
+			const stats = byWorkflow[row.workflow]!
+			stats.total++
+			if (row.isBreached) stats.breachCount++
+			if (row.durationMinutes) stats.totalDuration += row.durationMinutes
+		}
+
+		const tiles = Object.entries(byWorkflow).map(([workflow, stats]) => {
+			const withinSLAPct =
+				stats.total > 0 ? ((stats.total - stats.breachCount) / stats.total) * 100 : 100
+			const avgTatMinutes = stats.total > 0 ? stats.totalDuration / stats.total : 0
+			const statusColor: "green" | "amber" | "red" =
+				withinSLAPct >= 95 ? "green" : withinSLAPct >= 85 ? "amber" : "red"
+
+			return {
+				workflowType: workflow,
+				workflowLabel: workflow.replace(/_/g, " ").replace(/w/g, c => c.toUpperCase()),
+				totalCases: stats.total,
+				withinSLAPct: Math.round(withinSLAPct * 100) / 100,
+				breachCount: stats.breachCount,
+				avgTatMinutes: Math.round(avgTatMinutes * 100) / 100,
+				statusColor,
+			}
+		})
+
+		const totalCases = tiles.reduce((s, t) => s + t.totalCases, 0)
+		const totalBreaches = tiles.reduce((s, t) => s + t.breachCount, 0)
+		const overallCompliancePct =
+			totalCases > 0 ? ((totalCases - totalBreaches) / totalCases) * 100 : 100
+
+		return {
+			tiles,
+			overallCompliancePct: Math.round(overallCompliancePct * 100) / 100,
+		}
+	}
+
+	async getTurnaround(input: {
+		facilityId: string
+		workflowType: string
+		startDate: string
+		endDate: string
+		compareStartDate?: string
+		compareEndDate?: string
+	}) {
+		const primary = await this.aggregateTurnaroundByDay(
+			input.facilityId,
+			input.workflowType,
+			input.startDate,
+			input.endDate
+		)
+
+		let comparison = null
+		if (input.compareStartDate && input.compareEndDate) {
+			comparison = await this.aggregateTurnaroundByDay(
+				input.facilityId,
+				input.workflowType,
+				input.compareStartDate,
+				input.compareEndDate
+			)
+		}
+
+		return { primary, comparison }
+	}
+
+	private async aggregateTurnaroundByDay(
+		facilityId: string,
+		workflowType: string,
+		startDate: string,
+		endDate: string
+	) {
+		const rows = await db
+			.select({
+				durationMinutes: workflowStatusLog.durationMinutes,
+				isBreached: workflowStatusLog.isBreached,
+				startedAt: workflowStatusLog.startedAt,
+			})
+			.from(workflowStatusLog)
+			.where(
+				and(
+					eq(workflowStatusLog.facilityId, facilityId),
+					eq(workflowStatusLog.workflow, workflowType as SlaWorkflowType),
+					gte(workflowStatusLog.startedAt, new Date(startDate)),
+					lte(workflowStatusLog.startedAt, new Date(`${endDate}T23:59:59Z`)),
+					isNotNull(workflowStatusLog.durationMinutes)
+				)
+			)
+
+		type DayAgg = { durations: number[]; breachCount: number }
+		const byDay: Record<string, DayAgg> = {}
+
+		for (const row of rows) {
+			const dateKey = row.startedAt.toISOString().slice(0, 10)
+			if (!byDay[dateKey]) byDay[dateKey] = { durations: [], breachCount: 0 }
+			const day = byDay[dateKey]!
+			if (row.durationMinutes) day.durations.push(row.durationMinutes)
+			if (row.isBreached) day.breachCount++
+		}
+
+		return Object.entries(byDay)
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(([date, agg]) => {
+				const sorted = [...agg.durations].sort((a, b) => a - b)
+				const mid = Math.floor(sorted.length / 2)
+				const medianTAT =
+					sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!
+				const p95Idx = Math.floor(sorted.length * 0.95)
+				const p95TAT = sorted[Math.min(p95Idx, sorted.length - 1)]!
+				const withinSLAPct =
+					sorted.length > 0 ? ((sorted.length - agg.breachCount) / sorted.length) * 100 : 100
+
+				return {
+					date,
+					cases: sorted.length,
+					medianTAT: Math.round(medianTAT * 100) / 100,
+					p95TAT: Math.round(p95TAT * 100) / 100,
+					withinSLAPct: Math.round(withinSLAPct * 100) / 100,
+					breachCount: agg.breachCount,
+				}
+			})
+	}
+
+	async getBottleneck(input: {
+		facilityId: string
+		workflowType: string
+		startDate: string
+		endDate: string
+	}) {
+		const rows = await db
+			.select({
+				step: workflowStatusLog.step,
+				durationMinutes: workflowStatusLog.durationMinutes,
+				encounterId: workflowStatusLog.encounterId,
+			})
+			.from(workflowStatusLog)
+			.where(
+				and(
+					eq(workflowStatusLog.facilityId, input.facilityId),
+					eq(workflowStatusLog.workflow, input.workflowType as SlaWorkflowType),
+					gte(workflowStatusLog.startedAt, new Date(input.startDate)),
+					lte(workflowStatusLog.startedAt, new Date(`${input.endDate}T23:59:59Z`)),
+					isNotNull(workflowStatusLog.durationMinutes)
+				)
+			)
+
+		type StepAgg = { durations: number[]; encounterIds: string[] }
+		const byStep: Record<string, StepAgg> = {}
+
+		for (const row of rows) {
+			if (!byStep[row.step]) byStep[row.step] = { durations: [], encounterIds: [] }
+			const agg = byStep[row.step]!
+			if (row.durationMinutes) agg.durations.push(row.durationMinutes)
+			agg.encounterIds.push(row.encounterId)
+		}
+
+		const steps = Object.entries(byStep).map(([step, agg]) => {
+			const sorted = [...agg.durations].sort((a, b) => a - b)
+			const mid = Math.floor(sorted.length / 2)
+			const medianMinutes =
+				sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : (sorted[mid] ?? 0)
+			const p95Idx = Math.floor(sorted.length * 0.95)
+			const p95Minutes = sorted[Math.min(p95Idx, sorted.length - 1)] ?? 0
+
+			// Outliers: duration > p95
+			const outlierEncounterIds = agg.durations
+				.map((d, i) => ({ d, id: agg.encounterIds[i]! }))
+				.filter(({ d }) => d > p95Minutes)
+				.map(({ id }) => id)
+
+			return {
+				stepType: step,
+				stepLabel: step.replace(/_/g, " ").replace(/w/g, c => c.toUpperCase()),
+				medianMinutes: Math.round(medianMinutes * 100) / 100,
+				p95Minutes: Math.round(p95Minutes * 100) / 100,
+				outlierEncounterIds,
+			}
+		})
+
+		return { steps }
+	}
+
+	// ========================================================================
+	// SLA Export (ADM-BE-09 AC3)
+	// ========================================================================
+
+	async exportCompliance(input: {
+		workflowType: string
+		dateFrom: string
+		dateTo: string
+		facilityId: string
+	}) {
+		const [facilityRow] = await db
+			.select({ name: facilities.name })
+			.from(facilities)
+			.where(eq(facilities.id, input.facilityId))
+			.limit(1)
+
+		const rows = await db
+			.select({
+				encounterId: workflowStatusLog.encounterId,
+				workflow: workflowStatusLog.workflow,
+				step: workflowStatusLog.step,
+				startedAt: workflowStatusLog.startedAt,
+				endedAt: workflowStatusLog.endedAt,
+				durationMinutes: workflowStatusLog.durationMinutes,
+				isBreached: workflowStatusLog.isBreached,
+				isHardCapBreached: workflowStatusLog.isHardCapBreached,
+			})
+			.from(workflowStatusLog)
+			.where(
+				and(
+					eq(workflowStatusLog.facilityId, input.facilityId),
+					eq(workflowStatusLog.workflow, input.workflowType as SlaWorkflowType),
+					gte(workflowStatusLog.startedAt, new Date(input.dateFrom)),
+					lte(workflowStatusLog.startedAt, new Date(`${input.dateTo}T23:59:59Z`))
+				)
+			)
+			.orderBy(asc(workflowStatusLog.startedAt))
+
+		return {
+			facilityName: facilityRow?.name ?? input.facilityId,
+			reportPeriod: `${input.dateFrom} to ${input.dateTo}`,
+			generatedAt: new Date().toISOString(),
+			rows: rows.map(r => ({
+				encounterId: r.encounterId,
+				workflow: r.workflow,
+				step: r.step,
+				startedAt: r.startedAt.toISOString(),
+				endedAt: r.endedAt ? r.endedAt.toISOString() : null,
+				durationMinutes: r.durationMinutes,
+				isBreached: r.isBreached,
+				isHardCapBreached: r.isHardCapBreached,
+			})),
+		}
 	}
 }

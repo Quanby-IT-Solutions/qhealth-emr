@@ -8,9 +8,9 @@ import {
 	UnauthorizedException,
 } from "@nestjs/common"
 import { Reflector } from "@nestjs/core"
-import { sql } from "drizzle-orm"
 import type { UserSession } from "@thallesp/nestjs-better-auth"
 import { fromNodeHeaders } from "better-auth/node"
+import { sql } from "drizzle-orm"
 
 import { getAuth } from "@repo/auth"
 
@@ -32,8 +32,7 @@ type PermissionEntry = NonNullable<V1Outputs["rbac"]["me"]["activeRole"]>["permi
 export const RequirePermission = (
 	module: PermissionEntry["module"],
 	action: PermissionEntry["action"]
-) =>
-	SetMetadata(RBAC_PERMISSION_KEY, { module, action })
+) => SetMetadata(RBAC_PERMISSION_KEY, { module, action })
 
 // ============================================================================
 // Decorator: RequirePermissions (multiple — AND logic)
@@ -45,8 +44,19 @@ export const RBAC_PERMISSIONS_KEY = "rbac_all"
 /** Require ALL listed permissions on a controller or handler (AND logic). */
 export const RequirePermissions = (
 	permissions: Array<{ module: PermissionEntry["module"]; action: PermissionEntry["action"] }>
-) =>
-	SetMetadata(RBAC_PERMISSIONS_KEY, permissions)
+) => SetMetadata(RBAC_PERMISSIONS_KEY, permissions)
+
+// ============================================================================
+// Decorator: RequireAnyPermissions (multiple — OR logic)
+// ============================================================================
+
+/** Metadata key used by RequireAnyPermissions decorator. */
+export const RBAC_ANY_PERMISSIONS_KEY = "rbac_any"
+
+/** Require ANY listed permission on a controller or handler (OR logic). */
+export const RequireAnyPermissions = (
+	permissions: Array<{ module: PermissionEntry["module"]; action: PermissionEntry["action"] }>
+) => SetMetadata(RBAC_ANY_PERMISSIONS_KEY, permissions)
 
 // ============================================================================
 // Guard
@@ -140,12 +150,17 @@ export class RbacGuard implements CanActivate {
 			Array<{ module: PermissionEntry["module"]; action: PermissionEntry["action"] }> | undefined
 		>(RBAC_PERMISSIONS_KEY, [context.getHandler(), context.getClass()])
 
+		// Check multi-permission OR-logic metadata
+		const requiredAny = this.reflector.getAllAndOverride<
+			Array<{ module: PermissionEntry["module"]; action: PermissionEntry["action"] }> | undefined
+		>(RBAC_ANY_PERMISSIONS_KEY, [context.getHandler(), context.getClass()])
+
 		// Reject deactivated accounts on permission-protected routes
-		if ((required || requiredAll) && profile.staffProfiles.length === 0) {
+		if ((required || requiredAll || requiredAny) && profile.staffProfiles.length === 0) {
 			throw new ForbiddenException("Account is deactivated")
 		}
 
-		if (!required && !requiredAll) {
+		if (!required && !requiredAll && !requiredAny) {
 			// No permission metadata — authenticated access is sufficient
 			return true
 		}
@@ -158,9 +173,7 @@ export class RbacGuard implements CanActivate {
 				) ?? false
 
 			if (!hasPermission) {
-				this.logger.warn(
-					`User ${userId} missing permission ${required.module}:${required.action}`
-				)
+				this.logger.warn(`User ${userId} missing permission ${required.module}:${required.action}`)
 				throw new ForbiddenException("Insufficient permissions")
 			}
 		}
@@ -174,11 +187,25 @@ export class RbacGuard implements CanActivate {
 					) ?? false
 
 				if (!hasPermission) {
-					this.logger.warn(
-						`User ${userId} missing permission ${req.module}:${req.action}`
-					)
+					this.logger.warn(`User ${userId} missing permission ${req.module}:${req.action}`)
 					throw new ForbiddenException("Insufficient permissions")
 				}
+			}
+		}
+
+		// Check any permission (OR logic)
+		if (requiredAny) {
+			const hasAnyPermission =
+				profile.activeRole?.permissions.some(permission =>
+					requiredAny.some(
+						req => permission.module === req.module && permission.action === req.action
+					)
+				) ?? false
+
+			if (!hasAnyPermission) {
+				const permissionList = requiredAny.map(req => `${req.module}:${req.action}`).join(" | ")
+				this.logger.warn(`User ${userId} missing any required permission: ${permissionList}`)
+				throw new ForbiddenException("Insufficient permissions")
 			}
 		}
 

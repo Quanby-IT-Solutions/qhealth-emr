@@ -1,21 +1,15 @@
 "use client"
 
-import {
-	BookOpen,
-	ClipboardList,
-	FileBadge,
-	FileCheck2,
-	FileText,
-	Stethoscope,
-} from "lucide-react"
+import { BookOpen, ClipboardList, FileBadge, FileCheck2, FileText, Stethoscope } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Separator } from "@/core/components/ui/separator"
+import type { ClinicalNoteType } from "@/features/clinical-docs/api/clinical-docs.hooks"
 
 interface ClinicalNote {
 	id: string
-	noteType: "admission" | "progress" | "consultation" | "discharge_summary" | "fpe"
+	noteType: ClinicalNoteType
 	templateName: string | null
 	status: "draft" | "signed"
 	authorStaffName: string | null
@@ -48,12 +42,14 @@ function noteTypeIcon(type: ClinicalNote["noteType"]) {
 }
 
 function noteTypeLabel(type: ClinicalNote["noteType"]) {
-	const labels: Record<ClinicalNote["noteType"], string> = {
+	const labels: Partial<Record<ClinicalNote["noteType"], string>> = {
 		admission: "Admission Note (H&P)",
 		progress: "Progress Note",
 		consultation: "Consultation",
 		discharge_summary: "Discharge Summary",
 		fpe: "FPE / Konsulta",
+		operative: "Operative Note",
+		anesthesia: "Anesthesia Note",
 	}
 	return labels[type] ?? type
 }
@@ -107,11 +103,7 @@ function noteExcerpt(content: string) {
  */
 export function NoteTimeline({ notes, onSelectNote, isLoading }: NoteTimelineProps) {
 	if (isLoading) {
-		return (
-			<div className="text-muted-foreground py-10 text-center text-sm">
-				Loading notes…
-			</div>
-		)
+		return <div className="text-muted-foreground py-10 text-center text-sm">Loading notes…</div>
 	}
 
 	if (notes.length === 0) {
@@ -137,91 +129,96 @@ export function NoteTimeline({ notes, onSelectNote, isLoading }: NoteTimelinePro
 	const dateKeys = Object.keys(groups)
 
 	return (
-		<div className="space-y-6">
-			{dateKeys.map((dateKey, groupIdx) => (
-				<div key={dateKey} className="space-y-3">
-					{/* Date header */}
-					<div className="flex items-center gap-3">
-						<span className="text-muted-foreground text-xs font-medium">
-							{formatDate(new Date(dateKey).toISOString())}
-						</span>
-						<Separator className="flex-1" />
-					</div>
+		<div className="min-w-0 space-y-6 px-3 pb-4 sm:px-4">
+			{dateKeys.map((dateKey, groupIdx) => {
+				const notesForDate = groups[dateKey] ?? []
+				return (
+					<div key={dateKey} className="min-w-0 space-y-3">
+						{/* Date header */}
+						<div className="flex min-w-0 items-center gap-3">
+							<span className="text-muted-foreground shrink-0 text-xs font-medium">
+								{formatDate(new Date(dateKey).toISOString())}
+							</span>
+							<Separator className="flex-1" />
+						</div>
 
-					{/* Notes for this date */}
-					<div className="relative ml-4 space-y-3">
-						{/* Vertical connector line */}
-						{groups[dateKey].length > 1 && (
-							<div className="bg-border absolute left-3 top-6 w-px"
-								style={{ height: `calc(100% - 1.5rem)` }}
-							/>
-						)}
-
-						{groups[dateKey].map((note, noteIdx) => (
-							<div key={note.id} className="relative flex gap-3">
-								{/* Icon bubble */}
+						{/* Notes for this date */}
+						<div className="relative space-y-3 sm:ml-4">
+							{/* Vertical connector line */}
+							{notesForDate.length > 1 && (
 								<div
-									className={`relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full ${noteTypeColor(note.noteType)}`}
-								>
-									{noteTypeIcon(note.noteType)}
-								</div>
+									className="bg-border absolute top-6 left-3 w-px"
+									style={{ height: `calc(100% - 1.5rem)` }}
+								/>
+							)}
 
-								{/* Note card */}
-								<Button
-									type="button"
-									variant="outline"
-									className="h-auto w-full justify-start px-4 py-3 text-left"
-									onClick={() => onSelectNote(note.id)}
-								>
-									<div className="w-full space-y-1">
-										<div className="flex items-center justify-between gap-2">
-											<span className="text-sm font-medium">
-												{noteTypeLabel(note.noteType)}
-											</span>
-											<div className="flex shrink-0 items-center gap-1.5">
-												{note.templateName && (
-													<Badge variant="outline" className="text-xs">
-														{note.templateName}
+							{notesForDate.map(note => (
+								<div key={note.id} className="relative flex min-w-0 gap-3">
+									{/* Icon bubble */}
+									<div
+										className={`relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full ${noteTypeColor(note.noteType)}`}
+									>
+										{noteTypeIcon(note.noteType)}
+									</div>
+
+									{/* Note card */}
+									<Button
+										type="button"
+										variant="outline"
+										className="h-auto min-w-0 flex-1 justify-start px-3 py-3 text-left whitespace-normal sm:px-4"
+										onClick={() => onSelectNote(note.id)}
+									>
+										<div className="min-w-0 flex-1 space-y-2">
+											<div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+												<span className="min-w-0 text-sm font-medium break-words">
+													{noteTypeLabel(note.noteType)}
+												</span>
+												<div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:justify-end">
+													{note.templateName && (
+														<Badge
+															variant="outline"
+															className="max-w-full text-xs whitespace-normal"
+														>
+															{note.templateName}
+														</Badge>
+													)}
+													<Badge variant={note.status === "signed" ? "default" : "secondary"}>
+														{note.status === "signed" ? "Signed" : "Draft"}
 													</Badge>
-												)}
-												<Badge
-													variant={
-														note.status === "signed" ? "default" : "secondary"
-													}
-												>
-													{note.status === "signed" ? "Signed" : "Draft"}
-												</Badge>
+												</div>
 											</div>
-										</div>
 
-										<div className="text-muted-foreground flex items-center gap-2 text-xs">
-											<span>{note.authorStaffName ?? "Unknown author"}</span>
-											<span>·</span>
-											<span>{formatDateTime(note.createdAt)}</span>
-											{note.signedAt && (
-												<>
-													<span>·</span>
-													<span className="text-green-600 dark:text-green-400">
-														Signed {formatDateTime(note.signedAt)}
-													</span>
-												</>
+											<div className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+												<span className="min-w-0 break-words">
+													{note.authorStaffName ?? "Unknown author"}
+												</span>
+												<span>·</span>
+												<span>{formatDateTime(note.createdAt)}</span>
+												{note.signedAt && (
+													<>
+														<span>·</span>
+														<span className="text-green-600 dark:text-green-400">
+															Signed {formatDateTime(note.signedAt)}
+														</span>
+													</>
+												)}
+											</div>
+
+											{noteExcerpt(note.content) && (
+												<p className="text-muted-foreground line-clamp-3 min-w-0 text-xs break-words">
+													{noteExcerpt(note.content)}
+												</p>
 											)}
 										</div>
+									</Button>
+								</div>
+							))}
+						</div>
 
-										{noteExcerpt(note.content) && (
-											<p className="text-muted-foreground line-clamp-2 text-xs">
-												{noteExcerpt(note.content)}
-											</p>
-										)}
-									</div>
-								</Button>
-							</div>
-						))}
+						{groupIdx < dateKeys.length - 1 && <div className="h-2" />}
 					</div>
-
-					{groupIdx < dateKeys.length - 1 && <div className="h-2" />}
-				</div>
-			))}
+				)
+			})}
 		</div>
 	)
 }

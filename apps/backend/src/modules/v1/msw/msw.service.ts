@@ -1,13 +1,8 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, sql } from "drizzle-orm"
 
-import {
-	mswEvaluations,
-	patients,
-	staffProfiles,
-	users,
-} from "@repo/db/schema"
 import type { MswEvaluation } from "@repo/contracts"
+import { mswEvaluations, patients, staffProfiles, users } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
@@ -56,7 +51,8 @@ export class MswService {
 		status: (typeof mswEvaluations.$inferSelect)["status"]
 		evaluationFindings: unknown
 	}): MswContractStatus {
-		const workflowStatus = (row.evaluationFindings as Record<string, unknown> | null)?.workflowStatus
+		const workflowStatus = (row.evaluationFindings as Record<string, unknown> | null)
+			?.workflowStatus
 		if (
 			workflowStatus === "pending" ||
 			workflowStatus === "in_progress" ||
@@ -90,11 +86,17 @@ export class MswService {
 	private mapEvaluationFindings(value: unknown): MswEvaluation["evaluationFindings"] {
 		const evaluationFindings = (value as Record<string, unknown> | null) ?? null
 		const rawFindings =
-			evaluationFindings && typeof evaluationFindings.findings === "object" && evaluationFindings.findings !== null
+			evaluationFindings &&
+			typeof evaluationFindings.findings === "object" &&
+			evaluationFindings.findings !== null
 				? (evaluationFindings.findings as Record<string, unknown>)
 				: evaluationFindings
 
-		if (!rawFindings || Object.keys(rawFindings).length === 0 || !("employmentStatus" in rawFindings)) {
+		if (
+			!rawFindings ||
+			Object.keys(rawFindings).length === 0 ||
+			!("employmentStatus" in rawFindings)
+		) {
 			return null
 		}
 
@@ -128,44 +130,50 @@ export class MswService {
 				typeof rawFindings.monthlyFamilyIncome === "number" ? rawFindings.monthlyFamilyIncome : 0,
 			incomeSources: Array.isArray(rawFindings.incomeSources)
 				? rawFindings.incomeSources.flatMap(item => {
-					if (typeof item !== "object" || item === null) {
-						return []
-					}
+						if (typeof item !== "object" || item === null) {
+							return []
+						}
 
-					const source = item as Record<string, unknown>
-					const frequency =
-						source.frequency === "daily" ||
-						source.frequency === "weekly" ||
-						source.frequency === "biweekly" ||
-						source.frequency === "monthly" ||
-						source.frequency === "annually"
-							? source.frequency
-							: "monthly"
+						const source = item as Record<string, unknown>
+						const frequency =
+							source.frequency === "daily" ||
+							source.frequency === "weekly" ||
+							source.frequency === "biweekly" ||
+							source.frequency === "monthly" ||
+							source.frequency === "annually"
+								? source.frequency
+								: "monthly"
 
-					return [{
-						source: typeof source.source === "string" ? source.source : "Unknown",
-						amount: typeof source.amount === "number" ? source.amount : 0,
-						frequency,
-					}]
-				})
+						return [
+							{
+								source: typeof source.source === "string" ? source.source : "Unknown",
+								amount: typeof source.amount === "number" ? source.amount : 0,
+								frequency,
+							},
+						]
+					})
 				: [],
 			numberOfDependents:
 				typeof rawFindings.numberOfDependents === "number" ? rawFindings.numberOfDependents : 0,
 			familyComposition: Array.isArray(rawFindings.familyComposition)
 				? rawFindings.familyComposition.flatMap(item => {
-					if (typeof item !== "object" || item === null) {
-						return []
-					}
+						if (typeof item !== "object" || item === null) {
+							return []
+						}
 
-					const member = item as Record<string, unknown>
-					return [{
-						relationship: typeof member.relationship === "string" ? member.relationship : "Unknown",
-						age: typeof member.age === "number" ? member.age : undefined,
-						occupation: typeof member.occupation === "string" ? member.occupation : undefined,
-						monthlyIncome: typeof member.monthlyIncome === "number" ? member.monthlyIncome : undefined,
-						isDependent: typeof member.isDependent === "boolean" ? member.isDependent : false,
-					}]
-				})
+						const member = item as Record<string, unknown>
+						return [
+							{
+								relationship:
+									typeof member.relationship === "string" ? member.relationship : "Unknown",
+								age: typeof member.age === "number" ? member.age : undefined,
+								occupation: typeof member.occupation === "string" ? member.occupation : undefined,
+								monthlyIncome:
+									typeof member.monthlyIncome === "number" ? member.monthlyIncome : undefined,
+								isDependent: typeof member.isDependent === "boolean" ? member.isDependent : false,
+							},
+						]
+					})
 				: undefined,
 			homeOwnership:
 				rawFindings.homeOwnership === "owned" ||
@@ -175,13 +183,17 @@ export class MswService {
 				rawFindings.homeOwnership === "other"
 					? rawFindings.homeOwnership
 					: undefined,
-			otherAssets: typeof rawFindings.otherAssets === "string" ? rawFindings.otherAssets : undefined,
-			existingDebts: typeof rawFindings.existingDebts === "number" ? rawFindings.existingDebts : undefined,
+			otherAssets:
+				typeof rawFindings.otherAssets === "string" ? rawFindings.otherAssets : undefined,
+			existingDebts:
+				typeof rawFindings.existingDebts === "number" ? rawFindings.existingDebts : undefined,
 			monthlyExpenses:
 				typeof rawFindings.monthlyExpenses === "number" ? rawFindings.monthlyExpenses : undefined,
 			financialClass,
 			classificationNotes:
-				typeof rawFindings.classificationNotes === "string" ? rawFindings.classificationNotes : undefined,
+				typeof rawFindings.classificationNotes === "string"
+					? rawFindings.classificationNotes
+					: undefined,
 			psychosocialAssessment:
 				typeof rawFindings.psychosocialAssessment === "string"
 					? rawFindings.psychosocialAssessment
@@ -269,28 +281,35 @@ export class MswService {
 			coeIssued: row.coeIssued,
 			coe: row.coeIssued
 				? {
-					coeNumber: row.coeNumber ?? `COE-${row.id.slice(0, 8).toUpperCase()}`,
-					program: this.mapCoeProgram(coeMeta?.program ?? row.coeProgram),
-					amountApproved: Number(coeMeta?.amountApproved ?? row.malasakitAmount ?? 0),
-					issuedAt:
-						typeof coeMeta?.issuedAt === "string"
-							? coeMeta.issuedAt
-							: row.approvedAt?.toISOString() ?? row.updatedAt.toISOString(),
-					validUntil: typeof coeMeta?.validUntil === "string" ? coeMeta.validUntil : undefined,
-					signatureData: typeof coeMeta?.signatureData === "string" ? coeMeta.signatureData : undefined,
-					witnessName: typeof coeMeta?.witnessName === "string" ? coeMeta.witnessName : undefined,
-				}
+						coeNumber: row.coeNumber ?? `COE-${row.id.slice(0, 8).toUpperCase()}`,
+						program: this.mapCoeProgram(coeMeta?.program ?? row.coeProgram),
+						amountApproved: Number(coeMeta?.amountApproved ?? row.malasakitAmount ?? 0),
+						issuedAt:
+							typeof coeMeta?.issuedAt === "string"
+								? coeMeta.issuedAt
+								: (row.approvedAt?.toISOString() ?? row.updatedAt.toISOString()),
+						validUntil: typeof coeMeta?.validUntil === "string" ? coeMeta.validUntil : undefined,
+						signatureData:
+							typeof coeMeta?.signatureData === "string" ? coeMeta.signatureData : undefined,
+						witnessName: typeof coeMeta?.witnessName === "string" ? coeMeta.witnessName : undefined,
+					}
 				: null,
 			malasakitAmount: row.malasakitAmount !== null ? Number(row.malasakitAmount) : null,
 			malasakitSources: this.mapMalasakitSources(row.malasakitSource),
 			konsultaTagged: row.konsultaTagged,
 			zBenefitsTagged: row.zBenefitsTagged,
 			annexASignature:
-				typeof evaluationFindings.annexASignature === "string" ? evaluationFindings.annexASignature : null,
+				typeof evaluationFindings.annexASignature === "string"
+					? evaluationFindings.annexASignature
+					: null,
 			annexBSignature:
-				typeof evaluationFindings.annexBSignature === "string" ? evaluationFindings.annexBSignature : null,
+				typeof evaluationFindings.annexBSignature === "string"
+					? evaluationFindings.annexBSignature
+					: null,
 			annexSignedAt:
-				typeof evaluationFindings.annexSignedAt === "string" ? evaluationFindings.annexSignedAt : null,
+				typeof evaluationFindings.annexSignedAt === "string"
+					? evaluationFindings.annexSignedAt
+					: null,
 			evaluatedByStaffId: row.evaluatedByStaffId,
 			evaluatedByStaffName: row.evaluatedByStaffName,
 			status: this.normalizeStatusForOutput(row),
@@ -346,7 +365,8 @@ export class MswService {
 		if (input.facilityId) conditions.push(eq(mswEvaluations.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(mswEvaluations.encounterId, input.encounterId))
 		if (input.patientId) conditions.push(eq(mswEvaluations.patientId, input.patientId))
-		if (typeof input.coeIssued === "boolean") conditions.push(eq(mswEvaluations.coeIssued, input.coeIssued))
+		if (typeof input.coeIssued === "boolean")
+			conditions.push(eq(mswEvaluations.coeIssued, input.coeIssued))
 		if (typeof input.konsultaTagged === "boolean") {
 			conditions.push(eq(mswEvaluations.konsultaTagged, input.konsultaTagged))
 		}
@@ -393,7 +413,7 @@ export class MswService {
 			? mappedRows.filter(row => row.status === input.status)
 			: mappedRows
 
-		const total = input.status ? filteredRows.length : totalRows[0]?.count ?? 0
+		const total = input.status ? filteredRows.length : (totalRows[0]?.count ?? 0)
 
 		return {
 			data: filteredRows,
@@ -504,13 +524,17 @@ export class MswService {
 	}
 
 	async addMalasakit(input: AddMalasakitInput) {
-		const totalAmount = input.sources.reduce((sum, source) => sum + source.amount, 0)
+		const totalAmount = (
+			input.sources as Array<{ amount: number; program: string; referenceNumber?: string }>
+		).reduce((sum: number, source) => sum + source.amount, 0)
 
 		await db
 			.update(mswEvaluations)
 			.set({
 				malasakitAmount: totalAmount.toString(),
-				malasakitSource: input.sources.map(source => ({
+				malasakitSource: (
+					input.sources as Array<{ amount: number; program: string; referenceNumber?: string }>
+				).map(source => ({
 					source: source.program,
 					amount: source.amount,
 					referenceNumber: source.referenceNumber,
@@ -534,20 +558,18 @@ export class MswService {
 				evaluationFindings: {
 					...existingFindings,
 					annexASignature:
-						input.annexType === "A"
-							? input.signatureData
-							: existingFindings.annexASignature,
+						input.annexType === "A" ? input.signatureData : existingFindings.annexASignature,
 					annexBSignature:
-						input.annexType === "B"
-							? input.signatureData
-							: existingFindings.annexBSignature,
+						input.annexType === "B" ? input.signatureData : existingFindings.annexBSignature,
 					annexSignedAt: new Date().toISOString(),
 				} as typeof mswEvaluations.$inferInsert.evaluationFindings,
 				updatedAt: new Date(),
 			})
 			.where(eq(mswEvaluations.id, input.evaluationId))
 
-		this.logger.log(`Captured Annex ${input.annexType} signature for MSW evaluation ${input.evaluationId}`)
+		this.logger.log(
+			`Captured Annex ${input.annexType} signature for MSW evaluation ${input.evaluationId}`
+		)
 
 		return this.get(input.evaluationId)
 	}

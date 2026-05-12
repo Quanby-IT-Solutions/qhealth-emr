@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BIL-BE-05 — CF5 (DRG Shadow Billing) placeholder XSD.
+
+  Real PhilHealth CF5 XSD is licensed and must replace this stub when the
+  integration credentials work (ADM-BE-12) lands. CF5 differs from CF4 by
+  carrying DRG code + grouper metadata; the schema below mirrors that contract.
+
+  Server-side validation in `BillingService.submitCf5` enforces a required-field
+  check that maps to the named elements below; the structured
+  { path, message } violation list is returned to the UI.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="CF5">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="EncounterID" type="xs:string" />
+        <xs:element name="DRGCode" type="xs:string" />
+        <xs:element name="DRGDescription" type="xs:string" minOccurs="0" />
+        <xs:element name="DRGGrouper" type="xs:string" minOccurs="0" />
+        <xs:element name="ManualOverrideReason" type="xs:string" minOccurs="0" />
+        <xs:element name="ChargesSummary" type="xs:anyType" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

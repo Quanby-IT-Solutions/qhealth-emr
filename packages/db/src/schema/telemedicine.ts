@@ -27,25 +27,17 @@ export const telemedicineAppointments = createTable(
 		scheduledDate: t.date("scheduled_date").notNull(),
 		scheduledTime: t.time("scheduled_time").notNull(),
 		durationMinutes: t.integer("duration_minutes").notNull().default(30),
-		platform: t
-			.text("platform")
-			.notNull()
-			.default("zoom")
-			.$type<"zoom" | "teams">(),
+		platform: t.text("platform").notNull().default("zoom").$type<"zoom" | "teams">(),
 		status: t
 			.text("status")
 			.notNull()
 			.default("scheduled")
-			.$type<
-				"scheduled" | "confirmed" | "in-progress" | "completed" | "cancelled" | "no-show"
-			>(),
+			.$type<"scheduled" | "confirmed" | "in-progress" | "completed" | "cancelled" | "no-show">(),
 		videoLink: t.text("video_link"),
 		meetingId: t.text("meeting_id"),
 		meetingPassword: t.text("meeting_password"),
 		notes: t.text("notes"),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
 		createdByStaffId: t
 			.uuid("created_by_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
@@ -101,11 +93,7 @@ export const telemedicineEncounters = createTable(
 			oxygenSaturation?: string
 			weight?: string
 		}>(),
-		status: t
-			.text("status")
-			.notNull()
-			.default("open")
-			.$type<"open" | "signed" | "finalized">(),
+		status: t.text("status").notNull().default("open").$type<"open" | "signed" | "finalized">(),
 		signedAt: t.timestamp("signed_at"),
 		signedByStaffId: t
 			.uuid("signed_by_staff_id")
@@ -175,7 +163,50 @@ export const telemedicinePrescriptionItems = createTable(
 		sortOrder: t.integer("sort_order").notNull().default(0),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
+	t => [index("telemedicine_prescription_items_prescription_id_idx").on(t.prescriptionId)]
+)
+
+export const telemedicineAbstracts = createTable(
+	"telemedicine_abstracts",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		encounterId: t
+			.uuid("encounter_id")
+			.notNull()
+			.unique()
+			.references(() => telemedicineEncounters.id, { onDelete: "restrict" }),
+		appointmentId: t
+			.uuid("appointment_id")
+			.notNull()
+			.references(() => telemedicineAppointments.id, { onDelete: "restrict" }),
+		patientId: t
+			.uuid("patient_id")
+			.notNull()
+			.references(() => patients.id, { onDelete: "restrict" }),
+		chiefComplaint: t.text("chief_complaint").notNull().default(""),
+		subjectiveNotes: t.text("subjective_notes").notNull().default(""),
+		objectiveNotes: t.text("objective_notes").notNull().default(""),
+		assessmentNotes: t.text("assessment_notes").notNull().default(""),
+		planNotes: t.text("plan_notes").notNull().default(""),
+		diagnosis: t.text("diagnosis").notNull().default(""),
+		icdCode: t.text("icd_code"),
+		additionalNotes: t.text("additional_notes"),
+		status: t.text("status").notNull().default("draft").$type<"draft" | "signed" | "sent">(),
+		signedAt: t.timestamp("signed_at"),
+		signedByStaffId: t
+			.uuid("signed_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		sentAt: t.timestamp("sent_at"),
+		sentToEmail: t.text("sent_to_email"),
+		createdByStaffId: t
+			.uuid("created_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
 	t => [
-		index("telemedicine_prescription_items_prescription_id_idx").on(t.prescriptionId),
+		index("telemedicine_abstracts_encounter_id_idx").on(t.encounterId),
+		index("telemedicine_abstracts_patient_id_idx").on(t.patientId),
+		index("telemedicine_abstracts_status_idx").on(t.status),
 	]
 )

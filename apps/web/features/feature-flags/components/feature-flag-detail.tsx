@@ -280,7 +280,7 @@ export function FeatureFlagDetail({ flagId, canEdit }: FeatureFlagDetailProps) {
 									}
 								>
 									<SelectTrigger>
-										<SelectValue placeholder="Any" />
+										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
 										<SelectItem value="any">Any (wildcard)</SelectItem>

@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-
 import { CheckCircle2, Circle, ShieldAlert } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -12,33 +11,85 @@ import { Label } from "@/core/components/ui/label"
 import { Separator } from "@/core/components/ui/separator"
 
 import {
-	type PreOpChecklist as PreOpChecklistData,
 	useSavePreOpChecklistMutation,
+	type PreOpChecklist as PreOpChecklistData,
 } from "../api/surgical.hooks"
 
 // ── Default checklist items ──────────────────────────────────────────────────
 
 const DEFAULT_CHECKLIST_ITEMS: Array<{ key: string; label: string; category: string }> = [
 	// Fasting
-	{ key: "npo_confirmed", label: "NPO status confirmed (solid food ≥ 6 h, clear fluids ≥ 2 h)", category: "Fasting & Preparation" },
-	{ key: "iv_access", label: "IV access established and patent", category: "Fasting & Preparation" },
+	{
+		key: "npo_confirmed",
+		label: "NPO status confirmed (solid food ≥ 6 h, clear fluids ≥ 2 h)",
+		category: "Fasting & Preparation",
+	},
+	{
+		key: "iv_access",
+		label: "IV access established and patent",
+		category: "Fasting & Preparation",
+	},
 	// Labs
-	{ key: "labs_reviewed", label: "Pre-operative labs reviewed (CBC, serum electrolytes, coag)", category: "Laboratory & Imaging" },
-	{ key: "xray_reviewed", label: "Chest X-ray/imaging reviewed where indicated", category: "Laboratory & Imaging" },
-	{ key: "blood_type", label: "Blood type and cross-match completed", category: "Laboratory & Imaging" },
+	{
+		key: "labs_reviewed",
+		label: "Pre-operative labs reviewed (CBC, serum electrolytes, coag)",
+		category: "Laboratory & Imaging",
+	},
+	{
+		key: "xray_reviewed",
+		label: "Chest X-ray/imaging reviewed where indicated",
+		category: "Laboratory & Imaging",
+	},
+	{
+		key: "blood_type",
+		label: "Blood type and cross-match completed",
+		category: "Laboratory & Imaging",
+	},
 	// Medications
-	{ key: "meds_held", label: "Anticoagulants / antiplatelet agents held as ordered", category: "Medications" },
+	{
+		key: "meds_held",
+		label: "Anticoagulants / antiplatelet agents held as ordered",
+		category: "Medications",
+	},
 	{ key: "pre_op_meds", label: "Pre-operative medications administered", category: "Medications" },
-	{ key: "allergy_reviewed", label: "Drug allergies reviewed and documented", category: "Medications" },
+	{
+		key: "allergy_reviewed",
+		label: "Drug allergies reviewed and documented",
+		category: "Medications",
+	},
 	// Consent
-	{ key: "surgical_consent", label: "Surgical consent form signed by patient/guardian", category: "Consents & Documents" },
-	{ key: "anesthesia_consent", label: "Anesthesia consent form signed", category: "Consents & Documents" },
-	{ key: "implant_consent", label: "Implant/blood product consent signed (if applicable)", category: "Consents & Documents" },
+	{
+		key: "surgical_consent",
+		label: "Surgical consent form signed by patient/guardian",
+		category: "Consents & Documents",
+	},
+	{
+		key: "anesthesia_consent",
+		label: "Anesthesia consent form signed",
+		category: "Consents & Documents",
+	},
+	{
+		key: "implant_consent",
+		label: "Implant/blood product consent signed (if applicable)",
+		category: "Consents & Documents",
+	},
 	// Safety
 	{ key: "site_marked", label: "Operative site marked by surgeon", category: "Safety Checks" },
-	{ key: "identity_confirmed", label: "Patient identity confirmed (name + ID + wristband)", category: "Safety Checks" },
-	{ key: "position_verified", label: "Planned procedure and position verified with team", category: "Safety Checks" },
-	{ key: "equipment_ready", label: "Special equipment/implants confirmed available", category: "Safety Checks" },
+	{
+		key: "identity_confirmed",
+		label: "Patient identity confirmed (name + ID + wristband)",
+		category: "Safety Checks",
+	},
+	{
+		key: "position_verified",
+		label: "Planned procedure and position verified with team",
+		category: "Safety Checks",
+	},
+	{
+		key: "equipment_ready",
+		label: "Special equipment/implants confirmed available",
+		category: "Safety Checks",
+	},
 ]
 
 type CheckMap = Record<string, boolean>
@@ -62,17 +113,25 @@ interface ChecklistGroupProps {
 	checks: CheckMap
 	onChange: (key: string, checked: boolean) => void
 	serverItems: PreOpChecklistData["items"]
+	canEdit: boolean
 }
 
-function ChecklistGroup({ category, items, checks, onChange, serverItems }: ChecklistGroupProps) {
+function ChecklistGroup({
+	category,
+	items,
+	checks,
+	onChange,
+	serverItems,
+	canEdit,
+}: ChecklistGroupProps) {
 	return (
 		<div>
-			<p className="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wide">
+			<p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
 				{category}
 			</p>
 			<div className="space-y-2">
-				{items.map((item) => {
-					const serverItem = serverItems?.find((s) => s.key === item.key)
+				{items.map(item => {
+					const serverItem = serverItems?.find(s => s.key === item.key)
 					const isChecked = checks[item.key] ?? false
 
 					return (
@@ -80,7 +139,8 @@ function ChecklistGroup({ category, items, checks, onChange, serverItems }: Chec
 							<Checkbox
 								id={item.key}
 								checked={isChecked}
-								onCheckedChange={(v) => onChange(item.key, !!v)}
+								onCheckedChange={v => onChange(item.key, !!v)}
+								disabled={!canEdit}
 								className="mt-0.5"
 							/>
 							<div className="flex-1">
@@ -89,8 +149,7 @@ function ChecklistGroup({ category, items, checks, onChange, serverItems }: Chec
 								</Label>
 								{serverItem?.checkedAt && (
 									<p className="text-muted-foreground text-xs">
-										Checked by{" "}
-										{serverItem.checkedByName ?? "staff"} at{" "}
+										Checked by {serverItem.checkedByName ?? "staff"} at{" "}
 										{new Date(serverItem.checkedAt).toLocaleString("en-PH", {
 											month: "short",
 											day: "numeric",
@@ -119,7 +178,7 @@ interface PreOpChecklistProps {
 	canEdit?: boolean
 }
 
-export function PreOpChecklist({ caseId, existing, canEdit = true }: PreOpChecklistProps) {
+export function PreOpChecklist({ caseId, existing, canEdit = false }: PreOpChecklistProps) {
 	const [checks, setChecks] = useState<CheckMap>(() => buildCheckMap(existing))
 	const save = useSavePreOpChecklistMutation()
 
@@ -141,7 +200,7 @@ export function PreOpChecklist({ caseId, existing, canEdit = true }: PreOpCheckl
 	const allClear = checkedCount === totalCount
 
 	function handleChange(key: string, checked: boolean) {
-		setChecks((prev) => ({ ...prev, [key]: checked }))
+		setChecks(prev => ({ ...prev, [key]: checked }))
 	}
 
 	function handleSave() {
@@ -159,6 +218,7 @@ export function PreOpChecklist({ caseId, existing, canEdit = true }: PreOpCheckl
 					<div className="flex items-center justify-between">
 						<CardTitle className="text-base">Pre-Operative Checklist</CardTitle>
 						<div className="flex items-center gap-3">
+							{!canEdit && <Badge variant="outline">View Only</Badge>}
 							<span className="text-muted-foreground text-sm">
 								{checkedCount} / {totalCount} items
 							</span>
@@ -168,9 +228,7 @@ export function PreOpChecklist({ caseId, existing, canEdit = true }: PreOpCheckl
 									All Clear
 								</Badge>
 							) : (
-								<Badge variant="secondary">
-									{totalCount - checkedCount} pending
-								</Badge>
+								<Badge variant="secondary">{totalCount - checkedCount} pending</Badge>
 							)}
 						</div>
 					</div>
@@ -180,9 +238,8 @@ export function PreOpChecklist({ caseId, existing, canEdit = true }: PreOpCheckl
 						<div className="mb-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
 							<ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
 							<p className="text-sm text-amber-800">
-								<strong>Surgery should not begin</strong> until all checklist items
-								are confirmed. Incomplete items must be addressed before proceeding
-								to the OR.
+								<strong>Surgery should not begin</strong> until all checklist items are confirmed.
+								Incomplete items must be addressed before proceeding to the OR.
 							</p>
 						</div>
 					)}
@@ -196,6 +253,7 @@ export function PreOpChecklist({ caseId, existing, canEdit = true }: PreOpCheckl
 									checks={checks}
 									onChange={handleChange}
 									serverItems={existing?.items ?? []}
+									canEdit={canEdit}
 								/>
 							</div>
 						))}
@@ -208,8 +266,7 @@ export function PreOpChecklist({ caseId, existing, canEdit = true }: PreOpCheckl
 					<CardContent className="flex items-center gap-2 py-4">
 						<CheckCircle2 className="size-5 text-green-600" />
 						<p className="text-sm">
-							Checklist completed by{" "}
-							<strong>{existing.completedByName ?? "staff"}</strong> at{" "}
+							Checklist completed by <strong>{existing.completedByName ?? "staff"}</strong> at{" "}
 							{new Date(existing.completedAt).toLocaleString("en-PH", {
 								month: "short",
 								day: "numeric",

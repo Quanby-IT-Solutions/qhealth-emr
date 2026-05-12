@@ -1,4 +1,4 @@
-import { type AnyPgColumn, index, uniqueIndex } from "drizzle-orm/pg-core"
+import { index, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
 import { facilities, staffProfiles } from "./rbac.js"
@@ -53,10 +53,7 @@ export const wards = createTable(
 			.notNull()
 			.references(() => facilities.id, { onDelete: "cascade" }),
 		name: t.text("name").notNull(),
-		wardType: t
-			.text("ward_type")
-			.notNull()
-			.$type<"general" | "icu" | "er" | "or" | "nursery">(),
+		wardType: t.text("ward_type").notNull().$type<"general" | "icu" | "er" | "or" | "nursery">(),
 		totalBeds: t.integer("total_beds").notNull().default(0),
 		isActive: t.boolean("is_active").notNull().default(true),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
@@ -105,19 +102,13 @@ export const preEncounters = createTable(
 			.references(() => facilities.id, { onDelete: "restrict" }),
 		traumaAlias: t.text("trauma_alias").notNull(),
 		chiefComplaint: t.text("chief_complaint"),
-		triageAcuityScale: t
-			.text("triage_acuity_scale")
-			.$type<"esi" | "ats" | "ctas">(),
+		triageAcuityScale: t.text("triage_acuity_scale").$type<"esi" | "ats" | "ctas">(),
 		triageAcuityLevel: t.integer("triage_acuity_level"),
 		triageDatetime: t.timestamp("triage_datetime"),
 		triageStaffId: t
 			.uuid("triage_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
-		status: t
-			.text("status")
-			.notNull()
-			.default("active")
-			.$type<"active" | "merged" | "cancelled">(),
+		status: t.text("status").notNull().default("active").$type<"active" | "merged" | "cancelled">(),
 		mergedToEncounterId: t
 			.uuid("merged_to_encounter_id")
 			.references((): AnyPgColumn => encounters.id, { onDelete: "set null" }),
@@ -153,7 +144,7 @@ export const encounters = createTable(
 			.text("status")
 			.notNull()
 			.default("active")
-			.$type<"active" | "discharged" | "closed" | "cancelled">(),
+			.$type<"active" | "pending_discharge" | "discharged" | "closed" | "cancelled">(),
 		chiefComplaint: t.text("chief_complaint"),
 		admittingStaffId: t
 			.uuid("admitting_staff_id")
@@ -164,9 +155,7 @@ export const encounters = createTable(
 		bedId: t.uuid("bed_id").references(() => beds.id, { onDelete: "set null" }),
 		admissionDatetime: t.timestamp("admission_datetime").notNull().defaultNow(),
 		dischargeDatetime: t.timestamp("discharge_datetime"),
-		disposition: t
-			.text("disposition")
-			.$type<"home" | "transfer" | "deceased" | "ama">(),
+		disposition: t.text("disposition").$type<"home" | "transfer" | "deceased" | "ama">(),
 		oecbEligible: t.boolean("oecb_eligible").notNull().default(false),
 		mergedFromPreEncounterId: t
 			.uuid("merged_from_pre_encounter_id")
@@ -186,9 +175,7 @@ export const encounters = createTable(
 			.uuid("clinician_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
 		// PS-003: Walk-in OPD queue status on the clinic queue board
-		queueStatus: t
-			.text("queue_status")
-			.$type<"waiting" | "in_progress" | "completed">(),
+		queueStatus: t.text("queue_status").$type<"waiting" | "in_progress" | "completed">(),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 	}),
@@ -210,9 +197,7 @@ export const opdTriageIntakes = createTable(
 			.notNull()
 			.references(() => facilities.id, { onDelete: "restrict" }),
 		// Nullable: pre-registration triage starts without an existing patient record
-		patientId: t
-			.uuid("patient_id")
-			.references(() => patients.id, { onDelete: "restrict" }),
+		patientId: t.uuid("patient_id").references(() => patients.id, { onDelete: "restrict" }),
 		arrivalTime: t.timestamp("arrival_time").notNull().defaultNow(),
 		chiefComplaint: t.text("chief_complaint").notNull(),
 		systolicBp: t.integer("systolic_bp"),
@@ -258,18 +243,10 @@ export const encounterTransfers = createTable(
 			.uuid("encounter_id")
 			.notNull()
 			.references(() => encounters.id, { onDelete: "cascade" }),
-		fromWardId: t
-			.uuid("from_ward_id")
-			.references(() => wards.id, { onDelete: "set null" }),
-		fromBedId: t
-			.uuid("from_bed_id")
-			.references(() => beds.id, { onDelete: "set null" }),
-		toWardId: t
-			.uuid("to_ward_id")
-			.references(() => wards.id, { onDelete: "set null" }),
-		toBedId: t
-			.uuid("to_bed_id")
-			.references(() => beds.id, { onDelete: "set null" }),
+		fromWardId: t.uuid("from_ward_id").references(() => wards.id, { onDelete: "set null" }),
+		fromBedId: t.uuid("from_bed_id").references(() => beds.id, { onDelete: "set null" }),
+		toWardId: t.uuid("to_ward_id").references(() => wards.id, { onDelete: "set null" }),
+		toBedId: t.uuid("to_bed_id").references(() => beds.id, { onDelete: "set null" }),
 		transferReason: t.text("transfer_reason"),
 		orderingStaffId: t
 			.uuid("ordering_staff_id")
@@ -291,19 +268,45 @@ export const bedCensusSnapshots = createTable(
 			.uuid("facility_id")
 			.notNull()
 			.references(() => facilities.id, { onDelete: "cascade" }),
-		wardId: t
-			.uuid("ward_id")
-			.references(() => wards.id, { onDelete: "set null" }),
+		wardId: t.uuid("ward_id").references(() => wards.id, { onDelete: "set null" }),
 		snapshotDate: t.date("snapshot_date").notNull(),
 		totalBeds: t.integer("total_beds").notNull().default(0),
 		occupiedBeds: t.integer("occupied_beds").notNull().default(0),
 		borPercentage: t.numeric("bor_percentage", { precision: 5, scale: 2 }),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
+	t => [index("bed_census_snapshots_facility_date_idx").on(t.facilityId, t.snapshotDate)]
+)
+
+// ============================================================================
+// BED STATUS HISTORY — audit trail for individual bed status changes
+// ============================================================================
+
+export const bedStatusHistory = createTable(
+	"bed_status_history",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		bedId: t
+			.uuid("bed_id")
+			.notNull()
+			.references(() => beds.id, { onDelete: "cascade" }),
+		previousStatus: t
+			.text("previous_status")
+			.$type<"available" | "occupied" | "reserved" | "cleaning" | "out_of_service">(),
+		newStatus: t
+			.text("new_status")
+			.notNull()
+			.$type<"available" | "occupied" | "reserved" | "cleaning" | "out_of_service">(),
+		changedAt: t.timestamp("changed_at").notNull().defaultNow(),
+		changedBy: t.uuid("changed_by").references(() => staffProfiles.id, { onDelete: "set null" }),
+	}),
 	t => [
-		index("bed_census_snapshots_facility_date_idx").on(t.facilityId, t.snapshotDate),
+		index("bed_status_history_bed_id_idx").on(t.bedId),
+		index("bed_status_history_changed_at_idx").on(t.changedAt),
 	]
 )
+
+export type BedStatusHistoryRow = typeof bedStatusHistory.$inferSelect
 
 // ============================================================================
 // SLA TRACKING — Event-sourced encounter status transitions
@@ -329,9 +332,7 @@ export const encounterStatusEvents = createTable(
 			.$type<"opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing">(),
 		slaTargetMinutes: t.integer("sla_target_minutes"),
 		actualMinutes: t.integer("actual_minutes"), // Computed on next transition
-		staffId: t
-			.uuid("staff_id")
-			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		staffId: t.uuid("staff_id").references(() => staffProfiles.id, { onDelete: "set null" }),
 		isEscalated: t.boolean("is_escalated").notNull().default(false),
 		escalatedAt: t.timestamp("escalated_at"),
 		notes: t.text("notes"),

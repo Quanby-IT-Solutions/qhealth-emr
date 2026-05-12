@@ -1,11 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq, sql } from "drizzle-orm"
 
-import { auditLogs, dataExports, fhirExports, staffProfiles, users } from "@repo/db/schema"
-
-import { db } from "@/common/database/database.client"
-import { env } from "@/config/env.config"
-
 import type {
 	CreateFhirExport,
 	FhirExport,
@@ -17,6 +12,17 @@ import type {
 	NhdrSubmission,
 	NhdrSubmissionsQuery,
 } from "@repo/contracts"
+import {
+	auditLogs,
+	dataExports,
+	fhirExports,
+	integrations,
+	staffProfiles,
+	users,
+} from "@repo/db/schema"
+
+import { db } from "@/common/database/database.client"
+import { env } from "@/config/env.config"
 
 import { FhirBundleBuilderService } from "./fhir-bundle-builder.service"
 import { FhirCanonicalValidatorService } from "./fhir-canonical-validator.service"
@@ -29,7 +35,7 @@ export class FhirService {
 		private readonly bundleBuilder: FhirBundleBuilderService,
 		private readonly validator: FhirValidatorService,
 		private readonly canonicalValidator: FhirCanonicalValidatorService,
-		private readonly nhdrAdapter: NhdrAdapterService,
+		private readonly nhdrAdapter: NhdrAdapterService
 	) {}
 
 	private toFhirResourceType(value: string): FhirResourceType | null {
@@ -54,7 +60,7 @@ export class FhirService {
 
 	private mapExportStatus(
 		status: (typeof fhirExports.$inferSelect)["submissionStatus"],
-		errorCount: number,
+		errorCount: number
 	): FhirExport["status"] {
 		switch (status) {
 			case "exporting":
@@ -114,8 +120,7 @@ export class FhirService {
 			return mapped ? [mapped] : []
 		})
 
-		const totalValidationIssues =
-			(report?.errors?.length ?? 0) > 0 ? row.id : null
+		const totalValidationIssues = (report?.errors?.length ?? 0) > 0 ? row.id : null
 
 		// exportUrl is non-null whenever the bundle has been built — the frontend
 		// uses it as a signal to show the download action, and composes the real
@@ -147,7 +152,9 @@ export class FhirService {
 			completedAt: row.exportedAt,
 			createdByName: row.createdByName,
 			nhdrSubmissionId:
-				row.submissionStatus === "submitted" || row.submissionStatus === "accepted" || row.submissionStatus === "rejected"
+				row.submissionStatus === "submitted" ||
+				row.submissionStatus === "accepted" ||
+				row.submissionStatus === "rejected"
 					? row.id
 					: null,
 		}
@@ -181,7 +188,7 @@ export class FhirService {
 					eq(fhirExports.id, exportId),
 					// Defense-in-depth: explicitly scope to the active facility so that
 					// cross-facility lookups return "not found" even if RLS is misconfigured.
-					sql`${fhirExports.facilityId}::text = current_setting('app.current_facility_id', true)`,
+					sql`${fhirExports.facilityId}::text = current_setting('app.current_facility_id', true)`
 				)
 			)
 			.limit(1)
@@ -290,7 +297,7 @@ export class FhirService {
 			exportId,
 			input.dateRangeStart,
 			input.dateRangeEnd,
-			input.resourceTypes as FhirResourceType[],
+			input.resourceTypes as FhirResourceType[]
 		)
 
 		// ── Validation is mandatory for every admin FHIR export (TOR §4.1) ─────
@@ -302,10 +309,18 @@ export class FhirService {
 		const canonicalIssues = await this.canonicalValidator.validateCanonical(buildResult.bundle)
 		const canonicalErrors = canonicalIssues
 			.filter(i => i.severity === "error")
-			.map(i => ({ resourceType: i.resourceType, resourceId: i.resourceId, error: `[${i.field}] ${i.error}` }))
+			.map(i => ({
+				resourceType: i.resourceType,
+				resourceId: i.resourceId,
+				error: `[${i.field}] ${i.error}`,
+			}))
 		const canonicalWarnings = canonicalIssues
 			.filter(i => i.severity === "warning")
-			.map(i => ({ resourceType: i.resourceType, resourceId: i.resourceId, warning: `[${i.field}] ${i.error}` }))
+			.map(i => ({
+				resourceType: i.resourceType,
+				resourceId: i.resourceId,
+				warning: `[${i.field}] ${i.error}`,
+			}))
 
 		const allErrors = [...vResult.errors, ...canonicalErrors]
 		const allWarnings = [...vResult.warnings, ...canonicalWarnings]
@@ -385,19 +400,31 @@ export class FhirService {
 
 			const errorIssues = (report.errors ?? [])
 				.filter(issue => issue.resourceType === mappedType)
-				.map(issue => ({ severity: "error" as const, code: "validation", message: issue.error, count: 1 }))
+				.map(issue => ({
+					severity: "error" as const,
+					code: "validation",
+					message: issue.error,
+					count: 1,
+				}))
 			const warningIssues = (report.warnings ?? [])
 				.filter(issue => issue.resourceType === mappedType)
-				.map(issue => ({ severity: "warning" as const, code: "validation", message: issue.warning, count: 1 }))
+				.map(issue => ({
+					severity: "warning" as const,
+					code: "validation",
+					message: issue.warning,
+					count: 1,
+				}))
 
-			return [{
-				resourceType: mappedType,
-				total: values.total,
-				valid: values.valid,
-				errorCount: errorIssues.length,
-				warningCount: warningIssues.length,
-				issues: [...errorIssues, ...warningIssues],
-			}]
+			return [
+				{
+					resourceType: mappedType,
+					total: values.total,
+					valid: values.valid,
+					errorCount: errorIssues.length,
+					warningCount: warningIssues.length,
+					issues: [...errorIssues, ...warningIssues],
+				},
+			]
 		})
 
 		return {
@@ -422,16 +449,22 @@ export class FhirService {
 
 		// Guard: export must have been validated (TOR §4.1 — no unvalidated submissions)
 		if (existing.validationReport === null) {
-			throw new Error(`Cannot submit export ${exportId} to NHDR: export has not been validated. Re-create the export to run mandatory validation.`)
+			throw new Error(
+				`Cannot submit export ${exportId} to NHDR: export has not been validated. Re-create the export to run mandatory validation.`
+			)
 		}
 
 		// Guard: validation must pass before submission
 		if (existing.errorCount > 0) {
-			throw new Error(`Cannot submit export ${exportId} to NHDR: validation report contains ${existing.errorCount} error(s). Resolve all errors before submitting.`)
+			throw new Error(
+				`Cannot submit export ${exportId} to NHDR: validation report contains ${existing.errorCount} error(s). Resolve all errors before submitting.`
+			)
 		}
 
 		if (!existing.bundleData) {
-			throw new Error(`Cannot submit export ${exportId} to NHDR: bundle has not been generated. Please re-create the export.`)
+			throw new Error(
+				`Cannot submit export ${exportId} to NHDR: bundle has not been generated. Please re-create the export.`
+			)
 		}
 
 		const dateRange = existing.exportDateRange ?? {
@@ -439,15 +472,51 @@ export class FhirService {
 			endDate: now.toISOString().split("T")[0]!,
 		}
 
+		// ── Resolve NHDR config from Integration Registry (authoritative source) ─
+		// The registry row is facility-scoped and takes precedence over global env vars.
+		// If no enabled registry row is found, the adapter falls back to NHDR_BASE_URL / NHDR_API_KEY.
+		const [nhdrRegistryRow] = await db
+			.select({
+				id: integrations.id,
+				endpointUrl: integrations.endpointUrl,
+				credentialsRef: integrations.credentialsRef,
+			})
+			.from(integrations)
+			.where(
+				and(
+					eq(integrations.facilityId, existing.facilityId),
+					eq(integrations.kind, "nhdr"),
+					eq(integrations.enabled, true)
+				)
+			)
+			.limit(1)
+
+		if (!nhdrRegistryRow) {
+			throw new Error(
+				"NHDR submission blocked: no enabled NHDR integration is configured for this facility " +
+					"in the Integration Registry. Configure one at Admin \u2192 Integration Registry."
+			)
+		}
+
+		const nhdrRuntimeConfig = {
+			baseUrl: nhdrRegistryRow.endpointUrl,
+			apiKey: nhdrRegistryRow.credentialsRef
+				? process.env[nhdrRegistryRow.credentialsRef]
+				: undefined,
+		}
+
 		// ── Submit via NHDR adapter ──────────────────────────────────────────
-		const ack = await this.nhdrAdapter.submit({
-			exportId,
-			facilityId: existing.facilityId,
-			periodStart: dateRange.startDate,
-			periodEnd: dateRange.endDate,
-			ndjsonContent: existing.bundleData,
-			submittedByName,
-		})
+		const ack = await this.nhdrAdapter.submit(
+			{
+				exportId,
+				facilityId: existing.facilityId,
+				periodStart: dateRange.startDate,
+				periodEnd: dateRange.endDate,
+				ndjsonContent: existing.bundleData,
+				submittedByName,
+			},
+			nhdrRuntimeConfig
+		)
 
 		const [submittedByStaff] = await db
 			.select({ id: staffProfiles.id })
@@ -492,6 +561,11 @@ export class FhirService {
 				consentOutcome: "granted",
 				status: "completed",
 			}),
+			// ── INTREG-014: Write sync outcome back to the integration row ──────
+			db
+				.update(integrations)
+				.set({ lastSyncAt: now, lastSyncStatus: "ok", updatedAt: now })
+				.where(eq(integrations.id, nhdrRegistryRow.id)),
 		])
 
 		return {
@@ -513,10 +587,15 @@ export class FhirService {
 	// Bundle download
 	// ========================================================================
 
-	async getBundleData(exportId: string, actorUserId: string): Promise<{ ndjson: string; filename: string }> {
+	async getBundleData(
+		exportId: string,
+		actorUserId: string
+	): Promise<{ ndjson: string; filename: string }> {
 		const row = await this.getExportRow(exportId)
 		if (!row.bundleData) {
-			throw new NotFoundException(`No bundle data found for export ${exportId}. The export may still be processing or failed.`)
+			throw new NotFoundException(
+				`No bundle data found for export ${exportId}. The export may still be processing or failed.`
+			)
 		}
 		const dateRange = row.exportDateRange
 		const suffix = dateRange ? `_${dateRange.startDate}_${dateRange.endDate}` : ""
@@ -552,7 +631,10 @@ export class FhirService {
 			}),
 		])
 
-		return { ndjson: row.bundleData, filename: `fhir_export_${exportId.slice(0, 8)}${suffix}.ndjson` }
+		return {
+			ndjson: row.bundleData,
+			filename: `fhir_export_${exportId.slice(0, 8)}${suffix}.ndjson`,
+		}
 	}
 
 	// ========================================================================
@@ -564,7 +646,7 @@ export class FhirService {
 		// the client-supplied query.facilityId is intentionally ignored here.
 		const whereClause = and(
 			sql`${fhirExports.facilityId}::text = current_setting('app.current_facility_id', true)`,
-			sql`${fhirExports.submissionStatus} in ('submitted', 'accepted', 'rejected')`,
+			sql`${fhirExports.submissionStatus} in ('submitted', 'accepted', 'rejected')`
 		)
 
 		const rows = await db
@@ -591,8 +673,9 @@ export class FhirService {
 			submittedAt: row.submittedAt,
 			acknowledgementId: row.nhdrAcknowledgment?.receiptNumber ?? null,
 			responseMessage: row.nhdrAcknowledgment?.responseMessage ?? null,
-			responseReceivedAt:
-				row.nhdrAcknowledgment?.submissionDate ? new Date(row.nhdrAcknowledgment.submissionDate) : null,
+			responseReceivedAt: row.nhdrAcknowledgment?.submissionDate
+				? new Date(row.nhdrAcknowledgment.submissionDate)
+				: null,
 			submittedByName: row.createdByName,
 			periodStart: row.exportDateRange?.startDate ?? "",
 			periodEnd: row.exportDateRange?.endDate ?? "",
@@ -603,18 +686,40 @@ export class FhirService {
 	// System status
 	// ========================================================================
 
-	async getSystemStatus(): Promise<FhirSystemStatus> {
+	async getSystemStatus(facilityId: string): Promise<FhirSystemStatus> {
 		const nhdrMode = env.NHDR_MODE
-		const nhdrConfigured =
-			nhdrMode === "real" &&
-			!!env.NHDR_BASE_URL &&
-			!!env.NHDR_API_KEY
+
+		// Scope the NHDR registry lookup to the active facility only.
+		// A different facility's enabled NHDR row must not influence this result.
+		const [registryNhdr] = await db
+			.select({
+				endpointUrl: integrations.endpointUrl,
+				credentialsRef: integrations.credentialsRef,
+			})
+			.from(integrations)
+			.where(
+				and(
+					eq(integrations.facilityId, facilityId),
+					eq(integrations.kind, "nhdr"),
+					eq(integrations.enabled, true)
+				)
+			)
+			.limit(1)
+
+		const nhdrConfigured = nhdrMode === "real" && registryNhdr !== undefined
 
 		let nhdrEndpointNote: string
 		if (nhdrMode === "real") {
-			nhdrEndpointNote = nhdrConfigured
-				? "NHDR integration is active. Submissions are sent to the configured NHDR endpoint."
-				: "NHDR mode is set to 'real' but NHDR_BASE_URL or NHDR_API_KEY is missing. Submissions will fail."
+			if (registryNhdr) {
+				const hasKey = registryNhdr.credentialsRef && process.env[registryNhdr.credentialsRef]
+				nhdrEndpointNote = hasKey
+					? "NHDR integration is active and configured via the Integration Registry."
+					: "NHDR integration is configured in the Integration Registry but the credential environment variable is not set. Submissions will fail."
+			} else {
+				nhdrEndpointNote =
+					"NHDR mode is set to 'real' but no active NHDR integration is configured. " +
+					"Configure one in Admin \u2192 Integration Registry."
+			}
 		} else {
 			nhdrEndpointNote =
 				"NHDR integration is in mock mode. Submissions return a PENDING acknowledgement and are not forwarded to the NHDR."
@@ -623,7 +728,7 @@ export class FhirService {
 		return {
 			nhdrMode,
 			nhdrConfigured,
-			nhdrBaseUrl: env.NHDR_BASE_URL ?? null,
+			nhdrBaseUrl: registryNhdr?.endpointUrl ?? null,
 			nhdrEndpointNote,
 		}
 	}

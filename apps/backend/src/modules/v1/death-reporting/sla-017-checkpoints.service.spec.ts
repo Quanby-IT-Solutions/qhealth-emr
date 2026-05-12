@@ -13,7 +13,7 @@
  */
 
 import { NotFoundException } from "@nestjs/common"
-import { Test, TestingModule } from "@nestjs/testing"
+import { Test, type TestingModule } from "@nestjs/testing"
 
 import { CivilRegistryService } from "../civil-registry/civil-registry.service"
 import { MedicalRecordsService } from "../medical-records/medical-records.service"
@@ -44,7 +44,7 @@ jest.mock("@/common/database/database.client", () => ({
 	// Use arrow-function wrappers so mockInsert/mockUpdate/mockSelect are accessed
 	// lazily (at call time, not factory-creation time). This avoids the TDZ error
 	// that occurs when jest.mock factories referencing const variables are hoisted.
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 	db: {
 		insert: (...args: any[]) => mockInsert(...args),
 		update: (...args: any[]) => mockUpdate(...args),
@@ -55,8 +55,28 @@ jest.mock("@/common/database/database.client", () => ({
 // Also mock the db schema symbols the services use
 jest.mock("@repo/db/schema", () => ({
 	deathReports: { id: "id", paidAt: "paidAt", requestedAt: "requestedAt", updatedAt: "updatedAt" },
-	birthRegistrations: { id: "id", paidAt: "paidAt", requestedAt: "requestedAt", updatedAt: "updatedAt", facilityId: "facilityId", patientId: "patientId", encounterId: "encounterId", status: "status", createdAt: "createdAt" },
-	medicalRecordsRequests: { id: "id", paidAt: "paidAt", updatedAt: "updatedAt", facilityId: "facilityId", patientId: "patientId", encounterId: "encounterId", requestType: "requestType", status: "status", createdAt: "createdAt" },
+	birthRegistrations: {
+		id: "id",
+		paidAt: "paidAt",
+		requestedAt: "requestedAt",
+		updatedAt: "updatedAt",
+		facilityId: "facilityId",
+		patientId: "patientId",
+		encounterId: "encounterId",
+		status: "status",
+		createdAt: "createdAt",
+	},
+	medicalRecordsRequests: {
+		id: "id",
+		paidAt: "paidAt",
+		updatedAt: "updatedAt",
+		facilityId: "facilityId",
+		patientId: "patientId",
+		encounterId: "encounterId",
+		requestType: "requestType",
+		status: "status",
+		createdAt: "createdAt",
+	},
 	staffProfiles: { id: "id", userId: "userId" },
 	users: { id: "id" },
 	encounters: {},
@@ -82,14 +102,20 @@ function setupUpdate(returnRow: Record<string, unknown>) {
 function setupSelectEmpty() {
 	mockSelectLimit.mockResolvedValue([])
 	mockSelectWhere.mockReturnValue({ limit: mockSelectLimit })
-	mockSelectFrom.mockReturnValue({ where: mockSelectWhere, leftJoin: jest.fn().mockReturnValue({ where: mockSelectWhere }) })
+	mockSelectFrom.mockReturnValue({
+		where: mockSelectWhere,
+		leftJoin: jest.fn().mockReturnValue({ where: mockSelectWhere }),
+	})
 	mockSelect.mockReturnValue({ from: mockSelectFrom })
 }
 
 function setupSelectRow(row: Record<string, unknown>) {
 	mockSelectLimit.mockResolvedValue([row])
 	mockSelectWhere.mockReturnValue({ limit: mockSelectLimit })
-	mockSelectFrom.mockReturnValue({ where: mockSelectWhere, leftJoin: jest.fn().mockReturnValue({ where: mockSelectWhere }) })
+	mockSelectFrom.mockReturnValue({
+		where: mockSelectWhere,
+		leftJoin: jest.fn().mockReturnValue({ where: mockSelectWhere }),
+	})
 	mockSelect.mockReturnValue({ from: mockSelectFrom })
 }
 
@@ -134,9 +160,7 @@ describe("DeathReportingService — SLA-017 checkpoints", () => {
 
 			const result = await service.markDeathReportPaid({ id, paidAt: customPaidAt })
 
-			expect(mockUpdateSet).toHaveBeenCalledWith(
-				expect.objectContaining({ paidAt: customPaidAt })
-			)
+			expect(mockUpdateSet).toHaveBeenCalledWith(expect.objectContaining({ paidAt: customPaidAt }))
 			expect(result.paidAt).toBe(customPaidAt.toISOString())
 		})
 
@@ -146,7 +170,9 @@ describe("DeathReportingService — SLA-017 checkpoints", () => {
 			mockUpdateSet.mockReturnValue({ where: mockUpdateWhere })
 			mockUpdate.mockReturnValue({ set: mockUpdateSet })
 
-			await expect(service.markDeathReportPaid({ id: "nonexistent" })).rejects.toThrow(NotFoundException)
+			await expect(service.markDeathReportPaid({ id: "nonexistent" })).rejects.toThrow(
+				NotFoundException
+			)
 		})
 	})
 })
@@ -227,7 +253,9 @@ describe("CivilRegistryService — SLA-017 checkpoints", () => {
 			mockUpdateSet.mockReturnValue({ where: mockUpdateWhere })
 			mockUpdate.mockReturnValue({ set: mockUpdateSet })
 
-			await expect(service.markBirthRegistrationPaid({ id: "nonexistent" })).rejects.toThrow(NotFoundException)
+			await expect(service.markBirthRegistrationPaid({ id: "nonexistent" })).rejects.toThrow(
+				NotFoundException
+			)
 		})
 	})
 })
@@ -278,9 +306,7 @@ describe("MedicalRecordsService — SLA-017 checkpoints", () => {
 			})
 
 			expect(result.status).toBe("pending")
-			expect(mockInsertValues).toHaveBeenCalledWith(
-				expect.objectContaining({ status: "pending" })
-			)
+			expect(mockInsertValues).toHaveBeenCalledWith(expect.objectContaining({ status: "pending" }))
 		})
 	})
 
@@ -306,7 +332,9 @@ describe("MedicalRecordsService — SLA-017 checkpoints", () => {
 			mockUpdateSet.mockReturnValue({ where: mockUpdateWhere })
 			mockUpdate.mockReturnValue({ set: mockUpdateSet })
 
-			await expect(service.markMedicalRecordsPaid({ id: "nonexistent" })).rejects.toThrow(NotFoundException)
+			await expect(service.markMedicalRecordsPaid({ id: "nonexistent" })).rejects.toThrow(
+				NotFoundException
+			)
 		})
 	})
 })

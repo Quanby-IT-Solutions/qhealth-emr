@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common"
+import {
+	BadRequestException,
+	ForbiddenException,
+	Injectable,
+	Logger,
+	NotFoundException,
+} from "@nestjs/common"
 import { AuthService } from "@thallesp/nestjs-better-auth"
 import { and, count, eq, ilike, inArray, or } from "drizzle-orm"
 
@@ -6,14 +12,15 @@ import {
 	facilities,
 	rolePermissions,
 	roles,
+	sessions,
 	staffProfiles,
 	userRoles,
 	users,
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
-import { AuditService, type DBTransaction } from "@/modules/v1/audit/audit.service"
 import type { V1Outputs } from "@/config/contract-types"
+import { AuditService, type DBTransaction } from "@/modules/v1/audit/audit.service"
 
 interface ListStaffInput {
 	facilityId?: string
@@ -148,7 +155,7 @@ export class RbacService {
 
 	constructor(
 		private readonly authService: AuthService,
-		private readonly auditService: AuditService,
+		private readonly auditService: AuditService
 	) {}
 
 	async getMyProfile(userId: string, overrideRoleId?: string) {
@@ -169,7 +176,11 @@ export class RbacService {
 		// 3. Batch-fetch roles and facilities for all profiles in two queries
 		type RoleRow = { id: string; name: string; isPrimary: boolean; staffProfileId: string }
 		let allRoleRows: RoleRow[] = []
-		let allFacilityRows: { id: string; name: string; facilityType: "community" | "district" | "tertiary" }[] = []
+		let allFacilityRows: {
+			id: string
+			name: string
+			facilityType: "community" | "district" | "tertiary"
+		}[] = []
 
 		if (profileRows.length > 0) {
 			const profileIds = profileRows.map(p => p.id)
@@ -192,7 +203,10 @@ export class RbacService {
 				.where(inArray(facilities.id, facilityIds))
 		}
 
-		const rolesByProfileId = new Map<string, Array<{ id: string; name: string; isPrimary: boolean }>>()
+		const rolesByProfileId = new Map<
+			string,
+			Array<{ id: string; name: string; isPrimary: boolean }>
+		>()
 		for (const row of allRoleRows) {
 			const list = rolesByProfileId.get(row.staffProfileId) ?? []
 			list.push({ id: row.id, name: row.name, isPrimary: row.isPrimary })
@@ -293,9 +307,7 @@ export class RbacService {
 
 		const userConditions = [inArray(users.id, profileQuery)]
 		if (search) {
-			userConditions.push(
-				or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`))!
-			)
+			userConditions.push(or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`))!)
 		}
 
 		const totalRows = await db
@@ -339,7 +351,10 @@ export class RbacService {
 				.where(inArray(userRoles.staffProfileId, profileIds))
 		}
 
-		const rolesByProfileId = new Map<string, Array<{ id: string; name: string; isPrimary: boolean }>>()
+		const rolesByProfileId = new Map<
+			string,
+			Array<{ id: string; name: string; isPrimary: boolean }>
+		>()
 		for (const row of allRoleRows) {
 			const list = rolesByProfileId.get(row.staffProfileId) ?? []
 			list.push({ id: row.id, name: row.name, isPrimary: row.isPrimary })
@@ -400,6 +415,7 @@ export class RbacService {
 					)
 				}
 
+				this.logger.log(`audit.staff.create userId=${userId} facilityId=${facilityId}`)
 				return { userId, staffProfileId: profile.id }
 			})
 		} catch (err) {
@@ -423,6 +439,7 @@ export class RbacService {
 			.returning()
 
 		if (!updated) throw new NotFoundException("Staff profile not found")
+		this.logger.log(`audit.staff.update staffProfileId=${id}`)
 		return updated
 	}
 
@@ -434,6 +451,7 @@ export class RbacService {
 			.returning()
 
 		if (!updated) throw new NotFoundException("Staff profile not found")
+		this.logger.log(`audit.staff.deactivate staffProfileId=${input.id}`)
 		return { success: true }
 	}
 
@@ -450,23 +468,38 @@ export class RbacService {
 			.from(staffProfiles)
 			.where(eq(staffProfiles.userId, input.id))
 
-		let staffProfilesWithRoles: Array<(typeof profileRows)[number] & { roles: Array<{ id: string; name: string; isPrimary: boolean }> }> = []
+		let staffProfilesWithRoles: Array<
+			(typeof profileRows)[number] & {
+				roles: Array<{ id: string; name: string; isPrimary: boolean }>
+			}
+		> = []
 
 		if (profileRows.length > 0) {
 			const profileIds = profileRows.map(p => p.id)
 			const roleRows = await db
-				.select({ id: roles.id, name: roles.name, isPrimary: userRoles.isPrimary, staffProfileId: userRoles.staffProfileId })
+				.select({
+					id: roles.id,
+					name: roles.name,
+					isPrimary: userRoles.isPrimary,
+					staffProfileId: userRoles.staffProfileId,
+				})
 				.from(userRoles)
 				.innerJoin(roles, eq(userRoles.roleId, roles.id))
 				.where(inArray(userRoles.staffProfileId, profileIds))
 
-			const rolesByProfileId = new Map<string, Array<{ id: string; name: string; isPrimary: boolean }>>()
+			const rolesByProfileId = new Map<
+				string,
+				Array<{ id: string; name: string; isPrimary: boolean }>
+			>()
 			for (const row of roleRows) {
 				const list = rolesByProfileId.get(row.staffProfileId) ?? []
 				list.push({ id: row.id, name: row.name, isPrimary: row.isPrimary })
 				rolesByProfileId.set(row.staffProfileId, list)
 			}
-			staffProfilesWithRoles = profileRows.map(p => ({ ...p, roles: rolesByProfileId.get(p.id) ?? [] }))
+			staffProfilesWithRoles = profileRows.map(p => ({
+				...p,
+				roles: rolesByProfileId.get(p.id) ?? [],
+			}))
 		}
 
 		return { user, staffProfiles: staffProfilesWithRoles }
@@ -509,6 +542,7 @@ export class RbacService {
 			.returning()
 
 		if (!role) throw new Error("Failed to create role")
+		this.logger.log(`audit.role.create roleId=${role.id} facilityId=${input.facilityId}`)
 		return role
 	}
 
@@ -522,11 +556,7 @@ export class RbacService {
 			throw new ForbiddenException("Cannot modify a system default role")
 		}
 
-		const [updated] = await db
-			.update(roles)
-			.set(updates)
-			.where(eq(roles.id, id))
-			.returning()
+		const [updated] = await db.update(roles).set(updates).where(eq(roles.id, id)).returning()
 
 		if (!updated) throw new NotFoundException("Role not found")
 		return updated
@@ -540,7 +570,10 @@ export class RbacService {
 
 		// Self-protection: system default roles must retain critical admin permissions
 		if (role.isSystemDefault) {
-			const CRITICAL: Array<{ module: PermissionEntry["module"]; action: PermissionEntry["action"] }> = [
+			const CRITICAL: Array<{
+				module: PermissionEntry["module"]
+				action: PermissionEntry["action"]
+			}> = [
 				{ module: "admin", action: "view" },
 				{ module: "admin", action: "edit" },
 				{ module: "admin", action: "create" },
@@ -569,10 +602,7 @@ export class RbacService {
 				)
 			}
 
-			return tx
-				.select()
-				.from(rolePermissions)
-				.where(eq(rolePermissions.roleId, id))
+			return tx.select().from(rolePermissions).where(eq(rolePermissions.roleId, id))
 		})
 
 		return { ...role, permissions: newPerms }
@@ -603,11 +633,9 @@ export class RbacService {
 			return { success: false, conflict: { assignedUserCount } }
 		}
 
-		await db
-			.update(roles)
-			.set({ isArchived: true, archivedAt: new Date() })
-			.where(eq(roles.id, id))
+		await db.update(roles).set({ isArchived: true, archivedAt: new Date() }).where(eq(roles.id, id))
 
+		this.logger.log(`audit.role.archive roleId=${id}`)
 		return { success: true }
 	}
 
@@ -637,16 +665,16 @@ export class RbacService {
 			)
 		}
 
+		this.logger.log(
+			`audit.user.role-change staffProfileId=${staffProfileId} roleIds=${roleIds.join(",")}`
+		)
 		return { success: true }
 	}
 
 	// ── License Status ──────────────────────────────────────────────────────
 
 	async getLicenseStatus(input: IdInput) {
-		const [profile] = await db
-			.select()
-			.from(staffProfiles)
-			.where(eq(staffProfiles.id, input.id))
+		const [profile] = await db.select().from(staffProfiles).where(eq(staffProfiles.id, input.id))
 
 		if (!profile) throw new NotFoundException("Staff profile not found")
 
@@ -682,6 +710,12 @@ export class RbacService {
 
 		if (!user) throw new NotFoundException("User not found")
 
+		// Revoke all active sessions for this user before sending the reset email.
+		// This prevents a compromised session from remaining valid after a forced reset.
+		await db.delete(sessions).where(eq(sessions.userId, input.userId))
+
+		// Anti-enumeration: requestPasswordReset returns 200 regardless of whether
+		// the email exists in Better Auth — do not branch on the result.
 		await this.authService.api.requestPasswordReset({
 			body: { email: user.email, redirectTo: "/" },
 		})
@@ -698,8 +732,16 @@ export class RbacService {
 	 */
 	async createUser(input: CreateUserWithFacilitiesInput, actor: ActorContext) {
 		const {
-			name, email, password, employeeNumber,
-			prcLicenseNumber, prcExpiry, ptrNumber, ptrExpiry, pdeaS2License, pdeaS2Expiry,
+			name,
+			email,
+			password,
+			employeeNumber,
+			prcLicenseNumber,
+			prcExpiry,
+			ptrNumber,
+			ptrExpiry,
+			pdeaS2License,
+			pdeaS2Expiry,
 			facilities: facilityEntries,
 		} = input
 
@@ -859,18 +901,13 @@ export class RbacService {
 			for (const roleId of roleIds) {
 				const row = roleRows.find(r => r.id === roleId)
 				if (!row || row.facilityId !== facilityId) {
-					throw new BadRequestException(
-						`Role ${roleId} does not belong to facility ${facilityId}`
-					)
+					throw new BadRequestException(`Role ${roleId} does not belong to facility ${facilityId}`)
 				}
 			}
 		}
 
 		const staffProfileId = await db.transaction(async (tx: DBTransaction) => {
-			const [profile] = await tx
-				.insert(staffProfiles)
-				.values({ userId, facilityId })
-				.returning()
+			const [profile] = await tx.insert(staffProfiles).values({ userId, facilityId }).returning()
 
 			if (!profile) throw new Error("Failed to create staff profile")
 
@@ -971,7 +1008,9 @@ export class RbacService {
 		const [role] = await db.select().from(roles).where(eq(roles.id, roleId))
 		if (!role) throw new NotFoundException("Role not found")
 		if (role.facilityId !== profile.facilityId) {
-			throw new BadRequestException("Role does not belong to the same facility as the staff profile")
+			throw new BadRequestException(
+				"Role does not belong to the same facility as the staff profile"
+			)
 		}
 
 		// Check if already assigned
@@ -1014,6 +1053,92 @@ export class RbacService {
 		return { success: true }
 	}
 
+	// ── Resend Activation ────────────────────────────────────────────────────
+
+	async resendActivation(input: IdInput) {
+		const [user] = await db
+			.select({ id: users.id, email: users.email })
+			.from(users)
+			.where(eq(users.id, input.id))
+
+		if (!user) throw new NotFoundException("User not found")
+
+		// Anti-enumeration: same 200 response whether or not email is found
+		await this.authService.api.requestPasswordReset({
+			body: { email: user.email, redirectTo: "/" },
+		})
+
+		this.logger.log(`audit.user.activation-resent userId=${input.id}`)
+
+		return { success: true }
+	}
+
+	// ── Get Single Role ──────────────────────────────────────────────────────
+
+	async getRole(input: IdInput) {
+		const [role] = await db.select().from(roles).where(eq(roles.id, input.id))
+		if (!role) throw new NotFoundException("Role not found")
+
+		const perms = await db
+			.select()
+			.from(rolePermissions)
+			.where(eq(rolePermissions.roleId, input.id))
+
+		return { ...role, permissions: perms }
+	}
+
+	// ── List All Permissions ─────────────────────────────────────────────────
+
+	listPermissions() {
+		const MODULES = [
+			"adt",
+			"clinical_docs",
+			"orders",
+			"nursing",
+			"billing",
+			"formulary",
+			"reporting",
+			"notifications",
+			"audit",
+			"admin",
+			"surgical",
+			"opd",
+			"nutrition",
+			"laboratory",
+			"radiology",
+			"scheduling",
+			"nbs",
+			"consent",
+			"fhir",
+			"msw",
+			"telemedicine",
+			"ed",
+			"death_reporting",
+			"feature_flags",
+			"system_settings",
+			"facility_profile",
+			"integration_registry",
+			"civil_registry",
+			"medical_records",
+			"patients",
+		] as const
+
+		const ACTIONS = [
+			"view",
+			"create",
+			"edit",
+			"sign",
+			"delete",
+			"verify",
+			"export",
+			"manage_catalog",
+			"clinical_policy",
+			"terminology_admin",
+		] as const
+
+		return MODULES.flatMap(module => ACTIONS.map(action => ({ module, action })))
+	}
+
 	async removeUserRole(input: RemoveRoleAssignmentInput, actor: ActorContext) {
 		const { staffProfileId, roleId } = input
 
@@ -1041,10 +1166,12 @@ export class RbacService {
 					await tx
 						.update(userRoles)
 						.set({ isPrimary: true })
-						.where(and(
-							eq(userRoles.staffProfileId, staffProfileId),
-							eq(userRoles.roleId, remaining[0].roleId)
-						))
+						.where(
+							and(
+								eq(userRoles.staffProfileId, staffProfileId),
+								eq(userRoles.roleId, remaining[0].roleId)
+							)
+						)
 				}
 			}
 

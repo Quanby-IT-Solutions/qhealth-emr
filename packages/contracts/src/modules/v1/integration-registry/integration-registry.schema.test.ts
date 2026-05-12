@@ -56,10 +56,14 @@ describe("IntegrationSchema", () => {
 		name: "NHDR FHIR",
 		endpointUrl: "https://nhdr.gov.ph/fhir",
 		credentialsRef: null,
+		webhookUrl: null,
 		enabled: false,
 		notes: null,
 		lastSyncAt: null,
 		lastSyncStatus: null,
+		lastTestedAt: null,
+		lastTestStatus: null,
+		lastTestReadinessLevel: null,
 		credentialStatus: "unset",
 		createdAt: new Date("2024-01-01"),
 		updatedAt: new Date("2024-01-01"),
@@ -91,21 +95,15 @@ describe("IntegrationSchema", () => {
 	})
 
 	it("rejects invalid kind", () => {
-		expect(() =>
-			IntegrationSchema.parse({ ...valid, kind: "unknown" })
-		).toThrow()
+		expect(() => IntegrationSchema.parse({ ...valid, kind: "unknown" })).toThrow()
 	})
 
 	it("rejects invalid credentialStatus", () => {
-		expect(() =>
-			IntegrationSchema.parse({ ...valid, credentialStatus: "partial" })
-		).toThrow()
+		expect(() => IntegrationSchema.parse({ ...valid, credentialStatus: "partial" })).toThrow()
 	})
 
 	it("rejects invalid id UUID", () => {
-		expect(() =>
-			IntegrationSchema.parse({ ...valid, id: "not-a-uuid" })
-		).toThrow()
+		expect(() => IntegrationSchema.parse({ ...valid, id: "not-a-uuid" })).toThrow()
 	})
 })
 
@@ -145,9 +143,7 @@ describe("CreateIntegrationSchema", () => {
 	})
 
 	it("rejects invalid kind", () => {
-		expect(() =>
-			CreateIntegrationSchema.parse({ ...valid, kind: "unknown" })
-		).toThrow()
+		expect(() => CreateIntegrationSchema.parse({ ...valid, kind: "unknown" })).toThrow()
 	})
 })
 
@@ -178,9 +174,7 @@ describe("UpdateIntegrationSchema", () => {
 	})
 
 	it("rejects invalid id UUID", () => {
-		expect(() =>
-			UpdateIntegrationSchema.parse({ id: "not-a-uuid", name: "x" })
-		).toThrow()
+		expect(() => UpdateIntegrationSchema.parse({ id: "not-a-uuid", name: "x" })).toThrow()
 	})
 
 	it("accepts null credentialsRef (clearing it)", () => {

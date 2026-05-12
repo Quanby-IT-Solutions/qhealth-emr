@@ -42,7 +42,15 @@ export const AirwayTypeEnum = z.enum([
 	"tracheostomy",
 ])
 
+export const AnesthesiaTypeEnum = z.enum(["general", "regional", "local", "sedation"])
+
+export const IntubationGradeEnum = z.enum(["CL1", "CL2", "CL3", "CL4", "not_applicable"])
+
+export const AnesthesiaRecordStatusEnum = z.enum(["draft", "signed"])
+
 export const RvsCodeStatusEnum = z.enum(["suggested", "validated", "finalized"])
+export const RvsAssignmentTypeEnum = z.enum(["primary", "adjunct"])
+export const OperationRecordStatusEnum = z.enum(["draft", "signed"])
 
 // ============================================================================
 // Surgical Case Schema
@@ -66,6 +74,8 @@ export const SurgicalCaseSchema = z.object({
 	status: SurgeryStatusEnum,
 	surgicalType: z.string(),
 	asaClass: AsaClassEnum.nullable(),
+	estimatedDurationMinutes: z.number().int().nullable(),
+	requiredEquipment: z.array(z.string()).nullable(),
 	notes: z.string().nullable(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
@@ -83,6 +93,7 @@ export const OperationRecordSchema = z.object({
 	preOpDiagnosis: z.string(),
 	postOpDiagnosis: z.string().nullable(),
 	procedurePerformed: z.string(),
+	procedureDescription: z.string().nullable(),
 	operativeTechnique: z.string().nullable(),
 	findings: z.string().nullable(),
 	specimens: z.string().nullable(),
@@ -96,9 +107,14 @@ export const OperationRecordSchema = z.object({
 	secondAssistantStaffId: z.string().uuid().nullable(),
 	scrubNurseStaffId: z.string().uuid().nullable(),
 	circulatingNurseStaffId: z.string().uuid().nullable(),
+	anesthesiologistStaffId: z.string().uuid().nullable(),
 	instrumentCountCorrect: z.boolean(),
 	swabCountCorrect: z.boolean(),
 	complications: z.string().nullable(),
+	status: OperationRecordStatusEnum,
+	signedAt: z.string().nullable(),
+	signedByStaffId: z.string().uuid().nullable(),
+	signedByName: z.string().nullable(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 })
@@ -116,12 +132,46 @@ export const AnesthesiaAgentSchema = z.object({
 	time: z.string(),
 })
 
+export const InductionAgentSchema = z.object({
+	agent: z.string(),
+	dose: z.string(),
+	time: z.string().optional(),
+})
+
+export const MaintenanceAgentSchema = z.object({
+	agent: z.string(),
+	dose: z.string(),
+	time: z.string().optional(),
+})
+
+export const MuscleRelaxantSchema = z.object({
+	agent: z.string(),
+	dose: z.string(),
+	time: z.string().optional(),
+})
+
+export const IntraopMedicationSchema = z.object({
+	name: z.string(),
+	dose: z.string(),
+	route: z.string(),
+	time: z.string(),
+	indication: z.string().optional(),
+})
+
 export const IntraopVitalSchema = z.object({
 	time: z.string(),
 	bp: z.string(),
 	hr: z.number(),
 	spo2: z.number(),
 	etco2: z.number().optional(),
+	temp: z.number().optional(),
+})
+
+export const FluidBalanceSchema = z.object({
+	ivFluids: z.array(z.object({ type: z.string(), volumeMl: z.number() })).optional(),
+	estimatedBloodLoss: z.number().optional(),
+	urineOutput: z.number().optional(),
+	otherOutput: z.number().optional(),
 })
 
 // ============================================================================
@@ -131,16 +181,29 @@ export const IntraopVitalSchema = z.object({
 export const AnesthesiaRecordSchema = z.object({
 	id: z.string().uuid(),
 	surgicalCaseId: z.string().uuid(),
-	asaClass: AsaClassEnum,
-	airwayType: AirwayTypeEnum,
-	intubationAttempts: z.number().int(),
-	agents: z.array(AnesthesiaAgentSchema),
-	intraopVitals: z.array(IntraopVitalSchema),
+	asaClass: AsaClassEnum.nullable(),
+	anesthesiaType: AnesthesiaTypeEnum.nullable(),
+	airwayType: AirwayTypeEnum.nullable(),
+	airwayManagement: z.string().nullable(),
+	intubationAttempts: z.number().int().nullable(),
+	intubationGrade: IntubationGradeEnum.nullable(),
+	difficultAirway: z.boolean(),
+	agents: z.array(AnesthesiaAgentSchema).nullable(),
+	inductionAgents: z.array(InductionAgentSchema).nullable(),
+	maintenanceAgents: z.array(MaintenanceAgentSchema).nullable(),
+	muscleRelaxants: z.array(MuscleRelaxantSchema).nullable(),
+	intraopMedications: z.array(IntraopMedicationSchema).nullable(),
+	intraopVitals: z.array(IntraopVitalSchema).nullable(),
+	fluidBalance: FluidBalanceSchema.nullable(),
 	reversalAgent: z.string().nullable(),
 	totalAnesthesiaMinutes: z.number().nullable(),
-	emergenceSmooth: z.boolean(),
+	emergenceSmooth: z.boolean().nullable(),
 	complications: z.string().nullable(),
 	postAnesthesiaCareNotes: z.string().nullable(),
+	anesthesiologistStaffId: z.string().uuid().nullable(),
+	status: AnesthesiaRecordStatusEnum,
+	signedAt: z.string().nullable(),
+	signedByStaffId: z.string().uuid().nullable(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 })
@@ -194,8 +257,10 @@ export const RvsAssignmentSchema = z.object({
 	id: z.string().uuid(),
 	surgicalCaseId: z.string().uuid(),
 	rvsCodeId: z.string().uuid(),
+	procedureLabel: z.string().nullable(),
 	code: z.string(),
 	description: z.string(),
+	assignmentType: RvsAssignmentTypeEnum,
 	status: RvsCodeStatusEnum,
 	suggestedByName: z.string().nullable(),
 	validatedByName: z.string().nullable(),
@@ -237,6 +302,8 @@ export const SurgicalCaseListSchema = PaginationInputSchema.extend({
 	encounterId: z.string().uuid().optional(),
 	status: SurgeryStatusEnum.optional(),
 	date: z.string().optional(),
+	surgeonStaffId: z.string().uuid().optional(),
+	anesthesiologistStaffId: z.string().uuid().optional(),
 })
 
 export const SurgicalCaseListResponseSchema = PaginatedResponseSchema.extend({
@@ -258,6 +325,8 @@ export const CreateSurgicalCaseSchema = z.object({
 	scheduledDatetime: z.string().optional(),
 	surgicalType: z.string().min(1),
 	asaClass: AsaClassEnum.optional(),
+	estimatedDurationMinutes: z.number().int().positive().optional().default(120),
+	requiredEquipment: z.array(z.string()).optional(),
 	notes: z.string().optional(),
 })
 
@@ -284,6 +353,7 @@ export const SaveOperationRecordSchema = z.object({
 	preOpDiagnosis: z.string().min(1),
 	postOpDiagnosis: z.string().optional(),
 	procedurePerformed: z.string().min(1),
+	procedureDescription: z.string().optional(),
 	operativeTechnique: z.string().optional(),
 	findings: z.string().optional(),
 	specimens: z.string().optional(),
@@ -297,9 +367,14 @@ export const SaveOperationRecordSchema = z.object({
 	secondAssistantStaffId: z.string().uuid().optional(),
 	scrubNurseStaffId: z.string().uuid().optional(),
 	circulatingNurseStaffId: z.string().uuid().optional(),
+	anesthesiologistStaffId: z.string().uuid().nullable().optional(),
 	instrumentCountCorrect: z.boolean(),
 	swabCountCorrect: z.boolean(),
 	complications: z.string().optional(),
+})
+
+export const SignOperationRecordSchema = z.object({
+	caseId: z.string().uuid(),
 })
 
 // ============================================================================
@@ -308,16 +383,30 @@ export const SaveOperationRecordSchema = z.object({
 
 export const SaveAnesthesiaRecordSchema = z.object({
 	caseId: z.string().uuid(),
-	asaClass: AsaClassEnum,
-	airwayType: AirwayTypeEnum,
-	intubationAttempts: z.number().int().min(0),
-	agents: z.array(AnesthesiaAgentSchema),
-	intraopVitals: z.array(IntraopVitalSchema),
+	asaClass: AsaClassEnum.optional(),
+	anesthesiaType: AnesthesiaTypeEnum.optional(),
+	airwayType: AirwayTypeEnum.optional(),
+	airwayManagement: z.string().optional(),
+	intubationAttempts: z.number().int().min(0).optional(),
+	intubationGrade: IntubationGradeEnum.optional(),
+	difficultAirway: z.boolean().optional(),
+	agents: z.array(AnesthesiaAgentSchema).optional(),
+	inductionAgents: z.array(InductionAgentSchema).optional(),
+	maintenanceAgents: z.array(MaintenanceAgentSchema).optional(),
+	muscleRelaxants: z.array(MuscleRelaxantSchema).optional(),
+	intraopMedications: z.array(IntraopMedicationSchema).optional(),
+	intraopVitals: z.array(IntraopVitalSchema).optional(),
+	fluidBalance: FluidBalanceSchema.optional(),
 	reversalAgent: z.string().optional(),
 	totalAnesthesiaMinutes: z.number().optional(),
-	emergenceSmooth: z.boolean(),
+	emergenceSmooth: z.boolean().optional(),
 	complications: z.string().optional(),
 	postAnesthesiaCareNotes: z.string().optional(),
+	anesthesiologistStaffId: z.string().uuid().optional(),
+})
+
+export const SignAnesthesiaRecordSchema = z.object({
+	caseId: z.string().uuid(),
 })
 
 // ============================================================================
@@ -354,6 +443,8 @@ export const RvsCodesResponseSchema = PaginatedResponseSchema.extend({
 export const SuggestRvsCodeSchema = z.object({
 	caseId: z.string().uuid(),
 	rvsCodeId: z.string().uuid(),
+	procedureLabel: z.string().min(1),
+	assignmentType: RvsAssignmentTypeEnum.default("primary"),
 	modifier: z.string().optional(),
 	units: z.number().int().positive().default(1),
 })
@@ -384,4 +475,39 @@ export const RemoveRvsAssignmentSchema = z.object({
 export const OrSlotsQuerySchema = z.object({
 	facilityId: z.string().uuid(),
 	weekStart: z.string(),
+	surgeonStaffId: z.string().uuid().optional(),
+	anesthesiologistStaffId: z.string().uuid().optional(),
 })
+
+// ============================================================================
+// OR Conflict Check
+// ============================================================================
+
+export const OrConflictCheckSchema = z.object({
+	facilityId: z.string().uuid(),
+	orSuite: z.string(),
+	scheduledDatetime: z.string(),
+	estimatedDurationMinutes: z.number().int().positive(),
+	surgeonStaffId: z.string().uuid().optional(),
+	requiredEquipment: z.array(z.string()).optional(),
+	excludeCaseId: z.string().uuid().optional(),
+})
+
+export const OrConflictSchema = z.object({
+	type: z.enum(["room", "surgeon", "equipment"]),
+	conflictingCaseId: z.string().uuid(),
+	conflictingProcedure: z.string(),
+	conflictingOrSuite: z.string().nullable(),
+	conflictingStart: z.string(),
+	conflictingEnd: z.string(),
+	equipmentItem: z.string().optional(),
+})
+
+export const OrConflictCheckResponseSchema = z.object({
+	hasConflicts: z.boolean(),
+	conflicts: z.array(OrConflictSchema),
+})
+
+export type OrConflictCheck = z.infer<typeof OrConflictCheckSchema>
+export type OrConflict = z.infer<typeof OrConflictSchema>
+export type OrConflictCheckResponse = z.infer<typeof OrConflictCheckResponseSchema>

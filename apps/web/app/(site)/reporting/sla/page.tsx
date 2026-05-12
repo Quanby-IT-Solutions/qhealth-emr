@@ -11,7 +11,7 @@ function usePermissionSet() {
 
 export default function ReportingSlaPage() {
 	const permSet = usePermissionSet()
-	const canAccess = permSet.has("admin:view") || permSet.has("reporting:view")
+	const canAccess = permSet.has("reporting:view")
 
 	if (!canAccess) {
 		return (

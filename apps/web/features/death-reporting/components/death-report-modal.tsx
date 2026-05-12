@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-
 import { AlertTriangle } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -56,27 +55,36 @@ export function DeathReportModal({
 	const allDone = (!needsFmdrf || fmdrfDone) && (!needsFndrf || fndrfDone)
 
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
+		<Dialog
+			open={open}
+			onOpenChange={nextOpen => {
+				if (nextOpen || allDone) onOpenChange(nextOpen)
+			}}
+		>
 			<DialogContent className="max-w-md">
 				<DialogHeader>
 					<div className="flex items-center gap-2">
-						<AlertTriangle className="size-5 text-destructive" />
+						<AlertTriangle className="text-destructive size-5" />
 						<DialogTitle>Death Reporting Required</DialogTitle>
 					</div>
 					<DialogDescription>
-						Discharge cannot be saved until the required death review form(s) are
-						completed and submitted.
+						Discharge cannot be saved until the required death review form(s) are completed and
+						submitted.
 					</DialogDescription>
 				</DialogHeader>
 
 				<div className="space-y-3 py-2">
+					{!allDone && (
+						<div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+							This form is required before discharge can be confirmed.
+						</div>
+					)}
+
 					{needsFmdrf && (
 						<div className="flex items-center justify-between rounded-md border p-3">
 							<div>
 								<p className="text-sm font-medium">FMDRF</p>
-								<p className="text-xs text-muted-foreground">
-									Facility Maternal Death Review Form
-								</p>
+								<p className="text-muted-foreground text-xs">Facility Maternal Death Review Form</p>
 							</div>
 							{fmdrfDone ? (
 								<Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
@@ -104,9 +112,7 @@ export function DeathReportModal({
 						<div className="flex items-center justify-between rounded-md border p-3">
 							<div>
 								<p className="text-sm font-medium">FNDRF</p>
-								<p className="text-xs text-muted-foreground">
-									Facility Neonatal Death Review Form
-								</p>
+								<p className="text-muted-foreground text-xs">Facility Neonatal Death Review Form</p>
 							</div>
 							{fndrfDone ? (
 								<Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
@@ -131,18 +137,18 @@ export function DeathReportModal({
 					)}
 
 					{!needsFmdrf && !needsFndrf && (
-						<p className="text-center text-sm text-muted-foreground">
+						<p className="text-muted-foreground text-center text-sm">
 							This patient does not require additional death reporting.
 						</p>
 					)}
 				</div>
 
 				<DialogFooter>
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
-						Dismiss
+					<Button variant="outline" onClick={() => onOpenChange(false)} disabled={!allDone}>
+						{allDone ? "Dismiss" : "Required"}
 					</Button>
 					{allDone && (
-						<p className="text-xs text-muted-foreground self-center">
+						<p className="text-muted-foreground self-center text-xs">
 							All required forms completed — you may now proceed with discharge.
 						</p>
 					)}

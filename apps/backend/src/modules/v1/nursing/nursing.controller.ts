@@ -4,7 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { NursingService } from "./nursing.service"
 
@@ -16,7 +16,10 @@ export class NursingController {
 	// Vital Signs
 	// ========================================================================
 
-	@RequirePermission("nursing", "view")
+	@RequireAnyPermissions([
+		{ module: "nursing", action: "view" },
+		{ module: "surgical", action: "view" },
+	])
 	@Implement(v1.nursing.listVitals)
 	async listVitals() {
 		return implement(v1.nursing.listVitals).handler(async ({ input }) => {
@@ -24,7 +27,10 @@ export class NursingController {
 		})
 	}
 
-	@RequirePermission("nursing", "view")
+	@RequireAnyPermissions([
+		{ module: "nursing", action: "view" },
+		{ module: "surgical", action: "view" },
+	])
 	@Implement(v1.nursing.getVital)
 	async getVital() {
 		return implement(v1.nursing.getVital).handler(async ({ input }) => {
@@ -221,6 +227,34 @@ export class NursingController {
 	async updateHaiTag() {
 		return implement(v1.nursing.updateHaiTag).handler(async ({ input }) => {
 			return this.nursingService.updateHaiTag(input)
+		})
+	}
+
+	// ========================================================================
+	// Consent Records
+	// ========================================================================
+
+	@RequirePermission("nursing", "view")
+	@Implement(v1.nursing.listConsents)
+	async listConsents() {
+		return implement(v1.nursing.listConsents).handler(async ({ input }) => {
+			return this.nursingService.findConsentRecords(input)
+		})
+	}
+
+	@RequirePermission("nursing", "view")
+	@Implement(v1.nursing.getConsent)
+	async getConsent() {
+		return implement(v1.nursing.getConsent).handler(async ({ input }) => {
+			return this.nursingService.findConsentRecord(input.id)
+		})
+	}
+
+	@RequirePermission("nursing", "create")
+	@Implement(v1.nursing.createConsent)
+	async createConsent(@Session() session: UserSession) {
+		return implement(v1.nursing.createConsent).handler(async ({ input }) => {
+			return this.nursingService.createConsentRecord(input, session.user.id)
 		})
 	}
 }

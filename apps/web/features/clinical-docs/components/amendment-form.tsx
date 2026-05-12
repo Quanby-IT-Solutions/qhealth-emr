@@ -1,74 +1,17 @@
 "use client"
 
 import { useState } from "react"
+import { AlertTriangle, FileText } from "lucide-react"
 
-import { AlertTriangle, Minus, Plus } from "lucide-react"
-
-import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Label } from "@/core/components/ui/label"
+import { ScrollArea } from "@/core/components/ui/scroll-area"
 import { Separator } from "@/core/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { Textarea } from "@/core/components/ui/textarea"
-import { useCreateAddendumMutation } from "@/features/clinical-docs/api/clinical-docs.hooks"
-
-interface DiffLine {
-	type: "unchanged" | "removed" | "added"
-	text: string
-	lineNumber: number
-}
-
-/**
- * Produces a simple line-by-line diff between original and amended content.
- * Uses a basic longest-common-subsequence approach.
- */
-function computeDiff(original: string, amended: string): DiffLine[] {
-	const origLines = original.split("\n")
-	const amendLines = amended.split("\n")
-
-	// Build LCS table
-	const m = origLines.length
-	const n = amendLines.length
-	const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0))
-
-	for (let i = 1; i <= m; i++) {
-		for (let j = 1; j <= n; j++) {
-			if (origLines[i - 1] === amendLines[j - 1]) {
-				dp[i][j] = dp[i - 1][j - 1] + 1
-			} else {
-				dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1])
-			}
-		}
-	}
-
-	// Back-track to build diff
-	const result: DiffLine[] = []
-	let i = m
-	let j = n
-	let lineNum = 1
-
-	const ops: { type: DiffLine["type"]; text: string }[] = []
-
-	while (i > 0 || j > 0) {
-		if (i > 0 && j > 0 && origLines[i - 1] === amendLines[j - 1]) {
-			ops.unshift({ type: "unchanged", text: origLines[i - 1] })
-			i--
-			j--
-		} else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-			ops.unshift({ type: "added", text: amendLines[j - 1] })
-			j--
-		} else {
-			ops.unshift({ type: "removed", text: origLines[i - 1] })
-			i--
-		}
-	}
-
-	ops.forEach(op => {
-		result.push({ ...op, lineNumber: lineNum++ })
-	})
-
-	return result
-}
+import {
+	useAddAddendumMutation,
+	useSignAddendumMutation,
+} from "@/features/clinical-docs/api/clinical-docs.hooks"
 
 interface AmendmentFormProps {
 	noteId: string
@@ -78,12 +21,11 @@ interface AmendmentFormProps {
 }
 
 /**
- * Amendment (addendum) form that shows:
- *  - A reason field
- *  - A proposed-amendment text area
- *  - A side-by-side or unified diff view comparing original vs proposed
+ * Addendum-only amendment form.
  *
- * Submits as a signed addendum via `useCreateAddendumMutation`.
+ * Signed notes are immutable: the original signed text is rendered read-only
+ * above and the clinician adds a new addendum below. The original is never
+ * modified.
  */
 export function AmendmentForm({
 	noteId,
@@ -92,159 +34,92 @@ export function AmendmentForm({
 	onCancel,
 }: AmendmentFormProps) {
 	const [reason, setReason] = useState("")
-	const [amendedContent, setAmendedContent] = useState(originalContent)
+	const [addendumContent, setAddendumContent] = useState("")
+	const [signFlowError, setSignFlowError] = useState<string | null>(null)
 
-	const createAddendum = useCreateAddendumMutation()
+	const addAddendum = useAddAddendumMutation()
+	const signAddendum = useSignAddendumMutation()
 
-	const diff = computeDiff(originalContent, amendedContent)
-	const hasChanges = diff.some(l => l.type !== "unchanged")
-	const removedCount = diff.filter(l => l.type === "removed").length
-	const addedCount = diff.filter(l => l.type === "added").length
+	const canSubmit =
+		reason.trim().length > 0 &&
+		addendumContent.trim().length > 0 &&
+		!addAddendum.isPending &&
+		!signAddendum.isPending
 
-	function handleSubmit() {
-		if (!reason.trim() || !amendedContent.trim() || !hasChanges) return
+	function getPayload() {
+		return { noteId, content: addendumContent.trim(), reason: reason.trim() }
+	}
 
-		// Store both old and new content in the addendum so reviewers can compare
-		const addendumContent = [
-			"**AMENDMENT**",
-			"",
-			"**Reason:**",
-			reason,
-			"",
-			"**Amended Content:**",
-			amendedContent,
-		].join("\n")
+	function handleSaveDraft() {
+		if (!canSubmit) return
+		setSignFlowError(null)
 
-		createAddendum.mutate(
-			{ noteId, content: addendumContent, reason },
-			{ onSuccess }
-		)
+		addAddendum.mutate(getPayload(), { onSuccess })
+	}
+
+	async function handleSignAddendum() {
+		if (!canSubmit) return
+		setSignFlowError(null)
+
+		try {
+			const addendum = await addAddendum.mutateAsync(getPayload())
+			await signAddendum.mutateAsync({ id: addendum.id, noteId })
+			onSuccess()
+		} catch (error) {
+			setSignFlowError(error instanceof Error ? error.message : "Unable to sign addendum.")
+		}
 	}
 
 	return (
 		<div className="space-y-4">
-			{/* Amendment reason */}
+			<div className="space-y-2">
+				<Label className="flex items-center gap-2">
+					<FileText className="size-4" />
+					Original Signed Note (read-only)
+				</Label>
+				<ScrollArea className="bg-muted/40 h-48 rounded-md border">
+					<div className="p-3 font-mono text-xs whitespace-pre-wrap">
+						{originalContent || "No content"}
+					</div>
+				</ScrollArea>
+				<p className="text-muted-foreground text-xs">
+					The original signed text is permanent and cannot be edited. Document any corrections or
+					additions below.
+				</p>
+			</div>
+
+			<Separator />
+
 			<div className="space-y-2">
 				<Label>
-					Reason for Amendment <span className="text-destructive">*</span>
+					Amendment Reason <span className="text-destructive">*</span>
 				</Label>
 				<Textarea
 					rows={2}
-					placeholder="e.g. Medication dosage correction, additional findings documented…"
+					placeholder="e.g. Medication dosage correction, additional findings documented..."
 					value={reason}
 					onChange={e => setReason(e.target.value)}
 				/>
 			</div>
 
-			{/* Amendment editor + diff view */}
-			<Tabs defaultValue="edit">
-				<TabsList>
-					<TabsTrigger value="edit">Edit Amendment</TabsTrigger>
-					<TabsTrigger value="diff">
-						Review Changes
-						{hasChanges && (
-							<span className="ml-1.5 flex gap-1 text-xs">
-								<Badge variant="destructive" className="px-1 py-0 text-xs">
-									<Minus className="size-2.5" />
-									{removedCount}
-								</Badge>
-								<Badge className="bg-green-600 px-1 py-0 text-xs hover:bg-green-700">
-									<Plus className="size-2.5" />
-									{addedCount}
-								</Badge>
-							</span>
-						)}
-					</TabsTrigger>
-				</TabsList>
+			<div className="space-y-2">
+				<Label>
+					Addendum Text <span className="text-destructive">*</span>
+				</Label>
+				<Textarea
+					rows={10}
+					placeholder="Document the correction or additional information here."
+					value={addendumContent}
+					onChange={e => setAddendumContent(e.target.value)}
+					className="font-mono text-sm"
+				/>
+			</div>
 
-				<TabsContent value="edit" className="mt-3">
-					<div className="space-y-2">
-						<p className="text-muted-foreground text-xs">
-							Modify the content below. Changes will be recorded as an addendum.
-						</p>
-						<Textarea
-							rows={14}
-							value={amendedContent}
-							onChange={e => setAmendedContent(e.target.value)}
-							className="font-mono text-sm"
-						/>
-					</div>
-				</TabsContent>
-
-				<TabsContent value="diff" className="mt-3">
-					{!hasChanges ? (
-						<div className="rounded-md border p-4 text-center">
-							<p className="text-muted-foreground text-sm">
-								No changes detected yet.
-							</p>
-						</div>
-					) : (
-						<div className="overflow-auto rounded-md border text-sm">
-							<div className="bg-muted/50 flex items-center justify-between border-b px-3 py-2 text-xs font-medium">
-								<span>Diff — Original vs Proposed Amendment</span>
-								<div className="flex gap-2">
-									<span className="flex items-center gap-1 text-red-600">
-										<Minus className="size-3" />
-										{removedCount} removed
-									</span>
-									<span className="flex items-center gap-1 text-green-600">
-										<Plus className="size-3" />
-										{addedCount} added
-									</span>
-								</div>
-							</div>
-							<div className="divide-y font-mono">
-								{diff.map((line, idx) => (
-									<div
-										key={idx}
-										className={
-											line.type === "removed"
-												? "bg-red-50 dark:bg-red-950/20"
-												: line.type === "added"
-													? "bg-green-50 dark:bg-green-950/20"
-													: ""
-										}
-									>
-										<div className="flex">
-											{/* Gutter */}
-											<span
-												className={`select-none px-3 py-1 text-xs ${
-													line.type === "removed"
-														? "text-red-500"
-														: line.type === "added"
-															? "text-green-600"
-															: "text-muted-foreground"
-												}`}
-											>
-												{line.type === "removed" ? "−" : line.type === "added" ? "+" : " "}
-											</span>
-											{/* Content */}
-											<span
-												className={`flex-1 px-2 py-1 ${
-													line.type === "removed"
-														? "text-red-700 line-through dark:text-red-400"
-														: line.type === "added"
-															? "text-green-700 dark:text-green-400"
-															: ""
-												}`}
-											>
-												{line.text || <span className="opacity-25">empty line</span>}
-											</span>
-										</div>
-									</div>
-								))}
-							</div>
-						</div>
-					)}
-				</TabsContent>
-			</Tabs>
-
-			{/* Warning */}
 			<div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/50 dark:bg-amber-950/20">
 				<AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
-				<p className="text-amber-800 dark:text-amber-300 text-sm">
-					This amendment will be appended as a signed addendum to the original note.
-					The original note remains unchanged in the permanent record.
+				<p className="text-sm text-amber-800 dark:text-amber-300">
+					The original note remains unchanged in the permanent record. Saving creates a draft
+					addendum; signing creates and locks the addendum.
 				</p>
 			</div>
 
@@ -254,21 +129,21 @@ export function AmendmentForm({
 				<Button type="button" variant="outline" onClick={onCancel}>
 					Cancel
 				</Button>
-				<Button
-					type="button"
-					onClick={handleSubmit}
-					disabled={
-						!reason.trim() ||
-						!hasChanges ||
-						createAddendum.isPending
-					}
-				>
-					{createAddendum.isPending ? "Submitting…" : "Submit Amendment"}
+				<Button type="button" variant="outline" onClick={handleSaveDraft} disabled={!canSubmit}>
+					{addAddendum.isPending && !signAddendum.isPending ? "Saving..." : "Save Addendum"}
+				</Button>
+				<Button type="button" onClick={handleSignAddendum} disabled={!canSubmit}>
+					{addAddendum.isPending || signAddendum.isPending ? "Signing..." : "Sign Addendum"}
 				</Button>
 			</div>
 
-			{createAddendum.isError && (
-				<p className="text-destructive text-sm">{createAddendum.error.message}</p>
+			{(addAddendum.isError || signAddendum.isError || signFlowError) && (
+				<p className="text-destructive text-sm">
+					{signFlowError ??
+						signAddendum.error?.message ??
+						addAddendum.error?.message ??
+						"Unable to save addendum."}
+				</p>
 			)}
 		</div>
 	)

@@ -112,7 +112,7 @@ function SingleAllergyAlert({
 								disabled={!overrideReason?.trim()}
 								onClick={() => {
 									if (overrideReason?.trim()) {
-										onOverride(overrideReason)
+										onOverride?.(overrideReason)
 										setShowOverride(false)
 									}
 								}}
@@ -138,7 +138,7 @@ export function AllergyAlertBanner({
 	return (
 		<div className="space-y-2">
 			<p className="text-xs font-medium text-muted-foreground">
-				Known Patient Medication Allergies
+				Matched Patient Medication Allergy Alerts
 			</p>
 			{alerts.map((alert) => (
 				<SingleAllergyAlert

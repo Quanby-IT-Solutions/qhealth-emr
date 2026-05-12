@@ -62,7 +62,6 @@ export { AUDIT_SERVICE_KEY }
  * ```
  */
 export function Audited(options: AuditedOptions): MethodDecorator {
-	 
 	return function (_target, _propertyKey, descriptor: TypedPropertyDescriptor<any>) {
 		const originalMethod = descriptor.value as (...args: unknown[]) => Promise<unknown>
 		const logger = new Logger("@Audited")
@@ -82,9 +81,7 @@ export function Audited(options: AuditedOptions): MethodDecorator {
 			const result = await originalMethod.apply(this, args)
 
 			// 3. Extract after-state
-			const afterState = options.extractAfterState
-				? options.extractAfterState(result)
-				: result
+			const afterState = options.extractAfterState ? options.extractAfterState(result) : result
 
 			// 4. Extract entity ID
 			let entityId: string | undefined
@@ -126,7 +123,9 @@ export function Audited(options: AuditedOptions): MethodDecorator {
 							metadata: changes && changes.length > 0 ? { changes } : null,
 						})
 						.catch(error => {
-							logger.error(`Failed to write audit log for ${options.entityType}:${entityId}: ${error}`)
+							logger.error(
+								`Failed to write audit log for ${options.entityType}:${entityId}: ${error}`
+							)
 						})
 				}
 			} else if (!auditService) {

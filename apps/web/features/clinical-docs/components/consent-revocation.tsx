@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { AlertTriangle } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -16,8 +15,10 @@ import {
 } from "@/core/components/ui/dialog"
 import { Label } from "@/core/components/ui/label"
 import { Textarea } from "@/core/components/ui/textarea"
-import type { ConsentRecord } from "@/features/clinical-docs/api/clinical-docs.hooks"
-import { useRevokeConsentWithReasonMutation } from "@/features/clinical-docs/api/clinical-docs.hooks"
+import {
+	useRevokeConsentWithReasonMutation,
+	type ConsentRecord,
+} from "@/features/clinical-docs/api/clinical-docs.hooks"
 
 const CONSENT_TYPE_LABELS: Record<string, string> = {
 	general: "General",
@@ -59,7 +60,7 @@ export function ConsentRevocation({
 			{
 				id: consent.id,
 				patientId,
-				encounterId: consent.encounterId,
+				encounterId: consent.encounterId ?? undefined,
 				reason: reason.trim() || undefined,
 			},
 			{
@@ -83,9 +84,8 @@ export function ConsentRevocation({
 						<span className="font-medium">
 							{CONSENT_TYPE_LABELS[consent.consentType] ?? consent.consentType}
 						</span>{" "}
-						consent signed by{" "}
-						<span className="font-medium">{consent.signedByName}</span>. This action cannot be
-						undone.
+						consent signed by <span className="font-medium">{consent.signedByName}</span>. This
+						action cannot be undone.
 					</DialogDescription>
 				</DialogHeader>
 
@@ -124,11 +124,7 @@ export function ConsentRevocation({
 					<Button variant="outline" onClick={() => handleClose(false)} disabled={revoke.isPending}>
 						Cancel
 					</Button>
-					<Button
-						variant="destructive"
-						onClick={handleSubmit}
-						disabled={!isValid}
-					>
+					<Button variant="destructive" onClick={handleSubmit} disabled={!isValid}>
 						{revoke.isPending ? "Revoking…" : "Revoke Consent"}
 					</Button>
 				</DialogFooter>

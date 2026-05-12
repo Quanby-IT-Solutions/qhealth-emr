@@ -17,6 +17,7 @@ import { Skeleton } from "@/core/components/ui/skeleton"
 import type { BreakGlassEvent } from "@/features/audit/api/audit.hooks"
 import {
 	useBreakGlassEventsQuery,
+	useBreakGlassExportMutation,
 	useBreakGlassPatternsQuery,
 	useReviewBreakGlassMutation,
 } from "@/features/audit/api/audit.hooks"
@@ -206,6 +207,8 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 		page,
 	})
 
+	const exportMutation = useBreakGlassExportMutation()
+
 	const [expandedId, setExpandedId] = useState<string | null>(null)
 
 	const [reviewDialog, setReviewDialog] = useState<{
@@ -256,13 +259,30 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 					<div className="flex flex-col gap-3">
 						<div className="flex items-center justify-between">
 							<CardTitle>Break-Glass Event Review</CardTitle>
-							<Button
-								variant={showPatterns ? "secondary" : "outline"}
-								size="sm"
-								onClick={() => setShowPatterns(v => !v)}
-							>
-								{showPatterns ? "Hide" : "Show"} Pattern Analysis
-							</Button>
+							<div className="flex items-center gap-2">
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={exportMutation.isPending}
+									onClick={() =>
+										exportMutation.mutate({
+											facilityId,
+											reviewStatus: statusFilter === "all" ? undefined : (statusFilter as "pending" | "appropriate" | "flagged"),
+											dateFrom: dateFrom || undefined,
+											dateTo: dateTo || undefined,
+										})
+									}
+								>
+									{exportMutation.isPending ? "Exporting…" : "Export CSV"}
+								</Button>
+								<Button
+									variant={showPatterns ? "secondary" : "outline"}
+									size="sm"
+									onClick={() => setShowPatterns(v => !v)}
+								>
+									{showPatterns ? "Hide" : "Show"} Pattern Analysis
+								</Button>
+							</div>
 						</div>
 
 						{showPatterns && (

@@ -20,15 +20,16 @@ type RbacProfile = {
 function extractFacilityId(req: Request): string {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
 	const activeProfile =
-		profile?.staffProfiles?.find(p =>
-			p.roles.some(r => r.id === profile?.activeRole?.id)
-		) ?? profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
 	return activeProfile?.facilityId ?? ""
 }
 
 function extractCanViewFhir(req: Request): boolean {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
-	return profile?.activeRole?.permissions.some(p => p.module === "fhir" && p.action === "view") ?? false
+	return (
+		profile?.activeRole?.permissions.some(p => p.module === "fhir" && p.action === "view") ?? false
+	)
 }
 
 @Controller()
@@ -54,7 +55,7 @@ export class AdminDashboardController {
 		})
 	}
 
-	@RequirePermission("admin", "view")
+	@RequirePermission("audit", "view")
 	@Implement(v1.adminDashboard.exportCompliance)
 	async exportCompliance(@Session() _session: UserSession, @Req() req: Request) {
 		return implement(v1.adminDashboard.exportCompliance).handler(async ({ input }) => {
@@ -63,7 +64,7 @@ export class AdminDashboardController {
 		})
 	}
 
-	@RequirePermission("admin", "view")
+	@RequirePermission("civil_registry", "view")
 	@Implement(v1.adminDashboard.civilRegistryOps)
 	async civilRegistryOps(@Session() _session: UserSession, @Req() req: Request) {
 		return implement(v1.adminDashboard.civilRegistryOps).handler(async () => {
@@ -72,7 +73,7 @@ export class AdminDashboardController {
 		})
 	}
 
-	@RequirePermission("admin", "view")
+	@RequirePermission("formulary", "clinical_policy")
 	@Implement(v1.adminDashboard.medicationCompliance)
 	async medicationCompliance(@Session() _session: UserSession, @Req() req: Request) {
 		return implement(v1.adminDashboard.medicationCompliance).handler(async () => {

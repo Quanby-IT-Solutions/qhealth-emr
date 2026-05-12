@@ -270,3 +270,59 @@ export const CreatePrescriptionInputSchema = z.object({
 })
 
 export type CreatePrescriptionInput = z.infer<typeof CreatePrescriptionInputSchema>
+
+// ============================================================================
+// Tele-Abstract
+// ============================================================================
+
+export const AbstractStatusEnum = z.enum(["draft", "signed", "sent"])
+
+export const TeleAbstractSchema = z.object({
+	id: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	appointmentId: z.string().uuid(),
+	patientName: z.string(),
+	clinicianName: z.string(),
+	clinicianPrcNumber: z.string(),
+	facilityName: z.string(),
+	chiefComplaint: z.string(),
+	subjectiveNotes: z.string(),
+	objectiveNotes: z.string(),
+	assessmentNotes: z.string(),
+	planNotes: z.string(),
+	diagnosis: z.string(),
+	icdCode: z.string().nullable(),
+	additionalNotes: z.string().nullable(),
+	status: AbstractStatusEnum,
+	signedAt: z.string().nullable(),
+	signedByName: z.string().nullable(),
+	sentAt: z.string().nullable(),
+	sentToEmail: z.string().nullable(),
+	createdAt: z.string(),
+})
+
+export type TeleAbstract = z.infer<typeof TeleAbstractSchema>
+
+export const GenerateAbstractInputSchema = z.object({
+	encounterId: z.string().uuid(),
+	additionalNotes: z.string().optional(),
+})
+
+export type GenerateAbstractInput = z.infer<typeof GenerateAbstractInputSchema>
+
+export const GetAbstractInputSchema = z.object({
+	id: z.string().uuid(),
+})
+
+export const ListEncounterAbstractsInputSchema = z.object({
+	encounterId: z.string().uuid(),
+})
+
+export const SignAbstractInputSchema = z.object({
+	id: z.string().uuid(),
+})
+
+export const SendAbstractInputSchema = z.object({
+	id: z.string().uuid(),
+	email: z.string().email(),
+})

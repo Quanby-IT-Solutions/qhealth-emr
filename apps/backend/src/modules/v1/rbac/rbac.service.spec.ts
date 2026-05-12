@@ -107,7 +107,13 @@ function makeRole(overrides: Record<string, unknown> = {}) {
 }
 
 function makeUserRole(overrides: Record<string, unknown> = {}) {
-	return { id: "ur-001", staffProfileId: PROFILE_ID, roleId: ROLE_ID, isPrimary: true, ...overrides }
+	return {
+		id: "ur-001",
+		staffProfileId: PROFILE_ID,
+		roleId: ROLE_ID,
+		isPrimary: true,
+		...overrides,
+	}
 }
 
 function mockSelectChain(rows: unknown[]) {
@@ -149,29 +155,31 @@ function mockDeleteChain() {
 }
 
 function setupTransaction() {
-	;(db.transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-		const tx = {
-			insert: jest.fn().mockReturnValue({
-				values: jest.fn().mockReturnValue({
-					returning: jest.fn().mockResolvedValue([makeProfile()]),
-				}),
-			}),
-			update: jest.fn().mockReturnValue({
-				set: jest.fn().mockReturnValue({
-					where: jest.fn().mockResolvedValue([]),
-				}),
-			}),
-			delete: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
-			select: jest.fn().mockReturnValue({
-				from: jest.fn().mockReturnValue({
-					where: jest.fn().mockReturnValue({
-						limit: jest.fn().mockResolvedValue([]),
+	;(db.transaction as jest.Mock).mockImplementation(
+		async (fn: (tx: unknown) => Promise<unknown>) => {
+			const tx = {
+				insert: jest.fn().mockReturnValue({
+					values: jest.fn().mockReturnValue({
+						returning: jest.fn().mockResolvedValue([makeProfile()]),
 					}),
 				}),
-			}),
+				update: jest.fn().mockReturnValue({
+					set: jest.fn().mockReturnValue({
+						where: jest.fn().mockResolvedValue([]),
+					}),
+				}),
+				delete: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+				select: jest.fn().mockReturnValue({
+					from: jest.fn().mockReturnValue({
+						where: jest.fn().mockReturnValue({
+							limit: jest.fn().mockResolvedValue([]),
+						}),
+					}),
+				}),
+			}
+			return fn(tx)
 		}
-		return fn(tx)
-	})
+	)
 }
 
 // ---------------------------------------------------------------------------
@@ -194,9 +202,7 @@ describe("RbacService — Access Governance", () => {
 			name: "Maria Santos",
 			email: "maria@hospital.ph",
 			password: "Password123",
-			facilities: [
-				{ facilityId: FACILITY_ID, roleIds: [ROLE_ID], isPrimary: true },
-			],
+			facilities: [{ facilityId: FACILITY_ID, roleIds: [ROLE_ID], isPrimary: true }],
 		}
 
 		it("throws BadRequestException when roleId does not belong to facilityId", async () => {
@@ -212,7 +218,9 @@ describe("RbacService — Access Governance", () => {
 		})
 
 		it("calls Better Auth signUpEmail before the DB transaction", async () => {
-			;(db.select as jest.Mock).mockReturnValue(mockSelectChain([{ id: ROLE_ID, facilityId: FACILITY_ID }]))
+			;(db.select as jest.Mock).mockReturnValue(
+				mockSelectChain([{ id: ROLE_ID, facilityId: FACILITY_ID }])
+			)
 			mockAuthService.api.signUpEmail.mockResolvedValue({ user: { id: USER_ID } })
 
 			await service.createUser(input, actor)
@@ -223,7 +231,9 @@ describe("RbacService — Access Governance", () => {
 		})
 
 		it("returns userId and staffProfileIds on success", async () => {
-			;(db.select as jest.Mock).mockReturnValue(mockSelectChain([{ id: ROLE_ID, facilityId: FACILITY_ID }]))
+			;(db.select as jest.Mock).mockReturnValue(
+				mockSelectChain([{ id: ROLE_ID, facilityId: FACILITY_ID }])
+			)
 			mockAuthService.api.signUpEmail.mockResolvedValue({ user: { id: USER_ID } })
 
 			const result = await service.createUser(input, actor)
@@ -233,7 +243,9 @@ describe("RbacService — Access Governance", () => {
 		})
 
 		it("logs orphaned userId and re-throws on DB transaction failure", async () => {
-			;(db.select as jest.Mock).mockReturnValue(mockSelectChain([{ id: ROLE_ID, facilityId: FACILITY_ID }]))
+			;(db.select as jest.Mock).mockReturnValue(
+				mockSelectChain([{ id: ROLE_ID, facilityId: FACILITY_ID }])
+			)
 			mockAuthService.api.signUpEmail.mockResolvedValue({ user: { id: USER_ID } })
 			;(db.transaction as jest.Mock).mockRejectedValue(new Error("DB failure"))
 
@@ -242,19 +254,20 @@ describe("RbacService — Access Governance", () => {
 			const logSpy = jest.spyOn(Logger.prototype, "error").mockImplementation(() => undefined)
 
 			await expect(service.createUser(input, actor)).rejects.toThrow("DB failure")
-			expect(logSpy).toHaveBeenCalledWith(
-				expect.stringContaining(USER_ID),
-				expect.any(Error)
-			)
+			expect(logSpy).toHaveBeenCalledWith(expect.stringContaining(USER_ID), expect.any(Error))
 
 			logSpy.mockRestore()
 		})
 
 		it("throws if Better Auth signUpEmail fails", async () => {
-			;(db.select as jest.Mock).mockReturnValue(mockSelectChain([{ id: ROLE_ID, facilityId: FACILITY_ID }]))
+			;(db.select as jest.Mock).mockReturnValue(
+				mockSelectChain([{ id: ROLE_ID, facilityId: FACILITY_ID }])
+			)
 			mockAuthService.api.signUpEmail.mockResolvedValue(null)
 
-			await expect(service.createUser(input, actor)).rejects.toThrow("Failed to create user account")
+			await expect(service.createUser(input, actor)).rejects.toThrow(
+				"Failed to create user account"
+			)
 		})
 	})
 
@@ -264,7 +277,9 @@ describe("RbacService — Access Governance", () => {
 		it("throws NotFoundException when staff profile does not exist", async () => {
 			;(db.select as jest.Mock).mockReturnValue(mockSelectChain([]))
 
-			await expect(service.reEnableUser({ staffProfileId: PROFILE_ID }, actor)).rejects.toThrow(NotFoundException)
+			await expect(service.reEnableUser({ staffProfileId: PROFILE_ID }, actor)).rejects.toThrow(
+				NotFoundException
+			)
 		})
 
 		it("returns success immediately when profile is already active", async () => {
@@ -292,7 +307,9 @@ describe("RbacService — Access Governance", () => {
 		it("throws NotFoundException when profile does not exist", async () => {
 			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([]))
 
-			await expect(service.removeStaffFacility({ staffProfileId: PROFILE_ID }, actor)).rejects.toThrow(NotFoundException)
+			await expect(
+				service.removeStaffFacility({ staffProfileId: PROFILE_ID }, actor)
+			).rejects.toThrow(NotFoundException)
 		})
 
 		it("throws BadRequestException when removing the last active profile", async () => {
@@ -304,7 +321,9 @@ describe("RbacService — Access Governance", () => {
 					}),
 				})
 
-			await expect(service.removeStaffFacility({ staffProfileId: PROFILE_ID }, actor)).rejects.toThrow(BadRequestException)
+			await expect(
+				service.removeStaffFacility({ staffProfileId: PROFILE_ID }, actor)
+			).rejects.toThrow(BadRequestException)
 		})
 
 		it("soft-removes profile and writes audit when ≥2 active profiles remain", async () => {
@@ -331,7 +350,9 @@ describe("RbacService — Access Governance", () => {
 				.mockReturnValueOnce(mockSelectChain([makeProfile()]))
 				.mockReturnValueOnce(mockSelectChain([makeRole({ facilityId: FACILITY_ID_2 })]))
 
-			await expect(service.addUserRole({ staffProfileId: PROFILE_ID, roleId: ROLE_ID }, actor)).rejects.toThrow(BadRequestException)
+			await expect(
+				service.addUserRole({ staffProfileId: PROFILE_ID, roleId: ROLE_ID }, actor)
+			).rejects.toThrow(BadRequestException)
 		})
 
 		it("returns success without inserting if role already assigned", async () => {
@@ -340,7 +361,10 @@ describe("RbacService — Access Governance", () => {
 				.mockReturnValueOnce(mockSelectChain([makeRole()]))
 				.mockReturnValueOnce(mockSelectChain([makeUserRole()])) // already exists
 
-			const result = await service.addUserRole({ staffProfileId: PROFILE_ID, roleId: ROLE_ID }, actor)
+			const result = await service.addUserRole(
+				{ staffProfileId: PROFILE_ID, roleId: ROLE_ID },
+				actor
+			)
 
 			expect(result).toEqual({ success: true })
 			expect(db.transaction).not.toHaveBeenCalled()
@@ -351,9 +375,12 @@ describe("RbacService — Access Governance", () => {
 				.mockReturnValueOnce(mockSelectChain([makeProfile()]))
 				.mockReturnValueOnce(mockSelectChain([makeRole()]))
 				.mockReturnValueOnce(mockSelectChain([])) // not yet assigned
-				.mockReturnValueOnce(mockSelectChain([]))  // no existing roles → isPrimary = true
+				.mockReturnValueOnce(mockSelectChain([])) // no existing roles → isPrimary = true
 
-			const result = await service.addUserRole({ staffProfileId: PROFILE_ID, roleId: ROLE_ID }, actor)
+			const result = await service.addUserRole(
+				{ staffProfileId: PROFILE_ID, roleId: ROLE_ID },
+				actor
+			)
 
 			expect(result).toEqual({ success: true })
 			expect(db.transaction).toHaveBeenCalled()
@@ -366,7 +393,9 @@ describe("RbacService — Access Governance", () => {
 		it("throws NotFoundException when role assignment does not exist", async () => {
 			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([]))
 
-			await expect(service.removeUserRole({ staffProfileId: PROFILE_ID, roleId: ROLE_ID }, actor)).rejects.toThrow(NotFoundException)
+			await expect(
+				service.removeUserRole({ staffProfileId: PROFILE_ID, roleId: ROLE_ID }, actor)
+			).rejects.toThrow(NotFoundException)
 		})
 
 		it("removes role assignment and writes audit", async () => {
@@ -374,7 +403,10 @@ describe("RbacService — Access Governance", () => {
 				mockSelectChain([makeUserRole({ isPrimary: false })])
 			)
 
-			const result = await service.removeUserRole({ staffProfileId: PROFILE_ID, roleId: ROLE_ID }, actor)
+			const result = await service.removeUserRole(
+				{ staffProfileId: PROFILE_ID, roleId: ROLE_ID },
+				actor
+			)
 
 			expect(result).toEqual({ success: true })
 			expect(db.transaction).toHaveBeenCalled()

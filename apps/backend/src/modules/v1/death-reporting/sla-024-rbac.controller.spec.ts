@@ -21,6 +21,8 @@
 // reflect-metadata must be loaded before any decorator-using imports
 import "reflect-metadata"
 
+import { DeathReportingController } from "./death-reporting.controller"
+
 // ============================================================================
 // Mock rbac.guard first (before importing the controller) to avoid the
 // better-auth/node ESM import chain that Jest cannot transform.
@@ -52,10 +54,7 @@ jest.mock("@orpc/server", () => ({
 
 jest.mock("@/config/api-versions.config", () => ({
 	v1: {
-		deathReporting: new Proxy(
-			{},
-			{ get: () => ({}) }
-		),
+		deathReporting: new Proxy({}, { get: () => ({}) }),
 	},
 }))
 
@@ -65,14 +64,14 @@ jest.mock("./death-reporting.service", () => ({
 	DeathReportingService: jest.fn().mockImplementation(() => ({})),
 }))
 
-import { DeathReportingController } from "./death-reporting.controller"
-
 // ============================================================================
 // Helpers
 // ============================================================================
 function getPermission(methodName: string) {
 	// Metadata is attached to descriptor.value (the method function itself).
-	const method = (DeathReportingController.prototype as Record<string, unknown>)[methodName] as Function
+	const method = (DeathReportingController.prototype as unknown as Record<string, unknown>)[
+		methodName
+	] as Function
 	return Reflect.getMetadata(RBAC_PERMISSION_KEY, method) as
 		| { module: string; action: string }
 		| undefined

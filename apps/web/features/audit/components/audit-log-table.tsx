@@ -24,16 +24,19 @@ const ACTION_COLORS: Record<string, string> = {
 
 interface AuditLogTableProps {
 	facilityId: string
+	initialEntityType?: string
+	initialEntityId?: string
 }
 
-export function AuditLogTable({ facilityId }: AuditLogTableProps) {
+export function AuditLogTable({ facilityId, initialEntityType, initialEntityId }: AuditLogTableProps) {
 	const [filters, setFilters] = useState<AuditLogFilter>({
 		facilityId,
 		startDate: undefined,
 		endDate: undefined,
 		userId: undefined,
 		action: undefined,
-		entityType: undefined,
+		entityType: initialEntityType,
+		entityId: initialEntityId,
 		patientMrn: undefined,
 		page: 1,
 		limit: 50,

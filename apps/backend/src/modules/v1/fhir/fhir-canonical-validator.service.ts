@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common"
-import { inArray, eq, and } from "drizzle-orm"
+import { and, eq, inArray } from "drizzle-orm"
 
-import { icd10Codes, loincCodes, rxnormCodes, rvsCodes, snomedCtCodes } from "@repo/db/schema"
+import { icd10Codes, loincCodes, rvsCodes, rxnormCodes, snomedCtCodes } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 
@@ -60,33 +60,55 @@ export class FhirCanonicalValidatorService {
 		const [validIcd10, validLoinc, validRxnorm, validRvs, validSnomed] = await Promise.all([
 			collectedIcd10.size > 0
 				? db
-					.select({ code: icd10Codes.code })
-					.from(icd10Codes)
-					.where(and(inArray(icd10Codes.code, [...collectedIcd10.keys()]), eq(icd10Codes.isActive, true)))
+						.select({ code: icd10Codes.code })
+						.from(icd10Codes)
+						.where(
+							and(
+								inArray(icd10Codes.code, [...collectedIcd10.keys()]),
+								eq(icd10Codes.isActive, true)
+							)
+						)
 				: Promise.resolve([]),
 			collectedLoinc.size > 0
 				? db
-					.select({ loincNum: loincCodes.loincNum })
-					.from(loincCodes)
-					.where(and(inArray(loincCodes.loincNum, [...collectedLoinc.keys()]), eq(loincCodes.isActive, true)))
+						.select({ loincNum: loincCodes.loincNum })
+						.from(loincCodes)
+						.where(
+							and(
+								inArray(loincCodes.loincNum, [...collectedLoinc.keys()]),
+								eq(loincCodes.isActive, true)
+							)
+						)
 				: Promise.resolve([]),
 			collectedRxnorm.size > 0
 				? db
-					.select({ rxcui: rxnormCodes.rxcui })
-					.from(rxnormCodes)
-					.where(and(inArray(rxnormCodes.rxcui, [...collectedRxnorm.keys()]), eq(rxnormCodes.isActive, true)))
+						.select({ rxcui: rxnormCodes.rxcui })
+						.from(rxnormCodes)
+						.where(
+							and(
+								inArray(rxnormCodes.rxcui, [...collectedRxnorm.keys()]),
+								eq(rxnormCodes.isActive, true)
+							)
+						)
 				: Promise.resolve([]),
 			collectedRvs.size > 0
 				? db
-					.select({ rvsCode: rvsCodes.rvsCode })
-					.from(rvsCodes)
-					.where(and(inArray(rvsCodes.rvsCode, [...collectedRvs.keys()]), eq(rvsCodes.isActive, true)))
+						.select({ rvsCode: rvsCodes.rvsCode })
+						.from(rvsCodes)
+						.where(
+							and(inArray(rvsCodes.rvsCode, [...collectedRvs.keys()]), eq(rvsCodes.isActive, true))
+						)
 				: Promise.resolve([]),
 			collectedSnomed.size > 0
 				? db
-					.select({ conceptId: snomedCtCodes.conceptId })
-					.from(snomedCtCodes)
-					.where(and(inArray(snomedCtCodes.conceptId, [...collectedSnomed.keys()]), eq(snomedCtCodes.isActive, true)))
+						.select({ conceptId: snomedCtCodes.conceptId })
+						.from(snomedCtCodes)
+						.where(
+							and(
+								inArray(snomedCtCodes.conceptId, [...collectedSnomed.keys()]),
+								eq(snomedCtCodes.isActive, true)
+							)
+						)
 				: Promise.resolve([]),
 		])
 

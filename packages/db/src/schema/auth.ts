@@ -3,7 +3,7 @@ import { index, primaryKey } from "drizzle-orm/pg-core"
 import { createTable } from "../utils/table.js"
 
 // ============================================================================
-// BETTER AUTH TABLES — Do not modify (managed by Better Auth)
+// BETTER AUTH TABLES — Keep aligned with enabled Better Auth plugins
 // ============================================================================
 
 export const users = createTable("users", t => ({
@@ -14,6 +14,7 @@ export const users = createTable("users", t => ({
 	image: t.text("image"),
 	createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	twoFactorEnabled: t.boolean("two_factor_enabled").default(false).notNull(),
 }))
 
 export const sessions = createTable("sessions", t => ({
@@ -68,3 +69,28 @@ export const verifications = createTable(
 	}),
 	t => [primaryKey({ columns: [t.identifier, t.value] })]
 )
+
+export const twoFactors = createTable(
+	"two_factors",
+	t => ({
+		id: t.text("id").primaryKey(),
+		secret: t.text("secret").notNull(),
+		backupCodes: t.text("backup_codes").notNull(),
+		userId: t
+			.text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+	}),
+	t => [index("two_factors_secret_idx").on(t.secret), index("two_factors_user_id_idx").on(t.userId)]
+)
+
+// Account lockout tracking for failed sign-in attempts (ADM-BE-02)
+export const authLockout = createTable("auth_lockout", t => ({
+	id: t.uuid("id").primaryKey().defaultRandom(),
+	identifier: t.text("identifier").notNull().unique(),
+	failedAttempts: t.integer("failed_attempts").notNull().default(0),
+	lastFailedAt: t.timestamp("last_failed_at"),
+	lockedUntil: t.timestamp("locked_until"),
+	createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+}))

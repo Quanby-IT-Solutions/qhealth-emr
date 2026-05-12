@@ -26,6 +26,7 @@ export const slaConfigs = createTable(
 			.references(() => facilities.id, { onDelete: "cascade" }),
 		workflowType: t.text("workflow_type").notNull().$type<SlaWorkflowType>(),
 		targetMinutes: t.integer("target_minutes").notNull(),
+		hardCapMinutes: t.integer("hard_cap_minutes"),
 		warningThresholdPct: t.integer("warning_threshold_pct").notNull().default(80),
 		isActive: t.boolean("is_active").notNull().default(true),
 		description: t.text("description").notNull().default(""),
@@ -85,6 +86,7 @@ export const slaStepConfigs = createTable(
 			.references(() => facilities.id, { onDelete: "cascade" }),
 		stepType: t.text("step_type").notNull().$type<SlaStepType>(),
 		targetMinutes: t.integer("target_minutes").notNull(),
+		hardCapMinutes: t.integer("hard_cap_minutes"),
 		warningThresholdPct: t.integer("warning_threshold_pct").notNull().default(80),
 		isActive: t.boolean("is_active").notNull().default(true),
 		description: t.text("description").notNull().default(""),
@@ -98,3 +100,35 @@ export const slaStepConfigs = createTable(
 )
 
 export type SlaStepConfigRow = typeof slaStepConfigs.$inferSelect
+
+// ============================================================================
+// workflow_status_log — append-only SLA timing log per encounter workflow step
+// ============================================================================
+
+export const workflowStatusLog = createTable(
+	"workflow_status_log",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "cascade" }),
+		encounterId: t.uuid("encounter_id").notNull(),
+		workflow: t.text("workflow").notNull().$type<SlaWorkflowType>(),
+		step: t.text("step").notNull().$type<SlaStepType>(),
+		startedAt: t.timestamp("started_at", { withTimezone: true }).notNull(),
+		endedAt: t.timestamp("ended_at", { withTimezone: true }),
+		durationMinutes: t.integer("duration_minutes"),
+		isBreached: t.boolean("is_breached").notNull().default(false),
+		isHardCapBreached: t.boolean("is_hard_cap_breached").notNull().default(false),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("workflow_status_log_facility_id_idx").on(t.facilityId),
+		index("workflow_status_log_encounter_id_idx").on(t.encounterId),
+		index("workflow_status_log_started_at_idx").on(t.startedAt),
+		index("workflow_status_log_is_breached_idx").on(t.isBreached),
+	]
+)
+
+export type WorkflowStatusLogRow = typeof workflowStatusLog.$inferSelect

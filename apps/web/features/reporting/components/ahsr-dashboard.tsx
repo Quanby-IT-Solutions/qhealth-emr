@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 
@@ -11,6 +11,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/core/components/ui/dialog"
+import { Progress } from "@/core/components/ui/progress"
 import {
 	Select,
 	SelectContent,
@@ -26,9 +27,10 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
 import {
-	useAhsrMetricsQuery,
 	useAhsrDrilldownQuery,
+	useAhsrMetricsQuery,
 	useExportAhsrMutation,
 } from "@/features/reporting/api/reporting.hooks"
 
@@ -43,17 +45,27 @@ function formatDate(d: string | null | undefined) {
 
 interface AhsrDashboardProps {
 	facilityId: string
+	canEdit?: boolean
+	canExport?: boolean
 }
 
-export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
+export function AhsrDashboard({
+	facilityId,
+	canEdit = false,
+	canExport = false,
+}: AhsrDashboardProps) {
 	const currentYear = new Date().getFullYear()
 	const [year, setYear] = useState(currentYear)
-	const [month, setMonth] = useState<string>("all")
+	const [quarter, setQuarter] = useState<string>("all")
 
-	const { data: metrics, isLoading } = useAhsrMetricsQuery({
+	const {
+		data: metrics,
+		isLoading,
+		refetch,
+	} = useAhsrMetricsQuery({
 		facilityId,
 		year,
-		month: month === "all" ? undefined : Number(month),
+		quarter: quarter === "all" ? undefined : (Number(quarter) as 1 | 2 | 3 | 4),
 	})
 
 	const exportMut = useExportAhsrMutation()
@@ -67,7 +79,7 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 		{
 			facilityId,
 			year,
-			month: month === "all" ? undefined : Number(month),
+			month: quarter === "all" ? undefined : Number(quarter) * 3,
 			metric: drillMetric,
 			icdCode: drillIcd,
 			haiType: drillHai,
@@ -87,24 +99,16 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 		exportMut.mutate({
 			facilityId,
 			year,
-			month: month === "all" ? undefined : Number(month),
+			month: quarter === "all" ? undefined : Number(quarter) * 3,
 		})
 	}
 
-	const months = [
-		{ value: "all", label: "Full Year" },
-		{ value: "1", label: "January" },
-		{ value: "2", label: "February" },
-		{ value: "3", label: "March" },
-		{ value: "4", label: "April" },
-		{ value: "5", label: "May" },
-		{ value: "6", label: "June" },
-		{ value: "7", label: "July" },
-		{ value: "8", label: "August" },
-		{ value: "9", label: "September" },
-		{ value: "10", label: "October" },
-		{ value: "11", label: "November" },
-		{ value: "12", label: "December" },
+	const quarters = [
+		{ value: "all", label: "Annual" },
+		{ value: "1", label: "Q1 (Jan–Mar)" },
+		{ value: "2", label: "Q2 (Apr–Jun)" },
+		{ value: "3", label: "Q3 (Jul–Sep)" },
+		{ value: "4", label: "Q4 (Oct–Dec)" },
 	]
 
 	return (
@@ -117,7 +121,7 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 						<div className="flex gap-2">
 							<Select
 								value={String(year)}
-								onValueChange={(v) => {
+								onValueChange={v => {
 									if (v) setYear(Number(v))
 								}}
 							>
@@ -125,7 +129,7 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{[currentYear, currentYear - 1, currentYear - 2].map((y) => (
+									{[currentYear, currentYear - 1, currentYear - 2].map(y => (
 										<SelectItem key={y} value={String(y)}>
 											{y}
 										</SelectItem>
@@ -133,25 +137,30 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 								</SelectContent>
 							</Select>
 							<Select
-								value={month}
-								onValueChange={(v) => {
-									if (v) setMonth(v)
+								value={quarter}
+								onValueChange={v => {
+									if (v) setQuarter(v)
 								}}
 							>
-								<SelectTrigger className="w-36">
+								<SelectTrigger className="w-40">
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{months.map((m) => (
-										<SelectItem key={m.value} value={m.value}>
-											{m.label}
+									{quarters.map(q => (
+										<SelectItem key={q.value} value={q.value}>
+											{q.label}
 										</SelectItem>
 									))}
 								</SelectContent>
 							</Select>
-							<Button variant="outline" onClick={handleExport} disabled={exportMut.isPending}>
-								{exportMut.isPending ? "Exporting…" : "Export Snapshot"}
+							<Button variant="ghost" size="sm" onClick={() => void refetch()} disabled={isLoading}>
+								{isLoading ? "Refreshing…" : "Refresh"}
 							</Button>
+							{canExport && (
+								<Button variant="outline" onClick={handleExport} disabled={exportMut.isPending}>
+									{exportMut.isPending ? "Exporting…" : "Export Snapshot"}
+								</Button>
+							)}
 						</div>
 					</div>
 				</CardHeader>
@@ -168,27 +177,66 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 						<MetricCard
 							title="Admissions"
 							value={metrics.totalAdmissions}
-							onClick={() => openDrilldown("admissions")}
+							onClick={canEdit ? () => openDrilldown("admissions") : undefined}
 						/>
 						<MetricCard
 							title="Discharges"
 							value={metrics.totalDischarges}
-							onClick={() => openDrilldown("discharges")}
+							onClick={canEdit ? () => openDrilldown("discharges") : undefined}
 						/>
 						<MetricCard
 							title="Deaths"
 							value={metrics.totalDeaths}
-							onClick={() => openDrilldown("deaths")}
+							onClick={canEdit ? () => openDrilldown("deaths") : undefined}
 						/>
 						<MetricCard
 							title="Bed Occupancy Rate"
 							value={
-								metrics.bedOccupancyRate != null
-									? `${metrics.bedOccupancyRate.toFixed(1)}%`
-									: "—"
+								metrics.bedOccupancyRate != null ? `${metrics.bedOccupancyRate.toFixed(1)}%` : "—"
 							}
 						/>
 					</div>
+
+					{/* Readiness tile */}
+					<Card>
+						<CardContent className="pt-4">
+							<div className="flex items-center justify-between">
+								<div className="text-muted-foreground text-sm">AHSR Data Readiness</div>
+								<Tooltip>
+									<TooltipTrigger>
+										<span className="text-muted-foreground cursor-help text-xs underline decoration-dotted">
+											What is this?
+										</span>
+									</TooltipTrigger>
+									<TooltipContent className="max-w-xs">
+										<p className="mb-1 font-medium">What lowers readiness:</p>
+										<ul className="list-inside list-disc space-y-0.5 text-xs">
+											<li>Encounters missing ICD-10 codes</li>
+											<li>Deprecated ICD-10 codes used</li>
+											<li>Encounters without finalized notes</li>
+										</ul>
+										<p className="text-muted-foreground mt-1 text-xs">
+											Below 95% blocks export. See Validation page for details.
+										</p>
+									</TooltipContent>
+								</Tooltip>
+							</div>
+							<div className="mt-1 text-3xl font-bold">
+								{metrics.readinessPercent != null ? `${metrics.readinessPercent}%` : "—"}
+							</div>
+							{metrics.readinessPercent != null && (
+								<Progress
+									value={metrics.readinessPercent}
+									className={`mt-2 h-2 ${metrics.readinessPercent < 95 ? "[&>div]:bg-destructive" : ""}`}
+								/>
+							)}
+							{metrics.readinessPercent != null && metrics.readinessPercent < 95 && (
+								<p className="text-destructive mt-1 text-xs">
+									Below 95% threshold — export blocked. Resolve missing ICD-10 codes.
+								</p>
+							)}
+						</CardContent>
+					</Card>
 
 					{/* Death Rates */}
 					<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -196,9 +244,7 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 							<CardContent className="pt-4">
 								<div className="text-muted-foreground text-sm">Gross Death Rate</div>
 								<div className="text-3xl font-bold">
-									{metrics.grossDeathRate != null
-										? `${metrics.grossDeathRate.toFixed(2)}%`
-										: "—"}
+									{metrics.grossDeathRate != null ? `${metrics.grossDeathRate.toFixed(2)}%` : "—"}
 								</div>
 								<p className="text-muted-foreground mt-1 text-xs">
 									Deaths per 100 discharges (including &lt;48h)
@@ -209,9 +255,7 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 							<CardContent className="pt-4">
 								<div className="text-muted-foreground text-sm">Net Death Rate</div>
 								<div className="text-3xl font-bold">
-									{metrics.netDeathRate != null
-										? `${metrics.netDeathRate.toFixed(2)}%`
-										: "—"}
+									{metrics.netDeathRate != null ? `${metrics.netDeathRate.toFixed(2)}%` : "—"}
 								</div>
 								<p className="text-muted-foreground mt-1 text-xs">
 									Deaths per 100 discharges (excluding &lt;48h)
@@ -237,27 +281,27 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 											<TableHead>ICD-10</TableHead>
 											<TableHead className="text-right">Count</TableHead>
 											<TableHead className="text-right">%</TableHead>
-											<TableHead />
+											{canEdit && <TableHead />}
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{metrics.topMorbidities.map((m) => (
+										{metrics.topMorbidities.map(m => (
 											<TableRow key={m.icdCode}>
 												<TableCell>{m.rank}</TableCell>
 												<TableCell>{m.diseaseName}</TableCell>
 												<TableCell className="text-muted-foreground">{m.icdCode}</TableCell>
 												<TableCell className="text-right">{m.count}</TableCell>
+												<TableCell className="text-right">{m.percentage.toFixed(1)}%</TableCell>
 												<TableCell className="text-right">
-													{m.percentage.toFixed(1)}%
-												</TableCell>
-												<TableCell className="text-right">
-													<Button
-														size="sm"
-														variant="ghost"
-														onClick={() => openDrilldown("morbidity", m.icdCode)}
-													>
-														Drilldown
-													</Button>
+													{canEdit && (
+														<Button
+															size="sm"
+															variant="ghost"
+															onClick={() => openDrilldown("morbidity", m.icdCode)}
+														>
+															Drilldown
+														</Button>
+													)}
 												</TableCell>
 											</TableRow>
 										))}
@@ -284,27 +328,27 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 											<TableHead>ICD-10</TableHead>
 											<TableHead className="text-right">Count</TableHead>
 											<TableHead className="text-right">%</TableHead>
-											<TableHead />
+											{canEdit && <TableHead />}
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{metrics.topMortalities.map((m) => (
+										{metrics.topMortalities.map(m => (
 											<TableRow key={m.icdCode}>
 												<TableCell>{m.rank}</TableCell>
 												<TableCell>{m.diseaseName}</TableCell>
 												<TableCell className="text-muted-foreground">{m.icdCode}</TableCell>
 												<TableCell className="text-right">{m.count}</TableCell>
+												<TableCell className="text-right">{m.percentage.toFixed(1)}%</TableCell>
 												<TableCell className="text-right">
-													{m.percentage.toFixed(1)}%
-												</TableCell>
-												<TableCell className="text-right">
-													<Button
-														size="sm"
-														variant="ghost"
-														onClick={() => openDrilldown("mortality", m.icdCode)}
-													>
-														Drilldown
-													</Button>
+													{canEdit && (
+														<Button
+															size="sm"
+															variant="ghost"
+															onClick={() => openDrilldown("mortality", m.icdCode)}
+														>
+															Drilldown
+														</Button>
+													)}
 												</TableCell>
 											</TableRow>
 										))}
@@ -329,25 +373,25 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 											<TableHead>HAI Type</TableHead>
 											<TableHead className="text-right">Count</TableHead>
 											<TableHead className="text-right">Rate / 1000 Admissions</TableHead>
-											<TableHead />
+											{canEdit && <TableHead />}
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{metrics.haiMetrics.map((h) => (
+										{metrics.haiMetrics.map(h => (
 											<TableRow key={h.haiType}>
-												<TableCell className="font-medium uppercase">
-													{h.haiType}
-												</TableCell>
+												<TableCell className="font-medium uppercase">{h.haiType}</TableCell>
 												<TableCell className="text-right">{h.count}</TableCell>
 												<TableCell className="text-right">{h.rate.toFixed(2)}</TableCell>
 												<TableCell className="text-right">
-													<Button
-														size="sm"
-														variant="ghost"
-														onClick={() => openDrilldown("hai", undefined, h.haiType)}
-													>
-														Drilldown
-													</Button>
+													{canEdit && (
+														<Button
+															size="sm"
+															variant="ghost"
+															onClick={() => openDrilldown("hai", undefined, h.haiType)}
+														>
+															Drilldown
+														</Button>
+													)}
 												</TableCell>
 											</TableRow>
 										))}
@@ -384,7 +428,7 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{drilldown.encounters.map((enc) => (
+									{drilldown.encounters.map(enc => (
 										<TableRow key={enc.encounterId}>
 											<TableCell>{enc.patientName}</TableCell>
 											<TableCell>{enc.patientMrn}</TableCell>
@@ -398,9 +442,7 @@ export function AhsrDashboard({ facilityId }: AhsrDashboardProps) {
 							</Table>
 						</div>
 					) : (
-						<p className="text-muted-foreground py-4 text-center text-sm">
-							No encounters found.
-						</p>
+						<p className="text-muted-foreground py-4 text-center text-sm">No encounters found.</p>
 					)}
 
 					<DialogFooter>

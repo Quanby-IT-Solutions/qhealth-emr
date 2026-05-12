@@ -25,7 +25,7 @@ export function useLoginMutation() {
 			// invalidateQueries only marks stale; the stale cache is still served until
 			// the background refetch completes, causing the previous user to flash.
 			queryClient.clear()
-			router.push("/")
+			router.push("/dashboard")
 			router.refresh()
 		},
 	})

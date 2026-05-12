@@ -19,6 +19,12 @@ export const BreakGlassReasonCategoryEnum = z.enum([
 	"covering_for_absent_provider",
 	"administrative_need",
 	"other",
+	"cardiac_arrest",
+	"motor_vehicle_accident",
+	"code_blue",
+	"trauma",
+	"sepsis",
+	"stroke",
 ])
 
 export const BreakGlassReviewStatusEnum = z.enum(["pending", "appropriate", "flagged"])
@@ -60,6 +66,7 @@ export const AuditLogFilterSchema = z.object({
 	userId: z.string().optional(),
 	action: AuditActionEnum.optional(),
 	entityType: z.string().optional(),
+	entityId: z.string().optional(),
 	patientMrn: z.string().optional(),
 	page: z.coerce.number().int().positive().default(1),
 	limit: z.coerce.number().int().positive().max(100).default(50),
@@ -109,6 +116,11 @@ export const CreateBreakGlassSchema = z.object({
 export type CreateBreakGlassInput = z.infer<typeof CreateBreakGlassSchema>
 
 export const BreakGlassIdSchema = z.object({ id: z.string().uuid() })
+
+export const ActiveBreakGlassLookupSchema = z.object({
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid(),
+})
 
 export const ReviewBreakGlassSchema = z.object({
 	id: z.string().uuid(),
@@ -194,9 +206,7 @@ export const ConfigHistoryEntrySchema = z.object({
 	actor: z.string(),
 	beforeState: z.unknown().nullable(),
 	afterState: z.unknown().nullable(),
-	at: z
-		.union([z.date(), z.string()])
-		.transform(v => (typeof v === "string" ? new Date(v) : v)),
+	at: z.union([z.date(), z.string()]).transform(v => (typeof v === "string" ? new Date(v) : v)),
 })
 
 export type ConfigHistoryEntry = z.infer<typeof ConfigHistoryEntrySchema>
@@ -214,6 +224,11 @@ export const ConfigHistoryListResponseSchema = z.object({
 // ============================================================================
 
 export const AuditLogExportFilterSchema = AuditLogFilterSchema.omit({
+	page: true,
+	limit: true,
+})
+
+export const BreakGlassExportFilterSchema = BreakGlassFilterSchema.omit({
 	page: true,
 	limit: true,
 })

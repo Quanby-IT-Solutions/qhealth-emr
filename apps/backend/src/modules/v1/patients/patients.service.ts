@@ -1,12 +1,20 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, count, desc, eq, gte, ilike, lt, max, or, sql } from "drizzle-orm"
+import { and, count, desc, eq, gte, ilike, inArray, lt, max, or, sql } from "drizzle-orm"
 
-import { encounterStatusEvents, encounters, opdTriageIntakes, patients, staffProfiles, users } from "@repo/db/schema"
+import {
+	encounters,
+	encounterStatusEvents,
+	opdTriageIntakes,
+	patients,
+	staffProfiles,
+	users,
+} from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
-import { resolveStepTarget } from "@/utils/sla-step-target"
 import type { V1Inputs } from "@/config/contract-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
+import { ChartAccessService, type ChartAccessActor } from "@/modules/v1/audit/chart-access.service"
+import { resolveStepTarget } from "@/utils/sla-step-target"
 
 type PatientSearchInput = V1Inputs["patient"]["search"]
 type CreatePatientInput = V1Inputs["patient"]["create"]
@@ -18,7 +26,10 @@ type ListCliniciansInput = V1Inputs["patient"]["listClinicians"]
 export class PatientsService {
 	private readonly logger = new Logger(PatientsService.name)
 
-	constructor(private readonly auditService: AuditService) {}
+	constructor(
+		private readonly auditService: AuditService,
+		private readonly chartAccessService: ChartAccessService
+	) {}
 
 	// ========================================================================
 	// Helper: resolve staffProfileId from userId (null-safe for audit)
@@ -45,12 +56,7 @@ export class PatientsService {
 			})
 			.from(staffProfiles)
 			.innerJoin(users, eq(staffProfiles.userId, users.id))
-			.where(
-				and(
-					eq(staffProfiles.facilityId, input.facilityId),
-					eq(staffProfiles.isActive, true)
-				)
-			)
+			.where(and(eq(staffProfiles.facilityId, input.facilityId), eq(staffProfiles.isActive, true)))
 			.orderBy(users.name)
 
 		return {
@@ -70,20 +76,25 @@ export class PatientsService {
 		const page = Number(filter.page) || 1
 		const limit = Number(filter.limit) || 50
 		const offset = (page - 1) * limit
+		const isActive =
+			filter.isActive === true || filter.isActive === "true"
+				? true
+				: filter.isActive === false || filter.isActive === "false"
+					? false
+					: true
 
 		const conditions = [eq(patients.facilityId, filter.facilityId)]
 
-		conditions.push(eq(patients.isActive, filter.isActive ?? true))
+		conditions.push(eq(patients.isActive, isActive))
 
 		if (filter.search) {
-			const s = this.escapeLike(filter.search)
-			conditions.push(
-				or(
-					ilike(patients.firstName, `%${s}%`),
-					ilike(patients.lastName, `%${s}%`),
-					ilike(patients.mrn, `%${s}%`)
-				)!
-			)
+			const searchTokens = this.tokenizeSearch(filter.search)
+
+			if (searchTokens.length > 0) {
+				conditions.push(
+					and(...searchTokens.map(token => this.buildPatientSearchTokenCondition(token)))!
+				)
+			}
 		}
 
 		if (filter.mrn) {
@@ -93,6 +104,11 @@ export class PatientsService {
 
 		if (filter.dateOfBirth) {
 			conditions.push(eq(patients.dateOfBirth, filter.dateOfBirth))
+		}
+
+		if (filter.philhealthMemberId) {
+			const philhealthMemberId = this.escapeLike(filter.philhealthMemberId)
+			conditions.push(ilike(patients.philhealthMemberId, `%${philhealthMemberId}%`))
 		}
 
 		const whereClause = and(...conditions)
@@ -119,6 +135,7 @@ export class PatientsService {
 					middleName: patients.middleName,
 					dateOfBirth: patients.dateOfBirth,
 					sex: patients.sex,
+					philhealthMemberId: patients.philhealthMemberId,
 					isActive: patients.isActive,
 					lastEncounterDate: lastEncounterSq.lastEncounterDate,
 				})
@@ -133,10 +150,33 @@ export class PatientsService {
 
 		const total = totalResult[0]?.count ?? 0
 
+		const hasDirectAccessSet = new Set<string>()
+		if (filter.clinicianStaffId && data.length > 0) {
+			const patientIds = data.map(r => r.id)
+			const accessRows = await db
+				.selectDistinct({ patientId: encounters.patientId })
+				.from(encounters)
+				.where(
+					and(
+						inArray(encounters.patientId, patientIds),
+						inArray(encounters.status, ["active", "discharged", "closed"]),
+						or(
+							eq(encounters.clinicianStaffId, filter.clinicianStaffId),
+							eq(encounters.attendingStaffId, filter.clinicianStaffId),
+							eq(encounters.admittingStaffId, filter.clinicianStaffId)
+						)
+					)
+				)
+			for (const row of accessRows) {
+				hasDirectAccessSet.add(row.patientId)
+			}
+		}
+
 		return {
 			data: data.map(row => ({
-				...row,
+				...this.serializePatient(row),
 				lastEncounterDate: row.lastEncounterDate ?? null,
+				hasDirectAccess: filter.clinicianStaffId ? hasDirectAccessSet.has(row.id) : true,
 			})),
 			total,
 			page,
@@ -149,12 +189,17 @@ export class PatientsService {
 	// Get by ID (with encounter history)
 	// ========================================================================
 
-	async findById(id: string, actor?: { userId: string; ipAddress?: string | null; userAgent?: string | null }) {
+	async findById(id: string, actor?: ChartAccessActor) {
 		const [patient] = await db.select().from(patients).where(eq(patients.id, id))
 
 		if (!patient) {
 			throw new NotFoundException(`Patient ${id} not found`)
 		}
+
+		const access = await this.chartAccessService.ensurePatientChartReadAccess(actor, id, {
+			entityType: "patient",
+			entityId: id,
+		})
 
 		// PS-049: emit DPA audit record for patient lookup
 		if (actor?.userId) {
@@ -170,7 +215,15 @@ export class PatientsService {
 				afterState: null,
 				ipAddress: actor.ipAddress ?? null,
 				userAgent: actor.userAgent ?? null,
-				metadata: { mrn: patient.mrn },
+				metadata: {
+					mrn: patient.mrn,
+					...(access.mode === "break_glass"
+						? {
+								accessMode: "break_glass",
+								breakGlassEventId: access.breakGlassEventId ?? null,
+							}
+						: {}),
+				},
 			})
 		}
 
@@ -188,7 +241,7 @@ export class PatientsService {
 			.orderBy(desc(encounters.admissionDatetime))
 
 		return {
-			...patient,
+			...this.serializePatient(patient),
 			encounters: patientEncounters,
 		}
 	}
@@ -230,7 +283,7 @@ export class PatientsService {
 				this.logger.log(
 					`Registered patient: ${created!.lastName}, ${created!.firstName} (MRN: ${mrn})`
 				)
-				return created!
+				return this.serializePatient(created!)
 			} catch (err) {
 				if (this.isUniqueMrnViolation(err) && attempt < MAX_RETRIES - 1) {
 					this.logger.warn(`MRN collision on ${mrn}, retrying (attempt ${attempt + 1})`)
@@ -261,7 +314,7 @@ export class PatientsService {
 		}
 
 		this.logger.log(`Updated patient: ${id}`)
-		return updated
+		return this.serializePatient(updated)
 	}
 
 	// ========================================================================
@@ -316,16 +369,13 @@ export class PatientsService {
 						.from(opdTriageIntakes)
 						.where(eq(opdTriageIntakes.id, input.pendingTriageId))
 					if (!intake) {
-						throw new NotFoundException(
-							`Triage intake ${input.pendingTriageId} not found`
-						)
+						throw new NotFoundException(`Triage intake ${input.pendingTriageId} not found`)
 					}
 					if (intake.facilityId !== input.facilityId) {
-						throw new BadRequestException(
-							`Triage intake does not belong to this facility`
-						)
+						throw new BadRequestException(`Triage intake does not belong to this facility`)
 					}
-					if (intake.status !== "pending_registration") { // PS-043
+					if (intake.status !== "pending_registration") {
+						// PS-043
 						throw new BadRequestException(
 							`Triage intake is no longer eligible for registration (status: ${intake.status})`
 						)
@@ -516,6 +566,49 @@ export class PatientsService {
 		return str.replace(/[%_\\]/g, "\\$&")
 	}
 
+	/**
+	 * Convert Postgres DATE values into stable YYYY-MM-DD strings that match the
+	 * shared contract without shifting the calendar day across timezones.
+	 */
+	private formatDateOnly(value: Date | string): string {
+		if (typeof value === "string") return value
+
+		const year = value.getFullYear().toString()
+		const month = (value.getMonth() + 1).toString().padStart(2, "0")
+		const day = value.getDate().toString().padStart(2, "0")
+
+		return `${year}-${month}-${day}`
+	}
+
+	private serializePatient<T extends { dateOfBirth: Date | string }>(
+		patient: T
+	): Omit<T, "dateOfBirth"> & { dateOfBirth: string } {
+		return {
+			...patient,
+			dateOfBirth: this.formatDateOnly(patient.dateOfBirth),
+		}
+	}
+
+	private tokenizeSearch(search: string): string[] {
+		return search
+			.trim()
+			.replaceAll(",", " ")
+			.split(/\s+/)
+			.map(token => token.trim())
+			.filter(Boolean)
+	}
+
+	private buildPatientSearchTokenCondition(token: string) {
+		const escapedToken = this.escapeLike(token)
+
+		return or(
+			ilike(patients.firstName, `%${escapedToken}%`),
+			ilike(patients.middleName, `%${escapedToken}%`),
+			ilike(patients.lastName, `%${escapedToken}%`),
+			ilike(patients.mrn, `%${escapedToken}%`)
+		)!
+	}
+
 	/** Detect a PostgreSQL unique-constraint violation (SQLSTATE 23505). */
 	private isUniqueMrnViolation(err: unknown): boolean {
 		return (
@@ -539,12 +632,7 @@ export class PatientsService {
 		const [result] = await db
 			.select({ count: count() })
 			.from(patients)
-			.where(
-				and(
-					eq(patients.facilityId, facilityId),
-					ilike(patients.mrn, `${prefix}%`)
-				)
-			)
+			.where(and(eq(patients.facilityId, facilityId), ilike(patients.mrn, `${prefix}%`)))
 
 		const sequence = (result?.count ?? 0) + 1
 		return `${prefix}${sequence.toString().padStart(4, "0")}`

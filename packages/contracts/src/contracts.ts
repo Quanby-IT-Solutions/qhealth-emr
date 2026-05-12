@@ -6,6 +6,28 @@
 // V1 contracts (routers)
 export { v1Contract } from "./modules/v1/v1.contract.js"
 
+// Billing contract — exported directly so backend controller can reference typed procedures
+// (v1Billing uses `as any` cast to avoid TS7056; billingContract retains full types)
+export { billingContract } from "./modules/v1/billing/billing.contract.js"
+
+// Reporting contract — exported for typed reportingOrpc client
+export { reportingContract } from "./modules/v1/reporting/reporting.contract.js"
+
+// HIM contract (HIM-BE-01..05)
+export { himContract } from "./modules/v1/him/him.contract.js"
+export type { HimContract } from "./modules/v1/him/him.contract.js"
+
+// MSW router contract — exported for typed mswOrpc client
+export { v1Msw } from "./modules/v1/msw/v1.msw.js"
+
+// MSW flat base contract and sub-contracts — exported for typed client composition and controller casts
+export { mswContract as mswBaseContract } from "./modules/v1/msw/msw.contract.js"
+export { assessmentsContract } from "./modules/v1/msw/assessments.contract.js"
+export { coeContract } from "./modules/v1/msw/coe.contract.js"
+export { annexSignaturesContract } from "./modules/v1/msw/annex-signatures.contract.js"
+export { malasakitContract } from "./modules/v1/msw/malasakit.contract.js"
+export { ancillaryClearanceContract } from "./modules/v1/msw/ancillary-clearance.contract.js"
+
 // Admin dashboard schemas — exported for frontend and backend consumption
 export type {
 	AdminDashboardSummary,
@@ -51,26 +73,59 @@ export type { EncounterDetail } from "./modules/v1/encounters/encounters.schema.
 // Audit schemas (enums, types) for use in frontend and backend
 export * from "./modules/v1/audit/audit.schema.js"
 
+// Auditor schemas — auditor-role read API types
+export * from "./modules/v1/auditor/auditor.schema.js"
+
 // Scheduling schemas — exported for frontend validation and types
 export {
 	AppointmentStatusEnum,
 	AppointmentEncounterTypeEnum,
+	ClinicSlotStatusEnum,
+	ClinicTemplateSchema,
 	AppointmentSchema,
 	AppointmentDetailSchema,
+	ClinicSlotSchema,
+	CreateClinicTemplateSchema,
+	TimeSlotSchema,
+	AvailableSlotsResponseSchema,
 	AppointmentListSchema,
+	AppointmentListResponseSchema,
 	CreateAppointmentSchema,
 	CheckInAppointmentSchema,
 	UpdateAppointmentStatusSchema,
+	UpdateClinicTemplateSchema,
 	AvailableSlotsQuerySchema,
+	ListTemplateSlotsQuerySchema,
+	UpdateSlotSchema,
 	ClinicQueueQuerySchema,
+	ClinicQueueResponseSchema,
+	QueueEntryStatusEnum,
+	UnifiedQueueEntrySchema,
+	UpdateEncounterQueueStatusSchema,
+	UpdateEncounterQueueStatusResponseSchema,
+	type CreateClinicTemplateInput,
+	type UpdateClinicTemplateInput,
 	type Appointment,
 	type AppointmentDetail,
+	type ClinicTemplate,
+	type ClinicSlot,
+	type TimeSlot,
+	type AvailableSlotsResponse,
+	type AppointmentListResponse,
+	type AppointmentListItem,
 	type AppointmentListInput,
 	type CreateAppointmentInput,
 	type CheckInAppointmentInput,
 	type UpdateAppointmentStatusInput,
 	type AvailableSlotsQuery,
+	type ListTemplateSlotsQuery,
 	type ClinicQueueQuery,
+	type QueueEntryStatus,
+	type UnifiedQueueEntry,
+	type ClinicQueueResponse,
+	type UpdateSlotInput,
+	type UpdateEncounterQueueStatusInput,
+	type UpdateEncounterQueueStatusResponse,
 } from "./modules/v1/scheduling/scheduling.schema.js"
 
 // SLA schemas — exported for frontend validation and types
@@ -113,6 +168,10 @@ export {
 	type SlaStepConfigsResponse,
 	type CreateSlaStepConfig,
 	type UpdateSlaStepConfig,
+	SlaKpiTileSchema,
+	SlaDashboardResponseSchema,
+	type SlaKpiTile,
+	type SlaDashboardResponse,
 } from "./modules/v1/sla/sla.schema.js"
 
 // OPD Triage schemas — exported for frontend validation and types
@@ -233,9 +292,19 @@ export {
 	NutritionAssessmentSchema,
 	CreateNutritionAssessmentSchema,
 	MealPlanSchema,
+	ScreeningScoreInputSchema,
+	ScreeningScoreResultSchema,
+	Nrs2002InputSchema,
+	MustInputSchema,
+	SgaInputSchema,
 	type NutritionAssessment,
 	type CreateNutritionAssessment,
 	type MealPlan,
+	type ScreeningScoreInput,
+	type ScreeningScoreResult,
+	type Nrs2002Input,
+	type MustInput,
+	type SgaInput,
 } from "./modules/v1/nutrition/nutrition.schema.js"
 
 // MSW (Medical Social Work) schemas — exported for frontend validation
@@ -310,3 +379,36 @@ export type {
 	SystemSettings,
 	TriggerOfflineCacheJobResult,
 } from "./modules/v1/system-settings/system-settings.schema.js"
+
+// FHIR Endpoints schemas (ADM-BE-07)
+export type {
+	FhirEndpoint,
+	FhirExchangeLogEntry,
+	TestConnectionResult,
+	UpsertFhirEndpointInput,
+	ListExchangeLogInput,
+	ExchangeLogResponse,
+} from "./modules/v1/fhir-endpoints/fhir-endpoints.schema.js"
+
+// Terminology schemas (ADM-BE-08)
+export type {
+	CodeSystem,
+	Code,
+	SearchCodesInput,
+	SearchCodesResponse,
+	DeprecateCodeInput,
+	ImportCodesInput,
+	ImportResult as TerminologyImportResult,
+} from "./modules/v1/terminology/terminology.schema.js"
+
+// Master Data schemas (ADM-BE-11 master data)
+export type {
+	MasterDataCatalog,
+	MasterDataItem,
+	ListItemsInput,
+	ItemsResponse,
+	UpsertItemInput,
+	DeprecateItemInput,
+	ImportItemsInput,
+	ImportResult as MasterDataImportResult,
+} from "./modules/v1/master-data/master-data.schema.js"

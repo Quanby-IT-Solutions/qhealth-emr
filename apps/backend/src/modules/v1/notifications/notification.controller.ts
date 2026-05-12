@@ -3,7 +3,7 @@ import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 import type { Request, Response } from "express"
-import { Observable, map } from "rxjs"
+import { map, Observable } from "rxjs"
 
 import { v1 } from "@/config/api-versions.config"
 import { env } from "@/config/env.config"
@@ -28,10 +28,7 @@ export class NotificationController {
 
 	@RequirePermission("notifications", "view")
 	@Sse("v1/notification/stream")
-	stream(
-		@Req() req: Request,
-		@Res({ passthrough: true }) res: Response
-	): Observable<MessageEvent> {
+	stream(@Req() req: Request, @Res({ passthrough: true }) res: Response): Observable<MessageEvent> {
 		// Set CORS headers explicitly for SSE streams (NestJS CORS middleware
 		// may not propagate headers to streaming responses)
 		const origin = req.headers.origin
@@ -44,14 +41,17 @@ export class NotificationController {
 		// The RbacGuard attaches the full RBAC profile to the request.
 		// Use the active staff profile's UUID so the SSE connection key matches
 		// the recipientStaffId used in send() — enabling real-time delivery.
-		const rbacProfile = (req as unknown as Record<string, unknown>).rbacProfile as {
-			staffProfiles: Array<{ id: string; facilityId: string; roles: Array<{ id: string }> }>
-			activeRole: { id: string } | null
-		} | undefined
+		const rbacProfile = (req as unknown as Record<string, unknown>).rbacProfile as
+			| {
+					staffProfiles: Array<{ id: string; facilityId: string; roles: Array<{ id: string }> }>
+					activeRole: { id: string } | null
+			  }
+			| undefined
 
-		const activeProfile = rbacProfile?.staffProfiles?.find(p =>
-			p.roles.some(r => r.id === rbacProfile?.activeRole?.id)
-		) ?? rbacProfile?.staffProfiles?.[0]
+		const activeProfile =
+			rbacProfile?.staffProfiles?.find(p =>
+				p.roles.some(r => r.id === rbacProfile?.activeRole?.id)
+			) ?? rbacProfile?.staffProfiles?.[0]
 
 		const staffProfileId = activeProfile?.id
 		if (!staffProfileId) {

@@ -5,7 +5,7 @@ import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions } from "@/modules/v1/rbac/rbac.guard"
 
 import { FacilityProfileService } from "./facility-profile.service"
 
@@ -17,9 +17,8 @@ type RbacProfile = {
 function extractActor(session: UserSession, req: Request) {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
 	const activeProfile =
-		profile?.staffProfiles?.find(p =>
-			p.roles.some(r => r.id === profile?.activeRole?.id)
-		) ?? profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
 
 	return {
 		userId: session.user.id,
@@ -33,9 +32,8 @@ function extractActor(session: UserSession, req: Request) {
 function getActiveFacilityId(req: Request): string {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
 	const activeProfile =
-		profile?.staffProfiles?.find(p =>
-			p.roles.some(r => r.id === profile?.activeRole?.id)
-		) ?? profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
 
 	return activeProfile?.facilityId ?? ""
 }
@@ -44,7 +42,10 @@ function getActiveFacilityId(req: Request): string {
 export class FacilityProfileController {
 	constructor(private readonly facilityProfileService: FacilityProfileService) {}
 
-	@RequirePermission("facility_profile", "view")
+	@RequireAnyPermissions([
+		{ module: "admin.facility", action: "read" },
+		{ module: "facility_profile", action: "view" },
+	])
 	@Implement(v1.facilityProfile.get)
 	async get(@Session() _session: UserSession, @Req() req: Request) {
 		const facilityId = getActiveFacilityId(req)
@@ -53,7 +54,10 @@ export class FacilityProfileController {
 		})
 	}
 
-	@RequirePermission("facility_profile", "edit")
+	@RequireAnyPermissions([
+		{ module: "admin.facility", action: "write" },
+		{ module: "facility_profile", action: "edit" },
+	])
 	@Implement(v1.facilityProfile.update)
 	async update(@Session() session: UserSession, @Req() req: Request) {
 		const actor = extractActor(session, req)

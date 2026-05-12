@@ -12,7 +12,7 @@ type NotificationListFilter = V1Inputs["notification"]["list"]
 interface SendNotificationInput {
 	facilityId: string
 	recipientStaffId: string
-	topic: "pidsr" | "news" | "pharmacy" | "break_glass" | "system" | "ed_queue"
+	topic: "pidsr" | "news" | "pharmacy" | "break_glass" | "system" | "ed_queue" | "sla_warning" | "sla_exceeded" | "surgical"
 	title: string
 	body: string
 	data?: unknown
@@ -40,15 +40,13 @@ export class NotificationService {
 		const [profile] = await db
 			.select({ id: staffProfiles.id })
 			.from(staffProfiles)
-			.where(
-				and(
-					eq(staffProfiles.userId, userId),
-					eq(staffProfiles.facilityId, facilityId)
-				)
-			)
+			.where(and(eq(staffProfiles.userId, userId), eq(staffProfiles.facilityId, facilityId)))
 			.limit(1)
 
-		if (!profile) throw new NotFoundException(`Staff profile not found for user ${userId} at facility ${facilityId}`)
+		if (!profile)
+			throw new NotFoundException(
+				`Staff profile not found for user ${userId} at facility ${facilityId}`
+			)
 		return profile.id
 	}
 
@@ -171,10 +169,7 @@ export class NotificationService {
 				.orderBy(desc(notifications.createdAt))
 				.limit(limit)
 				.offset(offset),
-			db
-				.select({ count: count() })
-				.from(notifications)
-				.where(whereClause),
+			db.select({ count: count() }).from(notifications).where(whereClause),
 			db
 				.select({ count: count() })
 				.from(notifications)
@@ -203,10 +198,7 @@ export class NotificationService {
 	 * Get a single notification.
 	 */
 	async findOne(id: string) {
-		const [notification] = await db
-			.select()
-			.from(notifications)
-			.where(eq(notifications.id, id))
+		const [notification] = await db.select().from(notifications).where(eq(notifications.id, id))
 
 		if (!notification) throw new NotFoundException(`Notification ${id} not found`)
 		return notification

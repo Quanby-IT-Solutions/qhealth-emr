@@ -1,15 +1,15 @@
 "use client"
 
 import { useState } from "react"
-
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react"
+import { Calendar, ChevronLeft, ChevronRight, Plus } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
-import { type OrSlot, useOrSlotsQuery } from "../api/surgical.hooks"
+import { useOrSlotsQuery, type OrSlot } from "../api/surgical.hooks"
+import { OrCaseBookingDialog } from "./or-case-booking-dialog"
 
 // ─── Date helpers ──────────────────────────────────────────────────────────
 
@@ -37,184 +37,238 @@ function formatWeekRange(start: Date): string {
 	return `${start.toLocaleDateString("en-PH", opts)} – ${end.toLocaleDateString("en-PH", { ...opts, year: "numeric" })}`
 }
 
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-
 // ─── OR Suites ─────────────────────────────────────────────────────────────
 
 const OR_SUITES = ["OR-1", "OR-2", "OR-3", "OR-4"]
 
-// ─── Slot Card ─────────────────────────────────────────────────────────────
+// ─── Time slots shown in the calendar rows ──────────────────────────────────
 
-interface SlotCardProps {
-	slot: OrSlot
-}
-
-function SlotCard({ slot }: SlotCardProps) {
-	const isBooked = !!slot.surgicalCaseId
-
-	return (
-		<div
-			className={`rounded-md border p-2 text-xs ${
-				isBooked
-					? "bg-primary/10 border-primary/30"
-					: "bg-muted/40 border-dashed hover:bg-muted/60"
-			}`}
-		>
-			<p className="font-semibold">
-				{slot.startTime} – {slot.endTime}
-			</p>
-			{isBooked ? (
-				<>
-					<p className="text-foreground/80 mt-0.5 truncate">{slot.procedureName}</p>
-					<p className="text-muted-foreground truncate">{slot.surgeonName}</p>
-				</>
-			) : (
-				<p className="text-muted-foreground mt-0.5">Available</p>
-			)}
-		</div>
-	)
-}
+const TIME_SLOTS = [
+	"07:00",
+	"08:00",
+	"09:00",
+	"10:00",
+	"11:00",
+	"12:00",
+	"13:00",
+	"14:00",
+	"15:00",
+	"16:00",
+	"17:00",
+]
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
-export function SurgicalCalendar() {
+interface SurgicalCalendarProps {
+	readOnly?: boolean
+	surgeonStaffId?: string
+	anesthesiologistStaffId?: string
+}
+
+export function SurgicalCalendar({
+	readOnly = false,
+	surgeonStaffId,
+	anesthesiologistStaffId,
+}: SurgicalCalendarProps) {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+	const permissions = profile?.activeRole?.permissions ?? []
+	const canViewSurgicalDashboard = permissions.some(
+		permission => permission.module === "surgical" && permission.action === "view"
+	)
+	const backHref = canViewSurgicalDashboard ? "/surgical" : "/scheduling/templates"
+	const backLabel = canViewSurgicalDashboard ? "Back to Dashboard" : "Back to Scheduling"
 
 	const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()))
+	const [bookingOpen, setBookingOpen] = useState(false)
+	const [bookingOrSuite, setBookingOrSuite] = useState("")
+	const [bookingDatetime, setBookingDatetime] = useState("")
 
 	const weekStartIso = toIsoDate(weekStart)
-	const { data: slots = [], isLoading } = useOrSlotsQuery(facilityId, weekStartIso)
+	const {
+		data: slots = [],
+		isLoading,
+		refetch,
+	} = useOrSlotsQuery({
+		facilityId,
+		weekStart: weekStartIso,
+		surgeonStaffId,
+		anesthesiologistStaffId,
+	})
 
 	const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
-	function slotsByDayAndSuite(day: Date, suite: string): OrSlot[] {
+	function isSlotOccupied(day: Date, suite: string, timeSlot: string): OrSlot | undefined {
 		const dayStr = toIsoDate(day)
-		return slots.filter((s) => s.date === dayStr && s.orSuite === suite)
+		const slotHour = parseInt(timeSlot.split(":")[0]!)
+		return slots.find(s => {
+			if (s.date !== dayStr || s.orSuite !== suite) return false
+			const startHour = parseInt(s.startTime.split(":")[0]!)
+			const endHour = parseInt(s.endTime.split(":")[0]!)
+			return slotHour >= startHour && slotHour < endHour
+		})
 	}
 
-	const bookedCount = slots.filter((s) => !!s.surgicalCaseId).length
+	function openBooking(day: Date, suite: string, timeSlot: string) {
+		const dt = new Date(day)
+		const [h, m] = timeSlot.split(":").map(Number)
+		dt.setHours(h ?? 7, m ?? 0, 0, 0)
+		setBookingOrSuite(suite)
+		setBookingDatetime(dt.toISOString())
+		setBookingOpen(true)
+	}
+
+	const bookedCount = slots.filter(s => !!s.surgicalCaseId).length
 
 	return (
-		<div className="space-y-4 p-6">
-			<div className="flex items-center justify-between">
-				<div>
-					<h1 className="text-2xl font-semibold">OR Schedule</h1>
-					<p className="text-muted-foreground text-sm">
-						Operating room slot management
-					</p>
-				</div>
-				<div className="flex items-center gap-2">
-					<Badge variant="secondary">{bookedCount} booked this week</Badge>
-					<Button variant="outline" size="sm" nativeButton={false} render={<a href="/surgical" />}>
-						← Back to Dashboard
-					</Button>
-				</div>
-			</div>
-
-			{/* Week navigation */}
-			<Card>
-				<CardHeader className="pb-3">
-					<div className="flex items-center justify-between">
-						<CardTitle className="flex items-center gap-2">
-							<Calendar className="size-5" />
-							{formatWeekRange(weekStart)}
-						</CardTitle>
-						<div className="flex items-center gap-1">
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => setWeekStart((w) => addDays(w, -7))}
-							>
-								<ChevronLeft className="size-4" />
-							</Button>
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => setWeekStart(startOfWeek(new Date()))}
-							>
-								Today
-							</Button>
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => setWeekStart((w) => addDays(w, 7))}
-							>
-								<ChevronRight className="size-4" />
-							</Button>
-						</div>
+		<>
+			<div className="space-y-4 p-6">
+				<div className="flex items-center justify-between">
+					<div>
+						<h1 className="text-2xl font-semibold">OR Schedule</h1>
+						<p className="text-muted-foreground text-sm">
+							Operating room slot management — click an empty cell to book a case
+						</p>
 					</div>
-				</CardHeader>
-				<CardContent className="overflow-x-auto p-0">
-					{isLoading ? (
-						<div className="text-muted-foreground py-12 text-center text-sm">
-							Loading schedule…
+					<div className="flex items-center gap-2">
+						<Badge variant="secondary">{bookedCount} booked this week</Badge>
+						{readOnly && <Badge variant="outline">Read Only</Badge>}
+						<Button variant="outline" size="sm" nativeButton={false} render={<a href={backHref} />}>
+							← {backLabel}
+						</Button>
+					</div>
+				</div>
+
+				{/* Week navigation */}
+				<Card>
+					<CardHeader className="pb-3">
+						<div className="flex items-center justify-between">
+							<CardTitle className="flex items-center gap-2">
+								<Calendar className="size-5" />
+								{formatWeekRange(weekStart)}
+							</CardTitle>
+							<div className="flex items-center gap-1">
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setWeekStart(w => addDays(w, -7))}
+								>
+									<ChevronLeft className="size-4" />
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setWeekStart(startOfWeek(new Date()))}
+								>
+									Today
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setWeekStart(w => addDays(w, 7))}
+								>
+									<ChevronRight className="size-4" />
+								</Button>
+							</div>
 						</div>
-					) : (
-						<table className="w-full border-collapse text-sm">
-							<thead>
-								<tr>
-									<th className="border-b border-r bg-muted/50 px-3 py-2 text-left font-medium">
-										OR Suite
-									</th>
-									{weekDays.map((day, i) => {
-										const isToday =
-											toIsoDate(day) === toIsoDate(new Date())
-										return (
+					</CardHeader>
+					<CardContent className="overflow-x-auto p-0">
+						{isLoading ? (
+							<div className="text-muted-foreground py-12 text-center text-sm">
+								Loading schedule…
+							</div>
+						) : (
+							<table className="w-full border-collapse text-sm">
+								<thead>
+									<tr>
+										<th className="bg-muted/50 w-16 border-r border-b px-3 py-2 text-left font-medium">
+											Time
+										</th>
+										{OR_SUITES.map(suite => (
 											<th
-												key={i}
-												className={`border-b px-3 py-2 text-center font-medium ${
-													isToday ? "bg-primary/10" : "bg-muted/50"
-												}`}
+												key={suite}
+												className="bg-muted/50 border-r border-b px-3 py-2 text-center font-medium"
 											>
-												<div className="text-xs font-semibold">
-													{DAY_LABELS[day.getDay()]}
-												</div>
-												<div
-													className={`text-base ${isToday ? "text-primary font-bold" : ""}`}
-												>
-													{day.getDate()}
-												</div>
+												{suite}
 											</th>
-										)
-									})}
-								</tr>
-							</thead>
-							<tbody>
-								{OR_SUITES.map((suite) => (
-									<tr key={suite} className="border-b last:border-0">
-										<td className="border-r px-3 py-2 font-medium">{suite}</td>
-										{weekDays.map((day, di) => {
-											const daySlots = slotsByDayAndSuite(day, suite)
-											return (
-												<td
-													key={di}
-													className="min-w-[120px] px-2 py-2 align-top"
-												>
-													{daySlots.length === 0 ? (
-														<div className="text-muted-foreground py-1 text-center text-xs">
-															—
-														</div>
-													) : (
-														<div className="space-y-1">
-															{daySlots.map((slot) => (
-																<SlotCard
-																	key={slot.id}
-																	slot={slot}
-																/>
+										))}
+									</tr>
+								</thead>
+								<tbody>
+									{TIME_SLOTS.map(timeSlot => (
+										<tr key={timeSlot} className="border-b last:border-0">
+											<td className="bg-muted/30 text-muted-foreground w-16 border-r px-3 py-2 text-xs font-medium">
+												{timeSlot}
+											</td>
+											{OR_SUITES.map(suite => {
+												const today = toIsoDate(new Date())
+												const todayOccupied = weekDays.map(day => {
+													const occupied = isSlotOccupied(day, suite, timeSlot)
+													const isToday = toIsoDate(day) === today
+													return { day, occupied, isToday }
+												})
+
+												return (
+													<td key={suite} className="border-r p-0">
+														<div className="grid grid-cols-7">
+															{todayOccupied.map(({ day, occupied, isToday }, di) => (
+																<div
+																	key={di}
+																	className={`min-h-[40px] border-r p-1 last:border-r-0 ${isToday ? "bg-primary/5" : ""}`}
+																>
+																	{occupied ? (
+																		<div className="bg-primary/10 border-primary/30 h-full rounded border p-1 text-xs">
+																			<p className="text-primary truncate font-semibold">
+																				{occupied.procedureName}
+																			</p>
+																			{occupied.surgeonName && (
+																				<p className="text-muted-foreground truncate">
+																					{occupied.surgeonName}
+																				</p>
+																			)}
+																		</div>
+																	) : (
+																		<div className="flex h-full min-h-[38px] items-center justify-center">
+																			{readOnly ? (
+																				<span className="text-muted-foreground/30 text-xs">
+																					Open
+																				</span>
+																			) : (
+																				<button
+																					onClick={() => openBooking(day, suite, timeSlot)}
+																					className="text-muted-foreground/40 hover:bg-primary/5 hover:text-primary/60 flex h-full min-h-[38px] w-full items-center justify-center rounded transition-colors"
+																					title={`Book case in ${suite} on ${toIsoDate(day)} at ${timeSlot}`}
+																				>
+																					<Plus className="size-3" />
+																				</button>
+																			)}
+																		</div>
+																	)}
+																</div>
 															))}
 														</div>
-													)}
-												</td>
-											)
-										})}
-									</tr>
-								))}
-							</tbody>
-						</table>
-					)}
-				</CardContent>
-			</Card>
-		</div>
+													</td>
+												)
+											})}
+										</tr>
+									))}
+								</tbody>
+							</table>
+						)}
+					</CardContent>
+				</Card>
+			</div>
+
+			{!readOnly && bookingOpen && facilityId && (
+				<OrCaseBookingDialog
+					open={bookingOpen}
+					onClose={() => setBookingOpen(false)}
+					onSuccess={() => void refetch()}
+					facilityId={facilityId}
+					orSuite={bookingOrSuite}
+					scheduledDatetime={bookingDatetime}
+				/>
+			)}
+		</>
 	)
 }

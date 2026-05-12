@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { startTransition, useState } from "react"
 import { toast } from "sonner"
-import { Plus, Trash2 } from "lucide-react"
+import { Info, Plus, Trash2 } from "lucide-react"
 
 import {
 	AlertDialog,
@@ -15,6 +15,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/core/components/ui/alert-dialog"
+import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
@@ -37,7 +38,6 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
-import { Switch } from "@/core/components/ui/switch"
 import { Textarea } from "@/core/components/ui/textarea"
 import {
 	useCreateFeatureFlagMutation,
@@ -45,8 +45,9 @@ import {
 	useFeatureFlagsListQuery,
 	useUpdateFeatureFlagMutation,
 } from "@/features/feature-flags/api/feature-flags.hooks"
+import { ToggleListItem } from "./toggle-list-item"
 
-type FeatureFlagGroup = "platform-control" | "compliance" | "integration"
+type FeatureFlagGroup = "platform-control" | "financial" | "compliance" | "integration"
 type FeatureFlagRiskLevel = "low" | "moderate" | "high"
 
 interface CreateFlagForm {
@@ -69,21 +70,27 @@ const INITIAL_CREATE_FORM: CreateFlagForm = {
 	defaultEnabled: false,
 }
 
+// TOR §2 category mapping — 4 groups per ADM-FE-04
 const FEATURE_FLAG_GROUPS: Array<{ value: FeatureFlagGroup; title: string; description: string }> = [
 	{
 		value: "platform-control",
-		title: "Platform Control",
-		description: "Operational feature gates for staged rollout and support workflows.",
+		title: "Clinical",
+		description: "Patient-facing workflow gates for staged rollout of clinical modules and high-risk features.",
+	},
+	{
+		value: "financial",
+		title: "Financial",
+		description: "Revenue cycle, billing, and PhilHealth integration controls.",
 	},
 	{
 		value: "compliance",
-		title: "Compliance Controls",
+		title: "Reporting",
 		description: "Toggles that affect regulatory evidence, audit strength, or TOR-mandated safeguards.",
 	},
 	{
 		value: "integration",
-		title: "Integration Rollouts",
-		description: "Feature gates for external systems and phased partner activation.",
+		title: "Interop",
+		description: "Feature gates for external systems, FHIR endpoints, and phased partner activation.",
 	},
 ]
 
@@ -97,8 +104,11 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 	const createMutation = useCreateFeatureFlagMutation()
 	const deleteMutation = useDeleteFeatureFlagMutation()
 
-	// Draft state: map from flagId → override defaultEnabled (FF-003: do NOT auto-clear on data refresh)
+	// Draft state: map from flagId → override defaultEnabled
 	const [draft, setDraft] = useState<Record<string, boolean>>({})
+
+	// Save confirmation modal
+	const [showConfirm, setShowConfirm] = useState(false)
 
 	// Create dialog
 	const [createOpen, setCreateOpen] = useState(false)
@@ -124,6 +134,8 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 		const entries = Object.entries(draft)
 		if (entries.length === 0) return
 
+		setShowConfirm(false)
+
 		const results = await Promise.allSettled(
 			entries.map(([id, defaultEnabled]) => updateMutation.mutateAsync({ id, defaultEnabled }))
 		)
@@ -138,7 +150,6 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 			}
 		})
 
-		// Only remove succeeded flags from draft; preserve failed ones for retry
 		setDraft(prev => {
 			const next = { ...prev }
 			for (const id of succeeded) delete next[id]
@@ -187,6 +198,12 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 	const serverEnabledCount = flags.filter(f => getEnabled(f.id, f.defaultEnabled)).length
 	const highRiskCount = flags.filter(f => f.riskLevel === "high").length
 
+	// Build diff for save confirmation modal
+	const draftDiff = Object.entries(draft).map(([id, newVal]) => {
+		const flag = flags.find(f => f.id === id)
+		return { id, name: flag?.name ?? id, before: !newVal, after: newVal }
+	})
+
 	if (isPending) {
 		return (
 			<div className="space-y-6">
@@ -228,6 +245,14 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 				)}
 			</div>
 
+			{/* Audit trail banner — ADM-FE-04 */}
+			<Alert>
+				<Info className="size-4" />
+				<AlertDescription>
+					Changes to feature flags are logged to the audit trail and attributed to your account.
+				</AlertDescription>
+			</Alert>
+
 			<div className="grid gap-4 md:grid-cols-3">
 				<Card>
 					<CardHeader className="pb-2">
@@ -259,79 +284,73 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 							<h2 className="text-lg font-medium">{group.title}</h2>
 							<p className="text-muted-foreground text-sm">{group.description}</p>
 						</div>
-						<div className="grid gap-4 xl:grid-cols-2">
-							{groupFlags.map(flag => {
-								const enabled = getEnabled(flag.id, flag.defaultEnabled)
-								const isDirty = draft[flag.id] !== undefined
+						<Card>
+							<CardContent className="divide-y p-0">
+								{groupFlags.map(flag => {
+									const enabled = getEnabled(flag.id, flag.defaultEnabled)
+									const isDirty = draft[flag.id] !== undefined
 
-								return (
-									<Card key={flag.id} className={isDirty ? "ring-primary ring-1" : ""}>
-										<CardHeader className="gap-3">
-											<div className="flex items-start justify-between gap-3">
-												<div className="space-y-1">
-													<CardTitle className="text-base">{flag.name}</CardTitle>
-													{flag.description && (
-														<CardDescription>{flag.description}</CardDescription>
-													)}
-												</div>
-												<div className="flex items-center gap-2">
-													{canEdit && (
-														<Switch
-															checked={enabled}
-															onCheckedChange={() => toggleFlag(flag.id, enabled)}
-															aria-label={`Toggle ${flag.name}`}
-														/>
-													)}
-													{!canEdit && (
-														<Badge variant={enabled ? "default" : "secondary"}>
-															{enabled ? "On" : "Off"}
+									return (
+										<div key={flag.id} className={`space-y-2 px-4 py-1 ${isDirty ? "bg-primary/5" : ""}`}>
+											<ToggleListItem
+												label={flag.name}
+												description={flag.description ?? undefined}
+												checked={enabled}
+												onCheckedChange={() => canEdit && toggleFlag(flag.id, enabled)}
+												disabled={!canEdit}
+												lastChangedAt={flag.updatedAt.toLocaleDateString()}
+												lastChangedBy={flag.ownerTeam ?? undefined}
+											/>
+											<div className="flex items-center justify-between pb-2">
+												<div className="flex flex-wrap gap-1.5">
+													<Badge variant="outline" className="text-[10px]">
+														{flag.key}
+													</Badge>
+													<Badge
+														variant={flag.riskLevel === "high" ? "default" : "secondary"}
+														className="text-[10px]"
+													>
+														{flag.riskLevel} risk
+													</Badge>
+													<Badge variant="outline" className="text-[10px] border-amber-400 text-amber-600">
+														Staging
+													</Badge>
+													<Badge variant="outline" className="text-[10px] border-blue-500 text-blue-600">
+														Production
+													</Badge>
+													{isDirty && (
+														<Badge variant="destructive" className="text-[10px]">
+															Unsaved
 														</Badge>
 													)}
+												</div>
+												<div className="flex items-center gap-1">
+													<Button
+														variant="ghost"
+														size="sm"
+														nativeButton={false}
+														render={<Link href={`/admin/feature-flags/${flag.id}`} />}
+													>
+														Configure →
+													</Button>
 													{canEdit && (
 														<Button
 															variant="ghost"
 															size="icon"
-															className="text-destructive hover:text-destructive size-8"
+															className="text-destructive hover:text-destructive size-7"
 															aria-label={`Delete ${flag.name}`}
 															onClick={() => setDeleteTarget({ id: flag.id, name: flag.name })}
 														>
-															<Trash2 className="size-4" />
+															<Trash2 className="size-3.5" />
 														</Button>
 													)}
 												</div>
 											</div>
-										</CardHeader>
-										<CardContent className="space-y-3">
-											<div className="flex flex-wrap gap-2 text-xs">
-												{flag.ownerTeam && (
-													<Badge variant="outline">Owner: {flag.ownerTeam}</Badge>
-												)}
-												<Badge variant="outline">Key: {flag.key}</Badge>
-												<Badge variant={flag.riskLevel === "high" ? "default" : "secondary"}>
-													{flag.riskLevel} risk
-												</Badge>
-												{isDirty && (
-													<Badge variant="destructive">Unsaved</Badge>
-												)}
-											</div>
-											<Separator />
-											<div className="flex items-center justify-between gap-3">
-												<p className="text-muted-foreground text-sm">
-													{enabled
-														? "Enabled by default across all contexts."
-														: "Disabled by default. Targeting rules may override."}
-												</p>
-												<Button variant="ghost" size="sm" asChild>
-													<Link href={`/admin/feature-flags/${flag.id}`}>
-														Configure targeting →
-													</Link>
-												</Button>
-											</div>
-										</CardContent>
-									</Card>
-								)
-							})}
-						</div>
+										</div>
+									)
+								})}
+							</CardContent>
+						</Card>
 					</section>
 				)
 			})}
@@ -357,13 +376,49 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 							: "Toggle flags above to stage changes, then save."}
 					</p>
 					<Button
-						onClick={handlePersist}
+						onClick={() => setShowConfirm(true)}
 						disabled={!hasDraftChanges || updateMutation.isPending}
 					>
 						{updateMutation.isPending ? "Saving…" : "Save changes"}
 					</Button>
 				</div>
 			)}
+
+			{/* Save Confirmation Modal — shows diff before committing */}
+			<Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+				<DialogContent className="max-w-md">
+					<DialogHeader>
+						<DialogTitle>Confirm flag changes</DialogTitle>
+						<DialogDescription>
+							Review the changes below before saving. All changes are logged to the audit trail.
+						</DialogDescription>
+					</DialogHeader>
+					<div className="max-h-64 overflow-y-auto space-y-2 py-2">
+						{draftDiff.map(({ id, name, before, after }) => (
+							<div key={id} className="flex items-center justify-between text-sm">
+								<span className="truncate font-medium">{name}</span>
+								<span className="flex-shrink-0 flex items-center gap-1.5 text-xs">
+									<span className={before ? "text-emerald-600" : "text-muted-foreground"}>
+										{before ? "On" : "Off"}
+									</span>
+									<span className="text-muted-foreground">→</span>
+									<span className={after ? "text-emerald-600" : "text-muted-foreground"}>
+										{after ? "On" : "Off"}
+									</span>
+								</span>
+							</div>
+						))}
+					</div>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setShowConfirm(false)}>
+							Cancel
+						</Button>
+						<Button onClick={handlePersist} disabled={updateMutation.isPending}>
+							{updateMutation.isPending ? "Saving…" : "Confirm & save"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 
 			{/* Create flag dialog */}
 			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -412,18 +467,19 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 
 						<div className="grid grid-cols-2 gap-4">
 							<div className="space-y-1.5">
-								<Label>Group <span className="text-destructive">*</span></Label>
+								<Label>TOR §2 Category <span className="text-destructive">*</span></Label>
 								<Select
 									value={createForm.group}
-									onValueChange={v => setCreateForm(f => ({ ...f, group: v as FeatureFlagGroup }))}
+									onValueChange={v => setCreateForm(f => ({ ...f, group: (v ?? "platform-control") as FeatureFlagGroup }))}
 								>
 									<SelectTrigger>
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="platform-control">Platform Control</SelectItem>
-										<SelectItem value="compliance">Compliance</SelectItem>
-										<SelectItem value="integration">Integration</SelectItem>
+										<SelectItem value="platform-control">Clinical</SelectItem>
+										<SelectItem value="financial">Financial</SelectItem>
+										<SelectItem value="compliance">Reporting</SelectItem>
+										<SelectItem value="integration">Interop</SelectItem>
 									</SelectContent>
 								</Select>
 							</div>
@@ -432,7 +488,7 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 								<Label>Risk level <span className="text-destructive">*</span></Label>
 								<Select
 									value={createForm.riskLevel}
-									onValueChange={v => setCreateForm(f => ({ ...f, riskLevel: v as FeatureFlagRiskLevel }))}
+									onValueChange={v => setCreateForm(f => ({ ...f, riskLevel: (v ?? "low") as FeatureFlagRiskLevel }))}
 								>
 									<SelectTrigger>
 										<SelectValue />

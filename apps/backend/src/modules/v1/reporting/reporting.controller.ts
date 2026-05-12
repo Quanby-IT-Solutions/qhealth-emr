@@ -84,6 +84,14 @@ export class ReportingController {
 		})
 	}
 
+	@RequirePermission("reporting", "edit")
+	@Implement(v1.reporting.dismissPidsrCase)
+	async dismissPidsrCase() {
+		return implement(v1.reporting.dismissPidsrCase).handler(async ({ input }) => {
+			return this.reportingService.dismissPidsrCase(input)
+		})
+	}
+
 	// ========================================================================
 	// Weekly Report
 	// ========================================================================
@@ -129,6 +137,54 @@ export class ReportingController {
 	async exportAhsr(@Session() session: UserSession) {
 		return implement(v1.reporting.exportAhsr).handler(async ({ input }) => {
 			return this.reportingService.exportAhsr(input, session.user.id)
+		})
+	}
+
+	// ========================================================================
+	// AHSR Validation & Lock
+	// ========================================================================
+
+	@RequirePermission("reporting", "view")
+	@Implement(v1.reporting.validateAhsr)
+	async validateAhsr() {
+		return implement(v1.reporting.validateAhsr).handler(async ({ input }) => {
+			return this.reportingService.validateAhsr(input)
+		})
+	}
+
+	@RequirePermission("reporting", "edit")
+	@Implement(v1.reporting.lockAhsrPeriod)
+	async lockAhsrPeriod(@Session() session: UserSession) {
+		return implement(v1.reporting.lockAhsrPeriod).handler(async ({ input }) => {
+			return this.reportingService.lockAhsrPeriod(input, session.user.id)
+		})
+	}
+
+	// ========================================================================
+	// Mortality & Morbidity
+	// ========================================================================
+
+	@RequirePermission("reporting", "view")
+	@Implement(v1.reporting.getMmTop10)
+	async getMmTop10() {
+		return implement(v1.reporting.getMmTop10).handler(async ({ input }) => {
+			return this.reportingService.getMmTop10(input)
+		})
+	}
+
+	@RequirePermission("reporting", "view")
+	@Implement(v1.reporting.getMmCondition)
+	async getMmCondition() {
+		return implement(v1.reporting.getMmCondition).handler(async ({ input }) => {
+			return this.reportingService.getMmCondition(input)
+		})
+	}
+
+	@RequirePermission("reporting", "export")
+	@Implement(v1.reporting.exportMmPdf)
+	async exportMmPdf(@Session() session: UserSession) {
+		return implement(v1.reporting.exportMmPdf).handler(async ({ input }) => {
+			return this.reportingService.exportMmPdf(input, session.user.id)
 		})
 	}
 }

@@ -57,15 +57,17 @@ export const PatientSchema = z.object({
 export type Patient = z.infer<typeof PatientSchema>
 
 // ============================================================================
-// Search Input — search by name, MRN, DOB with pagination
+// Search Input — search by name, MRN, DOB, or PhilHealth number with pagination
 // ============================================================================
 
 export const PatientSearchSchema = PaginationInputSchema.extend({
 	search: z.string().optional(),
 	mrn: z.string().optional(),
 	dateOfBirth: z.string().optional(),
+	philhealthMemberId: z.string().optional(),
 	facilityId: z.string().uuid(),
-	isActive: z.boolean().optional().default(true),
+	isActive: z.coerce.boolean().optional().default(true),
+	clinicianStaffId: z.string().uuid().optional(),
 })
 
 export type PatientSearchInput = z.infer<typeof PatientSearchSchema>
@@ -82,9 +84,11 @@ export const PatientSearchResultSchema = PatientSchema.pick({
 	middleName: true,
 	dateOfBirth: true,
 	sex: true,
+	philhealthMemberId: true,
 	isActive: true,
 }).extend({
 	lastEncounterDate: dateOrString.nullable(),
+	hasDirectAccess: z.boolean(),
 })
 
 export const PatientSearchResponseSchema = PaginatedResponseSchema.extend({
@@ -133,8 +137,7 @@ export const RegisterPatientWithOpdEncounterInputSchema = CreatePatientSchema.ex
 	if (!data.pendingTriageId) {
 		ctx.addIssue({
 			code: z.ZodIssueCode.custom,
-			message:
-				"Outpatient registration requires a pending triage intake (TOR Flow 1 Step 1)",
+			message: "Outpatient registration requires a pending triage intake (TOR Flow 1 Step 1)",
 			path: ["pendingTriageId"],
 		})
 	}
@@ -223,7 +226,7 @@ export type PatientIdInput = z.infer<typeof PatientIdSchema>
 export const PatientEncounterSummarySchema = z.object({
 	id: z.string().uuid(),
 	encounterType: z.enum(["inpatient", "outpatient", "emergency", "telemedicine"]),
-	status: z.enum(["active", "discharged", "closed", "cancelled"]),
+	status: z.enum(["active", "pending_discharge", "discharged", "closed", "cancelled"]),
 	chiefComplaint: z.string().nullable(),
 	admissionDatetime: dateOrString,
 	dischargeDatetime: dateOrString.nullable(),

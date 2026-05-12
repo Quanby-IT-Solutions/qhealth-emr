@@ -4,11 +4,20 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { orpc } from "@/services/orpc/client"
 
+function shouldRetryDetailQuery(error: unknown, failureCount: number) {
+	const candidate = error as { status?: number } | null
+	if (candidate?.status === 403 || candidate?.status === 404) {
+		return false
+	}
+
+	return failureCount < 3
+}
+
 export function useEncounterListQuery(
 	params: {
 		facilityId: string
 		patientId: string
-		status?: "active" | "discharged" | "closed" | "cancelled"
+		status?: "active" | "pending_discharge" | "discharged" | "closed" | "cancelled"
 		page?: number
 		limit?: number
 	},
@@ -28,6 +37,7 @@ export function useEncounterDetailQuery(encounterId: string, options?: { enabled
 		orpc.encounter.get.queryOptions({
 			input: { id: encounterId },
 			enabled: (options?.enabled ?? true) && !!encounterId,
+			retry: (failureCount, error) => shouldRetryDetailQuery(error, failureCount),
 		})
 	)
 }
@@ -59,6 +69,15 @@ export function useDischargeEncounterMutation() {
 	)
 }
 
+export function useSignMayGoHomeOrderMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.encounter.signMayGoHomeOrder.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.encounter.key() }),
+		})
+	)
+}
+
 export function useCloseEncounterMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
@@ -66,6 +85,10 @@ export function useCloseEncounterMutation() {
 			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.encounter.key() }),
 		})
 	)
+}
+
+export function useCaptureDpaConsentMutation() {
+	return useMutation(orpc.clinicalDocs.createConsent.mutationOptions())
 }
 
 export function useDischargeChecklistQuery(encounterId: string, options?: { enabled?: boolean }) {

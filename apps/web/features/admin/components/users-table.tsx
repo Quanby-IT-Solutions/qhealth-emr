@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -10,19 +10,34 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
 	useDeactivateStaffMutation,
+	useListRolesQuery,
 	useListStaffQuery,
 } from "@/features/admin/api/admin.hooks"
 
 export function UsersTable() {
+	const router = useRouter()
+	const searchParams = useSearchParams()
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles[0]?.facilityId
 
-	const [search, setSearch] = useState("")
-	const [isActiveFilter, setIsActiveFilter] = useState<"all" | "active" | "inactive">("active")
-	const [page, setPage] = useState(1)
+	const search = searchParams.get("search") ?? ""
+	const statusFilter = (searchParams.get("status") ?? "active") as "all" | "active" | "inactive"
+	const roleFilter = searchParams.get("role") ?? "all"
+	const page = parseInt(searchParams.get("page") ?? "1", 10)
 	const limit = 20
 
-	const isActive = isActiveFilter === "all" ? undefined : isActiveFilter === "active"
+	function setParam(key: string, value: string) {
+		const params = new URLSearchParams(searchParams.toString())
+		if (value === "" || value === "all" || value === "1" && key === "page") {
+			params.delete(key)
+		} else {
+			params.set(key, value)
+		}
+		if (key !== "page") params.delete("page")
+		router.replace(`?${params.toString()}`, { scroll: false })
+	}
+
+	const isActive = statusFilter === "all" ? undefined : statusFilter === "active"
 
 	const { data, isLoading } = useListStaffQuery({
 		facilityId,
@@ -32,28 +47,32 @@ export function UsersTable() {
 		limit,
 	})
 
+	const { data: rolesData } = useListRolesQuery(facilityId ?? "")
 	const deactivateMutation = useDeactivateStaffMutation()
 
 	const totalPages = data ? Math.ceil(data.total / limit) : 1
 
+	// Client-side role filter (backend listStaff doesn't filter by role yet)
+	const filteredData = roleFilter === "all"
+		? data?.data
+		: data?.data.filter(user =>
+			user.staffProfiles.some(p =>
+				p.roles.some(r => r.id === roleFilter)
+			)
+		)
+
 	return (
 		<div className="space-y-4">
-			<div className="flex items-center gap-3">
+			<div className="flex flex-wrap items-center gap-3">
 				<Input
 					placeholder="Search by name or email…"
 					value={search}
-					onChange={e => {
-						setSearch(e.target.value)
-						setPage(1)
-					}}
+					onChange={e => setParam("search", e.target.value)}
 					className="max-w-xs"
 				/>
 				<Select
-					value={isActiveFilter}
-					onValueChange={v => {
-						setIsActiveFilter(v as "all" | "active" | "inactive")
-						setPage(1)
-					}}
+					value={statusFilter}
+					onValueChange={v => setParam("status", v ?? "all")}
 				>
 					<SelectTrigger className="w-36">
 						<SelectValue />
@@ -62,6 +81,22 @@ export function UsersTable() {
 						<SelectItem value="all">All users</SelectItem>
 						<SelectItem value="active">Active</SelectItem>
 						<SelectItem value="inactive">Inactive</SelectItem>
+					</SelectContent>
+				</Select>
+				<Select
+					value={roleFilter}
+					onValueChange={v => setParam("role", v ?? "all")}
+				>
+					<SelectTrigger className="w-44">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="all">All roles</SelectItem>
+						{rolesData?.map(role => (
+							<SelectItem key={role.id} value={role.id}>
+								{role.name}
+							</SelectItem>
+						))}
 					</SelectContent>
 				</Select>
 			</div>
@@ -85,14 +120,14 @@ export function UsersTable() {
 								</TableCell>
 							</TableRow>
 						)}
-						{!isLoading && data?.data.length === 0 && (
+						{!isLoading && filteredData?.length === 0 && (
 							<TableRow>
 								<TableCell colSpan={5} className="text-muted-foreground text-center">
 									No users found
 								</TableCell>
 							</TableRow>
 						)}
-						{data?.data.map(user => {
+						{filteredData?.map(user => {
 							const activeProfile = user.staffProfiles.find(p => p.isActive)
 							return (
 								<TableRow key={user.id}>
@@ -107,7 +142,7 @@ export function UsersTable() {
 									</TableCell>
 									<TableCell>
 										{activeProfile ? (
-											<Badge variant="outline" className="text-green-600 border-green-600">
+											<Badge variant="outline" className="border-green-600 text-green-600">
 												Active
 											</Badge>
 										) : (
@@ -153,7 +188,7 @@ export function UsersTable() {
 					<Button
 						variant="outline"
 						size="sm"
-						onClick={() => setPage(p => Math.max(1, p - 1))}
+						onClick={() => setParam("page", String(Math.max(1, page - 1)))}
 						disabled={page <= 1}
 					>
 						Previous
@@ -164,7 +199,7 @@ export function UsersTable() {
 					<Button
 						variant="outline"
 						size="sm"
-						onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+						onClick={() => setParam("page", String(Math.min(totalPages, page + 1)))}
 						disabled={page >= totalPages}
 					>
 						Next

@@ -1,6 +1,7 @@
 import { oc } from "@orpc/contract"
 
 import {
+	codeSetAdminContract,
 	drugBrandContract,
 	drugGenericContract,
 	formularyItemContract,
@@ -21,5 +22,6 @@ export const v1Formulary = oc.prefix("/formulary").router(
 		rxnorm: rxnormContract,
 		rvs: rvsContract,
 		snomedCt: snomedCtContract,
+		codeSetAdmin: codeSetAdminContract,
 	})
 )

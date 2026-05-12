@@ -1,11 +1,13 @@
 import { oc } from "@orpc/contract"
 
 import {
+	ActiveBreakGlassLookupSchema,
 	AuditLogExportFilterSchema,
 	AuditLogFilterSchema,
 	AuditLogListResponseSchema,
 	AuditLogSchema,
 	BreakGlassEventSchema,
+	BreakGlassExportFilterSchema,
 	BreakGlassFilterSchema,
 	BreakGlassIdSchema,
 	BreakGlassListResponseSchema,
@@ -83,6 +85,16 @@ export const breakGlassContract = {
 		.input(BreakGlassIdSchema)
 		.output(BreakGlassEventSchema),
 
+	myActive: oc
+		.route({
+			method: "GET",
+			path: "/break-glass/me/active",
+			summary: "Get the current clinician's active break-glass event for a patient",
+			tags: ["Audit", "Break Glass"],
+		})
+		.input(ActiveBreakGlassLookupSchema)
+		.output(BreakGlassEventSchema.nullable()),
+
 	create: oc
 		.route({
 			method: "POST",
@@ -112,4 +124,14 @@ export const breakGlassContract = {
 		})
 		.input(BreakGlassPatternsFilterSchema)
 		.output(BreakGlassPatternsSchema),
+
+	exportCsv: oc
+		.route({
+			method: "GET",
+			path: "/break-glass/export",
+			summary: "Export filtered break-glass events as CSV",
+			tags: ["Audit", "Break Glass"],
+		})
+		.input(BreakGlassExportFilterSchema)
+		.output(BreakGlassListResponseSchema),
 }

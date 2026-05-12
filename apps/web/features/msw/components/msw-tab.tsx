@@ -1,11 +1,11 @@
 "use client"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
-
-import { AnnexSignatureCapture } from "@/features/msw/components/annex-signature-capture"
-import { BenefitTags } from "@/features/msw/components/benefit-tags"
-import { CoeIssuance } from "@/features/msw/components/coe-issuance"
-import { MswEvaluationForm } from "@/features/msw/components/msw-evaluation-form"
+import { useMswEvaluationQuery } from "@/features/msw/assessment-coe/api/assessment.hooks"
+import { BenefitTags } from "@/features/msw/assessment-coe/components/benefit-tags"
+import { CoeIssuance } from "@/features/msw/assessment-coe/components/coe-issuance"
+import { MswEvaluationForm } from "@/features/msw/assessment-coe/components/msw-evaluation-form"
+import { AnnexPanel } from "@/features/msw/annex-signatures/components/annex-panel"
 
 const FINANCIAL_CLASS_BADGE: Record<string, { label: string; className: string }> = {
 	a: { label: "Class A", className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
@@ -20,7 +20,9 @@ interface MswTabProps {
 	facilityId: string
 }
 
-export function MswTab({ encounterId, patientId, facilityId: _facilityId }: MswTabProps) {
+export function MswTab({ encounterId, patientId, facilityId }: MswTabProps) {
+	const { data: evaluation } = useMswEvaluationQuery(encounterId)
+
 	return (
 		<div className="space-y-4">
 			<Tabs defaultValue="evaluation">
@@ -33,15 +35,28 @@ export function MswTab({ encounterId, patientId, facilityId: _facilityId }: MswT
 
 				<div className="mt-4">
 					<TabsContent value="evaluation">
-						<MswEvaluationForm encounterId={encounterId} patientId={patientId} />
+						<MswEvaluationForm
+							encounterId={encounterId}
+							patientId={patientId}
+							facilityId={facilityId}
+						/>
 					</TabsContent>
 
 					<TabsContent value="coe">
-						<CoeIssuance encounterId={encounterId} patientId={patientId} />
+						{evaluation ? (
+							<CoeIssuance evaluationId={evaluation.id} encounterId={encounterId} />
+						) : (
+							<p className="py-4 text-center text-sm text-muted-foreground">
+								Complete the financial evaluation first to issue a CoE.
+							</p>
+						)}
 					</TabsContent>
 
 					<TabsContent value="consent">
-						<AnnexSignatureCapture encounterId={encounterId} patientId={patientId} />
+						<div className="space-y-4">
+							<AnnexPanel annexType="a" encounterId={encounterId} />
+							<AnnexPanel annexType="b" encounterId={encounterId} />
+						</div>
 					</TabsContent>
 
 					<TabsContent value="benefits">

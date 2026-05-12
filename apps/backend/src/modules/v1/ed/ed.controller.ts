@@ -4,7 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { EdService } from "./ed.service"
 
@@ -16,7 +16,7 @@ export class EdController {
 
 	@RequirePermission("ed", "create")
 	@Implement(v1.ed.createPreEncounter)
-	async createPreEncounter(@Session() session: UserSession) {
+	async createPreEncounter(@Session() _session: UserSession) {
 		return implement(v1.ed.createPreEncounter).handler(async ({ input }) => {
 			return this.edService.createPreEncounter(input)
 		})
@@ -32,13 +32,16 @@ export class EdController {
 
 	@RequirePermission("ed", "edit")
 	@Implement(v1.ed.updatePreEncounter)
-	async updatePreEncounter(@Session() session: UserSession) {
+	async updatePreEncounter(@Session() _session: UserSession) {
 		return implement(v1.ed.updatePreEncounter).handler(async ({ input }) => {
 			return this.edService.updatePreEncounter(input)
 		})
 	}
 
-	@RequirePermission("ed", "view")
+	@RequireAnyPermissions([
+		{ module: "ed", action: "view" },
+		{ module: "adt", action: "edit" },
+	])
 	@Implement(v1.ed.listPreEncounters)
 	async listPreEncounters() {
 		return implement(v1.ed.listPreEncounters).handler(async ({ input }) => {
@@ -48,7 +51,10 @@ export class EdController {
 
 	// Chart Merge
 
-	@RequirePermission("ed", "view")
+	@RequireAnyPermissions([
+		{ module: "ed", action: "view" },
+		{ module: "adt", action: "edit" },
+	])
 	@Implement(v1.ed.mergePreview)
 	async mergePreview() {
 		return implement(v1.ed.mergePreview).handler(async ({ input }) => {
@@ -56,9 +62,12 @@ export class EdController {
 		})
 	}
 
-	@RequirePermission("ed", "edit")
+	@RequireAnyPermissions([
+		{ module: "ed", action: "edit" },
+		{ module: "adt", action: "edit" },
+	])
 	@Implement(v1.ed.merge)
-	async merge(@Session() session: UserSession) {
+	async merge(@Session() _session: UserSession) {
 		return implement(v1.ed.merge).handler(async ({ input }) => {
 			return this.edService.mergePreEncounter(input)
 		})
@@ -76,7 +85,7 @@ export class EdController {
 
 	@RequirePermission("ed", "edit")
 	@Implement(v1.ed.updateQueueStatus)
-	async updateQueueStatus(@Session() session: UserSession) {
+	async updateQueueStatus(@Session() _session: UserSession) {
 		return implement(v1.ed.updateQueueStatus).handler(async ({ input }) => {
 			return this.edService.updateQueueStatus(input)
 		})
@@ -86,7 +95,7 @@ export class EdController {
 
 	@RequirePermission("ed", "edit")
 	@Implement(v1.ed.dispose)
-	async dispose(@Session() session: UserSession) {
+	async dispose(@Session() _session: UserSession) {
 		return implement(v1.ed.dispose).handler(async ({ input }) => {
 			return this.edService.dispose(input)
 		})

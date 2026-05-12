@@ -1,6 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { ExternalLink } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -44,32 +47,75 @@ function categoryBadge(cat: string | null | undefined) {
 	return <Badge variant="secondary">—</Badge>
 }
 
+function useCountdown(createdAt: string): { hoursLeft: number; isUrgent: boolean } | null {
+	const [now, setNow] = useState(() => Date.now())
+	useEffect(() => {
+		const id = setInterval(() => setNow(Date.now()), 60_000)
+		return () => clearInterval(id)
+	}, [])
+	const deadline = new Date(createdAt).getTime() + 24 * 60 * 60 * 1000
+	const msLeft = deadline - now
+	if (msLeft <= 0) return { hoursLeft: 0, isUrgent: true }
+	const hoursLeft = Math.floor(msLeft / (60 * 60 * 1000))
+	return { hoursLeft, isUrgent: hoursLeft < 6 }
+}
+
+function Cat1Countdown({ createdAt }: { createdAt: string }) {
+	const info = useCountdown(createdAt)
+	if (!info) return null
+	if (info.hoursLeft <= 0)
+		return <Badge variant="destructive" className="text-xs">Overdue</Badge>
+	if (info.isUrgent)
+		return <Badge variant="destructive" className="text-xs">{info.hoursLeft}h left</Badge>
+	return <Badge variant="outline" className="text-xs">{info.hoursLeft}h left</Badge>
+}
+
 interface PidsrDashboardProps {
 	facilityId: string
 }
 
 export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
-	const [tab, setTab] = useState<"flags" | "cases">("flags")
-	const [flagPage, setFlagPage] = useState(1)
-	const [casePage, setCasePage] = useState(1)
-	const [reviewFilter, setReviewFilter] = useState("false")
-	const [categoryFilter, setCategoryFilter] = useState("all")
-	const [caseStatusFilter, setCaseStatusFilter] = useState("all")
+	const router = useRouter()
+	const searchParams = useSearchParams()
+
+	const tab = (searchParams.get("tab") ?? "flags") as "flags" | "cases"
+	const flagPage = Number(searchParams.get("flagPage") ?? "1")
+	const casePage = Number(searchParams.get("casePage") ?? "1")
+	const reviewFilter = searchParams.get("reviewed") ?? "false"
+	const categoryFilter = searchParams.get("category") ?? "all"
+	const caseStatusFilter = searchParams.get("status") ?? "all"
 	const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
+
+	function updateParam(key: string, value: string) {
+		const params = new URLSearchParams(searchParams.toString())
+		if (value === "" || value === "all" || value === "false" || value === "1") {
+			params.delete(key)
+		} else {
+			params.set(key, value)
+		}
+		router.replace(`?${params.toString()}`, { scroll: false })
+	}
+
+	function setTab(value: "flags" | "cases") { updateParam("tab", value === "flags" ? "" : value) }
+	function setFlagPage(fn: (p: number) => number) { updateParam("flagPage", String(fn(flagPage))) }
+	function setCasePage(fn: (p: number) => number) { updateParam("casePage", String(fn(casePage))) }
+	function setReviewFilter(v: string) { updateParam("reviewed", v) }
+	function setCategoryFilter(v: string) { updateParam("category", v) }
+	function setCaseStatusFilter(v: string) { updateParam("status", v) }
 
 	const flagsQuery = useSurveillanceFlagsQuery({
 		facilityId,
 		page: flagPage,
 		limit: 20,
 		isReviewed: reviewFilter === "all" ? undefined : reviewFilter === "true",
-		category: categoryFilter === "all" ? undefined : categoryFilter,
+		category: categoryFilter === "all" ? undefined : (categoryFilter as "category_1" | "category_2"),
 	})
 
 	const casesQuery = usePidsrCasesQuery({
 		facilityId,
 		page: casePage,
 		limit: 20,
-		reportStatus: caseStatusFilter === "all" ? undefined : caseStatusFilter,
+		reportStatus: caseStatusFilter === "all" ? undefined : (caseStatusFilter as "draft" | "submitted" | "rejected" | "blocked"),
 	})
 
 	const submitMut = useSubmitPidsrCaseMutation()
@@ -187,12 +233,24 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 														{flag.patientMrn ?? ""}
 													</div>
 												</TableCell>
-												<TableCell>{categoryBadge(flag.category)}</TableCell>
+												<TableCell>
+													<div className="flex flex-col gap-1">
+														{categoryBadge(flag.category)}
+														{flag.category === "category_1" && !flag.isReviewed && (
+															<Cat1Countdown createdAt={flag.createdAt} />
+														)}
+													</div>
+												</TableCell>
 												<TableCell>{flag.diseaseName ?? flag.triggerValue}</TableCell>
 												<TableCell>
-													<Badge variant="secondary">
-														{flag.flagType === "icd10_match" ? "ICD-10" : "Keyword"}
-													</Badge>
+													<div className="flex flex-col gap-0.5">
+														<Badge variant="secondary" className="w-fit">
+															{flag.flagType === "icd10_match" ? "ICD-10" : "Keyword"}
+														</Badge>
+														{flag.triggeredBy && (
+															<span className="text-xs text-muted-foreground font-mono">{flag.triggeredBy}</span>
+														)}
+													</div>
 												</TableCell>
 												<TableCell className="text-sm">
 													{formatDate(flag.createdAt)}
@@ -310,6 +368,13 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 														>
 															View
 														</Button>
+														<Link
+															href={`/surveillance/pidsr/${c.id}`}
+															title="Open submission page"
+															className="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+														>
+															<ExternalLink className="size-3.5" />
+														</Link>
 														{c.reportStatus === "draft" && (
 															<Button
 																size="sm"

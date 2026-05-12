@@ -160,6 +160,22 @@ export class OrdersController {
 		})
 	}
 
+	@RequirePermission("orders", "create")
+	@Implement(v1.orders.createHighAlertVerification)
+	async createHighAlertVerification(@Session() session: UserSession) {
+		return implement(v1.orders.createHighAlertVerification).handler(async ({ input }) => {
+			return this.ordersService.createHighAlertVerification(input, session.user.id)
+		})
+	}
+
+	@RequirePermission("orders", "view")
+	@Implement(v1.orders.getHighAlertVerification)
+	async getHighAlertVerification() {
+		return implement(v1.orders.getHighAlertVerification).handler(async ({ input }) => {
+			return this.ordersService.getHighAlertVerification(input.medicationOrderId)
+		})
+	}
+
 	// ========================================================================
 	// Prescriptions
 	// ========================================================================
@@ -245,6 +261,82 @@ export class OrdersController {
 	async getChildOrders() {
 		return implement(v1.orders.getChildOrders).handler(async ({ input }) => {
 			return this.ordersService.getChildOrders(input.parentOrderId)
+		})
+	}
+
+	// ========================================================================
+	// Dispense (Inpatient)
+	// ========================================================================
+
+	@RequirePermission("orders", "verify")
+	@Implement(v1.orders.dispenseOrder)
+	async dispenseOrder(@Session() session: UserSession) {
+		return implement(v1.orders.dispenseOrder).handler(async ({ input }) => {
+			return this.ordersService.dispenseOrder(input, session.user.id)
+		})
+	}
+
+	@RequirePermission("orders", "verify")
+	@Implement(v1.orders.listDispenseLogs)
+	async listDispenseLogs() {
+		return implement(v1.orders.listDispenseLogs).handler(async ({ input }) => {
+			return this.ordersService.findDispenseLogs(input)
+		})
+	}
+
+	@RequirePermission("orders", "verify")
+	@Implement(v1.orders.getDispenseLog)
+	async getDispenseLog() {
+		return implement(v1.orders.getDispenseLog).handler(async ({ input }) => {
+			return this.ordersService.findDispenseLog(input.id)
+		})
+	}
+
+	// ========================================================================
+	// OPD Dispensing
+	// ========================================================================
+
+	@RequirePermission("orders", "verify")
+	@Implement(v1.orders.searchOpdPrescription)
+	async searchOpdPrescription() {
+		return implement(v1.orders.searchOpdPrescription).handler(async ({ input }) => {
+			return this.ordersService.searchOpdPrescription(input)
+		})
+	}
+
+	@RequirePermission("orders", "verify")
+	@Implement(v1.orders.opdDispense)
+	async opdDispense(@Session() session: UserSession) {
+		return implement(v1.orders.opdDispense).handler(async ({ input }) => {
+			return this.ordersService.opdDispense(input, session.user.id)
+		})
+	}
+
+	@RequirePermission("orders", "verify")
+	@Implement(v1.orders.listOpdDispenseHistory)
+	async listOpdDispenseHistory() {
+		return implement(v1.orders.listOpdDispenseHistory).handler(async ({ input }) => {
+			return this.ordersService.listOpdDispenseHistory(input)
+		})
+	}
+
+	// ========================================================================
+	// Patient Counseling
+	// ========================================================================
+
+	@RequirePermission("orders", "verify")
+	@Implement(v1.orders.saveCounselingLog)
+	async saveCounselingLog(@Session() session: UserSession) {
+		return implement(v1.orders.saveCounselingLog).handler(async ({ input }) => {
+			return this.ordersService.saveCounselingLog(input, session.user.id)
+		})
+	}
+
+	@RequirePermission("orders", "verify")
+	@Implement(v1.orders.listCounselingLogs)
+	async listCounselingLogs() {
+		return implement(v1.orders.listCounselingLogs).handler(async ({ input }) => {
+			return this.ordersService.findCounselingLogs(input)
 		})
 	}
 }

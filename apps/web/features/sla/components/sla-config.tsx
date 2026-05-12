@@ -1,11 +1,13 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { Info, Pencil, Plus, Trash2 } from "lucide-react"
+import { toast } from "sonner"
+import { ChevronDown, ChevronRight, Info, Pencil, Plus, Trash2 } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import { Checkbox } from "@/core/components/ui/checkbox"
 import {
 	Dialog,
 	DialogContent,
@@ -33,21 +35,21 @@ import {
 } from "@/core/components/ui/table"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
-	type SlaConfig,
-	type SlaStepConfig,
-	type SlaStepType,
 	type SlaWorkflowType,
 	DEFAULT_SLA_TARGETS,
 	WORKFLOW_LABELS,
-	useCreateSlaConfigMutation,
-	useCreateSlaStepConfigMutation,
-	useDeleteSlaConfigMutation,
-	useDeleteSlaStepConfigMutation,
-	useSlaConfigsQuery,
-	useSlaStepConfigsQuery,
-	useUpdateSlaConfigMutation,
-	useUpdateSlaStepConfigMutation,
 } from "@/features/sla/api/sla.hooks"
+import type { SlaConfig, SlaStepConfig, SlaStepType } from "@repo/contracts"
+import {
+	useSlaConfigsOrpcQuery,
+	useCreateSlaConfigOrpcMutation,
+	useUpdateSlaConfigOrpcMutation,
+	useDeleteSlaConfigOrpcMutation,
+	useListStepConfigsOrpcQuery,
+	useCreateSlaStepConfigOrpcMutation,
+	useUpdateSlaStepConfigOrpcMutation,
+	useDeleteSlaStepConfigOrpcMutation,
+} from "@/features/sla/api/sla-orpc.hooks"
 
 // ============================================================================
 // Helpers
@@ -128,6 +130,7 @@ const UNSUPPORTED_STEPS: Partial<Record<SlaStepType, string>> = {}
 interface ConfigFormState {
 	workflowType: SlaWorkflowType
 	targetMinutes: string
+	hardCapMinutes: string
 	warningThresholdPct: string
 	description: string
 }
@@ -135,6 +138,7 @@ interface ConfigFormState {
 const DEFAULT_FORM: ConfigFormState = {
 	workflowType: "opd_consultation",
 	targetMinutes: "30",
+	hardCapMinutes: "",
 	warningThresholdPct: "80",
 	description: "",
 }
@@ -153,6 +157,7 @@ function SlaConfigDialog({ facilityId, editing, open, onOpenChange }: SlaConfigD
 			? {
 					workflowType: editing.workflowType,
 					targetMinutes: String(editing.targetMinutes),
+					hardCapMinutes: editing.hardCapMinutes != null ? String(editing.hardCapMinutes) : "",
 					warningThresholdPct: String(editing.warningThresholdPct),
 					description: editing.description,
 				}
@@ -160,8 +165,8 @@ function SlaConfigDialog({ facilityId, editing, open, onOpenChange }: SlaConfigD
 	)
 	const [error, setError] = useState<string | null>(null)
 
-	const createMutation = useCreateSlaConfigMutation()
-	const updateMutation = useUpdateSlaConfigMutation()
+	const createMutation = useCreateSlaConfigOrpcMutation()
+	const updateMutation = useUpdateSlaConfigOrpcMutation()
 
 	const isPending = createMutation.isPending || updateMutation.isPending
 
@@ -170,7 +175,8 @@ function SlaConfigDialog({ facilityId, editing, open, onOpenChange }: SlaConfigD
 	}
 
 	const handleWorkflowChange = useCallback(
-		(wt: string) => {
+		(wt: string | null) => {
+			if (!wt) return
 			const w = wt as SlaWorkflowType
 			setForm(prev => ({
 				...prev,
@@ -185,10 +191,15 @@ function SlaConfigDialog({ facilityId, editing, open, onOpenChange }: SlaConfigD
 		setError(null)
 
 		const targetMinutes = parseInt(form.targetMinutes, 10)
+		const hardCapMinutes = form.hardCapMinutes ? parseInt(form.hardCapMinutes, 10) : undefined
 		const warningThresholdPct = parseInt(form.warningThresholdPct, 10)
 
 		if (!targetMinutes || targetMinutes <= 0) {
 			setError("Target minutes must be a positive number.")
+			return
+		}
+		if (hardCapMinutes !== undefined && (isNaN(hardCapMinutes) || hardCapMinutes < targetMinutes)) {
+			setError("Hard cap must be greater than or equal to the target.")
 			return
 		}
 		if (!warningThresholdPct || warningThresholdPct <= 0 || warningThresholdPct >= 100) {
@@ -202,6 +213,7 @@ function SlaConfigDialog({ facilityId, editing, open, onOpenChange }: SlaConfigD
 					id: editing.id,
 					facilityId,
 					targetMinutes,
+					hardCapMinutes: hardCapMinutes ?? null,
 					warningThresholdPct,
 					description: form.description.trim(),
 				},
@@ -216,6 +228,7 @@ function SlaConfigDialog({ facilityId, editing, open, onOpenChange }: SlaConfigD
 					facilityId,
 					workflowType: form.workflowType,
 					targetMinutes,
+					hardCapMinutes,
 					warningThresholdPct,
 					description: form.description.trim(),
 				},
@@ -277,6 +290,21 @@ function SlaConfigDialog({ facilityId, editing, open, onOpenChange }: SlaConfigD
 						</div>
 
 						<div className="space-y-2">
+							<Label htmlFor="hard-cap-minutes">Hard Cap (minutes, optional)</Label>
+							<Input
+								id="hard-cap-minutes"
+								type="number"
+								min={1}
+								value={form.hardCapMinutes}
+								onChange={e => setField("hardCapMinutes", e.target.value)}
+								placeholder="e.g. 60"
+							/>
+							<p className="text-xs text-muted-foreground">Must be ≥ target</p>
+						</div>
+					</div>
+
+					<div className="grid grid-cols-2 gap-4">
+						<div className="space-y-2">
 							<Label htmlFor="warning-pct">Warning Threshold (%)</Label>
 							<Input
 								id="warning-pct"
@@ -327,8 +355,8 @@ export function SlaConfig() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles[0]?.facilityId ?? ""
 
-	const { data, isLoading, error } = useSlaConfigsQuery(facilityId)
-	const deleteMutation = useDeleteSlaConfigMutation()
+	const { data, isLoading, error } = useSlaConfigsOrpcQuery(facilityId)
+	const deleteMutation = useDeleteSlaConfigOrpcMutation()
 
 	const [dialogOpen, setDialogOpen] = useState(false)
 	const [editingConfig, setEditingConfig] = useState<SlaConfig | null>(null)
@@ -349,7 +377,7 @@ export function SlaConfig() {
 		if (!deleteConfirm) return
 		setDeleteError(null)
 		deleteMutation.mutate(
-			{ id: deleteConfirm.id, facilityId },
+			{ id: deleteConfirm.id },
 			{
 				onSuccess: () => setDeleteConfirm(null),
 				onError: err => setDeleteError(err instanceof Error ? err.message : "Failed to delete"),
@@ -507,6 +535,7 @@ export function SlaConfig() {
 
 interface StepConfigFormState {
 	targetMinutes: string
+	hardCapMinutes: string
 	warningThresholdPct: string
 	description: string
 }
@@ -527,19 +556,21 @@ function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange
 		editing
 			? {
 					targetMinutes: String(editing.targetMinutes),
+					hardCapMinutes: editing.hardCapMinutes != null ? String(editing.hardCapMinutes) : "",
 					warningThresholdPct: String(editing.warningThresholdPct),
 					description: editing.description,
 				}
 			: {
 					targetMinutes: String(torDefault),
+					hardCapMinutes: "",
 					warningThresholdPct: "80",
 					description: "",
 				}
 	)
 	const [error, setError] = useState<string | null>(null)
 
-	const createMutation = useCreateSlaStepConfigMutation()
-	const updateMutation = useUpdateSlaStepConfigMutation()
+	const createMutation = useCreateSlaStepConfigOrpcMutation()
+	const updateMutation = useUpdateSlaStepConfigOrpcMutation()
 	const isPending = createMutation.isPending || updateMutation.isPending
 
 	function setField<K extends keyof StepConfigFormState>(key: K, val: StepConfigFormState[K]) {
@@ -549,10 +580,15 @@ function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange
 	function handleSubmit() {
 		setError(null)
 		const targetMinutes = parseInt(form.targetMinutes, 10)
+		const hardCapMinutes = form.hardCapMinutes ? parseInt(form.hardCapMinutes, 10) : undefined
 		const warningThresholdPct = parseInt(form.warningThresholdPct, 10)
 
 		if (!targetMinutes || targetMinutes <= 0) {
 			setError("Target minutes must be a positive number.")
+			return
+		}
+		if (hardCapMinutes !== undefined && (isNaN(hardCapMinutes) || hardCapMinutes < targetMinutes)) {
+			setError("Hard cap must be greater than or equal to the target.")
 			return
 		}
 		if (!warningThresholdPct || warningThresholdPct <= 0 || warningThresholdPct >= 100) {
@@ -562,7 +598,7 @@ function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange
 
 		if (isEdit && editing) {
 			updateMutation.mutate(
-				{ id: editing.id, facilityId, targetMinutes, warningThresholdPct, description: form.description.trim() },
+				{ id: editing.id, targetMinutes, hardCapMinutes: hardCapMinutes ?? null, warningThresholdPct, description: form.description.trim() },
 				{
 					onSuccess: () => onOpenChange(false),
 					onError: err => setError(err instanceof Error ? err.message : "Failed to update"),
@@ -570,7 +606,7 @@ function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange
 			)
 		} else {
 			createMutation.mutate(
-				{ facilityId, stepType, targetMinutes, warningThresholdPct, description: form.description.trim() },
+				{ facilityId, stepType, targetMinutes, hardCapMinutes, warningThresholdPct, description: form.description.trim() },
 				{
 					onSuccess: () => onOpenChange(false),
 					onError: err => setError(err instanceof Error ? err.message : "Failed to create"),
@@ -609,6 +645,20 @@ function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange
 								</p>
 							)}
 						</div>
+						<div className="space-y-2">
+							<Label htmlFor="step-hard-cap">Hard Cap (minutes, optional)</Label>
+							<Input
+								id="step-hard-cap"
+								type="number"
+								min={1}
+								value={form.hardCapMinutes}
+								onChange={e => setField("hardCapMinutes", e.target.value)}
+								placeholder="e.g. 60"
+							/>
+							<p className="text-xs text-muted-foreground">Must be ≥ target</p>
+						</div>
+					</div>
+					<div className="grid grid-cols-2 gap-4">
 						<div className="space-y-2">
 							<Label htmlFor="step-warning-pct">Warning Threshold (%)</Label>
 							<Input
@@ -653,15 +703,90 @@ function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange
 // ============================================================================
 
 function SlaStepTargets({ facilityId }: { facilityId: string }) {
-	const { data, isLoading, error } = useSlaStepConfigsQuery(facilityId)
-	const deleteMutation = useDeleteSlaStepConfigMutation()
+	const { data, isLoading, error } = useListStepConfigsOrpcQuery(facilityId)
+	const deleteMutation = useDeleteSlaStepConfigOrpcMutation()
+	const updateMutation = useUpdateSlaStepConfigOrpcMutation()
 
+	const [collapsedFlows, setCollapsedFlows] = useState<Set<string>>(new Set())
 	const [dialogStep, setDialogStep] = useState<SlaStepType | null>(null)
 	const [editingStep, setEditingStep] = useState<SlaStepConfig | null>(null)
+
+	function toggleFlow(label: string) {
+		setCollapsedFlows(prev => {
+			const next = new Set(prev)
+			if (next.has(label)) next.delete(label)
+			else next.add(label)
+			return next
+		})
+	}
 	const [deleteConfirm, setDeleteConfirm] = useState<SlaStepConfig | null>(null)
 	const [deleteError, setDeleteError] = useState<string | null>(null)
 
+	// Bulk-edit mode
+	const [bulkEditMode, setBulkEditMode] = useState(false)
+	const [selectedStepIds, setSelectedStepIds] = useState<Set<string>>(new Set())
+	const [bulkTargetMinutes, setBulkTargetMinutes] = useState("")
+	const [bulkWarningPct, setBulkWarningPct] = useState("")
+
 	const configByStep = new Map((data?.data ?? []).map(c => [c.stepType, c]))
+
+	const allConfiguredStepIds = (data?.data ?? []).map(c => c.id)
+	const allSelected = allConfiguredStepIds.length > 0 && allConfiguredStepIds.every(id => selectedStepIds.has(id))
+
+	function toggleSelectAll() {
+		if (allSelected) {
+			setSelectedStepIds(new Set())
+		} else {
+			setSelectedStepIds(new Set(allConfiguredStepIds))
+		}
+	}
+
+	function toggleSelectStep(id: string) {
+		setSelectedStepIds(prev => {
+			const next = new Set(prev)
+			if (next.has(id)) {
+				next.delete(id)
+			} else {
+				next.add(id)
+			}
+			return next
+		})
+	}
+
+	async function handleBulkApply() {
+		const targetMinutes = parseInt(bulkTargetMinutes, 10)
+		const warningThresholdPct = parseInt(bulkWarningPct, 10)
+
+		if (!bulkTargetMinutes && !bulkWarningPct) {
+			toast.error("Enter at least one value to update.")
+			return
+		}
+		if (bulkTargetMinutes && (!targetMinutes || targetMinutes <= 0)) {
+			toast.error("Target minutes must be a positive number.")
+			return
+		}
+		if (bulkWarningPct && (!warningThresholdPct || warningThresholdPct <= 0 || warningThresholdPct >= 100)) {
+			toast.error("Warning threshold must be between 1 and 99.")
+			return
+		}
+
+		const updates = (data?.data ?? []).filter(c => selectedStepIds.has(c.id))
+		await Promise.all(
+			updates.map(c =>
+				updateMutation.mutateAsync({
+					id: c.id,
+					targetMinutes: bulkTargetMinutes ? targetMinutes : c.targetMinutes,
+					hardCapMinutes: c.hardCapMinutes,
+					warningThresholdPct: bulkWarningPct ? warningThresholdPct : c.warningThresholdPct,
+					description: c.description,
+				})
+			)
+		)
+		toast.success(`Updated ${updates.length} step${updates.length !== 1 ? "s" : ""}.`)
+		setSelectedStepIds(new Set())
+		setBulkTargetMinutes("")
+		setBulkWarningPct("")
+	}
 
 	function openEditStep(stepType: SlaStepType) {
 		const existing = configByStep.get(stepType) ?? null
@@ -673,7 +798,7 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 		if (!deleteConfirm) return
 		setDeleteError(null)
 		deleteMutation.mutate(
-			{ id: deleteConfirm.id, facilityId },
+			{ id: deleteConfirm.id },
 			{
 				onSuccess: () => setDeleteConfirm(null),
 				onError: err => setDeleteError(err instanceof Error ? err.message : "Failed to delete"),
@@ -684,7 +809,7 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 	return (
 		<>
 			<Card className="mt-6">
-				<CardHeader>
+				<CardHeader className="flex flex-row items-start justify-between">
 					<div>
 						<CardTitle>TOR Step Targets</CardTitle>
 						<p className="mt-1 text-sm text-muted-foreground">
@@ -692,6 +817,16 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 							Steps without an override use the TOR default shown in the table.
 						</p>
 					</div>
+					<Button
+						size="sm"
+						variant={bulkEditMode ? "default" : "outline"}
+						onClick={() => {
+							setBulkEditMode(prev => !prev)
+							setSelectedStepIds(new Set())
+						}}
+					>
+						{bulkEditMode ? "Exit Bulk Edit" : "Bulk Edit"}
+					</Button>
 				</CardHeader>
 				<CardContent className="p-0">
 					{error && (
@@ -702,14 +837,34 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 
 					{STEP_FLOWS.map(flow => (
 						<div key={flow.label}>
-							<div className="bg-muted/40 px-6 py-2 border-y border-border">
+							<div className="bg-muted/40 px-6 py-2 border-y border-border flex items-center justify-between">
 								<p className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
 									{flow.label}
 								</p>
+								<button
+									type="button"
+									onClick={() => toggleFlow(flow.label)}
+									className="text-muted-foreground hover:text-foreground"
+									aria-label={collapsedFlows.has(flow.label) ? "Expand flow" : "Collapse flow"}
+								>
+									{collapsedFlows.has(flow.label)
+										? <ChevronRight className="size-4" />
+										: <ChevronDown className="size-4" />
+									}
+								</button>
 							</div>
-							<Table>
+							{!collapsedFlows.has(flow.label) && <Table>
 								<TableHeader>
 									<TableRow>
+										{bulkEditMode && (
+											<TableHead className="w-10">
+												<Checkbox
+													checked={allSelected}
+													onCheckedChange={toggleSelectAll}
+													aria-label="Select all"
+												/>
+											</TableHead>
+										)}
 										<TableHead>Step</TableHead>
 										<TableHead>TOR Default</TableHead>
 										<TableHead>Facility Override</TableHead>
@@ -724,8 +879,20 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 										const torDefault = STEP_DEFAULTS[stepType]
 										const unsupportedNote = UNSUPPORTED_STEPS[stepType]
 										const isUnsupported = !!unsupportedNote
+										const isSelected = override ? selectedStepIds.has(override.id) : false
 										return (
 											<TableRow key={stepType} className={isUnsupported ? "opacity-60" : undefined}>
+												{bulkEditMode && (
+													<TableCell>
+														{override && !isUnsupported ? (
+															<Checkbox
+																checked={isSelected}
+																onCheckedChange={() => toggleSelectStep(override.id)}
+																aria-label={`Select ${STEP_LABELS[stepType]}`}
+															/>
+														) : null}
+													</TableCell>
+												)}
 												<TableCell className="text-sm font-medium">
 													<span className="flex items-center gap-1.5">
 														{STEP_LABELS[stepType]}
@@ -805,11 +972,56 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 										)
 									})}
 								</TableBody>
-							</Table>
+							</Table>}
 						</div>
 					))}
 				</CardContent>
 			</Card>
+
+			{/* Bulk Update Targets section */}
+			{bulkEditMode && selectedStepIds.size > 0 && (
+				<Card className="mt-4 border-primary/40">
+					<CardHeader>
+						<CardTitle className="text-base">
+							Bulk Update Targets ({selectedStepIds.size} step{selectedStepIds.size !== 1 ? "s" : ""} selected)
+						</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div className="grid grid-cols-2 gap-4 max-w-md">
+							<div className="space-y-2">
+								<Label htmlFor="bulk-target-minutes">Target (minutes)</Label>
+								<Input
+									id="bulk-target-minutes"
+									type="number"
+									min={1}
+									value={bulkTargetMinutes}
+									onChange={e => setBulkTargetMinutes(e.target.value)}
+									placeholder="Leave blank to keep"
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="bulk-warning-pct">Warning Threshold (%)</Label>
+								<Input
+									id="bulk-warning-pct"
+									type="number"
+									min={1}
+									max={99}
+									value={bulkWarningPct}
+									onChange={e => setBulkWarningPct(e.target.value)}
+									placeholder="Leave blank to keep"
+								/>
+							</div>
+						</div>
+						<Button
+							className="mt-4"
+							onClick={handleBulkApply}
+							disabled={updateMutation.isPending}
+						>
+							{updateMutation.isPending ? "Applying…" : "Apply to Selected"}
+						</Button>
+					</CardContent>
+				</Card>
+			)}
 
 			{/* Step Edit Dialog */}
 			{dialogStep && (

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq } from "drizzle-orm"
 
 import {
@@ -6,6 +6,7 @@ import {
 	facilities,
 	patients,
 	staffProfiles,
+	telemedicineAbstracts,
 	telemedicineAppointments,
 	telemedicineEncounters,
 	telemedicinePrescriptionItems,
@@ -25,6 +26,11 @@ type CreateEncounterInput = V1Inputs["telemedicine"]["createEncounter"]
 type GetPrescriptionInput = V1Inputs["telemedicine"]["getPrescription"]
 type ListPrescriptionsInput = V1Inputs["telemedicine"]["listPrescriptions"]
 type CreatePrescriptionInput = V1Inputs["telemedicine"]["createPrescription"]
+type GenerateAbstractInput = V1Inputs["telemedicine"]["generateAbstract"]
+type GetAbstractInput = V1Inputs["telemedicine"]["getAbstract"]
+type ListEncounterAbstractsInput = V1Inputs["telemedicine"]["listEncounterAbstracts"]
+type SignAbstractInput = V1Inputs["telemedicine"]["signAbstract"]
+type SendAbstractInput = V1Inputs["telemedicine"]["sendAbstract"]
 
 @Injectable()
 export class TelemedicineService {
@@ -36,10 +42,16 @@ export class TelemedicineService {
 
 	private buildAppointmentRow(
 		appt: typeof telemedicineAppointments.$inferSelect,
-		patientRow: { firstName: string; lastName: string; mrn: string; phone: string | null; email: string | null },
+		patientRow: {
+			firstName: string
+			lastName: string
+			mrn: string
+			phone: string | null
+			email: string | null
+		},
 		clinicianName: string,
 		clinicianSpecialty: string,
-		createdByName: string,
+		createdByName: string
 	) {
 		return {
 			id: appt.id,
@@ -127,13 +139,13 @@ export class TelemedicineService {
 				.leftJoin(clinicianStaff, eq(telemedicineAppointments.clinicianStaffId, clinicianStaff.id))
 				.leftJoin(createdByStaff, eq(telemedicineAppointments.createdByStaffId, createdByStaff.id))
 				.where(whereClause)
-				.orderBy(desc(telemedicineAppointments.scheduledDate), desc(telemedicineAppointments.scheduledTime))
+				.orderBy(
+					desc(telemedicineAppointments.scheduledDate),
+					desc(telemedicineAppointments.scheduledTime)
+				)
 				.limit(limit)
 				.offset(offset),
-			db
-				.select({ count: count() })
-				.from(telemedicineAppointments)
-				.where(whereClause),
+			db.select({ count: count() }).from(telemedicineAppointments).where(whereClause),
 		])
 
 		const total = totalResult[0]?.count ?? 0
@@ -435,7 +447,9 @@ export class TelemedicineService {
 			.set({ status: "in-progress", updatedAt: new Date() })
 			.where(eq(telemedicineAppointments.id, input.appointmentId))
 
-		this.logger.log(`Created telemedicine encounter: ${created.id} for appointment: ${input.appointmentId}`)
+		this.logger.log(
+			`Created telemedicine encounter: ${created.id} for appointment: ${input.appointmentId}`
+		)
 		void staffId
 		return this.getEncounter({ id: created.id })
 	}
@@ -475,10 +489,7 @@ export class TelemedicineService {
 				telemedicineAppointments,
 				eq(telemedicinePrescriptions.appointmentId, telemedicineAppointments.id)
 			)
-			.innerJoin(
-				staffProfiles,
-				eq(telemedicineEncounters.clinicianStaffId, staffProfiles.id)
-			)
+			.innerJoin(staffProfiles, eq(telemedicineEncounters.clinicianStaffId, staffProfiles.id))
 			.innerJoin(users, eq(staffProfiles.userId, users.id))
 			.innerJoin(facilities, eq(telemedicineAppointments.facilityId, facilities.id))
 			.where(eq(telemedicinePrescriptions.id, input.id))
@@ -604,6 +615,238 @@ export class TelemedicineService {
 
 		this.logger.log(`Created telemedicine prescription: ${created.id}`)
 		return this.getPrescription({ id: created.id })
+	}
+
+	// =========================================================================
+	// Get Abstract
+	// =========================================================================
+
+	async getAbstract(input: GetAbstractInput) {
+		const clinicianStaff = db
+			.select({
+				id: staffProfiles.id,
+				name: users.name,
+				prcLicenseNumber: staffProfiles.prcLicenseNumber,
+			})
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("clinician_staff")
+
+		const signedByStaff = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("signed_by_staff")
+
+		const [row] = await db
+			.select({
+				id: telemedicineAbstracts.id,
+				encounterId: telemedicineAbstracts.encounterId,
+				appointmentId: telemedicineAbstracts.appointmentId,
+				chiefComplaint: telemedicineAbstracts.chiefComplaint,
+				subjectiveNotes: telemedicineAbstracts.subjectiveNotes,
+				objectiveNotes: telemedicineAbstracts.objectiveNotes,
+				assessmentNotes: telemedicineAbstracts.assessmentNotes,
+				planNotes: telemedicineAbstracts.planNotes,
+				diagnosis: telemedicineAbstracts.diagnosis,
+				icdCode: telemedicineAbstracts.icdCode,
+				additionalNotes: telemedicineAbstracts.additionalNotes,
+				status: telemedicineAbstracts.status,
+				signedAt: telemedicineAbstracts.signedAt,
+				sentAt: telemedicineAbstracts.sentAt,
+				sentToEmail: telemedicineAbstracts.sentToEmail,
+				createdAt: telemedicineAbstracts.createdAt,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+				clinicianName: clinicianStaff.name,
+				clinicianPrcNumber: clinicianStaff.prcLicenseNumber,
+				facilityName: facilities.name,
+				signedByName: signedByStaff.name,
+			})
+			.from(telemedicineAbstracts)
+			.innerJoin(
+				telemedicineEncounters,
+				eq(telemedicineAbstracts.encounterId, telemedicineEncounters.id)
+			)
+			.innerJoin(patients, eq(telemedicineAbstracts.patientId, patients.id))
+			.innerJoin(
+				telemedicineAppointments,
+				eq(telemedicineAbstracts.appointmentId, telemedicineAppointments.id)
+			)
+			.innerJoin(clinicianStaff, eq(telemedicineEncounters.clinicianStaffId, clinicianStaff.id))
+			.innerJoin(facilities, eq(telemedicineAppointments.facilityId, facilities.id))
+			.leftJoin(signedByStaff, eq(telemedicineAbstracts.signedByStaffId, signedByStaff.id))
+			.where(eq(telemedicineAbstracts.id, input.id))
+
+		if (!row) {
+			throw new NotFoundException(`Tele-abstract ${input.id} not found`)
+		}
+
+		return {
+			id: row.id,
+			encounterId: row.encounterId,
+			appointmentId: row.appointmentId,
+			patientName: `${row.patientLastName}, ${row.patientFirstName}`,
+			clinicianName: row.clinicianName ?? "",
+			clinicianPrcNumber: row.clinicianPrcNumber ?? "",
+			facilityName: row.facilityName,
+			chiefComplaint: row.chiefComplaint,
+			subjectiveNotes: row.subjectiveNotes,
+			objectiveNotes: row.objectiveNotes,
+			assessmentNotes: row.assessmentNotes,
+			planNotes: row.planNotes,
+			diagnosis: row.diagnosis,
+			icdCode: row.icdCode ?? null,
+			additionalNotes: row.additionalNotes ?? null,
+			status: row.status,
+			signedAt: row.signedAt?.toISOString() ?? null,
+			signedByName: row.signedByName ?? null,
+			sentAt: row.sentAt?.toISOString() ?? null,
+			sentToEmail: row.sentToEmail ?? null,
+			createdAt: row.createdAt.toISOString(),
+		}
+	}
+
+	// =========================================================================
+	// List Abstracts by Encounter
+	// =========================================================================
+
+	async listEncounterAbstracts(input: ListEncounterAbstractsInput) {
+		const rows = await db
+			.select({ id: telemedicineAbstracts.id })
+			.from(telemedicineAbstracts)
+			.where(eq(telemedicineAbstracts.encounterId, input.encounterId))
+			.orderBy(desc(telemedicineAbstracts.createdAt))
+
+		return Promise.all(rows.map(r => this.getAbstract({ id: r.id })))
+	}
+
+	// =========================================================================
+	// Generate Abstract
+	// =========================================================================
+
+	async generateAbstract(input: GenerateAbstractInput, createdByStaffId?: string) {
+		// Return existing abstract if already generated for this encounter
+		const [existing] = await db
+			.select({ id: telemedicineAbstracts.id })
+			.from(telemedicineAbstracts)
+			.where(eq(telemedicineAbstracts.encounterId, input.encounterId))
+
+		if (existing) {
+			return this.getAbstract({ id: existing.id })
+		}
+
+		// Fetch encounter data to populate the abstract
+		const [enc] = await db
+			.select()
+			.from(telemedicineEncounters)
+			.where(eq(telemedicineEncounters.id, input.encounterId))
+
+		if (!enc) {
+			throw new NotFoundException(`Telemedicine encounter ${input.encounterId} not found`)
+		}
+
+		const [created] = await db
+			.insert(telemedicineAbstracts)
+			.values({
+				encounterId: input.encounterId,
+				appointmentId: enc.appointmentId,
+				patientId: enc.patientId,
+				chiefComplaint: enc.chiefComplaint,
+				subjectiveNotes: enc.subjectiveNotes,
+				objectiveNotes: enc.objectiveNotes,
+				assessmentNotes: enc.assessmentNotes,
+				planNotes: enc.planNotes,
+				diagnosis: enc.diagnosis,
+				icdCode: enc.icdCode ?? null,
+				additionalNotes: input.additionalNotes ?? null,
+				status: "draft",
+				createdByStaffId: createdByStaffId ?? null,
+			})
+			.returning()
+
+		if (!created) {
+			throw new Error("Failed to generate abstract")
+		}
+
+		this.logger.log(`Generated tele-abstract: ${created.id} for encounter: ${input.encounterId}`)
+		return this.getAbstract({ id: created.id })
+	}
+
+	// =========================================================================
+	// Sign Abstract
+	// =========================================================================
+
+	async signAbstract(input: SignAbstractInput, signedByStaffId?: string) {
+		const [abstract] = await db
+			.select()
+			.from(telemedicineAbstracts)
+			.where(eq(telemedicineAbstracts.id, input.id))
+
+		if (!abstract) {
+			throw new NotFoundException(`Tele-abstract ${input.id} not found`)
+		}
+
+		if (abstract.status !== "draft") {
+			throw new BadRequestException(`Abstract is already ${abstract.status}`)
+		}
+
+		await db
+			.update(telemedicineAbstracts)
+			.set({
+				status: "signed",
+				signedAt: new Date(),
+				signedByStaffId: signedByStaffId ?? null,
+				updatedAt: new Date(),
+			})
+			.where(eq(telemedicineAbstracts.id, input.id))
+
+		// Mark encounter as signed
+		await db
+			.update(telemedicineEncounters)
+			.set({ status: "signed", signedAt: new Date(), updatedAt: new Date() })
+			.where(eq(telemedicineEncounters.id, abstract.encounterId))
+
+		this.logger.log(`Signed tele-abstract: ${input.id}`)
+		return this.getAbstract({ id: input.id })
+	}
+
+	// =========================================================================
+	// Send Abstract
+	// =========================================================================
+
+	async sendAbstract(input: SendAbstractInput) {
+		const [abstract] = await db
+			.select()
+			.from(telemedicineAbstracts)
+			.where(eq(telemedicineAbstracts.id, input.id))
+
+		if (!abstract) {
+			throw new NotFoundException(`Tele-abstract ${input.id} not found`)
+		}
+
+		if (abstract.status === "draft") {
+			throw new BadRequestException("Abstract must be signed before sending")
+		}
+
+		await db
+			.update(telemedicineAbstracts)
+			.set({
+				status: "sent",
+				sentAt: new Date(),
+				sentToEmail: input.email,
+				updatedAt: new Date(),
+			})
+			.where(eq(telemedicineAbstracts.id, input.id))
+
+		// Mark encounter as finalized after abstract is sent
+		await db
+			.update(telemedicineEncounters)
+			.set({ status: "finalized", updatedAt: new Date() })
+			.where(eq(telemedicineEncounters.id, abstract.encounterId))
+
+		this.logger.log(`Sent tele-abstract: ${input.id} to ${input.email}`)
+		return this.getAbstract({ id: input.id })
 	}
 
 	// =========================================================================

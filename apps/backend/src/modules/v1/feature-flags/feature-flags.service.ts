@@ -1,11 +1,50 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { eq, inArray } from "drizzle-orm"
+import { count, desc, eq, inArray } from "drizzle-orm"
 
-import { featureFlags, featureFlagTargets } from "@repo/db/schema"
+import { featureFlagHistory, featureFlags, featureFlagTargets } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import { AUDIT_ENTITY_TYPES } from "@/modules/v1/audit/audit-entity-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
+
+// 30-second in-process cache for flag evaluation — invalidated on every update/delete
+interface CacheEntry {
+	value: boolean
+	expiresAt: number
+}
+const EVALUATE_CACHE = new Map<string, CacheEntry>()
+const CACHE_TTL_MS = 30_000
+
+function isTestEnvironment() {
+	return process.env.NODE_ENV === "test"
+}
+
+function cacheGet(key: string): boolean | undefined {
+	if (isTestEnvironment()) {
+		return undefined
+	}
+
+	const entry = EVALUATE_CACHE.get(key)
+	if (!entry || Date.now() > entry.expiresAt) {
+		EVALUATE_CACHE.delete(key)
+		return undefined
+	}
+	return entry.value
+}
+
+function cacheSet(key: string, value: boolean) {
+	if (isTestEnvironment()) {
+		return
+	}
+
+	EVALUATE_CACHE.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS })
+}
+
+function cacheInvalidate(flagId: string) {
+	for (const k of EVALUATE_CACHE.keys()) {
+		if (k.startsWith(flagId)) EVALUATE_CACHE.delete(k)
+	}
+}
 
 type Environment = "dev" | "staging" | "prod"
 
@@ -61,9 +100,7 @@ function resolveFlag(flag: FeatureFlagRow, targets: TargetRow[], ctx: Resolution
 
 	// Compute specificity (number of non-null dimensions)
 	const specificity = (t: TargetRow) =>
-		(t.environment !== null ? 1 : 0) +
-		(t.facilityId !== null ? 1 : 0) +
-		(t.roleId !== null ? 1 : 0)
+		(t.environment !== null ? 1 : 0) + (t.facilityId !== null ? 1 : 0) + (t.roleId !== null ? 1 : 0)
 
 	const maxSpec = Math.max(...matching.map(specificity))
 	const topTier = matching.filter(t => specificity(t) === maxSpec)
@@ -163,7 +200,7 @@ export class FeatureFlagsService {
 			key: string
 			name: string
 			description?: string
-			group: "platform-control" | "compliance" | "integration"
+			group: "platform-control" | "financial" | "compliance" | "integration"
 			riskLevel: "low" | "moderate" | "high"
 			ownerTeam?: string
 			defaultEnabled: boolean
@@ -210,7 +247,7 @@ export class FeatureFlagsService {
 			id: string
 			name?: string
 			description?: string | null
-			group?: "platform-control" | "compliance" | "integration"
+			group?: "platform-control" | "financial" | "compliance" | "integration"
 			riskLevel?: "low" | "moderate" | "high"
 			ownerTeam?: string | null
 			defaultEnabled?: boolean
@@ -218,10 +255,7 @@ export class FeatureFlagsService {
 		actor: { userId: string; facilityId: string; staffProfileId: string | null }
 	) {
 		return db.transaction(async tx => {
-			const [before] = await tx
-				.select()
-				.from(featureFlags)
-				.where(eq(featureFlags.id, input.id))
+			const [before] = await tx.select().from(featureFlags).where(eq(featureFlags.id, input.id))
 			if (!before) throw new NotFoundException(`Feature flag ${input.id} not found`)
 
 			const updates: Partial<FeatureFlagRow> = {}
@@ -238,6 +272,18 @@ export class FeatureFlagsService {
 				.set(updates)
 				.where(eq(featureFlags.id, input.id))
 				.returning()
+
+			// Write history row when defaultEnabled changes
+			if (input.defaultEnabled !== undefined && input.defaultEnabled !== before.defaultEnabled) {
+				await tx.insert(featureFlagHistory).values({
+					flagId: input.id,
+					previousValue: before.defaultEnabled,
+					newValue: input.defaultEnabled,
+					changedBy: actor.staffProfileId ?? null,
+					reason: null,
+				})
+				cacheInvalidate(input.id)
+			}
 
 			const changes = Object.entries(updates)
 				.filter(([k]) => k !== "updatedAt")
@@ -274,17 +320,13 @@ export class FeatureFlagsService {
 		actor: { userId: string; facilityId: string; staffProfileId: string | null }
 	) {
 		return db.transaction(async tx => {
-			const [flag] = await tx
-				.select()
-				.from(featureFlags)
-				.where(eq(featureFlags.id, id))
+			const [flag] = await tx.select().from(featureFlags).where(eq(featureFlags.id, id))
 			if (!flag) throw new NotFoundException(`Feature flag ${id} not found`)
 
 			await tx.delete(featureFlagTargets).where(eq(featureFlagTargets.flagId, id))
-			const [deleted] = await tx
-				.delete(featureFlags)
-				.where(eq(featureFlags.id, id))
-				.returning()
+			const [deleted] = await tx.delete(featureFlags).where(eq(featureFlags.id, id)).returning()
+
+			cacheInvalidate(id)
 
 			await this.auditService.log(
 				{
@@ -316,10 +358,7 @@ export class FeatureFlagsService {
 		actor: { userId: string; facilityId: string; staffProfileId: string | null }
 	) {
 		return db.transaction(async tx => {
-			const [flag] = await tx
-				.select()
-				.from(featureFlags)
-				.where(eq(featureFlags.id, input.flagId))
+			const [flag] = await tx.select().from(featureFlags).where(eq(featureFlags.id, input.flagId))
 			if (!flag) throw new NotFoundException(`Feature flag ${input.flagId} not found`)
 
 			const beforeTargets = await tx
@@ -328,9 +367,7 @@ export class FeatureFlagsService {
 				.where(eq(featureFlagTargets.flagId, input.flagId))
 
 			// Full replace: delete all then re-insert
-			await tx
-				.delete(featureFlagTargets)
-				.where(eq(featureFlagTargets.flagId, input.flagId))
+			await tx.delete(featureFlagTargets).where(eq(featureFlagTargets.flagId, input.flagId))
 
 			let afterTargets: TargetRow[] = []
 			if (input.targets.length > 0) {
@@ -426,11 +463,18 @@ export class FeatureFlagsService {
 
 	/**
 	 * Evaluate a single flag by key. Used for critical paths.
+	 * Results are cached in-process for 30 seconds per (key × facilityId × roleId).
 	 */
 	async evaluateByKey(key: string, ctx: Omit<ResolutionContext, "environment">) {
 		const environment = resolveEnvironment()
 		const [flag] = await db.select().from(featureFlags).where(eq(featureFlags.key, key))
 		if (!flag) throw new NotFoundException(`Feature flag key "${key}" not found`)
+
+		const cacheKey = `${flag.id}:${ctx.activeFacilityId}:${ctx.activeRoleId ?? ""}:${environment}`
+		const cached = cacheGet(cacheKey)
+		if (cached !== undefined) {
+			return { key: flag.key, enabled: cached, defaultEnabled: flag.defaultEnabled }
+		}
 
 		const targets = await db
 			.select()
@@ -443,10 +487,42 @@ export class FeatureFlagsService {
 			activeRoleId: ctx.activeRoleId,
 		}
 
+		const enabled = resolveFlag(flag, targets, resCtx)
+		cacheSet(cacheKey, enabled)
+
+		return { key: flag.key, enabled, defaultEnabled: flag.defaultEnabled }
+	}
+
+	// ── History ───────────────────────────────────────────────────────────────
+
+	async getHistory(flagId: string, page: number, limit: number) {
+		const [flag] = await db
+			.select({ id: featureFlags.id, name: featureFlags.name })
+			.from(featureFlags)
+			.where(eq(featureFlags.id, flagId))
+		if (!flag) throw new NotFoundException(`Feature flag ${flagId} not found`)
+
+		const offset = (page - 1) * limit
+
+		const [totalRow, rows] = await Promise.all([
+			db
+				.select({ total: count() })
+				.from(featureFlagHistory)
+				.where(eq(featureFlagHistory.flagId, flagId)),
+			db
+				.select()
+				.from(featureFlagHistory)
+				.where(eq(featureFlagHistory.flagId, flagId))
+				.orderBy(desc(featureFlagHistory.changedAt))
+				.limit(limit)
+				.offset(offset),
+		])
+
 		return {
-			key: flag.key,
-			enabled: resolveFlag(flag, targets, resCtx),
-			defaultEnabled: flag.defaultEnabled,
+			data: rows.map(r => ({ ...r, flagName: flag.name })),
+			total: totalRow[0]?.total ?? 0,
+			page,
+			limit,
 		}
 	}
 }

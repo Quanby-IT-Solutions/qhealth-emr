@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
+import { cva, type VariantProps } from "class-variance-authority"
 import { Cancel01Icon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 
@@ -37,12 +38,32 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
 	)
 }
 
+const dialogContentVariants = cva(
+	"bg-background data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl p-4 text-sm ring-1 duration-100 outline-none",
+	{
+		variants: {
+			size: {
+				default: "sm:max-w-sm",
+				md: "sm:max-w-md",
+				lg: "sm:max-w-2xl",
+				xl: "sm:max-w-5xl",
+				full: "sm:max-w-[min(1100px,calc(100vw-2rem))]",
+			},
+		},
+		defaultVariants: {
+			size: "default",
+		},
+	}
+)
+
 function DialogContent({
 	className,
 	children,
+	size = "default",
 	showCloseButton = true,
 	...props
 }: DialogPrimitive.Popup.Props & {
+	size?: VariantProps<typeof dialogContentVariants>["size"]
 	showCloseButton?: boolean
 }) {
 	return (
@@ -50,10 +71,7 @@ function DialogContent({
 			<DialogOverlay />
 			<DialogPrimitive.Popup
 				data-slot="dialog-content"
-				className={cn(
-					"bg-background data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl p-4 text-sm ring-1 duration-100 outline-none sm:max-w-sm",
-					className
-				)}
+				className={cn(dialogContentVariants({ size }), className)}
 				{...props}
 			>
 				{children}

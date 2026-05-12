@@ -40,13 +40,7 @@ export const MemberTypeEnum = z.enum([
 ])
 export type MemberType = z.infer<typeof MemberTypeEnum>
 
-export const PatientRelationEnum = z.enum([
-	"member",
-	"spouse",
-	"child",
-	"parent",
-	"dependent",
-])
+export const PatientRelationEnum = z.enum(["member", "spouse", "child", "parent", "dependent"])
 export type PatientRelation = z.infer<typeof PatientRelationEnum>
 
 export const Cf5StatusEnum = z.enum(["draft", "validated", "submitted", "approved", "returned"])

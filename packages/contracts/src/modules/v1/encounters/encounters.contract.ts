@@ -11,6 +11,7 @@ import {
 	EncounterListSchema,
 	EncounterSchema,
 	LinkedEncounterListSchema,
+	SignMayGoHomeOrderSchema,
 	TransferEncounterSchema,
 } from "./encounters.schema.js"
 
@@ -73,6 +74,16 @@ export const encounterContract = {
 			tags: ["Encounters"],
 		})
 		.input(DischargeEncounterSchema)
+		.output(EncounterSchema),
+
+	signMayGoHomeOrder: oc
+		.route({
+			method: "POST",
+			path: "/encounters/{encounterId}/may-go-home",
+			summary: "Sign May Go Home order and notify discharge queues",
+			tags: ["Encounters"],
+		})
+		.input(SignMayGoHomeOrderSchema)
 		.output(EncounterSchema),
 
 	close: oc

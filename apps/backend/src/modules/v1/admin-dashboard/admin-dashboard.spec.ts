@@ -1,3 +1,8 @@
+import { ReportingService } from "../reporting/reporting.service"
+import { SlaService } from "../sla/sla.service"
+import { AdminDashboardController } from "./admin-dashboard.controller"
+import { AdminDashboardService } from "./admin-dashboard.service"
+
 /**
  * Admin Dashboard — FHIR telemetry permission boundary tests (FHIR-009)
  *
@@ -15,6 +20,9 @@
  *
  * All ESM-only and transitive-contract-importing packages are stubbed via
  * jest.mock() at the module level.
+ *
+ * ADMIN-003 addendum: controller guard metadata tests for himOps and
+ * civilRegistryOps are appended at the end of this file.
  */
 
 // ── ESM / transitive dependency stubs ────────────────────────────────────────
@@ -30,10 +38,6 @@ jest.mock("../sla/sla.service", () => ({
 jest.mock("../reporting/reporting.service", () => ({
 	ReportingService: class ReportingService {},
 }))
-
-import { SlaService } from "../sla/sla.service"
-import { ReportingService } from "../reporting/reporting.service"
-import { AdminDashboardService } from "./admin-dashboard.service"
 
 // ── Minimal typed stubs returned by private fetcher methods ───────────────────
 
@@ -77,25 +81,6 @@ const EMPTY_OFFLINE = {
 	lastFailureMessage: null,
 }
 
-const EMPTY_STATUTORY_READINESS = {
-	facilitiesWithoutStatutoryReporting: 0,
-	totalFacilities: 0,
-}
-
-const EMPTY_STATUTORY_OPS = {
-	pidsr: { blockedOrRejected: false, draftCount: 0 },
-	hai: { pendingCount: 0 },
-	ahsr: { currentMonthReady: true },
-}
-
-const EMPTY_DATA_QUALITY = {
-	incompleteRecordsCount: 0,
-	duplicateRecordsCount: 0,
-	missingIcd10Count: 0,
-	missingRvsCount: 0,
-	cf4DraftCount: 0,
-}
-
 function makeIntegrationHealth(fhirFailures: number) {
 	return {
 		failedCount: fhirFailures,
@@ -114,21 +99,19 @@ function stubService(fhirFailures: number, consentEnforced = false) {
 	// Stub all private async fetchers via spyOn
 	jest.spyOn(service as never, "getAccessGovernance").mockResolvedValue(EMPTY_GOVERNANCE as never)
 	jest.spyOn(service as never, "getPlatformControl").mockResolvedValue(EMPTY_PLATFORM as never)
-	jest.spyOn(service as never, "getIntegrationHealth").mockResolvedValue(
-		makeIntegrationHealth(fhirFailures) as never
-	)
+	jest
+		.spyOn(service as never, "getIntegrationHealth")
+		.mockResolvedValue(makeIntegrationHealth(fhirFailures) as never)
 	jest.spyOn(service as never, "getAuditSummary").mockResolvedValue({
 		...EMPTY_AUDIT_BASE,
 		consentEnforced,
 	} as never)
-	jest.spyOn(service as never, "withMissingSchemaFallback").mockImplementation(
-		async (_section: unknown, _fid: unknown, fn: () => Promise<unknown>) => fn()
-	)
+	jest
+		.spyOn(service as never, "withMissingSchemaFallback")
+		.mockImplementation((async (...args: unknown[]) =>
+			(args[2] as () => Promise<unknown>)()) as never)
 	jest.spyOn(service as never, "getArtaSla").mockResolvedValue(EMPTY_ARTA as never)
 	jest.spyOn(service as never, "getOfflineReadiness").mockResolvedValue(EMPTY_OFFLINE as never)
-	jest.spyOn(service as never, "getStatutoryReadiness").mockResolvedValue(EMPTY_STATUTORY_READINESS as never)
-	jest.spyOn(service as never, "getStatutoryOps").mockResolvedValue(EMPTY_STATUTORY_OPS as never)
-	jest.spyOn(service as never, "getDataQuality").mockResolvedValue(EMPTY_DATA_QUALITY as never)
 
 	return service
 }
@@ -199,3 +182,77 @@ describe("AdminDashboardService.getSummary — FHIR telemetry permission boundar
 	})
 })
 
+// ── ADMIN-003: Controller guard metadata ─────────────────────────────────────
+//
+// Verifies that AdminDashboardController methods carry the correct
+// @RequirePermission metadata:
+//   • himOps           → medical_records:view  (HIM staff access, not admin)
+//   • civilRegistryOps → admin:view            (admin oversight surface)
+//
+// Uses Reflect.getMetadata so no DI container spin-up is needed.
+
+jest.mock("@orpc/nest", () => ({
+	Implement: () => () => {},
+}))
+jest.mock("@orpc/server", () => ({
+	implement: jest.fn().mockReturnValue({ handler: jest.fn() }),
+}))
+jest.mock("@thallesp/nestjs-better-auth", () => ({
+	Session: () => () => {},
+}))
+jest.mock("@/config/api-versions.config", () => ({
+	v1: {
+		adminDashboard: {
+			summary: {},
+			himOps: {},
+			exportCompliance: {},
+			civilRegistryOps: {},
+			medicationCompliance: {},
+		},
+	},
+}))
+jest.mock("@/modules/v1/rbac/rbac.guard", () => ({
+	RBAC_PERMISSION_KEY: "rbac",
+	RBAC_PERMISSIONS_KEY: "rbac_all",
+	RequirePermission: (module: string, action: string) => (target: object, key: string | symbol) => {
+		Reflect.defineMetadata("rbac", { module, action }, target, key)
+	},
+	RequirePermissions:
+		(permissions: Array<{ module: string; action: string }>) =>
+		(target: object, key: string | symbol) => {
+			Reflect.defineMetadata("rbac_all", permissions, target, key)
+		},
+}))
+
+type PermEntry = { module: string; action: string }
+
+function getGuard(methodName: keyof AdminDashboardController): PermEntry | undefined {
+	return Reflect.getMetadata("rbac", AdminDashboardController.prototype, methodName)
+}
+
+describe("AdminDashboardController — RBAC guard metadata (ADMIN-003)", () => {
+	it("himOps is guarded by medical_records:view", () => {
+		const perm = getGuard("himOps")
+		expect(perm).toEqual({ module: "medical_records", action: "view" })
+	})
+
+	it("civilRegistryOps is guarded by civil_registry:view", () => {
+		const perm = getGuard("civilRegistryOps")
+		expect(perm).toEqual({ module: "civil_registry", action: "view" })
+	})
+
+	it("summary is guarded by admin:view", () => {
+		const perm = getGuard("summary")
+		expect(perm).toEqual({ module: "admin", action: "view" })
+	})
+
+	it("exportCompliance is guarded by audit:view", () => {
+		const perm = getGuard("exportCompliance")
+		expect(perm).toEqual({ module: "audit", action: "view" })
+	})
+
+	it("medicationCompliance is guarded by formulary:clinical_policy", () => {
+		const perm = getGuard("medicationCompliance")
+		expect(perm).toEqual({ module: "formulary", action: "clinical_policy" })
+	})
+})

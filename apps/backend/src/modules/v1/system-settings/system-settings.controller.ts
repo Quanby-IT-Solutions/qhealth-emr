@@ -18,9 +18,8 @@ type RbacProfile = {
 function extractActor(session: UserSession, req: Request) {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
 	const activeProfile =
-		profile?.staffProfiles?.find(p =>
-			p.roles.some(r => r.id === profile?.activeRole?.id)
-		) ?? profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
 
 	return {
 		userId: session.user.id,
@@ -32,9 +31,8 @@ function extractActor(session: UserSession, req: Request) {
 function getActiveFacilityId(req: Request): string {
 	const profile = (req as unknown as Record<string, unknown>).rbacProfile as RbacProfile | undefined
 	const activeProfile =
-		profile?.staffProfiles?.find(p =>
-			p.roles.some(r => r.id === profile?.activeRole?.id)
-		) ?? profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile?.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
 
 	return activeProfile?.facilityId ?? ""
 }
@@ -44,7 +42,7 @@ function getActiveFacilityId(req: Request): string {
 export class SystemSettingsController {
 	constructor(
 		private readonly systemSettingsService: SystemSettingsService,
-		private readonly offlineCacheService: OfflineCacheService,
+		private readonly offlineCacheService: OfflineCacheService
 	) {}
 
 	@RequirePermissions([{ module: "system_settings", action: "view" }])

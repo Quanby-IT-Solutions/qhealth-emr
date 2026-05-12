@@ -20,9 +20,7 @@ export const birthRegistrations = createTable(
 			.uuid("patient_id")
 			.notNull()
 			.references(() => patients.id, { onDelete: "restrict" }),
-		encounterId: t
-			.uuid("encounter_id")
-			.references(() => encounters.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
 		birthDatetime: t.timestamp("birth_datetime").notNull(),
 		registeredByStaffId: t
 			.uuid("registered_by_staff_id")

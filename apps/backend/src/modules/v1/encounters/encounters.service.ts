@@ -1,23 +1,32 @@
 import {
 	BadRequestException,
+	ConflictException,
+	HttpException,
+	HttpStatus,
 	Injectable,
 	Logger,
 	NotFoundException,
+	UnprocessableEntityException,
 } from "@nestjs/common"
-import { and, count, desc, eq, gte, inArray, lt, max, sql } from "drizzle-orm"
+import { EventEmitter2 } from "@nestjs/event-emitter"
+import { and, count, desc, eq, gte, inArray, isNull, lt, max, sql } from "drizzle-orm"
 
 import {
 	beds,
 	clinicalNotes,
+	consentRecords,
 	deathReports,
-	encounterStatusEvents,
 	encounters,
+	encounterStatusEvents,
 	encounterTransfers,
 	flowsheetEntries,
 	medicationOrders,
 	opdTriageIntakes,
 	patients,
+	rolePermissions,
+	roles,
 	staffProfiles,
+	userRoles,
 	users,
 	vitalSigns,
 	wards,
@@ -26,6 +35,8 @@ import {
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
+import { ChartAccessService, type ChartAccessActor } from "@/modules/v1/audit/chart-access.service"
+import { NotificationService } from "@/modules/v1/notifications/notification.service"
 import { resolveStepTarget } from "@/utils/sla-step-target"
 
 type WorkflowType = "opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing"
@@ -34,6 +45,7 @@ type EncounterListInput = V1Inputs["encounter"]["list"]
 type CreateEncounterInput = V1Inputs["encounter"]["create"]
 type TransferEncounterInput = V1Inputs["encounter"]["transfer"]
 type DischargeEncounterInput = V1Inputs["encounter"]["discharge"]
+type SignMayGoHomeOrderInput = V1Inputs["encounter"]["signMayGoHomeOrder"]
 type CloseEncounterInput = V1Inputs["encounter"]["close"]
 type EncounterIdInput = V1Inputs["encounter"]["get"]
 type LinkedEncountersInput = V1Inputs["encounter"]["getLinked"]
@@ -42,7 +54,12 @@ type LinkedEncountersInput = V1Inputs["encounter"]["getLinked"]
 export class EncountersService {
 	private readonly logger = new Logger(EncountersService.name)
 
-	constructor(private readonly auditService: AuditService) {}
+	constructor(
+		private readonly auditService: AuditService,
+		private readonly chartAccessService: ChartAccessService,
+		private readonly eventEmitter: EventEmitter2,
+		private readonly notificationService?: NotificationService
+	) {}
 
 	// ========================================================================
 	// Helper: resolve staffProfileId from userId (null-safe for audit)
@@ -97,10 +114,42 @@ export class EncountersService {
 	}
 
 	// ========================================================================
+	// Private: OPD Queue Number Assignment
+	// ========================================================================
+
+	// PS-002/PS-036: MAX+1 per clinician per day. Known race: two simultaneous
+	// registrations may read the same MAX. Acceptable for typical facility volume.
+	private async assignQueueNumber(facilityId: string, clinicianStaffId: string): Promise<number> {
+		const todayStart = new Date()
+		todayStart.setUTCHours(0, 0, 0, 0)
+		const tomorrowStart = new Date(todayStart)
+		tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1)
+
+		const [result] = await db
+			.select({ maxQueue: max(encounters.queueNumber) })
+			.from(encounters)
+			.where(
+				and(
+					eq(encounters.facilityId, facilityId),
+					eq(encounters.clinicianStaffId, clinicianStaffId),
+					gte(encounters.admissionDatetime, todayStart),
+					lt(encounters.admissionDatetime, tomorrowStart)
+				)
+			)
+
+		return (result?.maxQueue ?? 0) + 1
+	}
+
+	// ========================================================================
 	// List encounters for a patient
 	// ========================================================================
 
-	async list(filter: EncounterListInput) {
+	async list(filter: EncounterListInput, actor?: ChartAccessActor) {
+		await this.chartAccessService.ensurePatientChartReadAccess(actor, filter.patientId, {
+			entityType: "encounter_list",
+			entityId: filter.patientId,
+		})
+
 		const page = Number(filter.page) || 1
 		const limit = Number(filter.limit) || 50
 		const offset = (page - 1) * limit
@@ -172,7 +221,12 @@ export class EncountersService {
 	// Get encounter detail
 	// ========================================================================
 
-	async findById(input: EncounterIdInput) {
+	async findById(input: EncounterIdInput, actor?: ChartAccessActor) {
+		await this.chartAccessService.ensureEncounterChartReadAccess(actor, input.id, {
+			entityType: "encounter",
+			entityId: input.id,
+		})
+
 		// Subquery aliases for admitting and attending staff — eliminates 2 separate queries
 		const admittingStaffSq = db
 			.select({ id: staffProfiles.id, name: users.name })
@@ -233,22 +287,13 @@ export class EncountersService {
 		}
 
 		// Single JOIN query for transfers — eliminates N+1 (5 queries per transfer → 1 total)
-		const fromWardsSq = db
-			.select({ id: wards.id, name: wards.name })
-			.from(wards)
-			.as("from_wards")
-		const toWardsSq = db
-			.select({ id: wards.id, name: wards.name })
-			.from(wards)
-			.as("to_wards")
+		const fromWardsSq = db.select({ id: wards.id, name: wards.name }).from(wards).as("from_wards")
+		const toWardsSq = db.select({ id: wards.id, name: wards.name }).from(wards).as("to_wards")
 		const fromBedsSq = db
 			.select({ id: beds.id, bedNumber: beds.bedNumber })
 			.from(beds)
 			.as("from_beds")
-		const toBedsSq = db
-			.select({ id: beds.id, bedNumber: beds.bedNumber })
-			.from(beds)
-			.as("to_beds")
+		const toBedsSq = db.select({ id: beds.id, bedNumber: beds.bedNumber }).from(beds).as("to_beds")
 		const orderingStaffSq = db
 			.select({ id: staffProfiles.id, name: users.name })
 			.from(staffProfiles)
@@ -353,14 +398,46 @@ export class EncountersService {
 	// ========================================================================
 
 	async create(input: CreateEncounterInput, userId?: string) {
+		if (!input.consentCaptured) {
+			throw new UnprocessableEntityException(
+				"Patient consent must be captured before creating an encounter"
+			)
+		}
+
 		// Verify patient exists
 		const [patient] = await db
 			.select({ id: patients.id })
 			.from(patients)
-			.where(eq(patients.id, input.patientId))
+			.where(and(eq(patients.id, input.patientId), eq(patients.facilityId, input.facilityId)))
 
 		if (!patient) {
-			throw new NotFoundException(`Patient ${input.patientId} not found`)
+			throw new NotFoundException(`Patient ${input.patientId} not found in this facility`)
+		}
+
+		// RA 10173: DPA consent must be active before clinical registration
+		const [dpaConsent] = await db
+			.select({ id: consentRecords.id })
+			.from(consentRecords)
+			.where(
+				and(
+					eq(consentRecords.patientId, input.patientId),
+					eq(consentRecords.facilityId, input.facilityId),
+					eq(consentRecords.consentType, "dpa"),
+					eq(consentRecords.isActive, true),
+					isNull(consentRecords.revokedAt)
+				)
+			)
+			.limit(1)
+
+		if (!dpaConsent) {
+			throw new HttpException(
+				{
+					statusCode: 422,
+					message: "DPA consent is required before creating an encounter.",
+					error: "CONSENT_REQUIRED",
+				},
+				HttpStatus.UNPROCESSABLE_ENTITY
+			)
 		}
 
 		// If inpatient and bed assigned, validate and mark bed as occupied
@@ -369,25 +446,29 @@ export class EncountersService {
 			if (!bed) {
 				throw new NotFoundException(`Bed ${input.bedId} not found`)
 			}
+			if (bed.facilityId !== input.facilityId) {
+				throw new NotFoundException(`Bed ${input.bedId} not found in this facility`)
+			}
 			if (bed.status !== "available") {
-				throw new BadRequestException(`Bed ${bed.bedNumber} is not available`)
+				throw new ConflictException(`Bed ${bed.bedNumber} is not available`)
 			}
 		}
+
+		// ENC-BE-003: assign queue number before the transaction so the helper can be tested independently
+		const queueNumber =
+			input.encounterType === "outpatient" && input.clinicianStaffId
+				? await this.assignQueueNumber(input.facilityId, input.clinicianStaffId)
+				: null
 
 		// Wrap encounter insert + bed update in a transaction to prevent orphaned bed state.
 		// Re-checking bed availability inside the transaction prevents the most common race
 		// condition (two concurrent requests both see 'available' before either commits).
 		const created = await db.transaction(async tx => {
 			if (input.bedId) {
-				const [bed] = await tx
-					.select()
-					.from(beds)
-					.where(eq(beds.id, input.bedId))
+				const [bed] = await tx.select().from(beds).where(eq(beds.id, input.bedId))
 				// Re-check inside the transaction — serialized against concurrent bed assignments
 				if (!bed || bed.status !== "available") {
-					throw new BadRequestException(
-						`Bed ${input.bedId} is not available`
-					)
+					throw new ConflictException(`Bed ${input.bedId} is not available`)
 				}
 			}
 
@@ -413,16 +494,13 @@ export class EncountersService {
 					.from(opdTriageIntakes)
 					.where(eq(opdTriageIntakes.id, input.triageIntakeId))
 				if (!intake) {
-					throw new NotFoundException(
-						`Triage intake ${input.triageIntakeId} not found`
-					)
+					throw new NotFoundException(`Triage intake ${input.triageIntakeId} not found`)
 				}
 				if (intake.facilityId !== input.facilityId) {
-					throw new BadRequestException(
-						`Triage intake does not belong to this facility`
-					)
+					throw new BadRequestException(`Triage intake does not belong to this facility`)
 				}
-				if (intake.status !== "pending_registration") { // PS-043
+				if (intake.status !== "pending_registration") {
+					// PS-043
 					throw new BadRequestException(
 						`Triage intake is no longer eligible for registration (status: ${intake.status})`
 					)
@@ -447,37 +525,6 @@ export class EncountersService {
 						"The selected clinician is not a valid active staff member for this facility"
 					)
 				}
-			}
-
-			// Generate OPD queue number for outpatient encounters (sequential per clinic per day)
-			let queueNumber: number | null = null
-			if (input.encounterType === "outpatient") {
-				const todayStart = new Date()
-				todayStart.setUTCHours(0, 0, 0, 0)
-				const tomorrowStart = new Date(todayStart)
-				tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1)
-
-// PS-036: clinicianStaffId required for outpatient — validated by contract; this is defense-in-depth
-				if (!input.clinicianStaffId) {
-					throw new BadRequestException(
-						"clinicianStaffId is required for outpatient encounter registration"
-					)
-				}
-
-				// PS-002/PS-036: Always scope queue per clinician (clinic) per day
-				const queueConditions: Parameters<typeof and>[0][] = [
-					eq(encounters.facilityId, input.facilityId),
-					eq(encounters.encounterType, sql`'outpatient'`),
-					gte(encounters.admissionDatetime, todayStart),
-					lt(encounters.admissionDatetime, tomorrowStart),
-					eq(encounters.clinicianStaffId, input.clinicianStaffId),
-				]
-
-				const [maxResult] = await tx
-					.select({ maxQueue: max(encounters.queueNumber) })
-					.from(encounters)
-					.where(and(...queueConditions))
-				queueNumber = (maxResult?.maxQueue ?? 0) + 1
 			}
 
 			const [enc] = await tx
@@ -543,7 +590,10 @@ export class EncountersService {
 						ipAddress: null,
 						userAgent: null,
 						metadata: {
-							workflow: input.encounterType === "outpatient" ? "opd_triage_reconciliation" : "encounter_creation",
+							workflow:
+								input.encounterType === "outpatient"
+									? "opd_triage_reconciliation"
+									: "encounter_creation",
 							triageIntakeId: input.triageIntakeId ?? null,
 						},
 					},
@@ -656,8 +706,7 @@ export class EncountersService {
 						triage.weightKg != null
 
 					if (hasVitals) {
-						const recordedByStaffId =
-							triage.triageNurseStaffId ?? input.admittingStaffId
+						const recordedByStaffId = triage.triageNurseStaffId ?? input.admittingStaffId
 						const recordedAt = triage.arrivalTime ?? new Date()
 
 						await db.insert(vitalSigns).values({
@@ -819,6 +868,98 @@ export class EncountersService {
 		}
 	}
 
+	private async notifyDischargeQueues(encounter: typeof encounters.$inferSelect) {
+		if (!this.notificationService) return
+
+		const recipients = await db
+			.selectDistinct({ staffId: staffProfiles.id })
+			.from(staffProfiles)
+			.innerJoin(userRoles, eq(userRoles.staffProfileId, staffProfiles.id))
+			.innerJoin(roles, eq(userRoles.roleId, roles.id))
+			.innerJoin(rolePermissions, eq(rolePermissions.roleId, roles.id))
+			.where(
+				and(
+					eq(staffProfiles.facilityId, encounter.facilityId),
+					eq(staffProfiles.isActive, true),
+					sql`(
+						(${rolePermissions.module} = 'orders' and ${rolePermissions.action} = 'verify')
+						or (${rolePermissions.module} = 'billing' and ${rolePermissions.action} in ('view', 'create', 'edit'))
+					)`
+				)
+			)
+
+		await Promise.all(
+			recipients.map(recipient =>
+				this.notificationService?.send({
+					facilityId: encounter.facilityId,
+					recipientStaffId: recipient.staffId,
+					topic: "system",
+					title: "May Go Home order signed",
+					body: "Ward charges are frozen. Review discharge pharmacy and billing tasks.",
+					data: {
+						encounterId: encounter.id,
+						patientId: encounter.patientId,
+						status: "pending_discharge",
+					},
+				})
+			)
+		)
+	}
+
+	async signMayGoHomeOrder(input: SignMayGoHomeOrderInput, userId?: string) {
+		const [encounter] = await db
+			.select()
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+
+		if (!encounter) {
+			throw new NotFoundException(`Encounter ${input.encounterId} not found`)
+		}
+
+		if (encounter.encounterType === "outpatient") {
+			throw new BadRequestException("May Go Home orders are only for inpatient discharge")
+		}
+
+		if (encounter.status === "pending_discharge") {
+			return {
+				...encounter,
+				slaStatus: null,
+				slaElapsedMinutes: null,
+				slaTargetMinutes: null,
+			}
+		}
+
+		if (encounter.status !== "active") {
+			throw new BadRequestException("Can only sign May Go Home order for active encounters")
+		}
+
+		const [updated] = await db
+			.update(encounters)
+			.set({ status: "pending_discharge", updatedAt: new Date() })
+			.where(eq(encounters.id, input.encounterId))
+			.returning()
+
+		const staffId = userId ? await this.getOptionalStaffProfileId(userId) : null
+		await this.logSlaEvent({
+			facilityId: encounter.facilityId,
+			encounterId: encounter.id,
+			fromStatus: "active",
+			toStatus: "pending_discharge",
+			workflowType: "discharge",
+			staffId,
+			notes: "May Go Home order signed; ward charges frozen and Pharmacy/Billing notified",
+		})
+
+		await this.notifyDischargeQueues(updated!)
+
+		return {
+			...updated!,
+			slaStatus: null,
+			slaElapsedMinutes: null,
+			slaTargetMinutes: null,
+		}
+	}
+
 	// ========================================================================
 	// Discharge (inpatient)
 	// ========================================================================
@@ -833,12 +974,35 @@ export class EncountersService {
 			throw new NotFoundException(`Encounter ${input.encounterId} not found`)
 		}
 
-		if (encounter.status !== "active") {
-			throw new BadRequestException("Can only discharge active encounters")
+		if (encounter.status !== "active" && encounter.status !== "pending_discharge") {
+			throw new BadRequestException("Can only discharge active or pending-discharge encounters")
+		}
+
+		if (encounter.encounterType === "inpatient" && encounter.status !== "pending_discharge") {
+			throw new BadRequestException("May Go Home order must be signed before discharge")
 		}
 
 		if (encounter.encounterType === "outpatient") {
 			throw new BadRequestException("Use the close endpoint for outpatient encounters")
+		}
+
+		// Enforce death report mandate before discharge
+		if (input.disposition === "deceased") {
+			const completedDeathReport = await db
+				.select()
+				.from(deathReports)
+				.where(
+					and(
+						eq(deathReports.encounterId, input.encounterId),
+						inArray(deathReports.status, ["completed", "submitted"])
+					)
+				)
+				.limit(1)
+			if (completedDeathReport.length === 0) {
+				throw new BadRequestException(
+					"A completed death report (FMDRF or FNDRF) must be submitted before discharging a deceased patient."
+				)
+			}
 		}
 
 		// Release bed
@@ -854,9 +1018,7 @@ export class EncountersService {
 			.set({
 				status: "discharged",
 				disposition: input.disposition,
-				dischargeDatetime: input.dischargeDatetime
-					? new Date(input.dischargeDatetime)
-					: new Date(),
+				dischargeDatetime: input.dischargeDatetime ? new Date(input.dischargeDatetime) : new Date(),
 				updatedAt: new Date(),
 			})
 			.where(eq(encounters.id, input.encounterId))
@@ -866,41 +1028,23 @@ export class EncountersService {
 		await this.logSlaEvent({
 			facilityId: encounter.facilityId,
 			encounterId: encounter.id,
-			fromStatus: "active",
+			fromStatus: encounter.status,
 			toStatus: "discharged",
 			workflowType: "discharge",
 			staffId: null,
 			notes: `Disposition: ${input.disposition}`,
 		})
 
-		// Trigger draft death report creation if disposition is deceased
-		if (input.disposition === "deceased") {
-			try {
-				await db.insert(deathReports).values({
-					facilityId: encounter.facilityId,
-					encounterId: encounter.id,
-					patientId: encounter.patientId,
-					reportType: "fmdrf", // Default to FMDRF, can be changed during review
-					deathDatetime: input.dischargeDatetime
-						? new Date(input.dischargeDatetime)
-						: new Date(),
-					causeOfDeath: "Pending determination", // Placeholder
-					status: "draft",
-				})
-				this.logger.log(
-					`Created draft death report for deceased patient on encounter ${encounter.id}`
-				)
-			} catch (error) {
-				// Log but don't fail discharge — death report can be created manually
-				this.logger.error(
-					`Failed to create draft death report for encounter ${encounter.id}: ${error}`
-				)
-			}
-		}
-
 		this.logger.log(
 			`Discharged encounter ${input.encounterId} with disposition: ${input.disposition}`
 		)
+
+		this.eventEmitter.emit("encounter.discharged", {
+			facilityId: encounter.facilityId,
+			encounterId: encounter.id,
+			encounterType: encounter.encounterType,
+			disposition: input.disposition,
+		})
 
 		// Return with SLA tracking fields
 		return {
@@ -962,6 +1106,13 @@ export class EncountersService {
 
 		this.logger.log(`Discharged outpatient encounter ${input.encounterId}`)
 
+		this.eventEmitter.emit("encounter.discharged", {
+			facilityId: encounter.facilityId,
+			encounterId: encounter.id,
+			encounterType: encounter.encounterType,
+			disposition: null,
+		})
+
 		// Return with SLA tracking fields
 		return {
 			...updated!,
@@ -976,10 +1127,7 @@ export class EncountersService {
 	// ========================================================================
 
 	async getDischargeChecklist(input: EncounterIdInput) {
-		const [encounter] = await db
-			.select()
-			.from(encounters)
-			.where(eq(encounters.id, input.id))
+		const [encounter] = await db.select().from(encounters).where(eq(encounters.id, input.id))
 
 		if (!encounter) {
 			throw new NotFoundException(`Encounter ${input.id} not found`)
@@ -1098,35 +1246,31 @@ export class EncountersService {
 						status: "not_applicable" as ChecklistStatus,
 						responsibleRole: "Biller",
 					},
-				{
-					key: "orders_finalized",
-					label: "Orders/prescriptions finalized",
-					category: "clinical" as ChecklistCategory,
-					// PS-018: check real medication orders — blocks close if pending orders exist
-					status: await (async (): Promise<ChecklistStatus> => {
-						const [totalRow] = await db
-							.select({ n: count() })
-							.from(medicationOrders)
-							.where(eq(medicationOrders.encounterId, encounter.id))
-						if ((totalRow?.n ?? 0) === 0) return "not_applicable" // no orders
-						const [pendingRow] = await db
-							.select({ n: count() })
-							.from(medicationOrders)
-							.where(
-								and(
-									eq(medicationOrders.encounterId, encounter.id),
-									inArray(medicationOrders.status, [
-										"pending_verification",
-										"verified",
-										"active",
-									])
+					{
+						key: "orders_finalized",
+						label: "Orders/prescriptions finalized",
+						category: "clinical" as ChecklistCategory,
+						// PS-018: check real medication orders — blocks close if pending orders exist
+						status: await (async (): Promise<ChecklistStatus> => {
+							const [totalRow] = await db
+								.select({ n: count() })
+								.from(medicationOrders)
+								.where(eq(medicationOrders.encounterId, encounter.id))
+							if ((totalRow?.n ?? 0) === 0) return "not_applicable" // no orders
+							const [pendingRow] = await db
+								.select({ n: count() })
+								.from(medicationOrders)
+								.where(
+									and(
+										eq(medicationOrders.encounterId, encounter.id),
+										inArray(medicationOrders.status, ["pending_verification", "verified", "active"])
+									)
 								)
-							)
-						return (pendingRow?.n ?? 0) === 0 ? "complete" : "incomplete"
-					})(),
-					responsibleRole: "Clinician",
-				},
-			]
+							return (pendingRow?.n ?? 0) === 0 ? "complete" : "incomplete"
+						})(),
+						responsibleRole: "Clinician",
+					},
+				]
 
 		return {
 			encounterId: encounter.id,

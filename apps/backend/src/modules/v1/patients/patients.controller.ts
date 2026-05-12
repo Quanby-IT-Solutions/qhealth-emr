@@ -5,7 +5,8 @@ import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { buildChartAccessActor } from "@/modules/v1/audit/chart-access.service"
+import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { PatientsService } from "./patients.service"
 
@@ -21,15 +22,22 @@ export class PatientsController {
 		})
 	}
 
+	@RequireAnyPermissions([
+		{ module: "opd", action: "view" },
+		{ module: "scheduling", action: "view" },
+	])
+	@Implement(v1.patient.listClinicians)
+	async listClinicians() {
+		return implement(v1.patient.listClinicians).handler(async ({ input }) => {
+			return this.patientsService.listClinicians(input)
+		})
+	}
+
 	@RequirePermission("patients", "view")
 	@Implement(v1.patient.get)
 	async get(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.patient.get).handler(async ({ input }) => {
-			return this.patientsService.findById(input.id, {
-				userId: session.user.id,
-				ipAddress: (req.headers["x-forwarded-for"] as string | undefined) ?? req.ip ?? null,
-				userAgent: (req.headers["user-agent"] as string | undefined) ?? null,
-			})
+			return this.patientsService.findById(input.id, buildChartAccessActor(session, req))
 		})
 	}
 
@@ -56,14 +64,6 @@ export class PatientsController {
 	async registerWithOpdEncounter(@Session() session: UserSession) {
 		return implement(v1.patient.registerWithOpdEncounter).handler(async ({ input }) => {
 			return this.patientsService.registerWithOpdEncounter(input, session.user.id)
-		})
-	}
-
-	@RequirePermission("opd", "view")
-	@Implement(v1.patient.listClinicians)
-	async listClinicians() {
-		return implement(v1.patient.listClinicians).handler(async ({ input }) => {
-			return this.patientsService.listClinicians(input)
 		})
 	}
 }

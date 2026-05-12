@@ -1,16 +1,14 @@
 "use client"
 
-import { useState } from "react"
-
 import { Loader2 } from "lucide-react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useChartContext } from "@/features/encounters/context/chart-context"
 import { AnesthesiaRecordForm } from "@/features/surgical/components/anesthesia-record-form"
 import { OperationRecordForm } from "@/features/surgical/components/operation-record-form"
 import { PreOpChecklist } from "@/features/surgical/components/pre-op-checklist"
 import { RvsCodeSelector } from "@/features/surgical/components/rvs-code-selector"
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 import {
 	useAnesthesiaRecordQuery,
@@ -22,13 +20,17 @@ import {
 export default function SurgicalPage() {
 	const { encounterId, facilityId } = useChartContext()
 	const { data: profile } = useMyProfile()
-	const staffId = profile?.staffProfiles?.[0]?.id ?? ""
+	const activeStaffProfile =
+		profile?.staffProfiles?.find((staffProfile) =>
+			staffProfile.roles?.some((role) => role.id === profile.activeRole?.id)
+		) ?? profile?.staffProfiles?.[0]
+	const staffId = activeStaffProfile?.id ?? ""
+	const activeFacilityId = facilityId || activeStaffProfile?.facilityId || ""
 
-	// Fetch the surgical case tied to this encounter
 	const { data: cases, isLoading: casesLoading } = useSurgicalCaseListQuery({
 		encounterId,
 	})
-	const surgicalCase = cases?.[0]
+	const surgicalCase = cases?.data?.[0]
 
 	const caseId = surgicalCase?.id ?? ""
 
@@ -44,14 +46,29 @@ export default function SurgicalPage() {
 
 	const permSet = usePermissionSet()
 	const canEditSurgical = can(permSet, "surgical", "edit")
+	const canSignSurgical = can(permSet, "surgical", "sign")
 	const canValidateRvs = can(permSet, "billing", "edit")
 	const canFinalizeRvs = can(permSet, "billing", "sign")
+	const isOperationRecordSigned = opRecord?.status === "signed"
+
+	const roleName = (profile?.activeRole?.name ?? "").toLowerCase()
+	const isSurgeon = roleName === "surgeon"
+	const isAnesthesiologist = roleName === "anesthesiologist"
+
+	const defaultTab = isSurgeon ? "operation" : isAnesthesiologist ? "anesthesia" : "checklist"
+	const showRvsTab = !isAnesthesiologist
+
+	const canEditPreOp = isAnesthesiologist ? false : canEditSurgical
+	const canEditOperation = isAnesthesiologist ? false : canEditSurgical
+	const canSignOperation = isAnesthesiologist ? false : canSignSurgical
+	const canEditAnesthesia = isSurgeon ? false : canEditSurgical
+	const canSignAnesthesia = isSurgeon ? false : canSignSurgical
 
 	if (casesLoading) {
 		return (
 			<div className="flex items-center gap-2 p-8 text-sm">
 				<Loader2 className="size-4 animate-spin" />
-				Loading surgical case…
+				Loading surgical case...
 			</div>
 		)
 	}
@@ -76,30 +93,35 @@ export default function SurgicalPage() {
 				<h2 className="text-base font-semibold">{surgicalCase.procedureName}</h2>
 				<p className="text-muted-foreground text-sm">
 					Case #{surgicalCase.id.slice(-8).toUpperCase()} &middot;{" "}
-					{surgicalCase.orSuite} &middot;{" "}
-					{new Date(surgicalCase.scheduledAt).toLocaleString("en-PH", {
-						month: "short",
-						day: "numeric",
-						year: "numeric",
-						hour: "2-digit",
-						minute: "2-digit",
-					})}
+					{surgicalCase.orSuite ?? "Unassigned OR"}
+					{surgicalCase.scheduledDatetime ? (
+						<>
+							{" "}&middot;{" "}
+							{new Date(surgicalCase.scheduledDatetime).toLocaleString("en-PH", {
+								month: "short",
+								day: "numeric",
+								year: "numeric",
+								hour: "2-digit",
+								minute: "2-digit",
+							})}
+						</>
+					) : null}
 				</p>
 			</div>
 
-			<Tabs defaultValue="checklist">
+			<Tabs defaultValue={defaultTab}>
 				<TabsList>
 					<TabsTrigger value="checklist">Pre-Op Checklist</TabsTrigger>
 					<TabsTrigger value="operation">Operation Record</TabsTrigger>
 					<TabsTrigger value="anesthesia">Anesthesia Record</TabsTrigger>
-					<TabsTrigger value="rvs">RVS Codes</TabsTrigger>
+					{showRvsTab && <TabsTrigger value="rvs">RVS Codes</TabsTrigger>}
 				</TabsList>
 
 				<TabsContent value="checklist" className="mt-6">
 					{checklistLoading ? (
 						<Loader2 className="size-4 animate-spin" />
 					) : (
-						<PreOpChecklist caseId={caseId} existing={preOpChecklist} canEdit={canEditSurgical} />
+						<PreOpChecklist caseId={caseId} existing={preOpChecklist} canEdit={canEditPreOp} />
 					)}
 				</TabsContent>
 
@@ -109,9 +131,12 @@ export default function SurgicalPage() {
 					) : (
 						<OperationRecordForm
 							caseId={caseId}
+							facilityId={activeFacilityId}
 							surgeonStaffId={surgicalCase.surgeonStaffId ?? staffId}
+							defaultAnesthesiologistStaffId={surgicalCase.anesthesiologistStaffId}
 							existing={opRecord}
-							canEdit={canEditSurgical}
+							canEdit={canEditOperation}
+							canSign={canSignOperation}
 						/>
 					)}
 				</TabsContent>
@@ -120,24 +145,31 @@ export default function SurgicalPage() {
 					{anesthesiaLoading ? (
 						<Loader2 className="size-4 animate-spin" />
 					) : (
-						<AnesthesiaRecordForm caseId={caseId} existing={anesthesiaRecord} canEdit={canEditSurgical} />
+						<AnesthesiaRecordForm
+							caseId={caseId}
+							existing={anesthesiaRecord}
+							canEdit={canEditAnesthesia}
+							canSign={canSignAnesthesia}
+						/>
 					)}
 				</TabsContent>
 
-				<TabsContent value="rvs" className="mt-6">
-					<RvsCodeSelector
-						caseId={caseId}
-						canEdit={canEditSurgical}
-						canValidate={canValidateRvs}
-						canFinalize={canFinalizeRvs}
-					/>
-				</TabsContent>
+				{showRvsTab && (
+					<TabsContent value="rvs" className="mt-6">
+						<RvsCodeSelector
+							caseId={caseId}
+							operationRecord={opRecord}
+							canEdit={canEditSurgical}
+							canValidate={canValidateRvs}
+							canFinalize={canFinalizeRvs}
+							isOperationRecordSigned={isOperationRecordSigned}
+						/>
+					</TabsContent>
+				)}
 			</Tabs>
 		</div>
 	)
 }
-
-// ── Inline RBAC helpers (mirrors layout.tsx pattern) ─────────────────────────
 
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()

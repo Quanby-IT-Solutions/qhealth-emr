@@ -123,6 +123,7 @@ export const PidsrCaseDetailSchema = PidsrCaseSchema.extend({
 	encounterType: z.string().nullable(),
 	chiefComplaint: z.string().nullable(),
 	attendingPhysician: z.string().nullable(),
+	category: PidsrCategoryEnum.nullable(),
 })
 
 export const SubmitPidsrCaseInputSchema = z.object({
@@ -130,6 +131,16 @@ export const SubmitPidsrCaseInputSchema = z.object({
 })
 
 export const SubmitPidsrCaseResponseSchema = z.object({
+	success: z.boolean(),
+	message: z.string(),
+})
+
+export const DismissPidsrCaseInputSchema = z.object({
+	id: z.string().uuid(),
+	reason: z.string().min(1),
+})
+
+export const DismissPidsrCaseResponseSchema = z.object({
 	success: z.boolean(),
 	message: z.string(),
 })
@@ -145,6 +156,7 @@ export type PidsrCaseDetail = z.infer<typeof PidsrCaseDetailSchema>
 export const GenerateWeeklyReportInputSchema = z.object({
 	facilityId: z.string().uuid(),
 	weekStartDate: z.string(),
+	caseIds: z.array(z.string().uuid()).optional(),
 })
 
 export const WeeklyReportSummarySchema = z.object({
@@ -159,7 +171,11 @@ export const WeeklyReportSummarySchema = z.object({
 			count: z.number(),
 		})
 	),
-	status: z.enum(["generated", "submitted"]),
+	// "generated": assembled but no enabled integration found — not transmitted
+	// "submitted": assembled and successfully transmitted to PIDSR endpoint
+	// "failed":    assembled but transmission attempt failed
+	status: z.enum(["generated", "submitted", "failed"]),
+	transmissionNote: z.string().optional(),
 })
 
 export type WeeklyReportSummary = z.infer<typeof WeeklyReportSummarySchema>
@@ -172,6 +188,7 @@ export const AhsrMetricsInputSchema = z.object({
 	facilityId: z.string().uuid(),
 	year: z.coerce.number().int().min(2000).max(2100),
 	month: z.coerce.number().int().min(1).max(12).optional(),
+	quarter: z.coerce.number().int().min(1).max(4).optional(),
 })
 
 export const MorbidityMortalityItemSchema = z.object({
@@ -201,6 +218,7 @@ export const AhsrMetricsResponseSchema = z.object({
 	topMorbidities: z.array(MorbidityMortalityItemSchema),
 	topMortalities: z.array(MorbidityMortalityItemSchema),
 	haiMetrics: z.array(HaiMetricSchema),
+	readinessPercent: z.number(),
 })
 
 export const AhsrDrilldownInputSchema = z.object({
@@ -241,6 +259,7 @@ export const ExportAhsrInputSchema = z.object({
 	facilityId: z.string().uuid(),
 	year: z.coerce.number().int(),
 	month: z.coerce.number().int().optional(),
+	adminOverride: z.coerce.boolean().optional(),
 })
 
 export const ExportAhsrResponseSchema = z.object({
@@ -317,11 +336,13 @@ export const AhsrRealTimeMetricsSchema = z.object({
 	),
 
 	// Emergency department metrics
-	edMetrics: z.object({
-		currentWaiting: z.number(),
-		averageWaitMinutes: z.number().nullable(),
-		bedsTurnover24h: z.number(),
-	}).nullable(),
+	edMetrics: z
+		.object({
+			currentWaiting: z.number(),
+			averageWaitMinutes: z.number().nullable(),
+			bedsTurnover24h: z.number(),
+		})
+		.nullable(),
 
 	// Alert counts (surveillance flags pending review)
 	pendingAlerts: z.number(),
@@ -380,6 +401,146 @@ export const RunAutoDetectionInputSchema = z.object({
 	facilityId: z.string().uuid(),
 	encounterId: z.string().uuid(),
 })
+
+// ============================================================================
+// AHSR Validation
+// ============================================================================
+
+export const AhsrValidationIssueTypeEnum = z.enum([
+	"missing_icd10",
+	"deprecated_code",
+	"no_finalized_note",
+])
+
+export const AhsrValidationIssueSchema = z.object({
+	id: z.string().uuid(),
+	issueType: AhsrValidationIssueTypeEnum,
+	encounterId: z.string().uuid().nullable(),
+	patientName: z.string().nullable(),
+	patientMrn: z.string().nullable(),
+	detail: z.string().nullable(),
+	status: z.enum(["open", "resolved"]),
+})
+
+export const ValidateAhsrInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	year: z.coerce.number().int().min(2000).max(2100),
+	quarter: z.coerce.number().int().min(1).max(4).optional(),
+	page: z.coerce.number().int().positive().default(1),
+	limit: z.coerce.number().int().positive().max(100).default(50),
+})
+
+export const ValidateAhsrResponseSchema = z.object({
+	total: z.number(),
+	page: z.number(),
+	limit: z.number(),
+	totalPages: z.number(),
+	readinessPercent: z.number(),
+	issuesByType: z.record(z.string(), z.number()),
+	issues: z.array(AhsrValidationIssueSchema),
+})
+
+export const LockAhsrPeriodInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	year: z.coerce.number().int().min(2000).max(2100),
+	quarter: z.coerce.number().int().min(1).max(4).optional(),
+})
+
+export const LockAhsrPeriodResponseSchema = z.object({
+	success: z.boolean(),
+	periodId: z.string().uuid(),
+})
+
+export type AhsrValidationIssue = z.infer<typeof AhsrValidationIssueSchema>
+export type ValidateAhsrInput = z.infer<typeof ValidateAhsrInputSchema>
+export type ValidateAhsrResponse = z.infer<typeof ValidateAhsrResponseSchema>
+
+// ============================================================================
+// Mortality / Morbidity — dedicated endpoints
+// ============================================================================
+
+export const AgeBandEnum = z.enum(["<1", "1-4", "5-14", "15-24", "25-44", "45-64", "65+"])
+
+export const MmTop10InputSchema = z.object({
+	facilityId: z.string().uuid(),
+	type: z.enum(["mortality", "morbidity"]),
+	year: z.coerce.number().int().min(2000).max(2100),
+	quarter: z.coerce.number().int().min(1).max(4).optional(),
+	ward: z.string().optional(),
+	sex: z.enum(["M", "F"]).optional(),
+	ageBand: AgeBandEnum.optional(),
+})
+
+export const MmTop10ItemSchema = z.object({
+	rank: z.number(),
+	icdCode: z.string(),
+	diseaseName: z.string(),
+	count: z.number(),
+	percentage: z.number(),
+	priorCount: z.number().nullable(),
+	rankChange: z.number().nullable(),
+})
+
+export const MmTop10ResponseSchema = z.object({
+	facilityId: z.string().uuid(),
+	type: z.enum(["mortality", "morbidity"]),
+	year: z.number(),
+	quarter: z.number().nullable(),
+	items: z.array(MmTop10ItemSchema),
+})
+
+export const MmConditionInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	icdCode: z.string(),
+	year: z.coerce.number().int().min(2000).max(2100),
+	quarter: z.coerce.number().int().min(1).max(4).optional(),
+})
+
+export const DemographicBreakdownSchema = z.object({
+	ageBand: AgeBandEnum,
+	male: z.number(),
+	female: z.number(),
+	unknown: z.number(),
+	total: z.number(),
+})
+
+export const MmConditionEncounterSchema = z.object({
+	encounterId: z.string().uuid(),
+	patientName: z.string().nullable(),
+	patientMrn: z.string().nullable(),
+	admissionDate: z.string().nullable(),
+	dischargeDate: z.string().nullable(),
+	disposition: z.string().nullable(),
+})
+
+export const MmConditionResponseSchema = z.object({
+	facilityId: z.string().uuid(),
+	icdCode: z.string(),
+	diseaseName: z.string(),
+	totalCount: z.number(),
+	demographics: z.array(DemographicBreakdownSchema),
+	encounters: z.array(MmConditionEncounterSchema).optional(),
+})
+
+export const ExportMmPdfInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	type: z.enum(["mortality", "morbidity"]),
+	year: z.coerce.number().int().min(2000).max(2100),
+	quarter: z.coerce.number().int().min(1).max(4).optional(),
+})
+
+export const ExportMmPdfResponseSchema = z.object({
+	success: z.boolean(),
+	message: z.string(),
+	snapshotId: z.string().uuid().nullable(),
+	downloadUrl: z.string().nullable().optional(),
+})
+
+export type MmTop10Input = z.infer<typeof MmTop10InputSchema>
+export type MmTop10Item = z.infer<typeof MmTop10ItemSchema>
+export type MmTop10Response = z.infer<typeof MmTop10ResponseSchema>
+export type MmConditionInput = z.infer<typeof MmConditionInputSchema>
+export type MmConditionResponse = z.infer<typeof MmConditionResponseSchema>
 
 // ============================================================================
 // Type exports for new schemas

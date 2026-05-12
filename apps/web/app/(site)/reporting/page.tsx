@@ -40,9 +40,12 @@ export default function ReportingPage() {
 		)
 	}
 
+	const canEdit = can(permSet, "reporting", "edit")
+	const canExport = can(permSet, "reporting", "export")
+
 	return (
 		<Suspense fallback={<ReportingDashboardSkeleton />}>
-			<ReportingDashboard />
+			<ReportingDashboard canEdit={canEdit} canExport={canExport} />
 		</Suspense>
 	)
 }
