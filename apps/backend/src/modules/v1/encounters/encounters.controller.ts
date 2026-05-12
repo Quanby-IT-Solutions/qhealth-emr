@@ -47,11 +47,28 @@ export class EncountersController {
 	}
 
 	@RequirePermission("adt", "edit")
-	@Implement(v1.encounter.transfer)
-	async transfer(@Session() session: UserSession) {
-		return implement(v1.encounter.transfer).handler(async ({ input }) => {
+	@Implement(v1.encounter.initiateTransfer)
+	async initiateTransfer(@Session() session: UserSession) {
+		return implement(v1.encounter.initiateTransfer).handler(async ({ input }) => {
 			void session
-			return this.encountersService.transfer(input)
+			return this.encountersService.initiateTransfer(input)
+		})
+	}
+
+	@RequirePermission("nursing", "create")
+	@Implement(v1.encounter.receiveTransfer)
+	async receiveTransfer(@Session() session: UserSession) {
+		return implement(v1.encounter.receiveTransfer).handler(async ({ input }) => {
+			void session
+			return this.encountersService.receiveTransfer(input)
+		})
+	}
+
+	@RequirePermission("nursing", "view")
+	@Implement(v1.encounter.listPendingTransfers)
+	async listPendingTransfers() {
+		return implement(v1.encounter.listPendingTransfers).handler(async ({ input }) => {
+			return this.encountersService.listPendingTransfers(input)
 		})
 	}
 

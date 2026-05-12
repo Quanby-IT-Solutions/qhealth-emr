@@ -6,6 +6,7 @@ import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Input } from "@/core/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import { Skeleton } from "@/core/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
@@ -13,6 +14,32 @@ import {
 	useListRolesQuery,
 	useListStaffQuery,
 } from "@/features/admin/api/admin.hooks"
+
+function UsersTableSkeletonRows() {
+	return (
+		<>
+			{Array.from({ length: 8 }).map((_, i) => (
+				<TableRow key={i}>
+					<TableCell>
+						<Skeleton className="h-4 w-36" />
+					</TableCell>
+					<TableCell>
+						<Skeleton className="h-4 w-48" />
+					</TableCell>
+					<TableCell>
+						<Skeleton className="h-4 w-24" />
+					</TableCell>
+					<TableCell>
+						<Skeleton className="h-5 w-16 rounded-full" />
+					</TableCell>
+					<TableCell>
+						<Skeleton className="h-4 w-20" />
+					</TableCell>
+				</TableRow>
+			))}
+		</>
+	)
+}
 
 export function UsersTable() {
 	const router = useRouter()
@@ -113,13 +140,7 @@ export function UsersTable() {
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{isLoading && (
-							<TableRow>
-								<TableCell colSpan={5} className="text-muted-foreground text-center">
-									Loading…
-								</TableCell>
-							</TableRow>
-						)}
+						{isLoading && <UsersTableSkeletonRows />}
 						{!isLoading && filteredData?.length === 0 && (
 							<TableRow>
 								<TableCell colSpan={5} className="text-muted-foreground text-center">

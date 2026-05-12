@@ -66,12 +66,12 @@ describe("filterNavItems", () => {
 
 		expect(primaryTitles).toEqual([
 			"Dashboard",
-			"Register Patient",
-			"Patients & Encounters",
+			"Patient Management",
 			"Bed Management",
 			"OPD",
 			"Chart Merge",
 			"Civil Registry",
+			"Patient Transfers",
 		])
 		expect(secondaryTitles).toEqual([])
 	})

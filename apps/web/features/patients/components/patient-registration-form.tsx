@@ -54,6 +54,7 @@ import { PatientRegistrationShell } from "@/features/patients/components/patient
 
 interface PatientRegistrationFormProps {
 	mode?: "standalone" | "triage-linked"
+	onBack?: () => void
 }
 
 function buildBackToSearchHref({ pendingTriageId }: { pendingTriageId: string }) {
@@ -138,7 +139,7 @@ function FormSection({
 	)
 }
 
-export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegistrationFormProps) {
+export function PatientRegistrationForm({ mode = "triage-linked", onBack }: PatientRegistrationFormProps) {
 	const router = useRouter()
 	const searchParams = useSearchParams()
 	const pendingTriageId = searchParams.get("pendingTriageId") ?? ""
@@ -350,7 +351,7 @@ export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegis
 							<Button
 								variant="outline"
 								className="border-border/60 bg-background"
-								onClick={() => router.push("/patients/register")}
+								onClick={() => (onBack ? onBack() : router.push("/patients/register"))}
 							>
 								Register another
 							</Button>
@@ -382,7 +383,7 @@ export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegis
 						<Button
 							variant="outline"
 							className="border-border/60 bg-background"
-							onClick={() => router.push("/patients/register")}
+							onClick={() => (onBack ? onBack() : router.push("/patients/register"))}
 						>
 							Back to patient search
 						</Button>
@@ -441,7 +442,7 @@ export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegis
 							<Button
 								variant="outline"
 								className="border-border/60 bg-background"
-								onClick={() => router.push("/patients/register")}
+								onClick={() => (onBack ? onBack() : router.push("/patients/register"))}
 							>
 								Register another
 							</Button>
@@ -781,7 +782,7 @@ export function PatientRegistrationForm({ mode = "triage-linked" }: PatientRegis
 								type="button"
 								variant="ghost"
 								className="justify-start sm:justify-center"
-								onClick={() => router.push(backToSearchHref)}
+								onClick={() => (onBack ? onBack() : router.push(backToSearchHref))}
 							>
 								<ArrowLeft className="size-4" />
 								Back to search
