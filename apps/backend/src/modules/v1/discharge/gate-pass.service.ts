@@ -48,7 +48,9 @@ export class GatePassService {
 		}
 
 		if (enc.status !== "discharged" && enc.status !== "pending_discharge") {
-			throw new BadRequestException("Gate pass can only be issued for discharged or pending-discharge encounters")
+			throw new BadRequestException(
+				"Gate pass can only be issued for discharged or pending-discharge encounters"
+			)
 		}
 
 		// Fetch patient name
@@ -127,10 +129,7 @@ export class GatePassService {
 	}
 
 	async getGatePass(encounterId: string) {
-		const [encounter] = await db
-			.select()
-			.from(encounters)
-			.where(eq(encounters.id, encounterId))
+		const [encounter] = await db.select().from(encounters).where(eq(encounters.id, encounterId))
 
 		if (!encounter) {
 			throw new NotFoundException(`Encounter ${encounterId} not found`)

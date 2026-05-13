@@ -45,6 +45,10 @@ function formatPrintDate(value: string | null | undefined): string {
 	})
 }
 
+function isValidEmail(value: string): boolean {
+	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
 export function openAbstractPrintWindow(abstract: TeleAbstract): void {
 	const win = window.open("", "_blank", "width=870,height=1100")
 	if (!win) return
@@ -243,7 +247,7 @@ function AbstractPreview({ abstract }: { abstract: TeleAbstract }) {
 					)}
 					<div className="mt-2 border-t pt-2">
 						<p className="text-muted-foreground text-xs">
-							Physician's Signature over Printed Name
+							Physician Signature over Printed Name
 						</p>
 					</div>
 				</div>
@@ -315,12 +319,13 @@ export function TeleAbstractPage({
 		e.preventDefault()
 		if (!abstract) return
 		setError(null)
-		if (!sendEmail.trim()) {
-			setError("Email address is required.")
+		const email = sendEmail.trim()
+		if (!isValidEmail(email)) {
+			setError("Enter a valid patient email address.")
 			return
 		}
 		try {
-			const result = await sendMutation.mutateAsync({ id: abstract.id, email: sendEmail.trim() })
+			const result = await sendMutation.mutateAsync({ id: abstract.id, email })
 			setActiveAbstractId(result.id)
 			setShowSendForm(false)
 			setSendEmail("")

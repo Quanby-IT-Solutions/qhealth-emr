@@ -104,6 +104,21 @@ export class RbacController {
 		})
 	}
 
+	@RequirePermission("orders", "view")
+	@Implement(v1.rbac.searchClinicians)
+	async searchClinicians() {
+		return implement(v1.rbac.searchClinicians).handler(async ({ input }) => {
+			return this.rbacService.searchClinicians(input)
+		})
+	}
+
+	@Implement(v1.rbac.verifyCoSignCredentials)
+	async verifyCoSignCredentials() {
+		return implement(v1.rbac.verifyCoSignCredentials).handler(async ({ input }) => {
+			return this.rbacService.verifyCoSignCredentials(input)
+		})
+	}
+
 	// ── Role Management ────────────────────────────────────────────────
 
 	@RequirePermission("admin", "view")

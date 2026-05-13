@@ -288,9 +288,7 @@ export class HimService {
 		})
 	}
 
-	private async lookupDeprecatedIcd10(
-		codeStrings: string[]
-	): Promise<
+	private async lookupDeprecatedIcd10(codeStrings: string[]): Promise<
 		Map<
 			string,
 			{

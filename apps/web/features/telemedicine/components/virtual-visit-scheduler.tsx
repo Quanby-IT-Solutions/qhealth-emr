@@ -1,11 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Calendar, Clock, User, Video } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
+import { useStaffClinicianListQuery } from "@/features/scheduling/api/scheduling.hooks"
 import {
 	type AppointmentStatus,
 	type CreateAppointmentInput,
@@ -48,12 +50,6 @@ interface BookingFormState {
 
 const DURATION_OPTIONS = [15, 30, 45, 60] as const
 
-const CLINICIAN_SPECIMENS = [
-	{ id: "c001", name: "Dr. Maria Santos", specialty: "Internal Medicine" },
-	{ id: "c002", name: "Dr. Jose Reyes", specialty: "General Practice" },
-	{ id: "c003", name: "Dr. Ana Dela Cruz", specialty: "Pediatrics" },
-]
-
 const EMPTY_FORM: BookingFormState = {
 	patientId: "",
 	patientName: "",
@@ -81,6 +77,15 @@ function formatDate(val: string): string {
 		day: "numeric",
 		year: "numeric",
 	})
+}
+
+function isValidEmail(value: string): boolean {
+	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function isFutureAppointment(date: string, time: string): boolean {
+	const scheduled = new Date(`${date}T${time}`)
+	return Number.isFinite(scheduled.getTime()) && scheduled.getTime() > Date.now()
 }
 
 // ============================================================================
@@ -132,25 +137,51 @@ function AppointmentStatusBadge({ status }: { status: AppointmentStatus }) {
 export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: VirtualVisitSchedulerProps) {
 	const [showForm, setShowForm] = useState(false)
 	const [form, setForm] = useState<BookingFormState>(EMPTY_FORM)
+	const [patientSearch, setPatientSearch] = useState("")
+	const [debouncedPatientSearch, setDebouncedPatientSearch] = useState("")
 	const [error, setError] = useState<string | null>(null)
 
 	const { data: appointments, isLoading } = useAppointmentsQuery(facilityId)
+	const { data: clinicians, isLoading: cliniciansLoading } = useStaffClinicianListQuery({ facilityId })
+	const { data: patientResults, isLoading: patientsLoading } = usePatientSearchQuery(
+		{ facilityId, search: debouncedPatientSearch, limit: 10 },
+		{ enabled: showForm && Boolean(facilityId) && debouncedPatientSearch.trim().length >= 2 },
+	)
 	const createMutation = useCreateAppointmentMutation()
+
+	useEffect(() => {
+		const timer = window.setTimeout(() => setDebouncedPatientSearch(patientSearch.trim()), 250)
+		return () => window.clearTimeout(timer)
+	}, [patientSearch])
 
 	function patch(key: keyof BookingFormState, value: string | number) {
 		setForm((prev) => ({ ...prev, [key]: value }))
 	}
 
 	function handleClinicianSelect(clinicianId: string) {
-		const clinician = CLINICIAN_SPECIMENS.find((c) => c.id === clinicianId)
+		const clinician = clinicians.find((c) => c.id === clinicianId)
 		if (clinician) {
 			setForm((prev) => ({
 				...prev,
 				clinicianId,
 				clinicianName: clinician.name,
-				clinicianSpecialty: clinician.specialty,
+				clinicianSpecialty: clinician.department ?? "",
 			}))
 		}
+	}
+
+	function handlePatientSelect(patient: NonNullable<typeof patientResults>["data"][number]) {
+		const patientWithContact = patient as typeof patient & { phone?: string | null; email?: string | null }
+		const patientName = `${patient.lastName}, ${patient.firstName}`
+		setPatientSearch(`${patientName} (${patient.mrn})`)
+		setForm((prev) => ({
+			...prev,
+			patientId: patient.id,
+			patientName,
+			patientMrn: patient.mrn,
+			patientContactNumber: patientWithContact.phone ?? "",
+			patientEmail: patientWithContact.email ?? "",
+		}))
 	}
 
 	async function handleSubmit(e: React.FormEvent) {
@@ -158,7 +189,7 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 		setError(null)
 
 		if (!form.patientId || !form.patientName || !form.patientMrn) {
-			setError("Patient information is required.")
+			setError("Select a patient from the search results before booking.")
 			return
 		}
 		if (!form.clinicianId) {
@@ -169,20 +200,30 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 			setError("Please select a date and time.")
 			return
 		}
+		if (!isFutureAppointment(form.scheduledDate, form.scheduledTime)) {
+			setError("Appointment date and time must be in the future.")
+			return
+		}
+		if (form.patientEmail.trim() && !isValidEmail(form.patientEmail.trim())) {
+			setError("Enter a valid patient email address.")
+			return
+		}
 
 		const input: CreateAppointmentInput = {
-			patientId: form.patientId || `P-${Date.now()}`,
+			facilityId,
+			patientId: form.patientId,
 			clinicianId: form.clinicianId,
 			scheduledDate: form.scheduledDate,
 			scheduledTime: form.scheduledTime,
 			durationMinutes: form.durationMinutes,
 			platform: form.platform,
-			notes: form.notes || undefined,
+			notes: form.notes.trim() || undefined,
 		}
 
 		try {
 			const appt = await createMutation.mutateAsync(input)
 			setForm(EMPTY_FORM)
+			setPatientSearch("")
 			setShowForm(false)
 			onAppointmentCreated?.(appt.id)
 		} catch (err) {
@@ -225,35 +266,55 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 
 							{/* Patient Info */}
 							<div className="grid grid-cols-2 gap-4">
-								<div className="space-y-1.5">
-									<label htmlFor="patientName" className="text-sm font-medium">
-										Patient Name <span className="text-destructive">*</span>
+								<div className="relative col-span-2 space-y-1.5">
+									<label htmlFor="patientSearch" className="text-sm font-medium">
+										Patient <span className="text-destructive">*</span>
 									</label>
 									<input
-										id="patientName"
+										id="patientSearch"
 										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-										value={form.patientName}
-										onChange={(e) => patch("patientName", e.target.value)}
-										placeholder="Full name"
+										value={patientSearch}
+										onChange={(e) => {
+											setPatientSearch(e.target.value)
+											setForm((prev) => ({
+												...prev,
+												patientId: "",
+												patientName: "",
+												patientMrn: "",
+												patientContactNumber: "",
+												patientEmail: "",
+											}))
+										}}
+										placeholder="Search by patient name or MRN"
 										required
 									/>
-								</div>
-								<div className="space-y-1.5">
-									<label htmlFor="patientMrn" className="text-sm font-medium">
-										MRN <span className="text-destructive">*</span>
-									</label>
-									<input
-										id="patientMrn"
-										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-										value={form.patientMrn}
-										onChange={(e) => patch("patientMrn", e.target.value)}
-										placeholder="e.g. MRN-00001"
-										required
-									/>
+									{debouncedPatientSearch.length >= 2 && !form.patientId && (
+										<div className="bg-background absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border shadow-sm">
+											{patientsLoading ? (
+												<p className="text-muted-foreground px-3 py-2 text-sm">Searching patients...</p>
+											) : patientResults?.data.length ? (
+												patientResults.data.map((patient) => (
+													<button
+														key={patient.id}
+														type="button"
+														className="hover:bg-muted w-full px-3 py-2 text-left text-sm"
+														onClick={() => handlePatientSelect(patient)}
+													>
+														<span className="font-medium">
+															{patient.lastName}, {patient.firstName}
+														</span>
+														<span className="text-muted-foreground ml-2">{patient.mrn}</span>
+													</button>
+												))
+											) : (
+												<p className="text-muted-foreground px-3 py-2 text-sm">No matching patients found.</p>
+											)}
+										</div>
+									)}
 								</div>
 								<div className="space-y-1.5">
 									<label htmlFor="patientContact" className="text-sm font-medium">
-										Contact Number <span className="text-destructive">*</span>
+										Contact Number
 									</label>
 									<input
 										id="patientContact"
@@ -261,7 +322,6 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 										value={form.patientContactNumber}
 										onChange={(e) => patch("patientContactNumber", e.target.value)}
 										placeholder="+63 9XX XXX XXXX"
-										required
 									/>
 								</div>
 								<div className="space-y-1.5">
@@ -290,11 +350,12 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 									value={form.clinicianId}
 									onChange={(e) => handleClinicianSelect(e.target.value)}
 									required
+									disabled={cliniciansLoading}
 								>
-									<option value="">Select clinician</option>
-									{CLINICIAN_SPECIMENS.map((c) => (
+									<option value="">{cliniciansLoading ? "Loading clinicians..." : "Select clinician"}</option>
+									{clinicians.map((c) => (
 										<option key={c.id} value={c.id}>
-											{c.name} — {c.specialty}
+											{c.name} - {c.department ?? "Clinician"}
 										</option>
 									))}
 								</select>

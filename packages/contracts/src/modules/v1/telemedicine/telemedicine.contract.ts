@@ -17,10 +17,12 @@ import {
 	ListEncounterAbstractsInputSchema,
 	ListPrescriptionsInputSchema,
 	SendAbstractInputSchema,
+	SendPrescriptionInputSchema,
 	SignAbstractInputSchema,
 	TeleAbstractSchema,
 	TelemedicineAppointmentSchema,
 	TelemedicineEncounterSchema,
+	UpdateAppointmentInputSchema,
 } from "./telemedicine.schema.js"
 
 export const telemedicineContract = {
@@ -54,6 +56,16 @@ export const telemedicineContract = {
 			tags: ["Telemedicine"],
 		})
 		.input(CreateAppointmentInputSchema)
+		.output(TelemedicineAppointmentSchema),
+
+	updateAppointment: oc
+		.route({
+			method: "PATCH",
+			path: "/appointments/{id}",
+			summary: "Update a telemedicine appointment",
+			tags: ["Telemedicine"],
+		})
+		.input(UpdateAppointmentInputSchema)
 		.output(TelemedicineAppointmentSchema),
 
 	cancelAppointment: oc
@@ -121,6 +133,16 @@ export const telemedicineContract = {
 		.output(EPrescriptionSchema),
 
 	// ─── Abstracts ─────────────────────────────────────────────────────────────
+
+	sendPrescription: oc
+		.route({
+			method: "POST",
+			path: "/prescriptions/{id}/send",
+			summary: "Send a telemedicine e-prescription",
+			tags: ["Telemedicine"],
+		})
+		.input(SendPrescriptionInputSchema)
+		.output(EPrescriptionSchema),
 
 	generateAbstract: oc
 		.route({

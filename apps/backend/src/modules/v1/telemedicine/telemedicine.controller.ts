@@ -1,8 +1,18 @@
-import { Controller } from "@nestjs/common"
+import { Controller, Get, NotFoundException, Param, Res, Version } from "@nestjs/common"
 import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
+import { and, eq } from "drizzle-orm"
+import type { Response } from "express"
 
+import {
+	staffProfiles,
+	telemedicineAbstracts,
+	telemedicineAppointments,
+	telemedicineEncounters,
+} from "@repo/db/schema"
+
+import { db } from "@/common/database/database.client"
 import { v1 } from "@/config/api-versions.config"
 import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
@@ -11,6 +21,57 @@ import { TelemedicineService } from "./telemedicine.service"
 @Controller()
 export class TelemedicineController {
 	constructor(private readonly telemedicineService: TelemedicineService) {}
+
+	private async resolveStaffProfileId(userId: string, facilityId: string) {
+		const [profile] = await db
+			.select({ id: staffProfiles.id })
+			.from(staffProfiles)
+			.where(and(eq(staffProfiles.userId, userId), eq(staffProfiles.facilityId, facilityId)))
+			.limit(1)
+
+		if (!profile) {
+			throw new NotFoundException(
+				`Staff profile not found for user ${userId} at facility ${facilityId}`
+			)
+		}
+
+		return profile.id
+	}
+
+	private async resolveAppointmentFacilityId(appointmentId: string) {
+		const [appointment] = await db
+			.select({ facilityId: telemedicineAppointments.facilityId })
+			.from(telemedicineAppointments)
+			.where(eq(telemedicineAppointments.id, appointmentId))
+
+		return appointment?.facilityId
+	}
+
+	private async resolveEncounterFacilityId(encounterId: string) {
+		const [encounter] = await db
+			.select({ facilityId: telemedicineAppointments.facilityId })
+			.from(telemedicineEncounters)
+			.innerJoin(
+				telemedicineAppointments,
+				eq(telemedicineEncounters.appointmentId, telemedicineAppointments.id)
+			)
+			.where(eq(telemedicineEncounters.id, encounterId))
+
+		return encounter?.facilityId
+	}
+
+	private async resolveAbstractFacilityId(abstractId: string) {
+		const [abstract] = await db
+			.select({ facilityId: telemedicineAppointments.facilityId })
+			.from(telemedicineAbstracts)
+			.innerJoin(
+				telemedicineAppointments,
+				eq(telemedicineAbstracts.appointmentId, telemedicineAppointments.id)
+			)
+			.where(eq(telemedicineAbstracts.id, abstractId))
+
+		return abstract?.facilityId
+	}
 
 	// ─── Appointments ──────────────────────────────────────────────────────────
 
@@ -34,8 +95,16 @@ export class TelemedicineController {
 	@Implement(v1.telemedicine.createAppointment)
 	async createAppointment(@Session() session: UserSession) {
 		return implement(v1.telemedicine.createAppointment).handler(async ({ input }) => {
-			void session
-			return this.telemedicineService.createAppointment(input)
+			const staffProfileId = await this.resolveStaffProfileId(session.user.id, input.facilityId)
+			return this.telemedicineService.createAppointment(input, staffProfileId)
+		})
+	}
+
+	@RequirePermission("telemedicine", "edit")
+	@Implement(v1.telemedicine.updateAppointment)
+	async updateAppointment() {
+		return implement(v1.telemedicine.updateAppointment).handler(async ({ input }) => {
+			return this.telemedicineService.updateAppointment(input)
 		})
 	}
 
@@ -62,8 +131,11 @@ export class TelemedicineController {
 	@Implement(v1.telemedicine.createEncounter)
 	async createEncounter(@Session() session: UserSession) {
 		return implement(v1.telemedicine.createEncounter).handler(async ({ input }) => {
-			void session
-			return this.telemedicineService.createEncounter(input)
+			const facilityId = await this.resolveAppointmentFacilityId(input.appointmentId)
+			const staffProfileId = facilityId
+				? await this.resolveStaffProfileId(session.user.id, facilityId)
+				: undefined
+			return this.telemedicineService.createEncounter(input, staffProfileId)
 		})
 	}
 
@@ -89,9 +161,30 @@ export class TelemedicineController {
 	@Implement(v1.telemedicine.createPrescription)
 	async createPrescription(@Session() session: UserSession) {
 		return implement(v1.telemedicine.createPrescription).handler(async ({ input }) => {
-			void session
-			return this.telemedicineService.createPrescription(input)
+			const facilityId = await this.resolveEncounterFacilityId(input.encounterId)
+			const staffProfileId = facilityId
+				? await this.resolveStaffProfileId(session.user.id, facilityId)
+				: undefined
+			return this.telemedicineService.createPrescription(input, staffProfileId)
 		})
+	}
+
+	@RequirePermission("telemedicine", "edit")
+	@Implement(v1.telemedicine.sendPrescription)
+	async sendPrescription() {
+		return implement(v1.telemedicine.sendPrescription).handler(async ({ input }) => {
+			return this.telemedicineService.sendPrescription(input)
+		})
+	}
+
+	@RequirePermission("telemedicine", "view")
+	@Version("1")
+	@Get("telemedicine/prescriptions/:id/pdf")
+	async getPrescriptionPdf(@Param("id") id: string, @Res() res: Response) {
+		const pdf = await this.telemedicineService.generatePrescriptionPdf(id)
+		res.setHeader("Content-Type", "application/pdf")
+		res.setHeader("Content-Disposition", `attachment; filename="prescription-${id}.pdf"`)
+		res.send(Buffer.from(pdf))
 	}
 
 	// ─── Abstracts ─────────────────────────────────────────────────────────────
@@ -100,8 +193,11 @@ export class TelemedicineController {
 	@Implement(v1.telemedicine.generateAbstract)
 	async generateAbstract(@Session() session: UserSession) {
 		return implement(v1.telemedicine.generateAbstract).handler(async ({ input }) => {
-			void session
-			return this.telemedicineService.generateAbstract(input)
+			const facilityId = await this.resolveEncounterFacilityId(input.encounterId)
+			const staffProfileId = facilityId
+				? await this.resolveStaffProfileId(session.user.id, facilityId)
+				: undefined
+			return this.telemedicineService.generateAbstract(input, staffProfileId)
 		})
 	}
 
@@ -125,8 +221,11 @@ export class TelemedicineController {
 	@Implement(v1.telemedicine.signAbstract)
 	async signAbstract(@Session() session: UserSession) {
 		return implement(v1.telemedicine.signAbstract).handler(async ({ input }) => {
-			void session
-			return this.telemedicineService.signAbstract(input)
+			const facilityId = await this.resolveAbstractFacilityId(input.id)
+			const staffProfileId = facilityId
+				? await this.resolveStaffProfileId(session.user.id, facilityId)
+				: undefined
+			return this.telemedicineService.signAbstract(input, staffProfileId)
 		})
 	}
 
@@ -134,8 +233,11 @@ export class TelemedicineController {
 	@Implement(v1.telemedicine.sendAbstract)
 	async sendAbstract(@Session() session: UserSession) {
 		return implement(v1.telemedicine.sendAbstract).handler(async ({ input }) => {
-			void session
-			return this.telemedicineService.sendAbstract(input)
+			const facilityId = await this.resolveAbstractFacilityId(input.id)
+			const staffProfileId = facilityId
+				? await this.resolveStaffProfileId(session.user.id, facilityId)
+				: undefined
+			return this.telemedicineService.sendAbstract(input, staffProfileId)
 		})
 	}
 }

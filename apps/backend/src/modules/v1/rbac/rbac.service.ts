@@ -4,11 +4,14 @@ import {
 	Injectable,
 	Logger,
 	NotFoundException,
+	UnauthorizedException,
 } from "@nestjs/common"
 import { AuthService } from "@thallesp/nestjs-better-auth"
-import { and, count, eq, ilike, inArray, or } from "drizzle-orm"
+import { and, count, eq, ilike, inArray, or, sql } from "drizzle-orm"
 
+import { getAuth } from "@repo/auth"
 import {
+	accounts,
 	facilities,
 	rolePermissions,
 	roles,
@@ -377,6 +380,114 @@ export class RbacService {
 		}))
 
 		return { data, total, page, limit }
+	}
+
+	async searchClinicians(input: {
+		facilityId: string
+		search?: string
+		excludeStaffProfileId?: string
+	}) {
+		const { facilityId, search, excludeStaffProfileId } = input
+
+		const profileRows = await db
+			.select({
+				staffProfileId: staffProfiles.id,
+				userId: staffProfiles.userId,
+				department: staffProfiles.department,
+			})
+			.from(staffProfiles)
+			.where(
+				and(
+					eq(staffProfiles.facilityId, facilityId),
+					eq(staffProfiles.isActive, true),
+					excludeStaffProfileId ? sql`${staffProfiles.id} != ${excludeStaffProfileId}` : undefined
+				)
+			)
+			.limit(20)
+
+		if (profileRows.length === 0) return []
+
+		const userIds = profileRows.map(p => p.userId)
+		const userConditions: ReturnType<typeof eq>[] = [
+			inArray(users.id, userIds) as ReturnType<typeof eq>,
+		]
+		if (search?.trim()) {
+			userConditions.push(
+				or(
+					ilike(users.name, `%${search.trim()}%`),
+					ilike(users.email, `%${search.trim()}%`)
+				)! as ReturnType<typeof eq>
+			)
+		}
+
+		const userRows = await db
+			.select({ id: users.id, name: users.name })
+			.from(users)
+			.where(and(...userConditions))
+
+		const profileIds = profileRows.map(p => p.staffProfileId)
+		const roleRows =
+			profileIds.length > 0
+				? await db
+						.select({
+							staffProfileId: userRoles.staffProfileId,
+							name: roles.name,
+							isPrimary: userRoles.isPrimary,
+						})
+						.from(userRoles)
+						.innerJoin(roles, eq(userRoles.roleId, roles.id))
+						.where(inArray(userRoles.staffProfileId, profileIds))
+				: []
+
+		const userMap = new Map(userRows.map(u => [u.id, u.name]))
+		const roleMap = new Map<string, string>()
+		for (const r of roleRows) {
+			if (r.isPrimary || !roleMap.has(r.staffProfileId)) {
+				roleMap.set(r.staffProfileId, r.name)
+			}
+		}
+
+		return profileRows
+			.filter(p => userMap.has(p.userId))
+			.map(p => ({
+				staffProfileId: p.staffProfileId,
+				name: userMap.get(p.userId)!,
+				department: p.department ?? null,
+				primaryRole: roleMap.get(p.staffProfileId) ?? null,
+			}))
+	}
+
+	async verifyCoSignCredentials(input: { staffProfileId: string; password: string }) {
+		const profile = await db
+			.select({ userId: staffProfiles.userId })
+			.from(staffProfiles)
+			.where(and(eq(staffProfiles.id, input.staffProfileId), eq(staffProfiles.isActive, true)))
+			.then(rows => rows[0])
+
+		if (!profile) throw new NotFoundException("Staff profile not found or inactive")
+
+		const account = await db
+			.select({ password: accounts.password })
+			.from(accounts)
+			.where(and(eq(accounts.userId, profile.userId), eq(accounts.providerId, "credential")))
+			.then(rows => rows[0])
+
+		if (!account?.password) {
+			throw new BadRequestException("Co-signer has no password credential on file")
+		}
+
+		const ctx = await getAuth().$context
+		const valid = await ctx.password.verify({ hash: account.password, password: input.password })
+
+		if (!valid) throw new UnauthorizedException("Invalid co-sign credentials")
+
+		const user = await db
+			.select({ name: users.name })
+			.from(users)
+			.where(eq(users.id, profile.userId))
+			.then(rows => rows[0])
+
+		return { verified: true as const, staffName: user?.name ?? "Unknown" }
 	}
 
 	async createStaff(input: CreateStaffInput) {

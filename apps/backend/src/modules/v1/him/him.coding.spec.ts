@@ -177,9 +177,7 @@ describe("HIM-BE-03 ICD-10 Coding", () => {
 		const { service } = makeService()
 		;(
 			service as unknown as {
-				lookupDeprecatedIcd10: (
-					codes: string[]
-				) => Promise<
+				lookupDeprecatedIcd10: (codes: string[]) => Promise<
 					Map<
 						string,
 						{
@@ -333,9 +331,7 @@ describe("HIM-BE-03 ICD-10 Coding", () => {
 		const { service } = makeService()
 		;(
 			service as unknown as {
-				lookupDeprecatedIcd10: (
-					codes: string[]
-				) => Promise<
+				lookupDeprecatedIcd10: (codes: string[]) => Promise<
 					Map<
 						string,
 						{

@@ -8,10 +8,7 @@ import { db } from "@/common/database/database.client"
 @Injectable()
 export class DischargeClearancesService {
 	async getClearanceStatus(encounterId: string) {
-		const [encounter] = await db
-			.select()
-			.from(encounters)
-			.where(eq(encounters.id, encounterId))
+		const [encounter] = await db.select().from(encounters).where(eq(encounters.id, encounterId))
 
 		if (!encounter) {
 			throw new NotFoundException(`Encounter ${encounterId} not found`)
@@ -75,10 +72,7 @@ export class DischargeClearancesService {
 	}
 
 	private async ensureEncounterPendingDischarge(encounterId: string) {
-		const [encounter] = await db
-			.select()
-			.from(encounters)
-			.where(eq(encounters.id, encounterId))
+		const [encounter] = await db.select().from(encounters).where(eq(encounters.id, encounterId))
 
 		if (!encounter) {
 			throw new NotFoundException(`Encounter ${encounterId} not found`)

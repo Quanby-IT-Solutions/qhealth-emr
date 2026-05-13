@@ -411,6 +411,7 @@ DONE - KARL
   - **As a** Billing Officer
   - **I want to** capture charges for clinical services rendered
   - **So that** invoices accurately reflect the care delivered
+  
   - **Pages**: Charge Capture Page, Service Item Page
 
 - **Story 12.2 – Invoice & Payment Processing**

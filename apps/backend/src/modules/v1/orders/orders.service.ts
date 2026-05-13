@@ -1306,7 +1306,7 @@ export class OrdersService {
 				.limit(1)
 			if (dualVerification.length === 0) {
 				throw new BadRequestException(
-					"High-alert medication requires dual verification by a second clinician before pharmacist approval.",
+					"High-alert medication requires dual verification by a second clinician before pharmacist approval."
 				)
 			}
 		}
@@ -2243,7 +2243,7 @@ export class OrdersService {
 
 			return {
 				id: row.id,
-				prescriptionNumber: "RX-" + row.id.slice(-8).toUpperCase(),
+				prescriptionNumber: `RX-${row.id.slice(-8).toUpperCase()}`,
 				patientName,
 				patientMrn: row.patientMrn ?? "-",
 				patientDateOfBirth: row.patientDateOfBirth ? String(row.patientDateOfBirth) : null,
@@ -2328,7 +2328,7 @@ export class OrdersService {
 				: null,
 			prescriberName: prescription.prescriberName ?? null,
 			prescriberPrc: prescription.prcLicenseNumber ?? "",
-			prescriptionNumber: "RX-" + prescription.id.slice(-8).toUpperCase(),
+			prescriptionNumber: `RX-${prescription.id.slice(-8).toUpperCase()}`,
 			prescribedAt: prescription.prescribedAt,
 			status: prescription.status,
 			estimatedTotal: 0,

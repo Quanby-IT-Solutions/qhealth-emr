@@ -4,9 +4,9 @@ import { z } from "zod"
 import {
 	ClearanceStatusSchema,
 	ConfirmClearanceInputSchema,
+	GatePassSchema,
 	GetClearanceStatusInputSchema,
 	GetGatePassInputSchema,
-	GatePassSchema,
 	IssueGatePassInputSchema,
 } from "./discharge.schema.js"
 
