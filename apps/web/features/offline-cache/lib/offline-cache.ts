@@ -203,3 +203,51 @@ export function clearEncounterSummary(encounterId: string): void {
 		// ignore
 	}
 }
+
+/**
+ * Find a patient's summary from any facility's cached patient list.
+ * Scans all localStorage keys matching the patient cache prefix.
+ */
+export function loadPatientFromCache(patientId: string): OfflinePatientSummary | null {
+	try {
+		for (let i = 0; i < localStorage.length; i++) {
+			const key = localStorage.key(i)
+			if (!key?.startsWith(CACHE_KEY_PREFIX)) continue
+			const raw = localStorage.getItem(key)
+			if (!raw) continue
+			const parsed = JSON.parse(raw) as OfflinePatientsCache
+			if (parsed.version !== CACHE_VERSION) continue
+			const patient = parsed.patients.find(p => p.id === patientId)
+			if (patient) return patient
+		}
+	} catch {
+		// ignore
+	}
+	return null
+}
+
+/**
+ * Find all cached encounter summaries for a specific patient.
+ * Scans all localStorage keys matching the encounter prefix.
+ * Returns summaries sorted by cachedAt descending (most recent first).
+ */
+export function loadPatientEncounterSummaries(patientId: string): OfflineEncounterSummaryCache[] {
+	const results: OfflineEncounterSummaryCache[] = []
+	try {
+		for (let i = 0; i < localStorage.length; i++) {
+			const key = localStorage.key(i)
+			if (!key?.startsWith(ENCOUNTER_CACHE_KEY_PREFIX)) continue
+			const raw = localStorage.getItem(key)
+			if (!raw) continue
+			const parsed = JSON.parse(raw) as OfflineEncounterSummaryCache
+			if (parsed.version !== ENCOUNTER_CACHE_VERSION) continue
+			if (parsed.summary?.encounter?.patientId === patientId) {
+				results.push(parsed)
+			}
+		}
+	} catch {
+		// ignore
+	}
+	results.sort((a, b) => new Date(b.cachedAt).getTime() - new Date(a.cachedAt).getTime())
+	return results
+}
