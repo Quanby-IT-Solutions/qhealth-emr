@@ -33,6 +33,8 @@ function bedStatusColor(status: string) {
 			return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
 		case "out_of_service":
 			return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+		case "dirty":
+			return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
 		default:
 			return ""
 	}
@@ -50,6 +52,8 @@ function bedStatusLabel(status: string) {
 			return "Cleaning"
 		case "out_of_service":
 			return "Out of Service"
+		case "dirty":
+			return "Dirty / For Cleaning"
 		default:
 			return status
 	}
@@ -261,7 +265,18 @@ export function BedManagement() {
 											{bed.patientMrn && (
 												<div className="text-xs opacity-75">MRN: {bed.patientMrn}</div>
 											)}
-											{bed.status !== "occupied" && (
+											{bed.status === "dirty" ? (
+												<Button
+													size="sm"
+													variant="ghost"
+													className="mt-1 h-6 px-2 text-xs"
+													onClick={() =>
+														updateBedStatus.mutate({ id: bed.id, status: "available" })
+													}
+												>
+													Mark Cleaned
+												</Button>
+											) : bed.status !== "occupied" && (
 												<Button
 													size="sm"
 													variant="ghost"
