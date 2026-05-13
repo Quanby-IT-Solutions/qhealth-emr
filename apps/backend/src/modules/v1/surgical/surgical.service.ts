@@ -1268,7 +1268,10 @@ export class SurgicalService {
 	async suggestRvsCode(input: SuggestRvsCodeInput, suggestedByStaffId: string | null) {
 		this.logger.log(`Suggesting RVS code for case: ${input.caseId}`)
 
-		const operationRecord = await this.requireSignedOperationRecord(input.caseId)
+		const operationRecord = await this.getOperationRecordRow(input.caseId)
+		if (!operationRecord) {
+			throw new BadRequestException("Create an operation record before mapping RVS codes.")
+		}
 		const availableProcedures = detectProcedureLabels(operationRecord.procedurePerformed)
 		const resolvedProcedureLabel = resolveProcedureLabel(
 			input.procedureLabel,
@@ -1380,7 +1383,6 @@ export class SurgicalService {
 	async removeRvsAssignment(input: RemoveRvsAssignmentInput) {
 		this.logger.log(`Removing RVS assignment: ${input.assignmentId}`)
 
-		await this.requireSignedOperationRecord(input.caseId)
 		await this.queryRvsAssignmentById(input.assignmentId, input.caseId)
 
 		await db
