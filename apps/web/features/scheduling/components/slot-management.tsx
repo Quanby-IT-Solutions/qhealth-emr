@@ -266,11 +266,13 @@ export function SlotManagement({ facilityId }: SlotManagementProps) {
 					</CardHeader>
 					<CardContent className="space-y-6">
 						{templateSlotsQuery.isLoading ? (
-							<div className="space-y-4">
-								<Skeleton className="h-[24rem] w-full rounded-xl" />
-								{Array.from({ length: 3 }).map((_, index) => (
-									<Skeleton key={index} className="h-20 w-full rounded-xl" />
-								))}
+							<div className="grid grid-cols-[auto_1fr] items-start gap-4">
+								<Skeleton className="h-[24rem] w-[21rem] rounded-xl" />
+								<div className="space-y-1.5">
+									{Array.from({ length: 8 }).map((_, index) => (
+										<Skeleton key={index} className="h-9 w-full rounded-lg" />
+									))}
+								</div>
 							</div>
 						) : templateSlotsQuery.isError ? (
 							<ErrorState
@@ -282,6 +284,7 @@ export function SlotManagement({ facilityId }: SlotManagementProps) {
 							/>
 						) : (
 							<>
+								<div className="grid grid-cols-[auto_1fr] items-start gap-4">
 								<div className="rounded-xl border p-3">
 									<Calendar
 										mode="single"
@@ -336,7 +339,7 @@ export function SlotManagement({ facilityId }: SlotManagementProps) {
 									/>
 								</div>
 
-								<div className="space-y-3">
+								<div className="space-y-2">
 									<div className="flex items-center justify-between gap-3">
 										<div>
 											<h2 className="font-semibold">{format(selectedDate, "MMMM d, yyyy")}</h2>
@@ -355,73 +358,70 @@ export function SlotManagement({ facilityId }: SlotManagementProps) {
 									{selectedDateSlots.length === 0 ? (
 										<EmptyState title="No slots in this date range — adjust template?" />
 									) : (
-										<div className="space-y-3">
-											{selectedDateSlots.map(slot => (
-												<div
-													key={slot.id}
-													className="flex flex-col gap-4 rounded-xl border p-4 md:flex-row md:items-center md:justify-between"
-												>
-													<div className="space-y-2">
-														<div className="flex flex-wrap items-center gap-2">
-															<p className="font-medium">{formatSlotTime(slot)}</p>
+										<div className="max-h-[420px] overflow-y-auto">
+											<div className="space-y-1.5">
+												{selectedDateSlots.map(slot => (
+													<div
+														key={slot.id}
+														className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+													>
+														<div className="flex min-w-0 items-center gap-2">
+															<span className="text-sm font-medium">{formatSlotTime(slot)}</span>
 															<Badge variant={SLOT_STATUS_BADGE_VARIANTS[slot.status]}>
 																{slot.status}
 															</Badge>
-														</div>
-														<div className="text-sm text-muted-foreground">
 															{slot.status === "blocked" && slot.blockReason ? (
-																<p>Reason: {slot.blockReason}</p>
-															) : slot.status === "booked" ? (
-																<p className="flex items-center gap-2">
-																	<UserRound className="size-4" />
+																<span className="text-muted-foreground max-w-[200px] truncate text-xs">
+																	· {slot.blockReason}
+																</span>
+															) : null}
+														</div>
+
+														<div className="flex shrink-0 items-center gap-2">
+															{slot.status === "open" ? (
+																<Button
+																	size="sm"
+																	onClick={() => setBlockTarget(slot)}
+																	aria-label={`Block ${slot.slotStartTime} slot on ${slot.slotDate}`}
+																>
+																	<Lock className="mr-1.5 size-3.5" />
+																	Block
+																</Button>
+															) : null}
+
+															{slot.status === "blocked" ? (
+																<Button
+																	size="sm"
+																	variant="outline"
+																	onClick={() => {
+																		void handleUnblock(slot)
+																	}}
+																	aria-label={`Unblock ${slot.slotStartTime} slot on ${slot.slotDate}`}
+																>
+																	<LockOpen className="mr-1.5 size-3.5" />
+																	Unblock
+																</Button>
+															) : null}
+
+															{slot.status === "booked" ? (
+																<span className="text-muted-foreground flex items-center gap-1.5 text-sm font-medium">
+																	<UserRound className="size-3.5" />
 																	Booked
-																</p>
-															) : (
-																<p>Available for booking.</p>
-															)}
+																</span>
+															) : null}
+
+															{slot.status === "cancelled" ? (
+																<span className="text-muted-foreground text-sm font-medium">
+																	Cancelled
+																</span>
+															) : null}
 														</div>
 													</div>
-
-													<div className="flex items-center gap-2">
-														{slot.status === "open" ? (
-															<Button
-																onClick={() => setBlockTarget(slot)}
-																aria-label={`Block ${slot.slotStartTime} slot on ${slot.slotDate}`}
-															>
-																<Lock className="mr-2 size-4" />
-																Block
-															</Button>
-														) : null}
-
-														{slot.status === "blocked" ? (
-															<Button
-																variant="outline"
-																onClick={() => {
-																	void handleUnblock(slot)
-																}}
-																aria-label={`Unblock ${slot.slotStartTime} slot on ${slot.slotDate}`}
-															>
-																<LockOpen className="mr-2 size-4" />
-																Unblock
-															</Button>
-														) : null}
-
-														{slot.status === "booked" ? (
-															<span className="text-sm font-medium text-muted-foreground">
-																Booked
-															</span>
-														) : null}
-
-														{slot.status === "cancelled" ? (
-															<span className="text-sm font-medium text-muted-foreground">
-																Cancelled
-															</span>
-														) : null}
-													</div>
-												</div>
-											))}
+												))}
+											</div>
 										</div>
 									)}
+								</div>
 								</div>
 							</>
 						)}
