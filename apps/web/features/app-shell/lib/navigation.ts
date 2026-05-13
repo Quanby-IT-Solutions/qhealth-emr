@@ -285,6 +285,13 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		excludePermissions: [{ module: "scheduling", action: "view" }],
 	},
 	{
+		title: "Housekeeping",
+		href: "/beds/housekeeping",
+		iconName: "bed",
+		requiredPermissions: [{ module: "adt", action: "edit" }],
+		requireAllPermissions: REGISTRAR_ROLE_BUNDLE,
+	},
+	{
 		title: "Emergency",
 		href: "/ed",
 		iconName: "emergency",

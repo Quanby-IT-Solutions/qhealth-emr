@@ -1,7 +1,7 @@
 "use client"
 
-import { CivilRegistryPanel } from "@/features/admin/components/civil-registry-panel"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { LcrPanel } from "@/features/registrar/civil-registry/components/lcr-panel"
 
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
@@ -26,5 +26,5 @@ export default function RegistrarCivilRegistryPage() {
 		)
 	}
 
-	return <CivilRegistryPanel />
+	return <LcrPanel />
 }

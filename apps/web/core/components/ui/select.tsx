@@ -24,13 +24,16 @@ function SelectValue({
 	children,
 	...props
 }: SelectPrimitive.Value.Props & { placeholder?: string }) {
+	void placeholder
+
 	return (
 		<SelectPrimitive.Value
 			data-slot="select-value"
 			className={cn("flex flex-1 text-left", className)}
-			placeholder={children ?? placeholder}
 			{...props}
-		/>
+		>
+			{children}
+		</SelectPrimitive.Value>
 	)
 }
 
