@@ -7,8 +7,6 @@ import {
 	ExternalLink,
 	KeyRound,
 	Loader2,
-	MessageSquare,
-	PhoneCall,
 	Video,
 } from "lucide-react"
 
@@ -20,6 +18,7 @@ import {
 	getPlatformLabel,
 	type TelemedicineAppointment,
 	useAppointmentQuery,
+	useUpdateAppointmentMutation,
 } from "@/features/telemedicine/api/telemedicine.hooks"
 
 // ============================================================================
@@ -83,25 +82,90 @@ function CopyButton({
 	)
 }
 
+function isValidMeetingUrl(value: string): boolean {
+	try {
+		const url = new URL(value)
+		return url.protocol === "https:" && Boolean(url.hostname)
+	} catch {
+		return false
+	}
+}
+
 // ============================================================================
 // Inner panel (renders when data is available)
 // ============================================================================
 
 function VideoCallContent({ appt }: { appt: TelemedicineAppointment }) {
 	const { copied, copyText } = useCopyToClipboard()
+	const [currentAppt, setCurrentAppt] = useState(appt)
+	const [videoLink, setVideoLink] = useState(appt.videoLink ?? "")
+	const [meetingId, setMeetingId] = useState(appt.meetingId ?? "")
+	const [meetingPassword, setMeetingPassword] = useState(appt.meetingPassword ?? "")
+	const [error, setError] = useState<string | null>(null)
+	const updateMutation = useUpdateAppointmentMutation()
 
-	const platformLabel = getPlatformLabel(appt.platform)
-	const hasLink = Boolean(appt.videoLink)
+	const platformLabel = getPlatformLabel(currentAppt.platform)
+	const hasLink = Boolean(currentAppt.videoLink)
+
+	async function handleSaveLink(e: React.FormEvent) {
+		e.preventDefault()
+		setError(null)
+
+		const trimmedVideoLink = videoLink.trim()
+		if (!isValidMeetingUrl(trimmedVideoLink)) {
+			setError("Enter a valid HTTPS Zoom or Teams meeting link.")
+			return
+		}
+
+		try {
+			const updated = await updateMutation.mutateAsync({
+				id: currentAppt.id,
+				videoLink: trimmedVideoLink,
+				meetingId: meetingId.trim() || null,
+				meetingPassword: meetingPassword.trim() || null,
+			})
+			setCurrentAppt(updated)
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to save video link.")
+		}
+	}
 
 	return (
 		<div className="space-y-4">
 			{/* Status banner */}
 			{!hasLink ? (
-				<div className="rounded-lg bg-yellow-50 px-4 py-3">
-					<p className="flex items-center gap-2 text-sm text-yellow-700">
-						<Loader2 className="size-4 animate-spin" />
-						Generating {platformLabel} link... This may take a moment after booking.
+				<div className="space-y-3 rounded-lg bg-yellow-50 px-4 py-3">
+					<p className="text-sm text-yellow-800">
+						No video link has been set for this appointment. Enter a Zoom or Teams meeting link manually.
 					</p>
+					<form onSubmit={handleSaveLink} className="space-y-3">
+						<input
+							type="url"
+							className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+							value={videoLink}
+							onChange={(e) => setVideoLink(e.target.value)}
+							placeholder="https://..."
+							required
+						/>
+						<div className="grid grid-cols-2 gap-3">
+							<input
+								className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+								value={meetingId}
+								onChange={(e) => setMeetingId(e.target.value)}
+								placeholder="Meeting ID"
+							/>
+							<input
+								className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+								value={meetingPassword}
+								onChange={(e) => setMeetingPassword(e.target.value)}
+								placeholder="Passcode"
+							/>
+						</div>
+						{error && <p className="text-destructive text-sm">{error}</p>}
+						<Button type="submit" size="sm" disabled={updateMutation.isPending}>
+							{updateMutation.isPending ? "Saving..." : "Save Link"}
+						</Button>
+					</form>
 				</div>
 			) : (
 				<div className="rounded-lg bg-green-50 px-4 py-3">
@@ -121,18 +185,18 @@ function VideoCallContent({ appt }: { appt: TelemedicineAppointment }) {
 								Meeting Link
 							</span>
 							<CopyButton
-								text={appt.videoLink!}
+								text={currentAppt.videoLink!}
 								copyKey="link"
 								copied={copied}
 								onCopy={copyText}
 							/>
 						</div>
 						<p className="text-primary break-all text-sm underline underline-offset-2">
-							{appt.videoLink}
+							{currentAppt.videoLink}
 						</p>
 					</div>
 
-					{appt.meetingId && (
+					{currentAppt.meetingId && (
 						<div className="grid grid-cols-2 gap-3">
 							<div className="rounded-lg border p-3">
 								<div className="mb-1 flex items-center justify-between">
@@ -141,15 +205,15 @@ function VideoCallContent({ appt }: { appt: TelemedicineAppointment }) {
 										Meeting ID
 									</span>
 									<CopyButton
-										text={appt.meetingId}
+										text={currentAppt.meetingId}
 										copyKey="meetingId"
 										copied={copied}
 										onCopy={copyText}
 									/>
 								</div>
-								<p className="font-mono text-sm font-medium">{appt.meetingId}</p>
+								<p className="font-mono text-sm font-medium">{currentAppt.meetingId}</p>
 							</div>
-							{appt.meetingPassword && (
+							{currentAppt.meetingPassword && (
 								<div className="rounded-lg border p-3">
 									<div className="mb-1 flex items-center justify-between">
 										<span className="text-muted-foreground flex items-center gap-1 text-xs">
@@ -157,13 +221,13 @@ function VideoCallContent({ appt }: { appt: TelemedicineAppointment }) {
 											Passcode
 										</span>
 										<CopyButton
-											text={appt.meetingPassword}
+											text={currentAppt.meetingPassword}
 											copyKey="password"
 											copied={copied}
 											onCopy={copyText}
 										/>
 									</div>
-									<p className="font-mono text-sm font-medium">{appt.meetingPassword}</p>
+									<p className="font-mono text-sm font-medium">{currentAppt.meetingPassword}</p>
 								</div>
 							)}
 						</div>
@@ -174,7 +238,7 @@ function VideoCallContent({ appt }: { appt: TelemedicineAppointment }) {
 					{/* Action Buttons */}
 					<div className="flex flex-wrap gap-3">
 						<a
-							href={appt.videoLink!}
+							href={currentAppt.videoLink!}
 							target="_blank"
 							rel="noopener noreferrer"
 							className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium"
@@ -186,7 +250,7 @@ function VideoCallContent({ appt }: { appt: TelemedicineAppointment }) {
 						<Button
 							variant="outline"
 							size="sm"
-							onClick={() => copyText(appt.videoLink!, "joinBtn")}
+							onClick={() => copyText(currentAppt.videoLink!, "joinBtn")}
 						>
 							{copied === "joinBtn" ? (
 								<>
@@ -209,19 +273,8 @@ function VideoCallContent({ appt }: { appt: TelemedicineAppointment }) {
 				<div className="rounded-lg bg-blue-50 p-4">
 					<h4 className="mb-2 text-sm font-medium text-blue-800">Share with Patient</h4>
 					<p className="mb-3 text-xs text-blue-700">
-						The video link has been automatically sent to the patient via SMS/email. You can also
-						manually share it.
+						Copy the link below and share it with the patient directly.
 					</p>
-					<div className="flex flex-wrap gap-2">
-						<Button variant="outline" size="sm" className="bg-white text-xs">
-							<MessageSquare className="mr-1.5 size-3" />
-							Send via SMS
-						</Button>
-						<Button variant="outline" size="sm" className="bg-white text-xs">
-							<PhoneCall className="mr-1.5 size-3" />
-							Send via Email
-						</Button>
-					</div>
 				</div>
 			)}
 
@@ -230,19 +283,19 @@ function VideoCallContent({ appt }: { appt: TelemedicineAppointment }) {
 			<div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
 				<div>
 					<span className="text-muted-foreground">Patient:</span>{" "}
-					<span className="font-medium">{appt.patientName}</span>
+					<span className="font-medium">{currentAppt.patientName}</span>
 				</div>
 				<div>
 					<span className="text-muted-foreground">Clinician:</span>{" "}
-					<span className="font-medium">{appt.clinicianName}</span>
+					<span className="font-medium">{currentAppt.clinicianName}</span>
 				</div>
 				<div>
 					<span className="text-muted-foreground">Date:</span>{" "}
-					<span className="font-medium">{appt.scheduledDate}</span>
+					<span className="font-medium">{currentAppt.scheduledDate}</span>
 				</div>
 				<div>
 					<span className="text-muted-foreground">Time:</span>{" "}
-					<span className="font-medium">{appt.scheduledTime} ({appt.durationMinutes} min)</span>
+					<span className="font-medium">{currentAppt.scheduledTime} ({currentAppt.durationMinutes} min)</span>
 				</div>
 				<div>
 					<span className="text-muted-foreground">Platform:</span>{" "}
@@ -252,7 +305,7 @@ function VideoCallContent({ appt }: { appt: TelemedicineAppointment }) {
 				</div>
 				<div>
 					<span className="text-muted-foreground">Status:</span>{" "}
-					<span className="font-medium capitalize">{appt.status}</span>
+					<span className="font-medium capitalize">{currentAppt.status}</span>
 				</div>
 			</div>
 		</div>

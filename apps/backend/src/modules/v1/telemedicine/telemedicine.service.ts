@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq } from "drizzle-orm"
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib"
 
 import {
 	encounters,
@@ -16,10 +17,12 @@ import {
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
+import { NotificationService } from "@/modules/v1/notifications/notification.service"
 
 type ListAppointmentsInput = V1Inputs["telemedicine"]["listAppointments"]
 type GetAppointmentInput = V1Inputs["telemedicine"]["getAppointment"]
 type CreateAppointmentInput = V1Inputs["telemedicine"]["createAppointment"]
+type UpdateAppointmentInput = V1Inputs["telemedicine"]["updateAppointment"]
 type CancelAppointmentInput = V1Inputs["telemedicine"]["cancelAppointment"]
 type GetEncounterInput = V1Inputs["telemedicine"]["getEncounter"]
 type CreateEncounterInput = V1Inputs["telemedicine"]["createEncounter"]
@@ -31,10 +34,13 @@ type GetAbstractInput = V1Inputs["telemedicine"]["getAbstract"]
 type ListEncounterAbstractsInput = V1Inputs["telemedicine"]["listEncounterAbstracts"]
 type SignAbstractInput = V1Inputs["telemedicine"]["signAbstract"]
 type SendAbstractInput = V1Inputs["telemedicine"]["sendAbstract"]
+type SendPrescriptionInput = V1Inputs["telemedicine"]["sendPrescription"]
 
 @Injectable()
 export class TelemedicineService {
 	private readonly logger = new Logger(TelemedicineService.name)
+
+	constructor(private readonly notificationService: NotificationService) {}
 
 	// =========================================================================
 	// Private helpers
@@ -286,6 +292,37 @@ export class TelemedicineService {
 
 		this.logger.log(`Created telemedicine appointment: ${created.id}`)
 		return this.getAppointment({ id: created.id })
+	}
+
+	async updateAppointment(input: UpdateAppointmentInput) {
+		const [appt] = await db
+			.select()
+			.from(telemedicineAppointments)
+			.where(eq(telemedicineAppointments.id, input.id))
+
+		if (!appt) {
+			throw new NotFoundException(`Telemedicine appointment ${input.id} not found`)
+		}
+
+		const updates: Partial<typeof telemedicineAppointments.$inferInsert> = {
+			updatedAt: new Date(),
+		}
+		if ("videoLink" in input) updates.videoLink = input.videoLink ?? null
+		if ("meetingId" in input) updates.meetingId = input.meetingId ?? null
+		if ("meetingPassword" in input) updates.meetingPassword = input.meetingPassword ?? null
+
+		const [updated] = await db
+			.update(telemedicineAppointments)
+			.set(updates)
+			.where(eq(telemedicineAppointments.id, input.id))
+			.returning({ id: telemedicineAppointments.id })
+
+		if (!updated) {
+			throw new Error("Failed to update telemedicine appointment")
+		}
+
+		this.logger.log(`Updated telemedicine appointment: ${input.id}`)
+		return this.getAppointment({ id: input.id })
 	}
 
 	// =========================================================================
@@ -617,6 +654,106 @@ export class TelemedicineService {
 		return this.getPrescription({ id: created.id })
 	}
 
+	async generatePrescriptionPdf(id: string): Promise<Uint8Array> {
+		const rx = await this.getPrescription({ id })
+		const pdf = await PDFDocument.create()
+		const page = pdf.addPage([612, 792])
+		const font = await pdf.embedFont(StandardFonts.Helvetica)
+		const bold = await pdf.embedFont(StandardFonts.HelveticaBold)
+		const margin = 48
+		let y = 744
+
+		const drawText = (text: string, x: number, size = 10, useBold = false) => {
+			page.drawText(text, {
+				x,
+				y,
+				size,
+				font: useBold ? bold : font,
+				color: rgb(0.08, 0.08, 0.08),
+			})
+			y -= size + 8
+		}
+
+		drawText(rx.facilityName, margin, 16, true)
+		if (rx.facilityAddress) drawText(rx.facilityAddress, margin, 9)
+		y -= 8
+		drawText("E-PRESCRIPTION", margin, 14, true)
+		y -= 4
+		drawText(`Patient: ${rx.patientName}`, margin, 10, true)
+		drawText(`MRN: ${rx.patientMrn}    Age/Sex: ${rx.patientAge} / ${rx.patientSex}`, margin)
+		drawText(`Prescription Date: ${rx.prescriptionDate}    Valid Until: ${rx.validUntil}`, margin)
+		y -= 8
+		drawText("Medications", margin, 12, true)
+
+		rx.medications.forEach((med, index) => {
+			const brand = med.brandName ? ` (${med.brandName})` : ""
+			drawText(`${index + 1}. ${med.genericName}${brand} ${med.dosage}`, margin, 10, true)
+			drawText(
+				`   ${med.quantity} ${med.unit} | ${med.form} | ${med.route} | ${med.frequency} | ${med.duration}`,
+				margin
+			)
+			if (med.instructions) drawText(`   Instructions: ${med.instructions}`, margin)
+			y -= 4
+		})
+
+		if (rx.dispensingInstructions) {
+			y -= 4
+			drawText("Dispensing Instructions", margin, 11, true)
+			drawText(rx.dispensingInstructions, margin)
+		}
+
+		y = Math.max(y - 24, 120)
+		drawText(rx.clinicianName, 360, 11, true)
+		drawText(`PRC #${rx.clinicianPrcNumber}`, 360)
+		page.drawLine({
+			start: { x: 360, y: y + 8 },
+			end: { x: 540, y: y + 8 },
+			thickness: 1,
+			color: rgb(0.2, 0.2, 0.2),
+		})
+		drawText("Signature over Printed Name", 360, 8)
+
+		return pdf.save()
+	}
+
+	async sendPrescription(input: SendPrescriptionInput) {
+		const [row] = await db
+			.select({
+				id: telemedicinePrescriptions.id,
+				facilityId: telemedicineAppointments.facilityId,
+				clinicianStaffId: telemedicineEncounters.clinicianStaffId,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+			})
+			.from(telemedicinePrescriptions)
+			.innerJoin(
+				telemedicineEncounters,
+				eq(telemedicinePrescriptions.encounterId, telemedicineEncounters.id)
+			)
+			.innerJoin(
+				telemedicineAppointments,
+				eq(telemedicinePrescriptions.appointmentId, telemedicineAppointments.id)
+			)
+			.innerJoin(patients, eq(telemedicineEncounters.patientId, patients.id))
+			.where(eq(telemedicinePrescriptions.id, input.id))
+
+		if (!row) {
+			throw new NotFoundException(`Prescription ${input.id} not found`)
+		}
+
+		await this.notificationService.send({
+			facilityId: row.facilityId,
+			recipientStaffId: row.clinicianStaffId,
+			topic: "system",
+			title: "Prescription Sent",
+			body: `E-prescription for ${row.patientLastName}, ${row.patientFirstName} marked sent to ${input.email}. Email delivery requires a mailer integration.`,
+			data: { prescriptionId: input.id, email: input.email },
+		})
+
+		this.logger.log(`Marked telemedicine prescription ${input.id} sent to ${input.email}`)
+		return this.getPrescription({ id: input.id })
+	}
+
 	// =========================================================================
 	// Get Abstract
 	// =========================================================================
@@ -815,7 +952,7 @@ export class TelemedicineService {
 	// Send Abstract
 	// =========================================================================
 
-	async sendAbstract(input: SendAbstractInput) {
+	async sendAbstract(input: SendAbstractInput, sentByStaffId?: string) {
 		const [abstract] = await db
 			.select()
 			.from(telemedicineAbstracts)
@@ -844,6 +981,36 @@ export class TelemedicineService {
 			.update(telemedicineEncounters)
 			.set({ status: "finalized", updatedAt: new Date() })
 			.where(eq(telemedicineEncounters.id, abstract.encounterId))
+
+		const [notificationTarget] = await db
+			.select({
+				facilityId: telemedicineAppointments.facilityId,
+				clinicianStaffId: telemedicineEncounters.clinicianStaffId,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+			})
+			.from(telemedicineAbstracts)
+			.innerJoin(
+				telemedicineAppointments,
+				eq(telemedicineAbstracts.appointmentId, telemedicineAppointments.id)
+			)
+			.innerJoin(
+				telemedicineEncounters,
+				eq(telemedicineAbstracts.encounterId, telemedicineEncounters.id)
+			)
+			.innerJoin(patients, eq(telemedicineAbstracts.patientId, patients.id))
+			.where(eq(telemedicineAbstracts.id, input.id))
+
+		if (notificationTarget) {
+			await this.notificationService.send({
+				facilityId: notificationTarget.facilityId,
+				recipientStaffId: notificationTarget.clinicianStaffId,
+				topic: "system",
+				title: "Abstract Sent",
+				body: `Tele-abstract for ${notificationTarget.patientLastName}, ${notificationTarget.patientFirstName} marked sent to ${input.email}. Email delivery requires a mailer integration.`,
+				data: { abstractId: input.id, email: input.email, sentByStaffId: sentByStaffId ?? null },
+			})
+		}
 
 		this.logger.log(`Sent tele-abstract: ${input.id} to ${input.email}`)
 		return this.getAbstract({ id: input.id })

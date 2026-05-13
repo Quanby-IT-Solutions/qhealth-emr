@@ -20,6 +20,14 @@ jest.mock("@thallesp/nestjs-better-auth", () => ({
 	AuthService: class MockAuthService {},
 }))
 
+jest.mock("@repo/auth", () => ({
+	getAuth: jest.fn(() => ({
+		$context: Promise.resolve({
+			password: { verify: jest.fn().mockResolvedValue(true) },
+		}),
+	})),
+}))
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------

@@ -21,6 +21,7 @@ import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Separator } from "@/core/components/ui/separator"
+import { env } from "@/env"
 import {
 	type CreatePrescriptionInput,
 	type EPrescription,
@@ -28,6 +29,7 @@ import {
 	type PrescriptionStatus,
 	useCreatePrescriptionMutation,
 	useEncounterPrescriptionsQuery,
+	useSendPrescriptionMutation,
 } from "@/features/telemedicine/api/telemedicine.hooks"
 
 // ============================================================================
@@ -76,6 +78,10 @@ function isWithinDays(d: string | null | undefined, days: number): boolean {
 function formatDate(d: string | null | undefined): string {
 	if (!d) return "--"
 	return new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" })
+}
+
+function isValidEmail(value: string): boolean {
+	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
 type NewMedItem = Omit<EPrescriptionItem, "id">
@@ -216,11 +222,12 @@ function MedicationRow({
 					/>
 				</div>
 				<div className="space-y-1">
-					<label className="text-xs text-muted-foreground">Form</label>
+					<label className="text-xs text-muted-foreground">Form *</label>
 					<select
 						className="border-input bg-background w-full rounded border px-2 py-1.5 text-sm"
 						value={med.form}
 						onChange={(e) => onChange("form", e.target.value)}
+						required
 					>
 						<option value="">Select form</option>
 						{MED_FORMS.map((f) => (
@@ -255,11 +262,12 @@ function MedicationRow({
 					</div>
 				</div>
 				<div className="space-y-1">
-					<label className="text-xs text-muted-foreground">Route</label>
+					<label className="text-xs text-muted-foreground">Route *</label>
 					<select
 						className="border-input bg-background w-full rounded border px-2 py-1.5 text-sm"
 						value={med.route}
 						onChange={(e) => onChange("route", e.target.value)}
+						required
 					>
 						{MED_ROUTES.map((r) => (
 							<option key={r} value={r}>
@@ -304,6 +312,50 @@ function MedicationRow({
 }
 
 function PrescriptionPreview({ rx }: { rx: EPrescription }) {
+	const [showSendForm, setShowSendForm] = useState(false)
+	const [sendEmail, setSendEmail] = useState("")
+	const sendMutation = useSendPrescriptionMutation()
+
+	async function handleDownloadPdf() {
+		try {
+			const response = await fetch(
+				`${env.NEXT_PUBLIC_API_BASE_URL}/v1/telemedicine/prescriptions/${rx.id}/pdf`,
+				{ credentials: "include" },
+			)
+			if (!response.ok) {
+				throw new Error(await response.text().catch(() => "Failed to download PDF."))
+			}
+			const blob = await response.blob()
+			const url = URL.createObjectURL(blob)
+			const link = document.createElement("a")
+			link.href = url
+			link.download = `prescription-${rx.id}.pdf`
+			document.body.appendChild(link)
+			link.click()
+			link.remove()
+			URL.revokeObjectURL(url)
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Failed to download PDF.")
+		}
+	}
+
+	async function handleSendEmail(e: React.FormEvent) {
+		e.preventDefault()
+		const email = sendEmail.trim()
+		if (!isValidEmail(email)) {
+			toast.error("Enter a valid email address.")
+			return
+		}
+		try {
+			await sendMutation.mutateAsync({ id: rx.id, email })
+			toast.success("Prescription marked sent.")
+			setSendEmail("")
+			setShowSendForm(false)
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Failed to send prescription.")
+		}
+	}
+
 	return (
 		<div className="space-y-4">
 			{/* Header */}
@@ -402,7 +454,7 @@ function PrescriptionPreview({ rx }: { rx: EPrescription }) {
 				<Button
 					variant="outline"
 					size="sm"
-					onClick={() => toast.info("PDF download is not yet available.")}
+					onClick={handleDownloadPdf}
 				>
 					<Download className="mr-1.5 size-3.5" />
 					Download PDF
@@ -418,12 +470,27 @@ function PrescriptionPreview({ rx }: { rx: EPrescription }) {
 				<Button
 					variant="outline"
 					size="sm"
-					onClick={() => toast.info("Email delivery is not yet configured.")}
+					onClick={() => setShowSendForm((v) => !v)}
 				>
 					<Mail className="mr-1.5 size-3.5" />
 					Send via Email
 				</Button>
 			</div>
+			{showSendForm && (
+				<form onSubmit={handleSendEmail} className="mt-3 flex flex-wrap gap-2">
+					<input
+						type="email"
+						className="border-input bg-background min-w-64 flex-1 rounded-md border px-3 py-2 text-sm"
+						value={sendEmail}
+						onChange={(e) => setSendEmail(e.target.value)}
+						placeholder="patient@email.com"
+						required
+					/>
+					<Button type="submit" size="sm" disabled={sendMutation.isPending}>
+						{sendMutation.isPending ? "Sending..." : "Send"}
+					</Button>
+				</form>
+			)}
 		</div>
 	)
 }
@@ -434,16 +501,8 @@ function PrescriptionPreview({ rx }: { rx: EPrescription }) {
 
 export function EPrescriptionCard({
 	encounterId,
-	patientName,
-	patientMrn,
-	patientAge,
-	patientSex,
-	clinicianName,
-	clinicianPrcNumber,
 	clinicianPrcExpiry,
 	clinicianPtrExpiry,
-	facilityName,
-	facilityAddress,
 	onPrescriptionCreated,
 }: EPrescriptionCardProps) {
 	const [showForm, setShowForm] = useState(false)
@@ -492,17 +551,37 @@ export function EPrescriptionCard({
 		setError(null)
 
 		const invalid = medications.some(
-			(m) => !m.genericName.trim() || !m.dosage.trim() || !m.frequency.trim() || !m.duration.trim(),
+			(m) =>
+				!m.genericName.trim() ||
+				!m.dosage.trim() ||
+				!m.form.trim() ||
+				!m.unit.trim() ||
+				!m.route.trim() ||
+				!m.frequency.trim() ||
+				!m.duration.trim() ||
+				!Number.isInteger(m.quantity) ||
+				m.quantity < 1,
 		)
 		if (invalid) {
-			setError("Please fill in all required medication fields (Generic Name, Dosage, Frequency, Duration).")
+			setError("Please complete each medication: generic name, dosage, form, quantity, unit, route, frequency, and duration are required.")
 			return
 		}
 
 		const input: CreatePrescriptionInput = {
 			encounterId,
-			medications,
-			dispensingInstructions: dispensingInstructions || undefined,
+			medications: medications.map((med) => ({
+				...med,
+				genericName: med.genericName.trim(),
+				brandName: med.brandName?.trim() || undefined,
+				dosage: med.dosage.trim(),
+				form: med.form.trim(),
+				unit: med.unit.trim(),
+				frequency: med.frequency.trim(),
+				duration: med.duration.trim(),
+				route: med.route.trim(),
+				instructions: med.instructions?.trim() || undefined,
+			})),
+			dispensingInstructions: dispensingInstructions.trim() || undefined,
 		}
 
 		try {

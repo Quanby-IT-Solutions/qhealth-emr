@@ -594,9 +594,14 @@ export function CreateMedOrderDialog({
 					<div className="grid gap-4 py-4">
 						{/* ── Generic Name (primary / required) ─────────── */}
 						<div className="space-y-2">
-							<Label htmlFor="genericName">
-								Generic Name <span className="text-destructive">*</span>
-							</Label>
+							<div className="flex items-center gap-2">
+								<Label htmlFor="genericName">
+									Generic Name <span className="text-destructive">*</span>
+								</Label>
+								<Badge variant="outline" className="border-emerald-400 text-[10px] text-emerald-700 dark:text-emerald-400">
+									RA 6675 — Required
+								</Badge>
+							</div>
 							<DrugSearchCombobox
 								id="genericName"
 								facilityId={facilityId}
@@ -625,19 +630,28 @@ export function CreateMedOrderDialog({
 								autoFocus
 							/>
 							<p className="text-muted-foreground text-xs">
-								Per RA 6675 (Generics Act), orders must specify the generic name.
+								Per RA 6675 (Generics Act), orders must specify the generic name. Brand name is optional and subordinate.
 							</p>
 						</div>
 
 						{/* ── Brand Name (secondary — only after generic entered) */}
 						{genericName.trim() && (
-							<div className="space-y-2">
-								<Label htmlFor="brandName">Brand Name (optional)</Label>
+							<div className="border-muted-foreground/25 space-y-1 border-l-2 pl-3">
+								<Label
+									htmlFor="brandName"
+									className="text-muted-foreground text-xs font-normal"
+								>
+									Brand / Trade Name{" "}
+									<span className="text-muted-foreground/60">
+										(optional — generic name above is legally required per RA 6675)
+									</span>
+								</Label>
 								<Input
 									id="brandName"
 									value={brandName}
 									onChange={e => setBrandName(e.target.value)}
-									placeholder="e.g., Amoxil — leave blank to dispense any generic"
+									placeholder="e.g., Amoxil — leave blank to dispense any generic equivalent"
+									className="h-8 text-sm"
 								/>
 							</div>
 						)}
@@ -1044,6 +1058,7 @@ export function CreateMedOrderDialog({
 				onOpenChange={handleHighAlertDialogOpenChange}
 				medicationOrderId={pendingHighAlertOrderId ?? ""}
 				requestingStaffId={orderingStaffId}
+				facilityId={facilityId}
 				drugName={genericName.trim()}
 				onPrepareVerification={handleHighAlertPrepared}
 				onVerified={handleHighAlertVerified}

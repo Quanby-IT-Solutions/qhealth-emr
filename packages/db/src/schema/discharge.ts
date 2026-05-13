@@ -65,13 +65,8 @@ export const gatePasses = createTable(
 		admissionDatetime: t.timestamp("admission_datetime").notNull(),
 		dischargeDatetime: t.timestamp("discharge_datetime").notNull(),
 		lengthOfStayDays: t.integer("length_of_stay_days").notNull(),
-		disposition: t
-			.text("disposition")
-			.notNull()
-			.$type<"home" | "transfer" | "deceased" | "ama">(),
-		deathClassification: t
-			.text("death_classification")
-			.$type<"gross" | "net">(),
+		disposition: t.text("disposition").notNull().$type<"home" | "transfer" | "deceased" | "ama">(),
+		deathClassification: t.text("death_classification").$type<"gross" | "net">(),
 		qrCodePayload: t.text("qr_code_payload").notNull(),
 		pdfUri: t.text("pdf_uri"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),

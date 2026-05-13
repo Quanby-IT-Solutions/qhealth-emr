@@ -1,7 +1,12 @@
 import { BadRequestException, Injectable } from "@nestjs/common"
 import { and, eq } from "drizzle-orm"
 
-import { ancillaryClearance, coeCertificates, malasakitCases, mswEvaluations } from "@repo/db/schema"
+import {
+	ancillaryClearance,
+	coeCertificates,
+	malasakitCases,
+	mswEvaluations,
+} from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 

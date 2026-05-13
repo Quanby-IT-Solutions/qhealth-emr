@@ -1919,7 +1919,10 @@ export class ReportingService {
 			let rank = 0
 			let prevCnt: number | null = null
 			priorRows.forEach((r, i) => {
-				if (r.cnt !== prevCnt) { rank = i + 1; prevCnt = r.cnt }
+				if (r.cnt !== prevCnt) {
+					rank = i + 1
+					prevCnt = r.cnt
+				}
 				if (r.icdCode) priorRankMap.set(r.icdCode, rank)
 			})
 		}
@@ -1929,7 +1932,10 @@ export class ReportingService {
 		let currentRank = 0
 		let prevCnt: number | null = null
 		const items = rows.map((r, i) => {
-			if (r.cnt !== prevCnt) { currentRank = i + 1; prevCnt = r.cnt }
+			if (r.cnt !== prevCnt) {
+				currentRank = i + 1
+				prevCnt = r.cnt
+			}
 			const priorCount = r.icdCode ? (priorCountMap.get(r.icdCode) ?? null) : null
 			const priorRank = r.icdCode ? (priorRankMap.get(r.icdCode) ?? null) : null
 			const rankChange = priorRank !== null ? priorRank - currentRank : null

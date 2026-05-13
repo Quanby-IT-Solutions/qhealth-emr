@@ -126,6 +126,16 @@ const SOAP_SECTIONS = [
 	},
 ] as const
 
+function isUuid(value: string): boolean {
+	return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
+function isNumberInRange(value: string, min: number, max: number): boolean {
+	if (!value.trim()) return true
+	const number = Number(value)
+	return Number.isFinite(number) && number >= min && number <= max
+}
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -154,30 +164,50 @@ export function TelemedicineEncounterForm({
 			setError("Chief complaint is required.")
 			return
 		}
+		if (form.encounterType === "linked" && !isUuid(form.linkedEncounterId.trim())) {
+			setError("Linked encounter ID must be a valid UUID.")
+			return
+		}
 		if (!form.diagnosis.trim()) {
 			setError("Diagnosis is required.")
+			return
+		}
+		if (!isNumberInRange(form.heartRate, 1, 250)) {
+			setError("Heart rate must be a number between 1 and 250.")
+			return
+		}
+		if (!isNumberInRange(form.temperature, 30, 45)) {
+			setError("Temperature must be a number between 30 and 45.")
+			return
+		}
+		if (!isNumberInRange(form.oxygenSaturation, 1, 100)) {
+			setError("Oxygen saturation must be a number between 1 and 100.")
+			return
+		}
+		if (!isNumberInRange(form.weight, 1, 500)) {
+			setError("Weight must be a number between 1 and 500.")
 			return
 		}
 
 		const input: CreateEncounterInput = {
 			appointmentId,
 			encounterType: form.encounterType,
-			linkedEncounterId: form.encounterType === "linked" && form.linkedEncounterId
-				? form.linkedEncounterId
+			linkedEncounterId: form.encounterType === "linked" && form.linkedEncounterId.trim()
+				? form.linkedEncounterId.trim()
 				: undefined,
-			chiefComplaint: form.chiefComplaint,
-			subjectiveNotes: form.subjectiveNotes,
-			objectiveNotes: form.objectiveNotes,
-			assessmentNotes: form.assessmentNotes,
-			planNotes: form.planNotes,
-			diagnosis: form.diagnosis,
-			icdCode: form.icdCode || undefined,
+			chiefComplaint: form.chiefComplaint.trim(),
+			subjectiveNotes: form.subjectiveNotes.trim(),
+			objectiveNotes: form.objectiveNotes.trim(),
+			assessmentNotes: form.assessmentNotes.trim(),
+			planNotes: form.planNotes.trim(),
+			diagnosis: form.diagnosis.trim(),
+			icdCode: form.icdCode.trim() || undefined,
 			vitalSigns: {
-				bloodPressure: form.bloodPressure || undefined,
-				heartRate: form.heartRate || undefined,
-				temperature: form.temperature || undefined,
-				oxygenSaturation: form.oxygenSaturation || undefined,
-				weight: form.weight || undefined,
+				bloodPressure: form.bloodPressure.trim() || undefined,
+				heartRate: form.heartRate.trim() || undefined,
+				temperature: form.temperature.trim() || undefined,
+				oxygenSaturation: form.oxygenSaturation.trim() || undefined,
+				weight: form.weight.trim() || undefined,
 			},
 		}
 

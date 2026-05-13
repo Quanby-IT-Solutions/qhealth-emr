@@ -6,6 +6,9 @@ import {
 	AddRoleAssignmentSchema,
 	ArchiveRoleResponseSchema,
 	AssignUserRolesSchema,
+	ClinicianSummarySchema,
+	CoSignVerifyInputSchema,
+	CoSignVerifyResponseSchema,
 	CreateRoleSchema,
 	CreateStaffProfileSchema,
 	CreateUserSchema,
@@ -25,6 +28,7 @@ import {
 	RoleIdSchema,
 	RoleSchema,
 	RoleWithPermissionsSchema,
+	SearchCliniciansQuerySchema,
 	SetRolePermissionsSchema,
 	StaffProfileIdSchema,
 	StaffProfileSchema,
@@ -137,6 +141,26 @@ export const rbacContract = {
 		})
 		.input(StaffProfileIdSchema)
 		.output(z.object({ success: z.boolean() })),
+
+	searchClinicians: oc
+		.route({
+			method: "GET",
+			path: "/staff/search-clinicians",
+			summary: "Search active clinical staff for co-sign workflows (orders-scoped)",
+			tags: ["RBAC"],
+		})
+		.input(SearchCliniciansQuerySchema)
+		.output(z.array(ClinicianSummarySchema)),
+
+	verifyCoSignCredentials: oc
+		.route({
+			method: "POST",
+			path: "/staff/verify-cosign",
+			summary: "Verify a co-signer's credentials without creating a session",
+			tags: ["RBAC"],
+		})
+		.input(CoSignVerifyInputSchema)
+		.output(CoSignVerifyResponseSchema),
 
 	// ── Role Management ────────────────────────────────────────────────
 

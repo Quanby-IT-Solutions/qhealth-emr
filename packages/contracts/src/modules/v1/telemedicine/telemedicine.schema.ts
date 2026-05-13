@@ -105,6 +105,19 @@ export const CreateAppointmentInputSchema = z.object({
 export type CreateAppointmentInput = z.infer<typeof CreateAppointmentInputSchema>
 
 // ============================================================================
+// Update Appointment
+// ============================================================================
+
+export const UpdateAppointmentInputSchema = z.object({
+	id: z.string().uuid(),
+	videoLink: z.string().url().nullable().optional(),
+	meetingId: z.string().nullable().optional(),
+	meetingPassword: z.string().nullable().optional(),
+})
+
+export type UpdateAppointmentInput = z.infer<typeof UpdateAppointmentInputSchema>
+
+// ============================================================================
 // Cancel Appointment
 // ============================================================================
 
@@ -323,6 +336,11 @@ export const SignAbstractInputSchema = z.object({
 })
 
 export const SendAbstractInputSchema = z.object({
+	id: z.string().uuid(),
+	email: z.string().email(),
+})
+
+export const SendPrescriptionInputSchema = z.object({
 	id: z.string().uuid(),
 	email: z.string().email(),
 })

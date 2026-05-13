@@ -129,6 +129,7 @@ export interface EPrescriptionItem {
 }
 
 export interface CreateAppointmentInput {
+	facilityId: string
 	patientId: string
 	clinicianId: string
 	scheduledDate: string
@@ -136,6 +137,13 @@ export interface CreateAppointmentInput {
 	durationMinutes: number
 	platform: TelemedicinePlatform
 	notes?: string
+}
+
+export interface UpdateAppointmentInput {
+	id: string
+	videoLink?: string | null
+	meetingId?: string | null
+	meetingPassword?: string | null
 }
 
 export interface CreateEncounterInput {
@@ -154,7 +162,18 @@ export interface CreateEncounterInput {
 
 export interface CreatePrescriptionInput {
 	encounterId: string
-	medications: Omit<EPrescriptionItem, "id">[]
+	medications: Array<{
+		genericName: string
+		brandName?: string
+		dosage: string
+		form: string
+		quantity: number
+		unit: string
+		frequency: string
+		duration: string
+		route: string
+		instructions?: string
+	}>
 	dispensingInstructions?: string
 }
 
@@ -200,6 +219,11 @@ export interface SendAbstractInput {
 	email: string
 }
 
+export interface SendPrescriptionInput {
+	id: string
+	email: string
+}
+
 export const telemedicineKeys = {
 	all: ["telemedicine"] as const,
 	appointments: (facilityId: string) => [...telemedicineKeys.all, "appointments", facilityId] as const,
@@ -235,7 +259,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 function buildQueryString(params: Record<string, string | number | undefined | null>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== null)
 	if (!entries.length) return ""
-	return "?" + entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
+	return `?${entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")}`
 }
 
 // ============================================================================
@@ -319,6 +343,20 @@ export function useCancelAppointmentMutation() {
 	})
 }
 
+export function useUpdateAppointmentMutation() {
+	const queryClient = useQueryClient()
+	return useMutation<TelemedicineAppointment, Error, UpdateAppointmentInput>({
+		mutationFn: (input) =>
+			fetchJson<TelemedicineAppointment>(`${API_BASE}/appointments/${input.id}`, {
+				method: "PATCH",
+				body: JSON.stringify(input),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.all })
+		},
+	})
+}
+
 export function useCreateEncounterMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<TelemedicineEncounter, Error, CreateEncounterInput>({
@@ -338,6 +376,20 @@ export function useCreatePrescriptionMutation() {
 	return useMutation<EPrescription, Error, CreatePrescriptionInput>({
 		mutationFn: (input) =>
 			fetchJson<EPrescription>(`${API_BASE}/prescriptions`, {
+				method: "POST",
+				body: JSON.stringify(input),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.all })
+		},
+	})
+}
+
+export function useSendPrescriptionMutation() {
+	const queryClient = useQueryClient()
+	return useMutation<EPrescription, Error, SendPrescriptionInput>({
+		mutationFn: (input) =>
+			fetchJson<EPrescription>(`${API_BASE}/prescriptions/${input.id}/send`, {
 				method: "POST",
 				body: JSON.stringify(input),
 			}),
