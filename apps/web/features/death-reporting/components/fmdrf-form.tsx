@@ -11,10 +11,12 @@ import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import type { CreateFmdrfInput } from "@/features/death-reporting/api/death-reporting.hooks"
 import {
 	useCreateFmdrfMutation,
 	useFmdrfQuery,
+	useMarkDeathReportReleasedMutation,
 	useUpdateFmdrfMutation,
 } from "@/features/death-reporting/api/death-reporting.hooks"
 
@@ -204,6 +206,18 @@ export function FmdrfForm({
 	const { data: existing } = useFmdrfQuery(encounterId)
 	const createMutation = useCreateFmdrfMutation()
 	const updateMutation = useUpdateFmdrfMutation()
+	const markReleasedMutation = useMarkDeathReportReleasedMutation()
+
+	const { data: profile } = useMyProfile()
+	const activeStaffProfile =
+		profile?.staffProfiles?.find(p =>
+			p.roles.some((r: { id: string }) => r.id === profile?.activeRole?.id)
+		) ?? profile?.staffProfiles?.[0]
+	const staffProfileId = activeStaffProfile?.id ?? null
+	const permissions = profile?.activeRole?.permissions ?? []
+	const canEdit = (permissions as Array<{ module: string; action: string }>).some(
+		p => p.module === "death_reporting" && p.action === "edit"
+	)
 
 	const [editing, setEditing] = useState(false)
 	const [form, setForm] = useState<FormState>(emptyForm)
@@ -335,7 +349,33 @@ export function FmdrfForm({
 				</div>
 				{existing && !editing && (
 					<div className="flex items-center gap-2">
-						<Badge className="bg-green-100 text-green-800">Submitted</Badge>
+						{existing.status === "draft" && (
+							<Badge className="bg-amber-100 text-amber-800">Draft</Badge>
+						)}
+						{existing.status === "completed" && (
+							<Badge className="bg-green-100 text-green-800">Completed</Badge>
+						)}
+						{existing.status === "submitted" && (
+							<Badge className="bg-blue-100 text-blue-800">Submitted</Badge>
+						)}
+						{existing.status === "draft" && canEdit && (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={markReleasedMutation.isPending || !staffProfileId}
+								onClick={() => {
+									if (!staffProfileId) return
+									void markReleasedMutation.mutateAsync({
+										id: existing.id,
+										encounterId,
+										releasedByStaffId: staffProfileId,
+									})
+								}}
+							>
+								{markReleasedMutation.isPending ? "Marking…" : "Mark as Completed"}
+							</Button>
+						)}
 						<Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
 							Edit
 						</Button>

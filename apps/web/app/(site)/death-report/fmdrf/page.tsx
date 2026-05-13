@@ -1,5 +1,7 @@
 "use client"
 
+import { Suspense } from "react"
+
 import { useSearchParams } from "next/navigation"
 
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
@@ -15,7 +17,7 @@ function can(permSet: Set<string>, module: string, action: string) {
 	return permSet.has(`${module}:${action}`)
 }
 
-export default function FmdrfPage() {
+function FmdrfPageInner() {
 	const searchParams = useSearchParams()
 	const encounterId = searchParams.get("encounterId") ?? ""
 	const patientId = searchParams.get("patientId") ?? ""
@@ -26,6 +28,14 @@ export default function FmdrfPage() {
 		return (
 			<div className="flex items-center justify-center p-8 text-muted-foreground">
 				You do not have permission to access death reporting records.
+			</div>
+		)
+	}
+
+	if (!encounterId || !patientId || !facilityId) {
+		return (
+			<div className="flex items-center justify-center p-8 text-muted-foreground">
+				Missing required context — please open this form from the patient encounter.
 			</div>
 		)
 	}
@@ -44,5 +54,17 @@ export default function FmdrfPage() {
 				facilityId={facilityId}
 			/>
 		</div>
+	)
+}
+
+export default function FmdrfPage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="flex items-center justify-center p-8 text-muted-foreground">Loading…</div>
+			}
+		>
+			<FmdrfPageInner />
+		</Suspense>
 	)
 }

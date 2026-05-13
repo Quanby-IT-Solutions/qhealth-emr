@@ -65,12 +65,14 @@ export const FmdrfReportSchema = z.object({
 	physicianSignatureDataUrl: z.string(),
 	certificationDate: z.string(),
 
+	status: z.enum(["draft", "completed", "submitted"]),
 	createdAt: z.string(),
 	updatedAt: z.string(),
 })
 
 export const CreateFmdrfInputSchema = FmdrfReportSchema.omit({
 	id: true,
+	status: true,
 	createdAt: true,
 	updatedAt: true,
 })
@@ -82,6 +84,7 @@ export const UpdateFmdrfInputSchema = z
 	.extend(
 		FmdrfReportSchema.omit({
 			id: true,
+			status: true,
 			createdAt: true,
 			updatedAt: true,
 		}).partial().shape
@@ -147,12 +150,14 @@ export const FndrfReportSchema = z.object({
 	physicianSignatureDataUrl: z.string(),
 	certificationDate: z.string(),
 
+	status: z.enum(["draft", "completed", "submitted"]),
 	createdAt: z.string(),
 	updatedAt: z.string(),
 })
 
 export const CreateFndrfInputSchema = FndrfReportSchema.omit({
 	id: true,
+	status: true,
 	createdAt: true,
 	updatedAt: true,
 })
@@ -164,6 +169,7 @@ export const UpdateFndrfInputSchema = z
 	.extend(
 		FndrfReportSchema.omit({
 			id: true,
+			status: true,
 			createdAt: true,
 			updatedAt: true,
 		}).partial().shape
