@@ -47,7 +47,10 @@ export class SurgicalController {
 	// Surgical Cases
 	// ========================================================================
 
-	@RequirePermission("surgical", "view")
+	@RequireAnyPermissions([
+		{ module: "surgical", action: "view" },
+		{ module: "scheduling", action: "view" },
+	])
 	@Implement(v1.surgical.listCases)
 	async listCases() {
 		return implement(v1.surgical.listCases).handler(async ({ input }) => {
