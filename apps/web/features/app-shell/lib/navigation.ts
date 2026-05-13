@@ -211,7 +211,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 	{
 		title: "Clinic Templates",
 		href: "/scheduling/templates",
-		iconName: "calendar",
+		iconName: "records",
 		// Scheduler Story 13.1 — define provider clinic templates.
 		requiredPermissions: [{ module: "scheduling", action: "view" }],
 		requireAllPermissions: [{ module: "scheduling", action: "edit" }],
@@ -232,7 +232,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 	{
 		title: "Appointment Booking",
 		href: "/scheduling/book",
-		iconName: "calendar",
+		iconName: "patient",
 		// Scheduler Story 13.2 — search/select patient inside booking workflow.
 		requiredPermissions: [{ module: "scheduling", action: "view" }],
 		requireAllPermissions: [{ module: "scheduling", action: "create" }],
@@ -241,7 +241,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 	{
 		title: "Check-In",
 		href: "/scheduling/check-in",
-		iconName: "calendar",
+		iconName: "nursing",
 		// Scheduler Story 13.2 — mark appointments arrived and issue queue numbers.
 		requiredPermissions: [{ module: "scheduling", action: "view" }],
 		requireAllPermissions: [{ module: "scheduling", action: "create" }],
@@ -250,7 +250,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 	{
 		title: "OPD Queue",
 		href: "/scheduling/queue",
-		iconName: "calendar",
+		iconName: "sla",
 		// Scheduler Story 13.2 — monitor and advance the OPD queue.
 		requiredPermissions: [{ module: "scheduling", action: "view" }],
 		requireAllPermissions: [{ module: "scheduling", action: "edit" }],
