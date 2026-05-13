@@ -631,6 +631,7 @@ export function useOrSlotsQuery(params: OrSlotsParams) {
 				`${API_BASE}/or-slots${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
 			),
 		enabled: !!params.facilityId,
+		staleTime: 0,
 	})
 }
 
