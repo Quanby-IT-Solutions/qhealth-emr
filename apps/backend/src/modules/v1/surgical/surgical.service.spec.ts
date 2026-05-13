@@ -393,7 +393,7 @@ describe("SurgicalService", () => {
 			returning: jest.fn().mockResolvedValue([{ id: "assignment-1" }]),
 		})
 
-		jest.spyOn(service as any, "requireSignedOperationRecord").mockResolvedValue({
+		jest.spyOn(service as any, "getOperationRecordRow").mockResolvedValue({
 			id: "op-1",
 			status: "signed",
 			procedurePerformed: "Laparoscopic cholecystectomy",

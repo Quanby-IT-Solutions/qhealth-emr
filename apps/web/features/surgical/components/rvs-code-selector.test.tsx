@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { RvsCodeSelector } from "./rvs-code-selector"
@@ -87,16 +87,24 @@ describe("RvsCodeSelector", () => {
 		})
 
 		fireEvent.click(await screen.findByRole("button", { name: /suggest/i }))
+		fireEvent.click(screen.getByRole("button", { name: /add/i }))
 
-		expect(suggestMutate).toHaveBeenCalledWith({
-			caseId: "case-1",
-			rvsCodeId: "rvs-uuid-1",
-			procedureLabel: "Laparoscopic cholecystectomy",
-			assignmentType: "primary",
-		})
+		expect(suggestMutate).toHaveBeenCalledWith(
+			{
+				caseId: "case-1",
+				rvsCodeId: "rvs-uuid-1",
+				procedureLabel: "Laparoscopic cholecystectomy",
+				assignmentType: "primary",
+				modifier: undefined,
+				units: 1,
+			},
+			expect.objectContaining({
+				onSuccess: expect.any(Function),
+			})
+		)
 	})
 
-	it("disables mutating actions until the operation record is signed", async () => {
+	it("disables billing status actions until the operation record is signed", async () => {
 		mockUseRvsAssignmentsQuery.mockReturnValue({
 			data: [
 				{
@@ -133,19 +141,8 @@ describe("RvsCodeSelector", () => {
 			/>
 		)
 
-		expect(screen.getByText(/sign the operative record first/i)).toBeInTheDocument()
+		expect(screen.getByText(/sign the operative record before validating/i)).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: /validate/i })).toBeDisabled()
-		expect(screen.getByRole("button", { name: /remove 47562/i })).toBeDisabled()
-
-		fireEvent.change(screen.getByLabelText(/search rvs\/cpt codes/i), {
-			target: { value: "47" },
-		})
-		await act(async () => {
-			await new Promise(resolve => setTimeout(resolve, 350))
-		})
-
-		await waitFor(() => {
-			expect(screen.getByRole("button", { name: /suggest/i })).toBeDisabled()
-		})
+		expect(screen.getByRole("button", { name: /remove 47562/i })).toBeEnabled()
 	})
 })
