@@ -35,10 +35,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
 	if (entries.length === 0) return ""
-	return (
-		"?" +
-		entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
-	)
+	return `?${entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")}`
 }
 
 // ============================================================================
@@ -62,6 +59,15 @@ export interface LabResultData {
 	comments: string | null
 }
 
+export type LabOrderStatus =
+	| "ordered"
+	| "pending"
+	| "collected"
+	| "in_progress"
+	| "resulted"
+	| "completed"
+	| "cancelled"
+
 export interface LabOrder {
 	id: string
 	facilityId: string
@@ -74,7 +80,7 @@ export interface LabOrder {
 	testName: string
 	panelName: string | null
 	priority: "routine" | "urgent" | "stat"
-	status: "pending" | "in_progress" | "completed" | "cancelled"
+	status: LabOrderStatus
 	specimenType: string | null
 	orderingStaffId: string
 	orderingStaffName: string | null
@@ -119,20 +125,22 @@ export const labKeys = {
 
 interface LabDashboardParams {
 	facilityId: string
-	status?: "pending" | "in_progress" | "completed" | "cancelled"
+	status?: LabOrderStatus
 	priority?: string
 	page?: number
 	limit?: number
 }
 
-export function useLabDashboardQuery(params: LabDashboardParams) {
+export function useLabDashboardQuery(params: LabDashboardParams, options?: { enabled?: boolean }) {
 	return useQuery({
 		queryKey: labKeys.dashboard(params),
 		queryFn: () =>
 			fetchJson<PaginatedLabOrders>(
 				`${ORDERS_BASE}/labs${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
 			),
-		enabled: !!params.facilityId,
+		enabled: !!params.facilityId && (options?.enabled ?? true),
+		refetchOnWindowFocus: true,
+		staleTime: 30_000,
 	})
 }
 

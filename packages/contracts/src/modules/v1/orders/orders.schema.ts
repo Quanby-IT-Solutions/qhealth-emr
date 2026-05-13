@@ -261,6 +261,8 @@ export const LabOrderSchema = z.object({
 	facilityId: z.string().uuid(),
 	encounterId: z.string().uuid().nullable(),
 	preEncounterId: z.string().uuid().nullable(),
+	patientId: z.string().uuid().nullable().optional(),
+	patientName: z.string().nullable().optional(),
 	loincCode: z.string().nullable(),
 	panelCode: z.string().nullable(),
 	testName: z.string(),
@@ -274,6 +276,7 @@ export const LabOrderSchema = z.object({
 	resultedDatetime: dateOrString.nullable(),
 	results: z.unknown(),
 	cdsAlerts: z.unknown(),
+	hasCriticalValues: z.boolean().default(false),
 	/** SLA-016: set when lab acknowledges specimen receipt */
 	specimenReceivedAt: dateOrString.nullable().optional(),
 	/** SLA-016: set when billing clears payment for the lab order */
@@ -310,9 +313,11 @@ export const CreateLabOrderSchema = z.object({
 })
 
 export const LabOrderListSchema = PaginationInputSchema.extend({
+	facilityId: z.string().uuid().optional(),
 	encounterId: z.string().uuid().optional(),
 	preEncounterId: z.string().uuid().optional(),
 	status: LabOrderStatusEnum.optional(),
+	priority: OrderPriorityEnum.optional(),
 })
 
 export const LabOrderListResponseSchema = PaginatedResponseSchema.extend({
@@ -328,6 +333,9 @@ export const ImagingOrderSchema = z.object({
 	facilityId: z.string().uuid(),
 	encounterId: z.string().uuid().nullable(),
 	preEncounterId: z.string().uuid().nullable(),
+	patientId: z.string().uuid().nullable().optional(),
+	patientName: z.string().nullable().optional(),
+	patientMrn: z.string().nullable().optional(),
 	modality: ImagingModalityEnum,
 	bodyPart: z.string(),
 	clinicalIndication: z.string().nullable(),
@@ -379,9 +387,11 @@ export const CreateImagingOrderSchema = z.object({
 })
 
 export const ImagingOrderListSchema = PaginationInputSchema.extend({
+	facilityId: z.string().uuid().optional(),
 	encounterId: z.string().uuid().optional(),
 	preEncounterId: z.string().uuid().optional(),
 	status: ImagingOrderStatusEnum.optional(),
+	priority: OrderPriorityEnum.optional(),
 })
 
 export const ImagingOrderListResponseSchema = PaginatedResponseSchema.extend({

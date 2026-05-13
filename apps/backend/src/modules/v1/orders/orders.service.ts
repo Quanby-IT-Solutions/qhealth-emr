@@ -757,15 +757,28 @@ export class OrdersService {
 	// Lab Orders
 	// ========================================================================
 
+	private computeHasCriticalValues(results: unknown): boolean {
+		if (!results || typeof results !== "object") return false
+		const r = results as Record<string, unknown>
+		if (!Array.isArray(r.items)) return false
+		return r.items.some((item: unknown) => {
+			if (!item || typeof item !== "object") return false
+			const i = item as Record<string, unknown>
+			return i.isCritical === true || i.flag === "C"
+		})
+	}
+
 	async findLabOrders(input: LabOrderListInput) {
 		const page = Number(input.page) || 1
 		const limit = Number(input.limit) || 50
 		const offset = (page - 1) * limit
 
 		const conditions: ReturnType<typeof eq>[] = []
+		if (input.facilityId) conditions.push(eq(labOrders.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(labOrders.encounterId, input.encounterId))
 		if (input.preEncounterId) conditions.push(eq(labOrders.preEncounterId, input.preEncounterId))
 		if (input.status) conditions.push(eq(labOrders.status, input.status))
+		if (input.priority) conditions.push(eq(labOrders.priority, input.priority))
 
 		const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 
@@ -790,10 +803,15 @@ export class OrdersService {
 					resultedDatetime: labOrders.resultedDatetime,
 					results: labOrders.results,
 					cdsAlerts: labOrders.cdsAlerts,
+					patientId: patients.id,
+					patientFirstName: patients.firstName,
+					patientLastName: patients.lastName,
 					createdAt: labOrders.createdAt,
 					updatedAt: labOrders.updatedAt,
 				})
 				.from(labOrders)
+				.leftJoin(encounters, eq(labOrders.encounterId, encounters.id))
+				.leftJoin(patients, eq(encounters.patientId, patients.id))
 				.leftJoin(staffProfiles, eq(labOrders.orderingStaffId, staffProfiles.id))
 				.leftJoin(users, eq(staffProfiles.userId, users.id))
 				.where(whereClause)
@@ -805,7 +823,15 @@ export class OrdersService {
 		const total = totalResult?.count ?? 0
 
 		return {
-			data: rows,
+			data: rows.map(row => ({
+				...row,
+				patientId: row.patientId ?? null,
+				patientName:
+					row.patientLastName && row.patientFirstName
+						? `${row.patientLastName}, ${row.patientFirstName}`
+						: null,
+				hasCriticalValues: this.computeHasCriticalValues(row.results),
+			})),
 			total,
 			page,
 			limit,
@@ -835,16 +861,29 @@ export class OrdersService {
 				cdsAlerts: labOrders.cdsAlerts,
 				specimenReceivedAt: labOrders.specimenReceivedAt,
 				billingClearedAt: labOrders.billingClearedAt,
+				patientId: patients.id,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
 				createdAt: labOrders.createdAt,
 				updatedAt: labOrders.updatedAt,
 			})
 			.from(labOrders)
+			.leftJoin(encounters, eq(labOrders.encounterId, encounters.id))
+			.leftJoin(patients, eq(encounters.patientId, patients.id))
 			.leftJoin(staffProfiles, eq(labOrders.orderingStaffId, staffProfiles.id))
 			.leftJoin(users, eq(staffProfiles.userId, users.id))
 			.where(eq(labOrders.id, id))
 
 		if (!row) throw new NotFoundException(`Lab order ${id} not found`)
-		return row
+		return {
+			...row,
+			patientId: row.patientId ?? null,
+			patientName:
+				row.patientLastName && row.patientFirstName
+					? `${row.patientLastName}, ${row.patientFirstName}`
+					: null,
+			hasCriticalValues: this.computeHasCriticalValues(row.results),
+		}
 	}
 
 	async createLabOrder(input: CreateLabOrderInput, userId: string) {
@@ -929,10 +968,12 @@ export class OrdersService {
 		const offset = (page - 1) * limit
 
 		const conditions: ReturnType<typeof eq>[] = []
+		if (input.facilityId) conditions.push(eq(imagingOrders.facilityId, input.facilityId))
 		if (input.encounterId) conditions.push(eq(imagingOrders.encounterId, input.encounterId))
 		if (input.preEncounterId)
 			conditions.push(eq(imagingOrders.preEncounterId, input.preEncounterId))
 		if (input.status) conditions.push(eq(imagingOrders.status, input.status))
+		if (input.priority) conditions.push(eq(imagingOrders.priority, input.priority))
 
 		const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 
@@ -953,13 +994,21 @@ export class OrdersService {
 					orderingStaffName: users.name,
 					scheduledDatetime: imagingOrders.scheduledDatetime,
 					completedDatetime: imagingOrders.completedDatetime,
+					studyStartedAt: imagingOrders.studyStartedAt,
+					imagingOrderReceivedAt: imagingOrders.imagingOrderReceivedAt,
 					report: imagingOrders.report,
 					structuredResults: imagingOrders.structuredResults,
 					cdsAlerts: imagingOrders.cdsAlerts,
+					patientId: patients.id,
+					patientFirstName: patients.firstName,
+					patientLastName: patients.lastName,
+					patientMrn: patients.mrn,
 					createdAt: imagingOrders.createdAt,
 					updatedAt: imagingOrders.updatedAt,
 				})
 				.from(imagingOrders)
+				.leftJoin(encounters, eq(imagingOrders.encounterId, encounters.id))
+				.leftJoin(patients, eq(encounters.patientId, patients.id))
 				.leftJoin(staffProfiles, eq(imagingOrders.orderingStaffId, staffProfiles.id))
 				.leftJoin(users, eq(staffProfiles.userId, users.id))
 				.where(whereClause)
@@ -971,7 +1020,15 @@ export class OrdersService {
 		const total = totalResult?.count ?? 0
 
 		return {
-			data: rows,
+			data: rows.map(row => ({
+				...row,
+				patientId: row.patientId ?? null,
+				patientName:
+					row.patientLastName && row.patientFirstName
+						? `${row.patientLastName}, ${row.patientFirstName}`
+						: null,
+				patientMrn: row.patientMrn ?? null,
+			})),
 			total,
 			page,
 			limit,
@@ -1001,16 +1058,30 @@ export class OrdersService {
 				studyStartedAt: imagingOrders.studyStartedAt,
 				imagingOrderReceivedAt: imagingOrders.imagingOrderReceivedAt,
 				billingClearedAt: imagingOrders.billingClearedAt,
+				patientId: patients.id,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+				patientMrn: patients.mrn,
 				createdAt: imagingOrders.createdAt,
 				updatedAt: imagingOrders.updatedAt,
 			})
 			.from(imagingOrders)
+			.leftJoin(encounters, eq(imagingOrders.encounterId, encounters.id))
+			.leftJoin(patients, eq(encounters.patientId, patients.id))
 			.leftJoin(staffProfiles, eq(imagingOrders.orderingStaffId, staffProfiles.id))
 			.leftJoin(users, eq(staffProfiles.userId, users.id))
 			.where(eq(imagingOrders.id, id))
 
 		if (!row) throw new NotFoundException(`Imaging order ${id} not found`)
-		return row
+		return {
+			...row,
+			patientId: row.patientId ?? null,
+			patientName:
+				row.patientLastName && row.patientFirstName
+					? `${row.patientLastName}, ${row.patientFirstName}`
+					: null,
+			patientMrn: row.patientMrn ?? null,
+		}
 	}
 
 	async createImagingOrder(input: CreateImagingOrderInput, userId: string) {
