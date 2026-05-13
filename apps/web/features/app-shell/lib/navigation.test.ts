@@ -68,6 +68,7 @@ describe("filterNavItems", () => {
 			"Dashboard",
 			"Patient Management",
 			"Bed Management",
+			"Housekeeping",
 			"OPD",
 			"Chart Merge",
 			"Civil Registry",

@@ -38,6 +38,12 @@ const STATUSES: StatusDef[] = [
 		dotClass: "bg-yellow-500",
 		textClass: "text-yellow-700 dark:text-yellow-400",
 	},
+	{
+		key: "dirty",
+		label: "Dirty / For Cleaning",
+		dotClass: "bg-amber-500",
+		textClass: "text-amber-700 dark:text-amber-400",
+	},
 ]
 
 export function BedStatusLegend() {

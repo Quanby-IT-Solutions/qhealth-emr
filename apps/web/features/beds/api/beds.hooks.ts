@@ -15,7 +15,7 @@ export function useWardsQuery(facilityId: string) {
 }
 
 export function useBedListQuery(
-	params: { facilityId: string; wardId?: string; status?: "available" | "occupied" | "out_of_service" },
+	params: { facilityId: string; wardId?: string; status?: "available" | "occupied" | "out_of_service" | "dirty" | "reserved" | "cleaning" | "pending_transfer" },
 	options?: { enabled?: boolean }
 ) {
 	return useQuery(
