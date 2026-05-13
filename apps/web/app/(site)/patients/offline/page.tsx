@@ -123,7 +123,7 @@ export default function OfflinePatientCachePage() {
 												{patient.isActive ? "Active" : "Inactive"}
 											</Badge>
 										</div>
-										<Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/patients/${patient.id}`} />}>
+										<Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/patients/offline/${patient.id}`} />}>
 											Open
 											<ArrowRight className="size-4" />
 										</Button>

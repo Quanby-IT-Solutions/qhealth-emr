@@ -620,7 +620,7 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 							>
 								<Icons.CloudOff className="size-3.5" />
 								<span className="text-[11px] font-semibold tracking-wide">
-									{showSyncing ? "SYNCING..." : "OFFLINE"}
+									{showSyncing ? "Back online — Syncing…" : "Offline — Cached data"}
 								</span>
 							</motion.div>
 						)}

@@ -23,8 +23,8 @@ import {
 	TableRow,
 } from "@/core/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { type LabOrder, useLabDashboardQuery } from "@/features/lab/api/lab.hooks"
+import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
+import { type LabOrder, type LabOrderStatus, useLabDashboardQuery } from "@/features/lab/api/lab.hooks"
 
 import { LabResultDetail } from "./lab-result-detail"
 
@@ -43,6 +43,17 @@ function formatDateTime(d: string | null | undefined) {
 	})
 }
 
+function formatTAT(orderedAt: string, resultedAt: string | null): string {
+	if (!resultedAt) return "—"
+	const diffMs = new Date(resultedAt).getTime() - new Date(orderedAt).getTime()
+	const diffMins = Math.floor(diffMs / 60000)
+	if (diffMins < 1) return "<1m"
+	if (diffMins < 60) return `${diffMins}m`
+	const hours = Math.floor(diffMins / 60)
+	const mins = diffMins % 60
+	return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
+}
+
 function priorityBadge(priority: string) {
 	switch (priority) {
 		case "stat":
@@ -54,12 +65,18 @@ function priorityBadge(priority: string) {
 	}
 }
 
-function statusBadge(status: string) {
+function statusBadge(status: LabOrderStatus) {
 	switch (status) {
+		case "ordered":
+			return <Badge variant="outline">Ordered</Badge>
 		case "pending":
 			return <Badge variant="outline">Pending</Badge>
+		case "collected":
+			return <Badge variant="secondary">Collected</Badge>
 		case "in_progress":
 			return <Badge variant="secondary">In Progress</Badge>
+		case "resulted":
+			return <Badge variant="secondary">Resulted</Badge>
 		case "completed":
 			return <Badge variant="default">Completed</Badge>
 		case "cancelled":
@@ -68,8 +85,6 @@ function statusBadge(status: string) {
 					Cancelled
 				</Badge>
 			)
-		default:
-			return <Badge variant="outline">{status}</Badge>
 	}
 }
 
@@ -107,8 +122,11 @@ function LabOrderRow({
 			<TableCell>{formatDateTime(order.createdAt)}</TableCell>
 			<TableCell>{formatDateTime(order.collectionDatetime)}</TableCell>
 			<TableCell>{statusBadge(order.status)}</TableCell>
+			<TableCell className="text-xs text-muted-foreground">
+				{formatTAT(order.createdAt, order.resultedDatetime)}
+			</TableCell>
 			<TableCell>
-				{order.status === "completed" && (
+				{(order.status === "resulted" || order.status === "completed") && (
 					<Button
 						variant="outline"
 						size="sm"
@@ -163,6 +181,7 @@ function LabOrdersTable({
 					<TableHead>Ordered</TableHead>
 					<TableHead>Collection</TableHead>
 					<TableHead>Status</TableHead>
+					<TableHead>TAT</TableHead>
 					<TableHead />
 				</TableRow>
 			</TableHeader>
@@ -176,36 +195,76 @@ function LabOrdersTable({
 }
 
 // ============================================================================
+// Status classification — single rule mapping every backend status to a tab
+// ============================================================================
+
+type DashboardTab = "pending" | "in_progress" | "completed"
+
+// Every lab order status maps to exactly one visible tab; none are omitted.
+const STATUS_TAB: Record<LabOrderStatus, DashboardTab> = {
+	ordered:    "pending",
+	pending:    "pending",
+	collected:  "in_progress",
+	in_progress:"in_progress",
+	resulted:   "in_progress",
+	completed:  "completed",
+	cancelled:  "completed",
+}
+
+const TAB_STATUSES = (Object.entries(STATUS_TAB) as [LabOrderStatus, DashboardTab][]).reduce(
+	(acc, [status, tab]) => ({ ...acc, [tab]: [...(acc[tab] ?? []), status] }),
+	{} as Record<DashboardTab, LabOrderStatus[]>,
+)
+
+// ============================================================================
 // Main Dashboard
 // ============================================================================
 
 export function LabDashboard() {
-	const { data: profile } = useMyProfile()
-	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+	const facilityId = useActiveFacilityId() ?? ""
 
 	const [priorityFilter, setPriorityFilter] = useState<string>("all")
+	const [activeTab, setActiveTab] = useState<DashboardTab>("pending")
 	const [selectedOrder, setSelectedOrder] = useState<LabOrder | null>(null)
 	const [detailOpen, setDetailOpen] = useState(false)
 
-	const buildParams = (status: "pending" | "in_progress" | "completed") => ({
+	const buildParams = (status: LabOrderStatus) => ({
 		facilityId,
 		status,
 		priority: priorityFilter !== "all" ? priorityFilter : undefined,
 		limit: 50,
 	})
 
-	const pendingQuery = useLabDashboardQuery(buildParams("pending"))
-	const inProgressQuery = useLabDashboardQuery(buildParams("in_progress"))
-	const completedQuery = useLabDashboardQuery(buildParams("completed"))
+	// "Pending" tab: ordered + pending
+	const statusOrderedQ    = useLabDashboardQuery(buildParams("ordered"),    { enabled: activeTab === "pending" })
+	const statusPendingQ    = useLabDashboardQuery(buildParams("pending"),    { enabled: activeTab === "pending" })
+	// "In Progress" tab: collected + in_progress + resulted
+	const statusCollectedQ  = useLabDashboardQuery(buildParams("collected"),  { enabled: activeTab === "in_progress" })
+	const statusInProgressQ = useLabDashboardQuery(buildParams("in_progress"),{ enabled: activeTab === "in_progress" })
+	const statusResultedQ   = useLabDashboardQuery(buildParams("resulted"),   { enabled: activeTab === "in_progress" })
+	// "Completed" tab: completed + cancelled
+	const statusCompletedQ  = useLabDashboardQuery(buildParams("completed"),  { enabled: activeTab === "completed" })
+	const statusCancelledQ  = useLabDashboardQuery(buildParams("cancelled"),  { enabled: activeTab === "completed" })
+
+	const pendingOrders     = [...(statusOrderedQ.data?.data ?? []),    ...(statusPendingQ.data?.data ?? [])]
+	const pendingTotal      = (statusOrderedQ.data?.total ?? 0)         + (statusPendingQ.data?.total ?? 0)
+	const pendingLoading    = statusOrderedQ.isLoading                  || statusPendingQ.isLoading
+
+	const inProgressOrders  = [...(statusCollectedQ.data?.data ?? []),  ...(statusInProgressQ.data?.data ?? []),  ...(statusResultedQ.data?.data ?? [])]
+	const inProgressTotal   = (statusCollectedQ.data?.total ?? 0)       + (statusInProgressQ.data?.total ?? 0)    + (statusResultedQ.data?.total ?? 0)
+	const inProgressLoading = statusCollectedQ.isLoading                || statusInProgressQ.isLoading             || statusResultedQ.isLoading
+
+	const completedOrders   = [...(statusCompletedQ.data?.data ?? []),  ...(statusCancelledQ.data?.data ?? [])]
+	const completedTotal    = (statusCompletedQ.data?.total ?? 0)       + (statusCancelledQ.data?.total ?? 0)
+	const completedLoading  = statusCompletedQ.isLoading                || statusCancelledQ.isLoading
 
 	function handleViewResult(order: LabOrder) {
 		setSelectedOrder(order)
 		setDetailOpen(true)
 	}
 
-	const criticalCount =
-		(completedQuery.data?.data.filter((o) => o.hasCriticalValues).length ?? 0) +
-		(inProgressQuery.data?.data.filter((o) => o.hasCriticalValues).length ?? 0)
+	// Count critical values across whichever tab data has been fetched
+	const criticalCount = [...inProgressOrders, ...completedOrders].filter((o) => o.hasCriticalValues).length
 
 	return (
 		<div className="space-y-4">
@@ -225,7 +284,7 @@ export function LabDashboard() {
 							{criticalCount} critical value{criticalCount > 1 ? "s" : ""}
 						</div>
 					)}
-					<Select value={priorityFilter} onValueChange={setPriorityFilter}>
+					<Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v ?? "all")}>
 						<SelectTrigger className="w-36">
 							<SelectValue placeholder="All priorities" />
 						</SelectTrigger>
@@ -245,38 +304,29 @@ export function LabDashboard() {
 					<CardTitle className="text-base">Lab Orders</CardTitle>
 				</CardHeader>
 				<CardContent className="pt-0">
-					<Tabs defaultValue="pending">
+					<Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)}>
 						<TabsList className="mb-4 mt-2">
 							<TabsTrigger value="pending">
 								Pending
-								{(pendingQuery.data?.total ?? 0) > 0 && (
-									<Badge
-										variant="secondary"
-										className="ml-1.5 text-[10px]"
-									>
-										{pendingQuery.data?.total}
+								{pendingTotal > 0 && (
+									<Badge variant="secondary" className="ml-1.5 text-[10px]">
+										{pendingTotal}
 									</Badge>
 								)}
 							</TabsTrigger>
 							<TabsTrigger value="in_progress">
 								In Progress
-								{(inProgressQuery.data?.total ?? 0) > 0 && (
-									<Badge
-										variant="secondary"
-										className="ml-1.5 text-[10px]"
-									>
-										{inProgressQuery.data?.total}
+								{inProgressTotal > 0 && (
+									<Badge variant="secondary" className="ml-1.5 text-[10px]">
+										{inProgressTotal}
 									</Badge>
 								)}
 							</TabsTrigger>
 							<TabsTrigger value="completed">
 								Completed
-								{(completedQuery.data?.total ?? 0) > 0 && (
-									<Badge
-										variant="outline"
-										className="ml-1.5 text-[10px]"
-									>
-										{completedQuery.data?.total}
+								{completedTotal > 0 && (
+									<Badge variant="outline" className="ml-1.5 text-[10px]">
+										{completedTotal}
 									</Badge>
 								)}
 							</TabsTrigger>
@@ -284,24 +334,24 @@ export function LabDashboard() {
 
 						<TabsContent value="pending">
 							<LabOrdersTable
-								orders={pendingQuery.data?.data ?? []}
-								isLoading={pendingQuery.isLoading}
+								orders={pendingOrders}
+								isLoading={pendingLoading}
 								onViewResult={handleViewResult}
 							/>
 						</TabsContent>
 
 						<TabsContent value="in_progress">
 							<LabOrdersTable
-								orders={inProgressQuery.data?.data ?? []}
-								isLoading={inProgressQuery.isLoading}
+								orders={inProgressOrders}
+								isLoading={inProgressLoading}
 								onViewResult={handleViewResult}
 							/>
 						</TabsContent>
 
 						<TabsContent value="completed">
 							<LabOrdersTable
-								orders={completedQuery.data?.data ?? []}
-								isLoading={completedQuery.isLoading}
+								orders={completedOrders}
+								isLoading={completedLoading}
 								onViewResult={handleViewResult}
 							/>
 						</TabsContent>
@@ -318,3 +368,6 @@ export function LabDashboard() {
 		</div>
 	)
 }
+
+// Exported for use by other components that need to classify a lab order status
+export { TAB_STATUSES, STATUS_TAB, type DashboardTab }
