@@ -198,13 +198,29 @@ export class BedsService implements OnApplicationBootstrap {
 		if (!ward) {
 			throw new NotFoundException(`Ward ${input.wardId} not found`)
 		}
+		if (ward.facilityId !== input.facilityId) {
+			throw new BadRequestException("Selected ward does not belong to this facility")
+		}
+
+		const bedNumber = input.bedNumber.trim()
+		const [existingBed] = await db
+			.select({ id: beds.id })
+			.from(beds)
+			.where(
+				and(eq(beds.wardId, input.wardId), sql`lower(${beds.bedNumber}) = lower(${bedNumber})`)
+			)
+			.limit(1)
+
+		if (existingBed) {
+			throw new BadRequestException(`Bed ${bedNumber} already exists in ${ward.name}`)
+		}
 
 		const [created] = await db
 			.insert(beds)
 			.values({
 				wardId: input.wardId,
 				facilityId: input.facilityId,
-				bedNumber: input.bedNumber,
+				bedNumber,
 			})
 			.returning()
 
@@ -216,7 +232,7 @@ export class BedsService implements OnApplicationBootstrap {
 			})
 			.where(eq(wards.id, input.wardId))
 
-		this.logger.log(`Created bed: ${input.bedNumber} in ward ${ward.name}`)
+		this.logger.log(`Created bed: ${bedNumber} in ward ${ward.name}`)
 		return created!
 	}
 

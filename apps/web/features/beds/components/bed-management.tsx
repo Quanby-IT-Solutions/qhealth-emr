@@ -5,10 +5,24 @@ import { useState } from "react"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/core/components/ui/dialog"
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
@@ -64,7 +78,9 @@ export function BedManagement() {
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 
 	const permissions = profile?.activeRole?.permissions ?? []
-	const permSet = new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	const permSet = new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 	const canCreate = permSet.has("adt:create")
 
 	const { data: bedData, isLoading } = useBedListQuery({ facilityId })
@@ -93,6 +109,11 @@ export function BedManagement() {
 	}
 
 	const wards = bedData?.wards ?? []
+	const selectedWard = wards.find(w => w.id === newBed.wardId)
+	const normalizedNewBedNumber = newBed.bedNumber.trim().toLowerCase()
+	const duplicateBed = selectedWard?.beds.some(
+		bed => bed.bedNumber.trim().toLowerCase() === normalizedNewBedNumber
+	)
 
 	return (
 		<div className="space-y-6">
@@ -100,111 +121,136 @@ export function BedManagement() {
 			{census && <BedCensusMetrics census={census} />}
 
 			{/* Actions */}
-			{canCreate && <div className="flex flex-wrap gap-2">
-				<Dialog>
-					<DialogTrigger render={<Button size="sm">Add Ward</Button>} />
-					<DialogContent>
-						<DialogHeader>
-							<DialogTitle>Create Ward</DialogTitle>
-						</DialogHeader>
-						<div className="space-y-4 py-4">
-							<div className="space-y-1.5">
-								<Label>Ward Name</Label>
-								<Input
-									value={newWard.name}
-									onChange={e => setNewWard(prev => ({ ...prev, name: e.target.value }))}
-								/>
+			{canCreate && (
+				<div className="flex flex-wrap gap-2">
+					<Dialog>
+						<DialogTrigger render={<Button size="sm">Add Ward</Button>} />
+						<DialogContent>
+							<DialogHeader>
+								<DialogTitle>Create Ward</DialogTitle>
+							</DialogHeader>
+							<div className="space-y-4 py-4">
+								<div className="space-y-1.5">
+									<Label>Ward Name</Label>
+									<Input
+										value={newWard.name}
+										onChange={e => setNewWard(prev => ({ ...prev, name: e.target.value }))}
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<Label>Ward Type</Label>
+									<Select
+										value={newWard.wardType}
+										onValueChange={v => setNewWard(prev => ({ ...prev, wardType: v ?? "general" }))}
+									>
+										<SelectTrigger className="w-full">
+											<SelectValue>
+												{{ general: "General", icu: "ICU", er: "ER", or: "OR", nursery: "Nursery" }[
+													newWard.wardType
+												] ?? newWard.wardType}
+											</SelectValue>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="general">General</SelectItem>
+											<SelectItem value="icu">ICU</SelectItem>
+											<SelectItem value="er">ER</SelectItem>
+											<SelectItem value="or">OR</SelectItem>
+											<SelectItem value="nursery">Nursery</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
 							</div>
-							<div className="space-y-1.5">
-								<Label>Ward Type</Label>
-								<Select value={newWard.wardType} onValueChange={v => setNewWard(prev => ({ ...prev, wardType: v ?? "general" }))}>
-									<SelectTrigger className="w-full">
-										<SelectValue>
-											{{ general: "General", icu: "ICU", er: "ER", or: "OR", nursery: "Nursery" }[newWard.wardType] ?? newWard.wardType}
-										</SelectValue>
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="general">General</SelectItem>
-										<SelectItem value="icu">ICU</SelectItem>
-										<SelectItem value="er">ER</SelectItem>
-										<SelectItem value="or">OR</SelectItem>
-										<SelectItem value="nursery">Nursery</SelectItem>
-									</SelectContent>
-								</Select>
-							</div>
-						</div>
-						<DialogFooter>
-							<DialogClose render={<Button variant="outline">Cancel</Button>} />
-							<Button
-								disabled={!newWard.name || createWard.isPending}
-								onClick={async () => {
-									await createWard.mutateAsync({
-										facilityId,
-										name: newWard.name,
-										wardType: newWard.wardType as "general" | "icu" | "er" | "or" | "nursery",
-									})
-									setNewWard({ name: "", wardType: "general" })
-								}}
-							>
-								Create
-							</Button>
-						</DialogFooter>
-					</DialogContent>
-				</Dialog>
+							<DialogFooter>
+								<DialogClose render={<Button variant="outline">Cancel</Button>} />
+								<Button
+									disabled={!newWard.name || createWard.isPending}
+									onClick={async () => {
+										await createWard.mutateAsync({
+											facilityId,
+											name: newWard.name,
+											wardType: newWard.wardType as "general" | "icu" | "er" | "or" | "nursery",
+										})
+										setNewWard({ name: "", wardType: "general" })
+									}}
+								>
+									Create
+								</Button>
+							</DialogFooter>
+						</DialogContent>
+					</Dialog>
 
-				<Dialog>
-					<DialogTrigger render={<Button size="sm" variant="outline">Add Bed</Button>} />
-					<DialogContent>
-						<DialogHeader>
-							<DialogTitle>Add Bed to Ward</DialogTitle>
-						</DialogHeader>
-						<div className="space-y-4 py-4">
-							<div className="space-y-1.5">
-								<Label>Ward</Label>
-								<Select value={newBed.wardId} onValueChange={v => setNewBed(prev => ({ ...prev, wardId: v ?? "" }))}>
-									<SelectTrigger className="w-full">
-										<SelectValue>
-											{newBed.wardId
-												? (wards.find(w => w.id === newBed.wardId)?.name ?? newBed.wardId)
-												: <span className="text-muted-foreground">Select a ward</span>}
-										</SelectValue>
-									</SelectTrigger>
-									<SelectContent>
-										{wards.map(w => (
-											<SelectItem key={w.id} value={w.id}>
-												{w.name}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+					<Dialog>
+						<DialogTrigger
+							render={
+								<Button size="sm" variant="outline">
+									Add Bed
+								</Button>
+							}
+						/>
+						<DialogContent>
+							<DialogHeader>
+								<DialogTitle>Add Bed to Ward</DialogTitle>
+							</DialogHeader>
+							<div className="space-y-4 py-4">
+								<div className="space-y-1.5">
+									<Label>Ward</Label>
+									<Select
+										value={newBed.wardId}
+										onValueChange={v => setNewBed(prev => ({ ...prev, wardId: v ?? "" }))}
+									>
+										<SelectTrigger className="w-full">
+											<SelectValue>
+												{newBed.wardId ? (
+													(wards.find(w => w.id === newBed.wardId)?.name ?? newBed.wardId)
+												) : (
+													<span className="text-muted-foreground">Select a ward</span>
+												)}
+											</SelectValue>
+										</SelectTrigger>
+										<SelectContent>
+											{wards.map(w => (
+												<SelectItem key={w.id} value={w.id} label={w.name}>
+													{w.name}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+								<div className="space-y-1.5">
+									<Label>Bed Number</Label>
+									<Input
+										value={newBed.bedNumber}
+										onChange={e => setNewBed(prev => ({ ...prev, bedNumber: e.target.value }))}
+									/>
+									{duplicateBed && (
+										<p className="text-destructive text-sm">
+											This ward already has a bed named {newBed.bedNumber.trim()}.
+										</p>
+									)}
+								</div>
 							</div>
-							<div className="space-y-1.5">
-								<Label>Bed Number</Label>
-								<Input
-									value={newBed.bedNumber}
-									onChange={e => setNewBed(prev => ({ ...prev, bedNumber: e.target.value }))}
-								/>
-							</div>
-						</div>
-						<DialogFooter>
-							<DialogClose render={<Button variant="outline">Cancel</Button>} />
-							<Button
-								disabled={!newBed.wardId || !newBed.bedNumber || createBed.isPending}
-								onClick={async () => {
-									await createBed.mutateAsync({
-										facilityId,
-										wardId: newBed.wardId,
-										bedNumber: newBed.bedNumber,
-									})
-									setNewBed({ wardId: "", bedNumber: "" })
-								}}
-							>
-								Create
-							</Button>
-						</DialogFooter>
-					</DialogContent>
-				</Dialog>
-			</div>}
+							<DialogFooter>
+								<DialogClose render={<Button variant="outline">Cancel</Button>} />
+								<Button
+									disabled={
+										!newBed.wardId || !normalizedNewBedNumber || duplicateBed || createBed.isPending
+									}
+									onClick={async () => {
+										await createBed.mutateAsync({
+											facilityId,
+											wardId: newBed.wardId,
+											bedNumber: newBed.bedNumber.trim(),
+										})
+										setNewBed({ wardId: "", bedNumber: "" })
+									}}
+								>
+									Create
+								</Button>
+							</DialogFooter>
+						</DialogContent>
+					</Dialog>
+				</div>
+			)}
 
 			{/* Bed Status Legend */}
 			<BedStatusLegend />
@@ -213,7 +259,9 @@ export function BedManagement() {
 			{wards.length === 0 ? (
 				<Card>
 					<CardContent className="py-12 text-center">
-						<p className="text-muted-foreground">No wards configured yet. Add a ward to get started.</p>
+						<p className="text-muted-foreground">
+							No wards configured yet. Add a ward to get started.
+						</p>
 					</CardContent>
 				</Card>
 			) : (
@@ -258,9 +306,7 @@ export function BedManagement() {
 											<div className="font-medium">{bed.bedNumber}</div>
 											<div className="text-xs">{bedStatusLabel(bed.status)}</div>
 											{bed.patientName && (
-												<div className="mt-1 truncate text-xs font-medium">
-													{bed.patientName}
-												</div>
+												<div className="mt-1 truncate text-xs font-medium">{bed.patientName}</div>
 											)}
 											{bed.patientMrn && (
 												<div className="text-xs opacity-75">MRN: {bed.patientMrn}</div>
@@ -276,23 +322,22 @@ export function BedManagement() {
 												>
 													Mark Cleaned
 												</Button>
-											) : bed.status !== "occupied" && (
-												<Button
-													size="sm"
-													variant="ghost"
-													className="mt-1 h-6 px-2 text-xs"
-													onClick={() =>
-														updateBedStatus.mutate({
-															id: bed.id,
-															status:
-																bed.status === "available"
-																	? "out_of_service"
-																	: "available",
-														})
-													}
-												>
-													{bed.status === "available" ? "Mark OOS" : "Mark Available"}
-												</Button>
+											) : (
+												bed.status !== "occupied" && (
+													<Button
+														size="sm"
+														variant="ghost"
+														className="mt-1 h-6 px-2 text-xs"
+														onClick={() =>
+															updateBedStatus.mutate({
+																id: bed.id,
+																status: bed.status === "available" ? "out_of_service" : "available",
+															})
+														}
+													>
+														{bed.status === "available" ? "Mark OOS" : "Mark Available"}
+													</Button>
+												)
 											)}
 										</div>
 									))}
@@ -302,8 +347,6 @@ export function BedManagement() {
 					</Card>
 				))
 			)}
-
-
 		</div>
 	)
 }

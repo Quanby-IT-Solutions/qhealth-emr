@@ -217,16 +217,43 @@ export class EncountersService {
 		])
 
 		const total = totalResult[0]?.count ?? 0
+		const encounterIds = data.map(row => row.id)
+		const transferRows =
+			encounterIds.length > 0
+				? await db
+						.select({
+							encounterId: encounterTransfers.encounterId,
+							status: encounterTransfers.status,
+							transferredAt: encounterTransfers.transferredAt,
+						})
+						.from(encounterTransfers)
+						.where(inArray(encounterTransfers.encounterId, encounterIds))
+						.orderBy(desc(encounterTransfers.transferredAt))
+				: []
+		const latestTransferByEncounterId = new Map<string, { status: "pending" | "completed" }>()
+
+		for (const transfer of transferRows) {
+			if (!latestTransferByEncounterId.has(transfer.encounterId)) {
+				latestTransferByEncounterId.set(transfer.encounterId, {
+					status: transfer.status,
+				})
+			}
+		}
 
 		return {
-			data: data.map(row => ({
-				...row,
-				patientName: `${row.patientLastName}, ${row.patientFirstName}`,
-				attendingStaffName: row.attendingStaffName ?? null,
-				wardName: row.wardName ?? null,
-				bedNumber: row.bedNumber ?? null,
-				queueNumber: row.queueNumber ?? null,
-			})),
+			data: data.map(row => {
+				const latestTransfer = latestTransferByEncounterId.get(row.id)
+
+				return {
+					...row,
+					patientName: `${row.patientLastName}, ${row.patientFirstName}`,
+					attendingStaffName: row.attendingStaffName ?? null,
+					wardName: row.wardName ?? null,
+					bedNumber: row.bedNumber ?? null,
+					queueNumber: row.queueNumber ?? null,
+					transferStatus: latestTransfer?.status ?? null,
+				}
+			}),
 			total,
 			page,
 			limit,
@@ -898,9 +925,7 @@ export class EncountersService {
 			notes: `Transfer initiated to ward ${input.toWardId}, bed ${input.toBedId}`,
 		})
 
-		this.logger.log(
-			`Transfer initiated for encounter ${input.encounterId} to bed ${input.toBedId}`
-		)
+		this.logger.log(`Transfer initiated for encounter ${input.encounterId} to bed ${input.toBedId}`)
 
 		return {
 			...updated,
@@ -1474,7 +1499,9 @@ export class EncountersService {
 							key: "pharmacy_clearance",
 							label: "Pharmacy clearance confirmed",
 							category: "billing" as ChecklistCategory,
-							status: (clearances?.pharmacyClearedAt ? "complete" : "incomplete") as ChecklistStatus,
+							status: (clearances?.pharmacyClearedAt
+								? "complete"
+								: "incomplete") as ChecklistStatus,
 							responsibleRole: "Pharmacist",
 						},
 						{
@@ -1488,7 +1515,9 @@ export class EncountersService {
 							key: "billing_sign_off",
 							label: "Billing sign-off received",
 							category: "billing" as ChecklistCategory,
-							status: (clearances?.billingSignedOffAt ? "complete" : "incomplete") as ChecklistStatus,
+							status: (clearances?.billingSignedOffAt
+								? "complete"
+								: "incomplete") as ChecklistStatus,
 							responsibleRole: "Biller",
 						},
 					]

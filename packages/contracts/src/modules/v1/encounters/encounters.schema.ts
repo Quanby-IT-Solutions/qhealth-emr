@@ -219,6 +219,7 @@ export const EncounterListItemSchema = z.object({
 	wardName: z.string().nullable(),
 	bedNumber: z.string().nullable(),
 	queueNumber: z.number().int().positive().nullable(),
+	transferStatus: z.enum(["pending", "completed"]).nullable(),
 })
 
 export const EncounterListResponseSchema = PaginatedResponseSchema.extend({
