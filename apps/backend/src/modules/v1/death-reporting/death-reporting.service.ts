@@ -51,11 +51,7 @@ interface CreateFmdrfInput {
 	certificationDate: string
 }
 
-interface UpdateFmdrfInput {
-	id: string
-	// All fields are optional for update
-	[key: string]: unknown
-}
+type UpdateFmdrfInput = Partial<CreateFmdrfInput> & { id: string }
 
 interface GetFndrfInput {
 	encounterId: string
@@ -223,6 +219,97 @@ export class DeathReportingService {
 			updateData.causeOfDeath = data.causeOfDeathImmediate
 		}
 
+		const knownFactors = ["Hemorrhage", "Sepsis", "Eclampsia", "Obstructed Labor", "Unsafe Abortion"]
+		const hasFactorUpdate = [
+			data.factorHemorrhage,
+			data.factorSepsis,
+			data.factorEclampsia,
+			data.factorObstructedLabor,
+			data.factorUnsafeAbortion,
+			data.factorOther,
+		].some(v => v !== undefined)
+
+		if (hasFactorUpdate) {
+			const ef = (existing.contributingFactors ?? []) as Array<{ factor: string }>
+			const flagH = data.factorHemorrhage ?? ef.some(f => f.factor === "Hemorrhage")
+			const flagS = data.factorSepsis ?? ef.some(f => f.factor === "Sepsis")
+			const flagE = data.factorEclampsia ?? ef.some(f => f.factor === "Eclampsia")
+			const flagL = data.factorObstructedLabor ?? ef.some(f => f.factor === "Obstructed Labor")
+			const flagA = data.factorUnsafeAbortion ?? ef.some(f => f.factor === "Unsafe Abortion")
+			const existingOther = ef.find(f => !knownFactors.includes(f.factor))?.factor ?? null
+			const otherFactor = data.factorOther !== undefined ? (data.factorOther || null) : existingOther
+			updateData.contributingFactors = [
+				...(flagH ? [{ factor: "Hemorrhage" }] : []),
+				...(flagS ? [{ factor: "Sepsis" }] : []),
+				...(flagE ? [{ factor: "Eclampsia" }] : []),
+				...(flagL ? [{ factor: "Obstructed Labor" }] : []),
+				...(flagA ? [{ factor: "Unsafe Abortion" }] : []),
+				...(otherFactor ? [{ factor: otherFactor }] : []),
+			]
+		}
+
+		const hasMaternalUpdate = [
+			data.gravidity,
+			data.parity,
+			data.gestationalAgeWeeks,
+			data.antenatalVisitCount,
+			data.complicationType,
+			data.avoidableFactors,
+			data.avoidableRemark,
+		].some(v => v !== undefined)
+
+		if (hasMaternalUpdate) {
+			const em = (existing.maternalHistory ?? {}) as {
+				gravida?: number
+				para?: number
+				gestationalAge?: number
+				antenatalCareVisits?: number
+				complications?: string[]
+				preventableFactors?: string[]
+			}
+			const avoidable = data.avoidableFactors !== undefined ? data.avoidableFactors : !!em.preventableFactors?.length
+			const avoidRemark =
+				data.avoidableRemark !== undefined ? (data.avoidableRemark || null) : (em.preventableFactors?.[0] ?? null)
+			updateData.maternalHistory = {
+				...em,
+				...(data.gravidity !== undefined ? { gravida: data.gravidity } : {}),
+				...(data.parity !== undefined ? { para: data.parity } : {}),
+				...(data.gestationalAgeWeeks !== undefined ? { gestationalAge: data.gestationalAgeWeeks ?? undefined } : {}),
+				...(data.antenatalVisitCount !== undefined
+					? { antenatalCareVisits: data.antenatalVisitCount ?? undefined }
+					: {}),
+				...(data.complicationType !== undefined
+					? { complications: data.complicationType ? [data.complicationType] : undefined }
+					: {}),
+				...(data.avoidableFactors !== undefined || data.avoidableRemark !== undefined
+					? { preventableFactors: avoidable && avoidRemark ? [avoidRemark] : undefined }
+					: {}),
+			}
+		}
+
+		const hasCertUpdate = [
+			data.physicianName,
+			data.physicianLicenseNo,
+			data.certificationDate,
+			data.physicianSignatureDataUrl,
+		].some(v => v !== undefined)
+
+		if (hasCertUpdate) {
+			const ec = (existing.physicianCertification ?? {}) as {
+				certifyingPhysicianName?: string
+				prcLicenseNumber?: string
+				certificationDate?: string
+				signatureData?: string
+			}
+			updateData.physicianCertification = {
+				...ec,
+				...(data.physicianName !== undefined ? { certifyingPhysicianName: data.physicianName } : {}),
+				...(data.physicianLicenseNo !== undefined ? { prcLicenseNumber: data.physicianLicenseNo } : {}),
+				...(data.certificationDate !== undefined ? { certificationDate: data.certificationDate } : {}),
+				...(data.physicianSignatureDataUrl !== undefined ? { signatureData: data.physicianSignatureDataUrl } : {}),
+			}
+		}
+
 		const [report] = await db
 			.update(deathReports)
 			.set(updateData)
@@ -233,7 +320,7 @@ export class DeathReportingService {
 			throw new Error("Failed to update FMDRF report")
 		}
 
-		return this.mapFmdrfReport(report, data as Partial<CreateFmdrfInput>)
+		return this.mapFmdrfReport(report, data)
 	}
 
 	/**
@@ -327,6 +414,94 @@ export class DeathReportingService {
 			updateData.deathDatetime = new Date(data.dateOfDeath)
 		}
 
+		const knownCauses = ["Prematurity", "Birth Asphyxia", "Sepsis", "Congenital Anomaly", "Respiratory Distress Syndrome"]
+		const hasCauseUpdate = [
+			data.causePrematurity,
+			data.causeBirthAsphyxia,
+			data.causeSepsis,
+			data.causeCongenitalAnomaly,
+			data.causeRds,
+			data.causeOther,
+		].some(v => v !== undefined)
+
+		if (hasCauseUpdate) {
+			const existingCauses = existing.causeOfDeath.split(", ").filter(Boolean)
+			const flagP = data.causePrematurity ?? existingCauses.includes("Prematurity")
+			const flagB = data.causeBirthAsphyxia ?? existingCauses.includes("Birth Asphyxia")
+			const flagS = data.causeSepsis ?? existingCauses.includes("Sepsis")
+			const flagC = data.causeCongenitalAnomaly ?? existingCauses.includes("Congenital Anomaly")
+			const flagR = data.causeRds ?? existingCauses.includes("Respiratory Distress Syndrome")
+			const existingOther = existingCauses.find(c => !knownCauses.includes(c)) ?? null
+			const otherCause = data.causeOther !== undefined ? (data.causeOther || null) : existingOther
+			updateData.causeOfDeath = [
+				...(flagP ? ["Prematurity"] : []),
+				...(flagB ? ["Birth Asphyxia"] : []),
+				...(flagS ? ["Sepsis"] : []),
+				...(flagC ? ["Congenital Anomaly"] : []),
+				...(flagR ? ["Respiratory Distress Syndrome"] : []),
+				...(otherCause ? [otherCause] : []),
+			].join(", ") || existing.causeOfDeath
+
+			if (data.contributingRemarks !== undefined) {
+				updateData.contributingFactors = data.contributingRemarks
+					? [{ factor: data.contributingRemarks }]
+					: []
+			}
+		} else if (data.contributingRemarks !== undefined) {
+			updateData.contributingFactors = data.contributingRemarks
+				? [{ factor: data.contributingRemarks }]
+				: []
+		}
+
+		const hasNeonatalUpdate = [
+			data.gestationalAgeWeeks,
+			data.birthWeightGrams,
+			data.apgarScore1Min,
+			data.apgarScore5Min,
+			data.ageAtDeathHours,
+		].some(v => v !== undefined)
+
+		if (hasNeonatalUpdate) {
+			const en = (existing.neonatalDetails ?? {}) as {
+				gestationalAgeWeeks?: number
+				birthWeight?: number
+				apgarScore1Min?: number
+				apgarScore5Min?: number
+				ageAtDeathHours?: number
+			}
+			updateData.neonatalDetails = {
+				...en,
+				...(data.gestationalAgeWeeks !== undefined ? { gestationalAgeWeeks: data.gestationalAgeWeeks } : {}),
+				...(data.birthWeightGrams !== undefined ? { birthWeight: data.birthWeightGrams } : {}),
+				...(data.apgarScore1Min !== undefined ? { apgarScore1Min: data.apgarScore1Min ?? undefined } : {}),
+				...(data.apgarScore5Min !== undefined ? { apgarScore5Min: data.apgarScore5Min ?? undefined } : {}),
+				...(data.ageAtDeathHours !== undefined ? { ageAtDeathHours: data.ageAtDeathHours ?? undefined } : {}),
+			}
+		}
+
+		const hasNeonatalCertUpdate = [
+			data.physicianName,
+			data.physicianLicenseNo,
+			data.certificationDate,
+			data.physicianSignatureDataUrl,
+		].some(v => v !== undefined)
+
+		if (hasNeonatalCertUpdate) {
+			const ec = (existing.physicianCertification ?? {}) as {
+				certifyingPhysicianName?: string
+				prcLicenseNumber?: string
+				certificationDate?: string
+				signatureData?: string
+			}
+			updateData.physicianCertification = {
+				...ec,
+				...(data.physicianName !== undefined ? { certifyingPhysicianName: data.physicianName } : {}),
+				...(data.physicianLicenseNo !== undefined ? { prcLicenseNumber: data.physicianLicenseNo } : {}),
+				...(data.certificationDate !== undefined ? { certificationDate: data.certificationDate } : {}),
+				...(data.physicianSignatureDataUrl !== undefined ? { signatureData: data.physicianSignatureDataUrl } : {}),
+			}
+		}
+
 		const [report] = await db
 			.update(deathReports)
 			.set(updateData)
@@ -391,6 +566,7 @@ export class DeathReportingService {
 			physicianLicenseNo: cert.prcLicenseNumber ?? "",
 			physicianSignatureDataUrl: cert.signatureData ?? "",
 			certificationDate: cert.certificationDate ?? "",
+			status: report.status as "draft" | "completed" | "submitted",
 			createdAt: report.createdAt.toISOString(),
 			updatedAt: report.updatedAt.toISOString(),
 		}
@@ -508,6 +684,7 @@ export class DeathReportingService {
 			physicianLicenseNo: cert.prcLicenseNumber ?? "",
 			physicianSignatureDataUrl: cert.signatureData ?? "",
 			certificationDate: cert.certificationDate ?? "",
+			status: report.status as "draft" | "completed" | "submitted",
 			createdAt: report.createdAt.toISOString(),
 			updatedAt: report.updatedAt.toISOString(),
 		}

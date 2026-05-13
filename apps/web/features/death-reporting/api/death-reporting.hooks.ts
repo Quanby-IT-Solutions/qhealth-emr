@@ -100,12 +100,13 @@ export interface FmdrfReport {
 	physicianSignatureDataUrl: string
 	certificationDate: string
 
+	status: "draft" | "completed" | "submitted"
 	createdAt: string
 	updatedAt: string
 }
 
-export type CreateFmdrfInput = Omit<FmdrfReport, "id" | "createdAt" | "updatedAt">
-export type UpdateFmdrfInput = Partial<Omit<FmdrfReport, "id" | "createdAt" | "updatedAt">> & {
+export type CreateFmdrfInput = Omit<FmdrfReport, "id" | "createdAt" | "updatedAt" | "status">
+export type UpdateFmdrfInput = Partial<Omit<FmdrfReport, "id" | "createdAt" | "updatedAt" | "status">> & {
 	id: string
 }
 
@@ -161,12 +162,13 @@ export interface FndrfReport {
 	physicianSignatureDataUrl: string
 	certificationDate: string
 
+	status: "draft" | "completed" | "submitted"
 	createdAt: string
 	updatedAt: string
 }
 
-export type CreateFndrfInput = Omit<FndrfReport, "id" | "createdAt" | "updatedAt">
-export type UpdateFndrfInput = Partial<Omit<FndrfReport, "id" | "createdAt" | "updatedAt">> & {
+export type CreateFndrfInput = Omit<FndrfReport, "id" | "createdAt" | "updatedAt" | "status">
+export type UpdateFndrfInput = Partial<Omit<FndrfReport, "id" | "createdAt" | "updatedAt" | "status">> & {
 	id: string
 }
 
@@ -251,6 +253,58 @@ export function useUpdateFmdrfMutation() {
 		onSuccess: (data) => {
 			void qc.invalidateQueries({ queryKey: deathReportingKeys.fmdrf(data.encounterId) })
 			void qc.invalidateQueries({ queryKey: deathReportingKeys.statusByEncounter(data.encounterId) })
+		},
+	})
+}
+
+export function useMarkDeathReportPaidMutation() {
+	const qc = useQueryClient()
+	return useMutation({
+		mutationFn: ({
+			id,
+			paidAt,
+		}: {
+			id: string
+			encounterId: string
+			paidAt?: string
+		}) =>
+			fetchJson<{ id: string; paidAt: string | null }>(`${API_BASE}/${id}/mark-paid`, {
+				method: "POST",
+				body: JSON.stringify({ paidAt }),
+			}),
+		onSuccess: (_data, variables) => {
+			void qc.invalidateQueries({ queryKey: deathReportingKeys.statusByEncounter(variables.encounterId) })
+		},
+	})
+}
+
+export function useMarkDeathReportReleasedMutation() {
+	const qc = useQueryClient()
+	return useMutation({
+		mutationFn: ({
+			id,
+			releasedByStaffId,
+			releasedAt,
+		}: {
+			id: string
+			encounterId: string
+			releasedByStaffId: string
+			releasedAt?: string
+		}) =>
+			fetchJson<{
+				id: string
+				releasedByStaffId: string | null
+				releasedAt: string | null
+				status: string
+				completedAt: string | null
+			}>(`${API_BASE}/${id}/mark-released`, {
+				method: "POST",
+				body: JSON.stringify({ releasedByStaffId, releasedAt }),
+			}),
+		onSuccess: (_data, variables) => {
+			void qc.invalidateQueries({ queryKey: deathReportingKeys.statusByEncounter(variables.encounterId) })
+			void qc.invalidateQueries({ queryKey: deathReportingKeys.fmdrf(variables.encounterId) })
+			void qc.invalidateQueries({ queryKey: deathReportingKeys.fndrf(variables.encounterId) })
 		},
 	})
 }
