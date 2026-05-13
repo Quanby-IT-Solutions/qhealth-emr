@@ -4,7 +4,7 @@ import { AdminDashboard } from "@/features/admin/components/admin-dashboard"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { DashboardWidgets } from "@/features/app-shell/components/dashboard-widgets"
 import { getDashboardWidgetsForPermissions } from "@/features/app-shell/lib/navigation"
-import { NursingDashboard } from "@/features/nursing/components/nursing-dashboard"
+import { NurseRoleDashboard } from "@/features/nursing/components/nurse-role-dashboard"
 import { DietitianDashboard } from "@/features/nutrition/components/dietitian-dashboard"
 import { PharmacyDashboard } from "@/features/pharmacy/components/pharmacy-dashboard"
 
@@ -16,7 +16,8 @@ export default function DashboardPage() {
 	)
 	const widgetIds = getDashboardWidgetsForPermissions(permissions)
 	const canViewAdminDashboard = permSet.has("admin:view")
-	const canViewNursingDashboard = permSet.has("nursing:view")
+	const canViewNursingDashboard =
+		permSet.has("nursing:view") && !permSet.has("clinical_docs:sign")
 	const canViewPharmacyDashboard = permSet.has("orders:verify")
 	const canViewNutritionDashboard = permSet.has("nutrition:view")
 
@@ -44,7 +45,7 @@ export default function DashboardPage() {
 	}
 
 	if (canViewNursingDashboard) {
-		return <NursingDashboard />
+		return <NurseRoleDashboard />
 	}
 
 	if (canViewPharmacyDashboard) {
