@@ -100,4 +100,38 @@ export class EdController {
 			return this.edService.dispose(input)
 		})
 	}
+
+	// Tele-Triage
+
+	@RequirePermission("ed", "create")
+	@Implement(v1.ed.createInboundTriage)
+	async createInboundTriage(@Session() _session: UserSession) {
+		return implement(v1.ed.createInboundTriage).handler(async ({ input }) => {
+			return this.edService.createInboundTriage(input)
+		})
+	}
+
+	@RequirePermission("ed", "view")
+	@Implement(v1.ed.listInboundTriage)
+	async listInboundTriage() {
+		return implement(v1.ed.listInboundTriage).handler(async ({ input }) => {
+			return this.edService.listInboundTriage(input)
+		})
+	}
+
+	@RequirePermission("ed", "edit")
+	@Implement(v1.ed.markInboundArrived)
+	async markInboundArrived(@Session() _session: UserSession) {
+		return implement(v1.ed.markInboundArrived).handler(async ({ input }) => {
+			return this.edService.markInboundArrived(input)
+		})
+	}
+
+	@RequirePermission("ed", "edit")
+	@Implement(v1.ed.cancelInboundTriage)
+	async cancelInboundTriage(@Session() _session: UserSession) {
+		return implement(v1.ed.cancelInboundTriage).handler(async ({ input }) => {
+			return this.edService.cancelInboundTriage(input)
+		})
+	}
 }
