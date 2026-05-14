@@ -59,8 +59,8 @@ interface NoteViewDialogProps {
 
 export function NoteViewDialog({
 	noteId,
-	encounterId,
-	patientId,
+	encounterId: _encounterId,
+	patientId: _patientId,
 	open,
 	onOpenChange,
 	canWrite,
@@ -79,8 +79,12 @@ export function NoteViewDialog({
 	const isDraft = note?.status === "draft"
 	const isSigned = note?.status === "signed"
 
-	// Build staff credentials for NoteSigning from the current user's profile
-	const staffProfile = profile?.staffProfiles?.[0]
+	const activeStaffProfile =
+		profile?.staffProfiles?.find(p => p.roles.some(r => r.id === profile.activeRole?.id)) ??
+		undefined
+	const staffProfile =
+		profile?.staffProfiles?.find(p => p.facilityId === note?.facilityId) ?? activeStaffProfile
+	const isAuthor = staffProfile?.id === note?.authorStaffId
 	const staffCredentials = {
 		name: profile?.user?.name ?? note?.authorStaffName ?? "Unknown",
 		prcLicenseNumber: staffProfile?.prcLicenseNumber ?? null,
@@ -221,15 +225,17 @@ export function NoteViewDialog({
 																<div className="text-sm break-words whitespace-pre-wrap">
 																	{addendum.content}
 																</div>
-																<Button
-																	size="sm"
-																	variant="outline"
-																	className="mt-1"
-																	onClick={() => handleSignAddendum(addendum.id)}
-																	disabled={signAddendum.isPending}
-																>
-																	Sign Addendum
-																</Button>
+																{addendum.authorStaffId === staffProfile?.id && (
+																	<Button
+																		size="sm"
+																		variant="outline"
+																		className="mt-1"
+																		onClick={() => handleSignAddendum(addendum.id)}
+																		disabled={signAddendum.isPending}
+																	>
+																		Sign Addendum
+																	</Button>
+																)}
 															</div>
 														))}
 												</div>
@@ -247,7 +253,7 @@ export function NoteViewDialog({
 						{/* ─── Footer Actions ─── */}
 						{!signOpen && !addendumOpen && (
 							<div className="flex justify-end gap-2 pt-2">
-								{isDraft && !isEditing && canWrite && (
+								{isDraft && !isEditing && canWrite && isAuthor && (
 									<>
 										<Button variant="outline" onClick={() => setEditContent(note.content)}>
 											Edit

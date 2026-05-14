@@ -84,7 +84,7 @@ export class ClinicalDocsController {
 	@Implement(v1.clinicalDocs.updateNote)
 	async updateNote(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.updateNote).handler(async ({ input }) => {
-			return this.service.updateNote(input)
+			return this.service.updateNote(input, session.user.id)
 		})
 	}
 
@@ -127,9 +127,9 @@ export class ClinicalDocsController {
 
 	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.clinicalDocs.signAddendum)
-	async signAddendum(@Session() session: UserSession) {
+	async signAddendum(@Session() session: UserSession, @Ip() ip: string) {
 		return implement(v1.clinicalDocs.signAddendum).handler(async ({ input }) => {
-			return this.service.signAddendum(input, session.user.id)
+			return this.service.signAddendum(input, session.user.id, ip ?? "unknown")
 		})
 	}
 

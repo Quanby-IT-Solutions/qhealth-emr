@@ -130,6 +130,7 @@ export const AddendumSchema = z.object({
 	authorStaffId: z.string().uuid(),
 	authorStaffName: z.string().nullable(),
 	signedAt: dateOrString.nullable(),
+	signedIp: z.string().nullable(),
 	createdAt: dateOrString,
 })
 
@@ -288,6 +289,7 @@ export const ConsentRecordSchema = z.object({
 	witnessStaffId: z.string().uuid().nullable(),
 	witnessStaffName: z.string().nullable(),
 	revokedAt: dateOrString.nullable(),
+	revocationReason: z.string().nullable(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 })
@@ -307,6 +309,7 @@ export const CreateConsentRecordSchema = z.object({
 
 export const RevokeConsentSchema = z.object({
 	id: z.string().uuid(),
+	reason: z.string().min(1).max(500).optional(),
 })
 
 export const ConsentRecordIdSchema = z.object({

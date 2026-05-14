@@ -132,6 +132,9 @@ export function NoteHistory({ note }: NoteHistoryProps) {
 										<ShieldCheck className="size-3 text-green-600" />
 										<span className="font-medium">Signed:</span>{" "}
 										{formatDateTime(addendum.signedAt)}
+										{addendum.signedIp && (
+											<span className="ml-1 font-mono">(IP {addendum.signedIp})</span>
+										)}
 									</div>
 								)}
 							</div>

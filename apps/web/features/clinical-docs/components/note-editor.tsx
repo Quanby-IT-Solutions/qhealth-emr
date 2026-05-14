@@ -62,6 +62,7 @@ interface Icd10Diagnosis {
 
 type StructuredDataValue = string | Icd10Diagnosis | undefined
 type StructuredData = Record<string, StructuredDataValue>
+type InsertSource = "vitals" | "allergies" | "labs"
 
 function hasSection(sections: TemplateSection[], target: "assessment" | "plan") {
 	return sections.some(section => {
@@ -181,6 +182,39 @@ function labLine(context: NoteContext) {
 			return `${lab.testName}${lab.panelName ? ` (${lab.panelName})` : ""} - ${resultText}`
 		}),
 	].join("\n")
+}
+
+function sourcePattern(source: InsertSource) {
+	switch (source) {
+		case "vitals":
+			return /(^|\n\n)Vitals \([^\n]*\): [^\n]*(?=\n\n|$)/m
+		case "allergies":
+			return /(^|\n\n)Active allergies: [^\n]*(?=\n\n|$)/m
+		case "labs":
+			return /(^|\n\n)Recent labs:\n[\s\S]*?(?=\n\n|$)/m
+	}
+}
+
+function upsertSourceBlock(existing: string, source: InsertSource, nextText: string) {
+	const current = existing.trim()
+	const next = nextText.trim()
+	if (!next) return current
+
+	const pattern = sourcePattern(source)
+	if (pattern.test(current)) {
+		return current.replace(pattern, (_match, prefix: string) => `${prefix}${next}`)
+	}
+
+	return [current, next].filter(Boolean).join("\n\n")
+}
+
+function hasSourceBlock(existing: string, source: InsertSource, text: string) {
+	const current = existing.trim()
+	const next = text.trim()
+	if (!current || !next) return false
+	const match = sourcePattern(source).exec(current)
+	if (!match) return false
+	return match[0].trim() === next
 }
 
 function isIcd10Diagnosis(value: StructuredDataValue): value is Icd10Diagnosis {
@@ -320,6 +354,7 @@ function InsertButton({
 						type="button"
 						size="icon"
 						variant="outline"
+						aria-label={label}
 						disabled={disabled}
 						onClick={onClick}
 					/>
@@ -340,6 +375,7 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 	const [noteId, setNoteId] = useState<string | null>(null)
 	const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
 	const [hasLocalChanges, setHasLocalChanges] = useState(false)
+	const [isDraftCreateLocked, setIsDraftCreateLocked] = useState(false)
 
 	const noteContext = useNoteContextQuery(encounterId)
 	const createNote = useCreateNoteMutation()
@@ -365,8 +401,9 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 		: null
 	const showIcd10Field = shouldRenderIcd10Field(template, sections)
 	const isSaving = createNote.isPending || updateNote.isPending
+	const isSaveBlocked = isSaving || isDraftCreateLocked
 	const hasRequiredSections = missingRequiredSections.length === 0
-	const canSave = hasRequiredSections && !isSaving && (!noteId || hasLocalChanges)
+	const canSave = hasRequiredSections && !isSaveBlocked && (!noteId || hasLocalChanges)
 
 	function updateSection(key: string, value: string) {
 		setStructuredData(prev => ({ ...prev, [key]: value }))
@@ -386,11 +423,18 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 		setHasLocalChanges(true)
 	}
 
-	function insertIntoSection(key: string | undefined, text: string) {
+	function sectionHasSourceBlock(key: string | undefined, source: InsertSource, text: string) {
+		if (!key) return false
+		return hasSourceBlock(sectionText(structuredData, key), source, text)
+	}
+
+	function insertIntoSection(key: string | undefined, text: string, source?: InsertSource) {
 		if (!key) return
 		setStructuredData(prev => ({
 			...prev,
-			[key]: [sectionText(prev, key).trim(), text.trim()].filter(Boolean).join("\n\n"),
+			[key]: source
+				? upsertSourceBlock(sectionText(prev, key), source, text)
+				: [sectionText(prev, key).trim(), text.trim()].filter(Boolean).join("\n\n"),
 		}))
 		setHasLocalChanges(true)
 	}
@@ -403,6 +447,7 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 	function handleSave() {
 		if (!canSave) return
 		if (!noteId) {
+			setIsDraftCreateLocked(true)
 			createNote.mutate(
 				{
 					facilityId,
@@ -416,6 +461,9 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 					onSuccess: note => {
 						setNoteId(note.id)
 						markSaved()
+					},
+					onSettled: () => {
+						setIsDraftCreateLocked(false)
 					},
 				}
 			)
@@ -437,7 +485,7 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 
 	const saveError = createNote.error?.message ?? updateNote.error?.message
 	const context = noteContext.data
-	const saveButtonLabel = isSaving
+	const saveButtonLabel = isSaving || isDraftCreateLocked
 		? "Saving..."
 		: noteId
 			? hasLocalChanges
@@ -446,7 +494,7 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 			: "Save Draft"
 	const saveStatus = saveError
 		? saveError
-		: isSaving
+		: isSaving || isDraftCreateLocked
 			? "Saving..."
 			: hasLocalChanges
 				? hasRequiredSections
@@ -457,6 +505,9 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 				: lastSavedAt
 					? `Saved ${formatDateTime(lastSavedAt)}`
 					: "Not saved"
+	const latestVitalsText = context?.latestVitals ? vitalLine(context.latestVitals) : ""
+	const allergiesText = context ? allergyLine(context) : ""
+	const labsText = context ? labLine(context) : ""
 
 	return (
 		<div className="space-y-4">
@@ -506,10 +557,10 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 						type="button"
 						onClick={handleSave}
 						disabled={!canSave}
-						variant={noteId && !hasLocalChanges && !isSaving ? "outline" : "default"}
+						variant={noteId && !hasLocalChanges && !isSaveBlocked ? "outline" : "default"}
 						className="gap-2"
 					>
-						{noteId && !hasLocalChanges && !isSaving ? (
+						{noteId && !hasLocalChanges && !isSaveBlocked ? (
 							<CheckCircle2 className="size-4" />
 						) : (
 							<Save className="size-4" />
@@ -597,10 +648,14 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 										</div>
 										<InsertButton
 											label="Insert vitals into Objective"
-											disabled={!context.latestVitals || !objectiveKey}
+											disabled={
+												!context.latestVitals ||
+												!objectiveKey ||
+												sectionHasSourceBlock(objectiveKey, "vitals", latestVitalsText)
+											}
 											onClick={() =>
 												context.latestVitals &&
-												insertIntoSection(objectiveKey, vitalLine(context.latestVitals))
+												insertIntoSection(objectiveKey, latestVitalsText, "vitals")
 											}
 										/>
 									</div>
@@ -642,8 +697,11 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 										</div>
 										<InsertButton
 											label="Insert allergies into Subjective"
-											disabled={!subjectiveKey}
-											onClick={() => insertIntoSection(subjectiveKey, allergyLine(context))}
+											disabled={
+												!subjectiveKey ||
+												sectionHasSourceBlock(subjectiveKey, "allergies", allergiesText)
+											}
+											onClick={() => insertIntoSection(subjectiveKey, allergiesText, "allergies")}
 										/>
 									</div>
 									<div className="flex flex-wrap gap-1.5">
@@ -672,8 +730,12 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 										</div>
 										<InsertButton
 											label="Insert labs into Objective"
-											disabled={context.recentLabs.length === 0 || !objectiveKey}
-											onClick={() => insertIntoSection(objectiveKey, labLine(context))}
+											disabled={
+												context.recentLabs.length === 0 ||
+												!objectiveKey ||
+												sectionHasSourceBlock(objectiveKey, "labs", labsText)
+											}
+											onClick={() => insertIntoSection(objectiveKey, labsText, "labs")}
 										/>
 									</div>
 									<div className="space-y-2">

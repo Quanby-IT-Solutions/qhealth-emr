@@ -60,6 +60,7 @@ describe("NoteEditor", () => {
 
 		createMutate.mockImplementation((_payload, options) => {
 			options?.onSuccess?.({ id: "note-1" })
+			options?.onSettled?.()
 		})
 		updateMutate.mockImplementation((_payload, options) => {
 			options?.onSuccess?.({ id: "note-1" })
@@ -139,5 +140,86 @@ describe("NoteEditor", () => {
 		await waitFor(() => {
 			expect(screen.getByRole("button", { name: /^saved$/i })).toBeDisabled()
 		})
+	})
+
+	it("prevents duplicate chart context inserts", async () => {
+		const user = userEvent.setup()
+		const templateWithContextTargets: AuthoringTemplate = {
+			...template,
+			sections: [
+				{ key: "subjective", label: "Subjective", type: "structured" },
+				{ key: "objective", label: "Objective", type: "structured" },
+				{ key: "assessment", label: "Assessment", type: "structured" },
+				{ key: "plan", label: "Plan", type: "structured" },
+			],
+		}
+
+		mockUseNoteContextQuery.mockReturnValue({
+			isLoading: false,
+			data: {
+				encounterId: "enc-1",
+				patientId: "pat-1",
+				latestVitals: {
+					id: "vital-1",
+					temperature: "38.1",
+					bpSystolic: 120,
+					bpDiastolic: 80,
+					heartRate: 88,
+					respiratoryRate: 18,
+					spo2: "98",
+					painScore: 2,
+					weight: null,
+					height: null,
+					newsScore: null,
+					newsRiskLevel: null,
+					recordedAt: "2026-05-14T08:00:00.000Z",
+				},
+				activeAllergies: [
+					{
+						id: "allergy-1",
+						allergenName: "Penicillin",
+						allergenType: "medication",
+						reactionType: "rash",
+						severity: "moderate",
+						onsetDate: null,
+					},
+				],
+				recentLabs: [
+					{
+						id: "lab-1",
+						testName: "CBC",
+						panelName: null,
+						status: "resulted",
+						resultedDatetime: "2026-05-14T08:30:00.000Z",
+						results: { items: [{ testName: "WBC", value: "8.2", unit: "10^9/L" }] },
+					},
+				],
+			},
+		})
+
+		render(
+			<NoteEditor
+				encounterId="enc-1"
+				facilityId="fac-1"
+				template={templateWithContextTargets}
+				onBack={vi.fn()}
+				onDone={vi.fn()}
+			/>
+		)
+
+		await user.click(screen.getByRole("button", { name: /insert vitals into objective/i }))
+		await user.click(screen.getByRole("button", { name: /insert allergies into subjective/i }))
+		await user.click(screen.getByRole("button", { name: /insert labs into objective/i }))
+
+		expect(screen.getByRole("button", { name: /insert vitals into objective/i })).toBeDisabled()
+		expect(screen.getByRole("button", { name: /insert allergies into subjective/i })).toBeDisabled()
+		expect(screen.getByRole("button", { name: /insert labs into objective/i })).toBeDisabled()
+
+		const objective = screen.getByLabelText("Objective")
+		const subjective = screen.getByLabelText("Subjective")
+
+		expect((objective as HTMLTextAreaElement).value.match(/Vitals/g)).toHaveLength(1)
+		expect((objective as HTMLTextAreaElement).value.match(/Recent labs/g)).toHaveLength(1)
+		expect((subjective as HTMLTextAreaElement).value.match(/Active allergies/g)).toHaveLength(1)
 	})
 })
