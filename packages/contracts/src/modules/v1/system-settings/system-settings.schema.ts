@@ -114,6 +114,129 @@ export const UpdateSystemSettingsSchema = z.object({
 export type UpdateSystemSettingsInput = z.infer<typeof UpdateSystemSettingsSchema>
 
 // ============================================================================
+// Offline patient summary snapshots
+// ============================================================================
+
+const OfflineDateStringSchema = z.union([z.date(), z.string()]).transform(v =>
+	typeof v === "string" ? v : v.toISOString()
+)
+
+export const OfflinePatientDemographicsSchema = z.object({
+	id: z.string().uuid(),
+	mrn: z.string(),
+	firstName: z.string(),
+	middleName: z.string().nullable(),
+	lastName: z.string(),
+	dateOfBirth: z.string(),
+	sex: z.enum(["male", "female", "other"]),
+	isActive: z.boolean(),
+})
+
+export const OfflineVitalSummarySchema = z.object({
+	id: z.string().uuid(),
+	temperature: z.union([z.string(), z.number()]).nullable(),
+	bpSystolic: z.number().int().nullable(),
+	bpDiastolic: z.number().int().nullable(),
+	heartRate: z.number().int().nullable(),
+	respiratoryRate: z.number().int().nullable(),
+	spo2: z.union([z.string(), z.number()]).nullable(),
+	newsScore: z.number().int().nullable().optional(),
+	newsRiskLevel: z.enum(["low", "medium", "high"]).nullable().optional(),
+	recordedAt: OfflineDateStringSchema,
+})
+
+export const OfflineProblemSummarySchema = z.object({
+	id: z.string().uuid(),
+	description: z.string(),
+	icd10Code: z.string().nullable(),
+	icd10Display: z.string().nullable().optional(),
+	snomedCode: z.string().nullable().optional(),
+	snomedDisplay: z.string().nullable().optional(),
+	onsetDate: z.string().nullable().optional(),
+	status: z.enum(["active", "resolved"]),
+})
+
+export const OfflineAllergySummarySchema = z.object({
+	id: z.string().uuid(),
+	allergenName: z.string(),
+	allergenType: z.enum(["medication", "food", "environmental"]),
+	reactionType: z.string().nullable(),
+	severity: z.enum(["mild", "moderate", "severe"]),
+	onsetDate: z.string().nullable(),
+	isActive: z.boolean(),
+})
+
+export const OfflineMedicationSummarySchema = z.object({
+	id: z.string().uuid(),
+	genericName: z.string(),
+	dose: z.string(),
+	doseUnit: z.string(),
+	route: z.string(),
+	frequency: z.string(),
+	status: z.string(),
+})
+
+export const OfflineEncounterHeaderSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	patientName: z.string(),
+	patientMrn: z.string(),
+	patientDateOfBirth: z.string(),
+	patientSex: z.enum(["male", "female", "other"]),
+	encounterType: z.enum(["inpatient", "outpatient", "emergency", "telemedicine"]),
+	status: z.enum(["active", "pending_discharge", "discharged", "closed", "cancelled"]),
+	chiefComplaint: z.string().nullable(),
+	admissionDatetime: OfflineDateStringSchema,
+	dischargeDatetime: OfflineDateStringSchema.nullable(),
+	disposition: z.enum(["home", "transfer", "deceased", "ama"]).nullable(),
+	admittingStaffName: z.string().nullable(),
+	attendingStaffName: z.string().nullable(),
+	wardName: z.string().nullable(),
+	bedNumber: z.string().nullable(),
+	oecbEligible: z.boolean(),
+	transfers: z.array(z.unknown()),
+})
+
+export const OfflineEncounterSummarySchema = z.object({
+	encounter: OfflineEncounterHeaderSchema,
+	latestVitals: OfflineVitalSummarySchema.nullable(),
+	activeProblems: z.array(OfflineProblemSummarySchema),
+	activeAllergies: z.array(OfflineAllergySummarySchema),
+	activeMedications: z.array(OfflineMedicationSummarySchema),
+	activeProblemCount: z.number().int(),
+	activeAllergyCount: z.number().int(),
+	hasSevereAllergies: z.boolean(),
+})
+
+export const OfflinePreparedPatientSummarySchema = z.object({
+	schemaVersion: z.literal(1),
+	facilityId: z.string().uuid(),
+	patient: OfflinePatientDemographicsSchema,
+	encounterSummary: OfflineEncounterSummarySchema.nullable(),
+	preparedAt: OfflineDateStringSchema,
+	sourceJobId: z.string().uuid().nullable(),
+})
+
+export type OfflinePreparedPatientSummary = z.infer<typeof OfflinePreparedPatientSummarySchema>
+
+export const OfflineSummarySnapshotSchema = z.object({
+	schemaVersion: z.literal(1),
+	facilityId: z.string().uuid(),
+	preparedAt: OfflineDateStringSchema.nullable(),
+	patientCount: z.number().int(),
+	summaries: z.array(OfflinePreparedPatientSummarySchema),
+})
+
+export type OfflineSummarySnapshot = z.infer<typeof OfflineSummarySnapshotSchema>
+
+export const OfflinePatientSummaryParamsSchema = z.object({
+	patientId: z.string().uuid(),
+})
+
+export type OfflinePatientSummaryParams = z.infer<typeof OfflinePatientSummaryParamsSchema>
+
+// ============================================================================
 // Offline cache job trigger result
 // ============================================================================
 

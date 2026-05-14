@@ -158,6 +158,7 @@ interface UnbilledEncounter {
 	patientName: string
 	mrn: string
 	encounterType: string
+	oecbEligible: boolean
 	admittedAt: string
 	totalCharges: number
 	chargeCount: number
@@ -455,6 +456,7 @@ export function useUnbilledEncountersQuery(params: {
 	facilityId: string
 	page?: number
 	limit?: number
+	oecbOnly?: boolean
 }) {
 	return useQuery({
 		queryKey: billingKeys.unbilled(params),
@@ -462,6 +464,7 @@ export function useUnbilledEncountersQuery(params: {
 			fetchJson<PaginatedResponse<UnbilledEncounter>>(
 				`${API_BASE}/unbilled${buildQueryString(params)}`
 			),
+		enabled: !!params.facilityId,
 	})
 }
 
