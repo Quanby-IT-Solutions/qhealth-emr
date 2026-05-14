@@ -80,7 +80,7 @@ export default function BillingPage() {
 			<Card className="overflow-hidden">
 				<TableToolbar
 					title="Unbilled Encounters"
-					description="Encounters with charges but no invoice. Generate invoices to begin billing."
+					description="Encounters ready for billing with no invoice, including OECB-routed ED discharges awaiting charge capture."
 					filters={
 						<div className="flex items-center gap-2">
 							<Switch
@@ -112,7 +112,7 @@ export default function BillingPage() {
 							description={
 								oecbOnly
 									? "No OECB-eligible emergency encounters awaiting billing."
-									: "All encounters with charges have been invoiced."
+									: "All encounters ready for billing have been invoiced."
 							}
 						/>
 					) : (

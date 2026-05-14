@@ -256,7 +256,7 @@ function mockUnbilledSelects(rows: unknown[], total: number) {
 		.mockReturnValueOnce({
 			from: jest.fn().mockReturnValue({
 				innerJoin: jest.fn().mockReturnValue({
-					innerJoin: jest.fn().mockReturnValue({
+					leftJoin: jest.fn().mockReturnValue({
 						leftJoin: jest.fn().mockReturnValue({
 							where: jest.fn().mockImplementation((cond: WhereArg) => {
 								captured.where = cond
@@ -277,7 +277,7 @@ function mockUnbilledSelects(rows: unknown[], total: number) {
 		})
 		.mockReturnValueOnce({
 			from: jest.fn().mockReturnValue({
-				innerJoin: jest.fn().mockReturnValue({
+				leftJoin: jest.fn().mockReturnValue({
 					leftJoin: jest.fn().mockReturnValue({
 						where: jest.fn().mockResolvedValue([{ total }]),
 					}),

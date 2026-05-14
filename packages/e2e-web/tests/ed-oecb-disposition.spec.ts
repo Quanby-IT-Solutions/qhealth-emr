@@ -4,6 +4,11 @@ const HAS_BACKEND = !!process.env.E2E_AUTH_API_URL
 const AUTH_API = process.env.E2E_AUTH_API_URL ?? "http://localhost:3000/api/v1/auth/"
 const WEB_ORIGIN = process.env.BASE_URL ?? "http://localhost:3001"
 const DEFAULT_PASSWORD = process.env.E2E_SEED_PASSWORD ?? "Password123"
+const OECB_CRITERIA = [
+	"Patient was not admitted as inpatient",
+	"Emergency care was rendered",
+	"Patient has active PhilHealth membership",
+] as const
 
 async function signInAs(page: Page, email: string) {
 	const api = await request.newContext({
@@ -60,15 +65,11 @@ test.describe("OECB ED disposition → billing queue visibility", () => {
 		// OECB eligibility checklist should appear
 		await expect(dialog.getByText(/OECB Eligibility Checklist/i)).toBeVisible()
 
-		// Check every checkbox in the dialog (OECB criteria + tag checkbox)
-		const checkboxes = dialog.getByRole("checkbox")
-		const count = await checkboxes.count()
-		for (let i = 0; i < count; i++) {
-			const cb = checkboxes.nth(i)
-			if (!(await cb.isChecked())) {
-				await cb.check()
-			}
+		// Check eligibility criteria first; the OECB tag checkbox is disabled until these are met.
+		for (const criterion of OECB_CRITERIA) {
+			await dialog.getByText(criterion, { exact: true }).click()
 		}
+		await dialog.getByText(/Tag as OECB/i).click()
 
 		// ── Step 5: Submit disposition ────────────────────────────────────────────
 		await dialog.getByRole("button", { name: "Confirm Disposition" }).click()

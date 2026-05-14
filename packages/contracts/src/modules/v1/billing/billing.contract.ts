@@ -565,7 +565,7 @@ export const billingContract = {
 		.route({
 			method: "GET",
 			path: "/unbilled",
-			summary: "List encounters with charges but no invoice",
+			summary: "List encounters ready for billing with no invoice",
 			tags: ["Billing"],
 		})
 		.input(UnbilledEncountersInputSchema)
