@@ -5,16 +5,18 @@ import {
 	Logger,
 	NotFoundException,
 } from "@nestjs/common"
-import { and, count, desc, eq, inArray } from "drizzle-orm"
+import { and, count, desc, eq, inArray, isNull } from "drizzle-orm"
 
 import {
 	allergies,
 	clinicalNotes,
 	consentRecords,
 	encounters,
+	konsultaActivities,
 	labOrders,
 	noteAddenda,
 	noteTemplates,
+	patients,
 	preEncounters,
 	staffProfiles,
 	users,
@@ -654,6 +656,10 @@ export class ClinicalDocsService {
 		if (!data || typeof data !== "object" || Array.isArray(data)) {
 			return { valid: false, missingFields: ["All required FPE fields"] }
 		}
+		const icd10Pattern = /^[A-Z][0-9][0-9A-Z](\.[0-9A-Z]{1,4})?$/
+		const bloodPressurePattern = /^\d{2,3}\/\d{2,3}$/
+		const wholeNumberPattern = /^\d{1,3}$/
+		const decimalPattern = /^\d{1,3}(\.\d{1,2})?$/
 		const d = data as Record<string, unknown>
 		const vs =
 			d.vitalSigns && typeof d.vitalSigns === "object" && !Array.isArray(d.vitalSigns)
@@ -665,16 +671,45 @@ export class ClinicalDocsService {
 			!Array.isArray(d.primaryDiagnosis)
 				? (d.primaryDiagnosis as Record<string, unknown>)
 				: {}
+		const hasText = (value: unknown) => typeof value === "string" && value.trim().length > 0
+		const textValue = (value: unknown) => (typeof value === "string" ? value.trim() : "")
 
 		const missing: string[] = []
-		if (!d.chiefComplaint) missing.push("Chief Complaint")
-		if (!vs.bloodPressure) missing.push("Blood Pressure")
-		if (!vs.weight) missing.push("Weight")
-		if (!vs.height) missing.push("Height")
-		if (!pd.code) missing.push("Primary Diagnosis Code")
-		if (!pd.description) missing.push("Primary Diagnosis Description")
-		if (!d.historyOfPresentIllness) missing.push("History of Present Illness")
-		if (!d.physicalExamGeneral) missing.push("Physical Exam (General)")
+		if (!hasText(d.chiefComplaint)) missing.push("Chief Complaint")
+		if (!hasText(vs.bloodPressure)) missing.push("Blood Pressure")
+		if (!hasText(vs.weight)) missing.push("Weight")
+		if (!hasText(vs.height)) missing.push("Height")
+		if (!hasText(pd.code)) missing.push("Primary Diagnosis Code")
+		if (!hasText(pd.description)) missing.push("Primary Diagnosis Description")
+		if (!hasText(d.socialHistory)) missing.push("Lifestyle / Social History")
+		if (!hasText(d.mentalHealthScreening)) missing.push("Mental Health Screening")
+		if (!hasText(d.historyOfPresentIllness)) missing.push("History of Present Illness")
+		if (!hasText(d.physicalExamGeneral)) missing.push("Physical Exam (General)")
+
+		if (hasText(pd.code) && !icd10Pattern.test(textValue(pd.code))) {
+			missing.push("Primary Diagnosis Code must use ICD-10 format")
+		}
+		if (hasText(vs.bloodPressure) && !bloodPressurePattern.test(textValue(vs.bloodPressure))) {
+			missing.push("Blood Pressure must use systolic/diastolic format")
+		}
+		for (const [field, label] of [
+			["heartRate", "Heart Rate"],
+			["respiratoryRate", "Respiratory Rate"],
+			["oxygenSaturation", "O2 Saturation"],
+		] as const) {
+			if (hasText(vs[field]) && !wholeNumberPattern.test(textValue(vs[field]))) {
+				missing.push(`${label} must be a whole number`)
+			}
+		}
+		for (const [field, label] of [
+			["temperature", "Temperature"],
+			["weight", "Weight"],
+			["height", "Height"],
+		] as const) {
+			if (hasText(vs[field]) && !decimalPattern.test(textValue(vs[field]))) {
+				missing.push(`${label} must be a number with up to 2 decimals`)
+			}
+		}
 
 		return { valid: missing.length === 0, missingFields: missing }
 	}
@@ -684,9 +719,11 @@ export class ClinicalDocsService {
 			.select({
 				id: clinicalNotes.id,
 				facilityId: clinicalNotes.facilityId,
+				encounterId: clinicalNotes.encounterId,
 				noteType: clinicalNotes.noteType,
 				status: clinicalNotes.status,
 				structuredData: clinicalNotes.structuredData,
+				authorStaffId: clinicalNotes.authorStaffId,
 			})
 			.from(clinicalNotes)
 			.where(eq(clinicalNotes.id, input.noteId))
@@ -701,10 +738,110 @@ export class ClinicalDocsService {
 
 		const { valid, missingFields } = this.validateKonsultaCompleteness(existing.structuredData)
 		if (!valid) {
-			throw new BadRequestException(`Missing required FPE fields: ${missingFields.join(", ")}`)
+			throw new BadRequestException(`FPE data is incomplete or invalid: ${missingFields.join(", ")}`)
 		}
 
-		return this.signNote({ id: input.noteId }, signedIp, userId)
+		if (!existing.encounterId) {
+			throw new BadRequestException("FPE notes must be attached to an encounter.")
+		}
+
+		const signerStaffId = await this.getStaffProfileId(userId, existing.facilityId)
+		if (signerStaffId !== existing.authorStaffId) {
+			throw new ForbiddenException("Only the original author can submit this FPE note.")
+		}
+
+		const [encounter] = await db
+			.select({
+				id: encounters.id,
+				patientId: encounters.patientId,
+				facilityId: encounters.facilityId,
+			})
+			.from(encounters)
+			.where(eq(encounters.id, existing.encounterId))
+			.limit(1)
+
+		if (!encounter) throw new NotFoundException(`Encounter ${existing.encounterId} not found`)
+		if (encounter.facilityId !== existing.facilityId || encounter.facilityId !== input.facilityId) {
+			throw new BadRequestException("FPE note does not belong to the selected facility.")
+		}
+
+		const [patient] = await db
+			.select({ philhealthMemberId: patients.philhealthMemberId })
+			.from(patients)
+			.where(eq(patients.id, encounter.patientId))
+			.limit(1)
+
+		if (!patient?.philhealthMemberId) {
+			throw new BadRequestException("Patient does not have an active PhilHealth PIN for Konsulta FPE.")
+		}
+
+		const [dpaConsent] = await db
+			.select({ id: consentRecords.id })
+			.from(consentRecords)
+			.where(
+				and(
+					eq(consentRecords.facilityId, existing.facilityId),
+					eq(consentRecords.patientId, encounter.patientId),
+					eq(consentRecords.consentType, "dpa"),
+					eq(consentRecords.isActive, true),
+					isNull(consentRecords.revokedAt)
+				)
+			)
+			.orderBy(desc(consentRecords.signedAt), desc(consentRecords.createdAt))
+			.limit(1)
+
+		if (!dpaConsent) {
+			throw new BadRequestException(
+				"Active Data Privacy Act consent is required before submitting an FPE for Konsulta capitation."
+			)
+		}
+
+		const signedAt = new Date()
+		const activityDate = signedAt.toISOString().slice(0, 10)
+
+		await db.transaction(async tx => {
+			await tx
+				.update(clinicalNotes)
+				.set({
+					status: "signed",
+					signedAt,
+					signedIp,
+					updatedAt: signedAt,
+				})
+				.where(eq(clinicalNotes.id, input.noteId))
+
+			await tx
+				.insert(konsultaActivities)
+				.values({
+					patientId: encounter.patientId,
+					facilityId: existing.facilityId,
+					activityType: "FPE",
+					activityDate,
+					sourceRef: input.noteId,
+				})
+				.onConflictDoNothing()
+		})
+
+		await this.auditService.log({
+			facilityId: existing.facilityId,
+			userId,
+			staffProfileId: signerStaffId,
+			action: "sign",
+			entityType: "clinical_note",
+			entityId: existing.id,
+			beforeState: { status: existing.status },
+			afterState: { status: "signed", signedAt: signedAt.toISOString(), signedIp },
+			ipAddress: signedIp,
+			userAgent: null,
+			metadata: {
+				operation: "submitFpe",
+				konsultaActivityType: "FPE",
+				konsultaActivityDate: activityDate,
+			},
+		})
+
+		this.logger.log(`Submitted FPE note ${input.noteId} and recorded Konsulta activity`)
+		return this.getNote(input.noteId)
 	}
 
 	async signNote(input: SignNoteInput, signedIp: string, userId: string) {
