@@ -52,6 +52,7 @@ import {
 	medicationOrders,
 	nbsLogEntries,
 	offlineCacheJobs,
+	offlinePatientSummaries,
 	operationRecords,
 	pidsrCases,
 	prescriptions,
@@ -876,7 +877,7 @@ export class AdminDashboardService {
 		const offlineMode = settingsRow?.policySections?.offlineMode
 		const maxOfflineDays = offlineMode?.maxOfflineDays ?? null
 
-		// Read from the offline_cache_jobs table for real runtime telemetry
+		// Read from prepared summary rows plus the offline_cache_jobs table for runtime telemetry
 		const [lastJob] = await db
 			.select()
 			.from(offlineCacheJobs)
@@ -889,10 +890,18 @@ export class AdminDashboardService {
 			.orderBy(desc(offlineCacheJobs.startedAt))
 			.limit(1)
 
+		const [preparedRow] = await db
+			.select({
+				preparedCount: count(),
+				lastPreparedAt: sql<Date | null>`max(${offlinePatientSummaries.preparedAt})`,
+			})
+			.from(offlinePatientSummaries)
+			.where(eq(offlinePatientSummaries.facilityId, facilityId))
+
 		const lastCachePreparedAt =
-			lastJob?.status === "completed" ? (lastJob.completedAt ?? lastJob.startedAt) : null
-		const activePatientsCount =
-			lastJob?.status === "completed" ? (lastJob.cachedPatientCount ?? 0) : 0
+			preparedRow?.lastPreparedAt ??
+			(lastJob?.status === "completed" ? (lastJob.completedAt ?? lastJob.startedAt) : null)
+		const activePatientsCount = preparedRow?.preparedCount ?? 0
 
 		let status: OfflineReadinessSection["status"]
 		if (!enabled) {
