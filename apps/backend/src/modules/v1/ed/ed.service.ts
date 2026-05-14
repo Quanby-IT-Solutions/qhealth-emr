@@ -781,6 +781,27 @@ export class EdService {
 			throw new BadRequestException("Can only set disposition on active encounters")
 		}
 
+		if (encounter.encounterType !== "emergency") {
+			throw new BadRequestException(
+				"Disposition is only allowed on emergency department encounters"
+			)
+		}
+
+		// Require at least one signed clinical note before allowing disposition
+		const [signedNote] = await db
+			.select({ id: clinicalNotes.id })
+			.from(clinicalNotes)
+			.where(
+				and(eq(clinicalNotes.encounterId, input.encounterId), eq(clinicalNotes.status, "signed"))
+			)
+			.limit(1)
+
+		if (!signedNote) {
+			throw new BadRequestException(
+				"At least one signed clinical note is required before disposition"
+			)
+		}
+
 		// SLA-004: Resolve step targets before the transaction (read-only operations)
 		const [dispositionSlaMins, admittedSlaMins] = await Promise.all([
 			resolveStepTarget(encounter.facilityId, "discharge", input.disposition),
@@ -902,6 +923,20 @@ export class EdService {
 				})
 			}
 
+			// Emit billing routing event for OECB-tagged ED discharges
+			if (input.disposition === "discharge" && (input.oecbEligible ?? false)) {
+				await tx.insert(encounterStatusEvents).values({
+					facilityId: encounter.facilityId,
+					encounterId: input.encounterId,
+					fromStatus: null,
+					toStatus: "ready_for_billing",
+					workflowType: "billing" as const,
+					staffId: null,
+					notes: "OECB-tagged ED discharge — routed to PhilHealth outpatient billing",
+					occurredAt: dispositionNow,
+				})
+			}
+
 			return {
 				encounterId: input.encounterId,
 				disposition: input.disposition,
@@ -911,7 +946,7 @@ export class EdService {
 		})
 
 		this.logger.log(
-			`ED Disposition: encounter ${input.encounterId} → ${input.disposition}${input.oecbEligible ? " (OECB tagged)" : ""}`
+			`ED Disposition: encounter ${input.encounterId} → ${input.disposition}${result.oecbEligible ? " (OECB → billing routed)" : ""}`
 		)
 		this.notificationService.broadcast(
 			"ed_queue",

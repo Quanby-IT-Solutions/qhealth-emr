@@ -151,6 +151,7 @@ interface UnbilledEncountersInput {
 	page: number
 	limit: number
 	facilityId: string
+	oecbOnly?: boolean
 }
 
 interface GetSoaInput {
@@ -1366,8 +1367,16 @@ export class BillingService {
 	// ========================================================================
 
 	async listUnbilledEncounters(input: UnbilledEncountersInput) {
-		const { page, limit, facilityId } = input
+		const { page, limit, facilityId, oecbOnly } = input
 		const offset = (page - 1) * limit
+
+		const baseWhere = and(
+			eq(encounters.facilityId, facilityId),
+			isNull(invoices.id),
+			...(oecbOnly
+				? [eq(encounters.oecbEligible, true), eq(encounters.encounterType, "emergency")]
+				: []),
+		)
 
 		// Encounters that have charges but no invoice
 		const result = await db
@@ -1377,6 +1386,7 @@ export class BillingService {
 				patientName: sql<string>`CONCAT(${patients.firstName}, ' ', ${patients.lastName})`,
 				mrn: patients.mrn,
 				encounterType: encounters.encounterType,
+				oecbEligible: encounters.oecbEligible,
 				admittedAt: encounters.admissionDatetime,
 				totalCharges: sql<number>`COALESCE(SUM(CAST(${charges.totalAmount} AS NUMERIC)), 0)`,
 				chargeCount: sql<number>`COUNT(${charges.id})::int`,
@@ -1385,7 +1395,7 @@ export class BillingService {
 			.innerJoin(patients, eq(patients.id, encounters.patientId))
 			.innerJoin(charges, eq(charges.encounterId, encounters.id))
 			.leftJoin(invoices, eq(invoices.encounterId, encounters.id))
-			.where(and(eq(encounters.facilityId, facilityId), isNull(invoices.id)))
+			.where(baseWhere)
 			.groupBy(encounters.id, patients.id)
 			.orderBy(desc(encounters.admissionDatetime))
 			.limit(limit)
@@ -1397,7 +1407,7 @@ export class BillingService {
 			.from(encounters)
 			.innerJoin(charges, eq(charges.encounterId, encounters.id))
 			.leftJoin(invoices, eq(invoices.encounterId, encounters.id))
-			.where(and(eq(encounters.facilityId, facilityId), isNull(invoices.id)))
+			.where(baseWhere)
 
 		const total = countResult[0]?.total ?? 0
 

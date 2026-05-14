@@ -185,7 +185,8 @@
       "Bash(npx pnpm *)",
       "Bash(pnpm -F web tsc --noEmit)",
       "Bash(pnpm -F @qhealth/web typecheck)",
-      "Read(//c/Users/thanbags/.traycer/yolo_artifacts/**)"
+      "Read(//c/Users/thanbags/.traycer/yolo_artifacts/**)",
+      "Bash(pnpm *)"
     ]
   }
 }
