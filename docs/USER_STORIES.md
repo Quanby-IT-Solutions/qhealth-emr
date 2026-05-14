@@ -34,6 +34,7 @@
   - **So that** electronic prescriptions and controlled drug orders remain legally compliant with FDA and PDEA mandates
   - **Pages**: Clinician License Management Page, License Verification Page
 
+DONE - RICARDO
 - **Story 1.5 – Break-Glass Emergency Access**
   - **As a** Physician
   - **I want to** request emergency override access to a patient chart with a justification

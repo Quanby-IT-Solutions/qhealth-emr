@@ -40,6 +40,9 @@ interface LogAuditEntry {
 	ipAddress: string | null
 	userAgent: string | null
 	metadata: Record<string, unknown> | null
+	severity?: "info" | "warning" | "critical"
+	sessionId?: string | null
+	outcome?: "success" | "failure"
 }
 
 @Injectable()
@@ -110,6 +113,9 @@ export class AuditService {
 					ipAddress: entry.ipAddress,
 					userAgent: entry.userAgent,
 					metadata: entry.metadata,
+					severity: entry.severity ?? "info",
+					sessionId: entry.sessionId ?? null,
+					outcome: entry.outcome ?? "success",
 				})
 				.returning()
 			return created
@@ -263,41 +269,49 @@ export class AuditService {
 			accessGrantedAt.getTime() + (input.durationHours ?? 4) * 60 * 60 * 1000
 		)
 
-		const [event] = await db
-			.insert(breakGlassEvents)
-			.values({
-				facilityId: input.facilityId,
-				clinicianStaffId: input.clinicianStaffId,
-				patientId: input.patientId,
-				reasonCategory: input.reasonCategory,
-				justification: input.justification,
-				accessGrantedAt,
-				accessExpiresAt,
-				reviewStatus: "pending",
-			})
-			.returning()
+		return db.transaction(async tx => {
+			const [event] = await tx
+				.insert(breakGlassEvents)
+				.values({
+					facilityId: input.facilityId,
+					clinicianStaffId: input.clinicianStaffId,
+					patientId: input.patientId,
+					reasonCategory: input.reasonCategory,
+					justification: input.justification,
+					accessGrantedAt,
+					accessExpiresAt,
+					reviewStatus: "pending",
+				})
+				.returning()
 
-		if (!event) throw new Error("Failed to create break-glass event")
+			if (!event) throw new Error("Failed to create break-glass event")
 
-		// Log the break-glass as an audit entry
-		await this.log({
-			facilityId: input.facilityId,
-			userId: input.userId,
-			staffProfileId: input.clinicianStaffId,
-			action: "override",
-			entityType: "break_glass_event",
-			entityId: event.id,
-			beforeState: null,
-			afterState: event as unknown as Record<string, unknown>,
-			ipAddress: null,
-			userAgent: null,
-			metadata: {
-				reasonCategory: input.reasonCategory,
-				patientId: input.patientId,
-			},
+			// Break-glass is a high-priority privacy event and must commit atomically
+			// with the override row.
+			await this.log(
+				{
+					facilityId: input.facilityId,
+					userId: input.userId,
+					staffProfileId: input.clinicianStaffId,
+					action: "override",
+					entityType: "break_glass_event",
+					entityId: event.id,
+					beforeState: null,
+					afterState: event as unknown as Record<string, unknown>,
+					ipAddress: null,
+					userAgent: null,
+					metadata: {
+						reasonCategory: input.reasonCategory,
+						patientId: input.patientId,
+					},
+					severity: "critical",
+					outcome: "success",
+				},
+				{ tx }
+			)
+
+			return event
 		})
-
-		return event
 	}
 
 	/**
