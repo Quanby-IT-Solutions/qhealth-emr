@@ -1373,12 +1373,17 @@ export class BillingService {
 		const baseWhere = and(
 			eq(encounters.facilityId, facilityId),
 			isNull(invoices.id),
+			or(
+				sql`${charges.id} IS NOT NULL`,
+				and(eq(encounters.oecbEligible, true), eq(encounters.encounterType, "emergency"))
+			),
 			...(oecbOnly
 				? [eq(encounters.oecbEligible, true), eq(encounters.encounterType, "emergency")]
 				: []),
 		)
 
-		// Encounters that have charges but no invoice
+		// Encounters that have charges but no invoice, plus OECB-routed ED discharges
+		// whose charges are still pending capture.
 		const result = await db
 			.select({
 				encounterId: encounters.id,
@@ -1393,7 +1398,7 @@ export class BillingService {
 			})
 			.from(encounters)
 			.innerJoin(patients, eq(patients.id, encounters.patientId))
-			.innerJoin(charges, eq(charges.encounterId, encounters.id))
+			.leftJoin(charges, eq(charges.encounterId, encounters.id))
 			.leftJoin(invoices, eq(invoices.encounterId, encounters.id))
 			.where(baseWhere)
 			.groupBy(encounters.id, patients.id)
@@ -1405,7 +1410,7 @@ export class BillingService {
 		const countResult = await db
 			.select({ total: sql<number>`COUNT(DISTINCT ${encounters.id})::int` })
 			.from(encounters)
-			.innerJoin(charges, eq(charges.encounterId, encounters.id))
+			.leftJoin(charges, eq(charges.encounterId, encounters.id))
 			.leftJoin(invoices, eq(invoices.encounterId, encounters.id))
 			.where(baseWhere)
 
