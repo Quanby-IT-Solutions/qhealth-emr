@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -92,7 +92,9 @@ describe("FpeEditorFlow", () => {
 		expect(screen.getByRole("button", { name: /save draft/i })).toBeDisabled()
 		expect(screen.getByRole("button", { name: /review & submit/i })).toBeDisabled()
 
-		await user.type(screen.getByPlaceholderText(/icd-10 code/i), "j18.9")
+		fireEvent.change(screen.getByPlaceholderText(/icd-10 code/i), {
+			target: { value: "j18.9" },
+		})
 		await user.click(screen.getByRole("button", { name: /save draft/i }))
 
 		await waitFor(() => {
@@ -106,13 +108,27 @@ describe("FpeEditorFlow", () => {
 			"Chief Complaint"
 		)
 
-		await user.type(screen.getByPlaceholderText(/patient's primary reason/i), "Cough")
-		await user.type(screen.getByPlaceholderText(/onset, duration/i), "Three days")
-		await user.type(screen.getByPlaceholderText("mmHg"), "120/80")
-		await user.type(screen.getByPlaceholderText("kg"), "65")
-		await user.type(screen.getByPlaceholderText("cm"), "170")
-		await user.type(screen.getByPlaceholderText(/diagnosis description/i), "Pneumonia")
-		await user.type(screen.getByPlaceholderText(/general findings/i), "Awake, not in distress")
+		fireEvent.change(screen.getByPlaceholderText(/patient's primary reason/i), {
+			target: { value: "Cough" },
+		})
+		fireEvent.change(screen.getByPlaceholderText(/onset, duration/i), {
+			target: { value: "Three days" },
+		})
+		fireEvent.change(screen.getByPlaceholderText("mmHg"), {
+			target: { value: "120/80" },
+		})
+		fireEvent.change(screen.getByPlaceholderText("kg"), {
+			target: { value: "65" },
+		})
+		fireEvent.change(screen.getByPlaceholderText("cm"), {
+			target: { value: "170" },
+		})
+		fireEvent.change(screen.getByPlaceholderText(/diagnosis description/i), {
+			target: { value: "Pneumonia" },
+		})
+		fireEvent.change(screen.getByPlaceholderText(/general findings/i), {
+			target: { value: "Awake, not in distress" },
+		})
 
 		expect(screen.getByText(/save draft changes before review & submit/i)).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: /review & submit/i })).toBeDisabled()
@@ -129,8 +145,6 @@ describe("FpeEditorFlow", () => {
 	})
 
 	it("sanitizes FPE numeric, ICD-10, and clinical text inputs while typing", async () => {
-		const user = userEvent.setup()
-
 		render(
 			<FpeEditorFlow
 				encounterId="enc-1"
@@ -141,19 +155,29 @@ describe("FpeEditorFlow", () => {
 			/>
 		)
 
-		await user.type(screen.getByPlaceholderText(/icd-10 code/i), "j18.$9")
+		fireEvent.change(screen.getByPlaceholderText(/icd-10 code/i), {
+			target: { value: "j18.$9" },
+		})
 		expect(screen.getByPlaceholderText(/icd-10 code/i)).toHaveValue("J18.9")
 
-		await user.type(screen.getByPlaceholderText("mmHg"), "120/80abc")
+		fireEvent.change(screen.getByPlaceholderText("mmHg"), {
+			target: { value: "120/80abc" },
+		})
 		expect(screen.getByPlaceholderText("mmHg")).toHaveValue("120/80")
 
-		await user.type(screen.getByPlaceholderText("bpm"), "7a2")
+		fireEvent.change(screen.getByPlaceholderText("bpm"), {
+			target: { value: "7a2" },
+		})
 		expect(screen.getByPlaceholderText("bpm")).toHaveValue("72")
 
-		await user.type(screen.getByPlaceholderText("kg"), "65.456")
+		fireEvent.change(screen.getByPlaceholderText("kg"), {
+			target: { value: "65.456" },
+		})
 		expect(screen.getByPlaceholderText("kg")).toHaveValue("65.45")
 
-		await user.type(screen.getByPlaceholderText(/patient's primary reason/i), "Cough <script>|")
+		fireEvent.change(screen.getByPlaceholderText(/patient's primary reason/i), {
+			target: { value: "Cough <script>|" },
+		})
 		expect(screen.getByPlaceholderText(/patient's primary reason/i)).toHaveValue("Cough script")
 	})
 
