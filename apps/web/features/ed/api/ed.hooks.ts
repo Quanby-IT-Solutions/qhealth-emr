@@ -128,4 +128,53 @@ export function useEdDispositionMutation() {
 	)
 }
 
+// ============================================================================
+// Tele-Triage — Inbound Patient Management
+// ============================================================================
+
+export function useInboundTriageListQuery(
+	facilityId: string,
+	status?: "queued" | "arrived" | "cancelled"
+) {
+	return useQuery(
+		orpc.ed.listInboundTriage.queryOptions({
+			input: { facilityId, status },
+			enabled: !!facilityId,
+			refetchInterval: 30_000,
+		})
+	)
+}
+
+export function useCreateInboundTriageMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.ed.createInboundTriage.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+		})
+	)
+}
+
+export function useMarkInboundArrivedMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.ed.markInboundArrived.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+		})
+	)
+}
+
+export function useCancelInboundTriageMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.ed.cancelInboundTriage.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+		})
+	)
+}
 

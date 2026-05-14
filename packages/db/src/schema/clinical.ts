@@ -5,6 +5,53 @@ import { encounters, patients, preEncounters } from "./core.js"
 import { facilities, staffProfiles } from "./rbac.js"
 
 // ============================================================================
+// TELE-TRIAGE — Inbound patient records from phone/video triage
+// ============================================================================
+
+export const inboundTriageRecords = createTable(
+	"inbound_triage_records",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		callerName: t.text("caller_name").notNull(),
+		patientLocation: t.text("patient_location").notNull(),
+		transportMode: t
+			.text("transport_mode")
+			.notNull()
+			.$type<"ambulance" | "private_vehicle" | "walk_in" | "motorcycle_ambulance">(),
+		channelType: t.text("channel_type").notNull().$type<"phone" | "video">(),
+		etaMinutes: t.integer("eta_minutes").notNull(),
+		etaAt: t.timestamp("eta_at", { withTimezone: true }).notNull(),
+		provisionalAcuityLevel: t.integer("provisional_acuity_level").notNull(),
+		acuityScale: t.text("acuity_scale").notNull().$type<"esi" | "ats" | "ctas">(),
+		assessmentNotes: t.text("assessment_notes").notNull().default(""),
+		resourceNeeds: t.jsonb("resource_needs").notNull().default({}),
+		status: t
+			.text("status")
+			.notNull()
+			.default("queued")
+			.$type<"queued" | "arrived" | "cancelled">(),
+		arrivedAt: t.timestamp("arrived_at", { withTimezone: true }),
+		preEncounterId: t
+			.uuid("pre_encounter_id")
+			.references(() => preEncounters.id, { onDelete: "set null" }),
+		triageStaffId: t
+			.uuid("triage_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("inbound_triage_records_facility_id_idx").on(t.facilityId),
+		index("inbound_triage_records_status_idx").on(t.status),
+		index("inbound_triage_records_eta_at_idx").on(t.etaAt),
+	]
+)
+
+// ============================================================================
 // CLINICAL — Notes, Templates, Consent, Problems, Allergies
 // ============================================================================
 

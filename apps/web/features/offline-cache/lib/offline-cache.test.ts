@@ -1,10 +1,22 @@
-import { beforeEach, describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import {
 	importOfflineSummarySnapshot,
 	loadPatientEncounterSummaries,
 	loadPatientSummaries,
 } from "./offline-cache"
+
+function makeLocalStorageMock() {
+	let store: Record<string, string> = {}
+	return {
+		getItem: (key: string) => store[key] ?? null,
+		setItem: (key: string, value: string) => { store[key] = value },
+		removeItem: (key: string) => { delete store[key] },
+		clear: () => { store = {} },
+		get length() { return Object.keys(store).length },
+		key: (i: number) => Object.keys(store)[i] ?? null,
+	}
+}
 
 const facilityId = "550e8400-e29b-41d4-a716-446655440000"
 const patientId = "770e8400-e29b-41d4-a716-446655440000"
@@ -13,7 +25,7 @@ const preparedAt = "2026-05-14T00:00:00.000Z"
 
 describe("offline cache snapshot import", () => {
 	beforeEach(() => {
-		localStorage.clear()
+		vi.stubGlobal("localStorage", makeLocalStorageMock())
 	})
 
 	it("imports a backend-prepared snapshot into patient and encounter caches", () => {

@@ -19,6 +19,7 @@ interface SendNotificationInput {
 		| "break_glass"
 		| "system"
 		| "ed_queue"
+		| "tele_triage"
 		| "sla_warning"
 		| "sla_exceeded"
 		| "surgical"
