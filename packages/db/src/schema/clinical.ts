@@ -151,6 +151,7 @@ export const noteAddenda = createTable(
 			.notNull()
 			.references(() => staffProfiles.id, { onDelete: "restrict" }),
 		signedAt: t.timestamp("signed_at"),
+		signedIp: t.text("signed_ip"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [index("note_addenda_note_id_idx").on(t.noteId)]

@@ -15,6 +15,7 @@ import {
 	labOrders,
 	noteAddenda,
 	noteTemplates,
+	preEncounters,
 	staffProfiles,
 	users,
 	vitalSigns,
@@ -281,6 +282,47 @@ export class ClinicalDocsService {
 		})
 	}
 
+	private async assertNoteTargetCanBeSaved(input: {
+		facilityId: string
+		encounterId?: string | null
+		preEncounterId?: string | null
+	}) {
+		if (!!input.encounterId === !!input.preEncounterId) {
+			throw new BadRequestException(
+				"Clinical note drafts must be attached to exactly one encounter or pre-encounter."
+			)
+		}
+
+		if (input.encounterId) {
+			const [encounter] = await db
+				.select({ id: encounters.id, facilityId: encounters.facilityId })
+				.from(encounters)
+				.where(eq(encounters.id, input.encounterId))
+				.limit(1)
+
+			if (!encounter) throw new NotFoundException(`Encounter ${input.encounterId} not found`)
+			if (encounter.facilityId !== input.facilityId) {
+				throw new BadRequestException("Encounter does not belong to the selected facility.")
+			}
+			return
+		}
+
+		if (input.preEncounterId) {
+			const [preEncounter] = await db
+				.select({ id: preEncounters.id, facilityId: preEncounters.facilityId })
+				.from(preEncounters)
+				.where(eq(preEncounters.id, input.preEncounterId))
+				.limit(1)
+
+			if (!preEncounter) {
+				throw new NotFoundException(`Pre-encounter ${input.preEncounterId} not found`)
+			}
+			if (preEncounter.facilityId !== input.facilityId) {
+				throw new BadRequestException("Pre-encounter does not belong to the selected facility.")
+			}
+		}
+	}
+
 	// ========================================================================
 	// Note Templates
 	// ========================================================================
@@ -515,6 +557,7 @@ export class ClinicalDocsService {
 				authorStaffId: noteAddenda.authorStaffId,
 				authorStaffName: users.name,
 				signedAt: noteAddenda.signedAt,
+				signedIp: noteAddenda.signedIp,
 				createdAt: noteAddenda.createdAt,
 			})
 			.from(noteAddenda)
@@ -527,6 +570,11 @@ export class ClinicalDocsService {
 	}
 
 	async createNote(input: CreateNoteInput, userId: string) {
+		await this.assertNoteTargetCanBeSaved({
+			facilityId: input.facilityId,
+			encounterId: input.encounterId,
+			preEncounterId: input.preEncounterId,
+		})
 		await this.assertNoteCanBeSaved({
 			facilityId: input.facilityId,
 			noteType: input.noteType,
@@ -536,25 +584,28 @@ export class ClinicalDocsService {
 		})
 
 		const resolvedAuthorStaffId = await this.getStaffProfileId(userId, input.facilityId)
-		const [row] = await db
-			.insert(clinicalNotes)
-			.values({
-				facilityId: input.facilityId,
-				encounterId: input.encounterId ?? null,
-				preEncounterId: input.preEncounterId ?? null,
-				templateId: input.templateId ?? null,
-				noteType: input.noteType,
-				content: input.content ?? "",
-				structuredData: input.structuredData ?? null,
-				authorStaffId: resolvedAuthorStaffId,
-			})
-			.returning()
+		const [row] = await db.transaction(async tx => {
+			return tx
+				.insert(clinicalNotes)
+				.values({
+					facilityId: input.facilityId,
+					encounterId: input.encounterId ?? null,
+					preEncounterId: input.preEncounterId ?? null,
+					templateId: input.templateId ?? null,
+					noteType: input.noteType,
+					content: input.content ?? "",
+					structuredData: input.structuredData ?? null,
+					status: "draft",
+					authorStaffId: resolvedAuthorStaffId,
+				})
+				.returning()
+		})
 
 		this.logger.log(`Created clinical note ${row!.id}`)
 		return this.getNote(row!.id)
 	}
 
-	async updateNote(input: UpdateNoteInput) {
+	async updateNote(input: UpdateNoteInput, userId: string) {
 		// Verify note is still draft
 		const [existing] = await db
 			.select({
@@ -565,6 +616,7 @@ export class ClinicalDocsService {
 				content: clinicalNotes.content,
 				structuredData: clinicalNotes.structuredData,
 				status: clinicalNotes.status,
+				authorStaffId: clinicalNotes.authorStaffId,
 			})
 			.from(clinicalNotes)
 			.where(eq(clinicalNotes.id, input.id))
@@ -572,6 +624,11 @@ export class ClinicalDocsService {
 		if (!existing) throw new NotFoundException(`Clinical note ${input.id} not found`)
 		if (existing.status === "signed") {
 			throw new BadRequestException("Cannot edit a signed note. Add an addendum instead.")
+		}
+
+		const editorStaffId = await this.getStaffProfileId(userId, existing.facilityId)
+		if (editorStaffId !== existing.authorStaffId) {
+			throw new ForbiddenException("Only the original author can edit this note.")
 		}
 
 		await this.assertNoteCanBeSaved({
@@ -829,7 +886,7 @@ export class ClinicalDocsService {
 		return this.getAddendum(row!.id)
 	}
 
-	async signAddendum(input: SignAddendumInput, userId: string) {
+	async signAddendum(input: SignAddendumInput, userId: string, signedIp: string) {
 		const [existing] = await db
 			.select({
 				id: noteAddenda.id,
@@ -860,7 +917,7 @@ export class ClinicalDocsService {
 		const signedAt = new Date()
 		await db
 			.update(noteAddenda)
-			.set({ status: "signed", signedAt })
+			.set({ status: "signed", signedAt, signedIp })
 			.where(eq(noteAddenda.id, input.id))
 
 		await this.auditService.log({
@@ -871,8 +928,8 @@ export class ClinicalDocsService {
 			entityType: "note_addendum",
 			entityId: existing.id,
 			beforeState: { status: existing.status },
-			afterState: { status: "signed", signedAt: signedAt.toISOString() },
-			ipAddress: null,
+			afterState: { status: "signed", signedAt: signedAt.toISOString(), signedIp },
+			ipAddress: signedIp,
 			userAgent: null,
 			metadata: { noteId: existing.noteId },
 		})
@@ -892,6 +949,7 @@ export class ClinicalDocsService {
 				authorStaffId: noteAddenda.authorStaffId,
 				authorStaffName: users.name,
 				signedAt: noteAddenda.signedAt,
+				signedIp: noteAddenda.signedIp,
 				createdAt: noteAddenda.createdAt,
 			})
 			.from(noteAddenda)
@@ -954,6 +1012,7 @@ export class ClinicalDocsService {
 				witnessStaffId: consentRecords.witnessStaffId,
 				witnessStaffName: users.name,
 				revokedAt: consentRecords.revokedAt,
+				revocationReason: consentRecords.revocationReason,
 				createdAt: consentRecords.createdAt,
 				updatedAt: consentRecords.updatedAt,
 			})
@@ -992,6 +1051,7 @@ export class ClinicalDocsService {
 				witnessStaffId: consentRecords.witnessStaffId,
 				witnessStaffName: users.name,
 				revokedAt: consentRecords.revokedAt,
+				revocationReason: consentRecords.revocationReason,
 				createdAt: consentRecords.createdAt,
 				updatedAt: consentRecords.updatedAt,
 			})
@@ -1050,7 +1110,11 @@ export class ClinicalDocsService {
 
 		await db
 			.update(consentRecords)
-			.set({ revokedAt: new Date(), updatedAt: new Date() })
+			.set({
+				revokedAt: new Date(),
+				revocationReason: input.reason ?? null,
+				updatedAt: new Date(),
+			})
 			.where(eq(consentRecords.id, input.id))
 
 		this.logger.log(`Revoked consent record ${input.id}`)
