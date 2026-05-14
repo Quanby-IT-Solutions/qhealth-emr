@@ -63,16 +63,6 @@ interface Icd10Diagnosis {
 type StructuredDataValue = string | Icd10Diagnosis | undefined
 type StructuredData = Record<string, StructuredDataValue>
 
-function sectionKeyFromLabel(label: string) {
-	return (
-		label
-			.trim()
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, "_")
-			.replace(/^_+|_+$/g, "") || "section"
-	)
-}
-
 function hasSection(sections: TemplateSection[], target: "assessment" | "plan") {
 	return sections.some(section => {
 		const key = section.key.toLowerCase()
@@ -228,10 +218,6 @@ function Icd10DiagnosisField({
 	const query = useIcd10ProblemSearchQuery({ search: searchTerm, limit: 10 })
 	const results = query.data?.data ?? []
 
-	useEffect(() => {
-		setInputValue(value ? `${value.icd10Code} - ${value.icd10Display}` : "")
-	}, [value])
-
 	function selectResult(result: Icd10SearchResult) {
 		onChange({ icd10Code: result.code, icd10Display: result.description })
 		setInputValue(`${result.code} - ${result.description}`)
@@ -302,7 +288,10 @@ function Icd10DiagnosisField({
 						<button
 							type="button"
 							aria-label="Clear ICD-10 diagnosis"
-							onClick={() => onChange(null)}
+							onClick={() => {
+								onChange(null)
+								setInputValue("")
+							}}
 							className="text-muted-foreground hover:text-foreground"
 						>
 							<X className="size-3" />
@@ -367,11 +356,17 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 
 	const assessmentText = assessmentKey ? sectionText(structuredData, assessmentKey).trim() : ""
 	const planText = planKey ? sectionText(structuredData, planKey).trim() : ""
+	const missingRequiredSections = [
+		!assessmentText ? "Assessment" : null,
+		!planText ? "Plan" : null,
+	].filter(Boolean)
 	const selectedIcd10 = isIcd10Diagnosis(structuredData.icd10_diagnosis)
 		? structuredData.icd10_diagnosis
 		: null
 	const showIcd10Field = shouldRenderIcd10Field(template, sections)
-	const canSave = !!assessmentText && !!planText && !createNote.isPending && !updateNote.isPending
+	const isSaving = createNote.isPending || updateNote.isPending
+	const hasRequiredSections = missingRequiredSections.length === 0
+	const canSave = hasRequiredSections && !isSaving && (!noteId || hasLocalChanges)
 
 	function updateSection(key: string, value: string) {
 		setStructuredData(prev => ({ ...prev, [key]: value }))
@@ -431,17 +426,37 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 	}
 
 	useEffect(() => {
-		if (!noteId || !hasLocalChanges || !canSave) return
+		if (!noteId || !hasLocalChanges || !hasRequiredSections || isSaving) return
 		const timeout = window.setTimeout(() => {
 			updateNote.mutate({ id: noteId, content, structuredData }, { onSuccess: markSaved })
 		}, 1200)
 
 		return () => window.clearTimeout(timeout)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [canSave, content, hasLocalChanges, noteId, structuredData])
+	}, [content, hasLocalChanges, hasRequiredSections, isSaving, noteId, structuredData])
 
 	const saveError = createNote.error?.message ?? updateNote.error?.message
 	const context = noteContext.data
+	const saveButtonLabel = isSaving
+		? "Saving..."
+		: noteId
+			? hasLocalChanges
+				? "Save Changes"
+				: "Saved"
+			: "Save Draft"
+	const saveStatus = saveError
+		? saveError
+		: isSaving
+			? "Saving..."
+			: hasLocalChanges
+				? hasRequiredSections
+					? noteId
+						? "Unsaved changes - autosave pending"
+						: "Unsaved draft"
+					: "Unsaved changes - complete required fields to save"
+				: lastSavedAt
+					? `Saved ${formatDateTime(lastSavedAt)}`
+					: "Not saved"
 
 	return (
 		<div className="space-y-4">
@@ -457,18 +472,27 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 							<Badge variant="secondary">Draft</Badge>
 						</div>
 						<div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
-							{lastSavedAt ? (
+							{saveError ? (
+								<>
+									<AlertCircle className="text-destructive size-3.5" />
+									<span>{saveStatus}</span>
+								</>
+							) : isSaving ? (
+								<>
+									<Clock3 className="size-3.5" />
+									<span>{saveStatus}</span>
+								</>
+							) : lastSavedAt && !hasLocalChanges ? (
 								<>
 									<CheckCircle2 className="size-3.5 text-green-600" />
-									<span>Saved {formatDateTime(lastSavedAt)}</span>
+									<span>{saveStatus}</span>
 								</>
 							) : (
 								<>
 									<Clock3 className="size-3.5" />
-									<span>Not saved</span>
+									<span>{saveStatus}</span>
 								</>
 							)}
-							{noteId && hasLocalChanges && <span>Autosave pending</span>}
 						</div>
 					</div>
 				</div>
@@ -478,18 +502,28 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 							Done
 						</Button>
 					)}
-					<Button type="button" onClick={handleSave} disabled={!canSave} className="gap-2">
-						<Save className="size-4" />
-						{noteId ? "Save" : "Save Draft"}
+					<Button
+						type="button"
+						onClick={handleSave}
+						disabled={!canSave}
+						variant={noteId && !hasLocalChanges && !isSaving ? "outline" : "default"}
+						className="gap-2"
+					>
+						{noteId && !hasLocalChanges && !isSaving ? (
+							<CheckCircle2 className="size-4" />
+						) : (
+							<Save className="size-4" />
+						)}
+						{saveButtonLabel}
 					</Button>
 				</div>
 			</div>
 
-			{(!assessmentText || !planText) && (
+			{missingRequiredSections.length > 0 && (
 				<Alert variant="destructive">
 					<AlertCircle className="size-4" />
 					<AlertDescription>
-						Assessment and Plan are required before the draft can be saved.
+						Complete {missingRequiredSections.join(" and ")} before saving this draft.
 					</AlertDescription>
 				</Alert>
 			)}
@@ -510,7 +544,12 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 							)}
 							<Card className="rounded-lg">
 								<CardHeader className="pb-2">
-									<CardTitle className="text-sm">{section.label}</CardTitle>
+									<CardTitle className="text-sm">
+										{section.label}
+										{(section.key === assessmentKey || section.key === planKey) && (
+											<span className="text-destructive"> *</span>
+										)}
+									</CardTitle>
 								</CardHeader>
 								<CardContent>
 									<Label className="sr-only" htmlFor={`note-section-${section.key}`}>
@@ -523,6 +562,16 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 										rows={section.key === "assessment" || section.key === "plan" ? 5 : 4}
 										className="min-h-28 resize-y"
 									/>
+									{section.key === assessmentKey && !assessmentText && (
+										<p className="text-destructive mt-2 text-xs">
+											Assessment is required before this draft can be saved.
+										</p>
+									)}
+									{section.key === planKey && !planText && (
+										<p className="text-destructive mt-2 text-xs">
+											Plan is required before this draft can be saved.
+										</p>
+									)}
 								</CardContent>
 							</Card>
 						</div>
