@@ -71,7 +71,7 @@ export class ClinicalDocsController {
 		})
 	}
 
-	@RequirePermission("clinical_docs", "sign")
+	@RequirePermission("clinical_docs", "create")
 	@Implement(v1.clinicalDocs.createNote)
 	async createNote(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.createNote).handler(async ({ input }) => {
@@ -80,7 +80,7 @@ export class ClinicalDocsController {
 		})
 	}
 
-	@RequirePermission("clinical_docs", "sign")
+	@RequirePermission("clinical_docs", "edit")
 	@Implement(v1.clinicalDocs.updateNote)
 	async updateNote(@Session() session: UserSession) {
 		return implement(v1.clinicalDocs.updateNote).handler(async ({ input }) => {

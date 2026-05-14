@@ -6,28 +6,10 @@ import { AlertTriangle, ArrowLeft, CheckCircle2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Button } from "@/core/components/ui/button"
 import { useRecordKonsultaVisitMutation } from "@/features/billing/api/billing.hooks"
-import {
-	useSubmitFpeMutation,
-} from "@/features/clinical-docs/api/clinical-docs.hooks"
+import { useSubmitFpeMutation } from "@/features/clinical-docs/api/clinical-docs.hooks"
 
 import { FpeTemplate, type FpeData } from "./fpe-template"
-
-// ─── Validation ──────────────────────────────────────────────────────────────
-
-function getMissingFields(data: FpeData): string[] {
-	const missing: string[] = []
-	if (!data.chiefComplaint.trim()) missing.push("Chief Complaint")
-	if (!data.vitalSigns.bloodPressure.trim()) missing.push("Blood Pressure")
-	if (!data.vitalSigns.weight.trim()) missing.push("Weight")
-	if (!data.vitalSigns.height.trim()) missing.push("Height")
-	if (!data.primaryDiagnosis.code.trim()) missing.push("Primary Diagnosis Code")
-	if (!data.primaryDiagnosis.description.trim()) missing.push("Primary Diagnosis Description")
-	if (!data.historyOfPresentIllness.trim()) missing.push("History of Present Illness")
-	if (!data.physicalExamGeneral.trim()) missing.push("Physical Exam (General)")
-	return missing
-}
-
-// ─── Props ───────────────────────────────────────────────────────────────────
+import { getFpeValidation } from "./fpe-validation"
 
 interface FpeReviewStepProps {
 	fpeData: FpeData
@@ -38,8 +20,6 @@ interface FpeReviewStepProps {
 	onBack: () => void
 	onSuccess: () => void
 }
-
-// ─── Component ───────────────────────────────────────────────────────────────
 
 export function FpeReviewStep({
 	fpeData,
@@ -56,8 +36,9 @@ export function FpeReviewStep({
 	const submitFpe = useSubmitFpeMutation()
 	const recordKonsulta = useRecordKonsultaVisitMutation()
 
-	const missingFields = getMissingFields(fpeData)
-	const isComplete = missingFields.length === 0
+	const validation = getFpeValidation(fpeData)
+	const blockingMessages = validation.allBlockingMessages
+	const isComplete = validation.canReview
 	const isSubmitting = submitFpe.isPending || recordKonsulta.isPending
 
 	function handleSubmit() {
@@ -105,20 +86,16 @@ export function FpeReviewStep({
 
 	return (
 		<div className="space-y-6">
-			{/* Header */}
 			<div className="flex items-center gap-3">
 				<Button variant="ghost" size="icon" onClick={onBack} disabled={isSubmitting}>
 					<ArrowLeft className="size-4" />
 				</Button>
 				<div>
-					<h2 className="text-base font-semibold">PhilHealth FPE — Review &amp; Submit</h2>
-					<p className="text-xs text-muted-foreground">
-						Verify all fields before archiving
-					</p>
+					<h2 className="text-base font-semibold">PhilHealth FPE - Review &amp; Submit</h2>
+					<p className="text-xs text-muted-foreground">Verify all fields before archiving</p>
 				</div>
 			</div>
 
-			{/* Validation panel */}
 			{isComplete ? (
 				<Alert className="border-green-200 bg-green-50 text-green-800">
 					<CheckCircle2 className="size-4 text-green-600" />
@@ -128,13 +105,11 @@ export function FpeReviewStep({
 				<Alert variant="destructive">
 					<AlertTriangle className="size-4" />
 					<AlertDescription>
-						<strong>Missing required fields:</strong>{" "}
-						{missingFields.join(", ")}
+						<strong>Fix required fields:</strong> {blockingMessages.join(", ")}
 					</AlertDescription>
 				</Alert>
 			)}
 
-			{/* Server-side error */}
 			{submitFpe.isError && (
 				<Alert variant="destructive">
 					<AlertTriangle className="size-4" />
@@ -146,16 +121,14 @@ export function FpeReviewStep({
 				</Alert>
 			)}
 
-			{/* Read-only preview */}
-			<FpeTemplate value={fpeData} readOnly />
+			<FpeTemplate value={fpeData} readOnly validation={validation} />
 
-			{/* Footer actions */}
 			<div className="flex justify-between pt-2 pb-6">
 				<Button variant="outline" onClick={onBack} disabled={isSubmitting}>
 					Cancel
 				</Button>
 				<Button onClick={handleSubmit} disabled={!isComplete || isSubmitting}>
-					{isSubmitting ? "Submitting…" : "Submit & Archive FPE →"}
+					{isSubmitting ? "Submitting..." : "Submit & Archive FPE ->"}
 				</Button>
 			</div>
 		</div>

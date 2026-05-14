@@ -12,8 +12,7 @@ import {
 
 import { FpeTemplate, EMPTY_FPE_DATA, type FpeData } from "./fpe-template"
 import { FpeReviewStep } from "./fpe-review-step"
-
-// ─── Props ───────────────────────────────────────────────────────────────────
+import { getFpeValidation } from "./fpe-validation"
 
 interface FpeEditorFlowProps {
 	encounterId: string
@@ -22,8 +21,6 @@ interface FpeEditorFlowProps {
 	onBack: () => void
 	onDone: () => void
 }
-
-// ─── Component ───────────────────────────────────────────────────────────────
 
 export function FpeEditorFlow({
 	encounterId,
@@ -36,16 +33,21 @@ export function FpeEditorFlow({
 	const [fpeData, setFpeData] = useState<FpeData>({ ...EMPTY_FPE_DATA })
 	const [noteId, setNoteId] = useState<string | null>(null)
 	const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
+	const [hasLocalChanges, setHasLocalChanges] = useState(false)
 
 	const createNote = useCreateNoteMutation()
 	const updateNote = useUpdateNoteMutation()
+	const validation = getFpeValidation(fpeData)
+	const isSaving = createNote.isPending || updateNote.isPending
+	const hasSavedDraft = !!noteId
 
-	const canSave =
-		!!fpeData.primaryDiagnosis.code.trim() &&
-		!createNote.isPending &&
-		!updateNote.isPending
+	const canSave = validation.canSaveDraft && !isSaving && (!hasSavedDraft || hasLocalChanges)
+	const canReview = hasSavedDraft && validation.canReview && !hasLocalChanges && !isSaving
 
-	const canReview = !!noteId && !!fpeData.primaryDiagnosis.code.trim()
+	function handleChange(nextData: FpeData) {
+		setFpeData(nextData)
+		setHasLocalChanges(true)
+	}
 
 	function handleSave() {
 		if (!canSave) return
@@ -63,6 +65,7 @@ export function FpeEditorFlow({
 					onSuccess: note => {
 						setNoteId(note.id)
 						setLastSavedAt(new Date().toISOString())
+						setHasLocalChanges(false)
 					},
 				}
 			)
@@ -70,7 +73,10 @@ export function FpeEditorFlow({
 			updateNote.mutate(
 				{ id: noteId, structuredData: fpeData },
 				{
-					onSuccess: () => setLastSavedAt(new Date().toISOString()),
+					onSuccess: () => {
+						setLastSavedAt(new Date().toISOString())
+						setHasLocalChanges(false)
+					},
 				}
 			)
 		}
@@ -92,7 +98,6 @@ export function FpeEditorFlow({
 
 	return (
 		<div className="space-y-4">
-			{/* Header */}
 			<div className="flex items-center justify-between gap-3">
 				<div className="flex items-center gap-3">
 					<Button variant="ghost" size="icon" onClick={onBack}>
@@ -105,7 +110,8 @@ export function FpeEditorFlow({
 						</div>
 						{lastSavedAt && (
 							<p className="text-xs text-muted-foreground">
-								Saved {new Date(lastSavedAt).toLocaleTimeString("en-PH", {
+								{hasLocalChanges ? "Unsaved changes" : "Saved"}{" "}
+								{new Date(lastSavedAt).toLocaleTimeString("en-PH", {
 									hour: "2-digit",
 									minute: "2-digit",
 								})}
@@ -122,22 +128,33 @@ export function FpeEditorFlow({
 						onClick={handleSave}
 					>
 						<Save className="size-3.5 mr-1.5" />
-						Save Draft
+						{isSaving ? "Saving..." : hasSavedDraft ? "Save Draft Changes" : "Save Draft"}
 					</Button>
 					<Button
 						size="sm"
 						disabled={!canReview}
 						onClick={() => setStep("review")}
 					>
-						Review &amp; Submit →
+						Review &amp; Submit -&gt;
 					</Button>
 				</div>
 			</div>
 
-			{/* Editor */}
-			<FpeTemplate value={fpeData} onChange={setFpeData} />
+			<FpeTemplate value={fpeData} onChange={handleChange} validation={validation} />
 
-			{/* Sticky footer hint */}
+			{!validation.canReview && (
+				<div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+					Fix these fields before Review &amp; Submit:{" "}
+					{validation.allBlockingMessages.join(", ")}
+				</div>
+			)}
+
+			{validation.canReview && hasLocalChanges && (
+				<div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+					Save draft changes before Review &amp; Submit.
+				</div>
+			)}
+
 			{!noteId && (
 				<p className="text-xs text-muted-foreground text-center pb-4">
 					Save a draft first to enable Review &amp; Submit
