@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 
-import { ChevronLeft, ChevronRight, PhoneForwarded } from "lucide-react"
+import { ArrowRight, FlaskConical, PhoneForwarded } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -13,14 +13,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/core/components/ui/dialog"
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/core/components/ui/table"
 
 import type { NbsLogbookEntry, NbsStatus } from "@/features/nbs/api/nbs.hooks"
 import { useNbsLogbookQuery } from "@/features/nbs/api/nbs.hooks"
@@ -65,13 +57,18 @@ interface NbsLogbookProps {
 	facilityId: string
 }
 
+const NBS_PAGE_SIZE = 8
+
 export function NbsLogbook({ facilityId }: NbsLogbookProps) {
 	const [page, setPage] = useState(1)
-	const { data, isLoading } = useNbsLogbookQuery(facilityId, page)
+	const { data, isLoading, isFetching } = useNbsLogbookQuery(facilityId, page, NBS_PAGE_SIZE)
 	const [referralEntry, setReferralEntry] = useState<NbsLogbookEntry | null>(null)
 
 	const entries = data?.data ?? []
 	const totalPages = data?.totalPages ?? 1
+	const totalEntries = data?.total ?? 0
+	const pageStart = totalEntries === 0 ? 0 : (page - 1) * NBS_PAGE_SIZE + 1
+	const pageEnd = Math.min(page * NBS_PAGE_SIZE, totalEntries)
 
 	const needsReferral = (entry: NbsLogbookEntry) =>
 		entry.result_overall === "abnormal" || entry.result_overall === "borderline"
@@ -79,144 +76,138 @@ export function NbsLogbook({ facilityId }: NbsLogbookProps) {
 	return (
 		<>
 			<Card>
-				<CardHeader>
-					<CardTitle className="text-base">NBS Logbook</CardTitle>
+				<CardHeader className="border-border/60 border-b pb-3">
+					<div className="flex items-start gap-3">
+						<div className="bg-secondary/60 text-muted-foreground flex size-10 items-center justify-center rounded-xl">
+							<FlaskConical className="size-4" />
+						</div>
+						<div className="space-y-1">
+							<CardTitle className="tracking-tight">NBS Logbook</CardTitle>
+							<p className="text-sm text-muted-foreground">
+								Track screening records, panel status, and referrals.
+							</p>
+						</div>
+					</div>
 				</CardHeader>
 				<CardContent className="space-y-3">
-					<div className="rounded-md border overflow-auto">
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>Patient</TableHead>
-									<TableHead>MRN</TableHead>
-									<TableHead>Birth Date</TableHead>
-									<TableHead>Collected At</TableHead>
-									<TableHead>Status</TableHead>
-									<TableHead>Overall Result</TableHead>
-									<TableHead className="w-30">Actions</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{isLoading ? (
-									<TableRow>
-										<TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-											Loading logbook…
-										</TableCell>
-									</TableRow>
-								) : entries.length === 0 ? (
-									<TableRow>
-										<TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-											No NBS entries recorded yet.
-										</TableCell>
-									</TableRow>
-								) : (
-									entries.map((entry) => {
-										const statusCfg = STATUS_CONFIG[entry.status]
-										return (
-											<TableRow key={entry.id}>
-												<TableCell className="font-medium">
-													{entry.patientName}
-												</TableCell>
-												<TableCell className="font-mono text-xs">
-													{entry.patientMrn}
-												</TableCell>
-												<TableCell className="text-sm">
-													{new Date(entry.birthDatetime).toLocaleDateString(
-														undefined,
-														{
-															month: "short",
-															day: "numeric",
-															year: "numeric",
-														}
-													)}
-												</TableCell>
-												<TableCell className="text-sm">
-													{entry.specimenCollectedAt
-														? new Date(
-																entry.specimenCollectedAt
-															).toLocaleString(undefined, {
-																month: "short",
-																day: "numeric",
-																hour: "2-digit",
-																minute: "2-digit",
-															})
-														: "—"}
-												</TableCell>
-												<TableCell>
-													<Badge className={statusCfg.className}>
+					{isLoading ? (
+						<div className="border-border/60 bg-secondary/40 text-muted-foreground rounded-2xl border border-dashed px-6 py-10 text-center text-sm">
+							Loading logbook...
+						</div>
+					) : entries.length === 0 ? (
+						<div className="border-border/60 bg-secondary/40 text-muted-foreground rounded-2xl border border-dashed px-6 py-10 text-center text-sm">
+							No NBS entries recorded yet.
+						</div>
+					) : (
+						<>
+							<p className="text-xs text-muted-foreground px-0.5">
+								Showing {pageStart}-{pageEnd} of {totalEntries} entries
+								{isFetching && " · Updating..."}
+							</p>
+
+							<div className="border-border/60 bg-background overflow-hidden rounded-2xl border divide-y divide-border/60">
+								{entries.map((entry) => {
+									const statusCfg = STATUS_CONFIG[entry.status]
+									const birthDate = new Date(entry.birthDatetime).toLocaleDateString(undefined, {
+										month: "short",
+										day: "numeric",
+										year: "numeric",
+									})
+									const collectedAt = entry.specimenCollectedAt
+										? new Date(entry.specimenCollectedAt).toLocaleString(undefined, {
+											month: "short",
+											day: "numeric",
+											hour: "2-digit",
+											minute: "2-digit",
+										})
+										: "—"
+
+									return (
+										<div
+											key={entry.id}
+											className="hover:bg-secondary/30 flex flex-col gap-2 px-4 py-2.5 transition-colors md:flex-row md:items-center md:justify-between"
+										>
+											<div className="min-w-0 space-y-1.5">
+												<div className="flex flex-wrap items-center gap-2">
+													<span className="text-foreground text-sm font-semibold tracking-tight">
+														{entry.patientName}
+													</span>
+													<Badge
+														variant="secondary"
+														className="border-border/60 bg-secondary/60 text-foreground rounded-full border px-2 py-0.5 font-mono text-[0.68rem] tracking-[0.14em]"
+													>
+														{entry.patientMrn}
+													</Badge>
+													<Badge className={`${statusCfg.className} rounded-full px-2 py-0.5 text-[0.68rem]`}>
 														{statusCfg.label}
 													</Badge>
-												</TableCell>
-												<TableCell>
-													{entry.result_overall ? (
+													{entry.result_overall && (
 														<Badge
 															className={
 																entry.result_overall === "normal"
-																	? "bg-green-100 text-green-800"
+																	? "rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-[0.68rem]"
 																	: entry.result_overall === "borderline"
-																		? "bg-amber-100 text-amber-800"
-																		: "bg-red-100 text-red-800"
+																		? "rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[0.68rem]"
+																		: "rounded-full bg-red-100 text-red-800 px-2 py-0.5 text-[0.68rem]"
 															}
 														>
-															{entry.result_overall.charAt(0).toUpperCase() +
-																entry.result_overall.slice(1)}
+															{entry.result_overall.charAt(0).toUpperCase() + entry.result_overall.slice(1)}
 														</Badge>
-													) : (
-														<span className="text-muted-foreground text-sm">—</span>
 													)}
-												</TableCell>
-												<TableCell>
-													{needsReferral(entry) && (
-														<Button
-															type="button"
-															size="sm"
-															variant="outline"
-															className="h-7 text-xs gap-1.5"
-															onClick={() => setReferralEntry(entry)}
-														>
-															<PhoneForwarded className="size-3.5" />
-															Refer
-														</Button>
-													)}
-												</TableCell>
-											</TableRow>
-										)
-									})
-								)}
-							</TableBody>
-						</Table>
-					</div>
+												</div>
+												<p className="text-muted-foreground text-xs">
+													Birth date {birthDate} · Collected {collectedAt}
+												</p>
+											</div>
 
-				{/* Pagination */}
-				{totalPages > 1 && (
-					<div className="flex items-center justify-between text-sm text-muted-foreground">
-						<span>
-							Page {page} of {totalPages} · {data?.total ?? 0} entries
-						</span>
-						<div className="flex gap-1">
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								className="size-8 p-0"
-								disabled={page <= 1}
-								onClick={() => setPage((p) => p - 1)}
-							>
-								<ChevronLeft className="size-4" />
-							</Button>
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								className="size-8 p-0"
-								disabled={page >= totalPages}
-								onClick={() => setPage((p) => p + 1)}
-							>
-								<ChevronRight className="size-4" />
-							</Button>
-						</div>
-					</div>
-				)}
+											{needsReferral(entry) ? (
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													className="shrink-0 justify-between gap-2"
+													onClick={() => setReferralEntry(entry)}
+												>
+													Refer patient
+													<ArrowRight className="size-4" />
+												</Button>
+											) : (
+												<span className="text-xs text-muted-foreground">No referral needed</span>
+											)}
+										</div>
+									)
+								})}
+							</div>
+
+							{totalPages > 1 && (
+								<div className="flex items-center justify-between gap-3 px-0.5">
+									<p className="text-xs text-muted-foreground">
+										Page {page} of {totalPages}
+									</p>
+									<div className="flex items-center gap-2">
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											disabled={page <= 1}
+											onClick={() => setPage((p) => p - 1)}
+										>
+											Previous
+										</Button>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											disabled={page >= totalPages}
+											onClick={() => setPage((p) => p + 1)}
+										>
+											Next
+										</Button>
+									</div>
+								</div>
+							)}
+						</>
+					)}
 			</CardContent>
 		</Card>
 
