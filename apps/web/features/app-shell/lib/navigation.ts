@@ -151,9 +151,29 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		excludeAllPermissions: TRIAGE_ROLE_BUNDLE,
 	},
 	{
-		title: "Triage",
+		title: "Triage Queue",
 		href: "/triage",
 		iconName: "emergency",
+		requiredPermissions: [{ module: "adt", action: "create" }],
+		requireAllPermissions: [
+			{ module: "nursing", action: "create" },
+			{ module: "ed", action: "create" },
+		],
+	},
+	{
+		title: "Trauma Alias",
+		href: "/triage/trauma-alias",
+		iconName: "records",
+		requiredPermissions: [{ module: "adt", action: "create" }],
+		requireAllPermissions: [
+			{ module: "nursing", action: "create" },
+			{ module: "ed", action: "create" },
+		],
+	},
+	{
+		title: "Tele-Triage",
+		href: "/triage/tele",
+		iconName: "video",
 		requiredPermissions: [{ module: "adt", action: "create" }],
 		requireAllPermissions: [
 			{ module: "nursing", action: "create" },

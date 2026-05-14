@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, count, desc, eq, isNull, like } from "drizzle-orm"
+import { and, asc, count, desc, eq, isNull, like } from "drizzle-orm"
 
 import {
 	beds,
@@ -7,6 +7,7 @@ import {
 	encounters,
 	encounterStatusEvents,
 	imagingOrders,
+	inboundTriageRecords,
 	ioEntries,
 	labOrders,
 	marEntries,
@@ -35,6 +36,9 @@ type MergeInput = V1Inputs["ed"]["merge"]
 type EdQueueInput = V1Inputs["ed"]["getQueue"]
 type UpdateQueueStatusInput = V1Inputs["ed"]["updateQueueStatus"]
 type EdDispositionInput = V1Inputs["ed"]["dispose"]
+type CreateInboundTriageInput = V1Inputs["ed"]["createInboundTriage"]
+type InboundTriageListInput = V1Inputs["ed"]["listInboundTriage"]
+type InboundTriageIdInput = V1Inputs["ed"]["markInboundArrived"]
 
 @Injectable()
 export class EdService {
@@ -920,5 +924,166 @@ export class EdService {
 		)
 
 		return result
+	}
+
+	// ========================================================================
+	// Tele-Triage — Inbound Patient Management
+	// ========================================================================
+
+	private mapInboundRecord(row: {
+		id: string
+		facilityId: string
+		callerName: string
+		patientLocation: string
+		transportMode: "ambulance" | "private_vehicle" | "walk_in" | "motorcycle_ambulance"
+		channelType: "phone" | "video"
+		etaMinutes: number
+		etaAt: Date
+		provisionalAcuityLevel: number
+		acuityScale: "esi" | "ats" | "ctas"
+		assessmentNotes: string
+		resourceNeeds: unknown
+		status: "queued" | "arrived" | "cancelled"
+		arrivedAt: Date | null
+		preEncounterId: string | null
+		triageStaffId: string | null
+		createdAt: Date
+		updatedAt: Date
+	}) {
+		const rn = (row.resourceNeeds ?? {}) as {
+			bed?: boolean
+			codeTeam?: boolean
+			equipment?: string[]
+		}
+		return {
+			...row,
+			resourceNeeds: {
+				bed: rn.bed ?? false,
+				codeTeam: rn.codeTeam ?? false,
+				equipment: rn.equipment ?? [],
+			},
+		}
+	}
+
+	async createInboundTriage(input: CreateInboundTriageInput) {
+		const now = new Date()
+		const etaAt = new Date(now.getTime() + input.etaMinutes * 60_000)
+
+		const [record] = await db
+			.insert(inboundTriageRecords)
+			.values({
+				facilityId: input.facilityId,
+				callerName: input.callerName,
+				patientLocation: input.patientLocation,
+				transportMode: input.transportMode,
+				channelType: input.channelType,
+				etaMinutes: input.etaMinutes,
+				etaAt,
+				provisionalAcuityLevel: input.provisionalAcuityLevel,
+				acuityScale: input.acuityScale,
+				assessmentNotes: input.assessmentNotes ?? "",
+				resourceNeeds: input.resourceNeeds ?? { bed: false, codeTeam: false, equipment: [] },
+				status: "queued",
+				triageStaffId: input.triageStaffId,
+			})
+			.returning()
+
+		this.logger.log(`Created inbound triage record ${record!.id} — ETA ${input.etaMinutes}m`)
+		this.notificationService.broadcast(
+			"tele_triage",
+			`Inbound L${input.provisionalAcuityLevel} patient — ETA ${input.etaMinutes}m`,
+			`${input.callerName} · ${input.patientLocation} via ${input.transportMode}`
+		)
+
+		return this.mapInboundRecord(record!)
+	}
+
+	async listInboundTriage(input: InboundTriageListInput) {
+		const conditions = [eq(inboundTriageRecords.facilityId, input.facilityId)]
+		if (input.status) {
+			conditions.push(eq(inboundTriageRecords.status, input.status))
+		}
+
+		const rows = await db
+			.select()
+			.from(inboundTriageRecords)
+			.where(and(...conditions))
+			.orderBy(asc(inboundTriageRecords.etaAt))
+
+		return rows.map(r => this.mapInboundRecord(r))
+	}
+
+	async markInboundArrived(input: InboundTriageIdInput) {
+		const [record] = await db
+			.select()
+			.from(inboundTriageRecords)
+			.where(eq(inboundTriageRecords.id, input.id))
+
+		if (!record) {
+			throw new NotFoundException(`Inbound triage record ${input.id} not found`)
+		}
+
+		if (record.status !== "queued") {
+			throw new BadRequestException("Record is not in queued status")
+		}
+
+		if (!record.triageStaffId) {
+			throw new BadRequestException("Inbound record has no triage staff assigned")
+		}
+
+		const now = new Date()
+
+		const preEncounter = await this.createPreEncounter({
+			facilityId: record.facilityId,
+			chiefComplaint: record.assessmentNotes || undefined,
+			triageAcuityScale: record.acuityScale,
+			triageAcuityLevel: record.provisionalAcuityLevel,
+			triageStaffId: record.triageStaffId,
+		})
+
+		await db
+			.update(inboundTriageRecords)
+			.set({
+				status: "arrived",
+				arrivedAt: now,
+				preEncounterId: preEncounter.id,
+				updatedAt: now,
+			})
+			.where(eq(inboundTriageRecords.id, input.id))
+
+		this.logger.log(
+			`Inbound triage ${input.id} arrived → pre-encounter ${preEncounter.id}`
+		)
+		this.notificationService.broadcast(
+			"ed_queue",
+			"Inbound patient arrived",
+			`${record.callerName} checked in — pre-encounter created`
+		)
+
+		return { id: input.id, preEncounterId: preEncounter.id }
+	}
+
+	async cancelInboundTriage(input: InboundTriageIdInput) {
+		const [record] = await db
+			.select()
+			.from(inboundTriageRecords)
+			.where(eq(inboundTriageRecords.id, input.id))
+
+		if (!record) {
+			throw new NotFoundException(`Inbound triage record ${input.id} not found`)
+		}
+
+		if (record.status !== "queued") {
+			throw new BadRequestException("Only queued records can be cancelled")
+		}
+
+		const [updated] = await db
+			.update(inboundTriageRecords)
+			.set({ status: "cancelled", updatedAt: new Date() })
+			.where(eq(inboundTriageRecords.id, input.id))
+			.returning()
+
+		this.logger.log(`Inbound triage record ${input.id} cancelled`)
+		return this.mapInboundRecord(updated!)
 	}
 }
