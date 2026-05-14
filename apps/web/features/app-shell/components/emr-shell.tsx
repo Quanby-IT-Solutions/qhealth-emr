@@ -321,6 +321,7 @@ function SidebarItem({ item, isActive, isCollapsed }: { item: NavItem, isActive:
 
 export function EmrShell({ children }: { children: React.ReactNode }) {
 	const pathname = usePathname()
+	const isNoPaddingRoute = pathname === "/patients/search" || pathname === "/opd"
 	const { theme, setTheme } = useTheme()
 	const { isOnline } = useOfflineSync()
 	const { data: profile } = useMyProfile()
@@ -671,7 +672,12 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 
 				{/* Page Content Area */}
 				<main className="flex-1 overflow-x-hidden overflow-y-auto">
-					<div className="mx-auto w-full max-w-[1440px] p-4 md:p-6 lg:p-8">
+					<div
+						className={cn(
+							"mx-auto w-full max-w-[1440px]",
+							isNoPaddingRoute ? "p-0" : "p-4 md:p-6 lg:p-8"
+						)}
+					>
 						<AnimatePresence mode="wait">
 							<motion.div
 								key={pathname}

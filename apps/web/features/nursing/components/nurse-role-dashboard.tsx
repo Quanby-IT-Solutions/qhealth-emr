@@ -20,6 +20,11 @@ import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 import { useHaiTagsQuery, useVitalsQuery } from "@/features/nursing/api/nursing.hooks"
 
+const DASHBOARD_VITALS_LIMIT = 50
+const DASHBOARD_HAI_LIMIT = 50
+const IMMEDIATE_ESCALATIONS_LIMIT = 4
+const RECENT_VITALS_LIMIT = 3
+
 function formatDateTime(iso: string) {
 	return new Date(iso).toLocaleString("en-PH", {
 		month: "short",
@@ -63,8 +68,8 @@ export function NurseRoleDashboard() {
 	const { data: profile, isLoading: profileLoading } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 
-	const vitals = useVitalsQuery({ facilityId, limit: 120 })
-	const haiTags = useHaiTagsQuery({ facilityId, limit: 120 })
+	const vitals = useVitalsQuery({ facilityId, page: 1, limit: DASHBOARD_VITALS_LIMIT })
+	const haiTags = useHaiTagsQuery({ facilityId, page: 1, limit: DASHBOARD_HAI_LIMIT })
 
 	const vitalsRows = vitals.data?.data ?? []
 	const haiRows = haiTags.data?.data ?? []
@@ -91,18 +96,18 @@ export function NurseRoleDashboard() {
 	const immediateEscalations = useMemo(() => {
 		return [...summary.escalations]
 			.sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime())
-			.slice(0, 6)
+			.slice(0, IMMEDIATE_ESCALATIONS_LIMIT)
 	}, [summary.escalations])
 
 	const recentVitals = useMemo(() => {
 		return [...vitalsRows]
 			.sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime())
-			.slice(0, 6)
+			.slice(0, RECENT_VITALS_LIMIT)
 	}, [vitalsRows])
 
 	if (profileLoading) {
 		return (
-			<div className="space-y-6">
+			<div className="space-y-4">
 				<div>
 					<h1 className="text-2xl font-semibold">Nurse Shift Dashboard</h1>
 					<p className="text-sm text-muted-foreground">Loading dashboard...</p>
@@ -113,7 +118,7 @@ export function NurseRoleDashboard() {
 
 	if (!facilityId) {
 		return (
-			<div className="space-y-6">
+			<div className="space-y-4">
 				<div>
 					<h1 className="text-2xl font-semibold">Nurse Shift Dashboard</h1>
 					<p className="text-sm text-muted-foreground">Viewing as Nurse</p>
@@ -128,7 +133,7 @@ export function NurseRoleDashboard() {
 	}
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-4">
 			<div className="flex items-center justify-between gap-3">
 				<div>
 					<h1 className="text-2xl font-semibold">Nurse Shift Dashboard</h1>
