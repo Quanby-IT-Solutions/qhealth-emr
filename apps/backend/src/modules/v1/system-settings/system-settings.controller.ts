@@ -5,7 +5,7 @@ import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermission, RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
+import { RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
 
 import { OfflineCacheService } from "./offline-cache.service"
 import { SystemSettingsService } from "./system-settings.service"
@@ -38,7 +38,6 @@ function getActiveFacilityId(req: Request): string {
 }
 
 @Controller()
-@RequirePermission("admin", "view")
 export class SystemSettingsController {
 	constructor(
 		private readonly systemSettingsService: SystemSettingsService,
@@ -75,6 +74,24 @@ export class SystemSettingsController {
 		const userId = session.user.id
 		return implement(v1.systemSettings.triggerCacheJob).handler(async () => {
 			return this.offlineCacheService.runJobForFacility(facilityId, `user:${userId}`)
+		})
+	}
+
+	@RequirePermissions([{ module: "patients", action: "view" }])
+	@Implement(v1.systemSettings.getOfflineSummarySnapshot)
+	async getOfflineSummarySnapshot(@Req() req: Request) {
+		const facilityId = getActiveFacilityId(req)
+		return implement(v1.systemSettings.getOfflineSummarySnapshot).handler(async () => {
+			return this.offlineCacheService.getPreparedSnapshot(facilityId)
+		})
+	}
+
+	@RequirePermissions([{ module: "patients", action: "view" }])
+	@Implement(v1.systemSettings.getOfflinePatientSummary)
+	async getOfflinePatientSummary(@Req() req: Request) {
+		const facilityId = getActiveFacilityId(req)
+		return implement(v1.systemSettings.getOfflinePatientSummary).handler(async ({ input }) => {
+			return this.offlineCacheService.getPreparedPatientSummary(facilityId, input.patientId)
 		})
 	}
 }

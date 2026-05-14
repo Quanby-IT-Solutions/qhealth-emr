@@ -12,6 +12,15 @@ export function useSystemSettingsQuery() {
 	)
 }
 
+export function useOfflineSummarySnapshotQuery(options?: { enabled?: boolean }) {
+	return useQuery({
+		...orpc.systemSettings.getOfflineSummarySnapshot.queryOptions({
+			staleTime: 5 * 60_000,
+		}),
+		enabled: options?.enabled ?? true,
+	})
+}
+
 export function useUpdateSystemSettingsMutation() {
 	const queryClient = useQueryClient()
 

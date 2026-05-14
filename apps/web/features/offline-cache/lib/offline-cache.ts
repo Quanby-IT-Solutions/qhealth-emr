@@ -6,6 +6,8 @@
  * retrieval of that cached dataset.
  */
 
+import type { OfflineSummarySnapshot } from "@repo/contracts"
+
 const CACHE_KEY_PREFIX = "qhealth_offline_patients_"
 const CACHE_VERSION = 2
 const ENCOUNTER_CACHE_KEY_PREFIX = "qhealth_offline_encounter_summary_"
@@ -122,10 +124,14 @@ function encounterCacheKey(encounterId: string) {
 }
 
 /** Persist patient summaries for a facility. Silent on quota errors. */
-export function savePatientSummaries(facilityId: string, patients: OfflinePatientSummary[]): void {
+export function savePatientSummaries(
+	facilityId: string,
+	patients: OfflinePatientSummary[],
+	cachedAt = new Date().toISOString()
+): void {
 	const payload: OfflinePatientsCache = {
 		version: CACHE_VERSION,
-		cachedAt: new Date().toISOString(),
+		cachedAt,
 		facilityId,
 		patients,
 	}
@@ -168,10 +174,14 @@ export function isOfflineCacheAvailable(facilityId: string): boolean {
 }
 
 /** Persist a full encounter summary for offline chart review. */
-export function saveEncounterSummary(encounterId: string, summary: OfflineEncounterSummary): void {
+export function saveEncounterSummary(
+	encounterId: string,
+	summary: OfflineEncounterSummary,
+	cachedAt = new Date().toISOString()
+): void {
 	const payload: OfflineEncounterSummaryCache = {
 		version: ENCOUNTER_CACHE_VERSION,
-		cachedAt: new Date().toISOString(),
+		cachedAt,
 		encounterId,
 		summary,
 	}
@@ -250,4 +260,31 @@ export function loadPatientEncounterSummaries(patientId: string): OfflineEncount
 	}
 	results.sort((a, b) => new Date(b.cachedAt).getTime() - new Date(a.cachedAt).getTime())
 	return results
+}
+
+/** Import the backend-prepared facility snapshot into the browser offline cache. */
+export function importOfflineSummarySnapshot(snapshot: OfflineSummarySnapshot): void {
+	const cachedAt = snapshot.preparedAt ?? new Date().toISOString()
+	const patients = snapshot.summaries.map(summary => ({
+		id: summary.patient.id,
+		mrn: summary.patient.mrn,
+		firstName: summary.patient.firstName,
+		middleName: summary.patient.middleName,
+		lastName: summary.patient.lastName,
+		dateOfBirth: summary.patient.dateOfBirth,
+		sex: summary.patient.sex,
+		isActive: summary.patient.isActive,
+	}))
+
+	savePatientSummaries(snapshot.facilityId, patients, cachedAt)
+
+	for (const summary of snapshot.summaries) {
+		if (summary.encounterSummary) {
+			saveEncounterSummary(
+				summary.encounterSummary.encounter.id,
+				summary.encounterSummary,
+				summary.preparedAt
+			)
+		}
+	}
 }

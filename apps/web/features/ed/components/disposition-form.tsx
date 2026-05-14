@@ -127,8 +127,7 @@ export function DispositionForm({
 			{
 				encounterId,
 				disposition,
-				oecbEligible:
-					disposition === "discharge" || disposition === "transfer" ? oecbEligible : false,
+				oecbEligible: disposition === "discharge" ? oecbEligible : false,
 				admitWardId: disposition === "admit" && admitWardId ? admitWardId : undefined,
 				admitBedId: disposition === "admit" && admitBedId ? admitBedId : undefined,
 			},
@@ -176,7 +175,7 @@ export function DispositionForm({
 									type="button"
 									onClick={() => {
 										setDisposition(opt.value)
-										if (opt.value !== "discharge" && opt.value !== "transfer") {
+										if (opt.value !== "discharge") {
 											setOecbChecklist(OECB_CRITERIA.map(() => false))
 											setTagAsOecb(false)
 										}
@@ -248,7 +247,7 @@ export function DispositionForm({
 				)}
 
 				{/* OECB eligibility checklist */}
-				{(disposition === "discharge" || disposition === "transfer") && (
+				{disposition === "discharge" && (
 					<div className="space-y-2">
 						<Label>OECB Eligibility Checklist</Label>
 						<div className="space-y-2 rounded-md border p-3">
@@ -265,8 +264,7 @@ export function DispositionForm({
 											Tag as OECB (Outpatient Emergency Care Benefit)
 										</Label>
 										<p className="text-xs text-blue-800">
-											Routes eligible ED discharge or transfer cases to PhilHealth outpatient
-											billing.
+											Routes eligible ED discharge cases to PhilHealth outpatient billing.
 										</p>
 									</div>
 								</div>

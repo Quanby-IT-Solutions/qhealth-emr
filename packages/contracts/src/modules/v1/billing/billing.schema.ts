@@ -402,6 +402,7 @@ export const BillingStatusResponseSchema = z.object({
 
 export const UnbilledEncountersInputSchema = PaginationInputSchema.extend({
 	facilityId: z.string().uuid(),
+	oecbOnly: z.coerce.boolean().optional(),
 })
 
 export const UnbilledEncounterSchema = z.object({
@@ -410,6 +411,7 @@ export const UnbilledEncounterSchema = z.object({
 	patientName: z.string(),
 	mrn: z.string(),
 	encounterType: z.string(),
+	oecbEligible: z.boolean(),
 	admittedAt: dateOrString,
 	totalCharges: z.number(),
 	chargeCount: z.number(),
