@@ -641,10 +641,7 @@ export function CreateMedOrderDialog({
 									htmlFor="brandName"
 									className="text-muted-foreground text-xs font-normal"
 								>
-									Brand / Trade Name{" "}
-									<span className="text-muted-foreground/60">
-										(optional — generic name above is legally required per RA 6675)
-									</span>
+									Brand Name (optional)
 								</Label>
 								<Input
 									id="brandName"
@@ -652,7 +649,11 @@ export function CreateMedOrderDialog({
 									onChange={e => setBrandName(e.target.value)}
 									placeholder="e.g., Amoxil — leave blank to dispense any generic equivalent"
 									className="h-8 text-sm"
+									aria-describedby="brand-name-hint"
 								/>
+								<p id="brand-name-hint" className="text-muted-foreground text-xs">
+									Generic name is required by the Generics Act of 1988. Brand name is optional.
+								</p>
 							</div>
 						)}
 

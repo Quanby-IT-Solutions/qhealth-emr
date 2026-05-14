@@ -1,7 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import { Ban, CheckCircle2, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react"
+import {
+	Ban,
+	BadgeCheck,
+	CheckCircle2,
+	Pencil,
+	Plus,
+	RotateCcw,
+	ShieldAlert,
+	Trash2,
+} from "lucide-react"
 
 import {
 	AlertDialog,
@@ -38,6 +47,7 @@ import {
 	useDeleteProblemMutation,
 	useProblemsQuery,
 	useUpdateProblemMutation,
+	useVerifyAllergyMutation,
 	type AllergenType,
 	type Allergy,
 	type AllergySeverity,
@@ -115,6 +125,7 @@ export function ProblemsAllergiesTab({
 	const updateProblem = useUpdateProblemMutation()
 	const deleteProblem = useDeleteProblemMutation()
 	const deactivateAllergy = useDeactivateAllergyMutation()
+	const verifyAllergy = useVerifyAllergyMutation()
 
 	function reactivateProblem(problem: Problem) {
 		updateProblem.mutate({
@@ -187,16 +198,57 @@ export function ProblemsAllergiesTab({
 					<Pencil className="size-4" />
 					Edit
 				</Button>
+				{!allergy.isVerified && (
+					<Button
+						size="sm"
+						variant="default"
+						className={compact ? "justify-center" : ""}
+						onClick={() => verifyAllergy.mutate(allergy.id)}
+						disabled={verifyAllergy.isPending}
+					>
+						<BadgeCheck className="size-4" />
+						Verify
+					</Button>
+				)}
 				<Button
 					size="sm"
 					variant="outline"
-					className={compact ? "justify-center" : ""}
+					className={compact ? "col-span-2 justify-center" : ""}
 					onClick={() => setAllergyToDeactivate(allergy)}
 				>
 					<Ban className="size-4" />
 					Deactivate
 				</Button>
 			</div>
+		)
+	}
+
+	function renderVerificationBadge(allergy: Allergy) {
+		if (allergy.isVerified) {
+			return (
+				<Badge
+					variant="outline"
+					className="gap-1 border-emerald-400 text-emerald-700 dark:text-emerald-400"
+					title={
+						allergy.verifiedByStaffName
+							? `Verified by ${allergy.verifiedByStaffName}`
+							: "Verified"
+					}
+				>
+					<BadgeCheck className="size-3" />
+					Verified
+				</Badge>
+			)
+		}
+		return (
+			<Badge
+				variant="outline"
+				className="gap-1 border-amber-400 text-amber-700 dark:text-amber-400"
+				title="Awaiting physician verification — does not block medication orders"
+			>
+				<ShieldAlert className="size-3" />
+				Unverified
+			</Badge>
 		)
 	}
 
@@ -389,6 +441,15 @@ export function ProblemsAllergiesTab({
 						</div>
 					) : allergiesData?.data.length ? (
 						<>
+							{allergiesData.data.some(a => !a.isVerified) && (
+								<p
+									className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+									role="note"
+								>
+									Unverified allergies are visible in the chart but do not block medication orders.
+									Verify each entry before relying on CDS for hard stops.
+								</p>
+							)}
 							<div className="divide-y rounded-md border md:hidden">
 								{allergiesData.data.map(allergy => (
 									<div key={allergy.id} className="space-y-3 p-4">
@@ -400,7 +461,10 @@ export function ProblemsAllergiesTab({
 													{formatDate(allergy.onsetDate)}
 												</p>
 											</div>
-											<Badge variant={severityVariant(allergy.severity)}>{allergy.severity}</Badge>
+											<div className="flex shrink-0 flex-col items-end gap-1">
+												<Badge variant={severityVariant(allergy.severity)}>{allergy.severity}</Badge>
+												{renderVerificationBadge(allergy)}
+											</div>
 										</div>
 										<div className="min-w-0 text-sm">
 											<p className="text-muted-foreground text-xs">Reaction</p>
@@ -419,6 +483,7 @@ export function ProblemsAllergiesTab({
 											<TableHead>Type</TableHead>
 											<TableHead>Reaction</TableHead>
 											<TableHead>Severity</TableHead>
+											<TableHead>Verification</TableHead>
 											<TableHead>Onset</TableHead>
 											<TableHead className="text-right">Actions</TableHead>
 										</TableRow>
@@ -440,6 +505,7 @@ export function ProblemsAllergiesTab({
 														{allergy.severity}
 													</Badge>
 												</TableCell>
+												<TableCell>{renderVerificationBadge(allergy)}</TableCell>
 												<TableCell>{formatDate(allergy.onsetDate)}</TableCell>
 												<TableCell className="min-w-40">{renderAllergyActions(allergy)}</TableCell>
 											</TableRow>

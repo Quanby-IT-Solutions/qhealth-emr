@@ -110,6 +110,14 @@ export class ProblemsAllergiesController {
 		})
 	}
 
+	@RequirePermission("clinical_docs", "sign")
+	@Implement(v1.problemsAllergies.verifyAllergy)
+	async verifyAllergy(@Session() session: UserSession) {
+		return implement(v1.problemsAllergies.verifyAllergy).handler(async ({ input }) => {
+			return this.service.verifyAllergy(input, session.user.id)
+		})
+	}
+
 	// ========================================================================
 	// Terminology / Search
 	// ========================================================================

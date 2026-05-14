@@ -77,6 +77,10 @@ export interface Allergy {
 	severity: AllergySeverity
 	onsetDate: string | null
 	isActive: boolean
+	isVerified: boolean
+	verifiedAt: string | null
+	verifiedByStaffId: string | null
+	verifiedByStaffName: string | null
 	documentingStaffId: string | null
 	documentingStaffName: string | null
 	createdAt: string
@@ -102,6 +106,7 @@ interface PatientSummaryResponse {
 	resolvedProblemCount: number
 	activeAllergies: Allergy[]
 	activeAllergyCount: number
+	unverifiedAllergyCount: number
 	hasSevereAllergies: boolean
 }
 
@@ -143,8 +148,10 @@ export const problemsAllergiesKeys = {
 	problems: (patientId: string, status?: string) =>
 		[...problemsAllergiesKeys.all, "problems", patientId, status] as const,
 	problem: (id: string) => [...problemsAllergiesKeys.all, "problem", id] as const,
-	allergies: (patientId: string, params?: { isActive?: boolean; allergenType?: string }) =>
-		[...problemsAllergiesKeys.all, "allergies", patientId, params] as const,
+	allergies: (
+		patientId: string,
+		params?: { isActive?: boolean; isVerified?: boolean; allergenType?: string }
+	) => [...problemsAllergiesKeys.all, "allergies", patientId, params] as const,
 	allergy: (id: string) => [...problemsAllergiesKeys.all, "allergy", id] as const,
 	activeAllergies: (patientId: string) =>
 		[...problemsAllergiesKeys.all, "active-allergies", patientId] as const,
@@ -276,6 +283,7 @@ export function useDeleteProblemMutation() {
 interface AllergyListParams {
 	patientId: string
 	isActive?: boolean
+	isVerified?: boolean
 	allergenType?: AllergenType
 	page?: number
 	limit?: number
@@ -285,6 +293,7 @@ export function useAllergiesQuery(params: AllergyListParams) {
 	return useQuery({
 		queryKey: problemsAllergiesKeys.allergies(params.patientId, {
 			isActive: params.isActive,
+			isVerified: params.isVerified,
 			allergenType: params.allergenType,
 		}),
 		queryFn: () =>
@@ -358,6 +367,21 @@ export function useDeactivateAllergyMutation() {
 	return useMutation({
 		mutationFn: (id: string) =>
 			fetchJson<Allergy>(`${API_BASE}/allergies/${id}/deactivate`, {
+				method: "PUT",
+				body: JSON.stringify({ id }),
+			}),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: problemsAllergiesKeys.all })
+		},
+	})
+}
+
+export function useVerifyAllergyMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation({
+		mutationFn: (id: string) =>
+			fetchJson<Allergy>(`${API_BASE}/allergies/${id}/verify`, {
 				method: "PUT",
 				body: JSON.stringify({ id }),
 			}),

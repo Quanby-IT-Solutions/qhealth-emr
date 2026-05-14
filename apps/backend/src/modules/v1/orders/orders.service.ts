@@ -267,11 +267,14 @@ export class OrdersService {
 		}[] = []
 
 		// Step 1: Allergy check
+		// Flow D5: getActiveAllergies already filters to active + verified, but
+		// we re-assert isVerified here so a future change to the upstream feed
+		// cannot quietly start hard-blocking on unverified allergies.
 		const { allergies: activeAllergies } = await this.problemsAllergiesService.getActiveAllergies({
 			patientId: input.patientId,
 		})
 
-		for (const allergy of activeAllergies) {
+		for (const allergy of activeAllergies.filter(a => a.isActive && a.isVerified)) {
 			if (allergy.allergenName.toLowerCase() === input.genericName.toLowerCase()) {
 				if (allergy.severity === "severe") {
 					alerts.push({

@@ -131,6 +131,13 @@ export const AllergySchema = z.object({
 	severity: AllergySeverityEnum,
 	onsetDate: z.string().nullable(),
 	isActive: z.boolean(),
+	// Flow D5: only verified active allergies block medication orders via CDS.
+	// Unverified allergies remain visible in the chart but are not silently
+	// enforced; a physician must explicitly verify before they hard-block.
+	isVerified: z.boolean(),
+	verifiedAt: dateOrString.nullable(),
+	verifiedByStaffId: z.string().uuid().nullable(),
+	verifiedByStaffName: z.string().nullable(),
 	documentingStaffId: z.string().uuid().nullable(),
 	documentingStaffName: z.string().nullable(),
 	createdAt: dateOrString,
@@ -166,6 +173,12 @@ export const DeactivateAllergySchema = z.object({
 	id: z.string().uuid(),
 })
 
+export const VerifyAllergySchema = z.object({
+	id: z.string().uuid(),
+})
+
+export type VerifyAllergyInput = z.infer<typeof VerifyAllergySchema>
+
 export const AllergyIdSchema = z.object({
 	id: z.string().uuid(),
 })
@@ -173,6 +186,7 @@ export const AllergyIdSchema = z.object({
 export const AllergyListSchema = PaginationInputSchema.extend({
 	patientId: z.string().uuid(),
 	isActive: z.union([z.boolean(), z.string().transform(v => v === "true")]).optional(),
+	isVerified: z.union([z.boolean(), z.string().transform(v => v === "true")]).optional(),
 	allergenType: AllergenTypeEnum.optional(),
 })
 
@@ -262,5 +276,8 @@ export const PatientSummaryResponseSchema = z.object({
 	resolvedProblemCount: z.number(),
 	activeAllergies: z.array(AllergySchema),
 	activeAllergyCount: z.number(),
+	// Count of active allergies that are still awaiting physician verification.
+	// Drives chart-level "needs review" badges without firing CDS hard-blocks.
+	unverifiedAllergyCount: z.number(),
 	hasSevereAllergies: z.boolean(),
 })
