@@ -268,6 +268,13 @@ export const allergies = createTable(
 		severity: t.text("severity").notNull().$type<"mild" | "moderate" | "severe">(),
 		onsetDate: t.date("onset_date"),
 		isActive: t.boolean("is_active").notNull().default(true),
+		// Flow D5: allergies must be physician-verified before they participate in
+		// CDS / CPOE hard-blocking. Newly captured allergies are unverified.
+		isVerified: t.boolean("is_verified").notNull().default(false),
+		verifiedAt: t.timestamp("verified_at", { withTimezone: true }),
+		verifiedByStaffId: t
+			.uuid("verified_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
 		documentingStaffId: t
 			.uuid("documenting_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
@@ -278,6 +285,8 @@ export const allergies = createTable(
 		index("allergies_patient_id_idx").on(t.patientId),
 		index("allergies_facility_id_idx").on(t.facilityId),
 		index("allergies_allergen_type_idx").on(t.allergenType),
+		index("allergies_is_active_idx").on(t.isActive),
+		index("allergies_is_verified_idx").on(t.isVerified),
 	]
 )
 

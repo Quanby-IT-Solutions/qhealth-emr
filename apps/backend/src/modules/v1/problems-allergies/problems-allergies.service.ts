@@ -27,6 +27,7 @@ type ListAllergiesInput = V1Inputs["problemsAllergies"]["listAllergies"]
 type CreateAllergyInput = V1Inputs["problemsAllergies"]["createAllergy"]
 type UpdateAllergyInput = V1Inputs["problemsAllergies"]["updateAllergy"]
 type DeactivateAllergyInput = V1Inputs["problemsAllergies"]["deactivateAllergy"]
+type VerifyAllergyInput = V1Inputs["problemsAllergies"]["verifyAllergy"]
 type ActiveAllergiesInput = V1Inputs["problemsAllergies"]["getActiveAllergies"]
 type PatientSummaryInput = V1Inputs["problemsAllergies"]["getPatientSummary"]
 
@@ -513,6 +514,10 @@ export class ProblemsAllergiesService {
 			const isActive = input.isActive === true || input.isActive === "true"
 			conditions.push(eq(allergies.isActive, isActive))
 		}
+		if (input.isVerified !== undefined) {
+			const isVerified = input.isVerified === true || input.isVerified === "true"
+			conditions.push(eq(allergies.isVerified, isVerified))
+		}
 		if (input.allergenType) {
 			conditions.push(eq(allergies.allergenType, input.allergenType))
 		}
@@ -520,6 +525,17 @@ export class ProblemsAllergiesService {
 		const whereClause = and(...conditions)
 
 		const [totalResult] = await db.select({ count: count() }).from(allergies).where(whereClause)
+
+		const documentingStaffSq = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("documenting_staff")
+		const verifyingStaffSq = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("verifying_staff")
 
 		const rows = await db
 			.select({
@@ -532,14 +548,18 @@ export class ProblemsAllergiesService {
 				severity: allergies.severity,
 				onsetDate: allergies.onsetDate,
 				isActive: allergies.isActive,
+				isVerified: allergies.isVerified,
+				verifiedAt: allergies.verifiedAt,
+				verifiedByStaffId: allergies.verifiedByStaffId,
+				verifiedByStaffName: verifyingStaffSq.name,
 				documentingStaffId: allergies.documentingStaffId,
-				documentingStaffName: users.name,
+				documentingStaffName: documentingStaffSq.name,
 				createdAt: allergies.createdAt,
 				updatedAt: allergies.updatedAt,
 			})
 			.from(allergies)
-			.leftJoin(staffProfiles, eq(allergies.documentingStaffId, staffProfiles.id))
-			.leftJoin(users, eq(staffProfiles.userId, users.id))
+			.leftJoin(documentingStaffSq, eq(allergies.documentingStaffId, documentingStaffSq.id))
+			.leftJoin(verifyingStaffSq, eq(allergies.verifiedByStaffId, verifyingStaffSq.id))
 			.where(whereClause)
 			.orderBy(desc(allergies.createdAt))
 			.limit(limit)
@@ -557,6 +577,17 @@ export class ProblemsAllergiesService {
 	}
 
 	async getAllergy(id: string, actor?: ChartAccessActor) {
+		const documentingStaffSq = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("documenting_staff")
+		const verifyingStaffSq = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("verifying_staff")
+
 		const [row] = await db
 			.select({
 				id: allergies.id,
@@ -568,14 +599,18 @@ export class ProblemsAllergiesService {
 				severity: allergies.severity,
 				onsetDate: allergies.onsetDate,
 				isActive: allergies.isActive,
+				isVerified: allergies.isVerified,
+				verifiedAt: allergies.verifiedAt,
+				verifiedByStaffId: allergies.verifiedByStaffId,
+				verifiedByStaffName: verifyingStaffSq.name,
 				documentingStaffId: allergies.documentingStaffId,
-				documentingStaffName: users.name,
+				documentingStaffName: documentingStaffSq.name,
 				createdAt: allergies.createdAt,
 				updatedAt: allergies.updatedAt,
 			})
 			.from(allergies)
-			.leftJoin(staffProfiles, eq(allergies.documentingStaffId, staffProfiles.id))
-			.leftJoin(users, eq(staffProfiles.userId, users.id))
+			.leftJoin(documentingStaffSq, eq(allergies.documentingStaffId, documentingStaffSq.id))
+			.leftJoin(verifyingStaffSq, eq(allergies.verifiedByStaffId, verifyingStaffSq.id))
 			.where(eq(allergies.id, id))
 
 		if (!row) throw new NotFoundException(`Allergy ${id} not found`)
@@ -600,6 +635,11 @@ export class ProblemsAllergiesService {
 				severity: input.severity,
 				onsetDate: input.onsetDate ?? null,
 				isActive: true,
+				// Flow D5: new allergies enter the chart unverified. A physician must
+				// explicitly verify before this row drives a CDS hard-block.
+				isVerified: false,
+				verifiedAt: null,
+				verifiedByStaffId: null,
 				documentingStaffId: staffProfileId,
 			})
 			.returning()
@@ -654,6 +694,43 @@ export class ProblemsAllergiesService {
 		return updated
 	}
 
+	async verifyAllergy(input: VerifyAllergyInput, userId: string) {
+		const existing = await this.getAllergy(input.id)
+		const staffProfileId = await this.getStaffProfileId(userId, existing.facilityId)
+
+		if (existing.isVerified) {
+			return existing
+		}
+
+		const verifiedAt = new Date()
+		await db
+			.update(allergies)
+			.set({
+				isVerified: true,
+				verifiedAt,
+				verifiedByStaffId: staffProfileId,
+				updatedAt: verifiedAt,
+			})
+			.where(eq(allergies.id, input.id))
+
+		this.logger.log(`Verified allergy ${input.id} by staff ${staffProfileId}`)
+
+		const updated = await this.getAllergy(input.id)
+		await this.writeAudit({
+			facilityId: updated.facilityId,
+			userId,
+			staffProfileId,
+			action: "update",
+			entityType: "allergy",
+			entityId: updated.id,
+			beforeState: existing as unknown as Record<string, unknown>,
+			afterState: updated as unknown as Record<string, unknown>,
+			metadata: { patientId: updated.patientId, verification: "verified" },
+		})
+
+		return updated
+	}
+
 	async deactivateAllergy(id: string, userId: string) {
 		const existing = await this.getAllergy(id)
 
@@ -695,6 +772,20 @@ export class ProblemsAllergiesService {
 			entityId: input.patientId,
 		})
 
+		const documentingStaffSq = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("documenting_staff")
+		const verifyingStaffSq = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("verifying_staff")
+
+		// Flow D5: CDS / CPOE blocking only considers active AND physician-verified
+		// allergies. Unverified allergies remain in the chart (via listAllergies /
+		// getPatientSummary) but must not silently block medication ordering.
 		const rows = await db
 			.select({
 				id: allergies.id,
@@ -706,15 +797,25 @@ export class ProblemsAllergiesService {
 				severity: allergies.severity,
 				onsetDate: allergies.onsetDate,
 				isActive: allergies.isActive,
+				isVerified: allergies.isVerified,
+				verifiedAt: allergies.verifiedAt,
+				verifiedByStaffId: allergies.verifiedByStaffId,
+				verifiedByStaffName: verifyingStaffSq.name,
 				documentingStaffId: allergies.documentingStaffId,
-				documentingStaffName: users.name,
+				documentingStaffName: documentingStaffSq.name,
 				createdAt: allergies.createdAt,
 				updatedAt: allergies.updatedAt,
 			})
 			.from(allergies)
-			.leftJoin(staffProfiles, eq(allergies.documentingStaffId, staffProfiles.id))
-			.leftJoin(users, eq(staffProfiles.userId, users.id))
-			.where(and(eq(allergies.patientId, input.patientId), eq(allergies.isActive, true)))
+			.leftJoin(documentingStaffSq, eq(allergies.documentingStaffId, documentingStaffSq.id))
+			.leftJoin(verifyingStaffSq, eq(allergies.verifiedByStaffId, verifyingStaffSq.id))
+			.where(
+				and(
+					eq(allergies.patientId, input.patientId),
+					eq(allergies.isActive, true),
+					eq(allergies.isVerified, true)
+				)
+			)
 			.orderBy(desc(allergies.createdAt))
 
 		const hasSevereAllergies = rows.some(a => a.severity === "severe")
@@ -759,7 +860,22 @@ export class ProblemsAllergiesService {
 			.from(problems)
 			.where(and(eq(problems.patientId, input.patientId), eq(problems.status, "resolved")))
 
-		// Active allergies
+		const allergyDocumentingStaffSq = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("allergy_documenting_staff")
+		const allergyVerifyingStaffSq = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("allergy_verifying_staff")
+
+		// Patient summary surfaces ALL active allergies (verified + unverified) so
+		// the chart can render the full list and an "awaiting verification" badge.
+		// hasSevereAllergies, however, only fires on verified severe allergies —
+		// that flag drives clinical decision banners and must not be triggered by
+		// unverified data per Flow D5.
 		const activeAllergies = await db
 			.select({
 				id: allergies.id,
@@ -771,18 +887,29 @@ export class ProblemsAllergiesService {
 				severity: allergies.severity,
 				onsetDate: allergies.onsetDate,
 				isActive: allergies.isActive,
+				isVerified: allergies.isVerified,
+				verifiedAt: allergies.verifiedAt,
+				verifiedByStaffId: allergies.verifiedByStaffId,
+				verifiedByStaffName: allergyVerifyingStaffSq.name,
 				documentingStaffId: allergies.documentingStaffId,
-				documentingStaffName: users.name,
+				documentingStaffName: allergyDocumentingStaffSq.name,
 				createdAt: allergies.createdAt,
 				updatedAt: allergies.updatedAt,
 			})
 			.from(allergies)
-			.leftJoin(staffProfiles, eq(allergies.documentingStaffId, staffProfiles.id))
-			.leftJoin(users, eq(staffProfiles.userId, users.id))
+			.leftJoin(
+				allergyDocumentingStaffSq,
+				eq(allergies.documentingStaffId, allergyDocumentingStaffSq.id)
+			)
+			.leftJoin(
+				allergyVerifyingStaffSq,
+				eq(allergies.verifiedByStaffId, allergyVerifyingStaffSq.id)
+			)
 			.where(and(eq(allergies.patientId, input.patientId), eq(allergies.isActive, true)))
 			.orderBy(desc(allergies.createdAt))
 
-		const hasSevereAllergies = activeAllergies.some(a => a.severity === "severe")
+		const hasSevereAllergies = activeAllergies.some(a => a.severity === "severe" && a.isVerified)
+		const unverifiedAllergyCount = activeAllergies.filter(a => !a.isVerified).length
 
 		return {
 			activeProblems,
@@ -790,6 +917,7 @@ export class ProblemsAllergiesService {
 			resolvedProblemCount: resolvedResult?.count ?? 0,
 			activeAllergies,
 			activeAllergyCount: activeAllergies.length,
+			unverifiedAllergyCount,
 			hasSevereAllergies,
 		}
 	}

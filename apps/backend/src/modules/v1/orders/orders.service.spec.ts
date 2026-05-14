@@ -441,6 +441,8 @@ describe("OrdersService", () => {
 					allergenType: "medication",
 					severity: "moderate",
 					reactionType: "rash",
+					isActive: true,
+					isVerified: true,
 				},
 			],
 		})
@@ -491,6 +493,8 @@ describe("OrdersService", () => {
 					allergenType: "medication",
 					severity: "moderate",
 					reactionType: "rash",
+					isActive: true,
+					isVerified: true,
 				},
 			],
 		})
