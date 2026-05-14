@@ -1,6 +1,9 @@
 import { oc } from "@orpc/contract"
 
 import {
+	OfflinePatientSummaryParamsSchema,
+	OfflinePreparedPatientSummarySchema,
+	OfflineSummarySnapshotSchema,
 	SystemSettingsSchema,
 	TriggerOfflineCacheJobResultSchema,
 	UpdateSystemSettingsSchema,
@@ -46,4 +49,28 @@ export const systemSettingsContract = {
 			tags: ["System Settings"],
 		})
 		.output(TriggerOfflineCacheJobResultSchema),
+
+	/**
+	 * Download the latest backend-prepared offline patient summaries for the
+	 * active facility. Physician-readable; the server has already materialized
+	 * the read-only care snapshot.
+	 */
+	getOfflineSummarySnapshot: oc
+		.route({
+			method: "GET",
+			path: "/offline-cache/summaries",
+			summary: "Download prepared offline patient summaries for the active facility",
+			tags: ["System Settings"],
+		})
+		.output(OfflineSummarySnapshotSchema),
+
+	getOfflinePatientSummary: oc
+		.route({
+			method: "GET",
+			path: "/offline-cache/summaries/{patientId}",
+			summary: "Download one prepared offline patient summary",
+			tags: ["System Settings"],
+		})
+		.input(OfflinePatientSummaryParamsSchema)
+		.output(OfflinePreparedPatientSummarySchema),
 }
