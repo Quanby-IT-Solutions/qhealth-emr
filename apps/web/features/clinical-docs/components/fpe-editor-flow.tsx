@@ -17,7 +17,6 @@ import { getFpeValidation } from "./fpe-validation"
 interface FpeEditorFlowProps {
 	encounterId: string
 	facilityId: string
-	patientId: string
 	onBack: () => void
 	onDone: () => void
 }
@@ -25,7 +24,6 @@ interface FpeEditorFlowProps {
 export function FpeEditorFlow({
 	encounterId,
 	facilityId,
-	patientId,
 	onBack,
 	onDone,
 }: FpeEditorFlowProps) {
@@ -88,8 +86,6 @@ export function FpeEditorFlow({
 				fpeData={fpeData}
 				noteId={noteId}
 				facilityId={facilityId}
-				patientId={patientId}
-				encounterId={encounterId}
 				onBack={() => setStep("fill")}
 				onSuccess={onDone}
 			/>

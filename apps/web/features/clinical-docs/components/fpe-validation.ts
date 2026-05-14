@@ -21,6 +21,7 @@ const TEXT_MAX_LENGTHS: Partial<Record<FpeFieldKey, number>> = {
 	pastMedicalHistory: 1500,
 	familyHistory: 1000,
 	socialHistory: 1000,
+	mentalHealthScreening: 1000,
 	reviewOfSystems: 2000,
 	physicalExamGeneral: 1000,
 	physicalExamHeent: 1000,
@@ -123,6 +124,12 @@ export function getFpeValidation(data: FpeData): FpeValidationResult {
 	if (!data.primaryDiagnosis.description.trim()) {
 		submitMissingFields.push("Primary Diagnosis Description")
 	}
+	if (!data.socialHistory.trim()) {
+		submitMissingFields.push("Lifestyle / Social History")
+	}
+	if (!data.mentalHealthScreening.trim()) {
+		submitMissingFields.push("Mental Health Screening")
+	}
 	if (!data.historyOfPresentIllness.trim()) {
 		submitMissingFields.push("History of Present Illness")
 	}
@@ -175,6 +182,12 @@ export function getFpeValidation(data: FpeData): FpeValidationResult {
 	addTextFormatError(fieldErrors, "pastMedicalHistory", "Past Medical History", data.pastMedicalHistory)
 	addTextFormatError(fieldErrors, "familyHistory", "Family History", data.familyHistory)
 	addTextFormatError(fieldErrors, "socialHistory", "Social History", data.socialHistory)
+	addTextFormatError(
+		fieldErrors,
+		"mentalHealthScreening",
+		"Mental Health Screening",
+		data.mentalHealthScreening
+	)
 	addTextFormatError(fieldErrors, "reviewOfSystems", "Review of Systems", data.reviewOfSystems)
 	addTextFormatError(fieldErrors, "physicalExamGeneral", "Physical Exam General", data.physicalExamGeneral)
 	addTextFormatError(fieldErrors, "physicalExamHeent", "Physical Exam HEENT", data.physicalExamHeent)

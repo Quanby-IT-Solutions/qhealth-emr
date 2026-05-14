@@ -9,17 +9,11 @@ import { EMPTY_FPE_DATA } from "./fpe-template"
 const mockUseCreateNoteMutation = vi.fn()
 const mockUseUpdateNoteMutation = vi.fn()
 const mockUseSubmitFpeMutation = vi.fn()
-const mockUseRecordKonsultaVisitMutation = vi.fn()
 
 vi.mock("@/features/clinical-docs/api/clinical-docs.hooks", () => ({
 	useCreateNoteMutation: (...args: unknown[]) => mockUseCreateNoteMutation(...args),
 	useUpdateNoteMutation: (...args: unknown[]) => mockUseUpdateNoteMutation(...args),
 	useSubmitFpeMutation: (...args: unknown[]) => mockUseSubmitFpeMutation(...args),
-}))
-
-vi.mock("@/features/billing/api/billing.hooks", () => ({
-	useRecordKonsultaVisitMutation: (...args: unknown[]) =>
-		mockUseRecordKonsultaVisitMutation(...args),
 }))
 
 describe("FpeEditorFlow", () => {
@@ -42,10 +36,6 @@ describe("FpeEditorFlow", () => {
 			isPending: false,
 			isError: false,
 			error: null,
-		})
-		mockUseRecordKonsultaVisitMutation.mockReturnValue({
-			mutate: vi.fn(),
-			isPending: false,
 		})
 
 		createMutate.mockImplementation((_payload, options) => {
@@ -70,6 +60,8 @@ describe("FpeEditorFlow", () => {
 				"Height",
 				"Primary Diagnosis Code",
 				"Primary Diagnosis Description",
+				"Lifestyle / Social History",
+				"Mental Health Screening",
 				"History of Present Illness",
 				"Physical Exam (General)",
 			])
@@ -83,7 +75,6 @@ describe("FpeEditorFlow", () => {
 			<FpeEditorFlow
 				encounterId="enc-1"
 				facilityId="fac-1"
-				patientId="pat-1"
 				onBack={vi.fn()}
 				onDone={vi.fn()}
 			/>
@@ -126,6 +117,12 @@ describe("FpeEditorFlow", () => {
 		fireEvent.change(screen.getByPlaceholderText(/diagnosis description/i), {
 			target: { value: "Pneumonia" },
 		})
+		fireEvent.change(screen.getByPlaceholderText(/smoking, alcohol use/i), {
+			target: { value: "No smoking or alcohol use" },
+		})
+		fireEvent.change(screen.getByPlaceholderText(/mood, sleep/i), {
+			target: { value: "No mood concerns or self-harm risk" },
+		})
 		fireEvent.change(screen.getByPlaceholderText(/general findings/i), {
 			target: { value: "Awake, not in distress" },
 		})
@@ -149,7 +146,6 @@ describe("FpeEditorFlow", () => {
 			<FpeEditorFlow
 				encounterId="enc-1"
 				facilityId="fac-1"
-				patientId="pat-1"
 				onBack={vi.fn()}
 				onDone={vi.fn()}
 			/>

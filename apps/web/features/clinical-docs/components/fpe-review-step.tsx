@@ -5,7 +5,6 @@ import { AlertTriangle, ArrowLeft, CheckCircle2 } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Button } from "@/core/components/ui/button"
-import { useRecordKonsultaVisitMutation } from "@/features/billing/api/billing.hooks"
 import { useSubmitFpeMutation } from "@/features/clinical-docs/api/clinical-docs.hooks"
 
 import { FpeTemplate, type FpeData } from "./fpe-template"
@@ -15,8 +14,6 @@ interface FpeReviewStepProps {
 	fpeData: FpeData
 	noteId: string
 	facilityId: string
-	patientId: string
-	encounterId: string
 	onBack: () => void
 	onSuccess: () => void
 }
@@ -25,40 +22,22 @@ export function FpeReviewStep({
 	fpeData,
 	noteId,
 	facilityId,
-	patientId,
-	encounterId,
 	onBack,
 	onSuccess,
 }: FpeReviewStepProps) {
 	const [done, setDone] = useState(false)
-	const [konsultaWarning, setKonsultaWarning] = useState<string | null>(null)
-
 	const submitFpe = useSubmitFpeMutation()
-	const recordKonsulta = useRecordKonsultaVisitMutation()
 
 	const validation = getFpeValidation(fpeData)
 	const blockingMessages = validation.allBlockingMessages
 	const isComplete = validation.canReview
-	const isSubmitting = submitFpe.isPending || recordKonsulta.isPending
+	const isSubmitting = submitFpe.isPending
 
 	function handleSubmit() {
 		submitFpe.mutate(
 			{ noteId, facilityId },
 			{
-				onSuccess: () => {
-					recordKonsulta.mutate(
-						{ facilityId, patientId, encounterId, visitType: "consultation" },
-						{
-							onSuccess: () => setDone(true),
-							onError: err => {
-								setKonsultaWarning(
-									err instanceof Error ? err.message : "Konsulta record failed"
-								)
-								setDone(true)
-							},
-						}
-					)
-				},
+				onSuccess: () => setDone(true),
 			}
 		)
 	}
@@ -69,16 +48,8 @@ export function FpeReviewStep({
 				<CheckCircle2 className="size-12 text-green-500" />
 				<h3 className="text-lg font-semibold">FPE Archived</h3>
 				<p className="text-sm text-muted-foreground max-w-sm">
-					The FPE note has been signed and archived successfully.
+					The FPE note has been signed and archived, and the Konsulta capitation activity has been recorded.
 				</p>
-				{konsultaWarning && (
-					<Alert variant="destructive" className="max-w-sm text-left">
-						<AlertTriangle className="size-4" />
-						<AlertDescription>
-							<strong>Konsulta record not updated:</strong> {konsultaWarning}
-						</AlertDescription>
-					</Alert>
-				)}
 				<Button onClick={onSuccess}>Done</Button>
 			</div>
 		)

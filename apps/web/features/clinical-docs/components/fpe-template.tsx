@@ -40,6 +40,7 @@ export interface FpeData {
 	pastMedicalHistory: string
 	familyHistory: string
 	socialHistory: string
+	mentalHealthScreening: string
 	reviewOfSystems: string
 	vitalSigns: VitalSigns
 	physicalExamGeneral: string
@@ -80,6 +81,7 @@ export const EMPTY_FPE_DATA: FpeData = {
 	pastMedicalHistory: "",
 	familyHistory: "",
 	socialHistory: "",
+	mentalHealthScreening: "",
 	reviewOfSystems: "",
 	vitalSigns: { ...EMPTY_VITALS },
 	physicalExamGeneral: "",
@@ -119,6 +121,16 @@ function ReadOnlyText({ value, placeholder }: { value: string; placeholder?: str
 function FieldError({ show, children }: { show: boolean; children: ReactNode }) {
 	if (!show) return null
 	return <p className="text-destructive mt-1.5 text-xs">{children}</p>
+}
+
+function calculateBmi(weightKg: string, heightCm: string) {
+	const weight = Number(weightKg)
+	const heightMeters = Number(heightCm) / 100
+	if (!Number.isFinite(weight) || !Number.isFinite(heightMeters) || weight <= 0 || heightMeters <= 0) {
+		return null
+	}
+
+	return (weight / (heightMeters * heightMeters)).toFixed(1)
 }
 
 export function FpeTemplate({
@@ -259,9 +271,9 @@ export function FpeTemplate({
 			</section>
 
 			<section>
-				<SectionHeader number={5} title="Social History" />
+				<SectionHeader number={5} title="Lifestyle / Social History" />
 				{isReadOnly ? (
-					<ReadOnlyText value={value.socialHistory} placeholder="No social history recorded" />
+					<ReadOnlyText value={value.socialHistory} placeholder="No lifestyle history recorded" />
 				) : (
 					<Textarea
 						placeholder="Smoking, alcohol use, recreational drugs, occupation, marital status, living conditions, activity level..."
@@ -271,13 +283,45 @@ export function FpeTemplate({
 						onChange={e => setText("socialHistory", e.target.value)}
 					/>
 				)}
+				<FieldError
+					show={!isReadOnly && missing.has("Lifestyle / Social History") && !errorFor("socialHistory")}
+				>
+					Lifestyle / Social History is required before Review &amp; Submit.
+				</FieldError>
 				<FieldError show={!isReadOnly && !!errorFor("socialHistory")}>
 					{errorFor("socialHistory")}
 				</FieldError>
 			</section>
 
 			<section>
-				<SectionHeader number={6} title="Review of Systems" />
+				<SectionHeader number={6} title="Mental Health Screening" />
+				{isReadOnly ? (
+					<ReadOnlyText value={value.mentalHealthScreening} placeholder="No mental health screening recorded" />
+				) : (
+					<Textarea
+						placeholder="Mood, sleep, appetite, stressors, safety concerns, self-harm risk, and referral needs..."
+						rows={3}
+						maxLength={maxLengthForFpeField("mentalHealthScreening")}
+						value={value.mentalHealthScreening}
+						onChange={e => setText("mentalHealthScreening", e.target.value)}
+					/>
+				)}
+				<FieldError
+					show={
+						!isReadOnly &&
+						missing.has("Mental Health Screening") &&
+						!errorFor("mentalHealthScreening")
+					}
+				>
+					Mental Health Screening is required before Review &amp; Submit.
+				</FieldError>
+				<FieldError show={!isReadOnly && !!errorFor("mentalHealthScreening")}>
+					{errorFor("mentalHealthScreening")}
+				</FieldError>
+			</section>
+
+			<section>
+				<SectionHeader number={7} title="Review of Systems" />
 				{isReadOnly ? (
 					<ReadOnlyText value={value.reviewOfSystems} placeholder="No ROS recorded" />
 				) : (
@@ -297,7 +341,7 @@ export function FpeTemplate({
 			<Separator />
 
 			<section className="space-y-4">
-				<SectionHeader number={7} title="Physical Examination" />
+				<SectionHeader number={8} title="Physical Examination" />
 
 				<div>
 					<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
@@ -349,6 +393,10 @@ export function FpeTemplate({
 							</div>
 						))}
 					</div>
+					<div className="mt-3 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+						<span className="font-medium">BMI:</span>{" "}
+						{calculateBmi(value.vitalSigns.weight, value.vitalSigns.height) ?? "-"}
+					</div>
 				</div>
 
 				{(
@@ -398,7 +446,7 @@ export function FpeTemplate({
 			<Separator />
 
 			<section className="space-y-4">
-				<SectionHeader number={8} title="Assessment / Diagnosis" />
+				<SectionHeader number={9} title="Assessment / Diagnosis" />
 
 				<div className="space-y-2">
 					<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -469,7 +517,7 @@ export function FpeTemplate({
 			</section>
 
 			<section className="space-y-4">
-				<SectionHeader number={9} title="Plan / Management" />
+				<SectionHeader number={10} title="Plan / Management" />
 
 				<div className="space-y-3">
 					<div className="space-y-1.5">
