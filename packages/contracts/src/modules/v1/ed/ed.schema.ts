@@ -174,6 +174,19 @@ export type MergeResult = z.infer<typeof MergeResultSchema>
 // ED Queue Item
 // ============================================================================
 
+export const EdInboundHandoffSchema = z.object({
+	id: z.string().uuid(),
+	callerName: z.string(),
+	patientLocation: z.string(),
+	transportMode: InboundTriageTransportEnum,
+	channelType: InboundTriageChannelEnum,
+	etaMinutes: z.number().int(),
+	etaAt: dateOrString,
+	arrivedAt: dateOrString.nullable(),
+	assessmentNotes: z.string(),
+	resourceNeeds: ResourceNeedsSchema,
+})
+
 export const EdQueueItemSchema = z.object({
 	id: z.string().uuid(),
 	type: z.enum(["pre_encounter", "encounter"]),
@@ -190,6 +203,7 @@ export const EdQueueItemSchema = z.object({
 	bedNumber: z.string().nullable(),
 	wardName: z.string().nullable(),
 	oecbEligible: z.boolean().default(false),
+	inboundHandoff: EdInboundHandoffSchema.nullable(),
 })
 
 export type EdQueueItem = z.infer<typeof EdQueueItemSchema>
