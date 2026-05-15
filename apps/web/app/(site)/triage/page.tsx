@@ -14,12 +14,12 @@ import {
 	DialogTrigger,
 } from "@/core/components/ui/dialog"
 import { Skeleton } from "@/core/components/ui/skeleton"
+import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useEdQueueQuery } from "@/features/ed/api/ed.hooks"
-import { TriageForm } from "@/features/ed/components/triage-form"
 import { TraumaAliasBadge } from "@/features/ed/components/trauma-alias-badge"
+import { TriageForm } from "@/features/ed/components/triage-form"
 import { acuityColor, acuityLabel } from "@/features/ed/lib/acuity-utils"
-import { cn } from "@/core/lib/utils"
 
 const ACUITY_COLUMNS = [1, 2, 3, 4, 5] as const
 
@@ -33,6 +33,22 @@ interface TriageQueueItem {
 	chiefComplaint: string | null
 	arrivalTime: string | Date
 	queueStatus: "waiting" | "triage" | "being_seen" | "disposition"
+	inboundHandoff?: {
+		id: string
+		callerName: string
+		patientLocation: string
+		transportMode: "ambulance" | "private_vehicle" | "walk_in" | "motorcycle_ambulance"
+		channelType: "phone" | "video"
+		etaMinutes: number
+		etaAt: string | Date
+		arrivedAt: string | Date | null
+		assessmentNotes: string
+		resourceNeeds: {
+			bed: boolean
+			codeTeam: boolean
+			equipment: string[]
+		}
+	} | null
 }
 
 function formatElapsed(arrivalTime: string | Date, now: number) {
@@ -52,6 +68,25 @@ function formatArrival(arrivalTime: string | Date) {
 		hour: "2-digit",
 		minute: "2-digit",
 	})
+}
+
+function formatLabel(value: string) {
+	return value
+		.split("_")
+		.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(" ")
+}
+
+function formatResourceNeeds(
+	needs: NonNullable<TriageQueueItem["inboundHandoff"]>["resourceNeeds"]
+) {
+	const resources = [
+		needs.bed ? "Bed" : null,
+		needs.codeTeam ? "Code team" : null,
+		...needs.equipment,
+	].filter(Boolean)
+
+	return resources.length > 0 ? resources.join(", ") : "No special resources"
 }
 
 function AcuityColumn({
@@ -91,11 +126,12 @@ function AcuityColumn({
 									<div className="min-w-0">
 										<p className="truncate text-sm font-semibold">
 											{item.type === "pre_encounter"
-												? item.traumaAlias ?? "Unregistered"
+												? (item.traumaAlias ?? "Unregistered")
 												: item.patientName}
 										</p>
 										<p className="text-muted-foreground text-xs">
-											{item.acuityScale?.toUpperCase() ?? "No scale"} · {formatArrival(item.arrivalTime)}
+											{item.acuityScale?.toUpperCase() ?? "No scale"} ·{" "}
+											{formatArrival(item.arrivalTime)}
 										</p>
 									</div>
 									<Badge className={acuityColor(item.acuityLevel)}>{item.acuityLevel}</Badge>
@@ -105,6 +141,48 @@ function AcuityColumn({
 									<p className="text-muted-foreground line-clamp-2 text-xs">
 										{item.chiefComplaint}
 									</p>
+								) : null}
+
+								{item.inboundHandoff ? (
+									<div className="bg-muted/40 space-y-2 rounded-md border p-2 text-xs">
+										<div className="flex flex-wrap gap-1">
+											<Badge variant="outline">
+												{formatLabel(item.inboundHandoff.transportMode)}
+											</Badge>
+											<Badge variant="outline">
+												{formatLabel(item.inboundHandoff.channelType)}
+											</Badge>
+											<Badge variant="secondary">
+												ETA {formatArrival(item.inboundHandoff.etaAt)}
+											</Badge>
+											{item.inboundHandoff.arrivedAt ? (
+												<Badge variant="secondary">
+													Arrived {formatArrival(item.inboundHandoff.arrivedAt)}
+												</Badge>
+											) : null}
+										</div>
+										<div className="space-y-1">
+											<p>
+												<span className="text-muted-foreground">From:</span>{" "}
+												{item.inboundHandoff.patientLocation}
+											</p>
+											<p>
+												<span className="text-muted-foreground">Caller:</span>{" "}
+												{item.inboundHandoff.callerName}
+											</p>
+											<p>
+												<span className="text-muted-foreground">Resources:</span>{" "}
+												{formatResourceNeeds(item.inboundHandoff.resourceNeeds)}
+											</p>
+											{item.inboundHandoff.assessmentNotes &&
+											item.inboundHandoff.assessmentNotes !== item.chiefComplaint ? (
+												<p className="line-clamp-2">
+													<span className="text-muted-foreground">Notes:</span>{" "}
+													{item.inboundHandoff.assessmentNotes}
+												</p>
+											) : null}
+										</div>
+									</div>
 								) : null}
 
 								<div className="flex items-center justify-between text-xs">
@@ -211,7 +289,7 @@ export default function TriageDashboardPage() {
 			)}
 
 			<Card className="border-dashed">
-				<CardContent className="flex items-start gap-3 p-4 text-sm text-muted-foreground">
+				<CardContent className="text-muted-foreground flex items-start gap-3 p-4 text-sm">
 					<Stethoscope className="mt-0.5 size-4 shrink-0" />
 					<span>
 						Level 1 and 2 cases receive trauma aliases through the existing ED pre-encounter
