@@ -669,12 +669,26 @@ export class ProblemsAllergiesService {
 		const staffProfileId = await this.getStaffProfileId(userId, existing.facilityId)
 
 		const updateValues: Record<string, unknown> = { updatedAt: new Date() }
+		const materiallyChanged =
+			(input.allergenName !== undefined &&
+				input.allergenName.trim() !== existing.allergenName) ||
+			(input.allergenType !== undefined && input.allergenType !== existing.allergenType) ||
+			(input.reactionType !== undefined &&
+				this.normalizeOptionalText(input.reactionType) !== existing.reactionType) ||
+			(input.severity !== undefined && input.severity !== existing.severity) ||
+			(input.onsetDate !== undefined && (input.onsetDate || null) !== existing.onsetDate)
+
 		if (input.allergenName !== undefined) updateValues.allergenName = input.allergenName.trim()
 		if (input.allergenType !== undefined) updateValues.allergenType = input.allergenType
 		if (input.reactionType !== undefined)
 			updateValues.reactionType = this.normalizeOptionalText(input.reactionType)
 		if (input.severity !== undefined) updateValues.severity = input.severity
 		if (input.onsetDate !== undefined) updateValues.onsetDate = input.onsetDate || null
+		if (materiallyChanged && existing.isVerified) {
+			updateValues.isVerified = false
+			updateValues.verifiedAt = null
+			updateValues.verifiedByStaffId = null
+		}
 
 		await db.update(allergies).set(updateValues).where(eq(allergies.id, existing.id))
 
@@ -688,7 +702,10 @@ export class ProblemsAllergiesService {
 			entityId: updated.id,
 			beforeState: existing as unknown as Record<string, unknown>,
 			afterState: updated as unknown as Record<string, unknown>,
-			metadata: { patientId: updated.patientId },
+			metadata: {
+				patientId: updated.patientId,
+				verificationReset: materiallyChanged && existing.isVerified,
+			},
 		})
 
 		return updated

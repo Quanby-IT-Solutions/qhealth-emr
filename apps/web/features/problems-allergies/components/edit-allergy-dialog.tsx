@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
+import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Button } from "@/core/components/ui/button"
 import {
 	Dialog,
@@ -40,11 +41,39 @@ export function EditAllergyDialog({
 	allergy,
 	facilityId,
 }: EditAllergyDialogProps) {
-	const [allergenName, setAllergenName] = useState("")
-	const [allergenType, setAllergenType] = useState<AllergenType | "">("")
-	const [reactionType, setReactionType] = useState("")
-	const [severity, setSeverity] = useState<AllergySeverity | "">("")
-	const [onsetDate, setOnsetDate] = useState("")
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="sm:max-w-lg">
+				<DialogHeader>
+					<DialogTitle>Edit Allergy</DialogTitle>
+				</DialogHeader>
+				{allergy && open ? (
+					<EditAllergyForm
+						key={allergy.id}
+						allergy={allergy}
+						facilityId={facilityId}
+						onSaved={() => onOpenChange(false)}
+					/>
+				) : null}
+			</DialogContent>
+		</Dialog>
+	)
+}
+
+function EditAllergyForm({
+	allergy,
+	facilityId,
+	onSaved,
+}: {
+	allergy: Allergy
+	facilityId: string
+	onSaved: () => void
+}) {
+	const [allergenName, setAllergenName] = useState(allergy.allergenName)
+	const [allergenType, setAllergenType] = useState<AllergenType | "">(allergy.allergenType)
+	const [reactionType, setReactionType] = useState(allergy.reactionType ?? "")
+	const [severity, setSeverity] = useState<AllergySeverity | "">(allergy.severity)
+	const [onsetDate, setOnsetDate] = useState(allergy.onsetDate ?? "")
 
 	const updateAllergy = useUpdateAllergyMutation()
 	const allergenSearch = useAllergenSearchQuery({
@@ -56,15 +85,6 @@ export function EditAllergyDialog({
 	const canSubmit = Boolean(
 		allergy && allergenName.trim() && allergenType && severity && !updateAllergy.isPending
 	)
-
-	useEffect(() => {
-		if (!allergy || !open) return
-		setAllergenName(allergy.allergenName)
-		setAllergenType(allergy.allergenType)
-		setReactionType(allergy.reactionType ?? "")
-		setSeverity(allergy.severity)
-		setOnsetDate(allergy.onsetDate ?? "")
-	}, [allergy, open])
 
 	function handleSubmit() {
 		if (!allergy || !canSubmit || !allergenType || !severity) return
@@ -79,19 +99,23 @@ export function EditAllergyDialog({
 				onsetDate: onsetDate || undefined,
 			},
 			{
-				onSuccess: () => onOpenChange(false),
+				onSuccess: onSaved,
 			}
 		)
 	}
 
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg">
-				<DialogHeader>
-					<DialogTitle>Edit Allergy</DialogTitle>
-				</DialogHeader>
-
+		<>
 				<div className="grid gap-4">
+					{allergy?.isVerified && (
+						<Alert>
+							<AlertDescription>
+								Saving clinical changes resets verification. Verify the allergy again before it can
+								block medication orders.
+							</AlertDescription>
+						</Alert>
+					)}
+
 					<div className="space-y-2">
 						<Label>Allergen Name *</Label>
 						<Input value={allergenName} onChange={event => setAllergenName(event.target.value)} />
@@ -173,7 +197,6 @@ export function EditAllergyDialog({
 						{updateAllergy.isPending ? "Saving..." : "Save Allergy"}
 					</Button>
 				</DialogFooter>
-			</DialogContent>
-		</Dialog>
+		</>
 	)
 }

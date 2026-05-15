@@ -207,10 +207,11 @@ function groupTranches(orders: MedOrderItem[]): Array<{
 	const trancheParents = orders.filter(
 		o => o.pdeaTrancheNumber === 1 && (o.pdeaTrancheTotal ?? 0) > 1
 	)
-	const trancheChildren = orders.filter(o => o.pdeaTrancheNumber != null && o.pdeaTrancheNumber > 1)
+	const trancheChildren = orders.filter(o => o.pdeaTrancheNumber !== null && o.pdeaTrancheNumber > 1)
 	const standalone = orders.filter(
 		o =>
-			o.pdeaTrancheNumber == null || (o.pdeaTrancheNumber === 1 && (o.pdeaTrancheTotal ?? 1) <= 1)
+			o.pdeaTrancheNumber === null ||
+			(o.pdeaTrancheNumber === 1 && (o.pdeaTrancheTotal ?? 1) <= 1)
 	)
 
 	const grouped = trancheParents.map(parent => ({
@@ -499,7 +500,7 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 					<Card>
 						<CardHeader className="flex flex-row items-center justify-between">
 							<CardTitle>Medication Orders</CardTitle>
-							{canCreateOrders ? (
+							{canPrescribe ? (
 								<Button size="sm" onClick={() => setCreateMedOpen(true)}>
 									New Medication Order
 								</Button>

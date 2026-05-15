@@ -4,7 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequirePermission, RequirePermissions } from "@/modules/v1/rbac/rbac.guard"
 
 import { OrdersService } from "./orders.service"
 
@@ -44,7 +44,10 @@ export class OrdersController {
 		})
 	}
 
-	@RequirePermission("orders", "create")
+	@RequirePermissions([
+		{ module: "orders", action: "create" },
+		{ module: "orders", action: "sign" },
+	])
 	@Implement(v1.orders.createMedOrder)
 	async createMedOrder(@Session() session: UserSession) {
 		return implement(v1.orders.createMedOrder).handler(async ({ input }) => {
@@ -152,7 +155,7 @@ export class OrdersController {
 		})
 	}
 
-	@RequirePermission("orders", "edit")
+	@RequirePermission("orders", "verify")
 	@Implement(v1.orders.verifyOrder)
 	async verifyOrder(@Session() session: UserSession) {
 		return implement(v1.orders.verifyOrder).handler(async ({ input }) => {
@@ -248,7 +251,10 @@ export class OrdersController {
 		})
 	}
 
-	@RequirePermission("orders", "create")
+	@RequirePermissions([
+		{ module: "orders", action: "create" },
+		{ module: "orders", action: "sign" },
+	])
 	@Implement(v1.orders.createTranchedOrders)
 	async createTranchedOrders(@Session() session: UserSession) {
 		return implement(v1.orders.createTranchedOrders).handler(async ({ input }) => {
