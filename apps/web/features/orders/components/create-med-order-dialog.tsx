@@ -168,8 +168,8 @@ export function CreateMedOrderDialog({
 		profile?.staffProfiles?.[0]
 	const pdeaLicense = staffProfile?.pdeaS2License ?? null
 	const pdeaExpiry = staffProfile?.pdeaS2Expiry ?? null
-	const pdeaExpired = pdeaExpiry != null ? new Date(pdeaExpiry) < new Date() : false
-	const pdeaValid = pdeaLicense != null && !pdeaExpired
+	const pdeaExpired = pdeaExpiry !== null ? new Date(pdeaExpiry) < new Date() : false
+	const pdeaValid = pdeaLicense !== null && !pdeaExpired
 	const pdeaLicenseStatus = useCheckPdeaLicenseQuery({
 		staffId: orderingStaffId,
 		facilityId,
@@ -239,6 +239,8 @@ export function CreateMedOrderDialog({
 				allergenName?: string
 				severity?: string
 				reactionType?: string | null
+				matchType?: "exact" | "class"
+				allergyClass?: string | null
 			}
 
 			return {
@@ -247,6 +249,8 @@ export function CreateMedOrderDialog({
 				allergenName: details.allergenName ?? genericName.trim(),
 				severity: details.severity ?? "unknown",
 				reactionType: details.reactionType ?? null,
+				matchType: details.matchType,
+				allergyClass: details.allergyClass ?? null,
 			}
 		})
 
@@ -908,7 +912,7 @@ export function CreateMedOrderDialog({
 									ordering controlled substances.
 								</div>
 							)}
-							{pdeaLicense != null && pdeaExpired && (
+							{pdeaLicense !== null && pdeaExpired && (
 								<div className="border-destructive bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
 									<AlertCircle className="size-4 shrink-0" />
 									PDEA S-2 license expired ({pdeaExpiry}). Renew your license before ordering
@@ -960,8 +964,8 @@ export function CreateMedOrderDialog({
 									</div>
 									<div className="text-xs">
 										Days Until Expiry:{" "}
-										{livePdeaStatus?.daysUntilExpiry != null
-											? livePdeaStatus.daysUntilExpiry
+										{(livePdeaStatus?.daysUntilExpiry ?? null) !== null
+											? livePdeaStatus?.daysUntilExpiry
 											: "--"}
 									</div>
 									{livePdeaStatus?.errorMessage && (

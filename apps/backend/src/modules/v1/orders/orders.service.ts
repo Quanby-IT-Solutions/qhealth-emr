@@ -5,6 +5,7 @@ import {
 	auditLogs,
 	counselingLogs,
 	dispenseLogs,
+	drugBrands,
 	drugGenerics,
 	encounters,
 	encounterStatusEvents,
@@ -62,6 +63,172 @@ export class OrdersService {
 
 	constructor(private readonly problemsAllergiesService: ProblemsAllergiesService) {}
 
+	private normalizeDrugName(value: string) {
+		return value
+			.trim()
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, " ")
+			.replace(/\s+/g, " ")
+			.trim()
+	}
+
+	private allergyClassRules = [
+		{
+			className: "Penicillin / beta-lactam",
+			allergens: [
+				"penicillin",
+				"penicillins",
+				"penicillin class",
+				"beta lactam",
+				"beta-lactam",
+			],
+			generics: [
+				"amoxicillin",
+				"ampicillin",
+				"penicillin",
+				"cloxacillin",
+				"dicloxacillin",
+				"piperacillin",
+				"tazobactam",
+				"amoxicillin clavulanate",
+				"co amoxiclav",
+				"ampicillin sulbactam",
+			],
+		},
+		{
+			className: "Cephalosporin",
+			allergens: ["cephalosporin", "cephalosporins"],
+			generics: [
+				"cefazolin",
+				"cefalexin",
+				"cephalexin",
+				"cefuroxime",
+				"ceftriaxone",
+				"cefixime",
+				"cefepime",
+			],
+		},
+		{
+			className: "Sulfonamide",
+			allergens: ["sulfa", "sulfonamide", "sulfonamides"],
+			generics: ["sulfamethoxazole", "trimethoprim sulfamethoxazole", "co trimoxazole"],
+		},
+		{
+			className: "NSAID",
+			allergens: ["nsaid", "nsaids", "aspirin"],
+			generics: ["aspirin", "ibuprofen", "naproxen", "diclofenac", "mefenamic acid", "ketorolac"],
+		},
+	]
+
+	private getAllergyConflict(allergenName: string, genericName: string) {
+		const normalizedAllergen = this.normalizeDrugName(allergenName)
+		const normalizedGeneric = this.normalizeDrugName(genericName)
+
+		if (normalizedAllergen === normalizedGeneric) {
+			return { matchType: "exact" as const }
+		}
+
+		const rule = this.allergyClassRules.find(candidate => {
+			const allergenMatches = candidate.allergens.some(
+				allergen => this.normalizeDrugName(allergen) === normalizedAllergen
+			)
+			const drugMatches = candidate.generics.some(generic => {
+				const normalizedRuleGeneric = this.normalizeDrugName(generic)
+				return (
+					normalizedRuleGeneric === normalizedGeneric ||
+					normalizedGeneric.includes(normalizedRuleGeneric)
+				)
+			})
+
+			return allergenMatches && drugMatches
+		})
+
+		return rule ? { matchType: "class" as const, className: rule.className } : null
+	}
+
+	private async resolveCanonicalGenericName(input: {
+		facilityId: string
+		formularyItemId?: string
+		genericName: string
+	}) {
+		const requestedGenericName = input.genericName.trim()
+
+		if (input.formularyItemId) {
+			const [formularySelection] = await db
+				.select({
+					id: formularyItems.id,
+					facilityId: formularyItems.facilityId,
+					isActive: formularyItems.isActive,
+					genericName: drugGenerics.genericName,
+				})
+				.from(formularyItems)
+				.innerJoin(drugGenerics, eq(formularyItems.drugGenericId, drugGenerics.id))
+				.where(eq(formularyItems.id, input.formularyItemId))
+				.limit(1)
+
+			if (!formularySelection) {
+				throw new BadRequestException("Selected formulary item was not found.")
+			}
+
+			if (formularySelection.facilityId !== input.facilityId || !formularySelection.isActive) {
+				throw new BadRequestException(
+					"Selected formulary item is inactive or does not belong to this facility."
+				)
+			}
+
+			if (
+				this.normalizeDrugName(formularySelection.genericName) !==
+				this.normalizeDrugName(requestedGenericName)
+			) {
+				throw new BadRequestException(
+					`Generic name must match the selected formulary generic (${formularySelection.genericName}).`
+				)
+			}
+
+			return formularySelection.genericName
+		}
+
+		const [brandMatch] = await db
+			.select({
+				brandName: drugBrands.brandName,
+				genericName: drugGenerics.genericName,
+			})
+			.from(drugBrands)
+			.innerJoin(drugGenerics, eq(drugBrands.drugGenericId, drugGenerics.id))
+			.where(
+				and(
+					eq(drugBrands.isActive, true),
+					sql`lower(${drugBrands.brandName}) = ${requestedGenericName.toLowerCase()}`
+				)
+			)
+			.limit(1)
+
+		if (brandMatch) {
+			throw new BadRequestException(
+				`${brandMatch.brandName} is a brand name. Select the generic name first (${brandMatch.genericName}); brand name is optional and subordinate.`
+			)
+		}
+
+		const [genericMatch] = await db
+			.select({ genericName: drugGenerics.genericName })
+			.from(drugGenerics)
+			.where(
+				and(
+					eq(drugGenerics.isActive, true),
+					sql`lower(${drugGenerics.genericName}) = ${requestedGenericName.toLowerCase()}`
+				)
+			)
+			.limit(1)
+
+		if (!genericMatch) {
+			throw new BadRequestException(
+				"Select an active generic drug name from Drug Search before signing the medication order."
+			)
+		}
+
+		return genericMatch.genericName
+	}
+
 	private async findFormularyItemForCds(
 		input: Pick<CdsEvaluateInput, "facilityId" | "formularyItemId" | "genericName">
 	) {
@@ -69,7 +236,12 @@ export class OrdersService {
 			const [formularyItem] = await db
 				.select()
 				.from(formularyItems)
-				.where(eq(formularyItems.id, input.formularyItemId))
+				.where(
+					and(
+						eq(formularyItems.id, input.formularyItemId),
+						eq(formularyItems.facilityId, input.facilityId)
+					)
+				)
 				.limit(1)
 
 			return formularyItem ?? null
@@ -148,31 +320,81 @@ export class OrdersService {
 		)
 	}
 
+	private async getOrderingStaffProfile(userId: string, facilityId: string) {
+		const [staff] = await db
+			.select()
+			.from(staffProfiles)
+			.where(
+				and(
+					eq(staffProfiles.userId, userId),
+					eq(staffProfiles.facilityId, facilityId),
+					eq(staffProfiles.isActive, true)
+				)
+			)
+			.limit(1)
+
+		if (!staff) {
+			throw new NotFoundException("Active staff profile not found for this facility")
+		}
+
+		return staff
+	}
+
 	private async resolveMedicationOrderPatientId(input: {
 		patientId?: string
 		encounterId?: string
+		facilityId: string
 	}) {
-		if (input.patientId) {
-			return input.patientId
-		}
-
-		if (!input.encounterId) {
+		if (!input.patientId && !input.encounterId) {
 			throw new BadRequestException(
 				"patientId or encounterId is required to run medication safety checks."
 			)
 		}
 
-		const [encounter] = await db
-			.select({ patientId: encounters.patientId })
-			.from(encounters)
-			.where(eq(encounters.id, input.encounterId))
-			.limit(1)
+		if (input.encounterId) {
+			const [encounter] = await db
+				.select({
+					patientId: encounters.patientId,
+					facilityId: encounters.facilityId,
+				})
+				.from(encounters)
+				.where(eq(encounters.id, input.encounterId))
+				.limit(1)
 
-		if (!encounter?.patientId) {
-			throw new NotFoundException("Encounter patient not found for medication safety checks")
+			if (!encounter?.patientId) {
+				throw new NotFoundException("Encounter patient not found for medication safety checks")
+			}
+
+			if (encounter.facilityId !== input.facilityId) {
+				throw new BadRequestException(
+					"Encounter does not belong to the medication order facility."
+				)
+			}
+
+			if (input.patientId && input.patientId !== encounter.patientId) {
+				throw new BadRequestException(
+					"Medication order patientId does not match the selected encounter."
+				)
+			}
+
+			return encounter.patientId
 		}
 
-		return encounter.patientId
+		const [patient] = await db
+			.select({ id: patients.id, facilityId: patients.facilityId })
+			.from(patients)
+			.where(eq(patients.id, input.patientId!))
+			.limit(1)
+
+		if (!patient) {
+			throw new NotFoundException("Patient not found for medication safety checks")
+		}
+
+		if (patient.facilityId !== input.facilityId) {
+			throw new BadRequestException("Patient does not belong to the medication order facility.")
+		}
+
+		return patient.id
 	}
 
 	private async validateMedicationOrderCds(input: {
@@ -186,7 +408,7 @@ export class OrdersService {
 		cdsOverrides?: unknown
 	}) {
 		const patientId = await this.resolveMedicationOrderPatientId(input)
-		const cdsResult = await this.evaluateCds({
+		const cdsResult = await this.evaluateCdsForResolvedPatient({
 			patientId,
 			facilityId: input.facilityId,
 			formularyItemId: input.formularyItemId,
@@ -253,6 +475,27 @@ export class OrdersService {
 	// ========================================================================
 
 	async evaluateCds(input: CdsEvaluateInput) {
+		await this.assertCdsPatientInFacility(input.patientId, input.facilityId)
+		return this.evaluateCdsForResolvedPatient(input)
+	}
+
+	private async assertCdsPatientInFacility(patientId: string, facilityId: string) {
+		const [patient] = await db
+			.select({ id: patients.id, facilityId: patients.facilityId })
+			.from(patients)
+			.where(eq(patients.id, patientId))
+			.limit(1)
+
+		if (!patient) {
+			throw new NotFoundException("Patient not found for medication safety checks")
+		}
+
+		if (patient.facilityId !== facilityId) {
+			throw new BadRequestException("Patient does not belong to the medication order facility.")
+		}
+	}
+
+	private async evaluateCdsForResolvedPatient(input: CdsEvaluateInput) {
 		const alerts: {
 			type:
 				| "allergy_hard_block"
@@ -275,29 +518,40 @@ export class OrdersService {
 		})
 
 		for (const allergy of activeAllergies.filter(a => a.isActive && a.isVerified)) {
-			if (allergy.allergenName.toLowerCase() === input.genericName.toLowerCase()) {
+			const conflict = this.getAllergyConflict(allergy.allergenName, input.genericName)
+			if (conflict) {
 				if (allergy.severity === "severe") {
 					alerts.push({
 						type: "allergy_hard_block",
 						severity: "hard_block",
-						message: `Patient has a SEVERE allergy to ${allergy.allergenName}. This order cannot proceed.`,
+						message:
+							conflict.matchType === "class"
+								? `Patient has a SEVERE ${conflict.className} allergy (${allergy.allergenName}). This ${input.genericName} order cannot proceed.`
+								: `Patient has a SEVERE allergy to ${allergy.allergenName}. This order cannot proceed.`,
 						details: {
 							allergenName: allergy.allergenName,
 							allergenType: allergy.allergenType,
 							severity: allergy.severity,
 							reactionType: allergy.reactionType ?? null,
+							matchType: conflict.matchType,
+							allergyClass: conflict.matchType === "class" ? conflict.className : null,
 						},
 					})
 				} else {
 					alerts.push({
 						type: "allergy_soft_block",
 						severity: "soft_block",
-						message: `Patient has a ${allergy.severity} allergy to ${allergy.allergenName}. Override required to proceed.`,
+						message:
+							conflict.matchType === "class"
+								? `Patient has a ${allergy.severity} ${conflict.className} allergy (${allergy.allergenName}). Override required to proceed with ${input.genericName}.`
+								: `Patient has a ${allergy.severity} allergy to ${allergy.allergenName}. Override required to proceed.`,
 						details: {
 							allergenName: allergy.allergenName,
 							allergenType: allergy.allergenType,
 							severity: allergy.severity,
 							reactionType: allergy.reactionType ?? null,
+							matchType: conflict.matchType,
+							allergyClass: conflict.matchType === "class" ? conflict.className : null,
 						},
 					})
 				}
@@ -401,6 +655,7 @@ export class OrdersService {
 				allergy_hard_block: "allergy_cross_reactivity",
 				allergy_soft_block: "allergy_cross_reactivity",
 				formulary_warning: "duplicate_therapy",
+				formulary_restricted: "duplicate_therapy",
 				high_alert: "black_box_warning",
 				s2_license_block: "pregnancy_category",
 			} as const
@@ -416,6 +671,7 @@ export class OrdersService {
 				allergy_hard_block: "Severe allergy conflict",
 				allergy_soft_block: "Allergy override required",
 				formulary_warning: "Formulary warning",
+				formulary_restricted: "Restricted formulary medication",
 				high_alert: "High-alert medication",
 				s2_license_block: "PDEA S-2 validation",
 			} as const
@@ -611,8 +867,7 @@ export class OrdersService {
 	}
 
 	async createMedOrder(input: CreateMedOrderInput, userId: string) {
-		const [staff] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId))
-		if (!staff) throw new NotFoundException("Staff profile not found for user")
+		const staff = await this.getOrderingStaffProfile(userId, input.facilityId)
 
 		const repeatingFrequencies = ["q4h", "q6h", "q8h", "q12h", "daily", "bid", "tid", "qid"]
 		if (repeatingFrequencies.includes(input.frequency) && !input.durationDays) {
@@ -647,12 +902,18 @@ export class OrdersService {
 			)
 		}
 
+		const canonicalGenericName = await this.resolveCanonicalGenericName({
+			facilityId: input.facilityId,
+			formularyItemId: input.formularyItemId,
+			genericName: input.genericName,
+		})
+
 		const evaluatedCdsAlerts = await this.validateMedicationOrderCds({
 			patientId: input.patientId,
 			encounterId: input.encounterId,
 			facilityId: input.facilityId,
 			formularyItemId: input.formularyItemId,
-			genericName: input.genericName,
+			genericName: canonicalGenericName,
 			isControlledSubstance: input.isControlledSubstance,
 			orderingStaffId: staff.id,
 			cdsOverrides: input.cdsOverrides,
@@ -665,7 +926,7 @@ export class OrdersService {
 				encounterId: input.encounterId ?? null,
 				preEncounterId: input.preEncounterId ?? null,
 				formularyItemId: input.formularyItemId ?? null,
-				genericName: input.genericName,
+				genericName: canonicalGenericName,
 				brandName: input.brandName ?? null,
 				rxnormCode: input.rxnormCode ?? null,
 				dose: input.dose,
@@ -688,6 +949,23 @@ export class OrdersService {
 				cdsOverrides: input.cdsOverrides ?? null,
 			})
 			.returning()
+
+		if (created) {
+			await this.writeAuditLog({
+				facilityId: input.facilityId,
+				userId,
+				staffProfileId: staff.id,
+				action: "sign",
+				entityType: "medication_order",
+				entityId: created.id,
+				metadata: {
+					patientId: input.patientId ?? null,
+					encounterId: input.encounterId ?? null,
+					genericName: canonicalGenericName,
+					alertCount: evaluatedCdsAlerts.length,
+				},
+			})
+		}
 
 		if (created && this.hasNonEmptyCdsOverrides(input.cdsOverrides)) {
 			await this.writeAuditLog({
@@ -1880,8 +2158,7 @@ export class OrdersService {
 	// ========================================================================
 
 	async createTranchedOrders(input: CreateTranchedOrdersInput, userId: string) {
-		const [staff] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId))
-		if (!staff) throw new NotFoundException("Staff profile not found for user")
+		const staff = await this.getOrderingStaffProfile(userId, input.facilityId)
 
 		if (!Array.isArray(input.cdsAlerts)) {
 			throw new BadRequestException(
@@ -1889,12 +2166,18 @@ export class OrdersService {
 			)
 		}
 
+		const canonicalGenericName = await this.resolveCanonicalGenericName({
+			facilityId: input.facilityId,
+			formularyItemId: input.formularyItemId,
+			genericName: input.genericName,
+		})
+
 		const evaluatedCdsAlerts = await this.validateMedicationOrderCds({
 			patientId: input.patientId,
 			encounterId: input.encounterId,
 			facilityId: input.facilityId,
 			formularyItemId: input.formularyItemId,
-			genericName: input.genericName,
+			genericName: canonicalGenericName,
 			isControlledSubstance: true,
 			orderingStaffId: staff.id,
 			cdsOverrides: input.cdsOverrides,
@@ -1902,7 +2185,7 @@ export class OrdersService {
 
 		const preview = await this.previewTranches({
 			facilityId: input.facilityId,
-			genericName: input.genericName,
+			genericName: canonicalGenericName,
 			dose: input.dose,
 			frequency: input.frequency,
 			durationDays: input.durationDays,
@@ -1926,7 +2209,7 @@ export class OrdersService {
 				encounterId: input.encounterId ?? null,
 				preEncounterId: input.preEncounterId ?? null,
 				formularyItemId: input.formularyItemId ?? null,
-				genericName: input.genericName,
+				genericName: canonicalGenericName,
 				brandName: input.brandName ?? null,
 				rxnormCode: input.rxnormCode ?? null,
 				dose: input.dose,
@@ -1953,6 +2236,22 @@ export class OrdersService {
 
 		if (!parentRow) throw new NotFoundException("Failed to create parent order")
 
+		await this.writeAuditLog({
+			facilityId: input.facilityId,
+			userId,
+			staffProfileId: staff.id,
+			action: "sign",
+			entityType: "medication_order",
+			entityId: parentRow.id,
+			metadata: {
+				patientId: input.patientId ?? null,
+				encounterId: input.encounterId ?? null,
+				genericName: canonicalGenericName,
+				alertCount: evaluatedCdsAlerts.length,
+				totalTranches,
+			},
+		})
+
 		// Create one child order per tranche
 		const childIds: string[] = []
 		for (const tranche of preview.tranches) {
@@ -1963,7 +2262,7 @@ export class OrdersService {
 					encounterId: input.encounterId ?? null,
 					preEncounterId: input.preEncounterId ?? null,
 					formularyItemId: input.formularyItemId ?? null,
-					genericName: input.genericName,
+					genericName: canonicalGenericName,
 					brandName: input.brandName ?? null,
 					rxnormCode: input.rxnormCode ?? null,
 					dose: input.dose,

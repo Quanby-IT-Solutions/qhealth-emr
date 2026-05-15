@@ -15,6 +15,8 @@ export interface AllergyAlertItem {
 	allergenName: string
 	severity: string
 	reactionType: string | null
+	allergyClass?: string | null
+	matchType?: "exact" | "class"
 }
 
 interface AllergyAlertBannerProps {
@@ -77,6 +79,9 @@ function SingleAllergyAlert({
 							<span className="ml-1 font-medium">{alert.allergenName}</span>
 							<span className="ml-1 opacity-80">
 								({formatSeverityLabel(alert.severity)}
+								{alert.matchType === "class" && alert.allergyClass
+									? ` / ${alert.allergyClass}`
+									: ""}
 								{alert.reactionType ? ` · ${alert.reactionType}` : ""})
 							</span>
 						</div>

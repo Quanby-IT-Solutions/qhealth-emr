@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common"
+import { BadRequestException, NotFoundException } from "@nestjs/common"
 
 import { db } from "@/common/database/database.client"
 
@@ -44,6 +44,7 @@ jest.mock("@repo/db/schema", () => {
 		auditLogs: createTable(),
 		counselingLogs: createTable(),
 		dispenseLogs: createTable(),
+		drugBrands: createTable(),
 		drugGenerics: createTable(),
 		encounters: createTable(),
 		encounterStatusEvents: createTable(),
@@ -410,9 +411,124 @@ describe("OrdersService", () => {
 		expect(mockDb.insert).not.toHaveBeenCalled()
 	})
 
+	it("hard-blocks beta-lactam orders for verified severe penicillin allergies", async () => {
+		problemsAllergiesMock.getActiveAllergies.mockResolvedValue({
+			allergies: [
+				{
+					allergenName: "Penicillin",
+					allergenType: "medication",
+					severity: "severe",
+					reactionType: "Anaphylaxis",
+					isActive: true,
+					isVerified: true,
+				},
+			],
+		})
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([], { withOrderBy: true, withLimit: true })
+			)
+
+		const result = await service.evaluateCds({
+			patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+			facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+			genericName: "Amoxicillin",
+			orderingStaffId: "staff-1",
+		})
+
+		expect(result.canProceed).toBe(false)
+		expect(result.alerts).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					type: "allergy_hard_block",
+					severity: "hard_block",
+					details: expect.objectContaining({
+						allergenName: "Penicillin",
+						matchType: "class",
+						allergyClass: "Penicillin / beta-lactam",
+					}),
+				}),
+			])
+		)
+	})
+
+	it("rejects CDS evaluation when the patient is outside the facility", async () => {
+		mockDb.select.mockImplementationOnce(() =>
+			createSelectBuilder(
+				[
+					{
+						id: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+						facilityId: "8d79f2a7-70d4-47b6-b8ff-3b944d4eeddd",
+					},
+				],
+				{ withLimit: true }
+			)
+		)
+
+		await expect(
+			service.evaluateCds({
+				patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+				facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+				genericName: "Amoxicillin",
+				orderingStaffId: "staff-1",
+			})
+		).rejects.toBeInstanceOf(BadRequestException)
+		expect(problemsAllergiesMock.getActiveAllergies).not.toHaveBeenCalled()
+	})
+
+	it("rejects a brand name entered in the generic-name field", async () => {
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "staff-1", userId: "user-1" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							brandName: "Biogesic",
+							genericName: "Paracetamol",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+
+		await expect(
+			service.createMedOrder(
+				{
+					facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+					patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+					genericName: "Biogesic",
+					dose: "500",
+					doseUnit: "mg",
+					doseForm: "tablet",
+					route: "PO",
+					frequency: "once",
+					cdsAlerts: [],
+				},
+				"user-1"
+			)
+		).rejects.toThrow(
+			"Biogesic is a brand name. Select the generic name first (Paracetamol); brand name is optional and subordinate."
+		)
+		expect(problemsAllergiesMock.getActiveAllergies).not.toHaveBeenCalled()
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
 	it("requires a completed CDS check before creating a medication order", async () => {
 		mockDb.select.mockImplementationOnce(() =>
-			createSelectBuilder([{ id: "staff-1", userId: "user-1" }])
+			createSelectBuilder([{ id: "staff-1", userId: "user-1" }], { withLimit: true })
 		)
 
 		await expect(
@@ -433,6 +549,61 @@ describe("OrdersService", () => {
 		).rejects.toThrow("Run the CDS safety check before submitting the medication order.")
 	})
 
+	it("rejects medication orders when patientId does not match the selected encounter", async () => {
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "staff-1", userId: "user-1" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ encounterType: "outpatient" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "3f6a0f4f-761d-4fd1-b76f-95e6692eb001",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+							isActive: true,
+							genericName: "Amoxicillin",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							patientId: "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+
+		await expect(
+			service.createMedOrder(
+				{
+					facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+					encounterId: "99999999-9999-4999-9999-999999999999",
+					patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+					formularyItemId: "3f6a0f4f-761d-4fd1-b76f-95e6692eb001",
+					genericName: "Amoxicillin",
+					dose: "500",
+					doseUnit: "mg",
+					doseForm: "capsule",
+					route: "PO",
+					frequency: "once",
+					cdsAlerts: [],
+				},
+				"user-1"
+			)
+		).rejects.toThrow("Medication order patientId does not match the selected encounter.")
+		expect(problemsAllergiesMock.getActiveAllergies).not.toHaveBeenCalled()
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
 	it("requires override reasons for CDS soft blocks before creating a medication order", async () => {
 		problemsAllergiesMock.getActiveAllergies.mockResolvedValue({
 			allergies: [
@@ -448,7 +619,33 @@ describe("OrdersService", () => {
 		})
 
 		mockDb.select
-			.mockImplementationOnce(() => createSelectBuilder([{ id: "staff-1", userId: "user-1" }]))
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "staff-1", userId: "user-1" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "3f6a0f4f-761d-4fd1-b76f-95e6692eb001",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+							isActive: true,
+							genericName: "Amoxicillin",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
 			.mockImplementationOnce(() =>
 				createSelectBuilder(
 					[
@@ -501,7 +698,33 @@ describe("OrdersService", () => {
 		jest.spyOn(service, "findMedOrder").mockResolvedValue({ id: "order-created" } as never)
 
 		mockDb.select
-			.mockImplementationOnce(() => createSelectBuilder([{ id: "staff-1", userId: "user-1" }]))
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "staff-1", userId: "user-1" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "3f6a0f4f-761d-4fd1-b76f-95e6692eb001",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+							isActive: true,
+							genericName: "Amoxicillin",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
 			.mockImplementationOnce(() =>
 				createSelectBuilder(
 					[
