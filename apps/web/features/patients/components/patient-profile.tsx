@@ -152,16 +152,22 @@ function StatCell({
 	monospace?: boolean
 }) {
 	return (
-		<div className="border-border/40 bg-background space-y-2 rounded-lg border px-4 py-4">
+		<div className="border-border/40 bg-background min-w-0 space-y-2 rounded-lg border px-3 py-3 sm:px-4 sm:py-4">
 			<div className="text-muted-foreground flex items-center gap-2 text-[0.68rem] font-medium tracking-[0.24em] uppercase">
-				<Icon className="size-3.5" />
-				<span>{label}</span>
+				<Icon className="size-3.5 shrink-0" />
+				<span className="min-w-0 truncate">{label}</span>
 			</div>
 			<div className="space-y-1">
-				<p className={monospace ? "font-mono text-sm font-medium" : "text-sm font-medium"}>
+				<p
+					className={
+						monospace
+							? "break-all font-mono text-sm font-medium"
+							: "break-words text-sm font-medium"
+					}
+				>
 					{value}
 				</p>
-				{hint && <p className="text-muted-foreground text-xs">{hint}</p>}
+				{hint && <p className="text-muted-foreground break-words text-xs">{hint}</p>}
 			</div>
 		</div>
 	)
@@ -179,12 +185,12 @@ function DetailItem({
 	monospace?: boolean
 }) {
 	return (
-		<div className="space-y-2">
+		<div className="min-w-0 space-y-2">
 			<dt className="text-muted-foreground flex items-center gap-2 text-[0.68rem] font-medium tracking-[0.24em] uppercase">
-				<Icon className="size-3.5" />
-				<span>{label}</span>
+				<Icon className="size-3.5 shrink-0" />
+				<span className="min-w-0 truncate">{label}</span>
 			</dt>
-			<dd className={monospace ? "font-mono text-sm" : "text-sm"}>{value}</dd>
+			<dd className={monospace ? "break-all font-mono text-sm" : "break-words text-sm"}>{value}</dd>
 		</div>
 	)
 }
@@ -237,6 +243,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 	useEffect(() => {
 		if (sourceFromQuery === "list" || sourceFromQuery === "register") {
+			// eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors the navigation source into local state and session storage
 			setSource(sourceFromQuery)
 			sessionStorage.setItem("patientProfileSource", sourceFromQuery)
 			return
@@ -305,6 +312,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 	useEffect(() => {
 		if (breakGlassRequired && canBreakGlass && activeFacilityId) {
+			// eslint-disable-next-line react-hooks/set-state-in-effect -- opens the required access dialog once the access context is known
 			setBreakGlassOpen(true)
 		}
 	}, [activeFacilityId, breakGlassRequired, canBreakGlass])
@@ -407,26 +415,28 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 	return (
 		<div className="bg-background">
-			<div className="w-full">
-				<div className="mb-8 flex items-center gap-3">
+			<div className="mx-auto w-full max-w-screen-2xl px-4 py-4 sm:px-6 lg:px-8">
+				<div className="mb-6 flex flex-wrap items-center gap-3 sm:mb-8">
 					<Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleBackToPrevious}>
 						<ArrowLeft className="size-4" />
 						Back to Search
 					</Button>
 				</div>
 
-				<section className="mb-8">
-					<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-						<div className="bg-secondary text-muted-foreground flex size-14 items-center justify-center rounded-full">
+				<section className="mb-6 sm:mb-8">
+					<div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+						<div className="bg-secondary text-muted-foreground flex size-12 shrink-0 items-center justify-center rounded-full sm:size-14">
 							<UserRound className="size-6" />
 						</div>
-						<div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-							<div className="space-y-3">
+						<div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+							<div className="min-w-0 space-y-3">
 								<p className="text-muted-foreground text-[0.68rem] font-medium tracking-[0.24em] uppercase">
 									Patient
 								</p>
 								<div className="space-y-2">
-									<h1 className="text-3xl font-semibold tracking-tight">{patientName}</h1>
+									<h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+										{patientName}
+									</h1>
 									<div className="flex flex-wrap items-center gap-3">
 										<Badge variant="secondary" className="font-mono">
 											{patient.mrn}
@@ -451,7 +461,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 							{activeBreakGlass ? (
 								<Button
 									variant="outline"
-									className="border-orange-300 text-orange-700 hover:bg-orange-50"
+									className="w-full border-orange-300 text-orange-700 hover:bg-orange-50 sm:w-fit"
 									onClick={() => setBreakGlassOpen(true)}
 								>
 									<ShieldAlert className="size-4" />
@@ -463,11 +473,11 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 				</section>
 
 				{activeBreakGlass ? (
-					<Card className="mb-8 border-orange-300 bg-orange-50/60 shadow-sm">
+					<Card className="mb-6 border-orange-300 bg-orange-50/60 shadow-sm sm:mb-8">
 						<CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-							<div className="space-y-1">
+							<div className="min-w-0 space-y-1">
 								<div className="flex items-center gap-2">
-									<ShieldAlert className="size-4 text-orange-700" />
+									<ShieldAlert className="size-4 shrink-0 text-orange-700" />
 									<p className="text-sm font-medium text-orange-900">
 										Temporary Break-Glass Access Active
 									</p>
@@ -480,11 +490,11 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 									Expires at {formatDateTime(activeBreakGlass.accessExpiresAt)}
 								</p>
 							</div>
-							<div className="flex flex-wrap items-center gap-3">
+							<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
 								<BreakGlassCountdown accessExpiresAt={activeBreakGlass.accessExpiresAt} />
 								<Button
 									variant="outline"
-									className="border-orange-300 text-orange-700 hover:bg-orange-100"
+									className="w-full border-orange-300 text-orange-700 hover:bg-orange-100 sm:w-fit"
 									onClick={() => setBreakGlassOpen(true)}
 								>
 									View Access Session
@@ -494,8 +504,8 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 					</Card>
 				) : null}
 
-				<Card className="border-border/60 mb-8 rounded-lg shadow-sm">
-					<CardContent className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-4">
+				<Card className="border-border/60 mb-6 rounded-lg shadow-sm sm:mb-8">
+					<CardContent className="grid gap-3 p-4 sm:grid-cols-2 sm:gap-4 sm:p-6 xl:grid-cols-4">
 						<StatCell
 							icon={Calendar}
 							label="Date of Birth"
@@ -508,7 +518,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 					</CardContent>
 				</Card>
 
-				<Card className="border-border/60 mb-8 rounded-lg shadow-sm">
+				<Card className="border-border/60 mb-6 rounded-lg shadow-sm sm:mb-8">
 					<CardHeader className="pb-4">
 						<div className="flex items-center gap-2">
 							<Users className="text-muted-foreground size-4" />
@@ -516,7 +526,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 						</div>
 					</CardHeader>
 					<CardContent>
-						<dl className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+						<dl className="grid min-w-0 gap-x-8 gap-y-6 md:grid-cols-2">
 							<DetailItem
 								icon={MapPin}
 								label="Address"
@@ -541,7 +551,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 					</CardContent>
 				</Card>
 
-				<Card className="border-border/60 mb-8 rounded-lg shadow-sm">
+				<Card className="border-border/60 mb-6 rounded-lg shadow-sm sm:mb-8">
 					<CardHeader className="flex flex-col gap-4 pb-4 sm:flex-row sm:items-center sm:justify-between">
 						<div className="flex items-center gap-2">
 							<Clock3 className="text-muted-foreground size-4" />
@@ -553,6 +563,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 							<Button
 								size="sm"
 								variant="outline"
+								className="w-full sm:w-fit"
 								nativeButton={false}
 								render={<Link href={`/patients/${patientId}/encounters/new`} />}
 							>
@@ -561,26 +572,26 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 							</Button>
 						)}
 					</CardHeader>
-					<CardContent>
+					<CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
 						{patient.encounters.length > 0 ? (
 							<div className="space-y-3">
 								{patient.encounters.map(enc => (
 									<Link
 										key={enc.id}
 										href={`/patients/${patientId}/encounters/${enc.id}`}
-										className="border-border/60 bg-background hover:bg-secondary/40 block rounded-lg border px-4 py-4 transition-colors"
+										className="border-border/60 bg-background hover:bg-secondary/40 block rounded-lg border px-3 py-4 transition-colors sm:px-4"
 									>
-										<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-											<div className="space-y-3">
+										<div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(190px,auto)] lg:items-start">
+											<div className="min-w-0 space-y-3">
 												<div className="flex flex-wrap items-center gap-2">
 													<Badge variant="secondary">{encounterTypeLabel(enc.encounterType)}</Badge>
 													<Badge variant={encounterStatusVariant(enc.status)}>{enc.status}</Badge>
 												</div>
-												<p className="text-sm font-medium">
+												<p className="break-words text-sm font-medium">
 													{enc.chiefComplaint ?? "No chief complaint recorded."}
 												</p>
 											</div>
-											<div className="text-muted-foreground space-y-1 text-sm sm:text-right">
+											<div className="text-muted-foreground space-y-1 text-sm lg:text-right">
 												<p>{formatDateTime(enc.admissionDatetime)}</p>
 												<p>
 													{enc.dischargeDatetime ? formatDateTime(enc.dischargeDatetime) : "Active"}
@@ -610,7 +621,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 				</Card>
 
 				{canViewClinicalSummary && (
-					<div className="mb-8">
+					<div className="mb-6 min-w-0 sm:mb-8">
 						<ProblemsAllergiesTab
 							patientId={patientId}
 							facilityId={patient.facilityId}
@@ -621,8 +632,8 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 				{can(permSet, "clinical_docs", "view") && (
 					<>
-						<Separator className="bg-border/60 mb-8" />
-						<div className="mb-8">
+						<Separator className="bg-border/60 mb-6 sm:mb-8" />
+						<div className="mb-6 min-w-0 sm:mb-8">
 							<ConsentHistory
 								patientId={patientId}
 								facilityId={patient.facilityId}

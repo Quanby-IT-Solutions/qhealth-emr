@@ -13,6 +13,7 @@ import {
 	loincCodes,
 	rvsCodes,
 	rxnormCodes,
+	snomedCtCodes,
 } from "./schema/formulary.js"
 
 const DATABASE_URL = process.env.DATABASE_URL
@@ -168,6 +169,104 @@ async function seedIcd10Codes() {
 
 	await db.insert(icd10Codes).values(data).onConflictDoNothing()
 	console.log(`Seeded ${data.length} ICD-10 codes`)
+}
+
+async function seedSnomedCtCodes() {
+	const data = [
+		{
+			conceptId: "38341003",
+			fsn: "Hypertensive disorder, systemic arterial (disorder)",
+			preferredTerm: "Hypertension",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "44054006",
+			fsn: "Diabetes mellitus type 2 (disorder)",
+			preferredTerm: "Type 2 diabetes mellitus",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "233604007",
+			fsn: "Pneumonia (disorder)",
+			preferredTerm: "Pneumonia",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "195967001",
+			fsn: "Asthma (disorder)",
+			preferredTerm: "Asthma",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "13645005",
+			fsn: "Chronic obstructive lung disease (disorder)",
+			preferredTerm: "Chronic obstructive pulmonary disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "84114007",
+			fsn: "Heart failure (disorder)",
+			preferredTerm: "Heart failure",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "53741008",
+			fsn: "Coronary arteriosclerosis (disorder)",
+			preferredTerm: "Coronary artery disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "235595009",
+			fsn: "Gastroesophageal reflux disease (disorder)",
+			preferredTerm: "Gastroesophageal reflux disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "279039007",
+			fsn: "Low back pain (finding)",
+			preferredTerm: "Low back pain",
+			semanticTag: "finding",
+		},
+		{
+			conceptId: "709044004",
+			fsn: "Chronic kidney disease (disorder)",
+			preferredTerm: "Chronic kidney disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "386661006",
+			fsn: "Fever (finding)",
+			preferredTerm: "Fever",
+			semanticTag: "finding",
+		},
+		{
+			conceptId: "68566005",
+			fsn: "Urinary tract infectious disease (disorder)",
+			preferredTerm: "Urinary tract infection",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "40930008",
+			fsn: "Hypothyroidism (disorder)",
+			preferredTerm: "Hypothyroidism",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "55822004",
+			fsn: "Hyperlipidemia (disorder)",
+			preferredTerm: "Hyperlipidemia",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "69896004",
+			fsn: "Rheumatoid arthritis (disorder)",
+			preferredTerm: "Rheumatoid arthritis",
+			semanticTag: "disorder",
+		},
+	]
+
+	await db.insert(snomedCtCodes).values(data).onConflictDoNothing()
+	console.log(`Seeded ${data.length} SNOMED CT codes`)
 }
 
 async function seedLoincCodes() {
@@ -365,6 +464,7 @@ async function main() {
 	const generics = await seedDrugGenerics()
 	await seedDrugBrands(generics)
 	await seedIcd10Codes()
+	await seedSnomedCtCodes()
 	await seedLoincCodes()
 	await seedRxnormCodes()
 	await seedRvsCodes()

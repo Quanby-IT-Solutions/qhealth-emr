@@ -46,6 +46,7 @@ export function AddAllergyDialog({
 	const [reactionType, setReactionType] = useState("")
 	const [severity, setSeverity] = useState<AllergySeverity | "">("")
 	const [onsetDate, setOnsetDate] = useState("")
+	const [allergenSearchOpen, setAllergenSearchOpen] = useState(false)
 
 	const createAllergy = useCreateAllergyMutation()
 	const { data: activeAllergies } = useAllergiesQuery({ patientId, isActive: true })
@@ -55,6 +56,8 @@ export function AddAllergyDialog({
 		allergenType: allergenType || undefined,
 		limit: 8,
 	})
+	const allergenResults = allergenSearch.data?.data ?? []
+	const canShowAllergenResults = allergenSearchOpen && allergenName.trim().length >= 2
 
 	const duplicateAllergy = activeAllergies?.data.find(
 		allergy => allergy.allergenName.trim().toLowerCase() === allergenName.trim().toLowerCase()
@@ -85,12 +88,26 @@ export function AddAllergyDialog({
 		)
 	}
 
+	function handleCancel() {
+		resetForm()
+		onOpenChange(false)
+	}
+
+	function closeAllergenSearch() {
+		setAllergenSearchOpen(false)
+	}
+
+	function closeAllergenSearchAfterSelectionChance() {
+		window.setTimeout(closeAllergenSearch, 100)
+	}
+
 	function resetForm() {
 		setAllergenName("")
 		setAllergenType("")
 		setReactionType("")
 		setSeverity("")
 		setOnsetDate("")
+		setAllergenSearchOpen(false)
 	}
 
 	return (
@@ -103,40 +120,65 @@ export function AddAllergyDialog({
 		>
 			<DialogContent className="sm:max-w-lg">
 				<DialogHeader>
-					<DialogTitle>Add Allergy</DialogTitle>
+					<DialogTitle className="text-xl">Add Allergy</DialogTitle>
 				</DialogHeader>
 
 				<div className="grid gap-4">
 					<div className="space-y-2">
 						<Label>Allergen Name *</Label>
-						<Input
-							placeholder="Search or enter allergen"
-							value={allergenName}
-							onChange={event => setAllergenName(event.target.value)}
-						/>
-						{allergenSearch.isFetching && (
-							<p className="text-muted-foreground text-xs">Searching allergens...</p>
-						)}
-						{allergenSearch.data?.data.length ? (
-							<div className="bg-background max-h-40 overflow-y-auto rounded-md border">
-								{allergenSearch.data.data.map(result => (
-									<button
-										key={`${result.allergenType}-${result.allergenName}-${result.source}`}
-										type="button"
-										className="hover:bg-muted flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm"
-										onClick={() => {
-											setAllergenName(result.allergenName)
-											setAllergenType(result.allergenType)
-										}}
-									>
-										<span>{result.allergenName}</span>
-										<span className="text-muted-foreground text-xs capitalize">
-											{result.allergenType}
-										</span>
-									</button>
-								))}
-							</div>
-						) : null}
+						<div className="relative">
+							<Input
+								placeholder="Search or enter allergen"
+								value={allergenName}
+								onChange={event => {
+									setAllergenName(event.target.value)
+									setAllergenSearchOpen(event.target.value.trim().length >= 2)
+								}}
+								onFocus={() => setAllergenSearchOpen(allergenName.trim().length >= 2)}
+								onBlur={closeAllergenSearchAfterSelectionChance}
+								onKeyDown={event => {
+									if (event.key === "Escape") closeAllergenSearch()
+									if (event.key === "Enter" && allergenResults[0]) {
+										event.preventDefault()
+										setAllergenName(allergenResults[0].allergenName)
+										setAllergenType(allergenResults[0].allergenType)
+										closeAllergenSearch()
+									}
+								}}
+								aria-expanded={canShowAllergenResults}
+								autoComplete="off"
+							/>
+							{canShowAllergenResults && (
+								<div className="bg-popover text-popover-foreground ring-foreground/10 absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border p-1 text-sm shadow-md ring-1">
+									{allergenSearch.isFetching ? (
+										<div className="text-muted-foreground px-3 py-3">Searching allergens...</div>
+									) : allergenResults.length ? (
+										allergenResults.map(result => (
+											<button
+												key={`${result.allergenType}-${result.allergenName}-${result.source}`}
+												type="button"
+												className="hover:bg-muted focus:bg-muted flex w-full items-start justify-between gap-3 rounded-sm px-3 py-2 text-left outline-hidden"
+												onMouseDown={event => event.preventDefault()}
+												onClick={() => {
+													setAllergenName(result.allergenName)
+													setAllergenType(result.allergenType)
+													closeAllergenSearch()
+												}}
+											>
+												<span className="min-w-0 break-words">{result.allergenName}</span>
+												<span className="text-muted-foreground shrink-0 text-xs capitalize">
+													{result.allergenType}
+												</span>
+											</button>
+										))
+									) : (
+										<div className="text-muted-foreground px-3 py-3">
+											No allergen matches. You can continue with a new allergen name.
+										</div>
+									)}
+								</div>
+							)}
+						</div>
 					</div>
 
 					{duplicateAllergy && (
@@ -156,7 +198,7 @@ export function AddAllergyDialog({
 								onValueChange={value => setAllergenType(value as AllergenType)}
 							>
 								<SelectTrigger className="w-full">
-									<SelectValue />
+									<SelectValue placeholder="Select allergen type" />
 								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="medication">Medication</SelectItem>
@@ -173,7 +215,7 @@ export function AddAllergyDialog({
 								onValueChange={value => setSeverity(value as AllergySeverity)}
 							>
 								<SelectTrigger className="w-full">
-									<SelectValue />
+									<SelectValue placeholder="Select severity" />
 								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="mild">Mild</SelectItem>
@@ -204,6 +246,9 @@ export function AddAllergyDialog({
 				</div>
 
 				<DialogFooter>
+					<Button type="button" variant="outline" onClick={handleCancel} disabled={createAllergy.isPending}>
+						Cancel
+					</Button>
 					<Button onClick={handleSubmit} disabled={!canSubmit}>
 						{createAllergy.isPending ? "Adding..." : "Add Allergy"}
 					</Button>

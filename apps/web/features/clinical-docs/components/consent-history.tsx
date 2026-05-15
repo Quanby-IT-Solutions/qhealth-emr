@@ -15,13 +15,15 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
-import type { ConsentRecord } from "@/features/clinical-docs/api/clinical-docs.hooks"
-import { usePatientConsentsQuery } from "@/features/clinical-docs/api/clinical-docs.hooks"
+import {
+	usePatientConsentsQuery,
+	type ConsentRecord,
+} from "@/features/clinical-docs/api/clinical-docs.hooks"
 import { DpaConsentModal } from "@/features/clinical-docs/components/dpa-consent-modal"
 import { ConsentRevocation } from "@/features/clinical-docs/components/consent-revocation"
 
 function formatDateTime(dateStr: string | null | undefined) {
-	if (!dateStr) return "—"
+	if (!dateStr) return "--"
 	return new Date(dateStr).toLocaleString("en-PH", {
 		year: "numeric",
 		month: "short",
@@ -50,7 +52,6 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
 
 function consentStatusLabel(consent: ConsentRecord) {
 	if (consent.revokedAt) return "Revoked"
-	// Consents do not have an expiry currently — show Active
 	return "Active"
 }
 
@@ -74,7 +75,12 @@ interface ConsentHistoryProps {
 	canManageConsents?: boolean
 }
 
-export function ConsentHistory({ patientId, facilityId, currentEncounterId, canManageConsents }: ConsentHistoryProps) {
+export function ConsentHistory({
+	patientId,
+	facilityId,
+	currentEncounterId,
+	canManageConsents,
+}: ConsentHistoryProps) {
 	const { data, isLoading } = usePatientConsentsQuery({ patientId })
 	const [dpaModalOpen, setDpaModalOpen] = useState(false)
 	const [revokeTarget, setRevokeTarget] = useState<ConsentRecord | null>(null)
@@ -83,74 +89,132 @@ export function ConsentHistory({ patientId, facilityId, currentEncounterId, canM
 
 	return (
 		<>
-			<Card>
-				<CardHeader className="flex flex-row items-center justify-between">
+			<Card className="overflow-hidden">
+				<CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<div className="flex items-center gap-2">
 						<FileText className="size-4 text-muted-foreground" />
 						<CardTitle>Consent History</CardTitle>
 					</div>
 					{currentEncounterId && canManageConsents && (
-						<Button size="sm" onClick={() => setDpaModalOpen(true)}>
+						<Button size="sm" className="w-full sm:w-fit" onClick={() => setDpaModalOpen(true)}>
 							DPA Consent
 						</Button>
 					)}
 				</CardHeader>
-				<CardContent className="p-0">
+				<CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
 					{isLoading ? (
-						<div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
+						<div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>
 					) : consents.length === 0 ? (
 						<div className="py-8 text-center text-sm text-muted-foreground">
 							No consent records found for this patient.
 						</div>
 					) : (
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>Type</TableHead>
-									<TableHead>Status</TableHead>
-									<TableHead>Signed By</TableHead>
-									<TableHead>Relationship</TableHead>
-									<TableHead>Date Signed</TableHead>
-									<TableHead>Revoked At</TableHead>
-									<TableHead className="w-[80px]" />
-								</TableRow>
-							</TableHeader>
-							<TableBody>
+						<>
+							<div className="divide-y rounded-md border md:hidden">
 								{consents.map(consent => (
-									<TableRow key={consent.id}>
-										<TableCell className="text-sm font-medium">
-											{CONSENT_TYPE_LABELS[consent.consentType] ?? consent.consentType}
-										</TableCell>
-										<TableCell>
-											<ConsentStatusBadge consent={consent} />
-										</TableCell>
-										<TableCell className="text-sm">{consent.signedByName}</TableCell>
-										<TableCell className="text-sm">
-											{RELATIONSHIP_LABELS[consent.relationship] ?? consent.relationship}
-										</TableCell>
-										<TableCell className="text-sm">{formatDateTime(consent.signedAt)}</TableCell>
-										<TableCell className="text-sm">
-											{consent.revokedAt ? (
-												<span className="text-red-600">{formatDateTime(consent.revokedAt)}</span>
-											) : (
-												"—"
-											)}
-										</TableCell>
-										<TableCell>
-											{!consent.revokedAt && canManageConsents && (
-												<Button
-													variant="outline"
-													size="sm"
-													onClick={() => setRevokeTarget(consent)}
-												>
-													Revoke
-												</Button>
-											)}
-										</TableCell>
-									</TableRow>
+									<div key={consent.id} className="space-y-3 p-4">
+										<div className="flex min-w-0 items-start justify-between gap-3">
+											<div className="min-w-0">
+												<p className="font-medium break-words">
+													{CONSENT_TYPE_LABELS[consent.consentType] ?? consent.consentType}
+												</p>
+												<p className="text-muted-foreground mt-1 text-xs break-words">
+													Signed {formatDateTime(consent.signedAt)}
+												</p>
+											</div>
+											<div className="shrink-0">
+												<ConsentStatusBadge consent={consent} />
+											</div>
+										</div>
+
+										<div className="grid gap-3 text-sm sm:grid-cols-2">
+											<div className="min-w-0">
+												<p className="text-muted-foreground text-xs">Signed By</p>
+												<p className="break-words">{consent.signedByName}</p>
+											</div>
+											<div className="min-w-0">
+												<p className="text-muted-foreground text-xs">Relationship</p>
+												<p className="break-words">
+													{RELATIONSHIP_LABELS[consent.relationship] ?? consent.relationship}
+												</p>
+											</div>
+										</div>
+
+										{consent.revokedAt ? (
+											<p className="text-sm text-red-600">
+												Revoked {formatDateTime(consent.revokedAt)}
+											</p>
+										) : canManageConsents ? (
+											<Button
+												variant="outline"
+												size="sm"
+												className="w-full"
+												onClick={() => setRevokeTarget(consent)}
+											>
+												Revoke
+											</Button>
+										) : null}
+									</div>
 								))}
-							</TableBody>
-						</Table>
+							</div>
+
+							<div className="hidden rounded-md border md:block">
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>Type</TableHead>
+											<TableHead>Status</TableHead>
+											<TableHead>Signed By</TableHead>
+											<TableHead>Relationship</TableHead>
+											<TableHead>Date Signed</TableHead>
+											<TableHead>Revoked At</TableHead>
+											<TableHead className="w-[96px] text-right" />
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{consents.map(consent => (
+											<TableRow key={consent.id}>
+												<TableCell className="max-w-48 text-sm font-medium whitespace-normal">
+													<span className="break-words">
+														{CONSENT_TYPE_LABELS[consent.consentType] ?? consent.consentType}
+													</span>
+												</TableCell>
+												<TableCell>
+													<ConsentStatusBadge consent={consent} />
+												</TableCell>
+												<TableCell className="max-w-48 text-sm whitespace-normal">
+													<span className="break-words">{consent.signedByName}</span>
+												</TableCell>
+												<TableCell className="text-sm whitespace-normal">
+													{RELATIONSHIP_LABELS[consent.relationship] ?? consent.relationship}
+												</TableCell>
+												<TableCell className="min-w-36 text-sm whitespace-normal">
+													{formatDateTime(consent.signedAt)}
+												</TableCell>
+												<TableCell className="min-w-36 text-sm whitespace-normal">
+													{consent.revokedAt ? (
+														<span className="text-red-600">{formatDateTime(consent.revokedAt)}</span>
+													) : (
+														"--"
+													)}
+												</TableCell>
+												<TableCell className="text-right">
+													{!consent.revokedAt && canManageConsents && (
+														<Button
+															variant="outline"
+															size="sm"
+															onClick={() => setRevokeTarget(consent)}
+														>
+															Revoke
+														</Button>
+													)}
+												</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+							</div>
+						</>
 					)}
 				</CardContent>
 			</Card>
@@ -168,7 +232,9 @@ export function ConsentHistory({ patientId, facilityId, currentEncounterId, canM
 			{revokeTarget && (
 				<ConsentRevocation
 					open={!!revokeTarget}
-					onOpenChange={open => { if (!open) setRevokeTarget(null) }}
+					onOpenChange={open => {
+						if (!open) setRevokeTarget(null)
+					}}
 					consent={revokeTarget}
 					patientId={patientId}
 				/>

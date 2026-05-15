@@ -395,6 +395,7 @@ export function useIcd10ProblemSearchQuery(params: {
 	search?: string
 	page?: number
 	limit?: number
+	includeEmptySearch?: boolean
 }) {
 	return useQuery({
 		queryKey: problemsAllergiesKeys.icd10Search(params.search, params.page, params.limit),
@@ -406,7 +407,7 @@ export function useIcd10ProblemSearchQuery(params: {
 					limit: params.limit ?? 10,
 				})}`
 			),
-		enabled: !!params.search && params.search.trim().length >= 2,
+		enabled: params.includeEmptySearch || (!!params.search && params.search.trim().length >= 2),
 		staleTime: 5 * 60 * 1000,
 	})
 }
@@ -416,6 +417,7 @@ export function useSnomedCtProblemSearchQuery(params: {
 	semanticTag?: string
 	page?: number
 	limit?: number
+	includeEmptySearch?: boolean
 }) {
 	return useQuery({
 		queryKey: problemsAllergiesKeys.snomedCtSearch(
@@ -433,7 +435,7 @@ export function useSnomedCtProblemSearchQuery(params: {
 					limit: params.limit ?? 10,
 				})}`
 			),
-		enabled: !!params.search && params.search.trim().length >= 2,
+		enabled: params.includeEmptySearch || (!!params.search && params.search.trim().length >= 2),
 		staleTime: 5 * 60 * 1000,
 	})
 }

@@ -40,7 +40,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
-import { Tabs, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import {
 	useAllergiesQuery,
 	useDeactivateAllergyMutation,
@@ -103,6 +103,7 @@ export function ProblemsAllergiesTab({
 	facilityId,
 	canWrite = false,
 }: ProblemsAllergiesTabProps) {
+	const [activeSection, setActiveSection] = useState<"problems" | "allergies">("problems")
 	const [problemStatusFilter, setProblemStatusFilter] = useState<ProblemStatus>("active")
 	const [allergenTypeFilter, setAllergenTypeFilter] = useState<AllergenType | "all">("all")
 	const [showAddProblem, setShowAddProblem] = useState(false)
@@ -253,8 +254,33 @@ export function ProblemsAllergiesTab({
 	}
 
 	return (
-		<div className="grid min-w-0 gap-6 2xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
-			<Card className="min-w-0 overflow-hidden">
+		<div className="min-w-0">
+			<Tabs
+				value={activeSection}
+				onValueChange={value => setActiveSection(value as "problems" | "allergies")}
+				className="min-w-0 gap-4"
+			>
+				<div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+					<div className="hidden sm:block" />
+					<TabsList className="grid h-auto w-full grid-cols-2 sm:w-[420px]">
+						<TabsTrigger value="problems" className="px-6 py-1.5">
+							Problems
+						</TabsTrigger>
+						<TabsTrigger value="allergies" className="px-6 py-1.5">
+							Allergies
+						</TabsTrigger>
+					</TabsList>
+					{allergiesData?.data.some(allergy => allergy.severity === "severe") ? (
+						<div className="flex justify-center sm:justify-end">
+							<Badge variant="destructive" className="w-fit">
+								Severe allergy documented
+							</Badge>
+						</div>
+					) : null}
+				</div>
+
+				<TabsContent value="problems" className="min-w-0">
+					<Card className="min-w-0 overflow-hidden">
 				<CardHeader className="gap-4">
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 						<div>
@@ -287,7 +313,7 @@ export function ProblemsAllergiesTab({
 						</div>
 					) : problemsData?.data.length ? (
 						<>
-							<div className="divide-y rounded-md border md:hidden">
+							<div className="divide-y rounded-md border lg:hidden">
 								{problemsData.data.map(problem => (
 									<div key={problem.id} className="space-y-3 p-4">
 										<div className="flex min-w-0 items-start justify-between gap-3">
@@ -342,7 +368,7 @@ export function ProblemsAllergiesTab({
 								))}
 							</div>
 
-							<div className="hidden rounded-md border md:block">
+							<div className="hidden rounded-md border lg:block">
 								<Table>
 									<TableHeader>
 										<TableRow>
@@ -401,9 +427,11 @@ export function ProblemsAllergiesTab({
 						</div>
 					)}
 				</CardContent>
-			</Card>
+					</Card>
+				</TabsContent>
 
-			<Card className="min-w-0 overflow-hidden">
+				<TabsContent value="allergies" className="min-w-0">
+					<Card className="min-w-0 overflow-hidden">
 				<CardHeader className="gap-4">
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 						<div>
@@ -450,7 +478,7 @@ export function ProblemsAllergiesTab({
 									Verify each entry before relying on CDS for hard stops.
 								</p>
 							)}
-							<div className="divide-y rounded-md border md:hidden">
+							<div className="divide-y rounded-md border lg:hidden">
 								{allergiesData.data.map(allergy => (
 									<div key={allergy.id} className="space-y-3 p-4">
 										<div className="flex min-w-0 items-start justify-between gap-3">
@@ -475,7 +503,7 @@ export function ProblemsAllergiesTab({
 								))}
 							</div>
 
-							<div className="hidden rounded-md border md:block">
+							<div className="hidden rounded-md border lg:block">
 								<Table>
 									<TableHeader>
 										<TableRow>
@@ -520,7 +548,9 @@ export function ProblemsAllergiesTab({
 						</div>
 					)}
 				</CardContent>
-			</Card>
+					</Card>
+				</TabsContent>
+			</Tabs>
 
 			<AddProblemDialog
 				open={showAddProblem}

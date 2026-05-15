@@ -85,6 +85,11 @@ export function AddProblemDialog({
 		)
 	}
 
+	function handleCancel() {
+		resetForm()
+		onOpenChange(false)
+	}
+
 	function resetForm() {
 		setDescription("")
 		setOnsetDate("")
@@ -105,7 +110,7 @@ export function AddProblemDialog({
 		>
 			<DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
 				<DialogHeader>
-					<DialogTitle>Add Problem</DialogTitle>
+					<DialogTitle className="text-xl">Add Problem</DialogTitle>
 				</DialogHeader>
 
 				<div className="grid gap-4">
@@ -122,8 +127,8 @@ export function AddProblemDialog({
 					/>
 
 					{!hasCode && (
-						<Alert>
-							<AlertDescription>
+						<Alert className="border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
+							<AlertDescription className="text-amber-900 dark:text-amber-100">
 								Select at least one ICD-10 or SNOMED CT code before saving.
 							</AlertDescription>
 						</Alert>
@@ -139,7 +144,7 @@ export function AddProblemDialog({
 						/>
 					</div>
 
-					<div className="grid gap-4 sm:grid-cols-3">
+					<div className={`grid gap-4 ${status === "resolved" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
 						<div className="space-y-2">
 							<Label>Status</Label>
 							<Select value={status} onValueChange={value => setStatus(value as ProblemStatus)}>
@@ -176,6 +181,9 @@ export function AddProblemDialog({
 				</div>
 
 				<DialogFooter>
+					<Button type="button" variant="outline" onClick={handleCancel} disabled={createProblem.isPending}>
+						Cancel
+					</Button>
 					<Button onClick={handleSubmit} disabled={!canSubmit}>
 						{createProblem.isPending ? "Adding..." : "Add Problem"}
 					</Button>
