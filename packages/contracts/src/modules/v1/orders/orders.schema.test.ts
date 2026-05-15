@@ -6,6 +6,7 @@ import {
 	CdsEvaluateInputSchema,
 	CdsEvaluateResponseSchema,
 	CreateMedOrderSchema,
+	CreateTranchedOrdersSchema,
 	HighAlertVerificationSchema,
 	MedOrderSchema,
 	PrescriptionSchema,
@@ -105,6 +106,46 @@ describe("CdsEvaluateInputSchema", () => {
 
 		expect(result.success).toBe(false)
 		expect(result.error?.issues.some(issue => issue.path.includes("patientId"))).toBe(true)
+	})
+
+	it("rejects a blank genericName", () => {
+		const result = CdsEvaluateInputSchema.safeParse({
+			patientId: PATIENT_ID,
+			genericName: "   ",
+			orderingStaffId: STAFF_ID,
+			facilityId: FACILITY_ID,
+		})
+
+		expect(result.success).toBe(false)
+	})
+})
+
+describe("CreateTranchedOrdersSchema", () => {
+	const baseValid = {
+		facilityId: FACILITY_ID,
+		patientId: PATIENT_ID,
+		genericName: "Morphine",
+		dose: "10",
+		doseUnit: "mg",
+		doseForm: "tablet",
+		route: "PO",
+		frequency: "bid" as const,
+		durationDays: 30,
+		pdeaSchedule: "S2",
+	}
+
+	it("accepts a valid tranched medication order", () => {
+		const result = CreateTranchedOrdersSchema.safeParse(baseValid)
+		expect(result.success).toBe(true)
+	})
+
+	it("rejects a whitespace-only genericName", () => {
+		const result = CreateTranchedOrdersSchema.safeParse({
+			...baseValid,
+			genericName: "   ",
+		})
+
+		expect(result.success).toBe(false)
 	})
 })
 
