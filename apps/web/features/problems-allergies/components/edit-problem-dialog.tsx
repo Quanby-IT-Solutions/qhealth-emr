@@ -55,6 +55,7 @@ export function EditProblemDialog({ open, onOpenChange, problem }: EditProblemDi
 
 	useEffect(() => {
 		if (!problem || !open) return
+		// eslint-disable-next-line react-hooks/set-state-in-effect -- syncing the selected problem into local editable form state is intentional
 		setDescription(problem.description)
 		setOnsetDate(problem.onsetDate ?? "")
 		setResolutionDate(problem.resolutionDate ?? "")
@@ -111,8 +112,8 @@ export function EditProblemDialog({ open, onOpenChange, problem }: EditProblemDi
 					/>
 
 					{!hasCode && (
-						<Alert>
-							<AlertDescription>
+						<Alert className="border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
+							<AlertDescription className="text-amber-900 dark:text-amber-100">
 								Select at least one ICD-10 or SNOMED CT code before saving.
 							</AlertDescription>
 						</Alert>

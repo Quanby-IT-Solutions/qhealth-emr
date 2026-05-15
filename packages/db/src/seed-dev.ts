@@ -23,6 +23,7 @@ import {
 	flowsheetEntries,
 	formularyItems,
 	haiTags,
+	icd10Codes,
 	imagingOrders,
 	integrations,
 	invoiceLineItems,
@@ -42,6 +43,7 @@ import {
 	rolePermissions,
 	roles,
 	shiftHandoffs,
+	snomedCtCodes,
 	staffProfiles,
 	surveillanceFlags,
 	systemSettings,
@@ -88,6 +90,193 @@ async function assertSeedSchemaReady() {
 async function ensureProblemsTerminologyColumns() {
 	await db.execute(sql`ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "snomed_code" text`)
 	await db.execute(sql`ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "snomed_display" text`)
+}
+
+async function seedProblemTerminology() {
+	const icd10Data = [
+		{
+			code: "A09",
+			description: "Infectious gastroenteritis and colitis, unspecified",
+			category: "Certain infectious and parasitic diseases",
+		},
+		{
+			code: "A15.0",
+			description: "Tuberculosis of lung",
+			category: "Certain infectious and parasitic diseases",
+		},
+		{
+			code: "B20",
+			description: "Human immunodeficiency virus [HIV] disease",
+			category: "Certain infectious and parasitic diseases",
+		},
+		{
+			code: "E11",
+			description: "Type 2 diabetes mellitus",
+			category: "Endocrine, nutritional and metabolic diseases",
+		},
+		{
+			code: "E11.65",
+			description: "Type 2 diabetes mellitus with hyperglycemia",
+			category: "Endocrine, nutritional and metabolic diseases",
+		},
+		{
+			code: "E78.5",
+			description: "Dyslipidemia, unspecified",
+			category: "Endocrine, nutritional and metabolic diseases",
+		},
+		{
+			code: "I10",
+			description: "Essential (primary) hypertension",
+			category: "Diseases of the circulatory system",
+		},
+		{
+			code: "I25.10",
+			description: "Atherosclerotic heart disease of native coronary artery",
+			category: "Diseases of the circulatory system",
+		},
+		{
+			code: "I50.9",
+			description: "Heart failure, unspecified",
+			category: "Diseases of the circulatory system",
+		},
+		{
+			code: "J06.9",
+			description: "Acute upper respiratory infection, unspecified",
+			category: "Diseases of the respiratory system",
+		},
+		{
+			code: "J18.9",
+			description: "Pneumonia, unspecified organism",
+			category: "Diseases of the respiratory system",
+		},
+		{
+			code: "J45.909",
+			description: "Unspecified asthma, uncomplicated",
+			category: "Diseases of the respiratory system",
+		},
+		{
+			code: "K21.0",
+			description: "Gastro-esophageal reflux disease with esophagitis",
+			category: "Diseases of the digestive system",
+		},
+		{
+			code: "M54.5",
+			description: "Low back pain",
+			category: "Diseases of the musculoskeletal system",
+		},
+		{
+			code: "N18.3",
+			description: "Chronic kidney disease, stage 3",
+			category: "Diseases of the genitourinary system",
+		},
+		{
+			code: "R50.9",
+			description: "Fever, unspecified",
+			category: "Symptoms, signs and abnormal clinical findings",
+		},
+		{
+			code: "Z00.00",
+			description: "Encounter for general adult medical examination without abnormal findings",
+			category: "Factors influencing health status",
+		},
+	]
+
+	const snomedData = [
+		{
+			conceptId: "38341003",
+			fsn: "Hypertensive disorder, systemic arterial (disorder)",
+			preferredTerm: "Hypertension",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "44054006",
+			fsn: "Diabetes mellitus type 2 (disorder)",
+			preferredTerm: "Type 2 diabetes mellitus",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "233604007",
+			fsn: "Pneumonia (disorder)",
+			preferredTerm: "Pneumonia",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "195967001",
+			fsn: "Asthma (disorder)",
+			preferredTerm: "Asthma",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "13645005",
+			fsn: "Chronic obstructive lung disease (disorder)",
+			preferredTerm: "Chronic obstructive pulmonary disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "84114007",
+			fsn: "Heart failure (disorder)",
+			preferredTerm: "Heart failure",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "53741008",
+			fsn: "Coronary arteriosclerosis (disorder)",
+			preferredTerm: "Coronary artery disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "235595009",
+			fsn: "Gastroesophageal reflux disease (disorder)",
+			preferredTerm: "Gastroesophageal reflux disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "279039007",
+			fsn: "Low back pain (finding)",
+			preferredTerm: "Low back pain",
+			semanticTag: "finding",
+		},
+		{
+			conceptId: "709044004",
+			fsn: "Chronic kidney disease (disorder)",
+			preferredTerm: "Chronic kidney disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "386661006",
+			fsn: "Fever (finding)",
+			preferredTerm: "Fever",
+			semanticTag: "finding",
+		},
+		{
+			conceptId: "68566005",
+			fsn: "Urinary tract infectious disease (disorder)",
+			preferredTerm: "Urinary tract infection",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "40930008",
+			fsn: "Hypothyroidism (disorder)",
+			preferredTerm: "Hypothyroidism",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "55822004",
+			fsn: "Hyperlipidemia (disorder)",
+			preferredTerm: "Hyperlipidemia",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "69896004",
+			fsn: "Rheumatoid arthritis (disorder)",
+			preferredTerm: "Rheumatoid arthritis",
+			semanticTag: "disorder",
+		},
+	]
+
+	await db.insert(icd10Codes).values(icd10Data).onConflictDoNothing()
+	await db.insert(snomedCtCodes).values(snomedData).onConflictDoNothing()
+	console.log(`  - Seeded ${icd10Data.length} ICD-10 and ${snomedData.length} SNOMED CT problem codes`)
 }
 
 type ModuleName =
@@ -2424,6 +2613,7 @@ async function main() {
 	console.log("Seeding qhealth-emr development data...")
 	await assertSeedSchemaReady()
 	await ensureProblemsTerminologyColumns()
+	await seedProblemTerminology()
 
 	const facilityMap = new Map<string, Awaited<ReturnType<typeof ensureFacility>>>()
 	for (const facilitySeed of demoFacilities) {

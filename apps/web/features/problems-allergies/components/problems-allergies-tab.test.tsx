@@ -112,6 +112,10 @@ function mockAllergiesWith(allergies: ReturnType<typeof buildAllergy>[]) {
 	})
 }
 
+async function openAllergiesTab(user: ReturnType<typeof userEvent.setup>) {
+	await user.click(screen.getByRole("tab", { name: /allergies/i }))
+}
+
 describe("ProblemsAllergiesTab", () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
@@ -128,8 +132,11 @@ describe("ProblemsAllergiesTab", () => {
 		expect(screen.getByText(/no active problems recorded\./i)).toBeInTheDocument()
 	})
 
-	it("renders empty state for allergies when none are returned", () => {
+	it("renders empty state for allergies when none are returned", async () => {
+		const user = userEvent.setup()
 		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
+		await openAllergiesTab(user)
+
 		expect(screen.getByText(/no active allergies documented\./i)).toBeInTheDocument()
 	})
 
@@ -139,9 +146,12 @@ describe("ProblemsAllergiesTab", () => {
 		expect(screen.queryByRole("button", { name: /add allergy/i })).toBeNull()
 	})
 
-	it("shows add buttons when canWrite is true", () => {
+	it("shows add buttons when canWrite is true", async () => {
+		const user = userEvent.setup()
 		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
 		expect(screen.getByRole("button", { name: /add problem/i })).toBeInTheDocument()
+		await openAllergiesTab(user)
+
 		expect(screen.getByRole("button", { name: /add allergy/i })).toBeInTheDocument()
 	})
 
@@ -152,11 +162,14 @@ describe("ProblemsAllergiesTab", () => {
 		expect(screen.getAllByText("I10").length).toBeGreaterThan(0)
 	})
 
-	it("renders allergy name and severity badge", () => {
+	it("renders allergy name and severity badge", async () => {
+		const user = userEvent.setup()
 		mockAllergiesWith([
 			buildAllergy({ allergenName: "Penicillin", allergenType: "medication", severity: "severe" }),
 		])
 		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
+		await openAllergiesTab(user)
+
 		expect(screen.getAllByText("Penicillin").length).toBeGreaterThan(0)
 		expect(screen.getAllByText("severe").length).toBeGreaterThan(0)
 	})
@@ -165,6 +178,7 @@ describe("ProblemsAllergiesTab", () => {
 		const user = userEvent.setup()
 		mockAllergiesWith([buildAllergy({ allergenName: "Penicillin" })])
 		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
+		await openAllergiesTab(user)
 
 		const [deactivateButton] = screen.getAllByRole("button", { name: /deactivate/i })
 		await user.click(deactivateButton!)
@@ -195,6 +209,7 @@ describe("ProblemsAllergiesTab", () => {
 		mockUseVerifyAllergyMutation.mockReturnValue({ mutate, isPending: false })
 		mockAllergiesWith([buildAllergy({ id: "allergy-unverified", isVerified: false })])
 		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
+		await openAllergiesTab(user)
 
 		expect(screen.getAllByText(/unverified/i).length).toBeGreaterThan(0)
 		expect(
@@ -206,7 +221,8 @@ describe("ProblemsAllergiesTab", () => {
 		expect(mutate).toHaveBeenCalledWith("allergy-unverified")
 	})
 
-	it("renders a Verified badge and no Verify action when the allergy is already verified", () => {
+	it("renders a Verified badge and no Verify action when the allergy is already verified", async () => {
+		const user = userEvent.setup()
 		mockAllergiesWith([
 			buildAllergy({
 				id: "allergy-verified",
@@ -217,6 +233,7 @@ describe("ProblemsAllergiesTab", () => {
 			}),
 		])
 		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
+		await openAllergiesTab(user)
 
 		expect(screen.getAllByText(/^verified$/i).length).toBeGreaterThan(0)
 		expect(screen.queryByRole("button", { name: /^verify$/i })).toBeNull()
