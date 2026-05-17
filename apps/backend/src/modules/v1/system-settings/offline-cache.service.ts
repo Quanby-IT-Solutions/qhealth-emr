@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from "@nestjs/common"
+import {
+	Injectable,
+	Logger,
+	NotFoundException,
+	OnModuleDestroy,
+	OnModuleInit,
+} from "@nestjs/common"
 import { and, desc, eq, inArray, sql } from "drizzle-orm"
 
 import type { OfflinePreparedPatientSummary, OfflineSummarySnapshot } from "@repo/contracts"
@@ -69,7 +75,7 @@ export class OfflineCacheService implements OnModuleInit, OnModuleDestroy {
 			.where(eq(systemSettings.facilityId, facilityId))
 			.limit(1)
 
-		if (!settings?.enableOfflineSummaryCache) {
+		if (settings && !settings.enableOfflineSummaryCache) {
 			return {
 				jobId: crypto.randomUUID(),
 				status: "failed",

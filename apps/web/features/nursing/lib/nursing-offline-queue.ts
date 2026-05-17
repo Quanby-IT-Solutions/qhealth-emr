@@ -1,5 +1,5 @@
 /**
- * Offline Queue — IndexedDB store for nursing records created while offline.
+ * Offline Queue — IndexedDB store for clinical documentation created while offline.
  *
  * Records are written here by form submit handlers when the browser is offline.
  * The useNursingSync hook drains this queue automatically when connectivity
@@ -19,6 +19,7 @@ const CONFLICT_STORE = "conflicts"
 
 export type NursingRecordType =
 	| "vital_sign"
+	| "clinical_note"
 	| "mar_entry"
 	| "tar_entry"
 	| "io_entry"
@@ -101,9 +102,12 @@ export async function getAllQueued(): Promise<QueueEntry[]> {
 	return new Promise((resolve, reject) => {
 		const tx = db.transaction(QUEUE_STORE, "readonly")
 		const req = tx.objectStore(QUEUE_STORE).getAll()
-		req.onsuccess = () => resolve((req.result as QueueEntry[]).sort(
-			(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-		))
+		req.onsuccess = () =>
+			resolve(
+				(req.result as QueueEntry[]).sort(
+					(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+				)
+			)
 		req.onerror = () => reject(req.error)
 	})
 }

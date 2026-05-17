@@ -1,20 +1,19 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-
 import { useQueryClient } from "@tanstack/react-query"
 
 import { env } from "@/env"
 
 import {
-	type ConflictEntry,
-	type QueueEntry,
 	getAllConflicts,
 	getAllQueued,
 	incrementRetry,
 	removeConflict,
 	removeQueued,
 	saveConflict,
+	type ConflictEntry,
+	type QueueEntry,
 } from "./nursing-offline-queue"
 
 export type SyncPhase = "online" | "offline" | "syncing" | "conflict"
@@ -35,6 +34,7 @@ export interface NursingSyncState {
 }
 
 const API_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/nursing`
+const CLINICAL_DOCS_API_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/clinical-docs`
 
 const MAX_RETRIES = 3
 
@@ -75,6 +75,7 @@ export function useNursingSync(): NursingSyncState {
 	// ---- initial load --------------------------------------------------
 
 	useEffect(() => {
+		// eslint-disable-next-line react-hooks/set-state-in-effect
 		void loadFromDb()
 	}, [loadFromDb])
 
@@ -113,7 +114,7 @@ export function useNursingSync(): NursingSyncState {
 			}
 
 			try {
-				const res = await fetch(`${API_BASE}/${endpointPath(entry)}`, {
+				const res = await fetch(endpointUrl(entry), {
 					method: entry.method,
 					credentials: "include",
 					headers: { "Content-Type": "application/json" },
@@ -172,7 +173,7 @@ export function useNursingSync(): NursingSyncState {
 	useEffect(() => {
 		function handleOnline() {
 			setIsOnline(true)
-			setSyncPhase((prev) => (prev !== "conflict" ? "online" : "conflict"))
+			setSyncPhase(prev => (prev !== "conflict" ? "online" : "conflict"))
 			void runSync()
 		}
 
@@ -196,14 +197,17 @@ export function useNursingSync(): NursingSyncState {
 		void runSync()
 	}, [isOnline, runSync])
 
-	const resolveConflict = useCallback(async (conflictId: string) => {
-		await removeConflict(conflictId)
-		const remaining = await getAllConflicts()
-		setConflicts(remaining)
-		if (remaining.length === 0) {
-			setSyncPhase(isOnline ? "online" : "offline")
-		}
-	}, [isOnline])
+	const resolveConflict = useCallback(
+		async (conflictId: string) => {
+			await removeConflict(conflictId)
+			const remaining = await getAllConflicts()
+			setConflicts(remaining)
+			if (remaining.length === 0) {
+				setSyncPhase(isOnline ? "online" : "offline")
+			}
+		},
+		[isOnline]
+	)
 
 	const refresh = useCallback(async () => {
 		await loadFromDb()
@@ -227,23 +231,24 @@ export function useNursingSync(): NursingSyncState {
 // ============================================================================
 
 /**
- * Maps a queue entry type to the relative API path segment.
- * The full URL is: {API_BASE}/{endpointPath(entry)}
+ * Maps a queue entry type to the API endpoint that can accept it on reconnect.
  */
-function endpointPath(entry: QueueEntry): string {
+function endpointUrl(entry: QueueEntry): string {
 	switch (entry.type) {
+		case "clinical_note":
+			return `${CLINICAL_DOCS_API_BASE}/notes`
 		case "vital_sign":
-			return "vitals"
+			return `${API_BASE}/vitals`
 		case "mar_entry":
-			return `mar/${entry.id}/administer`
+			return `${API_BASE}/mar/${entry.id}/administer`
 		case "tar_entry":
-			return `tar/${entry.id}/administer`
+			return `${API_BASE}/tar/${entry.id}/administer`
 		case "io_entry":
-			return "io"
+			return `${API_BASE}/io`
 		case "hai_tag":
-			return "hai-tags"
+			return `${API_BASE}/hai-tags`
 		case "handoff":
-			return "handoffs"
+			return `${API_BASE}/handoffs`
 	}
 }
 
@@ -251,15 +256,12 @@ function endpointPath(entry: QueueEntry): string {
  * Constructs a ConflictEntry from a failed 409 response.
  * Attempts to extract differing fields from the server response body.
  */
-function buildConflict(
-	entry: QueueEntry,
-	serverData: Record<string, unknown>
-): ConflictEntry {
+function buildConflict(entry: QueueEntry, serverData: Record<string, unknown>): ConflictEntry {
 	const localPayload = (entry.payload ?? {}) as Record<string, unknown>
 	const fields = Object.keys(localPayload)
-		.filter((k) => k in serverData && String(serverData[k]) !== String(localPayload[k]))
+		.filter(k => k in serverData && String(serverData[k]) !== String(localPayload[k]))
 		.slice(0, 8) // cap at 8 fields for readability
-		.map((k) => ({
+		.map(k => ({
 			field: k,
 			label: humanizeKey(k),
 			localValue: String(localPayload[k] ?? ""),
@@ -283,12 +285,13 @@ function humanizeKey(key: string): string {
 		.replace(/_/g, " ")
 		.replace(/^\s/, "")
 		.split(" ")
-		.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+		.map(w => w.charAt(0).toUpperCase() + w.slice(1))
 		.join(" ")
 }
 
 function humanizeType(type: QueueEntry["type"]): string {
 	const map: Record<QueueEntry["type"], string> = {
+		clinical_note: "Clinical Note",
 		vital_sign: "Vital Signs",
 		mar_entry: "MAR Administration",
 		tar_entry: "TAR Treatment",
