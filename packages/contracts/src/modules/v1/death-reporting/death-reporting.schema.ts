@@ -122,6 +122,7 @@ export const FndrfReportSchema = z.object({
 	deliveryType: z.enum(["svd", "cs", "forceps", "vacuum", "other"]),
 	apgarScore1Min: z.number().int().min(0).max(10).nullable(),
 	apgarScore5Min: z.number().int().min(0).max(10).nullable(),
+	resuscitationRequired: z.boolean(),
 
 	// Section 3 – Maternal Info
 	motherName: z.string(),

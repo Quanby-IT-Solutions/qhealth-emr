@@ -57,11 +57,11 @@ export function isMaternalDeathCandidate(sex: string, dateOfBirth: string): bool
 }
 
 /**
- * Returns true when the patient is a neonate (< 28 days old).
+ * Returns true when the patient is a neonate (<= 28 days old).
  */
 export function isNeonatalDeathCandidate(dateOfBirth: string): boolean {
 	const ageDays = (Date.now() - new Date(dateOfBirth).getTime()) / (1000 * 60 * 60 * 24)
-	return ageDays >= 0 && ageDays < 28
+	return ageDays >= 0 && ageDays <= 28
 }
 
 export function isDeathReportSubmitted(status: DeathReportWorkflowStatus | null | undefined) {
@@ -152,8 +152,9 @@ export interface FndrfReport {
 	deliveryType: "svd" | "cs" | "forceps" | "vacuum" | "other"
 	apgarScore1Min: number | null
 	apgarScore5Min: number | null
+	resuscitationRequired: boolean
 
-	// Section 3 – Maternal Info
+	// Section 3 — Maternal Info
 	motherName: string
 	motherAge: number
 	motherGravidity: number
