@@ -2,8 +2,8 @@
  * SLA-017 / SLA-023: Flow 7 certificate request, payment, and release checkpoint tests
  *
  * Covers:
- * - createFmdrf creates as status "draft" with requestedAt but without completedAt (SLA-023)
- * - createFndrf creates as status "draft" with requestedAt (SLA-017)
+ * - createFmdrf creates as status "submitted" with requestedAt/submittedAt but without completedAt
+ * - createFndrf creates as status "submitted" with requestedAt/submittedAt
  * - markDeathReportPaid sets paidAt (SLA-017)
  * - markDeathReportReleased sets releasedAt, releasedByStaffId, completedAt, status "completed" (SLA-023)
  * - CivilRegistryService.createBirthRegistration sets requestedAt
@@ -54,7 +54,21 @@ jest.mock("@/common/database/database.client", () => ({
 
 // Also mock the db schema symbols the services use
 jest.mock("@repo/db/schema", () => ({
-	deathReports: { id: "id", paidAt: "paidAt", requestedAt: "requestedAt", updatedAt: "updatedAt" },
+	deathReports: {
+		id: "id",
+		encounterId: "encounterId",
+		reportType: "reportType",
+		status: "status",
+		paidAt: "paidAt",
+		requestedAt: "requestedAt",
+		updatedAt: "updatedAt",
+	},
+	patients: {
+		id: "id",
+		facilityId: "facilityId",
+		sex: "sex",
+		dateOfBirth: "dateOfBirth",
+	},
 	birthRegistrations: {
 		id: "id",
 		paidAt: "paidAt",
@@ -79,8 +93,14 @@ jest.mock("@repo/db/schema", () => ({
 	},
 	staffProfiles: { id: "id", userId: "userId" },
 	users: { id: "id" },
-	encounters: {},
+	encounters: { id: "id", facilityId: "facilityId", patientId: "patientId" },
 	encounterStatusEvents: {},
+	surveillanceFlags: {
+		id: "id",
+		encounterId: "encounterId",
+		flagType: "flagType",
+		triggerValue: "triggerValue",
+	},
 }))
 
 // ---------------------------------------------------------------------------
@@ -117,6 +137,23 @@ function setupSelectRow(row: Record<string, unknown>) {
 		leftJoin: jest.fn().mockReturnValue({ where: mockSelectWhere }),
 	})
 	mockSelect.mockReturnValue({ from: mockSelectFrom })
+}
+
+function bypassFmdrfGuards(service: DeathReportingService) {
+	jest
+		.spyOn(
+			service as unknown as { assertCanCreateFmdrf(input: unknown): Promise<void> },
+			"assertCanCreateFmdrf"
+		)
+		.mockResolvedValue(undefined)
+	jest
+		.spyOn(
+			service as unknown as {
+				forwardSubmittedFmdrfToSurveillance(input: unknown, id: string): Promise<void>
+			},
+			"forwardSubmittedFmdrfToSurveillance"
+		)
+		.mockResolvedValue(undefined)
 }
 
 // ---------------------------------------------------------------------------
@@ -357,8 +394,9 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 		physicianCertification: null,
 		contributingFactors: [],
 		neonatalDetails: null,
-		status: "draft",
+		status: "submitted",
 		requestedAt: new Date(),
+		submittedAt: new Date(),
 		paidAt: null,
 		releasedAt: null,
 		releasedByStaffId: null,
@@ -376,9 +414,10 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 		patientAge: 30,
 		patientAddress: "123 Main St",
 		dateOfDeath: "2024-06-01T00:00:00Z",
+		placeOfDeath: "Ward 3",
 		causeOfDeathImmediate: "Hemorrhage",
 		causeOfDeathAntecedent: "",
-		causeOfDeathUnderlying: "",
+		causeOfDeathUnderlying: "Postpartum hemorrhage",
 		causeOfDeathContributing: null,
 		gravidity: 1,
 		parity: 0,
@@ -412,7 +451,8 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 	})
 
 	describe("createFmdrf", () => {
-		it("creates with status 'draft', not 'completed' (SLA-023: open SLA window)", async () => {
+		it("creates with status 'submitted' after physician signature", async () => {
+			bypassFmdrfGuards(service)
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -423,10 +463,11 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 
 			await service.createFmdrf(minimalFmdrfInput)
 
-			expect(capturedValues.status).toBe("draft")
+			expect(capturedValues.status).toBe("submitted")
 		})
 
-		it("does not set completedAt on creation (SLA-023: lifecycle stays open)", async () => {
+		it("does not set completedAt on physician submission", async () => {
+			bypassFmdrfGuards(service)
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -441,6 +482,7 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 		})
 
 		it("sets requestedAt to now on creation (SLA-017: Step 1 evidence)", async () => {
+			bypassFmdrfGuards(service)
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -452,6 +494,21 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 			await service.createFmdrf(minimalFmdrfInput)
 
 			expect(capturedValues.requestedAt).toBeInstanceOf(Date)
+		})
+
+		it("sets submittedAt to now on physician submission", async () => {
+			bypassFmdrfGuards(service)
+			let capturedValues: Record<string, unknown> = {}
+			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
+				capturedValues = vals
+				return { returning: mockInsertReturning }
+			})
+			mockInsertReturning.mockResolvedValue([baseDeathReport])
+			mockInsert.mockReturnValue({ values: mockInsertValues })
+
+			await service.createFmdrf(minimalFmdrfInput)
+
+			expect(capturedValues.submittedAt).toBeInstanceOf(Date)
 		})
 	})
 
@@ -539,8 +596,9 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 		physicianCertification: null,
 		contributingFactors: [],
 		neonatalDetails: null,
-		status: "draft",
+		status: "submitted",
 		requestedAt: new Date(),
+		submittedAt: new Date(),
 		paidAt: null,
 		releasedAt: null,
 		releasedByStaffId: null,
@@ -594,7 +652,7 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 	})
 
 	describe("createFndrf", () => {
-		it("creates with status 'draft' (SLA-023: parity with corrected FMDRF path)", async () => {
+		it("creates with status 'submitted' after physician signature", async () => {
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -605,7 +663,7 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 
 			await service.createFndrf(minimalFndrfInput)
 
-			expect(capturedValues.status).toBe("draft")
+			expect(capturedValues.status).toBe("submitted")
 		})
 
 		it("does not set completedAt on creation (lifecycle stays open until release)", async () => {
@@ -634,6 +692,20 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 			await service.createFndrf(minimalFndrfInput)
 
 			expect(capturedValues.requestedAt).toBeInstanceOf(Date)
+		})
+
+		it("sets submittedAt to now on physician submission", async () => {
+			let capturedValues: Record<string, unknown> = {}
+			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
+				capturedValues = vals
+				return { returning: mockInsertReturning }
+			})
+			mockInsertReturning.mockResolvedValue([baseFndrfReport])
+			mockInsert.mockReturnValue({ values: mockInsertValues })
+
+			await service.createFndrf(minimalFndrfInput)
+
+			expect(capturedValues.submittedAt).toBeInstanceOf(Date)
 		})
 	})
 })

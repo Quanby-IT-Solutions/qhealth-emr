@@ -1,9 +1,10 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, asc, count, desc, eq, isNull, like } from "drizzle-orm"
+import { and, asc, count, desc, eq, inArray, isNull, like } from "drizzle-orm"
 
 import {
 	beds,
 	clinicalNotes,
+	deathReports,
 	encounters,
 	encounterStatusEvents,
 	imagingOrders,
@@ -23,6 +24,11 @@ import {
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
+import {
+	formatDeathReportLabels,
+	getRequiredDeathReportTypes,
+	isSubmittedDeathReportStatus,
+} from "@/modules/v1/death-reporting/death-reporting-eligibility"
 import { closeOpenSlaStep } from "@/utils/sla-events"
 import { resolveStepTarget } from "@/utils/sla-step-target"
 
@@ -865,6 +871,10 @@ export class EdService {
 			)
 		}
 
+		if (input.disposition === "deceased") {
+			await this.assertRequiredDeathReportsSubmitted(encounter)
+		}
+
 		// SLA-004: Resolve step targets before the transaction (read-only operations)
 		const [dispositionSlaMins, admittedSlaMins] = await Promise.all([
 			resolveStepTarget(encounter.facilityId, "discharge", input.disposition),
@@ -1018,6 +1028,50 @@ export class EdService {
 		)
 
 		return result
+	}
+
+	private async assertRequiredDeathReportsSubmitted(encounter: typeof encounters.$inferSelect) {
+		const [patient] = await db
+			.select({
+				sex: patients.sex,
+				dateOfBirth: patients.dateOfBirth,
+			})
+			.from(patients)
+			.where(eq(patients.id, encounter.patientId))
+			.limit(1)
+
+		if (!patient) {
+			throw new NotFoundException(`Patient ${encounter.patientId} not found`)
+		}
+
+		const requiredReportTypes = getRequiredDeathReportTypes(patient.sex, patient.dateOfBirth)
+		if (requiredReportTypes.length === 0) return
+
+		const reports = await db
+			.select({
+				reportType: deathReports.reportType,
+				status: deathReports.status,
+			})
+			.from(deathReports)
+			.where(
+				and(
+					eq(deathReports.encounterId, encounter.id),
+					inArray(deathReports.reportType, requiredReportTypes)
+				)
+			)
+
+		const submittedTypes = new Set(
+			reports
+				.filter(report => isSubmittedDeathReportStatus(report.status))
+				.map(report => report.reportType)
+		)
+		const missingTypes = requiredReportTypes.filter(type => !submittedTypes.has(type))
+
+		if (missingTypes.length > 0) {
+			throw new BadRequestException(
+				`${formatDeathReportLabels(missingTypes)} must be submitted before dispositioning a deceased patient.`
+			)
+		}
 	}
 
 	// ========================================================================

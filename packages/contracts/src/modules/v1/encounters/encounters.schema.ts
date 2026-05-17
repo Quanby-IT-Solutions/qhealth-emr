@@ -115,6 +115,7 @@ export const EncounterTransferSchema = z.object({
 export const EncounterDetailSchema = EncounterSchema.extend({
 	patientName: z.string(),
 	patientMrn: z.string(),
+	patientAddress: z.string().nullable(),
 	patientDateOfBirth: z.string(),
 	patientSex: z.enum(["male", "female", "other"]),
 	admittingStaffName: z.string().nullable(),

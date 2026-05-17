@@ -21,8 +21,8 @@ import { BadRequestException, NotFoundException } from "@nestjs/common"
 
 import { db } from "@/common/database/database.client"
 
-import { EdService } from "./ed.service"
 import { BillingService } from "../billing/billing.service"
+import { EdService } from "./ed.service"
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -39,8 +39,18 @@ jest.mock("@/common/database/database.client", () => ({
 
 jest.mock("@repo/db/schema", () => ({
 	// ED / core tables
-	beds: { id: "id", status: "status", currentEncounterId: "currentEncounterId", updatedAt: "updatedAt" },
+	beds: {
+		id: "id",
+		status: "status",
+		currentEncounterId: "currentEncounterId",
+		updatedAt: "updatedAt",
+	},
 	clinicalNotes: { id: "id", encounterId: "encounterId", status: "status" },
+	deathReports: {
+		encounterId: "encounterId",
+		reportType: "reportType",
+		status: "status",
+	},
 	encounters: {
 		id: "id",
 		facilityId: "facilityId",
@@ -82,7 +92,14 @@ jest.mock("@repo/db/schema", () => ({
 	vitalSigns: {},
 	wards: {},
 	// Billing tables
-	patients: { id: "id", firstName: "firstName", lastName: "lastName", mrn: "mrn" },
+	patients: {
+		id: "id",
+		firstName: "firstName",
+		lastName: "lastName",
+		mrn: "mrn",
+		sex: "sex",
+		dateOfBirth: "dateOfBirth",
+	},
 	charges: { id: "id", encounterId: "encounterId", totalAmount: "totalAmount" },
 	invoices: { id: "id", encounterId: "encounterId" },
 	cewsSnapshots: {},
@@ -177,7 +194,11 @@ function makeEdService() {
  *  1st: encounter lookup → [encounter] or []
  *  2nd: signed note check → [signedNote] or []
  */
-function mockPreTransactionSelects(encounter: object | null, signedNote: object | null) {
+function mockPreTransactionSelects(
+	encounter: object | null,
+	signedNote: object | null,
+	options?: { patient?: object | null; deathReports?: object[] }
+) {
 	;(db.select as jest.Mock)
 		.mockReturnValueOnce({
 			from: jest.fn().mockReturnValue({
@@ -191,6 +212,24 @@ function mockPreTransactionSelects(encounter: object | null, signedNote: object 
 				}),
 			}),
 		})
+
+	if (options && "patient" in options) {
+		;(db.select as jest.Mock).mockReturnValueOnce({
+			from: jest.fn().mockReturnValue({
+				where: jest.fn().mockReturnValue({
+					limit: jest.fn().mockResolvedValue(options.patient ? [options.patient] : []),
+				}),
+			}),
+		})
+	}
+
+	if (options?.deathReports) {
+		;(db.select as jest.Mock).mockReturnValueOnce({
+			from: jest.fn().mockReturnValue({
+				where: jest.fn().mockResolvedValue(options.deathReports),
+			}),
+		})
+	}
 }
 
 /**
@@ -433,7 +472,46 @@ describe("EdService.dispose()", () => {
 	})
 
 	it("sets disposition deceased with no OECB billing event", async () => {
-		mockPreTransactionSelects(ACTIVE_ENCOUNTER, SIGNED_NOTE)
+		mockPreTransactionSelects(ACTIVE_ENCOUNTER, SIGNED_NOTE, {
+			patient: { sex: "male", dateOfBirth: "1980-01-01" },
+		})
+		const { tx, insertedValues } = makeTxMock()
+		mockTransaction(tx)
+
+		const service = makeEdService()
+		const result = await service.dispose({
+			encounterId: ENCOUNTER_ID,
+			disposition: "deceased",
+		})
+
+		expect(result.disposition).toBe("deceased")
+		expect(insertedValues).not.toEqual(
+			expect.arrayContaining([expect.objectContaining({ toStatus: "ready_for_billing" })])
+		)
+	})
+
+	it("blocks deceased disposition for reproductive-age female without submitted FMDRF", async () => {
+		mockPreTransactionSelects(ACTIVE_ENCOUNTER, SIGNED_NOTE, {
+			patient: { sex: "female", dateOfBirth: "1995-01-01" },
+			deathReports: [],
+		})
+
+		const service = makeEdService()
+		await expect(
+			service.dispose({
+				encounterId: ENCOUNTER_ID,
+				disposition: "deceased",
+			})
+		).rejects.toThrow(BadRequestException)
+
+		expect(db.transaction).not.toHaveBeenCalled()
+	})
+
+	it("allows deceased disposition for reproductive-age female with submitted FMDRF", async () => {
+		mockPreTransactionSelects(ACTIVE_ENCOUNTER, SIGNED_NOTE, {
+			patient: { sex: "female", dateOfBirth: "1995-01-01" },
+			deathReports: [{ reportType: "fmdrf", status: "submitted" }],
+		})
 		const { tx, insertedValues } = makeTxMock()
 		mockTransaction(tx)
 
@@ -471,7 +549,11 @@ describe("BillingService.listUnbilledEncounters()", () => {
 		const captured = mockUnbilledSelects([UNBILLED_ROW], 1)
 
 		const service = makeBillingService()
-		const result = await service.listUnbilledEncounters({ page: 1, limit: 20, facilityId: FACILITY })
+		const result = await service.listUnbilledEncounters({
+			page: 1,
+			limit: 20,
+			facilityId: FACILITY,
+		})
 
 		expect(result.encounters).toHaveLength(1)
 		expect(result.encounters[0]).toHaveProperty("oecbEligible")
@@ -481,9 +563,7 @@ describe("BillingService.listUnbilledEncounters()", () => {
 		// WHERE should have 2 base conditions (facilityId + isNull) and no OECB conditions
 		const where = captured.where!
 		expect(where.op).toBe("and")
-		const oecbCond = where.args?.find(
-			(a) => a.op === "eq" && a.left === "oecbEligible"
-		)
+		const oecbCond = where.args?.find(a => a.op === "eq" && a.left === "oecbEligible")
 		expect(oecbCond).toBeUndefined()
 	})
 
@@ -508,12 +588,12 @@ describe("BillingService.listUnbilledEncounters()", () => {
 		expect(where.op).toBe("and")
 
 		const oecbCond = where.args?.find(
-			(a) => a.op === "eq" && a.left === "oecbEligible" && a.right === true
+			a => a.op === "eq" && a.left === "oecbEligible" && a.right === true
 		)
 		expect(oecbCond).toBeDefined()
 
 		const typeCond = where.args?.find(
-			(a) => a.op === "eq" && a.left === "encounterType" && a.right === "emergency"
+			a => a.op === "eq" && a.left === "encounterType" && a.right === "emergency"
 		)
 		expect(typeCond).toBeDefined()
 	})

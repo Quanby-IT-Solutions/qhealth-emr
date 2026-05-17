@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ArrowRightLeft, BedDouble, HeartOff, LogOut } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -16,6 +16,7 @@ import {
 import { useBedListQuery, useWardsQuery } from "@/features/beds/api/beds.hooks"
 import { useNotesQuery } from "@/features/clinical-docs/api/clinical-docs.hooks"
 import {
+	isDeathReportSubmitted,
 	isMaternalDeathCandidate,
 	isNeonatalDeathCandidate,
 	useDeathReportStatusQuery,
@@ -118,8 +119,15 @@ export function DispositionForm({
 	const needsFndrf = patientDateOfBirth ? isNeonatalDeathCandidate(patientDateOfBirth) : false
 	const needsDeathReport = disposition === "deceased" && (needsFmdrf || needsFndrf)
 	const deathReportsDone =
-		(!needsFmdrf || (deathStatus?.hasFmdrf ?? false)) &&
-		(!needsFndrf || (deathStatus?.hasFndrf ?? false))
+		(!needsFmdrf || isDeathReportSubmitted(deathStatus?.fmdrfStatus)) &&
+		(!needsFndrf || isDeathReportSubmitted(deathStatus?.fndrfStatus))
+
+	useEffect(() => {
+		if (needsDeathReport && !deathReportsDone) {
+			// eslint-disable-next-line react-hooks/set-state-in-effect
+			setDeathReportOpen(true)
+		}
+	}, [deathReportsDone, needsDeathReport])
 
 	function doDispose() {
 		if (!disposition) return
@@ -211,7 +219,7 @@ export function DispositionForm({
 							>
 								<SelectTrigger className="w-full">
 									<SelectValue placeholder="Select ward...">
-									        {admitWardId ? (wards ?? []).find(w => w.id === admitWardId)?.name : undefined}
+										{admitWardId ? (wards ?? []).find(w => w.id === admitWardId)?.name : undefined}
 									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
@@ -230,7 +238,9 @@ export function DispositionForm({
 								<Select value={admitBedId || null} onValueChange={v => setAdmitBedId(v ?? "")}>
 									<SelectTrigger className="w-full">
 										<SelectValue placeholder="Select bed...">
-										        {admitBedId ? availableBeds.find(b => b.id === admitBedId)?.bedNumber : undefined}
+											{admitBedId
+												? availableBeds.find(b => b.id === admitBedId)?.bedNumber
+												: undefined}
 										</SelectValue>
 									</SelectTrigger>
 									<SelectContent>
