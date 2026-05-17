@@ -11,11 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { Input } from "@/core/components/ui/input"
 import { useOfflinePatients } from "@/features/offline-cache/lib/use-offline-patients"
 
-function patientName(patient: {
-	firstName: string
-	middleName?: string | null
-	lastName: string
-}) {
+function patientName(patient: { firstName: string; middleName?: string | null; lastName: string }) {
 	return [patient.firstName, patient.middleName, patient.lastName].filter(Boolean).join(" ")
 }
 
@@ -52,10 +48,13 @@ export default function OfflinePatientCachePage() {
 					<WifiOff className="size-4 text-amber-700" />
 				)}
 				<AlertTitle className={isOnline ? "text-blue-900" : "text-amber-900"}>
-					{isOnline ? "Offline cache is being kept warm" : "You are offline - viewing cached patient data"}
+					{isOnline
+						? "Offline cache is ready for outages"
+						: "You are offline - viewing cached patient data"}
 				</AlertTitle>
 				<AlertDescription className={isOnline ? "text-blue-800" : "text-amber-800"}>
-					Cache last updated: {formatCachedAt(cachedAt)} - {offlinePatients.length.toLocaleString()} patients cached
+					Cache last updated: {formatCachedAt(cachedAt)} - {offlinePatients.length.toLocaleString()}{" "}
+					patients cached
 				</AlertDescription>
 			</Alert>
 
@@ -69,71 +68,70 @@ export default function OfflinePatientCachePage() {
 				<Badge variant="secondary">{offlinePatients.length.toLocaleString()} patients cached</Badge>
 			</div>
 
-			{isOnline ? (
-				<Card>
-					<CardContent className="text-muted-foreground py-10 text-center text-sm">
-						Use the normal patient search while online. This page shows cached patient rows only when the browser is offline.
-					</CardContent>
-				</Card>
-			) : (
-				<Card>
-					<CardHeader>
-						<CardTitle className="text-sm">Cached Patients</CardTitle>
-					</CardHeader>
-					<CardContent className="space-y-4">
-						<div className="relative">
-							<Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
-							<Input
-								data-element-id="offline-search"
-								value={search}
-								onChange={event => setSearch(event.target.value)}
-								placeholder="Search by name or MRN..."
-								className="pl-9"
-							/>
-						</div>
+			<Card>
+				<CardHeader>
+					<CardTitle className="text-sm">Cached Patients</CardTitle>
+				</CardHeader>
+				<CardContent className="space-y-4">
+					<div className="relative">
+						<Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+						<Input
+							data-element-id="offline-search"
+							value={search}
+							onChange={event => setSearch(event.target.value)}
+							placeholder="Search by name or MRN..."
+							className="pl-9"
+						/>
+					</div>
 
-						{filteredPatients.length === 0 ? (
-							<div className="text-muted-foreground rounded-lg border border-dashed py-10 text-center text-sm">
-								{offlinePatients.length === 0 ? "No offline cache is available for this facility." : "No cached patients match your search."}
+					{filteredPatients.length === 0 ? (
+						<div className="text-muted-foreground rounded-lg border border-dashed py-10 text-center text-sm">
+							{offlinePatients.length === 0
+								? "No offline cache is available for this facility."
+								: "No cached patients match your search."}
+						</div>
+					) : (
+						<div className="overflow-hidden rounded-lg border">
+							<div className="bg-muted/50 text-muted-foreground grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_auto] gap-3 px-4 py-2 text-xs font-medium uppercase">
+								<div>Patient</div>
+								<div>MRN</div>
+								<div>Age / Sex</div>
+								<div>Status</div>
+								<div />
 							</div>
-						) : (
-							<div className="overflow-hidden rounded-lg border">
-								<div className="bg-muted/50 grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_auto] gap-3 px-4 py-2 text-xs font-medium uppercase text-muted-foreground">
-									<div>Patient</div>
-									<div>MRN</div>
-									<div>Age / Sex</div>
-									<div>Status</div>
-									<div />
-								</div>
-								{filteredPatients.map(patient => (
-									<div
-										key={patient.id}
-										className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_auto] items-center gap-3 border-t px-4 py-3 text-sm"
-									>
-										<div className="min-w-0">
-											<div className="truncate font-medium">{patientName(patient)}</div>
-											<div className="text-muted-foreground font-mono text-xs">{patient.mrn}</div>
-										</div>
-										<div className="font-mono text-xs">{patient.mrn}</div>
-										<div className="text-muted-foreground">
-											{calculateAge(patient.dateOfBirth)} / {patient.sex}
-										</div>
-										<div>
-											<Badge variant={patient.isActive ? "secondary" : "outline"}>
-												{patient.isActive ? "Active" : "Inactive"}
-											</Badge>
-										</div>
-										<Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/patients/offline/${patient.id}`} />}>
-											Open
-											<ArrowRight className="size-4" />
-										</Button>
+							{filteredPatients.map(patient => (
+								<div
+									key={patient.id}
+									className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_auto] items-center gap-3 border-t px-4 py-3 text-sm"
+								>
+									<div className="min-w-0">
+										<div className="truncate font-medium">{patientName(patient)}</div>
+										<div className="text-muted-foreground font-mono text-xs">{patient.mrn}</div>
 									</div>
-								))}
-							</div>
-						)}
-					</CardContent>
-				</Card>
-			)}
+									<div className="font-mono text-xs">{patient.mrn}</div>
+									<div className="text-muted-foreground">
+										{calculateAge(patient.dateOfBirth)} / {patient.sex}
+									</div>
+									<div>
+										<Badge variant={patient.isActive ? "secondary" : "outline"}>
+											{patient.isActive ? "Active" : "Inactive"}
+										</Badge>
+									</div>
+									<Button
+										variant="ghost"
+										size="sm"
+										nativeButton={false}
+										render={<Link href={`/patients/offline/${patient.id}`} />}
+									>
+										Open
+										<ArrowRight className="size-4" />
+									</Button>
+								</div>
+							))}
+						</div>
+					)}
+				</CardContent>
+			</Card>
 		</div>
 	)
 }

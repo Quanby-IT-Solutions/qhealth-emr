@@ -10,7 +10,6 @@ import {
 	WifiOff,
 } from "lucide-react"
 
-import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Progress } from "@/core/components/ui/progress"
@@ -23,7 +22,14 @@ export type SyncState = "online" | "offline" | "syncing" | "conflict"
 
 interface QueuedItem {
 	id: string
-	type: "vital_sign" | "mar_entry" | "tar_entry" | "io_entry" | "hai_tag" | "handoff"
+	type:
+		| "clinical_note"
+		| "vital_sign"
+		| "mar_entry"
+		| "tar_entry"
+		| "io_entry"
+		| "hai_tag"
+		| "handoff"
 	description: string
 	createdAt: string
 }
@@ -33,6 +39,7 @@ interface QueuedItem {
 // ============================================================================
 
 const QUEUE_LABELS: Record<QueuedItem["type"], string> = {
+	clinical_note: "Clinical Note",
 	vital_sign: "Vital Signs",
 	mar_entry: "MAR Administration",
 	tar_entry: "TAR Treatment",
@@ -59,17 +66,10 @@ interface SyncStatusBannerProps {
 	lastSyncedAt?: string
 }
 
-export function SyncStatusBanner({
-	syncState,
-	pendingCount,
-	lastSyncedAt,
-}: SyncStatusBannerProps) {
+export function SyncStatusBanner({ syncState, pendingCount, lastSyncedAt }: SyncStatusBannerProps) {
 	if (syncState === "online" && pendingCount === 0) return null
 
-	const configs: Record<
-		SyncState,
-		{ color: string; icon: React.ReactNode; text: string }
-	> = {
+	const configs: Record<SyncState, { color: string; icon: React.ReactNode; text: string }> = {
 		online: {
 			color: "bg-green-50 border-green-200 text-green-700",
 			icon: <Wifi className="size-3.5" />,
@@ -117,13 +117,7 @@ interface SyncStatusProps {
 	onSync: () => void
 }
 
-export function SyncStatus({
-	syncState,
-	queue,
-	progress,
-	lastSyncedAt,
-	onSync,
-}: SyncStatusProps) {
+export function SyncStatus({ syncState, queue, progress, lastSyncedAt, onSync }: SyncStatusProps) {
 	return (
 		<div className="space-y-4">
 			{/* Status card */}
@@ -134,7 +128,7 @@ export function SyncStatus({
 							{syncState === "offline" ? (
 								<CloudOff className="size-4 text-amber-500" />
 							) : syncState === "syncing" ? (
-								<RefreshCw className="size-4 text-blue-500 animate-spin" />
+								<RefreshCw className="size-4 animate-spin text-blue-500" />
 							) : syncState === "conflict" ? (
 								<AlertTriangle className="size-4 text-red-500" />
 							) : (
@@ -159,16 +153,14 @@ export function SyncStatus({
 						<div className="flex items-center gap-2 text-sm text-green-600">
 							<CheckCircle2 className="size-4" />
 							All records synchronized.{" "}
-							{lastSyncedAt && (
-								<>Last sync: {new Date(lastSyncedAt).toLocaleString("en-PH")}</>
-							)}
+							{lastSyncedAt && <>Last sync: {new Date(lastSyncedAt).toLocaleString("en-PH")}</>}
 						</div>
 					)}
 
 					{syncState === "offline" && (
 						<div className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
 							<p className="font-medium">You are offline.</p>
-							<p className="text-xs mt-0.5">
+							<p className="mt-0.5 text-xs">
 								{queue.length > 0
 									? `${queue.length} record${queue.length !== 1 ? "s" : ""} will sync automatically when connection is restored.`
 									: "No pending records. Continue charting — records will be saved locally."}
@@ -189,9 +181,9 @@ export function SyncStatus({
 					{syncState === "conflict" && (
 						<div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
 							<p className="font-medium">Sync conflict detected.</p>
-							<p className="text-xs mt-0.5">
-								Some records were modified both locally and on the server. Review
-								and resolve conflicts before continuing.
+							<p className="mt-0.5 text-xs">
+								Some records were modified both locally and on the server. Review and resolve
+								conflicts before continuing.
 							</p>
 						</div>
 					)}
@@ -199,22 +191,20 @@ export function SyncStatus({
 					{/* Queue list */}
 					{queue.length > 0 && (
 						<div className="space-y-2">
-							<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+							<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 								Pending Queue ({queue.length})
 							</p>
-							{queue.map((item) => (
+							{queue.map(item => (
 								<div
 									key={item.id}
-									className="flex items-center justify-between text-sm rounded-md border px-3 py-2"
+									className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
 								>
 									<div>
 										<span className="font-medium">{QUEUE_LABELS[item.type]}</span>
 										<span className="text-muted-foreground mx-1">·</span>
-										<span className="text-muted-foreground text-xs">
-											{item.description}
-										</span>
+										<span className="text-muted-foreground text-xs">{item.description}</span>
 									</div>
-									<span className="text-xs text-muted-foreground">
+									<span className="text-muted-foreground text-xs">
 										{formatRelative(item.createdAt)}
 									</span>
 								</div>
@@ -227,12 +217,12 @@ export function SyncStatus({
 			{/* Offline mode explanation */}
 			<Card className="bg-muted/30">
 				<CardContent className="py-4">
-					<p className="text-sm font-medium mb-1">About Offline Mode</p>
-					<p className="text-xs text-muted-foreground">
-						When offline, vital signs, MAR administrations, I/O entries, and other
-						nursing records are saved locally. They will automatically synchronize
-						with the server when your connection is restored. During offline mode,
-						patient summaries cached within the last 24 hours remain accessible.
+					<p className="mb-1 text-sm font-medium">About Offline Mode</p>
+					<p className="text-muted-foreground text-xs">
+						When offline, clinical notes, vital signs, MAR administrations, I/O entries, and other
+						care records are saved locally. They will automatically synchronize with the server when
+						your connection is restored. During offline mode, cached patient summaries remain
+						accessible.
 					</p>
 				</CardContent>
 			</Card>

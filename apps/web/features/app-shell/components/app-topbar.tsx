@@ -9,8 +9,8 @@ import { Separator } from "@/core/components/ui/separator"
 import { SidebarTrigger } from "@/core/components/ui/sidebar"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { NotificationBadge } from "@/features/app-shell/components/notification-badge"
-import { getDefaultPatientsHref } from "@/features/app-shell/lib/navigation"
 import { RoleSwitcher } from "@/features/app-shell/components/role-switcher"
+import { getDefaultPatientsHref } from "@/features/app-shell/lib/navigation"
 import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 
 export function AppTopbar() {
@@ -19,7 +19,7 @@ export function AppTopbar() {
 	const { isOnline } = useOfflineSync()
 	const permissions = profile?.activeRole?.permissions ?? []
 	const canSearchPatients = permissions.some(p => p.module === "patients" && p.action === "view")
-	const patientSearchHref = getDefaultPatientsHref(permissions)
+	const patientSearchHref = isOnline ? getDefaultPatientsHref(permissions) : "/patients/offline"
 	const isPatientProfilePage = /^\/patients\/[^/]+$/.test(pathname)
 
 	if (isPatientProfilePage) {
@@ -40,7 +40,9 @@ export function AppTopbar() {
 							className="bg-muted/40 hover:bg-muted/60 flex h-9 w-full max-w-sm items-center gap-2 rounded-md border px-3 text-sm transition-colors"
 						>
 							<HugeiconsIcon icon={Search01FreeIcons} className="text-muted-foreground size-4" />
-							<span className="text-muted-foreground text-[13px]">Search patients, orders…</span>
+							<span className="text-muted-foreground text-[13px]">
+								{isOnline ? "Search patients, orders..." : "Search cached patients"}
+							</span>
 						</Link>
 					)}
 				</div>
@@ -55,7 +57,8 @@ export function AppTopbar() {
 				<div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800/40 dark:bg-amber-950/20 dark:text-amber-300">
 					<HugeiconsIcon icon={WifiOffFreeIcons} className="size-4 shrink-0" />
 					<span>
-						<strong>Offline mode</strong> — patient data served from local cache. Changes will sync on reconnect.
+						<strong>Offline mode</strong> — patient data served from local cache. Changes will sync
+						on reconnect.
 					</span>
 				</div>
 			)}

@@ -116,7 +116,6 @@ describe("OfflineCacheService", () => {
 				preparedAt,
 				sourceJobId: "660e8400-e29b-41d4-a716-446655440000",
 			})
-
 		;(db.select as jest.Mock)
 			.mockReturnValueOnce(selectLimitRows([{ enableOfflineSummaryCache: true }]))
 			.mockReturnValueOnce(selectOrderedRows([patient]))
@@ -131,6 +130,26 @@ describe("OfflineCacheService", () => {
 		expect(result.status).toBe("completed")
 		expect(result.cachedPatientCount).toBe(1)
 		expect(db.insert).toHaveBeenCalledTimes(2)
+		expect(db.update).toHaveBeenCalledTimes(1)
+	})
+
+	it("treats a missing settings row as enabled because offline caching is mandatory", async () => {
+		const service = new OfflineCacheService()
+
+		;(db.select as jest.Mock)
+			.mockReturnValueOnce(selectLimitRows([]))
+			.mockReturnValueOnce(selectOrderedRows([]))
+		;(db.insert as jest.Mock).mockReturnValueOnce(insertJob())
+		;(db.update as jest.Mock).mockReturnValue(updateJob())
+
+		const result = await service.runJobForFacility(
+			"550e8400-e29b-41d4-a716-446655440000",
+			"scheduler"
+		)
+
+		expect(result.status).toBe("completed")
+		expect(result.cachedPatientCount).toBe(0)
+		expect(db.insert).toHaveBeenCalledTimes(1)
 		expect(db.update).toHaveBeenCalledTimes(1)
 	})
 
@@ -149,7 +168,6 @@ describe("OfflineCacheService", () => {
 
 		;(service as unknown as { buildPatientSummaryPayload: jest.Mock }).buildPatientSummaryPayload =
 			jest.fn().mockRejectedValue(new Error("boom"))
-
 		;(db.select as jest.Mock)
 			.mockReturnValueOnce(selectLimitRows([{ enableOfflineSummaryCache: true }]))
 			.mockReturnValueOnce(selectOrderedRows([patient]))
