@@ -1,4 +1,5 @@
-import { index } from "drizzle-orm/pg-core"
+import { sql } from "drizzle-orm"
+import { index, uniqueIndex } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
 import { encounters, patients } from "./core.js"
@@ -33,9 +34,19 @@ export const deathReports = createTable(
 		>(),
 		maternalHistory: t.jsonb("maternal_history").$type<{
 			// For FMDRF - Facility Maternal Death Review Form
+			patientName?: string
+			patientMrn?: string
+			patientAge?: number
+			patientAddress?: string
+			placeOfDeath?: string
+			causeOfDeathAntecedent?: string
+			causeOfDeathUnderlying?: string
+			causeOfDeathContributing?: string
 			gravida?: number
 			para?: number
+			lastMenstrualPeriod?: string
 			gestationalAge?: number
+			antenatalCare?: boolean
 			antenatalCareVisits?: number
 			complications?: string[]
 			deliveryMode?: "vaginal" | "cesarean"
@@ -91,5 +102,8 @@ export const deathReports = createTable(
 		index("death_reports_report_type_idx").on(t.reportType),
 		index("death_reports_status_idx").on(t.status),
 		index("death_reports_death_datetime_idx").on(t.deathDatetime),
+		uniqueIndex("death_reports_encounter_report_type_uniq")
+			.on(t.encounterId, t.reportType)
+			.where(sql`encounter_id IS NOT NULL`),
 	]
 )

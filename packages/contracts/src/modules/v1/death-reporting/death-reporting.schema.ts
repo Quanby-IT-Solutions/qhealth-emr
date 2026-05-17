@@ -9,6 +9,8 @@ export const DeathReportStatusSchema = z.object({
 	hasFndrf: z.boolean(),
 	fmdrfId: z.string().uuid().nullable(),
 	fndrfId: z.string().uuid().nullable(),
+	fmdrfStatus: z.enum(["draft", "completed", "submitted"]).nullable(),
+	fndrfStatus: z.enum(["draft", "completed", "submitted"]).nullable(),
 })
 
 export const GetDeathReportStatusInputSchema = z.object({
@@ -33,6 +35,7 @@ export const FmdrfReportSchema = z.object({
 
 	// Section 2 – Death Details
 	dateOfDeath: z.string(), // ISO datetime
+	placeOfDeath: z.string(),
 	causeOfDeathImmediate: z.string(),
 	causeOfDeathAntecedent: z.string(),
 	causeOfDeathUnderlying: z.string(),

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AlertTriangle, Printer } from "lucide-react"
 
@@ -19,6 +19,7 @@ import {
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useNotesQuery } from "@/features/clinical-docs/api/clinical-docs.hooks"
 import {
+	isDeathReportSubmitted,
 	isMaternalDeathCandidate,
 	isNeonatalDeathCandidate,
 	useDeathReportStatusQuery,
@@ -106,8 +107,16 @@ export function DischargePanel({
 	const deathReportComplete =
 		!needsDeathReport ||
 		((!isMaternalDeathCandidate(patientSex ?? "", patientDateOfBirth ?? "") ||
-			!!deathReportStatus?.hasFmdrf) &&
-			(!isNeonatalDeathCandidate(patientDateOfBirth ?? "") || !!deathReportStatus?.hasFndrf))
+			isDeathReportSubmitted(deathReportStatus?.fmdrfStatus)) &&
+			(!isNeonatalDeathCandidate(patientDateOfBirth ?? "") ||
+				isDeathReportSubmitted(deathReportStatus?.fndrfStatus)))
+
+	useEffect(() => {
+		if (needsDeathReport && !deathReportComplete) {
+			// eslint-disable-next-line react-hooks/set-state-in-effect
+			setDeathReportModalOpen(true)
+		}
+	}, [deathReportComplete, needsDeathReport])
 
 	const handleDischarge = async () => {
 		if (isOutpatient) {
@@ -250,7 +259,8 @@ export function DischargePanel({
 									<AlertTitle className="text-amber-900">Death review form required</AlertTitle>
 									<AlertDescription className="space-y-3 text-amber-800">
 										<p>
-											This patient requires completion of the {requiredDeathReportLabel} before discharge can be finalized.
+											This patient requires completion of the {requiredDeathReportLabel} before
+											discharge can be finalized.
 										</p>
 										<Button
 											type="button"
@@ -261,7 +271,7 @@ export function DischargePanel({
 												)
 											}
 										>
-											Complete Death Report
+											Complete {requiredDeathReportLabel}
 										</Button>
 									</AlertDescription>
 								</Alert>

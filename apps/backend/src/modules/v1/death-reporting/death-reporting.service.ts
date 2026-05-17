@@ -1,9 +1,17 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common"
+import {
+	BadRequestException,
+	ConflictException,
+	Injectable,
+	Logger,
+	NotFoundException,
+} from "@nestjs/common"
 import { and, eq } from "drizzle-orm"
 
-import { deathReports } from "@repo/db/schema"
+import { deathReports, encounters, patients, surveillanceFlags } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
+
+import { isMaternalDeathCandidate } from "./death-reporting-eligibility"
 
 // ============================================================================
 // Input Types
@@ -26,6 +34,7 @@ interface CreateFmdrfInput {
 	patientAge: number
 	patientAddress: string
 	dateOfDeath: string
+	placeOfDeath: string
 	causeOfDeathImmediate: string
 	causeOfDeathAntecedent: string
 	causeOfDeathUnderlying: string
@@ -97,6 +106,8 @@ interface UpdateFndrfInput {
 	[key: string]: unknown
 }
 
+type MaternalHistoryPayload = NonNullable<(typeof deathReports.$inferSelect)["maternalHistory"]>
+
 @Injectable()
 export class DeathReportingService {
 	private readonly logger = new Logger(DeathReportingService.name)
@@ -109,6 +120,7 @@ export class DeathReportingService {
 			.select({
 				id: deathReports.id,
 				reportType: deathReports.reportType,
+				status: deathReports.status,
 			})
 			.from(deathReports)
 			.where(eq(deathReports.encounterId, input.encounterId))
@@ -121,6 +133,8 @@ export class DeathReportingService {
 			hasFndrf: !!fndrf,
 			fmdrfId: fmdrf?.id ?? null,
 			fndrfId: fndrf?.id ?? null,
+			fmdrfStatus: fmdrf?.status ?? null,
+			fndrfStatus: fndrf?.status ?? null,
 		}
 	}
 
@@ -147,6 +161,9 @@ export class DeathReportingService {
 	 * Create FMDRF report
 	 */
 	async createFmdrf(input: CreateFmdrfInput) {
+		await this.assertCanCreateFmdrf(input)
+		const submittedAt = new Date()
+
 		const [report] = await db
 			.insert(deathReports)
 			.values({
@@ -165,9 +182,19 @@ export class DeathReportingService {
 					...(input.factorOther ? [{ factor: input.factorOther }] : []),
 				],
 				maternalHistory: {
+					patientName: input.patientName,
+					patientMrn: input.patientMrn,
+					patientAge: input.patientAge,
+					patientAddress: input.patientAddress,
+					placeOfDeath: input.placeOfDeath,
+					causeOfDeathAntecedent: input.causeOfDeathAntecedent,
+					causeOfDeathUnderlying: input.causeOfDeathUnderlying,
+					causeOfDeathContributing: input.causeOfDeathContributing ?? undefined,
 					gravida: input.gravidity,
 					para: input.parity,
+					lastMenstrualPeriod: input.lastMenstrualPeriod ?? undefined,
 					gestationalAge: input.gestationalAgeWeeks ?? undefined,
+					antenatalCare: input.antenatalCare,
 					antenatalCareVisits: input.antenatalVisitCount ?? undefined,
 					complications: input.complicationType ? [input.complicationType] : undefined,
 					preventableFactors:
@@ -179,19 +206,17 @@ export class DeathReportingService {
 					certificationDate: input.certificationDate,
 					signatureData: input.physicianSignatureDataUrl,
 				},
-				// SLA-023: create as draft so the certificate has a genuine open SLA window,
-				// consistent with the FNDRF path. Completion and release are recorded via
-				// markDeathReportReleased() which sets releasedAt + releasedByStaffId and
-				// closes the Flow 7 lifecycle.
-				status: "draft" as const,
-				// SLA-017: record the moment the death certificate request was formally submitted
-				requestedAt: new Date(),
+				status: "submitted" as const,
+				requestedAt: submittedAt,
+				submittedAt,
 			})
 			.returning()
 
 		if (!report) {
 			throw new Error("Failed to create FMDRF report")
 		}
+
+		await this.forwardSubmittedFmdrfToSurveillance(input, report.id)
 
 		return this.mapFmdrfReport(report, input)
 	}
@@ -208,18 +233,30 @@ export class DeathReportingService {
 			throw new NotFoundException(`FMDRF report ${id} not found`)
 		}
 
+		this.assertFmdrfRequiredFields(data, false)
+
 		const updateData: Record<string, unknown> = {
 			updatedAt: new Date(),
 		}
 
 		if (typeof data.dateOfDeath === "string") {
-			updateData.deathDatetime = new Date(data.dateOfDeath)
+			const deathDatetime = new Date(data.dateOfDeath)
+			if (Number.isNaN(deathDatetime.getTime())) {
+				throw new BadRequestException("A valid date and time of death is required for FMDRF.")
+			}
+			updateData.deathDatetime = deathDatetime
 		}
 		if (typeof data.causeOfDeathImmediate === "string") {
 			updateData.causeOfDeath = data.causeOfDeathImmediate
 		}
 
-		const knownFactors = ["Hemorrhage", "Sepsis", "Eclampsia", "Obstructed Labor", "Unsafe Abortion"]
+		const knownFactors = [
+			"Hemorrhage",
+			"Sepsis",
+			"Eclampsia",
+			"Obstructed Labor",
+			"Unsafe Abortion",
+		]
 		const hasFactorUpdate = [
 			data.factorHemorrhage,
 			data.factorSepsis,
@@ -237,7 +274,7 @@ export class DeathReportingService {
 			const flagL = data.factorObstructedLabor ?? ef.some(f => f.factor === "Obstructed Labor")
 			const flagA = data.factorUnsafeAbortion ?? ef.some(f => f.factor === "Unsafe Abortion")
 			const existingOther = ef.find(f => !knownFactors.includes(f.factor))?.factor ?? null
-			const otherFactor = data.factorOther !== undefined ? (data.factorOther || null) : existingOther
+			const otherFactor = data.factorOther !== undefined ? data.factorOther || null : existingOther
 			updateData.contributingFactors = [
 				...(flagH ? [{ factor: "Hemorrhage" }] : []),
 				...(flagS ? [{ factor: "Sepsis" }] : []),
@@ -249,9 +286,19 @@ export class DeathReportingService {
 		}
 
 		const hasMaternalUpdate = [
+			data.patientName,
+			data.patientMrn,
+			data.patientAge,
+			data.patientAddress,
+			data.placeOfDeath,
+			data.causeOfDeathAntecedent,
+			data.causeOfDeathUnderlying,
+			data.causeOfDeathContributing,
 			data.gravidity,
 			data.parity,
+			data.lastMenstrualPeriod,
 			data.gestationalAgeWeeks,
+			data.antenatalCare,
 			data.antenatalVisitCount,
 			data.complicationType,
 			data.avoidableFactors,
@@ -259,22 +306,40 @@ export class DeathReportingService {
 		].some(v => v !== undefined)
 
 		if (hasMaternalUpdate) {
-			const em = (existing.maternalHistory ?? {}) as {
-				gravida?: number
-				para?: number
-				gestationalAge?: number
-				antenatalCareVisits?: number
-				complications?: string[]
-				preventableFactors?: string[]
-			}
-			const avoidable = data.avoidableFactors !== undefined ? data.avoidableFactors : !!em.preventableFactors?.length
+			const em = (existing.maternalHistory ?? {}) as MaternalHistoryPayload
+			const avoidable =
+				data.avoidableFactors !== undefined
+					? data.avoidableFactors
+					: !!em.preventableFactors?.length
 			const avoidRemark =
-				data.avoidableRemark !== undefined ? (data.avoidableRemark || null) : (em.preventableFactors?.[0] ?? null)
+				data.avoidableRemark !== undefined
+					? data.avoidableRemark || null
+					: (em.preventableFactors?.[0] ?? null)
 			updateData.maternalHistory = {
 				...em,
+				...(data.patientName !== undefined ? { patientName: data.patientName } : {}),
+				...(data.patientMrn !== undefined ? { patientMrn: data.patientMrn } : {}),
+				...(data.patientAge !== undefined ? { patientAge: data.patientAge } : {}),
+				...(data.patientAddress !== undefined ? { patientAddress: data.patientAddress } : {}),
+				...(data.placeOfDeath !== undefined ? { placeOfDeath: data.placeOfDeath } : {}),
+				...(data.causeOfDeathAntecedent !== undefined
+					? { causeOfDeathAntecedent: data.causeOfDeathAntecedent }
+					: {}),
+				...(data.causeOfDeathUnderlying !== undefined
+					? { causeOfDeathUnderlying: data.causeOfDeathUnderlying }
+					: {}),
+				...(data.causeOfDeathContributing !== undefined
+					? { causeOfDeathContributing: data.causeOfDeathContributing ?? undefined }
+					: {}),
 				...(data.gravidity !== undefined ? { gravida: data.gravidity } : {}),
 				...(data.parity !== undefined ? { para: data.parity } : {}),
-				...(data.gestationalAgeWeeks !== undefined ? { gestationalAge: data.gestationalAgeWeeks ?? undefined } : {}),
+				...(data.lastMenstrualPeriod !== undefined
+					? { lastMenstrualPeriod: data.lastMenstrualPeriod ?? undefined }
+					: {}),
+				...(data.gestationalAgeWeeks !== undefined
+					? { gestationalAge: data.gestationalAgeWeeks ?? undefined }
+					: {}),
+				...(data.antenatalCare !== undefined ? { antenatalCare: data.antenatalCare } : {}),
 				...(data.antenatalVisitCount !== undefined
 					? { antenatalCareVisits: data.antenatalVisitCount ?? undefined }
 					: {}),
@@ -303,10 +368,18 @@ export class DeathReportingService {
 			}
 			updateData.physicianCertification = {
 				...ec,
-				...(data.physicianName !== undefined ? { certifyingPhysicianName: data.physicianName } : {}),
-				...(data.physicianLicenseNo !== undefined ? { prcLicenseNumber: data.physicianLicenseNo } : {}),
-				...(data.certificationDate !== undefined ? { certificationDate: data.certificationDate } : {}),
-				...(data.physicianSignatureDataUrl !== undefined ? { signatureData: data.physicianSignatureDataUrl } : {}),
+				...(data.physicianName !== undefined
+					? { certifyingPhysicianName: data.physicianName }
+					: {}),
+				...(data.physicianLicenseNo !== undefined
+					? { prcLicenseNumber: data.physicianLicenseNo }
+					: {}),
+				...(data.certificationDate !== undefined
+					? { certificationDate: data.certificationDate }
+					: {}),
+				...(data.physicianSignatureDataUrl !== undefined
+					? { signatureData: data.physicianSignatureDataUrl }
+					: {}),
 			}
 		}
 
@@ -346,6 +419,8 @@ export class DeathReportingService {
 	 * Create FNDRF report
 	 */
 	async createFndrf(input: CreateFndrfInput) {
+		const submittedAt = new Date()
+
 		const [report] = await db
 			.insert(deathReports)
 			.values({
@@ -378,12 +453,9 @@ export class DeathReportingService {
 					certificationDate: input.certificationDate,
 					signatureData: input.physicianSignatureDataUrl,
 				},
-				// SLA-021: create as draft so the certificate has a genuine open SLA window.
-				// Completion and release are recorded via markDeathReportReleased() which sets
-				// releasedAt + releasedByStaffId and closes the Flow 7 lifecycle.
-				status: "draft" as const,
-				// SLA-017: record the moment the death certificate request was formally submitted
-				requestedAt: new Date(),
+				status: "submitted" as const,
+				requestedAt: submittedAt,
+				submittedAt,
 			})
 			.returning()
 
@@ -414,7 +486,13 @@ export class DeathReportingService {
 			updateData.deathDatetime = new Date(data.dateOfDeath)
 		}
 
-		const knownCauses = ["Prematurity", "Birth Asphyxia", "Sepsis", "Congenital Anomaly", "Respiratory Distress Syndrome"]
+		const knownCauses = [
+			"Prematurity",
+			"Birth Asphyxia",
+			"Sepsis",
+			"Congenital Anomaly",
+			"Respiratory Distress Syndrome",
+		]
 		const hasCauseUpdate = [
 			data.causePrematurity,
 			data.causeBirthAsphyxia,
@@ -432,15 +510,16 @@ export class DeathReportingService {
 			const flagC = data.causeCongenitalAnomaly ?? existingCauses.includes("Congenital Anomaly")
 			const flagR = data.causeRds ?? existingCauses.includes("Respiratory Distress Syndrome")
 			const existingOther = existingCauses.find(c => !knownCauses.includes(c)) ?? null
-			const otherCause = data.causeOther !== undefined ? (data.causeOther || null) : existingOther
-			updateData.causeOfDeath = [
-				...(flagP ? ["Prematurity"] : []),
-				...(flagB ? ["Birth Asphyxia"] : []),
-				...(flagS ? ["Sepsis"] : []),
-				...(flagC ? ["Congenital Anomaly"] : []),
-				...(flagR ? ["Respiratory Distress Syndrome"] : []),
-				...(otherCause ? [otherCause] : []),
-			].join(", ") || existing.causeOfDeath
+			const otherCause = data.causeOther !== undefined ? data.causeOther || null : existingOther
+			updateData.causeOfDeath =
+				[
+					...(flagP ? ["Prematurity"] : []),
+					...(flagB ? ["Birth Asphyxia"] : []),
+					...(flagS ? ["Sepsis"] : []),
+					...(flagC ? ["Congenital Anomaly"] : []),
+					...(flagR ? ["Respiratory Distress Syndrome"] : []),
+					...(otherCause ? [otherCause] : []),
+				].join(", ") || existing.causeOfDeath
 
 			if (data.contributingRemarks !== undefined) {
 				updateData.contributingFactors = data.contributingRemarks
@@ -471,11 +550,19 @@ export class DeathReportingService {
 			}
 			updateData.neonatalDetails = {
 				...en,
-				...(data.gestationalAgeWeeks !== undefined ? { gestationalAgeWeeks: data.gestationalAgeWeeks } : {}),
+				...(data.gestationalAgeWeeks !== undefined
+					? { gestationalAgeWeeks: data.gestationalAgeWeeks }
+					: {}),
 				...(data.birthWeightGrams !== undefined ? { birthWeight: data.birthWeightGrams } : {}),
-				...(data.apgarScore1Min !== undefined ? { apgarScore1Min: data.apgarScore1Min ?? undefined } : {}),
-				...(data.apgarScore5Min !== undefined ? { apgarScore5Min: data.apgarScore5Min ?? undefined } : {}),
-				...(data.ageAtDeathHours !== undefined ? { ageAtDeathHours: data.ageAtDeathHours ?? undefined } : {}),
+				...(data.apgarScore1Min !== undefined
+					? { apgarScore1Min: data.apgarScore1Min ?? undefined }
+					: {}),
+				...(data.apgarScore5Min !== undefined
+					? { apgarScore5Min: data.apgarScore5Min ?? undefined }
+					: {}),
+				...(data.ageAtDeathHours !== undefined
+					? { ageAtDeathHours: data.ageAtDeathHours ?? undefined }
+					: {}),
 			}
 		}
 
@@ -495,10 +582,18 @@ export class DeathReportingService {
 			}
 			updateData.physicianCertification = {
 				...ec,
-				...(data.physicianName !== undefined ? { certifyingPhysicianName: data.physicianName } : {}),
-				...(data.physicianLicenseNo !== undefined ? { prcLicenseNumber: data.physicianLicenseNo } : {}),
-				...(data.certificationDate !== undefined ? { certificationDate: data.certificationDate } : {}),
-				...(data.physicianSignatureDataUrl !== undefined ? { signatureData: data.physicianSignatureDataUrl } : {}),
+				...(data.physicianName !== undefined
+					? { certifyingPhysicianName: data.physicianName }
+					: {}),
+				...(data.physicianLicenseNo !== undefined
+					? { prcLicenseNumber: data.physicianLicenseNo }
+					: {}),
+				...(data.certificationDate !== undefined
+					? { certificationDate: data.certificationDate }
+					: {}),
+				...(data.physicianSignatureDataUrl !== undefined
+					? { signatureData: data.physicianSignatureDataUrl }
+					: {}),
 			}
 		}
 
@@ -515,6 +610,122 @@ export class DeathReportingService {
 		return this.mapFndrfReport(report, data as Partial<CreateFndrfInput>)
 	}
 
+	private async assertCanCreateFmdrf(input: CreateFmdrfInput) {
+		this.assertFmdrfRequiredFields(input, true)
+
+		const deathDatetime = new Date(input.dateOfDeath)
+		if (Number.isNaN(deathDatetime.getTime())) {
+			throw new BadRequestException("A valid date and time of death is required for FMDRF.")
+		}
+
+		const [context] = await db
+			.select({
+				encounterId: encounters.id,
+				encounterFacilityId: encounters.facilityId,
+				encounterPatientId: encounters.patientId,
+				patientFacilityId: patients.facilityId,
+				patientSex: patients.sex,
+				patientDateOfBirth: patients.dateOfBirth,
+			})
+			.from(encounters)
+			.innerJoin(patients, eq(encounters.patientId, patients.id))
+			.where(eq(encounters.id, input.encounterId))
+			.limit(1)
+
+		if (!context) {
+			throw new NotFoundException(`Encounter ${input.encounterId} not found`)
+		}
+
+		if (context.encounterPatientId !== input.patientId) {
+			throw new BadRequestException("FMDRF patient does not match the encounter patient.")
+		}
+
+		if (
+			context.encounterFacilityId !== input.facilityId ||
+			context.patientFacilityId !== input.facilityId
+		) {
+			throw new BadRequestException("FMDRF facility does not match the encounter facility.")
+		}
+
+		if (!isMaternalDeathCandidate(context.patientSex, context.patientDateOfBirth, deathDatetime)) {
+			throw new BadRequestException(
+				"FMDRF is required only for female patients aged 10-49 years at death."
+			)
+		}
+
+		const [existing] = await db
+			.select({ id: deathReports.id })
+			.from(deathReports)
+			.where(
+				and(eq(deathReports.encounterId, input.encounterId), eq(deathReports.reportType, "fmdrf"))
+			)
+			.limit(1)
+
+		if (existing) {
+			throw new ConflictException("An FMDRF already exists for this encounter.")
+		}
+	}
+
+	private assertFmdrfRequiredFields(input: Partial<CreateFmdrfInput>, requireAll: boolean) {
+		const requiredTextFields: Array<keyof CreateFmdrfInput> = [
+			"patientName",
+			"patientMrn",
+			"patientAddress",
+			"placeOfDeath",
+			"dateOfDeath",
+			"causeOfDeathImmediate",
+			"causeOfDeathUnderlying",
+			"physicianName",
+			"physicianLicenseNo",
+			"physicianSignatureDataUrl",
+			"certificationDate",
+		]
+
+		for (const field of requiredTextFields) {
+			if (!requireAll && input[field] === undefined) continue
+			const value = input[field]
+			if (typeof value !== "string" || value.trim().length === 0) {
+				throw new BadRequestException(`${String(field)} is required for FMDRF submission.`)
+			}
+		}
+
+		if (
+			(requireAll || input.patientAge !== undefined) &&
+			(!input.patientAge || input.patientAge <= 0)
+		) {
+			throw new BadRequestException("patientAge must be greater than 0 for FMDRF submission.")
+		}
+	}
+
+	private async forwardSubmittedFmdrfToSurveillance(
+		input: CreateFmdrfInput,
+		deathReportId: string
+	) {
+		const triggerValue = `FMDRF:${deathReportId}`
+		const existingFlags = await db
+			.select({ id: surveillanceFlags.id })
+			.from(surveillanceFlags)
+			.where(
+				and(
+					eq(surveillanceFlags.encounterId, input.encounterId),
+					eq(surveillanceFlags.flagType, "mndrs_fmdrf"),
+					eq(surveillanceFlags.triggerValue, triggerValue)
+				)
+			)
+			.limit(1)
+
+		if (existingFlags.length > 0) return
+
+		await db.insert(surveillanceFlags).values({
+			facilityId: input.facilityId,
+			encounterId: input.encounterId,
+			noteId: null,
+			flagType: "mndrs_fmdrf",
+			triggeredBy: `FMDRF submitted for ${input.patientName}`,
+			triggerValue,
+		})
+	}
+
 	// ============================================================================
 	// Private Helpers
 	// ============================================================================
@@ -523,7 +734,7 @@ export class DeathReportingService {
 		report: typeof deathReports.$inferSelect,
 		input?: Partial<CreateFmdrfInput>
 	) {
-		const maternal = report.maternalHistory ?? {}
+		const maternal = (report.maternalHistory ?? {}) as MaternalHistoryPayload
 		const cert = report.physicianCertification ?? {}
 		const factors = report.contributingFactors ?? []
 
@@ -532,20 +743,24 @@ export class DeathReportingService {
 			encounterId: report.encounterId ?? "",
 			patientId: report.patientId,
 			facilityId: report.facilityId,
-			patientName: input?.patientName ?? "",
-			patientMrn: input?.patientMrn ?? "",
-			patientAge: input?.patientAge ?? 0,
-			patientAddress: input?.patientAddress ?? "",
+			patientName: maternal.patientName ?? input?.patientName ?? "",
+			patientMrn: maternal.patientMrn ?? input?.patientMrn ?? "",
+			patientAge: maternal.patientAge ?? input?.patientAge ?? 0,
+			patientAddress: maternal.patientAddress ?? input?.patientAddress ?? "",
 			dateOfDeath: report.deathDatetime.toISOString(),
+			placeOfDeath: maternal.placeOfDeath ?? input?.placeOfDeath ?? "",
 			causeOfDeathImmediate: report.causeOfDeath,
-			causeOfDeathAntecedent: input?.causeOfDeathAntecedent ?? "",
-			causeOfDeathUnderlying: input?.causeOfDeathUnderlying ?? "",
-			causeOfDeathContributing: input?.causeOfDeathContributing ?? null,
+			causeOfDeathAntecedent:
+				maternal.causeOfDeathAntecedent ?? input?.causeOfDeathAntecedent ?? "",
+			causeOfDeathUnderlying:
+				maternal.causeOfDeathUnderlying ?? input?.causeOfDeathUnderlying ?? "",
+			causeOfDeathContributing:
+				maternal.causeOfDeathContributing ?? input?.causeOfDeathContributing ?? null,
 			gravidity: maternal.gravida ?? input?.gravidity ?? 0,
 			parity: maternal.para ?? input?.parity ?? 0,
-			lastMenstrualPeriod: input?.lastMenstrualPeriod ?? null,
+			lastMenstrualPeriod: maternal.lastMenstrualPeriod ?? input?.lastMenstrualPeriod ?? null,
 			gestationalAgeWeeks: maternal.gestationalAge ?? null,
-			antenatalCare: input?.antenatalCare ?? false,
+			antenatalCare: maternal.antenatalCare ?? input?.antenatalCare ?? false,
 			antenatalVisitCount: maternal.antenatalCareVisits ?? null,
 			complicationType: maternal.complications?.[0] ?? null,
 			factorHemorrhage: factors.some(f => f.factor === "Hemorrhage"),

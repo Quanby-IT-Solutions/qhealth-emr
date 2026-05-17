@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-
 import { CheckCircle2, RefreshCw } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -9,15 +8,21 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import type { CreateFmdrfInput } from "@/features/death-reporting/api/death-reporting.hooks"
 import {
 	useCreateFmdrfMutation,
 	useFmdrfQuery,
 	useMarkDeathReportReleasedMutation,
 	useUpdateFmdrfMutation,
+	type CreateFmdrfInput,
 } from "@/features/death-reporting/api/death-reporting.hooks"
 
 // ============================================================================
@@ -132,7 +137,7 @@ function CheckRow({ id, label, checked, onChange, disabled }: CheckRowProps) {
 			<input
 				id={id}
 				type="checkbox"
-				className="size-4 accent-primary"
+				className="accent-primary size-4"
 				checked={checked}
 				onChange={e => onChange(e.target.checked)}
 				disabled={disabled}
@@ -148,6 +153,13 @@ function CheckRow({ id, label, checked, onChange, disabled }: CheckRowProps) {
 
 type FormState = Omit<CreateFmdrfInput, "encounterId" | "patientId" | "facilityId">
 
+function toDatetimeLocalValue(value: string) {
+	const date = new Date(value)
+	if (Number.isNaN(date.getTime())) return value
+	const pad = (n: number) => String(n).padStart(2, "0")
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 function emptyForm(): FormState {
 	return {
 		patientName: "",
@@ -155,6 +167,7 @@ function emptyForm(): FormState {
 		patientAge: 0,
 		patientAddress: "",
 		dateOfDeath: "",
+		placeOfDeath: "",
 		causeOfDeathImmediate: "",
 		causeOfDeathAntecedent: "",
 		causeOfDeathUnderlying: "",
@@ -193,6 +206,8 @@ interface FmdrfFormProps {
 	initialPatientName?: string
 	initialPatientMrn?: string
 	initialPatientAge?: number
+	initialPatientAddress?: string | null
+	initialPlaceOfDeath?: string | null
 }
 
 export function FmdrfForm({
@@ -202,6 +217,8 @@ export function FmdrfForm({
 	initialPatientName,
 	initialPatientMrn,
 	initialPatientAge,
+	initialPatientAddress,
+	initialPlaceOfDeath,
 }: FmdrfFormProps) {
 	const { data: existing } = useFmdrfQuery(encounterId)
 	const createMutation = useCreateFmdrfMutation()
@@ -213,6 +230,8 @@ export function FmdrfForm({
 		profile?.staffProfiles?.find(p =>
 			p.roles.some((r: { id: string }) => r.id === profile?.activeRole?.id)
 		) ?? profile?.staffProfiles?.[0]
+	const defaultPhysicianName = profile?.user?.name ?? ""
+	const defaultPhysicianLicenseNo = activeStaffProfile?.prcLicenseNumber ?? ""
 	const staffProfileId = activeStaffProfile?.id ?? null
 	const permissions = profile?.activeRole?.permissions ?? []
 	const canEdit = (permissions as Array<{ module: string; action: string }>).some(
@@ -226,12 +245,14 @@ export function FmdrfForm({
 	// Populate form from existing report or prefill values
 	useEffect(() => {
 		if (existing) {
+			// eslint-disable-next-line react-hooks/set-state-in-effect
 			setForm({
 				patientName: existing.patientName,
 				patientMrn: existing.patientMrn,
 				patientAge: existing.patientAge,
 				patientAddress: existing.patientAddress,
-				dateOfDeath: existing.dateOfDeath,
+				dateOfDeath: toDatetimeLocalValue(existing.dateOfDeath),
+				placeOfDeath: existing.placeOfDeath,
 				causeOfDeathImmediate: existing.causeOfDeathImmediate,
 				causeOfDeathAntecedent: existing.causeOfDeathAntecedent,
 				causeOfDeathUnderlying: existing.causeOfDeathUnderlying,
@@ -259,12 +280,25 @@ export function FmdrfForm({
 		} else {
 			setForm(prev => ({
 				...prev,
-				patientName: initialPatientName ?? "",
-				patientMrn: initialPatientMrn ?? "",
-				patientAge: initialPatientAge ?? 0,
+				patientName: prev.patientName || initialPatientName || "",
+				patientMrn: prev.patientMrn || initialPatientMrn || "",
+				patientAge: prev.patientAge || initialPatientAge || 0,
+				patientAddress: prev.patientAddress || initialPatientAddress || "",
+				placeOfDeath: prev.placeOfDeath || initialPlaceOfDeath || "",
+				physicianName: prev.physicianName || defaultPhysicianName,
+				physicianLicenseNo: prev.physicianLicenseNo || defaultPhysicianLicenseNo,
 			}))
 		}
-	}, [existing, initialPatientName, initialPatientMrn, initialPatientAge])
+	}, [
+		existing,
+		initialPatientName,
+		initialPatientMrn,
+		initialPatientAge,
+		initialPatientAddress,
+		initialPlaceOfDeath,
+		defaultPhysicianName,
+		defaultPhysicianLicenseNo,
+	])
 
 	const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
 		setForm(prev => ({ ...prev, [key]: value }))
@@ -275,7 +309,10 @@ export function FmdrfForm({
 	const requiredFields: (keyof FormState)[] = [
 		"patientName",
 		"patientMrn",
+		"patientAge",
+		"patientAddress",
 		"dateOfDeath",
+		"placeOfDeath",
 		"causeOfDeathImmediate",
 		"causeOfDeathUnderlying",
 		"physicianName",
@@ -284,7 +321,10 @@ export function FmdrfForm({
 		"certificationDate",
 	]
 
-	const isValid = requiredFields.every(f => !!form[f])
+	const isValid = requiredFields.every(f => {
+		const value = form[f]
+		return typeof value === "number" ? value > 0 : !!value
+	})
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
@@ -319,8 +359,8 @@ export function FmdrfForm({
 					<CheckCircle2 className="size-6 text-green-600" />
 					<div>
 						<p className="font-medium text-green-700">FMDRF Submitted</p>
-						<p className="text-sm text-muted-foreground">
-							Facility Maternal Death Review Form has been saved.
+						<p className="text-muted-foreground text-sm">
+							Facility Maternal Death Review Form has been submitted for MNDRS review.
 						</p>
 					</div>
 					<Button
@@ -328,7 +368,10 @@ export function FmdrfForm({
 						variant="outline"
 						size="sm"
 						className="ml-auto"
-						onClick={() => { setEditing(true); setSubmitted(false) }}
+						onClick={() => {
+							setEditing(true)
+							setSubmitted(false)
+						}}
 					>
 						Edit
 					</Button>
@@ -343,7 +386,7 @@ export function FmdrfForm({
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="text-lg font-semibold">Facility Maternal Death Review Form (FMDRF)</h2>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						DOH-mandated maternal death review documentation
 					</p>
 				</div>
@@ -443,6 +486,16 @@ export function FmdrfForm({
 							type="datetime-local"
 							value={form.dateOfDeath}
 							onChange={e => set("dateOfDeath", e.target.value)}
+							disabled={isReadOnly}
+							required
+						/>
+					</div>
+					<div className="space-y-1.5">
+						<Label>Place of Death *</Label>
+						<Input
+							placeholder="e.g., Emergency Department, Ward 3"
+							value={form.placeOfDeath}
+							onChange={e => set("placeOfDeath", e.target.value)}
 							disabled={isReadOnly}
 							required
 						/>
@@ -696,6 +749,7 @@ export function FmdrfForm({
 					<div className="space-y-1.5">
 						<Label>Physician Signature *</Label>
 						{isReadOnly && form.physicianSignatureDataUrl ? (
+							// eslint-disable-next-line @next/next/no-img-element
 							<img
 								src={form.physicianSignatureDataUrl}
 								alt="Physician signature"
@@ -709,9 +763,7 @@ export function FmdrfForm({
 									disabled={isReadOnly}
 								/>
 								{!isReadOnly && !form.physicianSignatureDataUrl && (
-									<p className="text-xs text-muted-foreground">
-										Draw your signature above *
-									</p>
+									<p className="text-muted-foreground text-xs">Draw your signature above *</p>
 								)}
 							</>
 						)}

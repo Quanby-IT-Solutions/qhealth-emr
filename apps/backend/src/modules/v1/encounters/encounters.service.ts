@@ -40,6 +40,11 @@ import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
 import { ChartAccessService, type ChartAccessActor } from "@/modules/v1/audit/chart-access.service"
+import {
+	formatDeathReportLabels,
+	getRequiredDeathReportTypes,
+	isSubmittedDeathReportStatus,
+} from "@/modules/v1/death-reporting/death-reporting-eligibility"
 import { NotificationService } from "@/modules/v1/notifications/notification.service"
 import { resolveStepTarget } from "@/utils/sla-step-target"
 
@@ -311,6 +316,10 @@ export class EncountersService {
 				patientFirstName: patients.firstName,
 				patientLastName: patients.lastName,
 				patientMrn: patients.mrn,
+				patientAddressLine1: patients.addressLine1,
+				patientAddressLine2: patients.addressLine2,
+				patientCity: patients.city,
+				patientProvince: patients.province,
 				patientDateOfBirth: patients.dateOfBirth,
 				patientSex: patients.sex,
 				wardName: wards.name,
@@ -376,6 +385,10 @@ export class EncountersService {
 			...row,
 			patientName: `${row.patientLastName}, ${row.patientFirstName}`,
 			patientMrn: row.patientMrn,
+			patientAddress:
+				[row.patientAddressLine1, row.patientAddressLine2, row.patientCity, row.patientProvince]
+					.filter(Boolean)
+					.join(", ") || null,
 			patientDateOfBirth: new Date(row.patientDateOfBirth).toISOString(),
 			patientSex: row.patientSex,
 			admittingStaffName: row.admittingStaffName ?? null,
@@ -1252,20 +1265,58 @@ export class EncountersService {
 
 		// Enforce death report mandate before discharge
 		if (input.disposition === "deceased") {
-			const completedDeathReport = await db
-				.select()
-				.from(deathReports)
-				.where(
-					and(
-						eq(deathReports.encounterId, input.encounterId),
-						inArray(deathReports.status, ["completed", "submitted"])
-					)
-				)
+			const [patient] = await db
+				.select({
+					sex: patients.sex,
+					dateOfBirth: patients.dateOfBirth,
+				})
+				.from(patients)
+				.where(eq(patients.id, encounter.patientId))
 				.limit(1)
-			if (completedDeathReport.length === 0) {
+
+			if (!patient) {
+				throw new NotFoundException(`Patient ${encounter.patientId} not found`)
+			}
+
+			const deathDatetime = input.dischargeDatetime ? new Date(input.dischargeDatetime) : new Date()
+			if (Number.isNaN(deathDatetime.getTime())) {
 				throw new BadRequestException(
-					"A completed death report (FMDRF or FNDRF) must be submitted before discharging a deceased patient."
+					"A valid discharge date/time is required for deceased disposition."
 				)
+			}
+
+			const requiredReportTypes = getRequiredDeathReportTypes(
+				patient.sex,
+				patient.dateOfBirth,
+				deathDatetime
+			)
+
+			if (requiredReportTypes.length > 0) {
+				const reports = await db
+					.select({
+						reportType: deathReports.reportType,
+						status: deathReports.status,
+					})
+					.from(deathReports)
+					.where(
+						and(
+							eq(deathReports.encounterId, input.encounterId),
+							inArray(deathReports.reportType, requiredReportTypes)
+						)
+					)
+
+				const submittedTypes = new Set(
+					reports
+						.filter(report => isSubmittedDeathReportStatus(report.status))
+						.map(report => report.reportType)
+				)
+				const missingTypes = requiredReportTypes.filter(type => !submittedTypes.has(type))
+
+				if (missingTypes.length > 0) {
+					throw new BadRequestException(
+						`${formatDeathReportLabels(missingTypes)} must be submitted before discharging a deceased patient.`
+					)
+				}
 			}
 		}
 
