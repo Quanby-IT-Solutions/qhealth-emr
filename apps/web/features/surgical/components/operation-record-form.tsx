@@ -105,10 +105,6 @@ function StaffSearchCombobox({
 		return source.slice(0, 20)
 	}, [inputValue, options])
 
-	useEffect(() => {
-		setInputValue(selectedOption?.name ?? "")
-	}, [selectedOption])
-
 	function handleInputChange(nextValue: string) {
 		setInputValue(nextValue)
 		if (!nextValue.trim()) {
@@ -121,6 +117,8 @@ function StaffSearchCombobox({
 		setOpen(nextOpen && !disabled)
 		if (!nextOpen && !value) {
 			setInputValue("")
+		} else if (!nextOpen && selectedOption) {
+			setInputValue(selectedOption.name)
 		}
 	}
 
@@ -136,7 +134,7 @@ function StaffSearchCombobox({
 				<PopoverTrigger render={<div className="w-full" />}>
 					<CommandInput
 						id={id}
-						value={inputValue}
+						value={inputValue || selectedOption?.name || ""}
 						onValueChange={handleInputChange}
 						onFocus={() => {
 							if (!disabled) {
@@ -224,9 +222,15 @@ export function OperationRecordForm({
 		staffOptions.find(option => option.staffProfileId === surgeonStaffId)?.name ?? surgeonStaffId
 	const isSigned = existing?.status === "signed"
 	const fieldsDisabled = isSigned || !canEdit || save.isPending || sign.isPending
+	const timeOrderInvalid = Boolean(
+		form.incisionDatetime &&
+			form.closureDatetime &&
+			new Date(form.closureDatetime) < new Date(form.incisionDatetime)
+	)
 	const canSubmit = Boolean(
 		form.preOpDiagnosis.trim() &&
 		form.procedurePerformed.trim() &&
+		!timeOrderInvalid &&
 		!save.isPending &&
 		!sign.isPending
 	)
@@ -239,11 +243,7 @@ export function OperationRecordForm({
 		if (!form.operativeTechnique.trim()) missingFields.push("operative technique")
 		if (!form.incisionDatetime) missingFields.push("incision time")
 		if (!form.closureDatetime) missingFields.push("closure time")
-		if (
-			form.incisionDatetime &&
-			form.closureDatetime &&
-			new Date(form.closureDatetime) < new Date(form.incisionDatetime)
-		) {
+		if (timeOrderInvalid) {
 			missingFields.push("closure time after incision time")
 		}
 		if (!form.scrubNurseStaffId) missingFields.push("scrub nurse")
@@ -251,7 +251,7 @@ export function OperationRecordForm({
 		if (!form.anesthesiologistStaffId) missingFields.push("anesthesiologist")
 
 		return missingFields
-	}, [form])
+	}, [form, timeOrderInvalid])
 	const canSignDraft = canSign && !isSigned && (Boolean(existing) || canEdit)
 	const canSignRecord = canSignDraft && signChecklistMissing.length === 0
 
@@ -396,7 +396,9 @@ export function OperationRecordForm({
 						</p>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Procedure Narrative</Label>
+						<Label>
+							Procedure Narrative <span className="text-destructive">*</span>
+						</Label>
 						<Textarea
 							rows={3}
 							value={form.procedureDescription}
@@ -406,7 +408,9 @@ export function OperationRecordForm({
 						/>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Operative Technique</Label>
+						<Label>
+							Operative Technique <span className="text-destructive">*</span>
+						</Label>
 						<Textarea
 							rows={4}
 							value={form.operativeTechnique}
@@ -458,6 +462,7 @@ export function OperationRecordForm({
 						<Input
 							type="number"
 							min={0}
+							step={1}
 							value={form.estimatedBloodLoss}
 							onChange={event => setField("estimatedBloodLoss", event.target.value)}
 							placeholder="0"
@@ -469,6 +474,7 @@ export function OperationRecordForm({
 						<Input
 							type="number"
 							min={0}
+							step={1}
 							value={form.fluidIn}
 							onChange={event => setField("fluidIn", event.target.value)}
 							placeholder="0"
@@ -480,6 +486,7 @@ export function OperationRecordForm({
 						<Input
 							type="number"
 							min={0}
+							step={1}
 							value={form.fluidOut}
 							onChange={event => setField("fluidOut", event.target.value)}
 							placeholder="0"
@@ -488,7 +495,9 @@ export function OperationRecordForm({
 					</div>
 					<div className="col-span-full grid gap-4 sm:grid-cols-2">
 						<div className="space-y-1.5">
-							<Label>Incision Time</Label>
+							<Label>
+								Incision Time <span className="text-destructive">*</span>
+							</Label>
 							<Input
 								type="datetime-local"
 								value={form.incisionDatetime}
@@ -497,7 +506,9 @@ export function OperationRecordForm({
 							/>
 						</div>
 						<div className="space-y-1.5">
-							<Label>Closure Time</Label>
+							<Label>
+								Closure Time <span className="text-destructive">*</span>
+							</Label>
 							<Input
 								type="datetime-local"
 								value={form.closureDatetime}
@@ -506,12 +517,17 @@ export function OperationRecordForm({
 							/>
 						</div>
 					</div>
+					{timeOrderInvalid ? (
+						<p className="text-destructive col-span-full text-sm">
+							Closure time must be after incision time.
+						</p>
+					) : null}
 				</CardContent>
 			</Card>
 
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base">Surgical Team</CardTitle>
+					<CardTitle className="text-base">OR Personnel</CardTitle>
 				</CardHeader>
 				<CardContent className="grid gap-4 sm:grid-cols-2">
 					<div className="space-y-1.5">
@@ -541,7 +557,9 @@ export function OperationRecordForm({
 						/>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Scrub Nurse</Label>
+						<Label>
+							Scrub Nurse <span className="text-destructive">*</span>
+						</Label>
 						<StaffSearchCombobox
 							id="scrub-nurse"
 							value={form.scrubNurseStaffId}
@@ -552,7 +570,9 @@ export function OperationRecordForm({
 						/>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Circulating Nurse</Label>
+						<Label>
+							Circulating Nurse <span className="text-destructive">*</span>
+						</Label>
 						<StaffSearchCombobox
 							id="circulating-nurse"
 							value={form.circulatingNurseStaffId}
@@ -563,7 +583,9 @@ export function OperationRecordForm({
 						/>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Anesthesiologist</Label>
+						<Label>
+							Anesthesiologist <span className="text-destructive">*</span>
+						</Label>
 						<StaffSearchCombobox
 							id="anesthesiologist"
 							value={form.anesthesiologistStaffId}

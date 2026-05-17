@@ -100,9 +100,9 @@ export class SurgicalController {
 
 	@RequirePermission("surgical", "edit")
 	@Implement(v1.surgical.saveOperationRecord)
-	async saveOperationRecord(@Session() session: UserSession) {
+	async saveOperationRecord(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.surgical.saveOperationRecord).handler(async ({ input }) => {
-			return this.surgicalService.saveOperationRecord(input, session)
+			return this.surgicalService.saveOperationRecord(input, session, extractActiveStaffProfileId(req))
 		})
 	}
 
@@ -128,9 +128,9 @@ export class SurgicalController {
 
 	@RequirePermission("surgical", "edit")
 	@Implement(v1.surgical.saveAnesthesiaRecord)
-	async saveAnesthesiaRecord(@Session() session: UserSession) {
+	async saveAnesthesiaRecord(@Req() req: Request) {
 		return implement(v1.surgical.saveAnesthesiaRecord).handler(async ({ input }) => {
-			return this.surgicalService.saveAnesthesiaRecord(input, session)
+			return this.surgicalService.saveAnesthesiaRecord(input, extractActiveStaffProfileId(req))
 		})
 	}
 
@@ -211,10 +211,10 @@ export class SurgicalController {
 
 	@RequirePermission("surgical", "edit")
 	@Implement(v1.surgical.removeRvsAssignment)
-	async removeRvsAssignment(@Session() session: UserSession) {
+	async removeRvsAssignment(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.surgical.removeRvsAssignment).handler(async ({ input }) => {
 			void session
-			return this.surgicalService.removeRvsAssignment(input)
+			return this.surgicalService.removeRvsAssignment(input, extractActiveStaffProfileId(req))
 		})
 	}
 

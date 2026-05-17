@@ -203,6 +203,12 @@ describe("AnesthesiaRecordForm", () => {
 			"anesthesia type"
 		)
 		expect(screen.getByText(/complete these fields before signing/i)).toHaveTextContent(
+			"Cormack-Lehane grade"
+		)
+		expect(screen.getByText(/complete these fields before signing/i)).toHaveTextContent(
+			"at least one complete medication or anesthetic agent"
+		)
+		expect(screen.getByText(/complete these fields before signing/i)).toHaveTextContent(
 			"at least one complete intraoperative vital"
 		)
 

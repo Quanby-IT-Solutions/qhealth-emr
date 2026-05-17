@@ -466,6 +466,7 @@ export class BillingService {
 						assignmentType: assignment.assignmentType,
 						status: assignment.status,
 					})) ?? [],
+				acceptedStatuses: ["finalized"],
 			})
 
 			return coverage.procedures.map(procedure => ({
@@ -507,7 +508,9 @@ export class BillingService {
 			)
 		}
 		if (missingPrimaryLabels.length > 0) {
-			failureMessages.push(`Missing primary RVS code for: ${missingPrimaryLabels.join(", ")}`)
+			failureMessages.push(
+				`Missing finalized primary RVS code for: ${missingPrimaryLabels.join(", ")}`
+			)
 		}
 
 		throw new BadRequestException(
@@ -938,7 +941,7 @@ export class BillingService {
 				throw new BadRequestException("HMO provider is required for HMO payments")
 			if (!input.hmoClaimNumber)
 				throw new BadRequestException("HMO claim number is required for HMO payments")
-			if (input.hmoPercentageCovered == null) {
+			if (input.hmoPercentageCovered === null || input.hmoPercentageCovered === undefined) {
 				throw new BadRequestException("HMO percentage covered is required for HMO payments")
 			}
 			if (input.hmoPercentageCovered < 0 || input.hmoPercentageCovered > 100) {
@@ -970,7 +973,9 @@ export class BillingService {
 				hmoProvider: input.hmoProvider ?? null,
 				hmoClaimNumber: input.hmoClaimNumber ?? null,
 				hmoPercentageCovered:
-					input.hmoPercentageCovered != null ? String(input.hmoPercentageCovered) : null,
+					input.hmoPercentageCovered !== null && input.hmoPercentageCovered !== undefined
+						? String(input.hmoPercentageCovered)
+						: null,
 				receivedByStaffId: staffProfileId,
 				paymentDate: input.paymentDate,
 				notes: input.notes ?? null,
@@ -1758,7 +1763,7 @@ export class BillingService {
 	// Malasakit Center
 	// ========================================================================
 
-	async getMalasakit(input: GetMalasakitInput) {
+	async getMalasakit(_input: GetMalasakitInput) {
 		// In production, query from malasakit_assistance table
 		// For now, return empty summary
 		return {
@@ -1962,7 +1967,9 @@ export class BillingService {
 		else if (input.type === "PWD") discountAmount = subtotal * 0.2
 		else if (input.type === "SOLO_PARENT") discountAmount = subtotal * 0.1
 		else if (input.type === "MANUAL") {
-			if (input.amount == null) throw new BadRequestException("Manual discount requires an amount")
+			if (input.amount === null || input.amount === undefined) {
+				throw new BadRequestException("Manual discount requires an amount")
+			}
 			if (input.amount > subtotal)
 				throw new BadRequestException("Discount cannot exceed invoice subtotal")
 			discountAmount = input.amount
@@ -2376,7 +2383,10 @@ ${procedures.map(proc => `    <Procedure>${esc(proc)}</Procedure>`).join("\n")}
 					memberPin: input.memberPin,
 					memberName: input.memberName ?? null,
 					status: input.status,
-					benefitBalance: input.benefitBalance != null ? String(input.benefitBalance) : null,
+					benefitBalance:
+						input.benefitBalance !== null && input.benefitBalance !== undefined
+							? String(input.benefitBalance)
+							: null,
 					dependentsJson: input.dependentsJson ?? null,
 					rawResponse: input.rawResponse ?? null,
 					capturedByStaffId: staffProfileId,
@@ -2448,7 +2458,7 @@ ${procedures.map(proc => `    <Procedure>${esc(proc)}</Procedure>`).join("\n")}
 	// Check CEWS (BIL-BE-07)
 	// ========================================================================
 
-	async checkCews(input: CheckCewsInput) {
+	async checkCews(_input: CheckCewsInput) {
 		// Stubbed real-time check
 		return {
 			status: "active" as const,

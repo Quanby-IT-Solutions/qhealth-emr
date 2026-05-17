@@ -171,6 +171,31 @@ const BLANK_VITAL: IntraopVital = {
 	temp: undefined,
 }
 
+function hasText(value: string | null | undefined) {
+	return !!value?.trim()
+}
+
+function hasCompleteMedication(form: FormState) {
+	return (
+		form.intraopMedications.some(
+			medication =>
+				hasText(medication.name) &&
+				hasText(medication.dose) &&
+				hasText(medication.route) &&
+				hasText(medication.time)
+		) ||
+		form.inductionAgents.some(
+			agent => hasText(agent.agent) && hasText(agent.dose) && hasText(agent.time)
+		) ||
+		form.maintenanceAgents.some(
+			agent => hasText(agent.agent) && hasText(agent.dose) && hasText(agent.time)
+		) ||
+		form.muscleRelaxants.some(
+			agent => hasText(agent.agent) && hasText(agent.dose) && hasText(agent.time)
+		)
+	)
+}
+
 interface AnesthesiaRecordFormProps {
 	caseId: string
 	existing: AnesthesiaRecord | null | undefined
@@ -200,9 +225,13 @@ export function AnesthesiaRecordForm({
 		if (!form.anesthesiaType) missingFields.push("anesthesia type")
 		if (!form.asaClass) missingFields.push("ASA physical status class")
 		if (!form.airwayType) missingFields.push("airway device")
+		if (!form.intubationGrade) missingFields.push("Cormack-Lehane grade")
 		if (!form.airwayManagement.trim()) missingFields.push("airway notes")
 		if (!form.totalAnesthesiaMinutes || Number(form.totalAnesthesiaMinutes) <= 0) {
 			missingFields.push("total anesthesia time")
+		}
+		if (!hasCompleteMedication(form)) {
+			missingFields.push("at least one complete medication or anesthetic agent")
 		}
 		if (!hasCompleteVital) missingFields.push("at least one complete intraoperative vital")
 

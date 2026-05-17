@@ -141,8 +141,68 @@ describe("RvsCodeSelector", () => {
 			/>
 		)
 
-		expect(screen.getByText(/sign the operative record before validating/i)).toBeInTheDocument()
+		expect(screen.getByText(/sign the operative record before mapping/i)).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: /validate/i })).toBeDisabled()
+		expect(screen.queryByRole("button", { name: /remove 47562/i })).not.toBeInTheDocument()
+	})
+
+	it("allows removing only suggested mappings after the operation record is signed", () => {
+		mockUseRvsAssignmentsQuery.mockReturnValue({
+			data: [
+				{
+					id: "assignment-1",
+					surgicalCaseId: "case-1",
+					rvsCodeId: "rvs-uuid-1",
+					procedureLabel: "Laparoscopic cholecystectomy",
+					code: "47562",
+					description: "Laparoscopic cholecystectomy",
+					assignmentType: "primary",
+					status: "suggested",
+					suggestedByName: "Dr. Smith",
+					validatedByName: null,
+					finalizedByName: null,
+					suggestedAt: "2026-05-05T00:00:00.000Z",
+					validatedAt: null,
+					finalizedAt: null,
+					modifier: null,
+					units: 1,
+					createdAt: "2026-05-05T00:00:00.000Z",
+				},
+				{
+					id: "assignment-2",
+					surgicalCaseId: "case-1",
+					rvsCodeId: "rvs-uuid-2",
+					procedureLabel: "Laparoscopic cholecystectomy",
+					code: "47563",
+					description: "Laparoscopic cholecystectomy with cholangiography",
+					assignmentType: "adjunct",
+					status: "validated",
+					suggestedByName: "Dr. Smith",
+					validatedByName: "Billing",
+					finalizedByName: null,
+					suggestedAt: "2026-05-05T00:00:00.000Z",
+					validatedAt: "2026-05-05T01:00:00.000Z",
+					finalizedAt: null,
+					modifier: null,
+					units: 1,
+					createdAt: "2026-05-05T00:00:00.000Z",
+				},
+			],
+			isLoading: false,
+		})
+
+		render(
+			<RvsCodeSelector
+				caseId="case-1"
+				operationRecord={{ procedurePerformed: "Laparoscopic cholecystectomy" }}
+				canEdit
+				canValidate
+				canFinalize
+				isOperationRecordSigned
+			/>
+		)
+
 		expect(screen.getByRole("button", { name: /remove 47562/i })).toBeEnabled()
+		expect(screen.queryByRole("button", { name: /remove 47563/i })).not.toBeInTheDocument()
 	})
 })

@@ -62,8 +62,12 @@ export default function SurgicalPage() {
 	const canEditPreOp = isAnesthesiologist ? false : canEditSurgical
 	const canEditOperation = isAnesthesiologist ? false : canEditSurgical
 	const canSignOperation = isAnesthesiologist ? false : canSignSurgical
-	const canEditAnesthesia = isSurgeon ? false : canEditSurgical
-	const canSignAnesthesia = isSurgeon ? false : canSignSurgical
+	const isAssignedAnesthesiologist =
+		isAnesthesiologist &&
+		!!surgicalCase?.anesthesiologistStaffId &&
+		surgicalCase.anesthesiologistStaffId === staffId
+	const canEditAnesthesia = isAssignedAnesthesiologist && canEditSurgical
+	const canSignAnesthesia = isAssignedAnesthesiologist && canSignSurgical
 
 	if (casesLoading) {
 		return (
