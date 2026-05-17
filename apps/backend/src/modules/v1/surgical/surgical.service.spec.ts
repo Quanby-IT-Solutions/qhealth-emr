@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common"
+import type { UserSession } from "@thallesp/nestjs-better-auth"
 
 import { db } from "@/common/database/database.client"
 
@@ -9,6 +10,7 @@ jest.mock("@/common/database/database.client", () => ({
 		select: jest.fn(),
 		insert: jest.fn(),
 		update: jest.fn(),
+		delete: jest.fn(),
 	},
 }))
 
@@ -67,6 +69,7 @@ type MockDb = {
 	select: jest.Mock
 	insert: jest.Mock
 	update: jest.Mock
+	delete: jest.Mock
 }
 
 function createSelectBuilder(result: unknown) {
@@ -88,9 +91,38 @@ function createUpdateBuilder() {
 	return { set, where }
 }
 
+function createDeleteBuilder() {
+	return {
+		where: jest.fn().mockResolvedValue(undefined),
+	}
+}
+
+function mockAssignedSurgicalCase(mockDb: MockDb, surgeonStaffId = "surgeon-1") {
+	mockDb.select.mockImplementationOnce(() =>
+		createSelectBuilder([
+			{
+				surgeonStaffId,
+			},
+		])
+	)
+}
+
+function mockAssignedAnesthesiaCase(mockDb: MockDb, anesthesiologistStaffId = "anes-1") {
+	mockDb.select.mockImplementationOnce(() =>
+		createSelectBuilder([
+			{
+				facilityId: "facility-1",
+				encounterId: "encounter-1",
+				anesthesiologistStaffId,
+			},
+		])
+	)
+}
+
 describe("SurgicalService", () => {
 	let service: SurgicalService
 	let mockDb: MockDb
+	const mockSession = { user: { id: "user-1" } } as unknown as UserSession
 
 	beforeEach(() => {
 		jest.clearAllMocks()
@@ -104,6 +136,7 @@ describe("SurgicalService", () => {
 				{
 					facilityId: "facility-1",
 					encounterId: "encounter-1",
+					surgeonStaffId: "surgeon-1",
 					anesthesiologistStaffId: "anes-1",
 				},
 			])
@@ -123,9 +156,75 @@ describe("SurgicalService", () => {
 					instrumentCountCorrect: true,
 					swabCountCorrect: true,
 				},
-				{ user: { id: "user-1" } } as any
+				mockSession
 			)
 		).rejects.toThrow(BadRequestException)
+	})
+
+	it("allows only the case assigned surgeon to author an operation record", async () => {
+		mockDb.select.mockImplementationOnce(() =>
+			createSelectBuilder([
+				{
+					facilityId: "facility-1",
+					encounterId: "encounter-1",
+					surgeonStaffId: "surgeon-1",
+					anesthesiologistStaffId: "anes-1",
+				},
+			])
+		)
+		jest.spyOn(service as any, "getOperationRecordRow").mockResolvedValue(null)
+
+		await expect(
+			service.saveOperationRecord(
+				{
+					caseId: "case-1",
+					surgeonStaffId: "surgeon-1",
+					preOpDiagnosis: "Acute appendicitis",
+					procedurePerformed: "Appendectomy",
+					instrumentCountCorrect: true,
+					swabCountCorrect: true,
+				},
+				mockSession,
+				"surgeon-2"
+			)
+		).rejects.toThrow(ForbiddenException)
+
+		expect(mockDb.insert).not.toHaveBeenCalled()
+		expect(mockDb.update).not.toHaveBeenCalled()
+	})
+
+	it("rejects saving operation record timestamps when closure precedes incision", async () => {
+		mockDb.select.mockImplementationOnce(() =>
+			createSelectBuilder([
+				{
+					facilityId: "facility-1",
+					encounterId: "encounter-1",
+					surgeonStaffId: "surgeon-1",
+					anesthesiologistStaffId: "anes-1",
+				},
+			])
+		)
+		jest.spyOn(service as any, "getOperationRecordRow").mockResolvedValue(null)
+
+		await expect(
+			service.saveOperationRecord(
+				{
+					caseId: "case-1",
+					surgeonStaffId: "surgeon-1",
+					preOpDiagnosis: "Acute appendicitis",
+					procedurePerformed: "Appendectomy",
+					incisionDatetime: "2026-05-05T02:00:00.000Z",
+					closureDatetime: "2026-05-05T01:00:00.000Z",
+					instrumentCountCorrect: true,
+					swabCountCorrect: true,
+				},
+				mockSession,
+				"surgeon-1"
+			)
+		).rejects.toThrow(BadRequestException)
+
+		expect(mockDb.insert).not.toHaveBeenCalled()
+		expect(mockDb.update).not.toHaveBeenCalled()
 	})
 
 	it("allows only the assigned surgeon to sign an operation record", async () => {
@@ -143,6 +242,7 @@ describe("SurgicalService", () => {
 			anesthesiologistStaffId: "anes-1",
 			surgeonStaffId: "surgeon-1",
 		} as any)
+		mockAssignedSurgicalCase(mockDb, "surgeon-1")
 
 		await expect(service.signOperationRecord({ caseId: "case-1" }, "surgeon-2")).rejects.toThrow(
 			ForbiddenException
@@ -164,6 +264,7 @@ describe("SurgicalService", () => {
 			anesthesiologistStaffId: null,
 			surgeonStaffId: "surgeon-1",
 		} as any)
+		mockAssignedSurgicalCase(mockDb, "surgeon-1")
 
 		await expect(service.signOperationRecord({ caseId: "case-1" }, "surgeon-1")).rejects.toThrow(
 			BadRequestException
@@ -189,6 +290,7 @@ describe("SurgicalService", () => {
 			anesthesiologistStaffId: "anes-1",
 			surgeonStaffId: "surgeon-1",
 		} as any)
+		mockAssignedSurgicalCase(mockDb, "surgeon-1")
 		jest.spyOn(service as any, "getOperationRecord").mockResolvedValue({
 			id: "op-1",
 			surgicalCaseId: "case-1",
@@ -249,12 +351,85 @@ describe("SurgicalService", () => {
 		expect(mockDb.update).not.toHaveBeenCalled()
 	})
 
+	it("allows only the assigned anesthesiologist to save an anesthesia record", async () => {
+		mockAssignedAnesthesiaCase(mockDb, "anes-1")
+
+		await expect(
+			service.saveAnesthesiaRecord(
+				{
+					caseId: "case-1",
+					asaClass: "ASA II",
+					anesthesiaType: "general",
+				},
+				"anes-2"
+			)
+		).rejects.toThrow(ForbiddenException)
+
+		expect(mockDb.insert).not.toHaveBeenCalled()
+		expect(mockDb.update).not.toHaveBeenCalled()
+	})
+
+	it("stores the assigned anesthesiologist when saving an anesthesia draft", async () => {
+		const values = jest.fn().mockResolvedValue(undefined)
+
+		mockAssignedAnesthesiaCase(mockDb, "anes-1")
+		mockDb.select.mockImplementationOnce(() => createSelectBuilder([]))
+		mockDb.insert.mockReturnValue({ values })
+		jest.spyOn(service, "getAnesthesiaRecord").mockResolvedValue({
+			id: "anes-record-1",
+			surgicalCaseId: "case-1",
+			asaClass: "ASA II",
+			anesthesiaType: "general",
+			airwayType: null,
+			airwayManagement: null,
+			intubationAttempts: null,
+			intubationGrade: null,
+			difficultAirway: false,
+			agents: null,
+			inductionAgents: null,
+			maintenanceAgents: null,
+			muscleRelaxants: null,
+			intraopMedications: null,
+			intraopVitals: null,
+			fluidBalance: null,
+			reversalAgent: null,
+			totalAnesthesiaMinutes: null,
+			emergenceSmooth: null,
+			complications: null,
+			postAnesthesiaCareNotes: null,
+			anesthesiologistStaffId: "anes-1",
+			status: "draft",
+			signedAt: null,
+			signedByStaffId: null,
+			createdAt: new Date("2026-05-05T00:00:00.000Z"),
+			updatedAt: new Date("2026-05-05T00:00:00.000Z"),
+		})
+
+		await service.saveAnesthesiaRecord(
+			{
+				caseId: "case-1",
+				asaClass: "ASA II",
+				anesthesiaType: "general",
+			},
+			"anes-1"
+		)
+
+		expect(values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				surgicalCaseId: "case-1",
+				anesthesiologistStaffId: "anes-1",
+			})
+		)
+	})
+
 	it("rejects signing an incomplete anesthesia record", async () => {
+		mockAssignedAnesthesiaCase(mockDb, "anes-1")
 		mockDb.select.mockImplementationOnce(() =>
 			createSelectBuilder([
 				{
 					id: "anes-1",
 					surgicalCaseId: "case-1",
+					anesthesiologistStaffId: "anes-1",
 					status: "draft",
 				},
 			])
@@ -299,11 +474,13 @@ describe("SurgicalService", () => {
 	it("signs a complete anesthesia draft and stamps signer metadata", async () => {
 		const updateBuilder = createUpdateBuilder()
 
+		mockAssignedAnesthesiaCase(mockDb, "anes-1")
 		mockDb.select.mockImplementationOnce(() =>
 			createSelectBuilder([
 				{
 					id: "anes-1",
 					surgicalCaseId: "case-1",
+					anesthesiologistStaffId: "anes-1",
 					status: "draft",
 				},
 			])
@@ -396,6 +573,7 @@ describe("SurgicalService", () => {
 		jest.spyOn(service as any, "getOperationRecordRow").mockResolvedValue({
 			id: "op-1",
 			status: "signed",
+			surgeonStaffId: "staff-1",
 			procedurePerformed: "Laparoscopic cholecystectomy",
 		} as any)
 		jest.spyOn(service as any, "queryRvsAssignments").mockResolvedValue([])
@@ -432,6 +610,133 @@ describe("SurgicalService", () => {
 		)
 	})
 
+	it("rejects RVS mapping before the operation record is signed", async () => {
+		jest.spyOn(service as any, "getOperationRecordRow").mockResolvedValue({
+			id: "op-1",
+			status: "draft",
+			surgeonStaffId: "staff-1",
+			procedurePerformed: "Appendectomy",
+		} as any)
+
+		await expect(
+			service.suggestRvsCode(
+				{
+					caseId: "case-1",
+					rvsCodeId: "rvs-1",
+					procedureLabel: "Appendectomy",
+					assignmentType: "primary",
+					units: 1,
+				},
+				"staff-1"
+			)
+		).rejects.toThrow(BadRequestException)
+
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
+	it("rejects RVS mapping by a clinician who is not the assigned surgeon", async () => {
+		jest.spyOn(service as any, "getOperationRecordRow").mockResolvedValue({
+			id: "op-1",
+			status: "signed",
+			surgeonStaffId: "surgeon-1",
+			procedurePerformed: "Appendectomy",
+		} as any)
+
+		await expect(
+			service.suggestRvsCode(
+				{
+					caseId: "case-1",
+					rvsCodeId: "rvs-1",
+					procedureLabel: "Appendectomy",
+					assignmentType: "primary",
+					units: 1,
+				},
+				"anes-1"
+			)
+		).rejects.toThrow(ForbiddenException)
+
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
+	it("requires an active RVS catalog code when suggesting a mapping", async () => {
+		jest.spyOn(service as any, "getOperationRecordRow").mockResolvedValue({
+			id: "op-1",
+			status: "signed",
+			surgeonStaffId: "staff-1",
+			procedurePerformed: "Appendectomy",
+		} as any)
+		jest.spyOn(service as any, "queryRvsAssignments").mockResolvedValue([])
+		mockDb.select.mockImplementationOnce(() => createSelectBuilder([]))
+
+		await expect(
+			service.suggestRvsCode(
+				{
+					caseId: "case-1",
+					rvsCodeId: "rvs-1",
+					procedureLabel: "Appendectomy",
+					assignmentType: "primary",
+					units: 1,
+				},
+				"staff-1"
+			)
+		).rejects.toThrow(BadRequestException)
+
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
+	it("blocks removing RVS mappings after billing review starts", async () => {
+		jest.spyOn(service as any, "requireAssignedSurgeonForRvs").mockResolvedValue({
+			id: "op-1",
+			status: "signed",
+			surgeonStaffId: "staff-1",
+		} as any)
+		jest.spyOn(service as any, "queryRvsAssignmentById").mockResolvedValue({
+			id: "assignment-1",
+			status: "validated",
+		} as any)
+		mockDb.delete.mockReturnValue(createDeleteBuilder())
+
+		await expect(
+			service.removeRvsAssignment(
+				{
+					caseId: "case-1",
+					assignmentId: "assignment-1",
+				},
+				"staff-1"
+			)
+		).rejects.toThrow(BadRequestException)
+
+		expect(mockDb.delete).not.toHaveBeenCalled()
+	})
+
+	it("requires RVS validation before finalization", async () => {
+		jest.spyOn(service as any, "requireSignedOperationRecord").mockResolvedValue({
+			id: "op-1",
+			status: "signed",
+		} as any)
+		jest.spyOn(service as any, "queryRvsAssignmentById").mockResolvedValue({
+			id: "assignment-1",
+			status: "suggested",
+		} as any)
+
+		await expect(
+			service.updateRvsStatus(
+				{
+					caseId: "case-1",
+					assignmentId: "assignment-1",
+					status: "finalized",
+				},
+				{
+					staffProfileId: "staff-1",
+					canEditBilling: true,
+					canSignBilling: true,
+				}
+			)
+		).rejects.toThrow(BadRequestException)
+
+		expect(mockDb.update).not.toHaveBeenCalled()
+	})
+
 	it("requires billing sign permission to finalize an RVS assignment", async () => {
 		jest.spyOn(service as any, "requireSignedOperationRecord").mockResolvedValue({
 			id: "op-1",
@@ -439,6 +744,7 @@ describe("SurgicalService", () => {
 		} as any)
 		jest.spyOn(service as any, "queryRvsAssignmentById").mockResolvedValue({
 			id: "assignment-1",
+			status: "validated",
 		} as any)
 
 		await expect(

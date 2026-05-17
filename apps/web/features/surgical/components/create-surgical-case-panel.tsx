@@ -109,7 +109,11 @@ export function CreateSurgicalCasePanel({
 					<Label htmlFor="surgicalType">
 						Surgical Type <span className="text-destructive">*</span>
 					</Label>
-					<Select value={surgicalType} onValueChange={setSurgicalType} disabled={isPending}>
+					<Select
+						value={surgicalType}
+						onValueChange={value => setSurgicalType(value ?? "")}
+						disabled={isPending}
+					>
 						<SelectTrigger id="surgicalType">
 							<SelectValue placeholder="Select type" />
 						</SelectTrigger>
@@ -127,7 +131,7 @@ export function CreateSurgicalCasePanel({
 					<Label htmlFor="surgeonStaffId">Surgeon (optional)</Label>
 					<Select
 						value={surgeonStaffId}
-						onValueChange={setSurgeonStaffId}
+						onValueChange={value => setSurgeonStaffId(value ?? "")}
 						disabled={isPending || cliniciansLoading}
 					>
 						<SelectTrigger id="surgeonStaffId">

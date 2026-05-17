@@ -20,6 +20,14 @@ const PaginatedResponseSchema = z.object({
 	totalPages: z.number(),
 })
 
+const RequiredTextSchema = z.string().trim().min(1)
+const OptionalTextSchema = z.string().trim().optional()
+const OptionalNonNegativeIntegerSchema = z.coerce.number().int().min(0).optional()
+const OptionalDateTimeStringSchema = z
+	.string()
+	.refine(value => !Number.isNaN(new Date(value).getTime()), "Invalid date/time")
+	.optional()
+
 // ============================================================================
 // Enums
 // ============================================================================
@@ -256,7 +264,7 @@ export type RvsCode = z.infer<typeof RvsCodeSchema>
 export const RvsAssignmentSchema = z.object({
 	id: z.string().uuid(),
 	surgicalCaseId: z.string().uuid(),
-	rvsCodeId: z.string().uuid(),
+	rvsCodeId: z.string().uuid().nullable(),
 	procedureLabel: z.string().nullable(),
 	code: z.string(),
 	description: z.string(),
@@ -350,18 +358,18 @@ export const UpdateSurgicalCaseSchema = z.object({
 
 export const SaveOperationRecordSchema = z.object({
 	caseId: z.string().uuid(),
-	preOpDiagnosis: z.string().min(1),
-	postOpDiagnosis: z.string().optional(),
-	procedurePerformed: z.string().min(1),
-	procedureDescription: z.string().optional(),
-	operativeTechnique: z.string().optional(),
-	findings: z.string().optional(),
-	specimens: z.string().optional(),
-	estimatedBloodLoss: z.number().optional(),
-	fluidIn: z.number().optional(),
-	fluidOut: z.number().optional(),
-	incisionDatetime: z.string().optional(),
-	closureDatetime: z.string().optional(),
+	preOpDiagnosis: RequiredTextSchema,
+	postOpDiagnosis: OptionalTextSchema,
+	procedurePerformed: RequiredTextSchema,
+	procedureDescription: OptionalTextSchema,
+	operativeTechnique: OptionalTextSchema,
+	findings: OptionalTextSchema,
+	specimens: OptionalTextSchema,
+	estimatedBloodLoss: OptionalNonNegativeIntegerSchema,
+	fluidIn: OptionalNonNegativeIntegerSchema,
+	fluidOut: OptionalNonNegativeIntegerSchema,
+	incisionDatetime: OptionalDateTimeStringSchema,
+	closureDatetime: OptionalDateTimeStringSchema,
 	surgeonStaffId: z.string().uuid(),
 	firstAssistantStaffId: z.string().uuid().optional(),
 	secondAssistantStaffId: z.string().uuid().optional(),
@@ -370,7 +378,7 @@ export const SaveOperationRecordSchema = z.object({
 	anesthesiologistStaffId: z.string().uuid().nullable().optional(),
 	instrumentCountCorrect: z.boolean(),
 	swabCountCorrect: z.boolean(),
-	complications: z.string().optional(),
+	complications: OptionalTextSchema,
 })
 
 export const SignOperationRecordSchema = z.object({
@@ -428,7 +436,7 @@ export const SavePreOpChecklistSchema = z.object({
 // ============================================================================
 
 export const RvsCodesQuerySchema = z.object({
-	search: z.string().min(2),
+	search: z.string().trim().min(2),
 	limit: z.coerce.number().int().positive().max(50).default(20),
 })
 
@@ -443,10 +451,10 @@ export const RvsCodesResponseSchema = PaginatedResponseSchema.extend({
 export const SuggestRvsCodeSchema = z.object({
 	caseId: z.string().uuid(),
 	rvsCodeId: z.string().uuid(),
-	procedureLabel: z.string().min(1),
+	procedureLabel: RequiredTextSchema,
 	assignmentType: RvsAssignmentTypeEnum.default("primary"),
-	modifier: z.string().optional(),
-	units: z.number().int().positive().default(1),
+	modifier: OptionalTextSchema,
+	units: z.coerce.number().int().positive().default(1),
 })
 
 // ============================================================================

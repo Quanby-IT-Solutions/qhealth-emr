@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { CheckCircle2, ChevronDown, ChevronUp, Loader2, Lock, Plus, ShieldAlert, Trash2 } from "lucide-react"
+import { CheckCircle2, ChevronUp, Loader2, Lock, Plus, ShieldAlert, Trash2 } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -43,6 +43,7 @@ interface ProcedureCoverage {
 	label: string
 	primaryCount: number
 	adjunctCount: number
+	finalizedPrimaryCount: number
 	isReady: boolean
 }
 
@@ -233,7 +234,7 @@ function AssignmentRow({
 							Finalize
 						</Button>
 					) : null}
-					{assignment.status !== "finalized" && canEdit ? (
+					{assignment.status === "suggested" && canEdit && isOperationRecordSigned ? (
 						<Button
 							size="sm"
 							variant="ghost"
@@ -264,6 +265,7 @@ interface SearchPanelProps {
 function SearchPanel({
 	caseId,
 	canEdit = false,
+	isOperationRecordSigned,
 	procedureCoverage,
 	selectedProcedureLabel,
 	onSelectProcedure,
@@ -285,6 +287,7 @@ function SearchPanel({
 	const hasPrimaryForSelectedProcedure = (selectedProcedure?.primaryCount ?? 0) > 0
 	const canSuggest =
 		canEdit &&
+		isOperationRecordSigned &&
 		!!selectedProcedureLabel &&
 		!(assignmentType === "primary" && hasPrimaryForSelectedProcedure)
 
@@ -493,11 +496,16 @@ export function RvsCodeSelector({
 			const adjunctCount = relatedAssignments.filter(
 				assignment => assignment.assignmentType === "adjunct"
 			).length
+			const finalizedPrimaryCount = relatedAssignments.filter(
+				assignment =>
+					assignment.assignmentType === "primary" && assignment.status === "finalized"
+			).length
 
 			return {
 				label: procedure.label,
 				primaryCount,
 				adjunctCount,
+				finalizedPrimaryCount,
 				isReady: primaryCount > 0,
 			}
 		})
@@ -512,12 +520,19 @@ export function RvsCodeSelector({
 			.reduce((sum, assignment) => sum + (assignment.units ?? 1), 0)
 	}, [assignments.data])
 
-	const finalizedCount = (assignments.data ?? []).filter(a => a.status === "finalized").length
 	const hasAnyAssignment = (assignments.data?.length ?? 0) > 0
 	const missingPrimaryCount = procedureCoverage.filter(procedure => !procedure.isReady).length
-	const claimReady = missingPrimaryCount === 0 && hasAnyAssignment && finalizedCount > 0
+	const missingFinalizedPrimaryCount = procedureCoverage.filter(
+		procedure => procedure.finalizedPrimaryCount === 0
+	).length
+	const claimReady =
+		procedureCoverage.length > 0 &&
+		missingPrimaryCount === 0 &&
+		missingFinalizedPrimaryCount === 0
 	const pendingBillingReview =
-		missingPrimaryCount === 0 && hasAnyAssignment && finalizedCount === 0
+		missingPrimaryCount === 0 &&
+		hasAnyAssignment &&
+		missingFinalizedPrimaryCount > 0
 
 	const selectedStillExists = procedureCoverage.some(
 		procedure =>
@@ -553,8 +568,7 @@ export function RvsCodeSelector({
 						<div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
 							<Lock className="mt-0.5 size-4 shrink-0 text-amber-600" />
 							<p>
-								Sign the operative record before validating or finalizing RVS codes.
-								Suggesting and removing codes is available now.
+								Sign the operative record before mapping, validating, or finalizing RVS codes.
 							</p>
 						</div>
 					) : null}
@@ -563,7 +577,8 @@ export function RvsCodeSelector({
 						<div className="flex items-start gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
 							<CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-600" />
 							<p>
-								All procedures mapped — {finalizedCount} finalized. Claim is ready for submission.
+								All procedures mapped with finalized primary RVS codes. Claim is ready for
+								submission.
 							</p>
 						</div>
 					) : pendingBillingReview ? (
