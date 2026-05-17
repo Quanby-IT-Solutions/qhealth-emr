@@ -183,6 +183,14 @@ export function CreateOrderSetDialog({
 													{order.payload.panelName}
 												</div>
 											) : null}
+											{order.payload.indicationIcd10Code ? (
+												<div className="text-muted-foreground text-xs">
+													{order.payload.indicationIcd10Code}
+													{order.payload.indicationIcd10Display
+														? ` - ${order.payload.indicationIcd10Display}`
+														: ""}
+												</div>
+											) : null}
 										</div>
 									</div>
 									<Badge
@@ -202,7 +210,7 @@ export function CreateOrderSetDialog({
 						Cancel
 					</Button>
 					<Button disabled={!selectedSet || isPending} onClick={handleSubmit}>
-						{isPending ? "Creating Order Set..." : "Create Order Set"}
+						{isPending ? "Signing Order Set..." : "Sign Order Set"}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

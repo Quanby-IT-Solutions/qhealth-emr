@@ -5,42 +5,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { type v1Contract } from "@repo/contracts"
 
-import { env } from "@/env"
 import { orpc } from "@/services/orpc/client"
-
-// Pharmacy endpoints are under /orders/pharmacy in the backend
-const ORDERS_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/orders`
-const PHARMACY_BASE = `${ORDERS_BASE}/pharmacy`
 
 type V1Outputs = InferContractRouterOutputs<typeof v1Contract>
 type RawMedOrder = V1Outputs["orders"]["getMedOrder"]
 type RawVerificationQueueResponse = V1Outputs["orders"]["getVerificationQueue"]
-
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-	const res = await fetch(url, {
-		credentials: "include",
-		...init,
-		headers: {
-			"Content-Type": "application/json",
-			...init?.headers,
-		},
-	})
-	if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-	return res.json() as Promise<T>
-}
-
-function buildQueryString(
-	params: Record<string, string | number | boolean | undefined>
-): string {
-	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
-	if (entries.length === 0) return ""
-	return (
-		"?" +
-		entries
-			.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-			.join("&")
-	)
-}
 
 // ============================================================================
 // Types
@@ -74,6 +43,8 @@ export interface PharmacyQueueItem {
 	prnReason: string | null
 	isControlledSubstance: boolean
 	pdeaSchedule: string | null
+	pdeaTrancheNumber: number | null
+	pdeaTrancheTotal: number | null
 	priority: OrderPriority
 	status: QueueStatus
 	orderingStaffId: string
@@ -236,6 +207,8 @@ function mapPharmacyQueueItem(order: RawMedOrder): PharmacyQueueItem {
 		prnReason: order.prnReason,
 		isControlledSubstance: order.isControlledSubstance,
 		pdeaSchedule: order.pdeaSchedule,
+		pdeaTrancheNumber: order.pdeaTrancheNumber,
+		pdeaTrancheTotal: order.pdeaTrancheTotal,
 		priority: (order.priority ?? "routine") as OrderPriority,
 		status: normalizeQueueStatus(order.status),
 		orderingStaffId: order.orderingStaffId,

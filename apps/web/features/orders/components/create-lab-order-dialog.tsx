@@ -23,6 +23,8 @@ import {
 import { Textarea } from "@/core/components/ui/textarea"
 import { useCreateLabOrderMutation } from "@/features/orders/api/orders.hooks"
 
+type OrderPriority = "routine" | "urgent" | "stat"
+
 interface CreateLabOrderDialogProps {
 	open: boolean
 	onOpenChange: (open: boolean) => void
@@ -42,7 +44,9 @@ export function CreateLabOrderDialog({
 	const [panelCode, setPanelCode] = useState("")
 	const [specimenType, setSpecimenType] = useState("")
 	const [clinicalIndication, setClinicalIndication] = useState("")
-	const [priority, setPriority] = useState("routine")
+	const [indicationIcd10Code, setIndicationIcd10Code] = useState("")
+	const [indicationIcd10Display, setIndicationIcd10Display] = useState("")
+	const [priority, setPriority] = useState<OrderPriority>("routine")
 
 	const createLabOrder = useCreateLabOrderMutation()
 
@@ -53,6 +57,8 @@ export function CreateLabOrderDialog({
 		setPanelCode("")
 		setSpecimenType("")
 		setClinicalIndication("")
+		setIndicationIcd10Code("")
+		setIndicationIcd10Display("")
 		setPriority("routine")
 	}
 
@@ -74,6 +80,8 @@ export function CreateLabOrderDialog({
 				panelCode: panelCode.trim() || undefined,
 				specimenType: specimenType.trim() || undefined,
 				clinicalIndication: clinicalIndication.trim() || undefined,
+				indicationIcd10Code: indicationIcd10Code.trim() || undefined,
+				indicationIcd10Display: indicationIcd10Display.trim() || undefined,
 				priority,
 			},
 			{
@@ -156,9 +164,30 @@ export function CreateLabOrderDialog({
 						/>
 					</div>
 
+					<div className="grid grid-cols-2 gap-4">
+						<div className="space-y-2">
+							<Label htmlFor="labIndicationIcd10Code">ICD-10 Code</Label>
+							<Input
+								id="labIndicationIcd10Code"
+								value={indicationIcd10Code}
+								onChange={(e) => setIndicationIcd10Code(e.target.value)}
+								placeholder="e.g., J18.9"
+							/>
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="labIndicationIcd10Display">ICD-10 Diagnosis</Label>
+							<Input
+								id="labIndicationIcd10Display"
+								value={indicationIcd10Display}
+								onChange={(e) => setIndicationIcd10Display(e.target.value)}
+								placeholder="e.g., Pneumonia, unspecified"
+							/>
+						</div>
+					</div>
+
 					<div className="space-y-2">
 						<Label htmlFor="labPriority">Priority</Label>
-						<Select value={priority} onValueChange={v => setPriority(v ?? "routine")}>
+						<Select value={priority} onValueChange={v => setPriority((v ?? "routine") as OrderPriority)}>
 							<SelectTrigger id="labPriority">
 								<SelectValue />
 							</SelectTrigger>
@@ -179,7 +208,7 @@ export function CreateLabOrderDialog({
 						disabled={!testName.trim() || createLabOrder.isPending}
 						onClick={handleSubmit}
 					>
-						{createLabOrder.isPending ? "Creating…" : "Create Lab Order"}
+						{createLabOrder.isPending ? "Signing..." : "Sign Lab Order"}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

@@ -8,6 +8,8 @@ export interface OrderSetLabPayload {
 	panelCode?: string
 	specimenType?: string
 	clinicalIndication?: string
+	indicationIcd10Code?: string
+	indicationIcd10Display?: string
 	priority?: OrderSetPriority
 }
 
@@ -15,6 +17,8 @@ export interface OrderSetImagingPayload {
 	modality: OrderSetImagingModality
 	bodyPart: string
 	clinicalIndication?: string
+	indicationIcd10Code?: string
+	indicationIcd10Display?: string
 	priority?: OrderSetPriority
 }
 
@@ -48,6 +52,8 @@ export const ORDER_SETS = [
 					panelName: "Sepsis Bundle",
 					specimenType: "Blood",
 					clinicalIndication: "Suspected sepsis",
+					indicationIcd10Code: "A41.9",
+					indicationIcd10Display: "Sepsis, unspecified organism",
 					priority: "stat",
 				},
 			},
@@ -58,6 +64,8 @@ export const ORDER_SETS = [
 					panelName: "Sepsis Bundle",
 					specimenType: "Blood",
 					clinicalIndication: "Suspected sepsis",
+					indicationIcd10Code: "A41.9",
+					indicationIcd10Display: "Sepsis, unspecified organism",
 					priority: "stat",
 				},
 			},
@@ -68,6 +76,8 @@ export const ORDER_SETS = [
 					panelName: "Sepsis Bundle",
 					specimenType: "Blood",
 					clinicalIndication: "Suspected sepsis",
+					indicationIcd10Code: "A41.9",
+					indicationIcd10Display: "Sepsis, unspecified organism",
 					priority: "stat",
 				},
 			},
@@ -78,6 +88,8 @@ export const ORDER_SETS = [
 					panelName: "Sepsis Bundle",
 					specimenType: "Blood",
 					clinicalIndication: "Suspected sepsis",
+					indicationIcd10Code: "A41.9",
+					indicationIcd10Display: "Sepsis, unspecified organism",
 					priority: "stat",
 				},
 			},
@@ -87,6 +99,8 @@ export const ORDER_SETS = [
 					modality: "xray",
 					bodyPart: "Chest",
 					clinicalIndication: "Suspected sepsis",
+					indicationIcd10Code: "A41.9",
+					indicationIcd10Display: "Sepsis, unspecified organism",
 					priority: "stat",
 				},
 			},
@@ -104,6 +118,8 @@ export const ORDER_SETS = [
 					panelName: "Cardiac Workup",
 					specimenType: "Blood",
 					clinicalIndication: "Chest pain evaluation",
+					indicationIcd10Code: "R07.9",
+					indicationIcd10Display: "Chest pain, unspecified",
 					priority: "urgent",
 				},
 			},
@@ -114,6 +130,8 @@ export const ORDER_SETS = [
 					panelName: "Cardiac Workup",
 					specimenType: "Blood",
 					clinicalIndication: "Chest pain evaluation",
+					indicationIcd10Code: "R07.9",
+					indicationIcd10Display: "Chest pain, unspecified",
 					priority: "urgent",
 				},
 			},
@@ -123,6 +141,8 @@ export const ORDER_SETS = [
 					modality: "xray",
 					bodyPart: "Chest",
 					clinicalIndication: "Chest pain evaluation",
+					indicationIcd10Code: "R07.9",
+					indicationIcd10Display: "Chest pain, unspecified",
 					priority: "urgent",
 				},
 			},
@@ -140,6 +160,8 @@ export const ORDER_SETS = [
 					panelName: "Pre-op Panel",
 					specimenType: "Blood",
 					clinicalIndication: "Pre-operative clearance",
+					indicationIcd10Code: "Z01.818",
+					indicationIcd10Display: "Encounter for other preprocedural examination",
 					priority: "routine",
 				},
 			},
@@ -150,6 +172,8 @@ export const ORDER_SETS = [
 					panelName: "Pre-op Panel",
 					specimenType: "Blood",
 					clinicalIndication: "Pre-operative clearance",
+					indicationIcd10Code: "Z01.818",
+					indicationIcd10Display: "Encounter for other preprocedural examination",
 					priority: "routine",
 				},
 			},
@@ -160,6 +184,8 @@ export const ORDER_SETS = [
 					panelName: "Pre-op Panel",
 					specimenType: "Blood",
 					clinicalIndication: "Pre-operative clearance",
+					indicationIcd10Code: "Z01.818",
+					indicationIcd10Display: "Encounter for other preprocedural examination",
 					priority: "routine",
 				},
 			},
@@ -169,6 +195,8 @@ export const ORDER_SETS = [
 					modality: "xray",
 					bodyPart: "Chest",
 					clinicalIndication: "Pre-operative clearance",
+					indicationIcd10Code: "Z01.818",
+					indicationIcd10Display: "Encounter for other preprocedural examination",
 					priority: "routine",
 				},
 			},

@@ -56,6 +56,7 @@ jest.mock("@repo/db/schema", () => {
 		medicationOrders: createTable(),
 		orderVerifications: createTable(),
 		patients: createTable(),
+		preEncounters: createTable(),
 		prescriptions: createTable(),
 		slaStepConfigs: createTable(),
 		staffProfiles: createTable(),
@@ -258,19 +259,22 @@ describe("OrdersService", () => {
 					patientLastName: "Reyes",
 					patientMrn: "MRN-002",
 					patientDateOfBirth: new Date("1985-02-14T00:00:00.000Z"),
-					cdsAlerts: [
-						{
-							type: "high_alert",
-							severity: "warning",
-							message: "High-alert medication",
-							details: { highAlertNotes: "Double verification required" },
-						},
-						{
-							type: "allergy_soft_block",
-							severity: "soft_block",
-							message: "Override required",
-						},
-					],
+					cdsAlerts: {
+						alerts: [
+							{
+								type: "high_alert",
+								severity: "warning",
+								message: "High-alert medication",
+								details: { highAlertNotes: "Double verification required" },
+							},
+							{
+								type: "allergy_soft_block",
+								severity: "soft_block",
+								message: "Override required",
+							},
+						],
+						pdeaDispenseDate: "2026-06-16",
+					},
 					cdsOverrides: null,
 					createdAt,
 					updatedAt: createdAt,
@@ -893,6 +897,163 @@ describe("OrdersService", () => {
 		)
 	})
 
+	it("creates a signed lab order with persisted indication metadata", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const encounterId = "99999999-9999-4999-9999-999999999999"
+		const labOrderId = "11111111-1111-4111-8111-111111111111"
+		const orderInsertBuilder = createInsertBuilder([{ id: labOrderId }])
+		const auditInsertBuilder = createInsertBuilder([])
+		const slaInsertBuilder = createInsertBuilder([])
+
+		jest.spyOn(service, "findLabOrder").mockResolvedValue({ id: labOrderId } as never)
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[{ id: "staff-physician", userId: "user-1", facilityId, isActive: true }],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: encounterId, facilityId }], { withLimit: true })
+			)
+
+		mockDb.insert
+			.mockImplementationOnce(() => orderInsertBuilder)
+			.mockImplementationOnce(() => auditInsertBuilder)
+			.mockImplementationOnce(() => slaInsertBuilder)
+
+		const result = await service.createLabOrder(
+			{
+				facilityId,
+				encounterId,
+				testName: "Complete Blood Count",
+				clinicalIndication: "Fever and productive cough",
+				indicationIcd10Code: "J18.9",
+				indicationIcd10Display: "Pneumonia, unspecified organism",
+				priority: "stat",
+				specimenType: "Blood",
+			},
+			"user-1"
+		)
+
+		expect(orderInsertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				facilityId,
+				encounterId,
+				testName: "Complete Blood Count",
+				clinicalIndication: "Fever and productive cough",
+				indicationIcd10Code: "J18.9",
+				indicationIcd10Display: "Pneumonia, unspecified organism",
+				priority: "stat",
+				status: "ordered",
+				orderingStaffId: "staff-physician",
+			})
+		)
+		expect(auditInsertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				facilityId,
+				userId: "user-1",
+				staffProfileId: "staff-physician",
+				action: "sign",
+				entityType: "lab_order",
+				entityId: labOrderId,
+				metadata: expect.objectContaining({
+					encounterId,
+					indicationIcd10Code: "J18.9",
+				}),
+			})
+		)
+		expect(slaInsertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				facilityId,
+				encounterId,
+				toStatus: "lab_ordered",
+				staffId: "staff-physician",
+			})
+		)
+		expect(result).toEqual({ id: labOrderId })
+	})
+
+	it("creates a signed imaging order with persisted indication metadata", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const encounterId = "99999999-9999-4999-9999-999999999999"
+		const imagingOrderId = "22222222-2222-4222-8222-222222222222"
+		const orderInsertBuilder = createInsertBuilder([{ id: imagingOrderId }])
+		const auditInsertBuilder = createInsertBuilder([])
+		const slaInsertBuilder = createInsertBuilder([])
+
+		jest.spyOn(service, "findImagingOrder").mockResolvedValue({ id: imagingOrderId } as never)
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[{ id: "staff-physician", userId: "user-1", facilityId, isActive: true }],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: encounterId, facilityId }], { withLimit: true })
+			)
+
+		mockDb.insert
+			.mockImplementationOnce(() => orderInsertBuilder)
+			.mockImplementationOnce(() => auditInsertBuilder)
+			.mockImplementationOnce(() => slaInsertBuilder)
+
+		const result = await service.createImagingOrder(
+			{
+				facilityId,
+				encounterId,
+				modality: "xray",
+				bodyPart: "Chest",
+				clinicalIndication: "Fever and productive cough",
+				indicationIcd10Code: "J18.9",
+				indicationIcd10Display: "Pneumonia, unspecified organism",
+				priority: "urgent",
+			},
+			"user-1"
+		)
+
+		expect(orderInsertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				facilityId,
+				encounterId,
+				modality: "xray",
+				bodyPart: "Chest",
+				clinicalIndication: "Fever and productive cough",
+				indicationIcd10Code: "J18.9",
+				indicationIcd10Display: "Pneumonia, unspecified organism",
+				priority: "urgent",
+				status: "ordered",
+				orderingStaffId: "staff-physician",
+			})
+		)
+		expect(auditInsertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				facilityId,
+				userId: "user-1",
+				staffProfileId: "staff-physician",
+				action: "sign",
+				entityType: "imaging_order",
+				entityId: imagingOrderId,
+				metadata: expect.objectContaining({
+					encounterId,
+					indicationIcd10Code: "J18.9",
+				}),
+			})
+		)
+		expect(slaInsertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				facilityId,
+				encounterId,
+				toStatus: "imaging_ordered",
+				staffId: "staff-physician",
+			})
+		)
+		expect(result).toEqual({ id: imagingOrderId })
+	})
+
 	it("creates an e-prescription with facility-scoped PRC and PTR credentials", async () => {
 		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
 		const encounterId = "99999999-9999-4999-9999-999999999999"
@@ -1114,6 +1275,261 @@ describe("OrdersService", () => {
 			)
 		).rejects.toThrow("A prescription already exists for this medication order.")
 		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
+	it("blocks controlled medication orders over 30 days on the non-tranched endpoint", async () => {
+		mockDb.select.mockImplementationOnce(() =>
+			createSelectBuilder(
+				[
+					{
+						id: "staff-prescriber",
+						userId: "user-1",
+						facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+						isActive: true,
+						pdeaS2License: "S2-100001",
+						pdeaS2Expiry: "2099-12-31",
+					},
+				],
+				{ withLimit: true }
+			)
+		)
+
+		await expect(
+			service.createMedOrder(
+				{
+					facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+					patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+					genericName: "Morphine",
+					dose: "10",
+					doseUnit: "mg",
+					doseForm: "tablet",
+					route: "PO",
+					frequency: "bid",
+					durationDays: 45,
+					isControlledSubstance: true,
+					pdeaSchedule: "S2",
+					cdsAlerts: [],
+				},
+				"user-1"
+			)
+		).rejects.toThrow("must be submitted through PDEA tranching")
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
+	it("reports S-2 licenses without expiry as invalid", async () => {
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "staff-prescriber",
+							userId: "user-1",
+							pdeaS2License: "S2-100001",
+							pdeaS2Expiry: null,
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ name: "Dr. Test" }], { withLimit: true })
+			)
+
+		const result = await service.checkPdeaLicense({
+			staffId: "staff-prescriber",
+			facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+		})
+
+		expect(result.canPrescribeControlled).toBe(false)
+		expect(result.errorMessage).toMatch(/expiry is not recorded/i)
+	})
+
+	it("rejects PDEA tranche previews over the 90-day cap", async () => {
+		await expect(
+			service.previewTranches({
+				facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+				genericName: "Morphine",
+				dose: "10",
+				frequency: "bid",
+				durationDays: 91,
+				pdeaSchedule: "S-2",
+			})
+		).rejects.toThrow("cannot exceed 90 days")
+	})
+
+	it("rejects controlled prescription generation from a parent tranche course", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const encounterId = "99999999-9999-4999-9999-999999999999"
+		const patientId = "d7f56ece-966e-4266-8f3c-ea71d58ee79b"
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "staff-prescriber",
+							userId: "user-1",
+							facilityId,
+							isActive: true,
+							prcLicenseNumber: "PRC-100001",
+							prcExpiry: "2099-12-31",
+							ptrNumber: "PTR-100001",
+							ptrExpiry: "2099-12-31",
+							pdeaS2License: "S2-100001",
+							pdeaS2Expiry: "2099-12-31",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: encounterId, facilityId, patientId }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "parent-order",
+							facilityId,
+							encounterId,
+							parentOrderId: null,
+							genericName: "Morphine",
+							brandName: null,
+							dose: "10",
+							doseUnit: "mg",
+							doseForm: "tablet",
+							route: "PO",
+							frequency: "bid",
+							durationDays: 90,
+							specialInstructions: null,
+							isPrn: false,
+							prnReason: null,
+							isControlledSubstance: true,
+							pdeaSchedule: "S-2",
+							pdeaTrancheNumber: null,
+							pdeaTrancheTotal: 3,
+							noRefillInscribed: true,
+							status: "verified",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+
+		await expect(
+			service.createPrescription(
+				{ facilityId, encounterId, medicationOrderId: "parent-order", patientId },
+				"user-1"
+			)
+		).rejects.toThrow("individual PDEA tranche orders")
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
+	it("adds PDEA No Refill and dispense-date instructions to tranche prescriptions", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const encounterId = "99999999-9999-4999-9999-999999999999"
+		const patientId = "d7f56ece-966e-4266-8f3c-ea71d58ee79b"
+		const medicationOrderId = "77777777-7777-4777-9777-777777777777"
+		const prescriptionId = "88888888-8888-4888-9888-888888888888"
+		const insertBuilder = createInsertBuilder([{ id: prescriptionId }])
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "staff-prescriber",
+							userId: "user-1",
+							facilityId,
+							isActive: true,
+							prcLicenseNumber: "PRC-100001",
+							prcExpiry: "2099-12-31",
+							ptrNumber: "PTR-100001",
+							ptrExpiry: "2099-12-31",
+							pdeaS2License: "S2-100001",
+							pdeaS2Expiry: "2099-12-31",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: encounterId, facilityId, patientId }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: medicationOrderId,
+							facilityId,
+							encounterId,
+							parentOrderId: "parent-order",
+							genericName: "Morphine",
+							brandName: null,
+							dose: "10",
+							doseUnit: "mg",
+							doseForm: "tablet",
+							route: "PO",
+							frequency: "bid",
+							durationDays: 30,
+							specialInstructions: null,
+							isPrn: false,
+							prnReason: null,
+							isControlledSubstance: true,
+							pdeaSchedule: "S-2",
+							pdeaTrancheNumber: 2,
+							pdeaTrancheTotal: 3,
+							noRefillInscribed: true,
+							cdsAlerts: { alerts: [], pdeaDispenseDate: "2026-06-16" },
+							status: "verified",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withLimit: true }))
+			.mockImplementationOnce(() =>
+				createSelectBuilder([
+					{
+						id: prescriptionId,
+						facilityId,
+						encounterId,
+						medicationOrderId,
+						patientId,
+						prescriberStaffId: "staff-prescriber",
+						prescriberStaffName: "Dr. Test",
+						prcLicenseNumber: "PRC-100001",
+						ptrNumber: "PTR-100001",
+						pdeaS2License: "S2-100001",
+						prescriptionContent: { genericName: "Morphine" },
+						status: "draft",
+						signedAt: null,
+						createdAt: new Date("2026-05-17T02:00:00.000Z"),
+					},
+				])
+			)
+		mockDb.insert.mockImplementationOnce(() => insertBuilder)
+
+		await service.createPrescription(
+			{ facilityId, encounterId, medicationOrderId, patientId },
+			"user-1"
+		)
+
+		expect(insertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				pdeaS2License: "S2-100001",
+				prescriptionContent: expect.objectContaining({
+					isControlledSubstance: true,
+					pdeaSchedule: "S-2",
+					pdeaTrancheNumber: 2,
+					pdeaTrancheTotal: 3,
+					noRefillInscribed: true,
+					pdeaDispenseDate: "2026-06-16",
+					pdeaDispensingInstructions:
+						"No Refill. Tranche 2 of 3. Earliest dispense date: 2026-06-16.",
+				}),
+			})
+		)
 	})
 
 	it("allows only the prescribing clinician with active PRC and PTR to sign", async () => {

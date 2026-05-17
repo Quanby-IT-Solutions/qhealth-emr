@@ -5,9 +5,13 @@ import {
 	CdsAlertTypeEnum,
 	CdsEvaluateInputSchema,
 	CdsEvaluateResponseSchema,
+	CreateImagingOrderSchema,
+	CreateLabOrderSchema,
 	CreateMedOrderSchema,
 	CreateTranchedOrdersSchema,
 	HighAlertVerificationSchema,
+	ImagingOrderSchema,
+	LabOrderSchema,
 	MedOrderSchema,
 	PrescriptionSchema,
 } from "./orders.schema.js"
@@ -83,6 +87,28 @@ describe("CreateMedOrderSchema", () => {
 
 		expect(result.success).toBe(true)
 	})
+
+	it("requires schedule and duration for controlled substance orders", () => {
+		const result = CreateMedOrderSchema.safeParse({
+			...baseValid,
+			isControlledSubstance: true,
+		})
+
+		expect(result.success).toBe(false)
+		expect(result.error?.issues.some(issue => issue.path.includes("pdeaSchedule"))).toBe(true)
+		expect(result.error?.issues.some(issue => issue.path.includes("durationDays"))).toBe(true)
+	})
+
+	it("rejects controlled substance orders over 30 days on the non-tranched endpoint", () => {
+		const result = CreateMedOrderSchema.safeParse({
+			...baseValid,
+			isControlledSubstance: true,
+			pdeaSchedule: "S-2",
+			durationDays: 31,
+		})
+
+		expect(result.success).toBe(false)
+	})
 })
 
 describe("CdsEvaluateInputSchema", () => {
@@ -130,7 +156,7 @@ describe("CreateTranchedOrdersSchema", () => {
 		doseForm: "tablet",
 		route: "PO",
 		frequency: "bid" as const,
-		durationDays: 30,
+		durationDays: 60,
 		pdeaSchedule: "S2",
 	}
 
@@ -146,6 +172,158 @@ describe("CreateTranchedOrdersSchema", () => {
 		})
 
 		expect(result.success).toBe(false)
+	})
+
+	it("rejects tranched orders beyond the 90-day PDEA cap", () => {
+		const result = CreateTranchedOrdersSchema.safeParse({
+			...baseValid,
+			durationDays: 91,
+		})
+
+		expect(result.success).toBe(false)
+	})
+})
+
+describe("CreateLabOrderSchema", () => {
+	const baseValid = {
+		facilityId: FACILITY_ID,
+		encounterId: ENCOUNTER_ID,
+		testName: "Complete Blood Count",
+		clinicalIndication: "Fever and productive cough",
+		indicationIcd10Code: "J18.9",
+		indicationIcd10Display: "Pneumonia, unspecified organism",
+		priority: "stat" as const,
+	}
+
+	it("accepts a signed lab requisition with free-text and ICD-10 indication", () => {
+		const result = CreateLabOrderSchema.safeParse(baseValid)
+
+		expect(result.success).toBe(true)
+	})
+
+	it("accepts pre-encounter lab orders for pre-arrival order sets", () => {
+		const result = CreateLabOrderSchema.safeParse({
+			...baseValid,
+			encounterId: undefined,
+			preEncounterId: ENCOUNTER_ID,
+		})
+
+		expect(result.success).toBe(true)
+	})
+
+	it("rejects lab orders without an encounter or pre-encounter context", () => {
+		const result = CreateLabOrderSchema.safeParse({
+			...baseValid,
+			encounterId: undefined,
+		})
+
+		expect(result.success).toBe(false)
+		expect(result.error?.issues.some(issue => issue.path.includes("encounterId"))).toBe(true)
+	})
+})
+
+describe("LabOrderSchema", () => {
+	it("accepts persisted lab orders with requisition indication fields", () => {
+		const result = LabOrderSchema.safeParse({
+			id: ORDER_ID,
+			facilityId: FACILITY_ID,
+			encounterId: ENCOUNTER_ID,
+			preEncounterId: null,
+			patientId: PATIENT_ID,
+			patientName: "Dela Cruz, Juan",
+			loincCode: "57021-8",
+			panelCode: null,
+			testName: "Complete Blood Count",
+			panelName: "Hematology",
+			clinicalIndication: "Fever and productive cough",
+			indicationIcd10Code: "J18.9",
+			indicationIcd10Display: "Pneumonia, unspecified organism",
+			priority: "stat",
+			status: "ordered",
+			specimenType: "Blood",
+			orderingStaffId: STAFF_ID,
+			orderingStaffName: "Dr. Smith",
+			collectionDatetime: null,
+			resultedDatetime: null,
+			results: null,
+			cdsAlerts: null,
+			hasCriticalValues: false,
+			createdAt: "2024-01-01T08:00:00.000Z",
+			updatedAt: "2024-01-01T08:00:00.000Z",
+		})
+
+		expect(result.success).toBe(true)
+	})
+})
+
+describe("CreateImagingOrderSchema", () => {
+	const baseValid = {
+		facilityId: FACILITY_ID,
+		encounterId: ENCOUNTER_ID,
+		modality: "xray" as const,
+		bodyPart: "Chest",
+		clinicalIndication: "Fever and productive cough",
+		indicationIcd10Code: "J18.9",
+		indicationIcd10Display: "Pneumonia, unspecified organism",
+		priority: "urgent" as const,
+	}
+
+	it("accepts a signed imaging requisition with free-text and ICD-10 indication", () => {
+		const result = CreateImagingOrderSchema.safeParse(baseValid)
+
+		expect(result.success).toBe(true)
+	})
+
+	it("accepts pre-encounter imaging orders for pre-arrival order sets", () => {
+		const result = CreateImagingOrderSchema.safeParse({
+			...baseValid,
+			encounterId: undefined,
+			preEncounterId: ENCOUNTER_ID,
+		})
+
+		expect(result.success).toBe(true)
+	})
+
+	it("rejects imaging orders without an encounter or pre-encounter context", () => {
+		const result = CreateImagingOrderSchema.safeParse({
+			...baseValid,
+			encounterId: undefined,
+		})
+
+		expect(result.success).toBe(false)
+		expect(result.error?.issues.some(issue => issue.path.includes("encounterId"))).toBe(true)
+	})
+})
+
+describe("ImagingOrderSchema", () => {
+	it("accepts persisted imaging orders with requisition indication fields", () => {
+		const result = ImagingOrderSchema.safeParse({
+			id: PRESCRIPTION_ID,
+			facilityId: FACILITY_ID,
+			encounterId: ENCOUNTER_ID,
+			preEncounterId: null,
+			patientId: PATIENT_ID,
+			patientName: "Dela Cruz, Juan",
+			patientMrn: "MRN-0001",
+			modality: "xray",
+			bodyPart: "Chest",
+			clinicalIndication: "Fever and productive cough",
+			indicationIcd10Code: "J18.9",
+			indicationIcd10Display: "Pneumonia, unspecified organism",
+			priority: "urgent",
+			status: "ordered",
+			orderingStaffId: STAFF_ID,
+			orderingStaffName: "Dr. Smith",
+			scheduledDatetime: null,
+			completedDatetime: null,
+			report: null,
+			structuredResults: null,
+			cdsAlerts: null,
+			createdAt: "2024-01-01T08:00:00.000Z",
+			updatedAt: "2024-01-01T08:00:00.000Z",
+		})
+
+		expect(result.success).toBe(true)
 	})
 })
 

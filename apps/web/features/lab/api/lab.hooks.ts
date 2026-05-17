@@ -79,6 +79,9 @@ export interface LabOrder {
 	panelCode: string | null
 	testName: string
 	panelName: string | null
+	clinicalIndication: string | null
+	indicationIcd10Code: string | null
+	indicationIcd10Display: string | null
 	priority: "routine" | "urgent" | "stat"
 	status: LabOrderStatus
 	specimenType: string | null
@@ -139,6 +142,7 @@ export function useLabDashboardQuery(params: LabDashboardParams, options?: { ena
 				`${ORDERS_BASE}/labs${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
 			),
 		enabled: !!params.facilityId && (options?.enabled ?? true),
+		refetchInterval: 30 * 1000,
 		refetchOnWindowFocus: true,
 		staleTime: 30_000,
 	})

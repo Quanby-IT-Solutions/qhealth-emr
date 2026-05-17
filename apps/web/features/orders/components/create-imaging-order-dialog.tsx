@@ -23,6 +23,9 @@ import {
 import { Textarea } from "@/core/components/ui/textarea"
 import { useCreateImagingOrderMutation } from "@/features/orders/api/orders.hooks"
 
+type ImagingModality = "xray" | "ct" | "mri" | "ultrasound" | "other"
+type OrderPriority = "routine" | "urgent" | "stat"
+
 interface CreateImagingOrderDialogProps {
 	open: boolean
 	onOpenChange: (open: boolean) => void
@@ -36,10 +39,12 @@ export function CreateImagingOrderDialog({
 	encounterId,
 	facilityId,
 }: CreateImagingOrderDialogProps) {
-	const [modality, setModality] = useState("")
+	const [modality, setModality] = useState<ImagingModality | "">("")
 	const [bodyPart, setBodyPart] = useState("")
 	const [clinicalIndication, setClinicalIndication] = useState("")
-	const [priority, setPriority] = useState("routine")
+	const [indicationIcd10Code, setIndicationIcd10Code] = useState("")
+	const [indicationIcd10Display, setIndicationIcd10Display] = useState("")
+	const [priority, setPriority] = useState<OrderPriority>("routine")
 
 	const createImagingOrder = useCreateImagingOrderMutation()
 
@@ -47,6 +52,8 @@ export function CreateImagingOrderDialog({
 		setModality("")
 		setBodyPart("")
 		setClinicalIndication("")
+		setIndicationIcd10Code("")
+		setIndicationIcd10Display("")
 		setPriority("routine")
 	}
 
@@ -65,6 +72,8 @@ export function CreateImagingOrderDialog({
 				modality,
 				bodyPart: bodyPart.trim(),
 				clinicalIndication: clinicalIndication.trim() || undefined,
+				indicationIcd10Code: indicationIcd10Code.trim() || undefined,
+				indicationIcd10Display: indicationIcd10Display.trim() || undefined,
 				priority,
 			},
 			{
@@ -86,7 +95,7 @@ export function CreateImagingOrderDialog({
 				<div className="grid gap-4 py-4">
 					<div className="space-y-2">
 						<Label htmlFor="imgModality">Modality *</Label>
-						<Select value={modality || undefined} onValueChange={v => setModality(v ?? "")}>
+						<Select value={modality || undefined} onValueChange={v => setModality((v ?? "") as ImagingModality | "")}>
 							<SelectTrigger id="imgModality">
 								<SelectValue />
 							</SelectTrigger>
@@ -121,9 +130,30 @@ export function CreateImagingOrderDialog({
 						/>
 					</div>
 
+					<div className="grid grid-cols-2 gap-4">
+						<div className="space-y-2">
+							<Label htmlFor="imgIndicationIcd10Code">ICD-10 Code</Label>
+							<Input
+								id="imgIndicationIcd10Code"
+								value={indicationIcd10Code}
+								onChange={(e) => setIndicationIcd10Code(e.target.value)}
+								placeholder="e.g., R05.9"
+							/>
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="imgIndicationIcd10Display">ICD-10 Diagnosis</Label>
+							<Input
+								id="imgIndicationIcd10Display"
+								value={indicationIcd10Display}
+								onChange={(e) => setIndicationIcd10Display(e.target.value)}
+								placeholder="e.g., Cough, unspecified"
+							/>
+						</div>
+					</div>
+
 					<div className="space-y-2">
 						<Label htmlFor="imgPriority">Priority</Label>
-						<Select value={priority} onValueChange={v => setPriority(v ?? "routine")}>
+						<Select value={priority} onValueChange={v => setPriority((v ?? "routine") as OrderPriority)}>
 							<SelectTrigger id="imgPriority">
 								<SelectValue />
 							</SelectTrigger>
@@ -144,7 +174,7 @@ export function CreateImagingOrderDialog({
 						disabled={!modality || !bodyPart.trim() || createImagingOrder.isPending}
 						onClick={handleSubmit}
 					>
-						{createImagingOrder.isPending ? "Creating…" : "Create Imaging Order"}
+						{createImagingOrder.isPending ? "Signing..." : "Sign Imaging Order"}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

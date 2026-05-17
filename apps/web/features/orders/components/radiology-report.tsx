@@ -20,6 +20,8 @@ export interface RadiologyReportProps {
 	modality: string
 	bodyPart: string
 	clinicalIndication: string | null
+	indicationIcd10Code: string | null
+	indicationIcd10Display: string | null
 	completedDatetime: string | null
 }
 
@@ -45,10 +47,15 @@ export function RadiologyReport({
 	modality,
 	bodyPart,
 	clinicalIndication,
+	indicationIcd10Code,
+	indicationIcd10Display,
 	completedDatetime,
 }: RadiologyReportProps) {
 	const structured = parseStructuredResults(structuredResults)
 	const hasReport = !!report || !!structured
+	const diagnosis = [indicationIcd10Code, indicationIcd10Display]
+		.filter(Boolean)
+		.join(" - ")
 
 	if (!hasReport) {
 		return (
@@ -83,12 +90,13 @@ export function RadiologyReport({
 			<Separator />
 
 			{/* Clinical Indication */}
-			{clinicalIndication && (
+			{(clinicalIndication || diagnosis) && (
 				<div>
 					<p className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
 						Clinical Indication
 					</p>
-					<p className="text-sm">{clinicalIndication}</p>
+					{clinicalIndication && <p className="text-sm">{clinicalIndication}</p>}
+					{diagnosis && <p className="text-muted-foreground text-xs">{diagnosis}</p>}
 				</div>
 			)}
 

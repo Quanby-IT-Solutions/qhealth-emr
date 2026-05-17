@@ -88,6 +88,16 @@ function statusBadge(status: LabOrderStatus) {
 	}
 }
 
+function indicationSummary(order: LabOrder) {
+	const diagnosis = [order.indicationIcd10Code, order.indicationIcd10Display]
+		.filter(Boolean)
+		.join(" - ")
+	return {
+		clinical: order.clinicalIndication,
+		diagnosis: diagnosis || null,
+	}
+}
+
 // ============================================================================
 // Lab Order Row
 // ============================================================================
@@ -99,6 +109,8 @@ function LabOrderRow({
 	order: LabOrder
 	onViewResult: (order: LabOrder) => void
 }) {
+	const indication = indicationSummary(order)
+
 	return (
 		<TableRow>
 			<TableCell>
@@ -118,6 +130,14 @@ function LabOrderRow({
 				</div>
 			</TableCell>
 			<TableCell>{order.specimenType ?? "—"}</TableCell>
+			<TableCell>
+				<div className="max-w-[220px]">
+					<p className="truncate text-sm">{indication.clinical ?? "—"}</p>
+					{indication.diagnosis && (
+						<p className="truncate text-xs text-muted-foreground">{indication.diagnosis}</p>
+					)}
+				</div>
+			</TableCell>
 			<TableCell>{priorityBadge(order.priority)}</TableCell>
 			<TableCell>{formatDateTime(order.createdAt)}</TableCell>
 			<TableCell>{formatDateTime(order.collectionDatetime)}</TableCell>
@@ -177,6 +197,7 @@ function LabOrdersTable({
 					<TableHead>Patient</TableHead>
 					<TableHead>Test / Panel</TableHead>
 					<TableHead>Specimen</TableHead>
+					<TableHead>Indication</TableHead>
 					<TableHead>Priority</TableHead>
 					<TableHead>Ordered</TableHead>
 					<TableHead>Collection</TableHead>
