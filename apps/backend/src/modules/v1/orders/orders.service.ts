@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
+import {
+	BadRequestException,
+	ForbiddenException,
+	Injectable,
+	Logger,
+	NotFoundException,
+} from "@nestjs/common"
 import { and, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 
 import {
@@ -340,6 +346,40 @@ export class OrdersService {
 		return staff
 	}
 
+	private assertActivePrescriberCredentials(staff: {
+		prcLicenseNumber?: string | null
+		prcExpiry?: string | Date | null
+		ptrNumber?: string | null
+		ptrExpiry?: string | Date | null
+	}) {
+		if (!staff.prcLicenseNumber) {
+			throw new NotFoundException("Prescriber does not have a PRC license number")
+		}
+
+		if (!staff.ptrNumber) {
+			throw new NotFoundException("Prescriber does not have a PTR number")
+		}
+
+		this.assertCredentialNotExpired("PRC license", staff.prcExpiry)
+		this.assertCredentialNotExpired("PTR number", staff.ptrExpiry)
+	}
+
+	private assertCredentialNotExpired(label: string, expiresAt?: string | Date | null) {
+		if (!expiresAt) {
+			throw new BadRequestException(`Physician ${label} expiry is not recorded`)
+		}
+
+		const expiryDate = new Date(expiresAt)
+		expiryDate.setHours(0, 0, 0, 0)
+
+		const today = new Date()
+		today.setHours(0, 0, 0, 0)
+
+		if (expiryDate < today) {
+			throw new BadRequestException(`Physician ${label} is expired`)
+		}
+	}
+
 	private async resolveMedicationOrderPatientId(input: {
 		patientId?: string
 		encounterId?: string
@@ -476,7 +516,16 @@ export class OrdersService {
 
 	async evaluateCds(input: CdsEvaluateInput) {
 		await this.assertCdsPatientInFacility(input.patientId, input.facilityId)
-		return this.evaluateCdsForResolvedPatient(input)
+		const canonicalGenericName = await this.resolveCanonicalGenericName({
+			facilityId: input.facilityId,
+			formularyItemId: input.formularyItemId,
+			genericName: input.genericName,
+		})
+
+		return this.evaluateCdsForResolvedPatient({
+			...input,
+			genericName: canonicalGenericName,
+		})
 	}
 
 	private async assertCdsPatientInFacility(patientId: string, facilityId: string) {
@@ -1743,6 +1792,10 @@ export class OrdersService {
 	// ========================================================================
 
 	async findPrescriptions(input: PrescriptionListInput) {
+		if (!input.encounterId && !input.patientId) {
+			throw new BadRequestException("encounterId or patientId is required to list prescriptions")
+		}
+
 		const page = Number(input.page) || 1
 		const limit = Number(input.limit) || 50
 		const offset = (page - 1) * limit
@@ -1820,17 +1873,29 @@ export class OrdersService {
 	}
 
 	async createPrescription(input: CreatePrescriptionInput, userId: string) {
-		const [staff] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId))
-		if (!staff) throw new NotFoundException("Staff profile not found for user")
+		const staff = await this.getOrderingStaffProfile(userId, input.facilityId)
+		this.assertActivePrescriberCredentials(staff)
 
-		if (!staff.prcLicenseNumber)
-			throw new NotFoundException("Prescriber does not have a PRC license number")
-		if (!staff.ptrNumber) throw new NotFoundException("Prescriber does not have a PTR number")
-		if (staff.prcExpiry && new Date(staff.prcExpiry) < new Date()) {
-			throw new BadRequestException("Physician PRC license is expired")
+		const [encounter] = await db
+			.select({
+				id: encounters.id,
+				facilityId: encounters.facilityId,
+				patientId: encounters.patientId,
+			})
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+			.limit(1)
+
+		if (!encounter) {
+			throw new NotFoundException(`Encounter ${input.encounterId} not found`)
 		}
-		if (staff.ptrExpiry && new Date(staff.ptrExpiry) < new Date()) {
-			throw new BadRequestException("Physician PTR number is expired")
+
+		if (encounter.facilityId !== input.facilityId) {
+			throw new BadRequestException("Encounter does not belong to the prescription facility.")
+		}
+
+		if (encounter.patientId !== input.patientId) {
+			throw new BadRequestException("Prescription patientId does not match the selected encounter.")
 		}
 
 		// Fetch medication order details for prescription content
@@ -1838,13 +1903,30 @@ export class OrdersService {
 			.select()
 			.from(medicationOrders)
 			.where(eq(medicationOrders.id, input.medicationOrderId))
+			.limit(1)
 
 		if (!medOrder)
 			throw new NotFoundException(`Medication order ${input.medicationOrderId} not found`)
+		if (medOrder.facilityId !== input.facilityId) {
+			throw new BadRequestException("Medication order does not belong to the prescription facility.")
+		}
+		if (medOrder.encounterId !== input.encounterId) {
+			throw new BadRequestException("Medication order does not belong to the selected encounter.")
+		}
 		if (medOrder.status !== "verified" && medOrder.status !== "active") {
 			throw new BadRequestException(
 				"Only verified or active medication orders can generate a prescription"
 			)
+		}
+
+		const [existingPrescription] = await db
+			.select({ id: prescriptions.id, status: prescriptions.status })
+			.from(prescriptions)
+			.where(eq(prescriptions.medicationOrderId, input.medicationOrderId))
+			.limit(1)
+
+		if (existingPrescription) {
+			throw new BadRequestException("A prescription already exists for this medication order.")
 		}
 
 		const prescriptionContent = {
@@ -1859,7 +1941,14 @@ export class OrdersService {
 			specialInstructions: medOrder.specialInstructions,
 			isPrn: medOrder.isPrn,
 			prnReason: medOrder.prnReason,
+			isControlledSubstance: medOrder.isControlledSubstance,
+			pdeaSchedule: medOrder.pdeaSchedule,
+			pdeaTrancheNumber: medOrder.pdeaTrancheNumber,
+			pdeaTrancheTotal: medOrder.pdeaTrancheTotal,
+			noRefillInscribed: medOrder.noRefillInscribed,
 		}
+		const prcLicenseNumber = staff.prcLicenseNumber as string
+		const ptrNumber = staff.ptrNumber as string
 
 		const [created] = await db
 			.insert(prescriptions)
@@ -1869,8 +1958,8 @@ export class OrdersService {
 				medicationOrderId: input.medicationOrderId,
 				patientId: input.patientId,
 				prescriberStaffId: staff.id,
-				prcLicenseNumber: staff.prcLicenseNumber,
-				ptrNumber: staff.ptrNumber,
+				prcLicenseNumber,
+				ptrNumber,
 				pdeaS2License: staff.pdeaS2License ?? null,
 				prescriptionContent,
 				status: "draft",
@@ -1884,11 +1973,17 @@ export class OrdersService {
 		return this.findPrescription(created!.id)
 	}
 
-	async signPrescription(id: string) {
+	async signPrescription(id: string, userId: string) {
 		const prescription = await this.findPrescription(id)
 		if (prescription.status === "signed" || prescription.status === "issued") {
 			throw new BadRequestException("Prescription is already signed")
 		}
+
+		const staff = await this.getOrderingStaffProfile(userId, prescription.facilityId)
+		if (staff.id !== prescription.prescriberStaffId) {
+			throw new ForbiddenException("Only the prescribing clinician can sign this prescription.")
+		}
+		this.assertActivePrescriberCredentials(staff)
 
 		await db
 			.update(prescriptions)

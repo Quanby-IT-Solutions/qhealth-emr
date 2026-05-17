@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common"
+import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common"
 
 import { db } from "@/common/database/database.client"
 
@@ -437,6 +437,12 @@ describe("OrdersService", () => {
 				)
 			)
 			.mockImplementationOnce(() =>
+				createSelectBuilder([], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ genericName: "Amoxicillin" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
 				createSelectBuilder([], { withOrderBy: true, withLimit: true })
 			)
 
@@ -463,6 +469,64 @@ describe("OrdersService", () => {
 		)
 	})
 
+	it("does not block orders for unverified allergies even if an upstream feed includes them", async () => {
+		problemsAllergiesMock.getActiveAllergies.mockResolvedValue({
+			allergies: [
+				{
+					allergenName: "Penicillin",
+					allergenType: "medication",
+					severity: "severe",
+					reactionType: "Anaphylaxis",
+					isActive: true,
+					isVerified: false,
+				},
+			],
+		})
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ genericName: "Amoxicillin" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "3f6a0f4f-761d-4fd1-b76f-95e6692eb001",
+							isActive: true,
+							isRestricted: false,
+							isHighAlert: false,
+						},
+					],
+					{ withOrderBy: true, withLimit: true }
+				)
+			)
+
+		const result = await service.evaluateCds({
+			patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+			facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+			genericName: "Amoxicillin",
+			orderingStaffId: "staff-1",
+		})
+
+		expect(result.canProceed).toBe(true)
+		expect(result.alerts).not.toEqual(
+			expect.arrayContaining([expect.objectContaining({ type: "allergy_hard_block" })])
+		)
+	})
+
 	it("rejects CDS evaluation when the patient is outside the facility", async () => {
 		mockDb.select.mockImplementationOnce(() =>
 			createSelectBuilder(
@@ -484,6 +548,44 @@ describe("OrdersService", () => {
 				orderingStaffId: "staff-1",
 			})
 		).rejects.toBeInstanceOf(BadRequestException)
+		expect(problemsAllergiesMock.getActiveAllergies).not.toHaveBeenCalled()
+	})
+
+	it("rejects CDS evaluation when a brand name is entered as the generic", async () => {
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							brandName: "Biogesic",
+							genericName: "Paracetamol",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+
+		await expect(
+			service.evaluateCds({
+				patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+				facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+				genericName: "Biogesic",
+				orderingStaffId: "staff-1",
+			})
+		).rejects.toThrow(
+			"Biogesic is a brand name. Select the generic name first (Paracetamol); brand name is optional and subordinate."
+		)
 		expect(problemsAllergiesMock.getActiveAllergies).not.toHaveBeenCalled()
 	})
 
@@ -789,5 +891,330 @@ describe("OrdersService", () => {
 				status: "pending_verification",
 			})
 		)
+	})
+
+	it("creates an e-prescription with facility-scoped PRC and PTR credentials", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const encounterId = "99999999-9999-4999-9999-999999999999"
+		const patientId = "d7f56ece-966e-4266-8f3c-ea71d58ee79b"
+		const medicationOrderId = "77777777-7777-4777-9777-777777777777"
+		const prescriptionId = "88888888-8888-4888-9888-888888888888"
+		const insertBuilder = createInsertBuilder([{ id: prescriptionId }])
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "staff-prescriber",
+							userId: "user-1",
+							facilityId,
+							isActive: true,
+							prcLicenseNumber: "PRC-100001",
+							prcExpiry: "2099-12-31",
+							ptrNumber: "PTR-100001",
+							ptrExpiry: "2099-12-31",
+							pdeaS2License: null,
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: encounterId, facilityId, patientId }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: medicationOrderId,
+							facilityId,
+							encounterId,
+							genericName: "Paracetamol",
+							brandName: "Biogesic",
+							dose: "500",
+							doseUnit: "mg",
+							doseForm: "tablet",
+							route: "oral",
+							frequency: "once",
+							durationDays: 3,
+							specialInstructions: null,
+							isPrn: false,
+							prnReason: null,
+							isControlledSubstance: false,
+							pdeaSchedule: null,
+							pdeaTrancheNumber: null,
+							pdeaTrancheTotal: null,
+							noRefillInscribed: false,
+							status: "verified",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withLimit: true }))
+			.mockImplementationOnce(() =>
+				createSelectBuilder([
+					{
+						id: prescriptionId,
+						facilityId,
+						encounterId,
+						medicationOrderId,
+						patientId,
+						prescriberStaffId: "staff-prescriber",
+						prescriberStaffName: "Dr. Test",
+						prcLicenseNumber: "PRC-100001",
+						ptrNumber: "PTR-100001",
+						pdeaS2License: null,
+						prescriptionContent: { genericName: "Paracetamol" },
+						status: "draft",
+						signedAt: null,
+						createdAt: new Date("2026-05-17T02:00:00.000Z"),
+					},
+				])
+			)
+		mockDb.insert.mockImplementationOnce(() => insertBuilder)
+
+		const result = await service.createPrescription(
+			{ facilityId, encounterId, medicationOrderId, patientId },
+			"user-1"
+		)
+
+		expect(insertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				prescriberStaffId: "staff-prescriber",
+				prcLicenseNumber: "PRC-100001",
+				ptrNumber: "PTR-100001",
+				prescriptionContent: expect.objectContaining({
+					genericName: "Paracetamol",
+					brandName: "Biogesic",
+					isControlledSubstance: false,
+					noRefillInscribed: false,
+				}),
+				status: "draft",
+			})
+		)
+		expect(result.prcLicenseNumber).toBe("PRC-100001")
+		expect(result.ptrNumber).toBe("PTR-100001")
+	})
+
+	it("rejects e-prescription generation when patientId does not match the encounter", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const encounterId = "99999999-9999-4999-9999-999999999999"
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "staff-prescriber",
+							userId: "user-1",
+							facilityId,
+							isActive: true,
+							prcLicenseNumber: "PRC-100001",
+							prcExpiry: "2099-12-31",
+							ptrNumber: "PTR-100001",
+							ptrExpiry: "2099-12-31",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: encounterId,
+							facilityId,
+							patientId: "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+
+		await expect(
+			service.createPrescription(
+				{
+					facilityId,
+					encounterId,
+					medicationOrderId: "77777777-7777-4777-9777-777777777777",
+					patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+				},
+				"user-1"
+			)
+		).rejects.toThrow("Prescription patientId does not match the selected encounter.")
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
+	it("prevents duplicate e-prescriptions for the same medication order", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const encounterId = "99999999-9999-4999-9999-999999999999"
+		const patientId = "d7f56ece-966e-4266-8f3c-ea71d58ee79b"
+		const medicationOrderId = "77777777-7777-4777-9777-777777777777"
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "staff-prescriber",
+							userId: "user-1",
+							facilityId,
+							isActive: true,
+							prcLicenseNumber: "PRC-100001",
+							prcExpiry: "2099-12-31",
+							ptrNumber: "PTR-100001",
+							ptrExpiry: "2099-12-31",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: encounterId, facilityId, patientId }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: medicationOrderId,
+							facilityId,
+							encounterId,
+							genericName: "Paracetamol",
+							brandName: null,
+							dose: "500",
+							doseUnit: "mg",
+							doseForm: "tablet",
+							route: "oral",
+							frequency: "once",
+							durationDays: null,
+							specialInstructions: null,
+							isPrn: false,
+							prnReason: null,
+							isControlledSubstance: false,
+							pdeaSchedule: null,
+							pdeaTrancheNumber: null,
+							pdeaTrancheTotal: null,
+							noRefillInscribed: false,
+							status: "verified",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "rx-existing", status: "draft" }], { withLimit: true })
+			)
+
+		await expect(
+			service.createPrescription(
+				{ facilityId, encounterId, medicationOrderId, patientId },
+				"user-1"
+			)
+		).rejects.toThrow("A prescription already exists for this medication order.")
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
+	it("allows only the prescribing clinician with active PRC and PTR to sign", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const createdAt = new Date("2026-05-17T02:00:00.000Z")
+		const prescription = {
+			id: "88888888-8888-4888-9888-888888888888",
+			facilityId,
+			encounterId: "99999999-9999-4999-9999-999999999999",
+			medicationOrderId: "77777777-7777-4777-9777-777777777777",
+			patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+			prescriberStaffId: "staff-prescriber",
+			prescriberStaffName: "Dr. Test",
+			prcLicenseNumber: "PRC-100001",
+			ptrNumber: "PTR-100001",
+			pdeaS2License: null,
+			prescriptionContent: { genericName: "Paracetamol" },
+			status: "draft",
+			signedAt: null,
+			createdAt,
+		}
+		const updateBuilder = createUpdateBuilder()
+
+		mockDb.select
+			.mockImplementationOnce(() => createSelectBuilder([prescription]))
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "staff-prescriber",
+							userId: "user-1",
+							facilityId,
+							isActive: true,
+							prcLicenseNumber: "PRC-100001",
+							prcExpiry: "2099-12-31",
+							ptrNumber: "PTR-100001",
+							ptrExpiry: "2099-12-31",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ ...prescription, status: "signed", signedAt: createdAt }])
+			)
+		mockDb.update.mockImplementationOnce(() => updateBuilder)
+
+		const result = await service.signPrescription(prescription.id, "user-1")
+
+		expect(updateBuilder.set).toHaveBeenCalledWith({
+			status: "signed",
+			signedAt: expect.any(Date),
+		})
+		expect(result.status).toBe("signed")
+	})
+
+	it("rejects prescription signing by a different clinician", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder([
+					{
+						id: "88888888-8888-4888-9888-888888888888",
+						facilityId,
+						encounterId: "99999999-9999-4999-9999-999999999999",
+						medicationOrderId: "77777777-7777-4777-9777-777777777777",
+						patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+						prescriberStaffId: "staff-prescriber",
+						prescriberStaffName: "Dr. Test",
+						prcLicenseNumber: "PRC-100001",
+						ptrNumber: "PTR-100001",
+						pdeaS2License: null,
+						prescriptionContent: { genericName: "Paracetamol" },
+						status: "draft",
+						signedAt: null,
+						createdAt: new Date("2026-05-17T02:00:00.000Z"),
+					},
+				])
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "staff-other",
+							userId: "user-2",
+							facilityId,
+							isActive: true,
+							prcLicenseNumber: "PRC-200001",
+							prcExpiry: "2099-12-31",
+							ptrNumber: "PTR-200001",
+							ptrExpiry: "2099-12-31",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+
+		await expect(
+			service.signPrescription("88888888-8888-4888-9888-888888888888", "user-2")
+		).rejects.toBeInstanceOf(ForbiddenException)
+		expect(mockDb.update).not.toHaveBeenCalled()
 	})
 })

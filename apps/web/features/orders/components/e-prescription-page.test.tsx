@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { EPrescriptionPage } from "./e-prescription-page"
@@ -33,6 +34,30 @@ vi.mock("./prescription-print-dialog", () => ({
 describe("EPrescriptionPage", () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
+		mockUseMyProfile.mockReturnValue({
+			data: {
+				activeRole: {
+					permissions: [
+						{ module: "orders", action: "view" },
+						{ module: "orders", action: "create" },
+						{ module: "orders", action: "sign" },
+					],
+				},
+				staffProfiles: [
+					{
+						id: "staff-1",
+						facilityId: "facility-1",
+						prcLicenseNumber: "PRC-100001",
+						prcExpiry: "2099-12-31",
+						ptrNumber: "PTR-100001",
+						ptrExpiry: "2099-12-31",
+						pdeaS2License: null,
+						pdeaS2Expiry: null,
+					},
+				],
+				user: { name: "Dr. Test" },
+			},
+		})
 		mockUseEncounterDetailQuery.mockReturnValue({
 			data: {
 				patientName: "Juan Dela Cruz",
@@ -50,6 +75,109 @@ describe("EPrescriptionPage", () => {
 			mutate: vi.fn(),
 			isPending: false,
 		})
+	})
+
+	it("shows facility-specific PRC/PTR credentials and generates a prescription draft", async () => {
+		const user = userEvent.setup()
+		const createMutate = vi.fn()
+		mockUseMedOrderListQuery.mockReturnValue({
+			data: {
+				data: [
+					{
+						id: "order-1",
+						status: "verified",
+						genericName: "Paracetamol",
+						brandName: "Biogesic",
+						dose: "500",
+						doseUnit: "mg",
+						doseForm: "tablet",
+						route: "oral",
+						frequency: "once",
+						durationDays: 3,
+						pdeaTrancheNumber: null,
+					},
+				],
+			},
+			isLoading: false,
+		})
+		mockUseCreatePrescriptionMutation.mockReturnValue({
+			mutate: createMutate,
+			isPending: false,
+		})
+
+		render(
+			<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />
+		)
+
+		expect(screen.getByText(/PRC PRC-100001/i)).toBeInTheDocument()
+		expect(screen.getByText(/PTR PTR-100001/i)).toBeInTheDocument()
+
+		await user.click(screen.getByRole("button", { name: /generate rx/i }))
+
+		expect(createMutate).toHaveBeenCalledWith(
+			{
+				facilityId: "facility-1",
+				encounterId: "enc-1",
+				medicationOrderId: "order-1",
+				patientId: "patient-1",
+			},
+			expect.objectContaining({
+				onSuccess: expect.any(Function),
+				onError: expect.any(Function),
+			})
+		)
+	})
+
+	it("blocks generation when no active staff profile exists for the selected facility", () => {
+		mockUseMyProfile.mockReturnValue({
+			data: {
+				activeRole: {
+					permissions: [
+						{ module: "orders", action: "view" },
+						{ module: "orders", action: "create" },
+						{ module: "orders", action: "sign" },
+					],
+				},
+				staffProfiles: [
+					{
+						id: "staff-other",
+						facilityId: "other-facility",
+						prcLicenseNumber: "PRC-OTHER",
+						prcExpiry: "2099-12-31",
+						ptrNumber: "PTR-OTHER",
+						ptrExpiry: "2099-12-31",
+					},
+				],
+				user: { name: "Dr. Other" },
+			},
+		})
+		mockUseMedOrderListQuery.mockReturnValue({
+			data: {
+				data: [
+					{
+						id: "order-1",
+						status: "verified",
+						genericName: "Paracetamol",
+						dose: "500",
+						doseUnit: "mg",
+						doseForm: "tablet",
+						route: "oral",
+						frequency: "once",
+						pdeaTrancheNumber: null,
+					},
+				],
+			},
+			isLoading: false,
+		})
+
+		render(
+			<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />
+		)
+
+		expect(
+			screen.getByText(/no active staff profile was found for this facility/i)
+		).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: /generate rx/i })).toBeDisabled()
 	})
 
 	it("blocks direct access for roles that cannot sign prescriptions", () => {

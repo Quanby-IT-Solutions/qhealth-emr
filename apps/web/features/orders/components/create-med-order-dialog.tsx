@@ -381,6 +381,11 @@ export function CreateMedOrderDialog({
 					setPendingSubmitOptions(null)
 					setHighAlertVerificationError(null)
 				},
+				onError: err => {
+					setSubmitError(
+						err instanceof Error ? err.message : "Failed to run drug safety check"
+					)
+				},
 			}
 		)
 	}

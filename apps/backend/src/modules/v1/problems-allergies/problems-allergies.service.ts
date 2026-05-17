@@ -5,6 +5,7 @@ import {
 	allergies,
 	drugGenerics,
 	icd10Codes,
+	patients,
 	problems,
 	snomedCtCodes,
 	staffProfiles,
@@ -140,6 +141,22 @@ export class ProblemsAllergiesService {
 		return profile.id
 	}
 
+	private async assertPatientBelongsToFacility(patientId: string, facilityId: string) {
+		const [patient] = await db
+			.select({ id: patients.id, facilityId: patients.facilityId })
+			.from(patients)
+			.where(eq(patients.id, patientId))
+			.limit(1)
+
+		if (!patient) {
+			throw new NotFoundException("Patient not found")
+		}
+
+		if (patient.facilityId !== facilityId) {
+			throw new BadRequestException("Patient does not belong to the selected facility.")
+		}
+	}
+
 	// ========================================================================
 	// Problems
 	// ========================================================================
@@ -161,7 +178,14 @@ export class ProblemsAllergiesService {
 
 		const whereClause = and(...conditions)
 
-		const [totalResult] = await db.select({ count: count() }).from(problems).where(whereClause)
+		const [totalResult] = await db
+			.select({ count: count() })
+			.from(problems)
+			.innerJoin(
+				patients,
+				and(eq(problems.patientId, patients.id), eq(problems.facilityId, patients.facilityId))
+			)
+			.where(whereClause)
 
 		const rows = await db
 			.select({
@@ -182,6 +206,10 @@ export class ProblemsAllergiesService {
 				updatedAt: problems.updatedAt,
 			})
 			.from(problems)
+			.innerJoin(
+				patients,
+				and(eq(problems.patientId, patients.id), eq(problems.facilityId, patients.facilityId))
+			)
 			.leftJoin(staffProfiles, eq(problems.documentingStaffId, staffProfiles.id))
 			.leftJoin(users, eq(staffProfiles.userId, users.id))
 			.where(whereClause)
@@ -220,6 +248,10 @@ export class ProblemsAllergiesService {
 				updatedAt: problems.updatedAt,
 			})
 			.from(problems)
+			.innerJoin(
+				patients,
+				and(eq(problems.patientId, patients.id), eq(problems.facilityId, patients.facilityId))
+			)
 			.leftJoin(staffProfiles, eq(problems.documentingStaffId, staffProfiles.id))
 			.leftJoin(users, eq(staffProfiles.userId, users.id))
 			.where(eq(problems.id, id))
@@ -234,6 +266,7 @@ export class ProblemsAllergiesService {
 
 	async createProblem(input: CreateProblemInput, userId: string) {
 		const staffProfileId = await this.getStaffProfileId(userId, input.facilityId)
+		await this.assertPatientBelongsToFacility(input.patientId, input.facilityId)
 		this.assertProblemHasClinicalCode(input)
 		await this.assertSubmittedProblemCodesAreActive(input)
 
@@ -558,7 +591,14 @@ export class ProblemsAllergiesService {
 
 		const whereClause = and(...conditions)
 
-		const [totalResult] = await db.select({ count: count() }).from(allergies).where(whereClause)
+		const [totalResult] = await db
+			.select({ count: count() })
+			.from(allergies)
+			.innerJoin(
+				patients,
+				and(eq(allergies.patientId, patients.id), eq(allergies.facilityId, patients.facilityId))
+			)
+			.where(whereClause)
 
 		const documentingStaffSq = db
 			.select({ id: staffProfiles.id, name: users.name })
@@ -592,6 +632,10 @@ export class ProblemsAllergiesService {
 				updatedAt: allergies.updatedAt,
 			})
 			.from(allergies)
+			.innerJoin(
+				patients,
+				and(eq(allergies.patientId, patients.id), eq(allergies.facilityId, patients.facilityId))
+			)
 			.leftJoin(documentingStaffSq, eq(allergies.documentingStaffId, documentingStaffSq.id))
 			.leftJoin(verifyingStaffSq, eq(allergies.verifiedByStaffId, verifyingStaffSq.id))
 			.where(whereClause)
@@ -643,6 +687,10 @@ export class ProblemsAllergiesService {
 				updatedAt: allergies.updatedAt,
 			})
 			.from(allergies)
+			.innerJoin(
+				patients,
+				and(eq(allergies.patientId, patients.id), eq(allergies.facilityId, patients.facilityId))
+			)
 			.leftJoin(documentingStaffSq, eq(allergies.documentingStaffId, documentingStaffSq.id))
 			.leftJoin(verifyingStaffSq, eq(allergies.verifiedByStaffId, verifyingStaffSq.id))
 			.where(eq(allergies.id, id))
@@ -657,6 +705,7 @@ export class ProblemsAllergiesService {
 
 	async createAllergy(input: CreateAllergyInput, userId: string) {
 		const staffProfileId = await this.getStaffProfileId(userId, input.facilityId)
+		await this.assertPatientBelongsToFacility(input.patientId, input.facilityId)
 
 		const [created] = await db
 			.insert(allergies)
@@ -747,11 +796,16 @@ export class ProblemsAllergiesService {
 
 	async verifyAllergy(input: VerifyAllergyInput, userId: string) {
 		const existing = await this.getAllergy(input.id)
-		const staffProfileId = await this.getStaffProfileId(userId, existing.facilityId)
+
+		if (!existing.isActive) {
+			throw new BadRequestException("Cannot verify an inactive allergy.")
+		}
 
 		if (existing.isVerified) {
 			return existing
 		}
+
+		const staffProfileId = await this.getStaffProfileId(userId, existing.facilityId)
 
 		const verifiedAt = new Date()
 		await db
@@ -858,6 +912,10 @@ export class ProblemsAllergiesService {
 				updatedAt: allergies.updatedAt,
 			})
 			.from(allergies)
+			.innerJoin(
+				patients,
+				and(eq(allergies.patientId, patients.id), eq(allergies.facilityId, patients.facilityId))
+			)
 			.leftJoin(documentingStaffSq, eq(allergies.documentingStaffId, documentingStaffSq.id))
 			.leftJoin(verifyingStaffSq, eq(allergies.verifiedByStaffId, verifyingStaffSq.id))
 			.where(
@@ -900,6 +958,10 @@ export class ProblemsAllergiesService {
 				updatedAt: problems.updatedAt,
 			})
 			.from(problems)
+			.innerJoin(
+				patients,
+				and(eq(problems.patientId, patients.id), eq(problems.facilityId, patients.facilityId))
+			)
 			.leftJoin(staffProfiles, eq(problems.documentingStaffId, staffProfiles.id))
 			.leftJoin(users, eq(staffProfiles.userId, users.id))
 			.where(and(eq(problems.patientId, input.patientId), eq(problems.status, "active")))
@@ -909,6 +971,10 @@ export class ProblemsAllergiesService {
 		const [resolvedResult] = await db
 			.select({ count: count() })
 			.from(problems)
+			.innerJoin(
+				patients,
+				and(eq(problems.patientId, patients.id), eq(problems.facilityId, patients.facilityId))
+			)
 			.where(and(eq(problems.patientId, input.patientId), eq(problems.status, "resolved")))
 
 		const allergyDocumentingStaffSq = db
@@ -948,6 +1014,10 @@ export class ProblemsAllergiesService {
 				updatedAt: allergies.updatedAt,
 			})
 			.from(allergies)
+			.innerJoin(
+				patients,
+				and(eq(allergies.patientId, patients.id), eq(allergies.facilityId, patients.facilityId))
+			)
 			.leftJoin(
 				allergyDocumentingStaffSq,
 				eq(allergies.documentingStaffId, allergyDocumentingStaffSq.id)

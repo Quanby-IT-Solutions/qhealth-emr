@@ -56,6 +56,7 @@ export interface OfflineAllergySummary {
 	severity: "mild" | "moderate" | "severe"
 	onsetDate: string | null
 	isActive: boolean
+	isVerified: boolean
 }
 
 export interface OfflineMedicationSummary {
