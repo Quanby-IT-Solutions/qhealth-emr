@@ -209,9 +209,9 @@ export class OrdersController {
 
 	@RequirePermission("orders", "sign")
 	@Implement(v1.orders.signPrescription)
-	async signPrescription() {
+	async signPrescription(@Session() session: UserSession) {
 		return implement(v1.orders.signPrescription).handler(async ({ input }) => {
-			return this.ordersService.signPrescription(input.id)
+			return this.ordersService.signPrescription(input.id, session.user.id)
 		})
 	}
 

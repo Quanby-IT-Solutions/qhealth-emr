@@ -1,6 +1,7 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
 import { env } from "@/env"
 
@@ -16,11 +17,26 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 		},
 	})
 	if (!res.ok) {
-		throw Object.assign(new Error(`HTTP ${res.status}: ${res.statusText}`), {
+		let message = `HTTP ${res.status}: ${res.statusText}`
+		try {
+			const body = (await res.json()) as { message?: string | string[] }
+			if (Array.isArray(body.message)) {
+				message = body.message.join("; ")
+			} else if (body.message) {
+				message = body.message
+			}
+		} catch {
+			// Keep the status text fallback when the server does not return JSON.
+		}
+		throw Object.assign(new Error(message), {
 			status: res.status,
 		})
 	}
 	return res.json() as Promise<T>
+}
+
+function showMutationError(error: unknown, fallback: string) {
+	toast.error(error instanceof Error ? error.message : fallback)
 }
 
 function shouldRetryPatientSummary(failureCount: number, error: unknown) {
@@ -145,13 +161,15 @@ interface ListResponse<T> {
 
 export const problemsAllergiesKeys = {
 	all: ["problems-allergies"] as const,
-	problems: (patientId: string, status?: string) =>
-		[...problemsAllergiesKeys.all, "problems", patientId, status] as const,
+	problems: (patientId: string, status?: string, page?: number, limit?: number) =>
+		[...problemsAllergiesKeys.all, "problems", patientId, status, page, limit] as const,
 	problem: (id: string) => [...problemsAllergiesKeys.all, "problem", id] as const,
 	allergies: (
 		patientId: string,
-		params?: { isActive?: boolean; isVerified?: boolean; allergenType?: string }
-	) => [...problemsAllergiesKeys.all, "allergies", patientId, params] as const,
+		params?: { isActive?: boolean; isVerified?: boolean; allergenType?: string },
+		page?: number,
+		limit?: number
+	) => [...problemsAllergiesKeys.all, "allergies", patientId, params, page, limit] as const,
 	allergy: (id: string) => [...problemsAllergiesKeys.all, "allergy", id] as const,
 	activeAllergies: (patientId: string) =>
 		[...problemsAllergiesKeys.all, "active-allergies", patientId] as const,
@@ -160,8 +178,22 @@ export const problemsAllergiesKeys = {
 		[...problemsAllergiesKeys.all, "icd10-search", search, page, limit] as const,
 	snomedCtSearch: (search?: string, semanticTag?: string, page?: number, limit?: number) =>
 		[...problemsAllergiesKeys.all, "snomed-ct-search", search, semanticTag, page, limit] as const,
-	allergenSearch: (search?: string, facilityId?: string, allergenType?: string) =>
-		[...problemsAllergiesKeys.all, "allergen-search", search, facilityId, allergenType] as const,
+	allergenSearch: (
+		search?: string,
+		facilityId?: string,
+		allergenType?: string,
+		page?: number,
+		limit?: number
+	) =>
+		[
+			...problemsAllergiesKeys.all,
+			"allergen-search",
+			search,
+			facilityId,
+			allergenType,
+			page,
+			limit,
+		] as const,
 }
 
 interface ProblemListParams {
@@ -172,13 +204,20 @@ interface ProblemListParams {
 }
 
 export function useProblemsQuery(params: ProblemListParams) {
+	const { patientId, status, page, limit } = params
+
 	return useQuery({
-		queryKey: problemsAllergiesKeys.problems(params.patientId, params.status),
+		queryKey: problemsAllergiesKeys.problems(
+			patientId,
+			status,
+			page,
+			limit
+		),
 		queryFn: () =>
 			fetchJson<ProblemListResponse>(
-				`${API_BASE}/problems${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
+				`${API_BASE}/problems${buildQueryString({ patientId, status, page, limit })}`
 			),
-		enabled: !!params.patientId,
+		enabled: !!patientId,
 	})
 }
 
@@ -216,6 +255,7 @@ export function useCreateProblemMutation() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: problemsAllergiesKeys.all })
 		},
+		onError: error => showMutationError(error, "Failed to add problem."),
 	})
 }
 
@@ -243,6 +283,7 @@ export function useUpdateProblemMutation() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: problemsAllergiesKeys.all })
 		},
+		onError: error => showMutationError(error, "Failed to update problem."),
 	})
 }
 
@@ -263,6 +304,7 @@ export function useResolveProblemMutation() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: problemsAllergiesKeys.all })
 		},
+		onError: error => showMutationError(error, "Failed to resolve problem."),
 	})
 }
 
@@ -277,6 +319,7 @@ export function useDeleteProblemMutation() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: problemsAllergiesKeys.all })
 		},
+		onError: error => showMutationError(error, "Failed to delete problem."),
 	})
 }
 
@@ -290,17 +333,31 @@ interface AllergyListParams {
 }
 
 export function useAllergiesQuery(params: AllergyListParams) {
+	const { patientId, isActive, isVerified, allergenType, page, limit } = params
+
 	return useQuery({
-		queryKey: problemsAllergiesKeys.allergies(params.patientId, {
-			isActive: params.isActive,
-			isVerified: params.isVerified,
-			allergenType: params.allergenType,
-		}),
+		queryKey: problemsAllergiesKeys.allergies(
+			patientId,
+			{
+				isActive,
+				isVerified,
+				allergenType,
+			},
+			page,
+			limit
+		),
 		queryFn: () =>
 			fetchJson<AllergyListResponse>(
-				`${API_BASE}/allergies${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
+				`${API_BASE}/allergies${buildQueryString({
+					patientId,
+					isActive,
+					isVerified,
+					allergenType,
+					page,
+					limit,
+				})}`
 			),
-		enabled: !!params.patientId,
+		enabled: !!patientId,
 	})
 }
 
@@ -334,6 +391,7 @@ export function useCreateAllergyMutation() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: problemsAllergiesKeys.all })
 		},
+		onError: error => showMutationError(error, "Failed to add allergy."),
 	})
 }
 
@@ -358,6 +416,7 @@ export function useUpdateAllergyMutation() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: problemsAllergiesKeys.all })
 		},
+		onError: error => showMutationError(error, "Failed to update allergy."),
 	})
 }
 
@@ -373,6 +432,7 @@ export function useDeactivateAllergyMutation() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: problemsAllergiesKeys.all })
 		},
+		onError: error => showMutationError(error, "Failed to deactivate allergy."),
 	})
 }
 
@@ -388,6 +448,7 @@ export function useVerifyAllergyMutation() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: problemsAllergiesKeys.all })
 		},
+		onError: error => showMutationError(error, "Failed to verify allergy."),
 	})
 }
 
@@ -451,7 +512,9 @@ export function useAllergenSearchQuery(params: {
 		queryKey: problemsAllergiesKeys.allergenSearch(
 			params.search,
 			params.facilityId,
-			params.allergenType
+			params.allergenType,
+			params.page,
+			params.limit
 		),
 		queryFn: () =>
 			fetchJson<ListResponse<AllergenSearchResult>>(

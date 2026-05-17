@@ -315,7 +315,9 @@ export class OfflineCacheService implements OnModuleInit, OnModuleDestroy {
 			activeMedications,
 			activeProblemCount: activeProblems.length,
 			activeAllergyCount: activeAllergies.length,
-			hasSevereAllergies: activeAllergies.some(allergy => allergy.severity === "severe"),
+			hasSevereAllergies: activeAllergies.some(
+				allergy => allergy.severity === "severe" && allergy.isVerified
+			),
 		}
 	}
 
@@ -379,6 +381,7 @@ export class OfflineCacheService implements OnModuleInit, OnModuleDestroy {
 				severity: allergies.severity,
 				onsetDate: allergies.onsetDate,
 				isActive: allergies.isActive,
+				isVerified: allergies.isVerified,
 			})
 			.from(allergies)
 			.where(

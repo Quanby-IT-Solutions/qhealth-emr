@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import * as QRCode from "qrcode"
 import { toast } from "sonner"
 
 import { Link2, Loader2, Mail, MonitorSmartphone, Printer, QrCode } from "lucide-react"
@@ -30,6 +31,9 @@ interface PrescriptionContent {
 	specialInstructions?: string | null
 	isPrn?: boolean
 	prnReason?: string | null
+	isControlledSubstance?: boolean
+	pdeaSchedule?: string | null
+	noRefillInscribed?: boolean
 }
 
 function formatDate(value: Date | string | null | undefined): string {
@@ -63,12 +67,23 @@ function parsePrescriptionContent(raw: unknown): PrescriptionContent {
 	return raw as PrescriptionContent
 }
 
+function escapeHtml(value: unknown): string {
+	return String(value ?? "")
+		.replaceAll("&", "&amp;")
+		.replaceAll("<", "&lt;")
+		.replaceAll(">", "&gt;")
+		.replaceAll('"', "&quot;")
+		.replaceAll("'", "&#39;")
+}
+
 interface RxPrintItem {
+	id: string
 	prescriberName: string
 	prcNumber: string
 	ptrNumber: string
 	pdeaS2License: string | null
 	noRefill: boolean
+	pdeaSchedule: string | null
 	signedAt: string
 	genericName: string
 	brandName: string | null
@@ -102,28 +117,29 @@ function openPrintWindow(data: PrintData): void {
     <div class="rx-block">
       <div class="rx-number">Rx ${i + 1}</div>
       <div class="rx-drug">
-        <span class="generic">${rx.genericName}</span>
-        ${rx.brandName ? `<span class="brand"> (${rx.brandName})</span>` : ""}
+        <span class="generic">${escapeHtml(rx.genericName)}</span>
+        ${rx.brandName ? `<span class="brand"> (${escapeHtml(rx.brandName)})</span>` : ""}
       </div>
       <table class="rx-table">
-        <tr><td class="label">Dose / Form</td><td>${rx.dose} ${rx.doseUnit} - ${rx.doseForm}</td></tr>
-        <tr><td class="label">Route</td><td>${rx.route}</td></tr>
-        <tr><td class="label">Frequency</td><td>${rx.frequency}${rx.isPrn ? ` (PRN: ${rx.prnReason ?? "as needed"})` : ""}</td></tr>
+        <tr><td class="label">Dose / Form</td><td>${escapeHtml(rx.dose)} ${escapeHtml(rx.doseUnit)} - ${escapeHtml(rx.doseForm)}</td></tr>
+        <tr><td class="label">Route</td><td>${escapeHtml(rx.route)}</td></tr>
+        <tr><td class="label">Frequency</td><td>${escapeHtml(rx.frequency)}${rx.isPrn ? ` (PRN: ${escapeHtml(rx.prnReason ?? "as needed")})` : ""}</td></tr>
         ${rx.durationDays ? `<tr><td class="label">Duration</td><td>${rx.durationDays} day(s)</td></tr>` : ""}
-        ${rx.specialInstructions ? `<tr><td class="label">Instructions</td><td>${rx.specialInstructions}</td></tr>` : ""}
+        ${rx.pdeaSchedule ? `<tr><td class="label">PDEA Schedule</td><td>${escapeHtml(rx.pdeaSchedule)}</td></tr>` : ""}
+        ${rx.specialInstructions ? `<tr><td class="label">Instructions</td><td>${escapeHtml(rx.specialInstructions)}</td></tr>` : ""}
       </table>
       ${rx.noRefill ? `<div class="no-refill-stamp">NO REFILL</div>` : ""}
       <div class="rx-sig">
         <div>
           <div class="sig-line">&nbsp;</div>
-          <div class="sig-label">${rx.prescriberName}</div>
-          <div class="sig-label">PRC Lic. No.: ${rx.prcNumber}</div>
-          <div class="sig-label">PTR No.: ${rx.ptrNumber}</div>
-          ${rx.pdeaS2License ? `<div class="sig-label">S2 Lic.: ${rx.pdeaS2License}</div>` : ""}
+          <div class="sig-label">${escapeHtml(rx.prescriberName)}</div>
+          <div class="sig-label">PRC Lic. No.: ${escapeHtml(rx.prcNumber)}</div>
+          <div class="sig-label">PTR No.: ${escapeHtml(rx.ptrNumber)}</div>
+          ${rx.pdeaS2License ? `<div class="sig-label">S2 Lic.: ${escapeHtml(rx.pdeaS2License)}</div>` : ""}
         </div>
         <div class="dispensing-note">${rx.noRefill ? "For single dispensing only. PDEA controlled substance." : "For single dispensing only unless otherwise indicated."}</div>
       </div>
-      <div class="signed-note">Electronically signed: ${rx.signedAt}</div>
+      <div class="signed-note">Electronically signed: ${escapeHtml(rx.signedAt)}</div>
     </div>`
 		)
 		.join("")
@@ -132,7 +148,7 @@ function openPrintWindow(data: PrintData): void {
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>e-Prescription - ${data.patientName}</title>
+  <title>e-Prescription - ${escapeHtml(data.patientName)}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #000; padding: 2cm; }
@@ -174,10 +190,10 @@ function openPrintWindow(data: PrintData): void {
 
   <div class="patient-section">
     <div class="grid-2">
-      <div class="field"><span class="label">Patient Name</span><span class="value">${data.patientName}</span></div>
-      <div class="field"><span class="label">MRN</span><span class="value">${data.patientMrn}</span></div>
-      <div class="field"><span class="label">Age / Sex</span><span class="value">${data.patientAge !== null ? `${data.patientAge} yrs` : "--"} / ${data.patientSex}</span></div>
-      <div class="field"><span class="label">Date Prescribed</span><span class="value">${data.encounterDate}</span></div>
+      <div class="field"><span class="label">Patient Name</span><span class="value">${escapeHtml(data.patientName)}</span></div>
+      <div class="field"><span class="label">MRN</span><span class="value">${escapeHtml(data.patientMrn)}</span></div>
+      <div class="field"><span class="label">Age / Sex</span><span class="value">${data.patientAge !== null ? `${data.patientAge} yrs` : "--"} / ${escapeHtml(data.patientSex)}</span></div>
+      <div class="field"><span class="label">Date Prescribed</span><span class="value">${escapeHtml(data.encounterDate)}</span></div>
     </div>
   </div>
 
@@ -210,6 +226,7 @@ export function PrescriptionPrintDialog({
 	onPrinted,
 }: PrescriptionPrintDialogProps) {
 	const [showQr, setShowQr] = useState(false)
+	const [qrDataUrl, setQrDataUrl] = useState("")
 	const { data: encounter, isLoading: encounterLoading } = useEncounterDetailQuery(encounterId, {
 		enabled: open,
 	})
@@ -238,12 +255,16 @@ export function PrescriptionPrintDialog({
 				encounterDate: formatDate(encounter.admissionDatetime),
 				prescriptions: signedPrescriptions.map(rx => {
 					const content = parsePrescriptionContent(rx.prescriptionContent)
+					const isControlled = Boolean(content.isControlledSubstance)
+					const noRefill = Boolean(content.noRefillInscribed || isControlled)
 					return {
+						id: rx.id,
 						prescriberName: rx.prescriberStaffName ?? "--",
 						prcNumber: rx.prcLicenseNumber ?? "--",
 						ptrNumber: rx.ptrNumber ?? "--",
-						pdeaS2License: rx.pdeaS2License ?? null,
-						noRefill: !!rx.pdeaS2License,
+						pdeaS2License: isControlled ? (rx.pdeaS2License ?? null) : null,
+						noRefill,
+						pdeaSchedule: content.pdeaSchedule ?? null,
 						signedAt: formatDateTime(rx.signedAt),
 						genericName: content.genericName ?? "--",
 						brandName: content.brandName ?? null,
@@ -266,7 +287,9 @@ export function PrescriptionPrintDialog({
 			: JSON.stringify({
 					patientName: printData.patientName,
 					patientMrn: printData.patientMrn,
+					prescriptionIds: printData.prescriptions.map(rx => rx.id),
 					prescriptions: printData.prescriptions.map(rx => ({
+						id: rx.id,
 						genericName: rx.genericName,
 						dose: `${rx.dose} ${rx.doseUnit}`.trim(),
 						prescriberPrc: rx.prcNumber,
@@ -275,6 +298,33 @@ export function PrescriptionPrintDialog({
 					})),
 				})
 	const qrLink = qrPayload ? `qhealth://eprescription?payload=${encodeURIComponent(qrPayload)}` : ""
+
+	useEffect(() => {
+		let cancelled = false
+
+		if (!showQr || !qrLink) {
+			return
+		}
+
+		QRCode.toDataURL(qrLink, {
+			errorCorrectionLevel: "M",
+			margin: 2,
+			width: 220,
+		})
+			.then(dataUrl => {
+				if (!cancelled) setQrDataUrl(dataUrl)
+			})
+			.catch(() => {
+				if (!cancelled) {
+					setQrDataUrl("")
+					toast.error("Failed to render e-Prescription QR.")
+				}
+			})
+
+		return () => {
+			cancelled = true
+		}
+	}, [showQr, qrLink])
 
 	function handlePrint() {
 		if (!printData) return
@@ -315,7 +365,10 @@ export function PrescriptionPrintDialog({
 
 		const subject = `e-Prescription - ${printData.patientName}`
 		const body = bodyLines.join("\n")
-		window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+		window.open(
+			`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
+			"_self"
+		)
 	}
 
 	return (
@@ -414,12 +467,20 @@ export function PrescriptionPrintDialog({
 
 						{showQr && signedPrescriptions.length > 0 && (
 							<div className="space-y-3 rounded-md border p-4">
-								<div>
-									<p className="text-sm font-medium">QR Payload Link</p>
-									<p className="text-muted-foreground text-xs">
-										No QR library is installed in this workspace, so this dialog exposes the encoded
-										payload link that can be rendered as a QR value elsewhere.
-									</p>
+								<p className="text-sm font-medium">Signed e-Prescription QR</p>
+								<div className="flex justify-center">
+									{qrDataUrl ? (
+										// eslint-disable-next-line @next/next/no-img-element
+										<img
+											src={qrDataUrl}
+											alt="Signed e-Prescription QR"
+											className="size-56 rounded-md border bg-white p-2"
+										/>
+									) : (
+										<div className="flex size-56 items-center justify-center rounded-md border">
+											<Loader2 className="text-muted-foreground size-5 animate-spin" />
+										</div>
+									)}
 								</div>
 								<a
 									href={qrLink}

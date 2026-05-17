@@ -164,6 +164,7 @@ export const OfflineAllergySummarySchema = z.object({
 	severity: z.enum(["mild", "moderate", "severe"]),
 	onsetDate: z.string().nullable(),
 	isActive: z.boolean(),
+	isVerified: z.boolean(),
 })
 
 export const OfflineMedicationSummarySchema = z.object({

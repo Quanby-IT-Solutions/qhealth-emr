@@ -61,12 +61,12 @@ vi.mock("@/core/components/ui/select", async () => {
 
 		React.Children.forEach(children, (child: unknown) => {
 			if (!React.isValidElement(child)) return
-			const props = child.props as MockSelectChildProps
+			const childProps = child.props as MockSelectChildProps
 			if (child.type === SelectTrigger) {
-				triggerId = props.id
+				triggerId = childProps.id
 			}
 			if (child.type === SelectContent) {
-				React.Children.forEach(props.children, (item: unknown) => {
+				React.Children.forEach(childProps.children, (item: unknown) => {
 					if (!React.isValidElement(item) || item.type !== SelectItem) return
 					const itemProps = item.props as MockSelectChildProps
 					options.push({ value: itemProps.value ?? "", label: itemProps.children })
@@ -230,6 +230,15 @@ function setCdsEvaluateResult(result: EvaluateCdsResult) {
 	})
 }
 
+function setCdsEvaluateError(error: Error) {
+	mockUseEvaluateCdsMutation.mockReturnValue({
+		mutate: (_input: unknown, opts?: { onError?: (error: Error) => void }) => {
+			opts?.onError?.(error)
+		},
+		isPending: false,
+	})
+}
+
 const defaultProps = {
 	open: true,
 	onOpenChange: () => {},
@@ -320,6 +329,23 @@ describe("CreateMedOrderDialog", () => {
 		await user.click(screen.getByRole("button", { name: /run drug safety check/i }))
 
 		expect(screen.getByTestId("allergy-alert-allergy-0")).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: /create order/i })).toBeDisabled()
+	})
+
+	it("shows CDS validation errors before signing the order", async () => {
+		const user = userEvent.setup()
+		setCdsEvaluateError(
+			new Error(
+				"Biogesic is a brand name. Select the generic name first (Paracetamol); brand name is optional and subordinate."
+			)
+		)
+
+		render(<CreateMedOrderDialog {...defaultProps} />)
+
+		await user.type(screen.getByTestId("generic-name-input"), "Biogesic")
+		await user.click(screen.getByRole("button", { name: /run drug safety check/i }))
+
+		expect(await screen.findByText(/Biogesic is a brand name/i)).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: /create order/i })).toBeDisabled()
 	})
 

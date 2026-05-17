@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 
 import {
 	AlertTriangle,
@@ -67,6 +68,10 @@ function isPastDate(d: string | null | undefined) {
 	return normalizeDate(d) < today
 }
 
+function mutationErrorMessage(error: unknown, fallback: string) {
+	return error instanceof Error ? error.message : fallback
+}
+
 function isWithinDays(d: string | null | undefined, days: number) {
 	if (!d || isPastDate(d)) return false
 	const today = new Date()
@@ -125,6 +130,13 @@ function LicenseBadge({
 		return (
 			<Badge variant="outline" className="text-muted-foreground gap-1">
 				{label}: Not set
+			</Badge>
+		)
+	if (!expiry)
+		return (
+			<Badge variant="destructive" className="gap-1">
+				<AlertTriangle className="size-3" />
+				{label} {number} - expiry not recorded
 			</Badge>
 		)
 	if (expired)
@@ -345,9 +357,7 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 	const canSignOrders = can(permSet, "orders", "sign")
 
 	// Prescriber's license from their staff profile for this facility
-	const staffProfile =
-		profile?.staffProfiles?.find(sp => sp.facilityId === facilityId) ??
-		profile?.staffProfiles?.[0]
+	const staffProfile = profile?.staffProfiles?.find(sp => sp.facilityId === facilityId)
 
 	const prcExpired = isPastDate(staffProfile?.prcExpiry)
 	const ptrExpired = isPastDate(staffProfile?.ptrExpiry)
@@ -362,15 +372,28 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 	)
 
 	const licenseAlertMessages: string[] = []
-	if (prcExpired)
+	if (!staffProfile)
 		licenseAlertMessages.push(
-			`PRC license expired ${formatDate(staffProfile?.prcExpiry)} — prescription generation blocked.`
+			"No active staff profile was found for this facility - prescription generation blocked."
+		)
+	else if (!staffProfile.prcLicenseNumber)
+		licenseAlertMessages.push("PRC license number is missing - prescription generation blocked.")
+	else if (!staffProfile.prcExpiry)
+		licenseAlertMessages.push("PRC license expiry is not recorded - prescription generation blocked.")
+	else if (prcExpired)
+		licenseAlertMessages.push(
+			`PRC license expired ${formatDate(staffProfile?.prcExpiry)} - prescription generation blocked.`
 		)
 	else if (prcExpiringSoon)
 		licenseAlertMessages.push(`PRC license expires ${formatDate(staffProfile?.prcExpiry)}.`)
-	if (ptrExpired)
+
+	if (!staffProfile?.ptrNumber)
+		licenseAlertMessages.push("PTR number is missing - prescription generation blocked.")
+	else if (!staffProfile.ptrExpiry)
+		licenseAlertMessages.push("PTR expiry is not recorded - prescription generation blocked.")
+	else if (ptrExpired)
 		licenseAlertMessages.push(
-			`PTR expired ${formatDate(staffProfile?.ptrExpiry)} — prescription generation blocked.`
+			`PTR expired ${formatDate(staffProfile?.ptrExpiry)} - prescription generation blocked.`
 		)
 	else if (ptrExpiringSoon)
 		licenseAlertMessages.push(`PTR expires ${formatDate(staffProfile?.ptrExpiry)}.`)
@@ -386,7 +409,7 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 			(o.status === "verified" || o.status === "active") &&
 			!prescribedOrderIds.has(o.id) &&
 			// Skip child tranches — only prescribe parent tranche (pdeaTrancheNumber === 1 or null)
-			(o.pdeaTrancheNumber == null || o.pdeaTrancheNumber === 1)
+			(o.pdeaTrancheNumber === null || o.pdeaTrancheNumber === undefined || o.pdeaTrancheNumber === 1)
 	)
 
 	const draftPrescriptions = allPrescriptions.filter(rx => rx.status === "draft")
@@ -396,18 +419,46 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 
 	function handleGenerateRx(medicationOrderId: string) {
 		if (!canCreateOrders) return
-		createPrescription.mutate({ facilityId, encounterId, medicationOrderId, patientId })
+		if (!hasValidLicense) {
+			toast.error("Cannot generate e-Prescription until PRC and PTR credentials are active.")
+			return
+		}
+		createPrescription.mutate(
+			{ facilityId, encounterId, medicationOrderId, patientId },
+			{
+				onSuccess: () => toast.success("e-Prescription draft generated."),
+				onError: error =>
+					toast.error(
+						mutationErrorMessage(error, "Failed to generate e-Prescription.")
+					),
+			}
+		)
 	}
 
 	function handleSign(id: string) {
 		if (!canSignOrders) return
-		signPrescription.mutate(id)
+		if (!hasValidLicense) {
+			toast.error("Cannot sign e-Prescription until PRC and PTR credentials are active.")
+			return
+		}
+		signPrescription.mutate(id, {
+			onSuccess: () => toast.success("e-Prescription signed."),
+			onError: error =>
+				toast.error(mutationErrorMessage(error, "Failed to sign e-Prescription.")),
+		})
 	}
 
 	function handleSignAll() {
 		if (!canSignOrders) return
+		if (!hasValidLicense) {
+			toast.error("Cannot sign e-Prescriptions until PRC and PTR credentials are active.")
+			return
+		}
 		for (const rx of draftPrescriptions) {
-			signPrescription.mutate(rx.id)
+			signPrescription.mutate(rx.id, {
+				onError: error =>
+					toast.error(mutationErrorMessage(error, "Failed to sign e-Prescription.")),
+			})
 		}
 	}
 
@@ -593,7 +644,7 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 							{draftPrescriptions.length > 1 && (
 								<Button
 									size="sm"
-									disabled={signPrescription.isPending}
+									disabled={signPrescription.isPending || !hasValidLicense}
 									onClick={handleSignAll}
 									className="gap-1"
 								>
@@ -608,7 +659,7 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 									key={rx.id}
 									rx={rx}
 									onSign={canSignOrders ? handleSign : undefined}
-									signPending={signPrescription.isPending}
+									signPending={signPrescription.isPending || !hasValidLicense}
 								/>
 							))}
 						</div>

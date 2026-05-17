@@ -123,6 +123,7 @@ export function useOfflineEncounter(
 					severity: a.severity,
 					onsetDate: a.onsetDate,
 					isActive: a.isActive,
+					isVerified: a.isVerified,
 				}))
 			: []
 		const activeMedications: OfflineMedicationSummary[] = (
