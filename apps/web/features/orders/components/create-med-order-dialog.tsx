@@ -45,6 +45,13 @@ import { S2ValidationModal } from "./s2-validation-modal"
 import { TranchingPreviewModal, type TrancheRow } from "./tranching-preview-modal"
 
 const TRANCHE_THRESHOLD_DAYS = 30
+const MAX_CONTROLLED_DAYS = 90
+
+const PDEA_SCHEDULE_OPTIONS = [
+	{ value: "S-2", label: "S-2 / List A" },
+	{ value: "S-3", label: "S-3" },
+	{ value: "S-4", label: "S-4" },
+] as const
 
 type CdsResult = CdsEvaluateResponse
 
@@ -98,6 +105,15 @@ function formatDisplayDate(dateStr: string | null | undefined) {
 		month: "short",
 		day: "numeric",
 	})
+}
+
+function isPastDate(dateStr: string | null | undefined) {
+	if (!dateStr) return false
+	const date = new Date(dateStr)
+	date.setHours(0, 0, 0, 0)
+	const today = new Date()
+	today.setHours(0, 0, 0, 0)
+	return date < today
 }
 
 export function CreateMedOrderDialog({
@@ -163,13 +179,12 @@ export function CreateMedOrderDialog({
 
 	// ── PDEA validation ──────────────────────────────────────────────────────
 	const staffProfile =
-		profile?.staffProfiles?.find(p => p.id === orderingStaffId) ??
-		profile?.staffProfiles?.find(p => p.facilityId === facilityId) ??
-		profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.id === orderingStaffId && p.facilityId === facilityId) ??
+		profile?.staffProfiles?.find(p => p.facilityId === facilityId)
 	const pdeaLicense = staffProfile?.pdeaS2License ?? null
 	const pdeaExpiry = staffProfile?.pdeaS2Expiry ?? null
-	const pdeaExpired = pdeaExpiry !== null ? new Date(pdeaExpiry) < new Date() : false
-	const pdeaValid = pdeaLicense !== null && !pdeaExpired
+	const pdeaExpired = isPastDate(pdeaExpiry)
+	const pdeaValid = pdeaLicense !== null && pdeaExpiry !== null && !pdeaExpired
 	const pdeaLicenseStatus = useCheckPdeaLicenseQuery({
 		staffId: orderingStaffId,
 		facilityId,
@@ -262,13 +277,18 @@ export function CreateMedOrderDialog({
 
 	// ── Tranche helpers ──────────────────────────────────────────────────────
 	const durationNum = durationDays ? Number(durationDays) : 0
-	const needsTranching = isControlledSubstance && durationNum > TRANCHE_THRESHOLD_DAYS
+	const controlledDurationMissing = isControlledSubstance && !durationDays
+	const controlledDurationTooLong = isControlledSubstance && durationNum > MAX_CONTROLLED_DAYS
+	const needsTranching =
+		isControlledSubstance &&
+		durationNum > TRANCHE_THRESHOLD_DAYS &&
+		durationNum <= MAX_CONTROLLED_DAYS
 
 	// ── Schedule anchor helpers ──────────────────────────────────────────────
 	const isRepeatingFrequency = frequency !== "" && REPEATING_FREQUENCIES.includes(frequency as FrequencyValue)
 	const needsInpatientFields =
 		encounterType === "inpatient" || encounterType === "emergency"
-	const durationRequired = isRepeatingFrequency
+	const durationRequired = isRepeatingFrequency || isControlledSubstance
 	const firstDoseRequired = needsInpatientFields
 
 	// ── Submission readiness ─────────────────────────────────────────────────
@@ -285,6 +305,9 @@ export function CreateMedOrderDialog({
 		hasFreshCdsCheck &&
 		(!durationRequired || !!durationDays) &&
 		(!firstDoseRequired || !!firstDoseAt) &&
+		!controlledDurationMissing &&
+		!controlledDurationTooLong &&
+		(!isControlledSubstance || durationNum > 0) &&
 		(!isControlledSubstance || !!pdeaSchedule.trim()) &&
 		!hasHardBlock &&
 		allSoftBlocksOverridden &&
@@ -414,6 +437,7 @@ export function CreateMedOrderDialog({
 				{
 					medicationOrderId: orderId,
 					verifyingStaffId: pendingHighAlertVerification.verifyingStaffId,
+					coSignerPassword: pendingHighAlertVerification.coSignerPassword,
 					notes: pendingHighAlertVerification.notes,
 				},
 				{
@@ -860,6 +884,12 @@ export function CreateMedOrderDialog({
 								</span>
 							</div>
 						)}
+						{controlledDurationTooLong && (
+							<div className="border-destructive bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+								<AlertCircle className="size-4 shrink-0" />
+								PDEA controlled substance orders cannot exceed {MAX_CONTROLLED_DAYS} days.
+							</div>
+						)}
 
 						{/* ── Special Instructions ─────────────────────── */}
 						<div className="space-y-2">
@@ -922,6 +952,13 @@ export function CreateMedOrderDialog({
 									<AlertCircle className="size-4 shrink-0" />
 									PDEA S-2 license expired ({pdeaExpiry}). Renew your license before ordering
 									controlled substances.
+								</div>
+							)}
+							{pdeaLicense !== null && !pdeaExpiry && (
+								<div className="border-destructive bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+									<AlertCircle className="size-4 shrink-0" />
+									PDEA S-2 license expiry is not recorded. Contact administration before
+									ordering controlled substances.
 								</div>
 							)}
 							{pdeaValid && (
@@ -989,12 +1026,21 @@ export function CreateMedOrderDialog({
 							{isControlledSubstance && (
 								<div className="space-y-2 pl-6">
 									<Label htmlFor="pdeaSchedule">PDEA Schedule</Label>
-									<Input
-										id="pdeaSchedule"
-										value={pdeaSchedule}
-										onChange={e => setPdeaSchedule(e.target.value)}
-										placeholder="e.g., S2, S3"
-									/>
+									<Select value={pdeaSchedule} onValueChange={value => setPdeaSchedule(value ?? "")}>
+										<SelectTrigger id="pdeaSchedule" className="w-full">
+											<SelectValue>
+												{PDEA_SCHEDULE_OPTIONS.find(o => o.value === pdeaSchedule)?.label ??
+													"Select PDEA schedule..."}
+											</SelectValue>
+										</SelectTrigger>
+										<SelectContent>
+											{PDEA_SCHEDULE_OPTIONS.map(option => (
+												<SelectItem key={option.value} value={option.value}>
+													{option.label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
 								</div>
 							)}
 						</div>

@@ -165,6 +165,9 @@ export const labOrders = createTable(
 		panelCode: t.text("panel_code"),
 		testName: t.text("test_name").notNull(),
 		panelName: t.text("panel_name"),
+		clinicalIndication: t.text("clinical_indication"),
+		indicationIcd10Code: t.text("indication_icd10_code"),
+		indicationIcd10Display: t.text("indication_icd10_display"),
 		priority: t
 			.text("priority")
 			.notNull()
@@ -215,6 +218,8 @@ export const imagingOrders = createTable(
 		modality: t.text("modality").notNull().$type<"xray" | "ct" | "mri" | "ultrasound" | "other">(),
 		bodyPart: t.text("body_part").notNull(),
 		clinicalIndication: t.text("clinical_indication"),
+		indicationIcd10Code: t.text("indication_icd10_code"),
+		indicationIcd10Display: t.text("indication_icd10_display"),
 		priority: t
 			.text("priority")
 			.notNull()

@@ -93,11 +93,32 @@ interface PrescriptionContent {
 	prnReason?: string | null
 	isControlledSubstance?: boolean
 	pdeaSchedule?: string | null
+	pdeaTrancheNumber?: number | null
+	pdeaTrancheTotal?: number | null
+	pdeaDispenseDate?: string | null
+	pdeaDispensingInstructions?: string | null
 }
 
 function parseContent(raw: unknown): PrescriptionContent {
 	if (!raw || typeof raw !== "object") return {}
 	return raw as PrescriptionContent
+}
+
+function isReadyForPrescriptionTranche(order: {
+	parentOrderId?: string | null
+	pdeaTrancheNumber?: number | null
+	pdeaTrancheTotal?: number | null
+}) {
+	const hasParentOrder = order.parentOrderId !== null && order.parentOrderId !== undefined
+	const hasTrancheNumber = order.pdeaTrancheNumber !== null && order.pdeaTrancheNumber !== undefined
+	const isMultiTrancheParent =
+		!hasParentOrder &&
+		!hasTrancheNumber &&
+		(order.pdeaTrancheTotal ?? 0) > 1
+	if (isMultiTrancheParent) return false
+
+	if (!hasTrancheNumber) return true
+	return order.pdeaTrancheNumber === 1
 }
 
 function usePermissionSet() {
@@ -190,6 +211,12 @@ function PrescriptionCard({
 	const content = parseContent(rx.prescriptionContent)
 	const isSigned = rx.status === "signed" || rx.status === "issued"
 	const isControlled = Boolean(content.isControlledSubstance)
+	const hasTranche =
+		content.pdeaTrancheNumber !== null &&
+		content.pdeaTrancheNumber !== undefined &&
+		content.pdeaTrancheTotal !== null &&
+		content.pdeaTrancheTotal !== undefined &&
+		content.pdeaTrancheTotal > 1
 
 	return (
 		<div
@@ -227,6 +254,11 @@ function PrescriptionCard({
 					{content.pdeaSchedule && (
 						<Badge variant="outline" className="text-xs">
 							Schedule {content.pdeaSchedule}
+						</Badge>
+					)}
+					{hasTranche && (
+						<Badge variant="outline" className="text-xs">
+							Tranche {content.pdeaTrancheNumber} of {content.pdeaTrancheTotal}
 						</Badge>
 					)}
 				</div>
@@ -277,6 +309,19 @@ function PrescriptionCard({
 							Special Instructions
 						</p>
 						<p className="text-muted-foreground italic">{content.specialInstructions}</p>
+					</div>
+				)}
+				{isControlled && (
+					<div className="col-span-2 sm:col-span-3">
+						<p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+							PDEA Dispensing
+						</p>
+						<p className="text-muted-foreground">
+							{content.pdeaDispensingInstructions ??
+								(content.pdeaDispenseDate
+									? `No Refill. Earliest dispense date: ${content.pdeaDispenseDate}.`
+									: "No Refill.")}
+						</p>
 					</div>
 				)}
 			</div>
@@ -408,8 +453,7 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 		o =>
 			(o.status === "verified" || o.status === "active") &&
 			!prescribedOrderIds.has(o.id) &&
-			// Skip child tranches — only prescribe parent tranche (pdeaTrancheNumber === 1 or null)
-			(o.pdeaTrancheNumber === null || o.pdeaTrancheNumber === undefined || o.pdeaTrancheNumber === 1)
+			isReadyForPrescriptionTranche(o)
 	)
 
 	const draftPrescriptions = allPrescriptions.filter(rx => rx.status === "draft")

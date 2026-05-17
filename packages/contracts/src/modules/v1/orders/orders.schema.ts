@@ -196,32 +196,58 @@ export const MedOrderSchema = z.object({
 
 export const MedOrderIdSchema = z.object({ id: z.string().uuid() })
 
-export const CreateMedOrderSchema = z.object({
-	facilityId: z.string().uuid(),
-	encounterId: z.string().uuid().optional(),
-	preEncounterId: z.string().uuid().optional(),
-	patientId: z.string().uuid().optional(),
-	formularyItemId: z.string().uuid().optional(),
-	genericName: z.string().trim().min(1),
-	brandName: z.string().optional(),
-	rxnormCode: z.string().optional(),
-	dose: z.string().min(1),
-	doseUnit: z.string().min(1),
-	doseForm: z.string().min(1),
-	route: z.string().min(1),
-	frequency: MedOrderFrequencyEnum,
-	firstDoseAt: z.string().datetime().optional(),
-	durationDays: z.number().int().positive().optional(),
-	specialInstructions: z.string().optional(),
-	isPrn: z.boolean().optional(),
-	prnReason: z.string().optional(),
-	isControlledSubstance: z.boolean().optional(),
-	pdeaSchedule: z.string().optional(),
-	pdeaTrancheNumber: z.number().int().positive().optional(),
-	pdeaTrancheTotal: z.number().int().positive().optional(),
-	cdsAlerts: z.unknown().optional(),
-	cdsOverrides: z.unknown().optional(),
-})
+export const CreateMedOrderSchema = z
+	.object({
+		facilityId: z.string().uuid(),
+		encounterId: z.string().uuid().optional(),
+		preEncounterId: z.string().uuid().optional(),
+		patientId: z.string().uuid().optional(),
+		formularyItemId: z.string().uuid().optional(),
+		genericName: z.string().trim().min(1),
+		brandName: z.string().optional(),
+		rxnormCode: z.string().optional(),
+		dose: z.string().min(1),
+		doseUnit: z.string().min(1),
+		doseForm: z.string().min(1),
+		route: z.string().min(1),
+		frequency: MedOrderFrequencyEnum,
+		firstDoseAt: z.string().datetime().optional(),
+		durationDays: z.number().int().positive().optional(),
+		specialInstructions: z.string().optional(),
+		isPrn: z.boolean().optional(),
+		prnReason: z.string().optional(),
+		isControlledSubstance: z.boolean().optional(),
+		pdeaSchedule: z.string().optional(),
+		pdeaTrancheNumber: z.number().int().positive().optional(),
+		pdeaTrancheTotal: z.number().int().positive().optional(),
+		cdsAlerts: z.unknown().optional(),
+		cdsOverrides: z.unknown().optional(),
+	})
+	.superRefine((value, ctx) => {
+		if (!value.isControlledSubstance) return
+
+		if (!value.pdeaSchedule?.trim()) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["pdeaSchedule"],
+				message: "PDEA schedule is required for controlled substances.",
+			})
+		}
+		if (!value.durationDays) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["durationDays"],
+				message: "durationDays is required for controlled substance orders.",
+			})
+		} else if (value.durationDays > 30) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["durationDays"],
+				message:
+					"Controlled substance orders over 30 days must be submitted through PDEA tranching.",
+			})
+		}
+	})
 
 export const UpdateMedOrderSchema = z.object({
 	id: z.string().uuid(),
@@ -267,6 +293,9 @@ export const LabOrderSchema = z.object({
 	panelCode: z.string().nullable(),
 	testName: z.string(),
 	panelName: z.string().nullable(),
+	clinicalIndication: z.string().nullable(),
+	indicationIcd10Code: z.string().nullable(),
+	indicationIcd10Display: z.string().nullable(),
 	priority: OrderPriorityEnum,
 	status: LabOrderStatusEnum,
 	specimenType: z.string().nullable(),
@@ -309,7 +338,17 @@ export const CreateLabOrderSchema = z.object({
 	panelName: z.string().optional(),
 	priority: OrderPriorityEnum.optional(),
 	specimenType: z.string().optional(),
-	clinicalIndication: z.string().optional(),
+	clinicalIndication: z.string().trim().min(1).optional(),
+	indicationIcd10Code: z.string().trim().min(1).optional(),
+	indicationIcd10Display: z.string().trim().min(1).optional(),
+}).superRefine((value, ctx) => {
+	if (!value.encounterId && !value.preEncounterId) {
+		ctx.addIssue({
+			code: "custom",
+			path: ["encounterId"],
+			message: "encounterId or preEncounterId is required for lab orders.",
+		})
+	}
 })
 
 export const LabOrderListSchema = PaginationInputSchema.extend({
@@ -339,6 +378,8 @@ export const ImagingOrderSchema = z.object({
 	modality: ImagingModalityEnum,
 	bodyPart: z.string(),
 	clinicalIndication: z.string().nullable(),
+	indicationIcd10Code: z.string().nullable(),
+	indicationIcd10Display: z.string().nullable(),
 	priority: OrderPriorityEnum,
 	status: ImagingOrderStatusEnum,
 	orderingStaffId: z.string().uuid(),
@@ -382,8 +423,18 @@ export const CreateImagingOrderSchema = z.object({
 	preEncounterId: z.string().uuid().optional(),
 	modality: ImagingModalityEnum,
 	bodyPart: z.string().min(1),
-	clinicalIndication: z.string().optional(),
+	clinicalIndication: z.string().trim().min(1).optional(),
+	indicationIcd10Code: z.string().trim().min(1).optional(),
+	indicationIcd10Display: z.string().trim().min(1).optional(),
 	priority: OrderPriorityEnum.optional(),
+}).superRefine((value, ctx) => {
+	if (!value.encounterId && !value.preEncounterId) {
+		ctx.addIssue({
+			code: "custom",
+			path: ["encounterId"],
+			message: "encounterId or preEncounterId is required for imaging orders.",
+		})
+	}
 })
 
 export const ImagingOrderListSchema = PaginationInputSchema.extend({
@@ -446,6 +497,7 @@ export const HighAlertVerificationSchema = z.object({
 export const CreateHighAlertVerificationSchema = z.object({
 	medicationOrderId: z.string().uuid(),
 	verifyingStaffId: z.string().uuid(),
+	coSignerPassword: z.string().trim().min(1),
 	notes: z.string().optional(),
 })
 
@@ -536,7 +588,7 @@ export const PdeaLicenseStatusSchema = z.object({
 export type PdeaLicenseStatus = z.infer<typeof PdeaLicenseStatusSchema>
 
 // ============================================================================
-// Tranching Preview (for controlled substances > 90 days)
+// Tranching Preview (for controlled substances > 30 days, max 90 days)
 // ============================================================================
 
 export const TranchePreviewItemSchema = z.object({
@@ -555,8 +607,8 @@ export const TranchePreviewInputSchema = z.object({
 	genericName: z.string(),
 	dose: z.string(),
 	frequency: z.string(),
-	durationDays: z.number().int().positive(),
-	pdeaSchedule: z.string(),
+	durationDays: z.number().int().positive().max(90),
+	pdeaSchedule: z.string().trim().min(1),
 	startDate: z.string().optional(), // Defaults to today
 })
 
@@ -591,11 +643,11 @@ export const CreateTranchedOrdersSchema = z.object({
 	route: z.string().min(1),
 	frequency: MedOrderFrequencyEnum,
 	firstDoseAt: z.string().datetime().optional(),
-	durationDays: z.number().int().positive(),
+	durationDays: z.number().int().min(31).max(90),
 	specialInstructions: z.string().optional(),
 	isPrn: z.boolean().optional(),
 	prnReason: z.string().optional(),
-	pdeaSchedule: z.string(),
+	pdeaSchedule: z.string().trim().min(1),
 	startDate: z.string().optional(),
 	cdsAlerts: z.unknown().optional(),
 	cdsOverrides: z.unknown().optional(),

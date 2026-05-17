@@ -4,10 +4,12 @@ import {
 	Injectable,
 	Logger,
 	NotFoundException,
+	UnauthorizedException,
 } from "@nestjs/common"
 import { and, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 
 import {
+	accounts,
 	auditLogs,
 	counselingLogs,
 	dispenseLogs,
@@ -23,6 +25,7 @@ import {
 	medicationOrders,
 	orderVerifications,
 	patients,
+	preEncounters,
 	prescriptions,
 	staffProfiles,
 	users,
@@ -62,6 +65,9 @@ type OpdDispenseInput = V1Inputs["orders"]["opdDispense"]
 type OpdDispenseHistoryInput = V1Inputs["orders"]["listOpdDispenseHistory"]
 type SaveCounselingLogInput = V1Inputs["orders"]["saveCounselingLog"]
 type CounselingLogListInput = V1Inputs["orders"]["listCounselingLogs"]
+
+const PDEA_TRANCHE_DAYS = 30
+const PDEA_MAX_CONTROLLED_DAYS = 90
 
 @Injectable()
 export class OrdersService {
@@ -364,19 +370,175 @@ export class OrdersService {
 		this.assertCredentialNotExpired("PTR number", staff.ptrExpiry)
 	}
 
+	private assertActivePdeaS2Credential(staff: {
+		pdeaS2License?: string | null
+		pdeaS2Expiry?: string | Date | null
+	}) {
+		const blockMessage = this.getPdeaS2CredentialBlockMessage(staff)
+		if (blockMessage) {
+			throw new BadRequestException(blockMessage)
+		}
+	}
+
+	private getPdeaS2CredentialBlockMessage(staff?: {
+		pdeaS2License?: string | null
+		pdeaS2Expiry?: string | Date | null
+	}) {
+		if (!staff?.pdeaS2License) {
+			return "Ordering staff does not have a PDEA S-2 license. Cannot prescribe controlled substances."
+		}
+
+		if (!staff.pdeaS2Expiry) {
+			return "PDEA S-2 license expiry is not recorded. Cannot prescribe controlled substances."
+		}
+
+		if (this.isBeforeToday(staff.pdeaS2Expiry)) {
+			return `PDEA S-2 license expired on ${this.formatDateOnly(staff.pdeaS2Expiry)}. Cannot prescribe controlled substances.`
+		}
+
+		return null
+	}
+
+	private normalizePdeaSchedule(value?: string | null) {
+		const raw = value?.trim()
+		if (!raw) {
+			throw new BadRequestException("PDEA schedule is required for controlled substances.")
+		}
+
+		const compact = raw.toUpperCase().replace(/\s+/g, "")
+		const romanScheduleMap: Record<string, string> = {
+			I: "1",
+			II: "2",
+			III: "3",
+			IV: "4",
+			V: "5",
+		}
+
+		const romanMatch = compact.match(/^(?:SCHEDULE)?(I|II|III|IV|V)$/)
+		if (romanMatch) {
+			return `S-${romanScheduleMap[romanMatch[1]!]!}`
+		}
+
+		const numericMatch = compact.match(/^(?:SCHEDULE)?S?-?([1-5])$/)
+		if (numericMatch) {
+			return `S-${numericMatch[1]}`
+		}
+
+		throw new BadRequestException("PDEA schedule must be one of S-1, S-2, S-3, S-4, or S-5.")
+	}
+
 	private assertCredentialNotExpired(label: string, expiresAt?: string | Date | null) {
 		if (!expiresAt) {
 			throw new BadRequestException(`Physician ${label} expiry is not recorded`)
 		}
 
-		const expiryDate = new Date(expiresAt)
+		if (this.isBeforeToday(expiresAt)) {
+			throw new BadRequestException(`Physician ${label} is expired`)
+		}
+	}
+
+	private isBeforeToday(value: string | Date) {
+		const expiryDate = new Date(value)
 		expiryDate.setHours(0, 0, 0, 0)
 
 		const today = new Date()
 		today.setHours(0, 0, 0, 0)
 
-		if (expiryDate < today) {
-			throw new BadRequestException(`Physician ${label} is expired`)
+		return expiryDate < today
+	}
+
+	private formatDateOnly(value: string | Date) {
+		if (typeof value === "string") return value.split("T")[0] ?? value
+		return value.toISOString().split("T")[0]!
+	}
+
+	private getPdeaDispenseDate(cdsAlerts: unknown) {
+		if (!cdsAlerts || typeof cdsAlerts !== "object" || Array.isArray(cdsAlerts)) return null
+
+		const value = (cdsAlerts as { pdeaDispenseDate?: unknown }).pdeaDispenseDate
+		return typeof value === "string" && value.trim().length > 0 ? value : null
+	}
+
+	private getCdsAlertEntries(cdsAlerts: unknown) {
+		if (Array.isArray(cdsAlerts)) {
+			return cdsAlerts
+		}
+
+		if (!cdsAlerts || typeof cdsAlerts !== "object") {
+			return []
+		}
+
+		const alerts = (cdsAlerts as { alerts?: unknown }).alerts
+		return Array.isArray(alerts) ? alerts : []
+	}
+
+	private buildPdeaDispensingInstructions(input: {
+		isControlledSubstance?: boolean
+		pdeaTrancheNumber?: number | null
+		pdeaTrancheTotal?: number | null
+		pdeaDispenseDate?: string | null
+	}) {
+		if (!input.isControlledSubstance) return null
+
+		const parts = ["No Refill."]
+		if (input.pdeaTrancheNumber && input.pdeaTrancheTotal && input.pdeaTrancheTotal > 1) {
+			parts.push(`Tranche ${input.pdeaTrancheNumber} of ${input.pdeaTrancheTotal}.`)
+		}
+		if (input.pdeaDispenseDate) {
+			parts.push(`Earliest dispense date: ${input.pdeaDispenseDate}.`)
+		}
+
+		return parts.join(" ")
+	}
+
+	private async assertHighAlertCoSignCredentials(input: {
+		verifyingStaffId: string
+		facilityId: string
+		password: string
+	}) {
+		const [profile] = await db
+			.select({
+				userId: staffProfiles.userId,
+				facilityId: staffProfiles.facilityId,
+			})
+			.from(staffProfiles)
+			.where(
+				and(
+					eq(staffProfiles.id, input.verifyingStaffId),
+					eq(staffProfiles.isActive, true)
+				)
+			)
+			.limit(1)
+
+		if (!profile) {
+			throw new NotFoundException("Co-signing staff profile not found or inactive")
+		}
+
+		if (profile.facilityId !== input.facilityId) {
+			throw new BadRequestException(
+				"Co-signing clinician does not belong to the medication order facility."
+			)
+		}
+
+		const [account] = await db
+			.select({ password: accounts.password })
+			.from(accounts)
+			.where(and(eq(accounts.userId, profile.userId), eq(accounts.providerId, "credential")))
+			.limit(1)
+
+		if (!account?.password) {
+			throw new BadRequestException("Co-signer has no password credential on file")
+		}
+
+		const { getAuth } = await import("@repo/auth")
+		const ctx = await getAuth().$context
+		const valid = await ctx.password.verify({
+			hash: account.password,
+			password: input.password,
+		})
+
+		if (!valid) {
+			throw new UnauthorizedException("Invalid co-sign credentials")
 		}
 	}
 
@@ -437,6 +599,50 @@ export class OrdersService {
 		return patient.id
 	}
 
+	private async assertAncillaryOrderContextInFacility(input: {
+		facilityId: string
+		encounterId?: string | null
+		preEncounterId?: string | null
+	}) {
+		if (!input.encounterId && !input.preEncounterId) {
+			throw new BadRequestException("encounterId or preEncounterId is required for ancillary orders.")
+		}
+
+		if (input.encounterId) {
+			const [encounter] = await db
+				.select({ id: encounters.id, facilityId: encounters.facilityId })
+				.from(encounters)
+				.where(eq(encounters.id, input.encounterId))
+				.limit(1)
+
+			if (!encounter) {
+				throw new NotFoundException("Encounter not found for ancillary order")
+			}
+
+			if (encounter.facilityId !== input.facilityId) {
+				throw new BadRequestException("Encounter does not belong to the ancillary order facility.")
+			}
+		}
+
+		if (input.preEncounterId) {
+			const [preEncounter] = await db
+				.select({ id: preEncounters.id, facilityId: preEncounters.facilityId })
+				.from(preEncounters)
+				.where(eq(preEncounters.id, input.preEncounterId))
+				.limit(1)
+
+			if (!preEncounter) {
+				throw new NotFoundException("Pre-encounter not found for ancillary order")
+			}
+
+			if (preEncounter.facilityId !== input.facilityId) {
+				throw new BadRequestException(
+					"Pre-encounter does not belong to the ancillary order facility."
+				)
+			}
+		}
+	}
+
 	private async validateMedicationOrderCds(input: {
 		patientId?: string
 		encounterId?: string
@@ -477,11 +683,7 @@ export class OrdersService {
 	}
 
 	private hasHighAlertAlert(cdsAlerts: unknown) {
-		if (!Array.isArray(cdsAlerts)) {
-			return false
-		}
-
-		return cdsAlerts.some(alert => {
+		return this.getCdsAlertEntries(cdsAlerts).some(alert => {
 			if (!alert || typeof alert !== "object") {
 				return false
 			}
@@ -652,26 +854,15 @@ export class OrdersService {
 			const [staff] = await db
 				.select()
 				.from(staffProfiles)
-				.where(eq(staffProfiles.id, input.orderingStaffId))
+				.where(and(eq(staffProfiles.id, input.orderingStaffId), eq(staffProfiles.isActive, true)))
 
-			if (!staff?.pdeaS2License) {
+			const s2BlockMessage = this.getPdeaS2CredentialBlockMessage(staff)
+			if (s2BlockMessage) {
 				alerts.push({
 					type: "s2_license_block",
 					severity: "hard_block",
-					message:
-						"Ordering staff does not have a PDEA S-2 license. Cannot prescribe controlled substances.",
+					message: s2BlockMessage,
 				})
-			} else if (staff.pdeaS2Expiry) {
-				const expiryDate = new Date(staff.pdeaS2Expiry)
-				const today = new Date()
-				today.setHours(0, 0, 0, 0)
-				if (expiryDate < today) {
-					alerts.push({
-						type: "s2_license_block",
-						severity: "hard_block",
-						message: `PDEA S-2 license expired on ${staff.pdeaS2Expiry}. Cannot prescribe controlled substances.`,
-					})
-				}
 			}
 		}
 
@@ -684,11 +875,7 @@ export class OrdersService {
 	}
 
 	private mapSafetyChecks(cdsAlerts: unknown) {
-		if (!Array.isArray(cdsAlerts)) {
-			return []
-		}
-
-		return cdsAlerts.flatMap((alert, index) => {
+		return this.getCdsAlertEntries(cdsAlerts).flatMap((alert, index) => {
 			if (!alert || typeof alert !== "object") {
 				return []
 			}
@@ -917,12 +1104,35 @@ export class OrdersService {
 
 	async createMedOrder(input: CreateMedOrderInput, userId: string) {
 		const staff = await this.getOrderingStaffProfile(userId, input.facilityId)
+		const isControlledOrder = input.isControlledSubstance ?? false
+		const normalizedPdeaSchedule = isControlledOrder
+			? this.normalizePdeaSchedule(input.pdeaSchedule)
+			: null
 
 		const repeatingFrequencies = ["q4h", "q6h", "q8h", "q12h", "daily", "bid", "tid", "qid"]
 		if (repeatingFrequencies.includes(input.frequency) && !input.durationDays) {
 			throw new BadRequestException(
 				`durationDays is required for repeating frequency "${input.frequency}"`
 			)
+		}
+
+		if (isControlledOrder) {
+			this.assertActivePdeaS2Credential(staff)
+			if (!input.durationDays) {
+				throw new BadRequestException(
+					"durationDays is required for controlled substance orders."
+				)
+			}
+			if (input.durationDays > PDEA_MAX_CONTROLLED_DAYS) {
+				throw new BadRequestException(
+					`PDEA controlled substance orders cannot exceed ${PDEA_MAX_CONTROLLED_DAYS} days.`
+				)
+			}
+			if (input.durationDays > PDEA_TRANCHE_DAYS) {
+				throw new BadRequestException(
+					`Controlled substance orders over ${PDEA_TRANCHE_DAYS} days must be submitted through PDEA tranching.`
+				)
+			}
 		}
 
 		const isPrn = input.frequency === "prn" ? true : (input.isPrn ?? false)
@@ -963,7 +1173,7 @@ export class OrdersService {
 			facilityId: input.facilityId,
 			formularyItemId: input.formularyItemId,
 			genericName: canonicalGenericName,
-			isControlledSubstance: input.isControlledSubstance,
+			isControlledSubstance: isControlledOrder,
 			orderingStaffId: staff.id,
 			cdsOverrides: input.cdsOverrides,
 		})
@@ -988,10 +1198,11 @@ export class OrdersService {
 				specialInstructions: input.specialInstructions ?? null,
 				isPrn,
 				prnReason: input.prnReason ?? null,
-				isControlledSubstance: input.isControlledSubstance ?? false,
-				pdeaSchedule: input.pdeaSchedule ?? null,
+				isControlledSubstance: isControlledOrder,
+				pdeaSchedule: normalizedPdeaSchedule,
 				pdeaTrancheNumber: input.pdeaTrancheNumber ?? null,
 				pdeaTrancheTotal: input.pdeaTrancheTotal ?? null,
+				noRefillInscribed: isControlledOrder,
 				status: "pending_verification",
 				orderingStaffId: staff.id,
 				cdsAlerts: evaluatedCdsAlerts,
@@ -1124,6 +1335,9 @@ export class OrdersService {
 					panelCode: labOrders.panelCode,
 					testName: labOrders.testName,
 					panelName: labOrders.panelName,
+					clinicalIndication: labOrders.clinicalIndication,
+					indicationIcd10Code: labOrders.indicationIcd10Code,
+					indicationIcd10Display: labOrders.indicationIcd10Display,
 					priority: labOrders.priority,
 					status: labOrders.status,
 					specimenType: labOrders.specimenType,
@@ -1180,6 +1394,9 @@ export class OrdersService {
 				panelCode: labOrders.panelCode,
 				testName: labOrders.testName,
 				panelName: labOrders.panelName,
+				clinicalIndication: labOrders.clinicalIndication,
+				indicationIcd10Code: labOrders.indicationIcd10Code,
+				indicationIcd10Display: labOrders.indicationIcd10Display,
 				priority: labOrders.priority,
 				status: labOrders.status,
 				specimenType: labOrders.specimenType,
@@ -1217,8 +1434,8 @@ export class OrdersService {
 	}
 
 	async createLabOrder(input: CreateLabOrderInput, userId: string) {
-		const [staff] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId))
-		if (!staff) throw new NotFoundException("Staff profile not found for user")
+		const staff = await this.getOrderingStaffProfile(userId, input.facilityId)
+		await this.assertAncillaryOrderContextInFacility(input)
 
 		const [created] = await db
 			.insert(labOrders)
@@ -1230,6 +1447,9 @@ export class OrdersService {
 				panelCode: input.panelCode ?? null,
 				testName: input.testName,
 				panelName: input.panelName ?? null,
+				clinicalIndication: input.clinicalIndication ?? null,
+				indicationIcd10Code: input.indicationIcd10Code ?? null,
+				indicationIcd10Display: input.indicationIcd10Display ?? null,
 				priority: input.priority ?? "routine",
 				status: "ordered",
 				specimenType: input.specimenType ?? null,
@@ -1238,6 +1458,22 @@ export class OrdersService {
 			.returning()
 
 		this.logger.log(`Created lab order ${created!.id}`)
+
+		await this.writeAuditLog({
+			facilityId: input.facilityId,
+			userId,
+			staffProfileId: staff.id,
+			action: "sign",
+			entityType: "lab_order",
+			entityId: created!.id,
+			metadata: {
+				encounterId: input.encounterId ?? null,
+				preEncounterId: input.preEncounterId ?? null,
+				testName: input.testName,
+				priority: input.priority ?? "routine",
+				indicationIcd10Code: input.indicationIcd10Code ?? null,
+			},
+		})
 
 		// SLA-003/SLA-004: Track ancillary work from the moment the order is placed.
 		// Only encounter-linked orders carry an SLA clock.
@@ -1318,6 +1554,8 @@ export class OrdersService {
 					modality: imagingOrders.modality,
 					bodyPart: imagingOrders.bodyPart,
 					clinicalIndication: imagingOrders.clinicalIndication,
+					indicationIcd10Code: imagingOrders.indicationIcd10Code,
+					indicationIcd10Display: imagingOrders.indicationIcd10Display,
 					priority: imagingOrders.priority,
 					status: imagingOrders.status,
 					orderingStaffId: imagingOrders.orderingStaffId,
@@ -1376,6 +1614,8 @@ export class OrdersService {
 				modality: imagingOrders.modality,
 				bodyPart: imagingOrders.bodyPart,
 				clinicalIndication: imagingOrders.clinicalIndication,
+				indicationIcd10Code: imagingOrders.indicationIcd10Code,
+				indicationIcd10Display: imagingOrders.indicationIcd10Display,
 				priority: imagingOrders.priority,
 				status: imagingOrders.status,
 				orderingStaffId: imagingOrders.orderingStaffId,
@@ -1415,8 +1655,8 @@ export class OrdersService {
 	}
 
 	async createImagingOrder(input: CreateImagingOrderInput, userId: string) {
-		const [staff] = await db.select().from(staffProfiles).where(eq(staffProfiles.userId, userId))
-		if (!staff) throw new NotFoundException("Staff profile not found for user")
+		const staff = await this.getOrderingStaffProfile(userId, input.facilityId)
+		await this.assertAncillaryOrderContextInFacility(input)
 
 		const [created] = await db
 			.insert(imagingOrders)
@@ -1427,6 +1667,8 @@ export class OrdersService {
 				modality: input.modality,
 				bodyPart: input.bodyPart,
 				clinicalIndication: input.clinicalIndication ?? null,
+				indicationIcd10Code: input.indicationIcd10Code ?? null,
+				indicationIcd10Display: input.indicationIcd10Display ?? null,
 				priority: input.priority ?? "routine",
 				status: "ordered",
 				orderingStaffId: staff.id,
@@ -1434,6 +1676,23 @@ export class OrdersService {
 			.returning()
 
 		this.logger.log(`Created imaging order ${created!.id}`)
+
+		await this.writeAuditLog({
+			facilityId: input.facilityId,
+			userId,
+			staffProfileId: staff.id,
+			action: "sign",
+			entityType: "imaging_order",
+			entityId: created!.id,
+			metadata: {
+				encounterId: input.encounterId ?? null,
+				preEncounterId: input.preEncounterId ?? null,
+				modality: input.modality,
+				bodyPart: input.bodyPart,
+				priority: input.priority ?? "routine",
+				indicationIcd10Code: input.indicationIcd10Code ?? null,
+			},
+		})
 
 		// SLA-003/SLA-004: Track ancillary work from the moment the imaging order is placed.
 		if (input.encounterId) {
@@ -1744,6 +2003,12 @@ export class OrdersService {
 			throw new BadRequestException("A clinician cannot co-sign their own high-alert order")
 		}
 
+		await this.assertHighAlertCoSignCredentials({
+			verifyingStaffId: input.verifyingStaffId,
+			facilityId: order.facilityId,
+			password: input.coSignerPassword,
+		})
+
 		const [verification] = await db
 			.insert(highAlertVerifications)
 			.values({
@@ -1918,6 +2183,18 @@ export class OrdersService {
 				"Only verified or active medication orders can generate a prescription"
 			)
 		}
+		if (medOrder.isControlledSubstance) {
+			this.assertActivePdeaS2Credential(staff)
+			const isParentCourseOrder =
+				medOrder.parentOrderId === null &&
+				medOrder.pdeaTrancheNumber === null &&
+				(medOrder.pdeaTrancheTotal ?? 0) > 1
+			if (isParentCourseOrder) {
+				throw new BadRequestException(
+					"Generate prescriptions from the individual PDEA tranche orders, not the parent course order."
+				)
+			}
+		}
 
 		const [existingPrescription] = await db
 			.select({ id: prescriptions.id, status: prescriptions.status })
@@ -1929,6 +2206,15 @@ export class OrdersService {
 			throw new BadRequestException("A prescription already exists for this medication order.")
 		}
 
+		const pdeaDispenseDate = medOrder.isControlledSubstance
+			? this.getPdeaDispenseDate(medOrder.cdsAlerts)
+			: null
+		const pdeaDispensingInstructions = this.buildPdeaDispensingInstructions({
+			isControlledSubstance: medOrder.isControlledSubstance,
+			pdeaTrancheNumber: medOrder.pdeaTrancheNumber,
+			pdeaTrancheTotal: medOrder.pdeaTrancheTotal,
+			pdeaDispenseDate,
+		})
 		const prescriptionContent = {
 			genericName: medOrder.genericName,
 			brandName: medOrder.brandName,
@@ -1946,6 +2232,8 @@ export class OrdersService {
 			pdeaTrancheNumber: medOrder.pdeaTrancheNumber,
 			pdeaTrancheTotal: medOrder.pdeaTrancheTotal,
 			noRefillInscribed: medOrder.noRefillInscribed,
+			pdeaDispenseDate,
+			pdeaDispensingInstructions,
 		}
 		const prcLicenseNumber = staff.prcLicenseNumber as string
 		const ptrNumber = staff.ptrNumber as string
@@ -1984,6 +2272,13 @@ export class OrdersService {
 			throw new ForbiddenException("Only the prescribing clinician can sign this prescription.")
 		}
 		this.assertActivePrescriberCredentials(staff)
+		const prescriptionContent =
+			prescription.prescriptionContent && typeof prescription.prescriptionContent === "object"
+				? (prescription.prescriptionContent as { isControlledSubstance?: unknown })
+				: null
+		if (prescriptionContent?.isControlledSubstance === true) {
+			this.assertActivePdeaS2Credential(staff)
+		}
 
 		await db
 			.update(prescriptions)
@@ -2054,6 +2349,9 @@ export class OrdersService {
 					panelCode: labOrders.panelCode,
 					testName: labOrders.testName,
 					panelName: labOrders.panelName,
+					clinicalIndication: labOrders.clinicalIndication,
+					indicationIcd10Code: labOrders.indicationIcd10Code,
+					indicationIcd10Display: labOrders.indicationIcd10Display,
 					priority: labOrders.priority,
 					status: labOrders.status,
 					specimenType: labOrders.specimenType,
@@ -2085,6 +2383,8 @@ export class OrdersService {
 					modality: imagingOrders.modality,
 					bodyPart: imagingOrders.bodyPart,
 					clinicalIndication: imagingOrders.clinicalIndication,
+					indicationIcd10Code: imagingOrders.indicationIcd10Code,
+					indicationIcd10Display: imagingOrders.indicationIcd10Display,
 					priority: imagingOrders.priority,
 					status: imagingOrders.status,
 					orderingStaffId: imagingOrders.orderingStaffId,
@@ -2133,7 +2433,11 @@ export class OrdersService {
 			})
 			.from(staffProfiles)
 			.where(
-				and(eq(staffProfiles.id, input.staffId), eq(staffProfiles.facilityId, input.facilityId))
+				and(
+					eq(staffProfiles.id, input.staffId),
+					eq(staffProfiles.facilityId, input.facilityId),
+					eq(staffProfiles.isActive, true)
+				)
 			)
 			.limit(1)
 
@@ -2168,6 +2472,7 @@ export class OrdersService {
 			isExpired = expiryDate < today
 			daysUntilExpiry = Math.floor((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 		}
+		const errorMessage = this.getPdeaS2CredentialBlockMessage(staff)
 
 		return {
 			staffId: staff.id,
@@ -2177,8 +2482,8 @@ export class OrdersService {
 			expiryDate: staff.pdeaS2Expiry ?? null,
 			isExpired,
 			daysUntilExpiry,
-			canPrescribeControlled: hasLicense && !isExpired,
-			errorMessage: isExpired ? `PDEA S-2 license expired on ${staff.pdeaS2Expiry}` : null,
+			canPrescribeControlled: !errorMessage,
+			errorMessage,
 		}
 	}
 
@@ -2188,8 +2493,13 @@ export class OrdersService {
 
 	async previewTranches(input: TranchePreviewInput) {
 		// PDEA regulations: S-2 controlled substances are limited to 30 days per prescription
-		const MAX_DAYS_PER_TRANCHE = 30
-		const requiresTranching = input.durationDays > MAX_DAYS_PER_TRANCHE
+		const normalizedPdeaSchedule = this.normalizePdeaSchedule(input.pdeaSchedule)
+		if (input.durationDays > PDEA_MAX_CONTROLLED_DAYS) {
+			throw new BadRequestException(
+				`PDEA controlled substance orders cannot exceed ${PDEA_MAX_CONTROLLED_DAYS} days.`
+			)
+		}
+		const requiresTranching = input.durationDays > PDEA_TRANCHE_DAYS
 
 		if (!requiresTranching) {
 			const startDate = input.startDate ? new Date(input.startDate) : new Date()
@@ -2200,7 +2510,7 @@ export class OrdersService {
 				requiresTranching: false,
 				reason: null,
 				totalDays: input.durationDays,
-				maxDaysPerTranche: MAX_DAYS_PER_TRANCHE,
+				maxDaysPerTranche: PDEA_TRANCHE_DAYS,
 				tranches: [
 					{
 						trancheNumber: 1,
@@ -2214,14 +2524,14 @@ export class OrdersService {
 			}
 		}
 
-		const totalTranches = Math.ceil(input.durationDays / MAX_DAYS_PER_TRANCHE)
+		const totalTranches = Math.ceil(input.durationDays / PDEA_TRANCHE_DAYS)
 		const startDate = input.startDate ? new Date(input.startDate) : new Date()
 		const tranches = []
 		let remainingDays = input.durationDays
 		let currentStart = new Date(startDate)
 
 		for (let i = 1; i <= totalTranches; i++) {
-			const trancheDays = Math.min(remainingDays, MAX_DAYS_PER_TRANCHE)
+			const trancheDays = Math.min(remainingDays, PDEA_TRANCHE_DAYS)
 			const trancheEnd = new Date(currentStart)
 			trancheEnd.setDate(trancheEnd.getDate() + trancheDays - 1)
 
@@ -2241,9 +2551,9 @@ export class OrdersService {
 
 		return {
 			requiresTranching: true,
-			reason: `PDEA ${input.pdeaSchedule} controlled substances may only be prescribed in ${MAX_DAYS_PER_TRANCHE}-day supply increments. This ${input.durationDays}-day order requires ${totalTranches} separate prescriptions.`,
+			reason: `PDEA ${normalizedPdeaSchedule} controlled substances may only be prescribed in ${PDEA_TRANCHE_DAYS}-day supply increments. This ${input.durationDays}-day order requires ${totalTranches} separate prescriptions.`,
 			totalDays: input.durationDays,
-			maxDaysPerTranche: MAX_DAYS_PER_TRANCHE,
+			maxDaysPerTranche: PDEA_TRANCHE_DAYS,
 			tranches,
 		}
 	}
@@ -2254,6 +2564,19 @@ export class OrdersService {
 
 	async createTranchedOrders(input: CreateTranchedOrdersInput, userId: string) {
 		const staff = await this.getOrderingStaffProfile(userId, input.facilityId)
+		const normalizedPdeaSchedule = this.normalizePdeaSchedule(input.pdeaSchedule)
+		this.assertActivePdeaS2Credential(staff)
+
+		if (input.durationDays <= PDEA_TRANCHE_DAYS) {
+			throw new BadRequestException(
+				`PDEA tranching is required only for controlled substance orders over ${PDEA_TRANCHE_DAYS} days.`
+			)
+		}
+		if (input.durationDays > PDEA_MAX_CONTROLLED_DAYS) {
+			throw new BadRequestException(
+				`PDEA controlled substance orders cannot exceed ${PDEA_MAX_CONTROLLED_DAYS} days.`
+			)
+		}
 
 		if (!Array.isArray(input.cdsAlerts)) {
 			throw new BadRequestException(
@@ -2284,7 +2607,7 @@ export class OrdersService {
 			dose: input.dose,
 			frequency: input.frequency,
 			durationDays: input.durationDays,
-			pdeaSchedule: input.pdeaSchedule,
+			pdeaSchedule: normalizedPdeaSchedule,
 			startDate: input.startDate,
 		})
 
@@ -2317,7 +2640,7 @@ export class OrdersService {
 				isPrn: input.isPrn ?? false,
 				prnReason: input.prnReason ?? null,
 				isControlledSubstance: true,
-				pdeaSchedule: input.pdeaSchedule,
+				pdeaSchedule: normalizedPdeaSchedule,
 				pdeaTrancheNumber: null,
 				pdeaTrancheTotal: totalTranches,
 				noRefillInscribed: true,
@@ -2370,7 +2693,7 @@ export class OrdersService {
 					isPrn: input.isPrn ?? false,
 					prnReason: input.prnReason ?? null,
 					isControlledSubstance: true,
-					pdeaSchedule: input.pdeaSchedule,
+					pdeaSchedule: normalizedPdeaSchedule,
 					pdeaTrancheNumber: tranche.trancheNumber,
 					pdeaTrancheTotal: totalTranches,
 					noRefillInscribed: true,

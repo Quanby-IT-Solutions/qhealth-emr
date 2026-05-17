@@ -337,7 +337,7 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 						<OrderDetail
 							label="Tranche"
 							value={
-								order.pdeaTrancheNumber != null && order.pdeaTrancheTotal != null
+								order.pdeaTrancheNumber !== null && order.pdeaTrancheTotal !== null
 									? `${order.pdeaTrancheNumber} of ${order.pdeaTrancheTotal}`
 									: null
 							}

@@ -180,6 +180,69 @@ describe("EPrescriptionPage", () => {
 		expect(screen.getByRole("button", { name: /generate rx/i })).toBeDisabled()
 	})
 
+	it("offers the first PDEA tranche for prescribing, not the parent course order", () => {
+		mockUseMedOrderListQuery.mockReturnValue({
+			data: {
+				data: [
+					{
+						id: "parent-order",
+						status: "verified",
+						parentOrderId: null,
+						genericName: "Morphine parent course",
+						brandName: null,
+						dose: "10",
+						doseUnit: "mg",
+						doseForm: "tablet",
+						route: "oral",
+						frequency: "bid",
+						durationDays: 90,
+						pdeaTrancheNumber: null,
+						pdeaTrancheTotal: 3,
+					},
+					{
+						id: "child-order-1",
+						status: "verified",
+						parentOrderId: "parent-order",
+						genericName: "Morphine tranche one",
+						brandName: null,
+						dose: "10",
+						doseUnit: "mg",
+						doseForm: "tablet",
+						route: "oral",
+						frequency: "bid",
+						durationDays: 30,
+						pdeaTrancheNumber: 1,
+						pdeaTrancheTotal: 3,
+					},
+					{
+						id: "child-order-2",
+						status: "verified",
+						parentOrderId: "parent-order",
+						genericName: "Morphine future tranche",
+						brandName: null,
+						dose: "10",
+						doseUnit: "mg",
+						doseForm: "tablet",
+						route: "oral",
+						frequency: "bid",
+						durationDays: 30,
+						pdeaTrancheNumber: 2,
+						pdeaTrancheTotal: 3,
+					},
+				],
+			},
+			isLoading: false,
+		})
+
+		render(
+			<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />
+		)
+
+		expect(screen.queryByText(/Morphine parent course/i)).toBeNull()
+		expect(screen.getByText(/Morphine tranche one/i)).toBeInTheDocument()
+		expect(screen.queryByText(/Morphine future tranche/i)).toBeNull()
+	})
+
 	it("blocks direct access for roles that cannot sign prescriptions", () => {
 		mockUseMyProfile.mockReturnValue({
 			data: {

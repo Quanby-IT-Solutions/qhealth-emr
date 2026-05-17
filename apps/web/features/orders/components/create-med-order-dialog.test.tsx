@@ -144,7 +144,22 @@ vi.mock("./s2-validation-modal", () => ({
 }))
 
 vi.mock("./tranching-preview-modal", () => ({
-	TranchingPreviewModal: () => null,
+	TranchingPreviewModal: ({
+		open,
+		onConfirm,
+	}: {
+		open: boolean
+		onConfirm: (tranches: Array<{ startDate: Date }>) => void
+	}) =>
+		open ? (
+			<button
+				type="button"
+				data-testid="confirm-tranches"
+				onClick={() => onConfirm([{ startDate: new Date("2026-05-17T00:00:00.000Z") }])}
+			>
+				Confirm Tranches
+			</button>
+		) : null,
 }))
 
 vi.mock("./high-alert-verification-dialog", () => ({
@@ -432,6 +447,128 @@ describe("CreateMedOrderDialog", () => {
 
 		expect(screen.queryByTestId("s2-validation-modal")).toBeNull()
 		expect(screen.getByLabelText(/pdea schedule/i)).toBeInTheDocument()
+	})
+
+	it("blocks controlled substance orders beyond the 90-day PDEA cap", async () => {
+		const user = userEvent.setup()
+		mockUseMyProfile.mockReturnValue({
+			data: {
+				activeRole: { permissions: [{ module: "orders", action: "create" }] },
+				staffProfiles: [
+					{
+						id: "staff-1",
+						facilityId: "facility-1",
+						prcLicenseNumber: "PRC-1",
+						ptrNumber: "PTR-1",
+						prcExpiry: "2027-01-01",
+						ptrExpiry: "2027-01-01",
+						pdeaS2License: "S2-1",
+						pdeaS2Expiry: "2027-01-01",
+					},
+				],
+				user: { name: "Dr. Test" },
+			},
+		})
+		mockUseCheckPdeaLicenseQuery.mockReturnValue({
+			data: {
+				canPrescribeControlled: true,
+				licenseNumber: "S2-1",
+				expiryDate: "2027-01-01",
+				daysUntilExpiry: 200,
+				errorMessage: null,
+			},
+			isLoading: false,
+			isSuccess: true,
+			isError: false,
+		})
+
+		render(<CreateMedOrderDialog {...defaultProps} />)
+
+		await user.type(screen.getByTestId("generic-name-input"), "Morphine")
+		await user.click(screen.getByRole("checkbox", { name: /controlled substance/i }))
+		await user.click(screen.getByTestId("s2-proceed"))
+		await user.click(screen.getByRole("button", { name: /run drug safety check/i }))
+		await user.type(screen.getByLabelText(/^Dose\s+\*$/i), "10")
+		await user.type(screen.getByLabelText(/^Dose Unit\s+\*$/i), "mg")
+		await user.type(screen.getByLabelText(/^Dose Form\s+\*$/i), "tablet")
+		await user.type(screen.getByLabelText(/^Route\s+\*$/i), "oral")
+		await user.selectOptions(screen.getByLabelText(/^Frequency\s+\*$/i), "bid")
+		await user.type(screen.getByLabelText(/duration/i), "91")
+		await user.selectOptions(screen.getByLabelText(/pdea schedule/i), "S-2")
+
+		expect(screen.getByText(/cannot exceed 90 days/i)).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: /create order/i })).toBeDisabled()
+	})
+
+	it("submits controlled orders over 30 days through the tranching endpoint", async () => {
+		const user = userEvent.setup()
+		const createMedOrderMutate = vi.fn()
+		const createTranchedOrdersMutate = vi.fn()
+		mockUseCreateMedOrderMutation.mockReturnValue({
+			mutate: createMedOrderMutate,
+			isPending: false,
+		})
+		mockUseCreateTranchedOrdersMutation.mockReturnValue({
+			mutate: createTranchedOrdersMutate,
+			isPending: false,
+		})
+		mockUseMyProfile.mockReturnValue({
+			data: {
+				activeRole: { permissions: [{ module: "orders", action: "create" }] },
+				staffProfiles: [
+					{
+						id: "staff-1",
+						facilityId: "facility-1",
+						prcLicenseNumber: "PRC-1",
+						ptrNumber: "PTR-1",
+						prcExpiry: "2027-01-01",
+						ptrExpiry: "2027-01-01",
+						pdeaS2License: "S2-1",
+						pdeaS2Expiry: "2027-01-01",
+					},
+				],
+				user: { name: "Dr. Test" },
+			},
+		})
+		mockUseCheckPdeaLicenseQuery.mockReturnValue({
+			data: {
+				canPrescribeControlled: true,
+				licenseNumber: "S2-1",
+				expiryDate: "2027-01-01",
+				daysUntilExpiry: 200,
+				errorMessage: null,
+			},
+			isLoading: false,
+			isSuccess: true,
+			isError: false,
+		})
+
+		render(<CreateMedOrderDialog {...defaultProps} />)
+
+		await user.type(screen.getByTestId("generic-name-input"), "Morphine")
+		await user.click(screen.getByRole("checkbox", { name: /controlled substance/i }))
+		await user.click(screen.getByTestId("s2-proceed"))
+		await user.click(screen.getByRole("button", { name: /run drug safety check/i }))
+		await user.type(screen.getByLabelText(/^Dose\s+\*$/i), "10")
+		await user.type(screen.getByLabelText(/^Dose Unit\s+\*$/i), "mg")
+		await user.type(screen.getByLabelText(/^Dose Form\s+\*$/i), "tablet")
+		await user.type(screen.getByLabelText(/^Route\s+\*$/i), "oral")
+		await user.selectOptions(screen.getByLabelText(/^Frequency\s+\*$/i), "bid")
+		await user.type(screen.getByLabelText(/duration/i), "45")
+		await user.selectOptions(screen.getByLabelText(/pdea schedule/i), "S-2")
+
+		await user.click(screen.getByRole("button", { name: /preview tranches/i }))
+		await user.click(screen.getByTestId("confirm-tranches"))
+
+		expect(createMedOrderMutate).not.toHaveBeenCalled()
+		expect(createTranchedOrdersMutate).toHaveBeenCalledWith(
+			expect.objectContaining({
+				durationDays: 45,
+				pdeaSchedule: "S-2",
+				startDate: "2026-05-17",
+			}),
+			expect.any(Object)
+		)
 	})
 
 	it("labels the brand name field as optional and renders it after the generic name", async () => {

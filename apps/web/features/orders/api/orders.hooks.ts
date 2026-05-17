@@ -6,12 +6,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { type v1Contract } from "@repo/contracts"
 
 import { orpc } from "@/services/orpc/client"
-import { env } from "@/env"
 
 type V1Inputs = InferContractRouterInputs<typeof v1Contract>
 type V1Outputs = InferContractRouterOutputs<typeof v1Contract>
 
-type RawCdsEvaluateResponse = V1Outputs["orders"]["evaluateCds"]
 type RawMedOrder = V1Outputs["orders"]["getMedOrder"]
 type RawLabOrder = V1Outputs["orders"]["getLabOrder"]
 type RawImagingOrder = V1Outputs["orders"]["getImagingOrder"]
@@ -113,6 +111,9 @@ export interface LabOrder {
 	panelCode: string | null
 	testName: string
 	panelName: string | null
+	clinicalIndication: string | null
+	indicationIcd10Code: string | null
+	indicationIcd10Display: string | null
 	priority: string
 	status: string
 	specimenType: string | null
@@ -134,6 +135,8 @@ export interface ImagingOrder {
 	modality: string
 	bodyPart: string
 	clinicalIndication: string | null
+	indicationIcd10Code: string | null
+	indicationIcd10Display: string | null
 	priority: string
 	status: string
 	orderingStaffId: string
@@ -372,8 +375,6 @@ export function useMedOrderDetailQuery(id: string) {
 	)
 }
 
-type CreateMedOrderData = V1Inputs["orders"]["createMedOrder"]
-
 export function useCreateMedOrderMutation() {
 	const queryClient = useQueryClient()
 
@@ -401,8 +402,6 @@ export function useCreateTranchedOrdersMutation() {
 		},
 	})
 }
-
-type UpdateMedOrderData = V1Inputs["orders"]["updateMedOrder"]
 
 export function useUpdateMedOrderMutation() {
 	const queryClient = useQueryClient()
@@ -465,8 +464,6 @@ export function useLabOrderDetailQuery(id: string) {
 	)
 }
 
-type CreateLabOrderData = V1Inputs["orders"]["createLabOrder"]
-
 export function useCreateLabOrderMutation() {
 	const queryClient = useQueryClient()
 
@@ -512,8 +509,6 @@ export function useImagingOrderDetailQuery(id: string) {
 		})
 	)
 }
-
-type CreateImagingOrderData = V1Inputs["orders"]["createImagingOrder"]
 
 export function useCreateImagingOrderMutation() {
 	const queryClient = useQueryClient()
@@ -626,8 +621,6 @@ export function usePrescriptionDetailQuery(id: string) {
 		})
 	)
 }
-
-type CreatePrescriptionData = V1Inputs["orders"]["createPrescription"]
 
 export function useCreatePrescriptionMutation() {
 	const queryClient = useQueryClient()

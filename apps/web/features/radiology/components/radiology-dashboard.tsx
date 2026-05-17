@@ -95,6 +95,16 @@ function getPacsUrl(structuredResults: unknown): string | null {
 	return typeof results.pacsUrl === "string" ? results.pacsUrl : null
 }
 
+function indicationSummary(order: ImagingDashboardOrder) {
+	const diagnosis = [order.indicationIcd10Code, order.indicationIcd10Display]
+		.filter(Boolean)
+		.join(" - ")
+	return {
+		clinical: order.clinicalIndication,
+		diagnosis: diagnosis || null,
+	}
+}
+
 type DashboardTab = "pending" | "in_progress" | "completed"
 
 const IN_PROGRESS_STATUSES = new Set(["in_progress"])
@@ -121,6 +131,7 @@ function ImagingOrderRow({
 }) {
 	const pacsUrl = getPacsUrl(order.structuredResults)
 	const tab = classifyOrder(order)
+	const indication = indicationSummary(order)
 
 	return (
 		<>
@@ -138,6 +149,14 @@ function ImagingOrderRow({
 				</TableCell>
 				<TableCell className="font-medium uppercase">{order.modality}</TableCell>
 				<TableCell>{order.bodyPart}</TableCell>
+				<TableCell>
+					<div className="max-w-[220px]">
+						<p className="truncate text-sm">{indication.clinical ?? "—"}</p>
+						{indication.diagnosis && (
+							<p className="truncate text-xs text-muted-foreground">{indication.diagnosis}</p>
+						)}
+					</div>
+				</TableCell>
 				<TableCell>{priorityBadge(order.priority)}</TableCell>
 				<TableCell>{statusBadge(order.status)}</TableCell>
 				<TableCell>{order.orderingStaffName ?? "—"}</TableCell>
@@ -178,13 +197,15 @@ function ImagingOrderRow({
 			</TableRow>
 			{isExpanded && (
 				<TableRow>
-					<TableCell colSpan={tab === "completed" ? 10 : 9} className="bg-muted/40 p-0">
+					<TableCell colSpan={tab === "completed" ? 11 : 10} className="bg-muted/40 p-0">
 						<RadiologyReport
 							report={order.report}
 							structuredResults={order.structuredResults}
 							modality={order.modality}
 							bodyPart={order.bodyPart}
 							clinicalIndication={order.clinicalIndication}
+							indicationIcd10Code={order.indicationIcd10Code}
+							indicationIcd10Display={order.indicationIcd10Display}
 							completedDatetime={order.completedDatetime}
 						/>
 					</TableCell>
@@ -234,6 +255,7 @@ function ImagingOrdersTable({
 					<TableHead>Encounter</TableHead>
 					<TableHead>Modality</TableHead>
 					<TableHead>Body Part</TableHead>
+					<TableHead>Indication</TableHead>
 					<TableHead>Priority</TableHead>
 					<TableHead>Status</TableHead>
 					<TableHead>Ordering Physician</TableHead>

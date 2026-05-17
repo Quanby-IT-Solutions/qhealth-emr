@@ -45,6 +45,9 @@ export function LabResultDetail({ order, open, onOpenChange }: LabResultDetailPr
 	if (!order) return null
 
 	const results = order.results
+	const diagnosis = [order.indicationIcd10Code, order.indicationIcd10Display]
+		.filter(Boolean)
+		.join(" - ")
 	const criticalItems: CriticalValueItem[] =
 		results?.items
 			.filter((item) => item.isCritical)
@@ -94,6 +97,14 @@ export function LabResultDetail({ order, open, onOpenChange }: LabResultDetailPr
 						<p className="font-medium">
 							{formatDateTime(order.collectionDatetime)}
 						</p>
+					</div>
+					<div>
+						<span className="text-muted-foreground">Clinical Indication</span>
+						<p className="font-medium">{order.clinicalIndication ?? "—"}</p>
+					</div>
+					<div>
+						<span className="text-muted-foreground">ICD-10 Diagnosis</span>
+						<p className="font-medium">{diagnosis || "—"}</p>
 					</div>
 					{results?.reportedBy && (
 						<>

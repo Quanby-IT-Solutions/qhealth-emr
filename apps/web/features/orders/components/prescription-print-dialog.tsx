@@ -34,6 +34,10 @@ interface PrescriptionContent {
 	isControlledSubstance?: boolean
 	pdeaSchedule?: string | null
 	noRefillInscribed?: boolean
+	pdeaTrancheNumber?: number | null
+	pdeaTrancheTotal?: number | null
+	pdeaDispenseDate?: string | null
+	pdeaDispensingInstructions?: string | null
 }
 
 function formatDate(value: Date | string | null | undefined): string {
@@ -84,6 +88,10 @@ interface RxPrintItem {
 	pdeaS2License: string | null
 	noRefill: boolean
 	pdeaSchedule: string | null
+	pdeaDispenseDate: string | null
+	pdeaDispensingInstructions: string | null
+	pdeaTrancheNumber: number | null
+	pdeaTrancheTotal: number | null
 	signedAt: string
 	genericName: string
 	brandName: string | null
@@ -126,6 +134,9 @@ function openPrintWindow(data: PrintData): void {
         <tr><td class="label">Frequency</td><td>${escapeHtml(rx.frequency)}${rx.isPrn ? ` (PRN: ${escapeHtml(rx.prnReason ?? "as needed")})` : ""}</td></tr>
         ${rx.durationDays ? `<tr><td class="label">Duration</td><td>${rx.durationDays} day(s)</td></tr>` : ""}
         ${rx.pdeaSchedule ? `<tr><td class="label">PDEA Schedule</td><td>${escapeHtml(rx.pdeaSchedule)}</td></tr>` : ""}
+        ${rx.pdeaTrancheNumber && rx.pdeaTrancheTotal ? `<tr><td class="label">PDEA Tranche</td><td>${rx.pdeaTrancheNumber} of ${rx.pdeaTrancheTotal}</td></tr>` : ""}
+        ${rx.pdeaDispenseDate ? `<tr><td class="label">Earliest Dispense</td><td>${escapeHtml(rx.pdeaDispenseDate)}</td></tr>` : ""}
+        ${rx.pdeaDispensingInstructions ? `<tr><td class="label">PDEA Instructions</td><td>${escapeHtml(rx.pdeaDispensingInstructions)}</td></tr>` : ""}
         ${rx.specialInstructions ? `<tr><td class="label">Instructions</td><td>${escapeHtml(rx.specialInstructions)}</td></tr>` : ""}
       </table>
       ${rx.noRefill ? `<div class="no-refill-stamp">NO REFILL</div>` : ""}
@@ -265,6 +276,10 @@ export function PrescriptionPrintDialog({
 						pdeaS2License: isControlled ? (rx.pdeaS2License ?? null) : null,
 						noRefill,
 						pdeaSchedule: content.pdeaSchedule ?? null,
+						pdeaDispenseDate: content.pdeaDispenseDate ?? null,
+						pdeaDispensingInstructions: content.pdeaDispensingInstructions ?? null,
+						pdeaTrancheNumber: content.pdeaTrancheNumber ?? null,
+						pdeaTrancheTotal: content.pdeaTrancheTotal ?? null,
 						signedAt: formatDateTime(rx.signedAt),
 						genericName: content.genericName ?? "--",
 						brandName: content.brandName ?? null,
@@ -294,6 +309,11 @@ export function PrescriptionPrintDialog({
 						dose: `${rx.dose} ${rx.doseUnit}`.trim(),
 						prescriberPrc: rx.prcNumber,
 						prescriberPtr: rx.ptrNumber,
+						pdeaSchedule: rx.pdeaSchedule,
+						pdeaDispenseDate: rx.pdeaDispenseDate,
+						pdeaTrancheNumber: rx.pdeaTrancheNumber,
+						pdeaTrancheTotal: rx.pdeaTrancheTotal,
+						noRefill: rx.noRefill,
 						signedAt: rx.signedAt,
 					})),
 				})
@@ -429,7 +449,9 @@ export function PrescriptionPrintDialog({
 								<div className="space-y-2">
 									{signedPrescriptions.map(rx => {
 										const content = parsePrescriptionContent(rx.prescriptionContent)
-										const noRefill = !!rx.pdeaS2License
+										const noRefill = Boolean(
+											content.noRefillInscribed || content.isControlledSubstance
+										)
 										return (
 											<div key={rx.id} className="space-y-1 rounded-md border p-3 text-sm">
 												<div className="flex items-start justify-between">
@@ -446,6 +468,11 @@ export function PrescriptionPrintDialog({
 															{content.dose} {content.doseUnit} - {content.doseForm} ·{" "}
 															{content.route} · {content.frequency}
 														</p>
+														{content.pdeaDispensingInstructions && (
+															<p className="text-muted-foreground text-xs">
+																{content.pdeaDispensingInstructions}
+															</p>
+														)}
 													</div>
 													<div className="text-muted-foreground text-right text-xs">
 														<p>{rx.prescriberStaffName ?? "--"}</p>

@@ -340,14 +340,14 @@ export const ordersContract = {
 		.output(PdeaLicenseStatusSchema),
 
 	// ========================================================================
-	// PDEA Tranching (for controlled substances > 90 days)
+	// PDEA Tranching (for controlled substances > 30 days, max 90 days)
 	// ========================================================================
 
 	previewTranches: oc
 		.route({
 			method: "POST",
 			path: "/pdea/preview-tranches",
-			summary: "Preview how an order will be split into tranches (controlled substances > 90 days)",
+			summary: "Preview how an order will be split into 30-day tranches (max 90 days)",
 			tags: ["Orders — PDEA"],
 		})
 		.input(TranchePreviewInputSchema)

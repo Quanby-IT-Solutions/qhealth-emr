@@ -42,6 +42,8 @@ export interface ImagingDashboardOrder {
 	modality: string
 	bodyPart: string
 	clinicalIndication: string | null
+	indicationIcd10Code: string | null
+	indicationIcd10Display: string | null
 	priority: "routine" | "urgent" | "stat"
 	status: "ordered" | "scheduled" | "in_progress" | "completed" | "cancelled"
 	orderingStaffId: string
@@ -94,6 +96,7 @@ export function useImagingDashboardQuery(params: ImagingDashboardParams, options
 				`${ORDERS_BASE}/imaging${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`,
 			),
 		enabled: !!params.facilityId && (options?.enabled ?? true),
+		refetchInterval: 30 * 1000,
 		refetchOnWindowFocus: true,
 		staleTime: 30_000,
 	})

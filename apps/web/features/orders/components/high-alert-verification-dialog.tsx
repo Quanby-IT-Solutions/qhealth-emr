@@ -22,6 +22,7 @@ import { ClinicianCoSignCombobox, type SelectedClinician } from "./clinician-cos
 
 export interface HighAlertVerificationDraft {
 	verifyingStaffId: string
+	coSignerPassword: string
 	notes?: string
 }
 
@@ -93,6 +94,7 @@ export function HighAlertVerificationDialog({
 
 		const draft: HighAlertVerificationDraft = {
 			verifyingStaffId: selectedClinician.staffProfileId,
+			coSignerPassword: password.trim(),
 			notes: notes.trim() || undefined,
 		}
 
@@ -111,6 +113,7 @@ export function HighAlertVerificationDialog({
 			{
 				medicationOrderId,
 				verifyingStaffId: draft.verifyingStaffId,
+				coSignerPassword: draft.coSignerPassword,
 				notes: draft.notes,
 			},
 			{

@@ -25,6 +25,8 @@ interface ImagingOrderItem {
 	modality: string
 	bodyPart: string
 	clinicalIndication: string | null
+	indicationIcd10Code: string | null
+	indicationIcd10Display: string | null
 	priority: string
 	status: string
 	orderingStaffName: string | null
@@ -43,7 +45,6 @@ interface ImagingDashboardProps {
 
 type StatusTab = "pending" | "in_progress" | "completed"
 
-const PENDING_STATUSES = new Set(["ordered", "pending", "scheduled"])
 const IN_PROGRESS_STATUSES = new Set(["in_progress", "processing"])
 const COMPLETED_STATUSES = new Set(["completed", "cancelled"])
 
@@ -98,6 +99,16 @@ function getPacsUrl(structuredResults: unknown): string | null {
 	if (!structuredResults || typeof structuredResults !== "object") return null
 	const results = structuredResults as Record<string, unknown>
 	return typeof results.pacsUrl === "string" ? results.pacsUrl : null
+}
+
+function indicationSummary(order: ImagingOrderItem) {
+	const diagnosis = [order.indicationIcd10Code, order.indicationIcd10Display]
+		.filter(Boolean)
+		.join(" - ")
+	return {
+		clinical: order.clinicalIndication,
+		diagnosis: diagnosis || null,
+	}
 }
 
 function classifyOrder(order: ImagingOrderItem): StatusTab {
@@ -172,6 +183,7 @@ export function ImagingDashboard({ orders, isLoading, onNewOrder }: ImagingDashb
 							<TableRow>
 								<TableHead>Modality</TableHead>
 								<TableHead>Body Part</TableHead>
+								<TableHead>Indication</TableHead>
 								<TableHead>Priority</TableHead>
 								<TableHead>Status</TableHead>
 								<TableHead>Report</TableHead>
@@ -185,6 +197,7 @@ export function ImagingDashboard({ orders, isLoading, onNewOrder }: ImagingDashb
 								const reportStatus = getReportStatus(order)
 								const pacsUrl = getPacsUrl(order.structuredResults)
 								const isExpanded = expandedId === order.id
+								const indication = indicationSummary(order)
 
 								return (
 									<>
@@ -193,6 +206,18 @@ export function ImagingDashboard({ orders, isLoading, onNewOrder }: ImagingDashb
 												{order.modality}
 											</TableCell>
 											<TableCell>{order.bodyPart}</TableCell>
+											<TableCell>
+												<div className="max-w-[220px]">
+													<p className="truncate text-sm">
+														{indication.clinical ?? "—"}
+													</p>
+													{indication.diagnosis && (
+														<p className="truncate text-xs text-muted-foreground">
+															{indication.diagnosis}
+														</p>
+													)}
+												</div>
+											</TableCell>
 											<TableCell>
 												<Badge variant={priorityVariant(order.priority)}>
 													{order.priority}
@@ -247,7 +272,7 @@ export function ImagingDashboard({ orders, isLoading, onNewOrder }: ImagingDashb
 										</TableRow>
 										{isExpanded && (
 											<TableRow key={`${order.id}-report`}>
-												<TableCell colSpan={8} className="bg-muted/40 p-0">
+												<TableCell colSpan={9} className="bg-muted/40 p-0">
 													<RadiologyReport
 														report={order.report}
 														structuredResults={order.structuredResults}
@@ -255,6 +280,12 @@ export function ImagingDashboard({ orders, isLoading, onNewOrder }: ImagingDashb
 														bodyPart={order.bodyPart}
 														clinicalIndication={
 															order.clinicalIndication
+														}
+														indicationIcd10Code={
+															order.indicationIcd10Code
+														}
+														indicationIcd10Display={
+															order.indicationIcd10Display
 														}
 														completedDatetime={order.completedDatetime}
 													/>

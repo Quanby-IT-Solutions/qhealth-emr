@@ -21,6 +21,7 @@ import {
 } from "@/core/components/ui/table"
 
 const TRANCHE_DAYS = 30
+const MAX_TOTAL_DAYS = 90
 
 export interface TrancheRow {
 	trancheNumber: number
@@ -122,6 +123,7 @@ export function TranchingPreviewModal({
 	startDate = new Date(),
 }: TranchingPreviewModalProps) {
 	const tranches = buildTranches(durationDays, frequency, startDate)
+	const exceedsMaxDays = durationDays > MAX_TOTAL_DAYS
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -175,12 +177,19 @@ export function TranchingPreviewModal({
 					prescription must carry a No Refill inscription, and the pharmacist may not dispense the
 					next tranche before the earliest dispensing date shown above.
 				</p>
+				{exceedsMaxDays && (
+					<p className="text-destructive text-xs font-medium">
+						PDEA controlled substance courses cannot exceed {MAX_TOTAL_DAYS} days.
+					</p>
+				)}
 
 				<DialogFooter>
 					<Button variant="outline" onClick={() => onOpenChange(false)}>
 						Back to Form
 					</Button>
-					<Button onClick={() => onConfirm(tranches)}>Confirm &amp; Submit Order</Button>
+					<Button disabled={exceedsMaxDays} onClick={() => onConfirm(tranches)}>
+						Confirm &amp; Submit Order
+					</Button>
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>

@@ -49,7 +49,54 @@ import { v1Terminology } from "./terminology/v1.terminology.js"
  * V1 contract router
  * Assembles all v1 feature contracts and applies the /v1 prefix
  */
-export const v1Contract = oc.prefix("/v1").router(
+export type V1Contract = {
+	health: typeof healthContract
+	audit: typeof v1Audit
+	auditor: typeof v1Auditor
+	adminDashboard: typeof v1AdminDashboard
+	notification: typeof v1Notification
+	formulary: typeof v1Formulary
+	lab: typeof v1Lab
+	nbs: typeof v1Nbs
+	patient: typeof v1Patient
+	encounter: typeof v1Encounter
+	fhir: typeof v1Fhir
+	bed: typeof v1Bed
+	rbac: typeof v1Rbac
+	ed: typeof v1Ed
+	problemsAllergies: typeof v1ProblemsAllergies
+	clinicalDocs: typeof v1ClinicalDocs
+	orders: typeof v1Orders
+	nursing: typeof v1Nursing
+	billing: typeof v1Billing
+	deathReporting: typeof v1DeathReporting
+	reporting: typeof v1Reporting
+	scheduling: typeof v1Scheduling
+	sla: typeof v1Sla
+	surgical: typeof v1Surgical
+	telemedicine: typeof v1Telemedicine
+	consent: typeof v1Consent
+	msw: typeof v1Msw
+	nutrition: typeof v1Nutrition
+	pharmacy: typeof v1Pharmacy
+	philhealth: typeof v1Philhealth
+	featureFlags: typeof v1FeatureFlags
+	systemSettings: typeof v1SystemSettings
+	facilityProfile: typeof v1FacilityProfile
+	integrationRegistry: typeof v1IntegrationRegistry
+	opdTriage: typeof v1OpdTriage
+	civilRegistry: typeof v1CivilRegistry
+	medicalRecords: typeof v1MedicalRecords
+	clinicianLicenses: typeof v1ClinicianLicenses
+	departments: typeof v1Departments
+	fhirEndpoints: typeof v1FhirEndpoints
+	terminology: typeof v1Terminology
+	masterData: typeof v1MasterData
+	him: typeof himContract
+	discharge: typeof v1Discharge
+}
+
+export const v1Contract: V1Contract = oc.prefix("/v1").router(
 	oc.router({
 		health: healthContract,
 		audit: v1Audit,
@@ -106,4 +153,4 @@ export const v1Contract = oc.prefix("/v1").router(
 		// Flow B6 / Story 2.6: Registrar discharge processing
 		discharge: v1Discharge,
 	})
-)
+) as V1Contract

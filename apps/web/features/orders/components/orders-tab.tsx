@@ -111,6 +111,18 @@ function formatImagingOrderName(modality: string, bodyPart: string) {
 	}
 }
 
+function formatIndication(
+	clinicalIndication: string | null | undefined,
+	icd10Code: string | null | undefined,
+	icd10Display: string | null | undefined,
+) {
+	const diagnosis = [icd10Code, icd10Display].filter(Boolean).join(" - ")
+	return {
+		clinical: clinicalIndication,
+		diagnosis: diagnosis || null,
+	}
+}
+
 function orderTypeVariant(type: "Medication" | "Lab" | "Imaging") {
 	switch (type) {
 		case "Medication":
@@ -571,6 +583,7 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 											<TableHead>Test Name</TableHead>
 											<TableHead>Panel</TableHead>
 											<TableHead>LOINC Code</TableHead>
+											<TableHead>Indication</TableHead>
 											<TableHead>Priority</TableHead>
 											<TableHead>Status</TableHead>
 											<TableHead>Ordered By</TableHead>
@@ -578,29 +591,51 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{labOrders.data.data.map(lab => (
-											<TableRow
-												key={lab.id}
-												className={cn(
-													lab.priority === "stat" &&
-														"border-destructive bg-destructive/10 border-l-2"
-												)}
-											>
-												<TableCell className="font-medium">{lab.testName}</TableCell>
-												<TableCell>{lab.panelName ?? "--"}</TableCell>
-												<TableCell>{lab.loincCode ?? "--"}</TableCell>
-												<TableCell>
-													<Badge variant={priorityVariant(lab.priority)}>{lab.priority}</Badge>
-												</TableCell>
-												<TableCell>
-													<Badge variant={medStatusVariant(lab.status)}>
-														{lab.status.replace(/_/g, " ")}
-													</Badge>
-												</TableCell>
-												<TableCell>{lab.orderingStaffName ?? "--"}</TableCell>
-												<TableCell>{formatDateTime(lab.createdAt)}</TableCell>
-											</TableRow>
-										))}
+										{labOrders.data.data.map(lab => {
+											const indication = formatIndication(
+												lab.clinicalIndication,
+												lab.indicationIcd10Code,
+												lab.indicationIcd10Display
+											)
+
+											return (
+												<TableRow
+													key={lab.id}
+													className={cn(
+														lab.priority === "stat" &&
+															"border-destructive bg-destructive/10 border-l-2"
+													)}
+												>
+													<TableCell className="font-medium">{lab.testName}</TableCell>
+													<TableCell>{lab.panelName ?? "--"}</TableCell>
+													<TableCell>{lab.loincCode ?? "--"}</TableCell>
+													<TableCell>
+														<div className="max-w-[220px]">
+															<p className="truncate text-sm">
+																{indication.clinical ?? "--"}
+															</p>
+															{indication.diagnosis && (
+																<p className="truncate text-xs text-muted-foreground">
+																	{indication.diagnosis}
+																</p>
+															)}
+														</div>
+													</TableCell>
+													<TableCell>
+														<Badge variant={priorityVariant(lab.priority)}>
+															{lab.priority}
+														</Badge>
+													</TableCell>
+													<TableCell>
+														<Badge variant={medStatusVariant(lab.status)}>
+															{lab.status.replace(/_/g, " ")}
+														</Badge>
+													</TableCell>
+													<TableCell>{lab.orderingStaffName ?? "--"}</TableCell>
+													<TableCell>{formatDateTime(lab.createdAt)}</TableCell>
+												</TableRow>
+											)
+										})}
 									</TableBody>
 								</Table>
 							)}
