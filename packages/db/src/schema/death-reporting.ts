@@ -56,13 +56,24 @@ export const deathReports = createTable(
 		}>(),
 		neonatalDetails: t.jsonb("neonatal_details").$type<{
 			// For FNDRF - Facility Neonatal Death Review Form
+			newbornName?: string
+			newbornMrn?: string
+			newbornDateOfBirth?: string
 			birthWeight?: number
 			gestationalAgeWeeks?: number
+			deliveryType?: "svd" | "cs" | "forceps" | "vacuum" | "other"
 			apgarScore1Min?: number
 			apgarScore5Min?: number
 			resuscitationRequired?: boolean
+			motherName?: string
+			motherAge?: number
+			motherGravidity?: number
+			motherParity?: number
+			motherAncVisits?: number
 			causeCategory?: "perinatal" | "congenital" | "infection" | "other"
 			ageAtDeathHours?: number
+			ageAtDeathDays?: number
+			placeOfDeath?: string
 			preventableFactors?: string[]
 		}>(),
 		physicianCertification: t.jsonb("physician_certification").$type<{

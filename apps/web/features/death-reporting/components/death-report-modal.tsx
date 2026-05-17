@@ -69,7 +69,9 @@ export function DeathReportModal({
 						<DialogTitle>
 							{needsFmdrf && !needsFndrf
 								? "Maternal Death Reporting Required"
-								: "Death Reporting Required"}
+								: needsFndrf && !needsFmdrf
+									? "Neonatal Death Reporting Required"
+									: "Death Reporting Required"}
 						</DialogTitle>
 					</div>
 					<DialogDescription>

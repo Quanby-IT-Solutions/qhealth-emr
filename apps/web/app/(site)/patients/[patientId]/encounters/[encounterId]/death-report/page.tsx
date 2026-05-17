@@ -86,6 +86,7 @@ export default function DeathReportPage() {
 							initialNewbornName={encounter?.patientName}
 							initialNewbornMrn={encounter?.patientMrn}
 							initialNewbornDateOfBirth={encounter?.patientDateOfBirth}
+							initialPlaceOfDeath={placeOfDeath}
 						/>
 					</TabsContent>
 				</Tabs>
@@ -108,6 +109,7 @@ export default function DeathReportPage() {
 					initialNewbornName={encounter?.patientName}
 					initialNewbornMrn={encounter?.patientMrn}
 					initialNewbornDateOfBirth={encounter?.patientDateOfBirth}
+					initialPlaceOfDeath={placeOfDeath}
 				/>
 			)}
 		</div>

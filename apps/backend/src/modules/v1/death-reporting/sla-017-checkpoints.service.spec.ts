@@ -156,6 +156,23 @@ function bypassFmdrfGuards(service: DeathReportingService) {
 		.mockResolvedValue(undefined)
 }
 
+function bypassFndrfGuards(service: DeathReportingService) {
+	jest
+		.spyOn(
+			service as unknown as { assertCanCreateFndrf(input: unknown): Promise<void> },
+			"assertCanCreateFndrf"
+		)
+		.mockResolvedValue(undefined)
+	jest
+		.spyOn(
+			service as unknown as {
+				forwardSubmittedFndrfToSurveillance(input: unknown, id: string): Promise<void>
+			},
+			"forwardSubmittedFndrfToSurveillance"
+		)
+		.mockResolvedValue(undefined)
+}
+
 // ---------------------------------------------------------------------------
 // DeathReportingService tests
 // ---------------------------------------------------------------------------
@@ -619,6 +636,7 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 		deliveryType: "svd" as const,
 		apgarScore1Min: null,
 		apgarScore5Min: null,
+		resuscitationRequired: true,
 		motherName: "Jane Doe",
 		motherAge: 25,
 		motherGravidity: 1,
@@ -653,6 +671,7 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 
 	describe("createFndrf", () => {
 		it("creates with status 'submitted' after physician signature", async () => {
+			bypassFndrfGuards(service)
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -667,6 +686,7 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 		})
 
 		it("does not set completedAt on creation (lifecycle stays open until release)", async () => {
+			bypassFndrfGuards(service)
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -681,6 +701,7 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 		})
 
 		it("sets requestedAt to now on creation (SLA-017: Step 1 evidence)", async () => {
+			bypassFndrfGuards(service)
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -695,6 +716,7 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 		})
 
 		it("sets submittedAt to now on physician submission", async () => {
+			bypassFndrfGuards(service)
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -706,6 +728,31 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 			await service.createFndrf(minimalFndrfInput)
 
 			expect(capturedValues.submittedAt).toBeInstanceOf(Date)
+		})
+
+		it("persists mandated neonatal review details", async () => {
+			bypassFndrfGuards(service)
+			let capturedValues: Record<string, unknown> = {}
+			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
+				capturedValues = vals
+				return { returning: mockInsertReturning }
+			})
+			mockInsertReturning.mockResolvedValue([baseFndrfReport])
+			mockInsert.mockReturnValue({ values: mockInsertValues })
+
+			await service.createFndrf(minimalFndrfInput)
+
+			expect(capturedValues.neonatalDetails).toEqual(
+				expect.objectContaining({
+					newbornName: "Baby Doe",
+					newbornMrn: "MRN-002",
+					birthWeight: 950,
+					gestationalAgeWeeks: 28,
+					resuscitationRequired: true,
+					motherName: "Jane Doe",
+					placeOfDeath: "NICU",
+				})
+			)
 		})
 	})
 })

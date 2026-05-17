@@ -11,7 +11,7 @@ import { deathReports, encounters, patients, surveillanceFlags } from "@repo/db/
 
 import { db } from "@/common/database/database.client"
 
-import { isMaternalDeathCandidate } from "./death-reporting-eligibility"
+import { isMaternalDeathCandidate, isNeonatalDeathCandidate } from "./death-reporting-eligibility"
 
 // ============================================================================
 // Input Types
@@ -78,6 +78,7 @@ interface CreateFndrfInput {
 	deliveryType: "svd" | "cs" | "forceps" | "vacuum" | "other"
 	apgarScore1Min: number | null
 	apgarScore5Min: number | null
+	resuscitationRequired: boolean
 	motherName: string
 	motherAge: number
 	motherGravidity: number
@@ -107,6 +108,7 @@ interface UpdateFndrfInput {
 }
 
 type MaternalHistoryPayload = NonNullable<(typeof deathReports.$inferSelect)["maternalHistory"]>
+type NeonatalDetailsPayload = NonNullable<(typeof deathReports.$inferSelect)["neonatalDetails"]>
 
 @Injectable()
 export class DeathReportingService {
@@ -419,6 +421,7 @@ export class DeathReportingService {
 	 * Create FNDRF report
 	 */
 	async createFndrf(input: CreateFndrfInput) {
+		await this.assertCanCreateFndrf(input)
 		const submittedAt = new Date()
 
 		const [report] = await db
@@ -441,11 +444,23 @@ export class DeathReportingService {
 					? [{ factor: input.contributingRemarks }]
 					: [],
 				neonatalDetails: {
+					newbornName: input.newbornName,
+					newbornMrn: input.newbornMrn,
+					newbornDateOfBirth: input.newbornDateOfBirth,
 					birthWeight: input.birthWeightGrams,
 					gestationalAgeWeeks: input.gestationalAgeWeeks,
+					deliveryType: input.deliveryType,
 					apgarScore1Min: input.apgarScore1Min ?? undefined,
 					apgarScore5Min: input.apgarScore5Min ?? undefined,
+					resuscitationRequired: input.resuscitationRequired,
+					motherName: input.motherName,
+					motherAge: input.motherAge,
+					motherGravidity: input.motherGravidity,
+					motherParity: input.motherParity,
+					motherAncVisits: input.motherAncVisits ?? undefined,
 					ageAtDeathHours: input.ageAtDeathHours ?? undefined,
+					ageAtDeathDays: input.ageAtDeathDays ?? undefined,
+					placeOfDeath: input.placeOfDeath,
 				},
 				physicianCertification: {
 					certifyingPhysicianName: input.physicianName,
@@ -463,6 +478,8 @@ export class DeathReportingService {
 			throw new Error("Failed to create FNDRF report")
 		}
 
+		await this.forwardSubmittedFndrfToSurveillance(input, report.id)
+
 		return this.mapFndrfReport(report, input)
 	}
 
@@ -478,12 +495,18 @@ export class DeathReportingService {
 			throw new NotFoundException(`FNDRF report ${id} not found`)
 		}
 
+		this.assertFndrfRequiredFields(data as Partial<CreateFndrfInput>, false)
+
 		const updateData: Record<string, unknown> = {
 			updatedAt: new Date(),
 		}
 
 		if (typeof data.dateOfDeath === "string") {
-			updateData.deathDatetime = new Date(data.dateOfDeath)
+			const deathDatetime = new Date(data.dateOfDeath)
+			if (Number.isNaN(deathDatetime.getTime())) {
+				throw new BadRequestException("A valid date and time of death is required for FNDRF.")
+			}
+			updateData.deathDatetime = deathDatetime
 		}
 
 		const knownCauses = [
@@ -533,36 +556,62 @@ export class DeathReportingService {
 		}
 
 		const hasNeonatalUpdate = [
+			data.newbornName,
+			data.newbornMrn,
+			data.newbornDateOfBirth,
 			data.gestationalAgeWeeks,
 			data.birthWeightGrams,
+			data.deliveryType,
 			data.apgarScore1Min,
 			data.apgarScore5Min,
+			data.resuscitationRequired,
+			data.motherName,
+			data.motherAge,
+			data.motherGravidity,
+			data.motherParity,
+			data.motherAncVisits,
 			data.ageAtDeathHours,
+			data.ageAtDeathDays,
+			data.placeOfDeath,
 		].some(v => v !== undefined)
 
 		if (hasNeonatalUpdate) {
-			const en = (existing.neonatalDetails ?? {}) as {
-				gestationalAgeWeeks?: number
-				birthWeight?: number
-				apgarScore1Min?: number
-				apgarScore5Min?: number
-				ageAtDeathHours?: number
-			}
+			const en = (existing.neonatalDetails ?? {}) as NeonatalDetailsPayload
 			updateData.neonatalDetails = {
 				...en,
+				...(data.newbornName !== undefined ? { newbornName: data.newbornName } : {}),
+				...(data.newbornMrn !== undefined ? { newbornMrn: data.newbornMrn } : {}),
+				...(data.newbornDateOfBirth !== undefined
+					? { newbornDateOfBirth: data.newbornDateOfBirth }
+					: {}),
 				...(data.gestationalAgeWeeks !== undefined
 					? { gestationalAgeWeeks: data.gestationalAgeWeeks }
 					: {}),
 				...(data.birthWeightGrams !== undefined ? { birthWeight: data.birthWeightGrams } : {}),
+				...(data.deliveryType !== undefined ? { deliveryType: data.deliveryType } : {}),
 				...(data.apgarScore1Min !== undefined
 					? { apgarScore1Min: data.apgarScore1Min ?? undefined }
 					: {}),
 				...(data.apgarScore5Min !== undefined
 					? { apgarScore5Min: data.apgarScore5Min ?? undefined }
 					: {}),
+				...(data.resuscitationRequired !== undefined
+					? { resuscitationRequired: data.resuscitationRequired }
+					: {}),
+				...(data.motherName !== undefined ? { motherName: data.motherName } : {}),
+				...(data.motherAge !== undefined ? { motherAge: data.motherAge } : {}),
+				...(data.motherGravidity !== undefined ? { motherGravidity: data.motherGravidity } : {}),
+				...(data.motherParity !== undefined ? { motherParity: data.motherParity } : {}),
+				...(data.motherAncVisits !== undefined
+					? { motherAncVisits: data.motherAncVisits ?? undefined }
+					: {}),
 				...(data.ageAtDeathHours !== undefined
 					? { ageAtDeathHours: data.ageAtDeathHours ?? undefined }
 					: {}),
+				...(data.ageAtDeathDays !== undefined
+					? { ageAtDeathDays: data.ageAtDeathDays ?? undefined }
+					: {}),
+				...(data.placeOfDeath !== undefined ? { placeOfDeath: data.placeOfDeath } : {}),
 			}
 		}
 
@@ -697,6 +746,132 @@ export class DeathReportingService {
 		}
 	}
 
+	private async assertCanCreateFndrf(input: CreateFndrfInput) {
+		this.assertFndrfRequiredFields(input, true)
+
+		const deathDatetime = new Date(input.dateOfDeath)
+		if (Number.isNaN(deathDatetime.getTime())) {
+			throw new BadRequestException("A valid date and time of death is required for FNDRF.")
+		}
+
+		const newbornDateOfBirth = new Date(input.newbornDateOfBirth)
+		if (Number.isNaN(newbornDateOfBirth.getTime())) {
+			throw new BadRequestException("A valid newborn date and time of birth is required for FNDRF.")
+		}
+
+		const [context] = await db
+			.select({
+				encounterId: encounters.id,
+				encounterFacilityId: encounters.facilityId,
+				encounterPatientId: encounters.patientId,
+				patientFacilityId: patients.facilityId,
+				patientDateOfBirth: patients.dateOfBirth,
+			})
+			.from(encounters)
+			.innerJoin(patients, eq(encounters.patientId, patients.id))
+			.where(eq(encounters.id, input.encounterId))
+			.limit(1)
+
+		if (!context) {
+			throw new NotFoundException(`Encounter ${input.encounterId} not found`)
+		}
+
+		if (context.encounterPatientId !== input.patientId) {
+			throw new BadRequestException("FNDRF patient does not match the encounter patient.")
+		}
+
+		if (
+			context.encounterFacilityId !== input.facilityId ||
+			context.patientFacilityId !== input.facilityId
+		) {
+			throw new BadRequestException("FNDRF facility does not match the encounter facility.")
+		}
+
+		if (!isNeonatalDeathCandidate(context.patientDateOfBirth, deathDatetime)) {
+			throw new BadRequestException("FNDRF is required only for neonates aged 28 days or less.")
+		}
+
+		const [existing] = await db
+			.select({ id: deathReports.id })
+			.from(deathReports)
+			.where(
+				and(eq(deathReports.encounterId, input.encounterId), eq(deathReports.reportType, "fndrf"))
+			)
+			.limit(1)
+
+		if (existing) {
+			throw new ConflictException("An FNDRF already exists for this encounter.")
+		}
+	}
+
+	private assertFndrfRequiredFields(input: Partial<CreateFndrfInput>, requireAll: boolean) {
+		const requiredTextFields: Array<keyof CreateFndrfInput> = [
+			"newbornName",
+			"newbornMrn",
+			"newbornDateOfBirth",
+			"motherName",
+			"dateOfDeath",
+			"placeOfDeath",
+			"physicianName",
+			"physicianLicenseNo",
+			"physicianSignatureDataUrl",
+			"certificationDate",
+		]
+
+		for (const field of requiredTextFields) {
+			if (!requireAll && input[field] === undefined) continue
+			const value = input[field]
+			if (typeof value !== "string" || value.trim().length === 0) {
+				throw new BadRequestException(`${String(field)} is required for FNDRF submission.`)
+			}
+		}
+
+		const requirePositive = (field: keyof CreateFndrfInput, label: string) => {
+			if (!requireAll && input[field] === undefined) return
+			const value = input[field]
+			if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+				throw new BadRequestException(`${label} must be greater than 0 for FNDRF submission.`)
+			}
+		}
+
+		const requireNonnegative = (field: keyof CreateFndrfInput, label: string) => {
+			if (!requireAll && input[field] === undefined) return
+			const value = input[field]
+			if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+				throw new BadRequestException(`${label} must be 0 or greater for FNDRF submission.`)
+			}
+		}
+
+		requirePositive("gestationalAgeWeeks", "gestationalAgeWeeks")
+		requirePositive("birthWeightGrams", "birthWeightGrams")
+		requirePositive("motherAge", "motherAge")
+		requireNonnegative("motherGravidity", "motherGravidity")
+		requireNonnegative("motherParity", "motherParity")
+
+		if ((requireAll || input.deliveryType !== undefined) && !input.deliveryType) {
+			throw new BadRequestException("deliveryType is required for FNDRF submission.")
+		}
+
+		if (
+			(requireAll || input.resuscitationRequired !== undefined) &&
+			typeof input.resuscitationRequired !== "boolean"
+		) {
+			throw new BadRequestException("resuscitationRequired is required for FNDRF submission.")
+		}
+
+		if (
+			requireAll &&
+			!input.causePrematurity &&
+			!input.causeBirthAsphyxia &&
+			!input.causeSepsis &&
+			!input.causeCongenitalAnomaly &&
+			!input.causeRds &&
+			!(typeof input.causeOther === "string" && input.causeOther.trim().length > 0)
+		) {
+			throw new BadRequestException("At least one cause of death is required for FNDRF.")
+		}
+	}
+
 	private async forwardSubmittedFmdrfToSurveillance(
 		input: CreateFmdrfInput,
 		deathReportId: string
@@ -722,6 +897,35 @@ export class DeathReportingService {
 			noteId: null,
 			flagType: "mndrs_fmdrf",
 			triggeredBy: `FMDRF submitted for ${input.patientName}`,
+			triggerValue,
+		})
+	}
+
+	private async forwardSubmittedFndrfToSurveillance(
+		input: CreateFndrfInput,
+		deathReportId: string
+	) {
+		const triggerValue = `FNDRF:${deathReportId}`
+		const existingFlags = await db
+			.select({ id: surveillanceFlags.id })
+			.from(surveillanceFlags)
+			.where(
+				and(
+					eq(surveillanceFlags.encounterId, input.encounterId),
+					eq(surveillanceFlags.flagType, "mndrs_fndrf"),
+					eq(surveillanceFlags.triggerValue, triggerValue)
+				)
+			)
+			.limit(1)
+
+		if (existingFlags.length > 0) return
+
+		await db.insert(surveillanceFlags).values({
+			facilityId: input.facilityId,
+			encounterId: input.encounterId,
+			noteId: null,
+			flagType: "mndrs_fndrf",
+			triggeredBy: `FNDRF submitted for ${input.newbornName}`,
 			triggerValue,
 		})
 	}
@@ -852,7 +1056,7 @@ export class DeathReportingService {
 		report: typeof deathReports.$inferSelect,
 		input?: Partial<CreateFndrfInput>
 	) {
-		const neonatal = report.neonatalDetails ?? {}
+		const neonatal = (report.neonatalDetails ?? {}) as NeonatalDetailsPayload
 		const cert = report.physicianCertification ?? {}
 		const causes = report.causeOfDeath.split(", ")
 
@@ -861,23 +1065,25 @@ export class DeathReportingService {
 			encounterId: report.encounterId ?? "",
 			patientId: report.patientId,
 			facilityId: report.facilityId,
-			newbornName: input?.newbornName ?? "",
-			newbornMrn: input?.newbornMrn ?? "",
-			newbornDateOfBirth: input?.newbornDateOfBirth ?? "",
+			newbornName: neonatal.newbornName ?? input?.newbornName ?? "",
+			newbornMrn: neonatal.newbornMrn ?? input?.newbornMrn ?? "",
+			newbornDateOfBirth: neonatal.newbornDateOfBirth ?? input?.newbornDateOfBirth ?? "",
 			gestationalAgeWeeks: neonatal.gestationalAgeWeeks ?? input?.gestationalAgeWeeks ?? 0,
 			birthWeightGrams: neonatal.birthWeight ?? input?.birthWeightGrams ?? 0,
-			deliveryType: input?.deliveryType ?? "svd",
+			deliveryType: neonatal.deliveryType ?? input?.deliveryType ?? "svd",
 			apgarScore1Min: neonatal.apgarScore1Min ?? null,
 			apgarScore5Min: neonatal.apgarScore5Min ?? null,
-			motherName: input?.motherName ?? "",
-			motherAge: input?.motherAge ?? 0,
-			motherGravidity: input?.motherGravidity ?? 0,
-			motherParity: input?.motherParity ?? 0,
-			motherAncVisits: input?.motherAncVisits ?? null,
+			resuscitationRequired:
+				neonatal.resuscitationRequired ?? input?.resuscitationRequired ?? false,
+			motherName: neonatal.motherName ?? input?.motherName ?? "",
+			motherAge: neonatal.motherAge ?? input?.motherAge ?? 0,
+			motherGravidity: neonatal.motherGravidity ?? input?.motherGravidity ?? 0,
+			motherParity: neonatal.motherParity ?? input?.motherParity ?? 0,
+			motherAncVisits: neonatal.motherAncVisits ?? input?.motherAncVisits ?? null,
 			dateOfDeath: report.deathDatetime.toISOString(),
 			ageAtDeathHours: neonatal.ageAtDeathHours ?? null,
-			ageAtDeathDays: input?.ageAtDeathDays ?? null,
-			placeOfDeath: input?.placeOfDeath ?? "",
+			ageAtDeathDays: neonatal.ageAtDeathDays ?? input?.ageAtDeathDays ?? null,
+			placeOfDeath: neonatal.placeOfDeath ?? input?.placeOfDeath ?? "",
 			causePrematurity: causes.includes("Prematurity"),
 			causeBirthAsphyxia: causes.includes("Birth Asphyxia"),
 			causeSepsis: causes.includes("Sepsis"),

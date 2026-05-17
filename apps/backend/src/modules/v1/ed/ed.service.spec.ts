@@ -526,6 +526,45 @@ describe("EdService.dispose()", () => {
 			expect.arrayContaining([expect.objectContaining({ toStatus: "ready_for_billing" })])
 		)
 	})
+
+	it("blocks deceased disposition for neonate without submitted FNDRF", async () => {
+		const neonatalDob = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+		mockPreTransactionSelects(ACTIVE_ENCOUNTER, SIGNED_NOTE, {
+			patient: { sex: "male", dateOfBirth: neonatalDob },
+			deathReports: [],
+		})
+
+		const service = makeEdService()
+		await expect(
+			service.dispose({
+				encounterId: ENCOUNTER_ID,
+				disposition: "deceased",
+			})
+		).rejects.toThrow(BadRequestException)
+
+		expect(db.transaction).not.toHaveBeenCalled()
+	})
+
+	it("allows deceased disposition for neonate with submitted FNDRF", async () => {
+		const neonatalDob = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+		mockPreTransactionSelects(ACTIVE_ENCOUNTER, SIGNED_NOTE, {
+			patient: { sex: "male", dateOfBirth: neonatalDob },
+			deathReports: [{ reportType: "fndrf", status: "submitted" }],
+		})
+		const { tx, insertedValues } = makeTxMock()
+		mockTransaction(tx)
+
+		const service = makeEdService()
+		const result = await service.dispose({
+			encounterId: ENCOUNTER_ID,
+			disposition: "deceased",
+		})
+
+		expect(result.disposition).toBe("deceased")
+		expect(insertedValues).not.toEqual(
+			expect.arrayContaining([expect.objectContaining({ toStatus: "ready_for_billing" })])
+		)
+	})
 })
 
 // ============================================================================

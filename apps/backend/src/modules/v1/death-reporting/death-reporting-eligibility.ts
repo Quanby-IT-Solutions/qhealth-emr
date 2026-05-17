@@ -49,7 +49,7 @@ export function isNeonatalDeathCandidate(
 	at: Date | string = new Date()
 ) {
 	const ageDays = calculateAgeDays(dateOfBirth, at)
-	return ageDays !== null && ageDays >= 0 && ageDays < 28
+	return ageDays !== null && ageDays >= 0 && ageDays <= 28
 }
 
 export function getRequiredDeathReportTypes(
