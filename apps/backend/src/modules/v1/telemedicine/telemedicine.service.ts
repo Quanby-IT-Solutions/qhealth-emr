@@ -25,6 +25,8 @@ import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { NotificationService } from "@/modules/v1/notifications/notification.service"
 
+import { assertTelemedicineVideoLink } from "./telemedicine-video-link"
+
 type ListAppointmentsInput = V1Inputs["telemedicine"]["listAppointments"]
 type GetAppointmentInput = V1Inputs["telemedicine"]["getAppointment"]
 type CreateAppointmentInput = V1Inputs["telemedicine"]["createAppointment"]
@@ -92,19 +94,6 @@ export class TelemedicineService {
 		}
 	}
 
-	private assertHttpsVideoLink(videoLink?: string | null) {
-		if (!videoLink) return
-		let url: URL
-		try {
-			url = new URL(videoLink)
-		} catch {
-			throw new BadRequestException("Video link must be a valid HTTPS URL.")
-		}
-		if (url.protocol !== "https:" || !url.hostname) {
-			throw new BadRequestException("Video link must be a valid HTTPS URL.")
-		}
-	}
-
 	private assertAssignedClinician(
 		requestingStaffId: string | undefined,
 		assignedStaffId: string,
@@ -115,6 +104,58 @@ export class TelemedicineService {
 		}
 		if (requestingStaffId !== assignedStaffId) {
 			throw new ForbiddenException(`Only the assigned clinician can ${action}.`)
+		}
+	}
+
+	private assertFutureAppointment(scheduledDate: string, scheduledTime: string) {
+		const scheduledAt = new Date(`${scheduledDate}T${scheduledTime}`)
+		if (!Number.isFinite(scheduledAt.getTime())) {
+			throw new BadRequestException("Appointment date and time are invalid.")
+		}
+		if (scheduledAt.getTime() <= Date.now()) {
+			throw new BadRequestException("Appointment date and time must be in the future.")
+		}
+	}
+
+	private async assertAppointmentScope(input: CreateAppointmentInput) {
+		const [patient] = await db
+			.select({
+				id: patients.id,
+				facilityId: patients.facilityId,
+				isActive: patients.isActive,
+			})
+			.from(patients)
+			.where(eq(patients.id, input.patientId))
+			.limit(1)
+
+		if (!patient) {
+			throw new NotFoundException(`Patient ${input.patientId} not found.`)
+		}
+		if (patient.facilityId !== input.facilityId) {
+			throw new BadRequestException("Patient must belong to the appointment facility.")
+		}
+		if (!patient.isActive) {
+			throw new BadRequestException("Cannot book a telemedicine appointment for an inactive patient.")
+		}
+
+		const [clinician] = await db
+			.select({
+				id: staffProfiles.id,
+				facilityId: staffProfiles.facilityId,
+				isActive: staffProfiles.isActive,
+			})
+			.from(staffProfiles)
+			.where(eq(staffProfiles.id, input.clinicianId))
+			.limit(1)
+
+		if (!clinician) {
+			throw new NotFoundException(`Clinician staff profile ${input.clinicianId} not found.`)
+		}
+		if (clinician.facilityId !== input.facilityId) {
+			throw new BadRequestException("Clinician must belong to the appointment facility.")
+		}
+		if (!clinician.isActive) {
+			throw new BadRequestException("Cannot book a telemedicine appointment with an inactive clinician.")
 		}
 	}
 
@@ -400,7 +441,9 @@ export class TelemedicineService {
 	// =========================================================================
 
 	async createAppointment(input: CreateAppointmentInput, createdByStaffId?: string) {
-		this.assertHttpsVideoLink(input.videoLink)
+		this.assertFutureAppointment(input.scheduledDate, input.scheduledTime)
+		await this.assertAppointmentScope(input)
+		assertTelemedicineVideoLink(input.videoLink, input.platform)
 
 		const [created] = await db
 			.insert(telemedicineAppointments)
@@ -428,7 +471,7 @@ export class TelemedicineService {
 		return this.getAppointment({ id: created.id })
 	}
 
-	async updateAppointment(input: UpdateAppointmentInput) {
+	async updateAppointment(input: UpdateAppointmentInput, updatedByStaffId?: string) {
 		const [appt] = await db
 			.select()
 			.from(telemedicineAppointments)
@@ -438,8 +481,10 @@ export class TelemedicineService {
 			throw new NotFoundException(`Telemedicine appointment ${input.id} not found`)
 		}
 
+		this.assertAssignedClinician(updatedByStaffId, appt.clinicianStaffId, "update this appointment")
+
 		if ("videoLink" in input) {
-			this.assertHttpsVideoLink(input.videoLink)
+			assertTelemedicineVideoLink(input.videoLink, appt.platform)
 		}
 
 		const updates: Partial<typeof telemedicineAppointments.$inferInsert> = {

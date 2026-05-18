@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { ArrowRight, Calendar, Clock, User, Video } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -18,6 +19,11 @@ import {
 	type CreateAppointmentInput,
 	type TelemedicinePlatform,
 } from "@/features/telemedicine/api/telemedicine.hooks"
+import {
+	getVideoLaunchPath,
+	getVideoLinkValidationMessage,
+	isValidVideoLinkForPlatform,
+} from "@/features/telemedicine/lib/video-links"
 
 // ============================================================================
 // Types
@@ -43,6 +49,9 @@ interface BookingFormState {
 	scheduledTime: string
 	durationMinutes: number
 	platform: TelemedicinePlatform
+	videoLink: string
+	meetingId: string
+	meetingPassword: string
 	notes: string
 }
 
@@ -65,6 +74,9 @@ const EMPTY_FORM: BookingFormState = {
 	scheduledTime: "",
 	durationMinutes: 30,
 	platform: "zoom",
+	videoLink: "",
+	meetingId: "",
+	meetingPassword: "",
 	notes: "",
 }
 
@@ -220,6 +232,11 @@ export function VirtualVisitScheduler({
 			setError("Enter a valid patient email address.")
 			return
 		}
+		const trimmedVideoLink = form.videoLink.trim()
+		if (trimmedVideoLink && !isValidVideoLinkForPlatform(trimmedVideoLink, form.platform)) {
+			setError(getVideoLinkValidationMessage(form.platform))
+			return
+		}
 
 		const input: CreateAppointmentInput = {
 			facilityId,
@@ -229,6 +246,9 @@ export function VirtualVisitScheduler({
 			scheduledTime: form.scheduledTime,
 			durationMinutes: form.durationMinutes,
 			platform: form.platform,
+			videoLink: trimmedVideoLink || undefined,
+			meetingId: form.meetingId.trim() || undefined,
+			meetingPassword: form.meetingPassword.trim() || undefined,
 			notes: form.notes.trim() || undefined,
 		}
 
@@ -273,6 +293,51 @@ export function VirtualVisitScheduler({
 							<div className="space-y-1.5">
 								<label className="text-sm font-medium">Video Platform</label>
 								<PlatformSelector value={form.platform} onChange={v => patch("platform", v)} />
+							</div>
+
+							{/* Meeting Details */}
+							<div className="grid grid-cols-2 gap-4">
+								<div className="col-span-2 space-y-1.5">
+									<label htmlFor="videoLink" className="text-sm font-medium">
+										Meeting Link (optional)
+									</label>
+									<input
+										id="videoLink"
+										type="url"
+										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+										value={form.videoLink}
+										onChange={e => patch("videoLink", e.target.value)}
+										placeholder={
+											form.platform === "zoom"
+												? "https://us02web.zoom.us/j/..."
+												: "https://teams.microsoft.com/l/meetup-join/..."
+										}
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<label htmlFor="meetingId" className="text-sm font-medium">
+										Meeting ID
+									</label>
+									<input
+										id="meetingId"
+										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+										value={form.meetingId}
+										onChange={e => patch("meetingId", e.target.value)}
+										placeholder="Meeting ID"
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<label htmlFor="meetingPassword" className="text-sm font-medium">
+										Passcode
+									</label>
+									<input
+										id="meetingPassword"
+										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+										value={form.meetingPassword}
+										onChange={e => patch("meetingPassword", e.target.value)}
+										placeholder="Passcode"
+									/>
+								</div>
 							</div>
 
 							{/* Patient Info */}
@@ -519,19 +584,19 @@ export function VirtualVisitScheduler({
 												variant={isSelected ? "secondary" : "outline"}
 												onClick={() => onAppointmentSelected?.(appt.id, appt.encounterId)}
 											>
-												{appt.encounterId ? "Continue" : "Open"}
+												{appt.encounterId ? "Continue Encounter" : "Start Virtual Encounter"}
 												<ArrowRight className="ml-1.5 size-3.5" />
 											</Button>
 											{appt.videoLink && (
-												<a
-													href={appt.videoLink}
+												<Link
+													href={getVideoLaunchPath(appt.id)}
 													target="_blank"
 													rel="noopener noreferrer"
 													className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium"
 												>
 													<Video className="size-3" />
-													Join
-												</a>
+													Launch Video
+												</Link>
 											)}
 										</div>
 									</div>

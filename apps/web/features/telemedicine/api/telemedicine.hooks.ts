@@ -148,6 +148,9 @@ export interface CreateAppointmentInput {
 	scheduledTime: string
 	durationMinutes: number
 	platform: TelemedicinePlatform
+	videoLink?: string
+	meetingId?: string
+	meetingPassword?: string
 	notes?: string
 }
 

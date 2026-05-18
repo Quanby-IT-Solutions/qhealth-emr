@@ -6,6 +6,7 @@ import { CheckCircle2, ClipboardList, Link2, Unlink } from "lucide-react"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Separator } from "@/core/components/ui/separator"
+import { usePatientSummaryQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
 import {
 	type CreateEncounterInput,
 	type EncounterType,
@@ -18,6 +19,7 @@ import {
 
 interface TelemedicineEncounterFormProps {
 	appointmentId: string
+	patientId: string
 	patientName: string
 	clinicianName: string
 	onEncounterCreated?: (encounterId: string) => void
@@ -26,7 +28,6 @@ interface TelemedicineEncounterFormProps {
 interface EncounterFormState {
 	encounterType: EncounterType
 	linkedEncounterId: string
-	linkedEncounterNumber: string
 	chiefComplaint: string
 	subjectiveNotes: string
 	objectiveNotes: string
@@ -45,7 +46,6 @@ interface EncounterFormState {
 const EMPTY_FORM: EncounterFormState = {
 	encounterType: "standalone",
 	linkedEncounterId: "",
-	linkedEncounterNumber: "",
 	chiefComplaint: "",
 	subjectiveNotes: "",
 	objectiveNotes: "",
@@ -136,12 +136,66 @@ function isNumberInRange(value: string, min: number, max: number): boolean {
 	return Number.isFinite(number) && number >= min && number <= max
 }
 
+function ChartSnapshot({ patientId }: { patientId: string }) {
+	const { data: summary, isLoading } = usePatientSummaryQuery(patientId, { enabled: Boolean(patientId) })
+	const activeProblems = summary?.activeProblems ?? []
+	const activeAllergies = summary?.activeAllergies ?? []
+
+	return (
+		<div className="grid gap-3 md:grid-cols-2">
+			<div className="rounded-lg border p-3">
+				<p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+					Active Problems
+				</p>
+				{isLoading ? (
+					<p className="text-muted-foreground text-sm">Loading chart...</p>
+				) : activeProblems.length ? (
+					<ul className="space-y-1 text-sm">
+						{activeProblems.slice(0, 5).map(problem => (
+							<li key={problem.id} className="text-foreground">
+								{problem.description}
+								{problem.icd10Code && (
+									<span className="text-muted-foreground"> - {problem.icd10Code}</span>
+								)}
+							</li>
+						))}
+					</ul>
+				) : (
+					<p className="text-muted-foreground text-sm">None recorded</p>
+				)}
+			</div>
+			<div className="rounded-lg border p-3">
+				<p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+					Active Allergies
+				</p>
+				{isLoading ? (
+					<p className="text-muted-foreground text-sm">Loading chart...</p>
+				) : activeAllergies.length ? (
+					<ul className="space-y-1 text-sm">
+						{activeAllergies.slice(0, 5).map(allergy => (
+							<li key={allergy.id} className="text-foreground">
+								{allergy.allergenName}
+								{allergy.severity && (
+									<span className="text-muted-foreground"> - {allergy.severity}</span>
+								)}
+							</li>
+						))}
+					</ul>
+				) : (
+					<p className="text-muted-foreground text-sm">None recorded</p>
+				)}
+			</div>
+		</div>
+	)
+}
+
 // ============================================================================
 // Main Component
 // ============================================================================
 
 export function TelemedicineEncounterForm({
 	appointmentId,
+	patientId,
 	patientName,
 	clinicianName,
 	onEncounterCreated,
@@ -230,15 +284,6 @@ export function TelemedicineEncounterForm({
 						<p className="text-muted-foreground text-sm">
 							The telemedicine clinical note has been recorded.
 						</p>
-						<Button
-							variant="outline"
-							onClick={() => {
-								setSubmitted(false)
-								setForm(EMPTY_FORM)
-							}}
-						>
-							New Encounter
-						</Button>
 					</div>
 				</CardContent>
 			</Card>
@@ -262,6 +307,9 @@ export function TelemedicineEncounterForm({
 			</CardHeader>
 			<CardContent>
 				<form onSubmit={handleSubmit} className="space-y-6">
+					<ChartSnapshot patientId={patientId} />
+					<Separator />
+
 					{/* Encounter Type */}
 					<div className="space-y-2">
 						<label className="text-sm font-medium">Encounter Type</label>
@@ -270,31 +318,17 @@ export function TelemedicineEncounterForm({
 							onChange={(v) => patch("encounterType", v)}
 						/>
 						{form.encounterType === "linked" && (
-							<div className="grid grid-cols-2 gap-4 pt-1">
-								<div className="space-y-1.5">
-									<label htmlFor="linkedEncounterId" className="text-sm font-medium">
-										Linked Encounter ID
-									</label>
-									<input
-										id="linkedEncounterId"
-										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-										value={form.linkedEncounterId}
-										onChange={(e) => patch("linkedEncounterId", e.target.value)}
-										placeholder="e.g. ENC-001234"
-									/>
-								</div>
-								<div className="space-y-1.5">
-									<label htmlFor="linkedEncounterNumber" className="text-sm font-medium">
-										Encounter Number
-									</label>
-									<input
-										id="linkedEncounterNumber"
-										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-										value={form.linkedEncounterNumber}
-										onChange={(e) => patch("linkedEncounterNumber", e.target.value)}
-										placeholder="e.g. IP-2026-00045"
-									/>
-								</div>
+							<div className="space-y-1.5 pt-1">
+								<label htmlFor="linkedEncounterId" className="text-sm font-medium">
+									Linked Encounter UUID
+								</label>
+								<input
+									id="linkedEncounterId"
+									className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+									value={form.linkedEncounterId}
+									onChange={(e) => patch("linkedEncounterId", e.target.value)}
+									placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+								/>
 							</div>
 						)}
 					</div>
@@ -323,8 +357,8 @@ export function TelemedicineEncounterForm({
 							{[
 								{ key: "bloodPressure" as const, label: "BP (mmHg)", placeholder: "120/80" },
 								{ key: "heartRate" as const, label: "HR (bpm)", placeholder: "72" },
-								{ key: "temperature" as const, label: "Temp (°C)", placeholder: "36.5" },
-								{ key: "oxygenSaturation" as const, label: "O₂ Sat (%)", placeholder: "98" },
+								{ key: "temperature" as const, label: "Temp (C)", placeholder: "36.5" },
+								{ key: "oxygenSaturation" as const, label: "O2 Sat (%)", placeholder: "98" },
 								{ key: "weight" as const, label: "Weight (kg)", placeholder: "65" },
 							].map(({ key, label, placeholder }) => (
 								<div key={key} className="space-y-1">

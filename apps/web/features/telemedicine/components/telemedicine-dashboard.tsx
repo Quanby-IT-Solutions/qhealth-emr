@@ -9,6 +9,7 @@ import { useAppointmentQuery } from "@/features/telemedicine/api/telemedicine.ho
 import { EPrescriptionCard } from "@/features/telemedicine/components/e-prescription-card"
 import { TeleAbstractPage } from "@/features/telemedicine/components/tele-abstract-page"
 import { TelemedicineEncounterForm } from "@/features/telemedicine/components/telemedicine-encounter-form"
+import { TelemedicineEncounterSummary } from "@/features/telemedicine/components/telemedicine-encounter-summary"
 import { VideoCallPanel } from "@/features/telemedicine/components/video-call-panel"
 import { VirtualVisitScheduler } from "@/features/telemedicine/components/virtual-visit-scheduler"
 
@@ -101,13 +102,12 @@ export function TelemedicineDashboard() {
 	function handleAppointmentSelected(appointmentId: string, encounterId?: string | null) {
 		setSelectedAppointmentId(appointmentId)
 		setActiveEncounterId(encounterId ?? null)
-		setActiveTab(encounterId ? "abstract" : "encounter")
+		setActiveTab("encounter")
 	}
 
 	function handleEncounterCreated(encounterId: string) {
 		setActiveEncounterId(encounterId)
-		// Auto-advance to abstract tab
-		setActiveTab("abstract")
+		setActiveTab("video")
 	}
 
 	function handleAbstractSigned() {
@@ -172,12 +172,21 @@ export function TelemedicineDashboard() {
 			{activeTab === "encounter" && (
 				<>
 					{selectedAppointmentId ? (
-						<TelemedicineEncounterForm
-							appointmentId={selectedAppointmentId}
-							patientName={patientName}
-							clinicianName={clinicianName}
-							onEncounterCreated={handleEncounterCreated}
-						/>
+						currentEncounterId ? (
+							<TelemedicineEncounterSummary
+								encounterId={currentEncounterId}
+								onLaunchVideo={() => setActiveTab("video")}
+								onGenerateAbstract={() => setActiveTab("abstract")}
+							/>
+						) : (
+							<TelemedicineEncounterForm
+								appointmentId={selectedAppointmentId}
+								patientId={appointment?.patientId ?? ""}
+								patientName={patientName}
+								clinicianName={clinicianName}
+								onEncounterCreated={handleEncounterCreated}
+							/>
+						)
 					) : (
 						<Card>
 							<CardContent className="py-10 text-center">

@@ -116,9 +116,13 @@ export class TelemedicineController {
 
 	@RequirePermission("telemedicine", "edit")
 	@Implement(v1.telemedicine.updateAppointment)
-	async updateAppointment() {
+	async updateAppointment(@Session() session: UserSession) {
 		return implement(v1.telemedicine.updateAppointment).handler(async ({ input }) => {
-			return this.telemedicineService.updateAppointment(input)
+			const facilityId = await this.resolveAppointmentFacilityId(input.id)
+			const staffProfileId = facilityId
+				? await this.resolveStaffProfileId(session.user.id, facilityId)
+				: undefined
+			return this.telemedicineService.updateAppointment(input, staffProfileId)
 		})
 	}
 
