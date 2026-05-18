@@ -1,17 +1,16 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useEffect, useState, useSyncExternalStore } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { useTheme } from "next-themes"
 
-import { cn } from "@/core/lib/utils"
+import { cn, getInitials } from "@/core/lib/utils"
 import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { filterNavItems, PRIMARY_NAV_ITEMS, SECONDARY_NAV_ITEMS } from "@/features/app-shell/lib/navigation"
 import { useUnreadNotificationCount } from "@/features/app-shell/api/notification.hooks"
-import { getInitials } from "@/core/lib/utils"
 import { useSignOutMutation } from "@/features/auth/api/session.hooks"
 import {
 	DropdownMenu,
@@ -159,6 +158,42 @@ const NAV_ICON_MAP: Record<string, React.FC<any>> = {
 	"radiology": Icons.Radiology,
 	"nbs": Icons.Maternal,
 	"sla": Icons.Stopwatch,
+}
+
+function subscribeDesktopBreakpoint(callback: () => void) {
+	if (typeof window === "undefined") {
+		return () => {}
+	}
+
+	const mediaQuery = window.matchMedia("(min-width: 1024px)")
+	mediaQuery.addEventListener("change", callback)
+
+	return () => mediaQuery.removeEventListener("change", callback)
+}
+
+function getDesktopBreakpointSnapshot() {
+	return typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches
+}
+
+function getDesktopBreakpointServerSnapshot() {
+	return false
+}
+
+function subscribeMounted(callback: () => void) {
+	if (typeof window === "undefined") {
+		return () => {}
+	}
+
+	const timeoutId = window.setTimeout(callback, 0)
+	return () => window.clearTimeout(timeoutId)
+}
+
+function getMountedSnapshot() {
+	return true
+}
+
+function getMountedServerSnapshot() {
+	return false
 }
 
 // Group mappings per the prompt's aesthetic layout
@@ -384,34 +419,44 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 
 	function isNavActive(href: string): boolean {
 		if (pathname === href) return true
-		if (!pathname.startsWith(href + "/")) return false
+		if (!pathname.startsWith(`${href}/`)) return false
 		return ![...allNavHrefs].some(
 			other => other !== href && other.startsWith(href) && pathname.startsWith(other)
 		)
 	}
 
-	const [showSyncing, setShowSyncing] = useState(false)
-	const [prevOnline, setPrevOnline] = useState(true)
-	const [isCollapsed, setIsCollapsed] = useState(false)
-	const [isMobileOpen, setIsMobileOpen] = useState(false)
-	const [mounted, setMounted] = useState(false)
+		const [showSyncing, setShowSyncing] = useState(false)
+		const [prevOnline, setPrevOnline] = useState(true)
+		const [isCollapsed, setIsCollapsed] = useState(false)
+		const [isMobileOpen, setIsMobileOpen] = useState(false)
+		const mounted = useSyncExternalStore(
+			subscribeMounted,
+			getMountedSnapshot,
+			getMountedServerSnapshot
+		)
+		const isDesktop = useSyncExternalStore(
+			subscribeDesktopBreakpoint,
+			getDesktopBreakpointSnapshot,
+			getDesktopBreakpointServerSnapshot
+		)
 
 	const { data: unreadData } = useUnreadNotificationCount(profile?.staffProfiles?.[0]?.facilityId)
 	const notificationCount = unreadData?.count ?? 0
 
-	useEffect(() => setMounted(true), [])
-
-	useEffect(() => {
-		if (!prevOnline && isOnline) {
-			setShowSyncing(true)
+		/* eslint-disable react-hooks/set-state-in-effect */
+		useEffect(() => {
+			if (!prevOnline && isOnline) {
+				setShowSyncing(true)
 			const timer = setTimeout(() => setShowSyncing(false), 3000)
 			setPrevOnline(isOnline)
 			return () => clearTimeout(timer)
-		}
-		setPrevOnline(isOnline)
-	}, [isOnline, prevOnline])
+			}
+			setPrevOnline(isOnline)
+		}, [isOnline, prevOnline])
+		/* eslint-enable react-hooks/set-state-in-effect */
 
-	const sidebarWidth = isCollapsed ? 72 : 256
+		const sidebarWidth = isCollapsed ? 72 : 256
+		const mainContentMarginLeft = !isMobileOpen && isDesktop ? sidebarWidth : 0
 
 	const SidebarContent = (
 		<div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border relative z-40">
@@ -430,7 +475,7 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 								className="flex flex-col whitespace-nowrap"
 							>
 								<span className="font-serif font-medium text-sidebar-foreground text-[15px] leading-tight tracking-tight">Quanby EMR Platform</span>
-								<span className="font-sans text-[11px] text-sidebar-foreground/70">St. Luke's Medical Center</span>
+								<span className="font-sans text-[11px] text-sidebar-foreground/70">St. Luke&apos;s Medical Center</span>
 							</motion.div>
 						)}
 					</AnimatePresence>
@@ -570,12 +615,12 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 			</AnimatePresence>
 
 			{/* Main Content Area */}
-			<motion.div
-				initial={false}
-				animate={{ marginLeft: isMobileOpen ? 0 : (typeof window !== 'undefined' && window.innerWidth >= 1024 ? sidebarWidth : 0) }}
-				transition={{ type: "spring", stiffness: 200, damping: 28 }}
-				className="flex flex-col flex-1 min-w-0 w-full lg:w-auto"
-			>
+				<motion.div
+					initial={false}
+					animate={{ marginLeft: mainContentMarginLeft }}
+					transition={{ type: "spring", stiffness: 200, damping: 28 }}
+					className="flex flex-col flex-1 min-w-0 w-full lg:w-auto"
+				>
 				{/* Top Header Bar */}
 				<header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-card/80 backdrop-blur-md px-4 md:px-6">
 					<button 

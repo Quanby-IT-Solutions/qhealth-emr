@@ -85,7 +85,11 @@ jest.mock("@repo/db/schema", () => ({
 	labOrders: {},
 	marEntries: {},
 	medicationOrders: {},
-	preEncounters: {},
+	preEncounters: {
+		id: "id",
+		status: "status",
+		updatedAt: "updatedAt",
+	},
 	staffProfiles: { id: "id", userId: "userId" },
 	tarEntries: {},
 	users: {},
@@ -166,6 +170,7 @@ jest.mock("@nestjs/schedule", () => ({
 
 const FACILITY = "fac-00000001-0000-0000-0000-000000000001"
 const ENCOUNTER_ID = "enc-00000001-0000-0000-0000-000000000001"
+const PRE_ENCOUNTER_ID = "pre-00000001-0000-0000-0000-000000000001"
 
 const ACTIVE_ENCOUNTER = {
 	id: ENCOUNTER_ID,
@@ -179,6 +184,12 @@ const ACTIVE_ENCOUNTER = {
 }
 
 const SIGNED_NOTE = { id: "note-00000001-0000-0000-0000-000000000001" }
+const ACTIVE_PRE_ENCOUNTER = {
+	id: PRE_ENCOUNTER_ID,
+	facilityId: FACILITY,
+	traumaAlias: "TRAUMA-2026-0001",
+	status: "active",
+}
 
 // ---------------------------------------------------------------------------
 // Helpers — EdService
@@ -333,6 +344,67 @@ function mockUnbilledSelects(rows: unknown[], total: number) {
 
 beforeEach(() => {
 	jest.clearAllMocks()
+})
+
+// ============================================================================
+// EdService.cancelPreEncounter()
+// ============================================================================
+
+describe("EdService.cancelPreEncounter()", () => {
+	it("marks an active pre-encounter as cancelled and broadcasts queue update", async () => {
+		const updated = { ...ACTIVE_PRE_ENCOUNTER, status: "cancelled" }
+		const set = jest.fn().mockReturnValue({
+			where: jest.fn().mockReturnValue({
+				returning: jest.fn().mockResolvedValue([updated]),
+			}),
+		})
+
+		;(db.select as jest.Mock).mockReturnValueOnce({
+			from: jest.fn().mockReturnValue({
+				where: jest.fn().mockResolvedValue([ACTIVE_PRE_ENCOUNTER]),
+			}),
+		})
+		;(db.update as jest.Mock).mockReturnValueOnce({ set })
+
+		const service = makeEdService()
+		const result = await service.cancelPreEncounter(PRE_ENCOUNTER_ID)
+
+		expect(result).toEqual(updated)
+		expect(set).toHaveBeenCalledWith({
+			status: "cancelled",
+			updatedAt: expect.any(Date),
+		})
+		expect((service as unknown as { notificationService: { broadcast: jest.Mock } }).notificationService.broadcast)
+			.toHaveBeenCalledWith(
+				"ed_queue",
+				"ED Queue Updated",
+				"Trauma alias pre-encounter removed from queue"
+			)
+	})
+
+	it("throws NotFoundException when pre-encounter is not found", async () => {
+		;(db.select as jest.Mock).mockReturnValueOnce({
+			from: jest.fn().mockReturnValue({
+				where: jest.fn().mockResolvedValue([]),
+			}),
+		})
+
+		const service = makeEdService()
+		await expect(service.cancelPreEncounter(PRE_ENCOUNTER_ID)).rejects.toThrow(NotFoundException)
+		expect(db.update).not.toHaveBeenCalled()
+	})
+
+	it("throws BadRequestException when pre-encounter is already merged or cancelled", async () => {
+		;(db.select as jest.Mock).mockReturnValueOnce({
+			from: jest.fn().mockReturnValue({
+				where: jest.fn().mockResolvedValue([{ ...ACTIVE_PRE_ENCOUNTER, status: "merged" }]),
+			}),
+		})
+
+		const service = makeEdService()
+		await expect(service.cancelPreEncounter(PRE_ENCOUNTER_ID)).rejects.toThrow(BadRequestException)
+		expect(db.update).not.toHaveBeenCalled()
+	})
 })
 
 // ============================================================================
