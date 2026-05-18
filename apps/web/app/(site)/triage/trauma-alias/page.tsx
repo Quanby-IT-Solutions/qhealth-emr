@@ -13,6 +13,10 @@ export default function TraumaAliasPage() {
 	const staffProfileId = profile?.staffProfiles?.[0]?.id ?? ""
 	const [created, setCreated] = useState(false)
 
+	function handleCreated() {
+		setCreated(true)
+	}
+
 	return (
 		<div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
 			<div className="space-y-4">
@@ -31,7 +35,7 @@ export default function TraumaAliasPage() {
 						<PreEncounterForm
 							facilityId={facilityId}
 							triageStaffId={staffProfileId}
-							onSuccess={() => setCreated(true)}
+							onSuccess={handleCreated}
 						/>
 					</CardContent>
 				</Card>

@@ -23,10 +23,10 @@ import {
 } from "@/core/components/ui/select"
 import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
 import {
-	type TimeSlot,
 	useAvailableSlotsQuery,
 	useBookAppointmentMutation,
 	useStaffClinicianListQuery,
+	type TimeSlot,
 } from "@/features/scheduling/api/scheduling.hooks"
 
 interface AppointmentBookingProps {
@@ -57,6 +57,7 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 
 	const cliniciansQuery = useStaffClinicianListQuery({ facilityId })
 	const clinicians = cliniciansQuery.data ?? []
+	const selectedClinician = clinicians.find(c => c.id === clinicianId)
 
 	const slotsQuery = useAvailableSlotsQuery(
 		{ facilityId, clinicianStaffId: clinicianId, date },
@@ -123,10 +124,14 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 									if (v) setClinicianId(v)
 								}}
 							>
-								<SelectTrigger>
-									<SelectValue>{clinicianId ? clinicians.find(c => c.id === clinicianId)?.name : "Select clinician"}</SelectValue>
+								<SelectTrigger className="w-full min-w-0">
+									<SelectValue className="min-w-0 truncate">
+										{selectedClinician
+											? `${selectedClinician.name}${selectedClinician.department ? ` — ${selectedClinician.department}` : ""}`
+											: "Select clinician"}
+									</SelectValue>
 								</SelectTrigger>
-								<SelectContent>
+								<SelectContent className="max-w-[calc(100vw-2rem)] min-w-72 sm:min-w-96">
 									{clinicians.map(c => (
 										<SelectItem key={c.id} value={c.id}>
 											{c.name}
@@ -156,7 +161,7 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 					<CardTitle>
 						{clinicName ?? "Available Slots"}
 						{availableCount > 0 && (
-							<span className="ml-2 text-sm font-normal text-muted-foreground">
+							<span className="text-muted-foreground ml-2 text-sm font-normal">
 								{availableCount} slot{availableCount !== 1 ? "s" : ""} available
 							</span>
 						)}
@@ -164,13 +169,13 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 				</CardHeader>
 				<CardContent>
 					{!clinicianId ? (
-						<p className="py-6 text-center text-muted-foreground">
+						<p className="text-muted-foreground py-6 text-center">
 							Select a clinician to see available slots.
 						</p>
 					) : slotsQuery.isLoading ? (
-						<p className="py-6 text-center text-muted-foreground">Searching for slots…</p>
+						<p className="text-muted-foreground py-6 text-center">Searching for slots…</p>
 					) : slots.length === 0 ? (
-						<p className="py-6 text-center text-muted-foreground">
+						<p className="text-muted-foreground py-6 text-center">
 							No slots found for the selected date.
 						</p>
 					) : (
@@ -178,10 +183,9 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 							{slots.map(slot => (
 								<Button
 									key={slot.slotId}
-									size="sm"
 									variant={slot.available ? "outline" : "ghost"}
 									disabled={!slot.available}
-									className={!slot.available ? "cursor-not-allowed opacity-50" : ""}
+									className={`min-h-11 px-4 text-sm ${!slot.available ? "cursor-not-allowed opacity-50" : ""}`}
 									onClick={() => slot.available && openBooking(slot)}
 								>
 									{formatSlotTime(slot.time)}
@@ -206,7 +210,7 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 
 					{selectedSlot && (
 						<div className="space-y-4 text-sm">
-							<div className="rounded-md border p-3 space-y-1">
+							<div className="space-y-1 rounded-md border p-3">
 								<div className="flex justify-between">
 									<span className="text-muted-foreground">Date</span>
 									<span className="font-medium">{date}</span>
@@ -239,38 +243,30 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 								{patientSearch.length >= 2 && !selectedPatientId && (
 									<div className="max-h-40 overflow-y-auto rounded-md border">
 										{patientSearchQuery.isLoading ? (
-											<p className="px-3 py-2 text-xs text-muted-foreground">Searching…</p>
+											<p className="text-muted-foreground px-3 py-2 text-xs">Searching…</p>
 										) : (patientSearchQuery.data?.data ?? []).length === 0 ? (
-											<p className="px-3 py-2 text-xs text-muted-foreground">
-												No patients found.
-											</p>
+											<p className="text-muted-foreground px-3 py-2 text-xs">No patients found.</p>
 										) : (
 											patientSearchQuery.data?.data.map(p => (
 												<button
 													key={p.id}
-													className="w-full px-3 py-2 text-left text-xs hover:bg-accent"
+													className="hover:bg-accent w-full px-3 py-2 text-left text-xs"
 													onClick={() => {
 														setSelectedPatientId(p.id)
-														setSelectedPatientLabel(
-															`${p.lastName}, ${p.firstName} (${p.mrn})`
-														)
-														setPatientSearch(
-															`${p.lastName}, ${p.firstName} (${p.mrn})`
-														)
+														setSelectedPatientLabel(`${p.lastName}, ${p.firstName} (${p.mrn})`)
+														setPatientSearch(`${p.lastName}, ${p.firstName} (${p.mrn})`)
 													}}
 												>
 													<span className="font-medium">
 														{p.lastName}, {p.firstName}
 													</span>
-													<span className="ml-2 text-muted-foreground">{p.mrn}</span>
+													<span className="text-muted-foreground ml-2">{p.mrn}</span>
 												</button>
 											))
 										)}
 									</div>
 								)}
-								{selectedPatientId && (
-									<p className="text-xs text-green-600">Patient selected</p>
-								)}
+								{selectedPatientId && <p className="text-xs text-green-600">Patient selected</p>}
 							</div>
 
 							<div className="space-y-1">
@@ -297,10 +293,7 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 						<Button variant="outline" onClick={() => setBookingOpen(false)}>
 							Cancel
 						</Button>
-						<Button
-							onClick={handleBook}
-							disabled={bookMut.isPending || !selectedPatientId}
-						>
+						<Button onClick={handleBook} disabled={bookMut.isPending || !selectedPatientId}>
 							{bookMut.isPending ? "Booking…" : "Confirm Booking"}
 						</Button>
 					</DialogFooter>
