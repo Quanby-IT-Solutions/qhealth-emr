@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+	CreateAppointmentInputSchema,
 	EPrescriptionSchema,
 	SignPrescriptionInputSchema,
 	UpdateAppointmentInputSchema,
@@ -9,6 +10,23 @@ import {
 const ID = "550e8400-e29b-41d4-a716-446655440000"
 
 describe("telemedicine appointment schema", () => {
+	it("accepts optional meeting details during appointment creation", () => {
+		expect(
+			CreateAppointmentInputSchema.safeParse({
+				facilityId: ID,
+				patientId: "550e8400-e29b-41d4-a716-446655440001",
+				clinicianId: "550e8400-e29b-41d4-a716-446655440002",
+				scheduledDate: "2026-05-19",
+				scheduledTime: "10:00",
+				durationMinutes: 30,
+				platform: "zoom",
+				videoLink: "https://us02web.zoom.us/j/123456789",
+				meetingId: "123 456 789",
+				meetingPassword: "secret",
+			}).success
+		).toBe(true)
+	})
+
 	it("requires manual video links to use HTTPS", () => {
 		expect(
 			UpdateAppointmentInputSchema.safeParse({

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import {
 	Check,
 	Copy,
@@ -20,6 +21,11 @@ import {
 	useAppointmentQuery,
 	useUpdateAppointmentMutation,
 } from "@/features/telemedicine/api/telemedicine.hooks"
+import {
+	getVideoLaunchPath,
+	getVideoLinkValidationMessage,
+	isValidVideoLinkForPlatform,
+} from "@/features/telemedicine/lib/video-links"
 
 // ============================================================================
 // Types
@@ -82,15 +88,6 @@ function CopyButton({
 	)
 }
 
-function isValidMeetingUrl(value: string): boolean {
-	try {
-		const url = new URL(value)
-		return url.protocol === "https:" && Boolean(url.hostname)
-	} catch {
-		return false
-	}
-}
-
 // ============================================================================
 // Inner panel (renders when data is available)
 // ============================================================================
@@ -112,8 +109,8 @@ function VideoCallContent({ appt }: { appt: TelemedicineAppointment }) {
 		setError(null)
 
 		const trimmedVideoLink = videoLink.trim()
-		if (!isValidMeetingUrl(trimmedVideoLink)) {
-			setError("Enter a valid HTTPS Zoom or Teams meeting link.")
+		if (!isValidVideoLinkForPlatform(trimmedVideoLink, currentAppt.platform)) {
+			setError(getVideoLinkValidationMessage(currentAppt.platform))
 			return
 		}
 
@@ -237,16 +234,16 @@ function VideoCallContent({ appt }: { appt: TelemedicineAppointment }) {
 
 					{/* Action Buttons */}
 					<div className="flex flex-wrap gap-3">
-						<a
-							href={currentAppt.videoLink!}
+						<Link
+							href={getVideoLaunchPath(currentAppt.id)}
 							target="_blank"
 							rel="noopener noreferrer"
 							className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium"
 						>
 							<Video className="size-4" />
-							Join {platformLabel} Call
+							Launch Video
 							<ExternalLink className="size-3" />
-						</a>
+						</Link>
 						<Button
 							variant="outline"
 							size="sm"
