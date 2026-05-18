@@ -461,7 +461,7 @@ export class EdService {
 					encounterType: input.encounterType ?? "emergency",
 					chiefComplaint: preEnc.chiefComplaint,
 					admittingStaffId: input.admittingStaffId,
-					attendingStaffId: input.admittingStaffId,
+					attendingStaffId: input.attendingStaffId ?? input.admittingStaffId,
 					bedId: input.bedId ?? null,
 					admissionDatetime: preEnc.triageDatetime ?? new Date(),
 					mergedFromPreEncounterId: preEnc.id,
