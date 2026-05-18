@@ -48,6 +48,8 @@ import {
 	surveillanceFlags,
 	systemSettings,
 	tarEntries,
+	telemedicineAppointments,
+	telemedicineEncounters,
 	userRoles,
 	users,
 	vitalSigns,
@@ -90,6 +92,39 @@ async function assertSeedSchemaReady() {
 async function ensureProblemsTerminologyColumns() {
 	await db.execute(sql`ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "snomed_code" text`)
 	await db.execute(sql`ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "snomed_display" text`)
+}
+
+async function ensureTelemedicineLiveKitColumns() {
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "livekit_room_name" text`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "livekit_session_started_at" timestamptz`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "livekit_session_ended_at" timestamptz`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "patient_invite_token_hash" text`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "patient_invite_expires_at" timestamptz`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "patient_invite_revoked_at" timestamptz`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "patient_invite_last_used_at" timestamptz`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "patient_joined_at" timestamptz`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ALTER COLUMN "platform" SET DEFAULT 'livekit'`
+	)
+	await db.execute(
+		sql`CREATE UNIQUE INDEX IF NOT EXISTS "telemedicine_appts_patient_invite_hash_uniq" ON "telemedicine_appointments" ("patient_invite_token_hash")`
+	)
 }
 
 async function seedProblemTerminology() {
@@ -276,7 +311,9 @@ async function seedProblemTerminology() {
 
 	await db.insert(icd10Codes).values(icd10Data).onConflictDoNothing()
 	await db.insert(snomedCtCodes).values(snomedData).onConflictDoNothing()
-	console.log(`  - Seeded ${icd10Data.length} ICD-10 and ${snomedData.length} SNOMED CT problem codes`)
+	console.log(
+		`  - Seeded ${icd10Data.length} ICD-10 and ${snomedData.length} SNOMED CT problem codes`
+	)
 }
 
 type ModuleName =
@@ -1185,6 +1222,323 @@ async function ensureEncounter(
 		})
 		.returning()
 	return created!
+}
+
+function toSeedDate(daysFromToday: number) {
+	const date = new Date()
+	date.setDate(date.getDate() + daysFromToday)
+	return formatSeedDate(date)
+}
+
+function formatSeedDate(date: Date) {
+	const year = date.getFullYear()
+	const month = `${date.getMonth() + 1}`.padStart(2, "0")
+	const day = `${date.getDate()}`.padStart(2, "0")
+	return `${year}-${month}-${day}`
+}
+
+function formatSeedTime(date: Date) {
+	const hour = `${date.getHours()}`.padStart(2, "0")
+	const minute = `${date.getMinutes()}`.padStart(2, "0")
+	const second = `${date.getSeconds()}`.padStart(2, "0")
+	return `${hour}:${minute}:${second}`
+}
+
+function toSeedDateTime(minutesFromNow: number) {
+	const date = new Date()
+	date.setMinutes(date.getMinutes() + minutesFromNow, 0, 0)
+	return {
+		scheduledDate: formatSeedDate(date),
+		scheduledTime: formatSeedTime(date),
+	}
+}
+
+async function ensureTelemedicineAppointment(seed: {
+	facilityId: string
+	patientId: string
+	clinicianStaffId: string
+	scheduledDate: string
+	scheduledTime: string
+	durationMinutes: number
+	status: "scheduled" | "confirmed" | "in-progress" | "completed" | "cancelled" | "no-show"
+	videoLink: string
+	meetingId: string
+	meetingPassword: string
+	notes: string
+	createdByStaffId: string
+}) {
+	const [existing] = await db
+		.select({
+			id: telemedicineAppointments.id,
+			meetingId: telemedicineAppointments.meetingId,
+		})
+		.from(telemedicineAppointments)
+		.where(
+			and(
+				eq(telemedicineAppointments.facilityId, seed.facilityId),
+				eq(telemedicineAppointments.meetingId, seed.meetingId)
+			)
+		)
+		.limit(1)
+
+	const values = {
+		facilityId: seed.facilityId,
+		patientId: seed.patientId,
+		clinicianStaffId: seed.clinicianStaffId,
+		scheduledDate: seed.scheduledDate,
+		scheduledTime: seed.scheduledTime,
+		durationMinutes: seed.durationMinutes,
+		platform: "livekit" as const,
+		status: seed.status,
+		videoLink: seed.videoLink,
+		meetingId: seed.meetingId,
+		meetingPassword: seed.meetingPassword,
+		notes: seed.notes,
+		createdByStaffId: seed.createdByStaffId,
+	}
+
+	if (existing) {
+		const [updated] = await db
+			.update(telemedicineAppointments)
+			.set({ ...values, updatedAt: new Date() })
+			.where(eq(telemedicineAppointments.id, existing.id))
+			.returning({
+				id: telemedicineAppointments.id,
+				meetingId: telemedicineAppointments.meetingId,
+			})
+		return updated ?? existing
+	}
+
+	const [created] = await db.insert(telemedicineAppointments).values(values).returning({
+		id: telemedicineAppointments.id,
+		meetingId: telemedicineAppointments.meetingId,
+	})
+	return created!
+}
+
+async function ensureTelemedicineEncounter(seed: {
+	appointmentId: string
+	patientId: string
+	clinicianStaffId: string
+	chiefComplaint: string
+	subjectiveNotes: string
+	objectiveNotes: string
+	assessmentNotes: string
+	planNotes: string
+	diagnosis: string
+	icdCode?: string
+	vitalSigns?: {
+		bloodPressure?: string
+		heartRate?: string
+		temperature?: string
+		oxygenSaturation?: string
+		weight?: string
+	}
+	status: "open" | "signed" | "finalized"
+	signedAt?: Date
+}) {
+	const [existing] = await db
+		.select()
+		.from(telemedicineEncounters)
+		.where(eq(telemedicineEncounters.appointmentId, seed.appointmentId))
+		.limit(1)
+
+	const values = {
+		appointmentId: seed.appointmentId,
+		encounterType: "standalone" as const,
+		linkedEncounterId: null,
+		patientId: seed.patientId,
+		clinicianStaffId: seed.clinicianStaffId,
+		chiefComplaint: seed.chiefComplaint,
+		subjectiveNotes: seed.subjectiveNotes,
+		objectiveNotes: seed.objectiveNotes,
+		assessmentNotes: seed.assessmentNotes,
+		planNotes: seed.planNotes,
+		diagnosis: seed.diagnosis,
+		icdCode: seed.icdCode ?? null,
+		vitalSigns: seed.vitalSigns ?? null,
+		status: seed.status,
+		signedAt: seed.status === "open" ? null : (seed.signedAt ?? new Date()),
+		signedByStaffId: seed.status === "open" ? null : seed.clinicianStaffId,
+	}
+
+	if (existing) {
+		const [updated] = await db
+			.update(telemedicineEncounters)
+			.set({ ...values, updatedAt: new Date() })
+			.where(eq(telemedicineEncounters.id, existing.id))
+			.returning()
+		return updated ?? existing
+	}
+
+	const [created] = await db.insert(telemedicineEncounters).values(values).returning()
+	return created!
+}
+
+async function ensureTelemedicineAppointments(params: {
+	mainFacilityId: string
+	northFacilityId: string
+	doctorStaffId: string
+	familyMedicineNorthStaffId: string
+	schedulerMainStaffId: string
+	schedulerNorthStaffId: string
+	mainPatientIds: {
+		scheduled: string
+		inProgress: string
+		confirmed: string
+		completed: string
+	}
+	northPatientIds: {
+		scheduled: string
+		confirmed: string
+	}
+}) {
+	const now = new Date()
+	const completedSignedAt = new Date(now.getTime() - 2 * 24 * 3_600_000)
+	const inProgressSchedule = toSeedDateTime(-15)
+
+	const mainScheduled = await ensureTelemedicineAppointment({
+		facilityId: params.mainFacilityId,
+		patientId: params.mainPatientIds.scheduled,
+		clinicianStaffId: params.doctorStaffId,
+		scheduledDate: toSeedDate(1),
+		scheduledTime: "09:00:00",
+		durationMinutes: 30,
+		status: "scheduled",
+		videoLink: "https://zoom.us/j/910000001",
+		meetingId: "QH-TM-MAIN-001",
+		meetingPassword: "telemed1",
+		notes: "Initial virtual consult for hypertension medication review.",
+		createdByStaffId: params.schedulerMainStaffId,
+	})
+
+	const mainInProgress = await ensureTelemedicineAppointment({
+		facilityId: params.mainFacilityId,
+		patientId: params.mainPatientIds.inProgress,
+		clinicianStaffId: params.doctorStaffId,
+		scheduledDate: inProgressSchedule.scheduledDate,
+		scheduledTime: inProgressSchedule.scheduledTime,
+		durationMinutes: 45,
+		status: "in-progress",
+		videoLink: "https://zoom.us/j/910000002",
+		meetingId: "QH-TM-MAIN-002",
+		meetingPassword: "telemed2",
+		notes: "Active virtual follow-up with partial SOAP documentation.",
+		createdByStaffId: params.schedulerMainStaffId,
+	})
+	await ensureTelemedicineEncounter({
+		appointmentId: mainInProgress.id,
+		patientId: params.mainPatientIds.inProgress,
+		clinicianStaffId: params.doctorStaffId,
+		chiefComplaint: "Persistent cough and low-grade fever",
+		subjectiveNotes:
+			"Patient reports five days of productive cough, intermittent fever, and mild fatigue. No chest pain or dyspnea at rest.",
+		objectiveNotes:
+			"Video assessment: speaking in full sentences, no visible respiratory distress. Home temperature 37.8 C.",
+		assessmentNotes:
+			"Likely acute upper respiratory infection. Pneumonia risk remains low but requires monitoring.",
+		planNotes:
+			"Complete respiratory review, counsel on warning signs, and decide if chest imaging is needed.",
+		diagnosis: "Acute upper respiratory infection",
+		icdCode: "J06.9",
+		vitalSigns: {
+			bloodPressure: "124/78",
+			heartRate: "88",
+			temperature: "37.8",
+			oxygenSaturation: "97",
+			weight: "68",
+		},
+		status: "open",
+	})
+
+	const mainConfirmed = await ensureTelemedicineAppointment({
+		facilityId: params.mainFacilityId,
+		patientId: params.mainPatientIds.confirmed,
+		clinicianStaffId: params.doctorStaffId,
+		scheduledDate: toSeedDate(3),
+		scheduledTime: "14:00:00",
+		durationMinutes: 30,
+		status: "confirmed",
+		videoLink: "https://zoom.us/j/910000003",
+		meetingId: "QH-TM-MAIN-003",
+		meetingPassword: "telemed3",
+		notes: "Confirmed diabetes follow-up and home glucose review.",
+		createdByStaffId: params.schedulerMainStaffId,
+	})
+
+	const mainCompleted = await ensureTelemedicineAppointment({
+		facilityId: params.mainFacilityId,
+		patientId: params.mainPatientIds.completed,
+		clinicianStaffId: params.doctorStaffId,
+		scheduledDate: toSeedDate(-4),
+		scheduledTime: "15:30:00",
+		durationMinutes: 30,
+		status: "completed",
+		videoLink: "https://zoom.us/j/910000004",
+		meetingId: "QH-TM-MAIN-004",
+		meetingPassword: "telemed4",
+		notes: "Completed virtual consult with finalized SOAP note.",
+		createdByStaffId: params.schedulerMainStaffId,
+	})
+	await ensureTelemedicineEncounter({
+		appointmentId: mainCompleted.id,
+		patientId: params.mainPatientIds.completed,
+		clinicianStaffId: params.doctorStaffId,
+		chiefComplaint: "Blood pressure follow-up",
+		subjectiveNotes:
+			"Patient reports improved adherence to losartan, no dizziness, chest pain, or shortness of breath.",
+		objectiveNotes:
+			"Home blood pressure log averages 128/82 mmHg. Patient appears well on video consultation.",
+		assessmentNotes: "Essential hypertension, controlled on current regimen.",
+		planNotes:
+			"Continue current medications, reinforce low-sodium diet, and repeat follow-up in four weeks.",
+		diagnosis: "Essential hypertension",
+		icdCode: "I10",
+		vitalSigns: {
+			bloodPressure: "128/82",
+			heartRate: "76",
+			temperature: "36.7",
+			oxygenSaturation: "98",
+			weight: "72",
+		},
+		status: "finalized",
+		signedAt: completedSignedAt,
+	})
+
+	await ensureTelemedicineAppointment({
+		facilityId: params.northFacilityId,
+		patientId: params.northPatientIds.scheduled,
+		clinicianStaffId: params.familyMedicineNorthStaffId,
+		scheduledDate: toSeedDate(2),
+		scheduledTime: "08:30:00",
+		durationMinutes: 30,
+		status: "scheduled",
+		videoLink: "https://zoom.us/j/920000001",
+		meetingId: "QH-TM-NORTH-001",
+		meetingPassword: "north1",
+		notes: "Family medicine virtual consult for headache and sleep hygiene review.",
+		createdByStaffId: params.schedulerNorthStaffId,
+	})
+
+	await ensureTelemedicineAppointment({
+		facilityId: params.northFacilityId,
+		patientId: params.northPatientIds.confirmed,
+		clinicianStaffId: params.familyMedicineNorthStaffId,
+		scheduledDate: toSeedDate(5),
+		scheduledTime: "11:00:00",
+		durationMinutes: 30,
+		status: "confirmed",
+		videoLink: "https://zoom.us/j/920000002",
+		meetingId: "QH-TM-NORTH-002",
+		meetingPassword: "north2",
+		notes: "Confirmed family medicine follow-up for allergic rhinitis.",
+		createdByStaffId: params.schedulerNorthStaffId,
+	})
+
+	console.log("  - Seeded telemedicine appointments for physician workflows")
+	console.log(
+		`    - Main facility examples: ${mainScheduled.meetingId}, ${mainConfirmed.meetingId}`
+	)
 }
 
 async function ensureReferenceData(facilityId: string) {
@@ -2618,6 +2972,7 @@ async function main() {
 	console.log("Seeding qhealth-emr development data...")
 	await assertSeedSchemaReady()
 	await ensureProblemsTerminologyColumns()
+	await ensureTelemedicineLiveKitColumns()
 	await seedProblemTerminology()
 
 	const facilityMap = new Map<string, Awaited<ReturnType<typeof ensureFacility>>>()
@@ -2628,6 +2983,7 @@ async function main() {
 	}
 
 	const mainFacility = facilityMap.get("main")!
+	const northFacility = facilityMap.get("north-clinic")!
 
 	const roleMap = new Map<string, string>()
 	for (const facilitySeed of demoFacilities) {
@@ -2647,6 +3003,7 @@ async function main() {
 	}
 
 	const staffMap = new Map<string, string>()
+	const staffFacilityMap = new Map<string, string>()
 	for (const user of demoUsers) {
 		const assignedFacilityKeys = staffFacilityAssignments[user.email] ?? ["main"]
 
@@ -2654,6 +3011,7 @@ async function main() {
 			const facility = facilityMap.get(facilityKey)!
 			const staff = await ensureStaffProfile(authUsers.get(user.email)!, facility.id, user)
 			await ensureUserRole(staff.id, roleMap.get(`${facilityKey}:${user.roleName}`)!)
+			staffFacilityMap.set(`${facilityKey}:${user.email}`, staff.id)
 
 			if (facilityKey === "main") {
 				staffMap.set(user.email, staff.id)
@@ -2687,7 +3045,57 @@ async function main() {
 		"1992-07-03",
 		"female"
 	)
-	await ensurePatient(mainFacility.id, "QH-000003", "Pedro", "Reyes", "1978-11-21", "male")
+	const patient3 = await ensurePatient(
+		mainFacility.id,
+		"QH-000003",
+		"Pedro",
+		"Reyes",
+		"1978-11-21",
+		"male"
+	)
+	const patient4 = await ensurePatient(
+		mainFacility.id,
+		"QH-000004",
+		"Lourdes",
+		"Garcia",
+		"1969-04-09",
+		"female"
+	)
+	const northPatient1 = await ensurePatient(
+		northFacility.id,
+		"QHN-000001",
+		"Elena",
+		"Flores",
+		"1988-03-17",
+		"female"
+	)
+	const northPatient2 = await ensurePatient(
+		northFacility.id,
+		"QHN-000002",
+		"Roberto",
+		"Lim",
+		"1975-09-12",
+		"male"
+	)
+
+	await ensureTelemedicineAppointments({
+		mainFacilityId: mainFacility.id,
+		northFacilityId: northFacility.id,
+		doctorStaffId: staffMap.get("doctor@qhealth.local")!,
+		familyMedicineNorthStaffId: staffFacilityMap.get("north-clinic:familymed@qhealth.local")!,
+		schedulerMainStaffId: staffMap.get("scheduler@qhealth.local")!,
+		schedulerNorthStaffId: staffFacilityMap.get("north-clinic:scheduler@qhealth.local")!,
+		mainPatientIds: {
+			scheduled: patient1.id,
+			inProgress: patient2.id,
+			confirmed: patient3.id,
+			completed: patient4.id,
+		},
+		northPatientIds: {
+			scheduled: northPatient1.id,
+			confirmed: northPatient2.id,
+		},
+	})
 
 	// Newborn patient — DOB set to ~36 hours ago so the NBS tab (< 30 days rule) is always visible.
 	// Re-run the seed if this patient's age exceeds 28 days.

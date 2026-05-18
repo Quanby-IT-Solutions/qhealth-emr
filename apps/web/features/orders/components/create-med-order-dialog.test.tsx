@@ -322,6 +322,19 @@ describe("CreateMedOrderDialog", () => {
 		expect(checkBtn).toBeDisabled()
 	})
 
+	it("clarifies that a clean CDS result means no order-specific safety alerts", async () => {
+		const user = userEvent.setup()
+
+		render(<CreateMedOrderDialog {...defaultProps} />)
+
+		await user.type(screen.getByTestId("generic-name-input"), "Paracetamol")
+		await user.click(screen.getByRole("button", { name: /run drug safety check/i }))
+
+		expect(
+			screen.getByText(/no medication-safety alerts for this order/i)
+		).toBeInTheDocument()
+	})
+
 	it("keeps submit disabled when CDS returns a hard-block allergy", async () => {
 		const user = userEvent.setup()
 		setCdsEvaluateResult({

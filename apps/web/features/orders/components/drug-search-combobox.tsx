@@ -99,31 +99,43 @@ export function DrugSearchCombobox({
 		setOpen(false)
 	}
 
+	function openIfSearchable() {
+		if (!disabled && facilityId && inputValue.trim().length >= 2) {
+			setOpen(true)
+		}
+	}
+
 	return (
 		<Popover open={open} onOpenChange={handleOpenChange}>
 			<Command shouldFilter={false} className="h-auto w-full overflow-visible bg-transparent p-0">
-				<PopoverTrigger render={<div className="w-full" />}>
+				<PopoverTrigger nativeButton={false} render={<div className="w-full" />}>
 					<CommandInput
 						id={id}
 						value={inputValue}
 						onValueChange={handleInputChange}
-						onFocus={() => {
-							if (!disabled && facilityId && inputValue.trim().length >= 2) {
-								setOpen(true)
-							}
+						onPointerDown={event => event.stopPropagation()}
+						onClick={event => {
+							event.stopPropagation()
+							openIfSearchable()
 						}}
+						onFocus={openIfSearchable}
 						placeholder={placeholder}
 						disabled={disabled}
 						autoFocus={autoFocus}
 					/>
 				</PopoverTrigger>
-				<PopoverContent align="start" className="w-(--anchor-width) p-0">
+				<PopoverContent
+					align="start"
+					className="w-(--anchor-width) p-0"
+					initialFocus={false}
+					finalFocus={false}
+				>
 					<CommandList>
 						{isLoading ? (
 							<div className="text-muted-foreground px-3 py-4 text-sm">Searching...</div>
 						) : (
 							<>
-								<CommandEmpty>No formulary matches</CommandEmpty>
+								<CommandEmpty>No drug matches</CommandEmpty>
 								<CommandGroup>
 									{items.map(item => (
 										<CommandItem

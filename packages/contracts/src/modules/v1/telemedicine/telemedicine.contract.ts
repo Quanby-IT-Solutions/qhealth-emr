@@ -7,15 +7,25 @@ import {
 	CreateAppointmentInputSchema,
 	CreateEncounterInputSchema,
 	CreatePrescriptionInputSchema,
+	EndLiveKitSessionInputSchema,
 	EPrescriptionSchema,
 	GenerateAbstractInputSchema,
 	GetAbstractInputSchema,
 	GetAppointmentInputSchema,
 	GetEncounterInputSchema,
 	GetPrescriptionInputSchema,
+	JoinLiveKitRoomInputSchema,
+	JoinPatientLiveKitRoomInputSchema,
 	ListAppointmentsInputSchema,
 	ListEncounterAbstractsInputSchema,
 	ListPrescriptionsInputSchema,
+	LiveKitSessionEndResponseSchema,
+	LiveKitTokenResponseSchema,
+	PatientInviteActionInputSchema,
+	PatientInvitePreviewSchema,
+	PatientInviteResponseSchema,
+	PatientInviteStatusResponseSchema,
+	PatientInviteTokenInputSchema,
 	SendAbstractInputSchema,
 	SendPrescriptionInputSchema,
 	SignAbstractInputSchema,
@@ -78,6 +88,66 @@ export const telemedicineContract = {
 		})
 		.input(CancelAppointmentInputSchema)
 		.output(z.void()),
+
+	joinLiveKitRoom: oc
+		.route({
+			method: "POST",
+			path: "/appointments/{id}/livekit-token",
+			summary: "Get a LiveKit access token for a telemedicine appointment",
+			tags: ["Telemedicine"],
+		})
+		.input(JoinLiveKitRoomInputSchema)
+		.output(LiveKitTokenResponseSchema),
+
+	endLiveKitSession: oc
+		.route({
+			method: "POST",
+			path: "/appointments/{id}/livekit-session/end",
+			summary: "Mark a LiveKit session as ended for a telemedicine appointment",
+			tags: ["Telemedicine"],
+		})
+		.input(EndLiveKitSessionInputSchema)
+		.output(LiveKitSessionEndResponseSchema),
+
+	regeneratePatientInvite: oc
+		.route({
+			method: "POST",
+			path: "/appointments/{id}/patient-invite/regenerate",
+			summary: "Regenerate the patient LiveKit invite for a telemedicine appointment",
+			tags: ["Telemedicine"],
+		})
+		.input(PatientInviteActionInputSchema)
+		.output(PatientInviteResponseSchema),
+
+	revokePatientInvite: oc
+		.route({
+			method: "POST",
+			path: "/appointments/{id}/patient-invite/revoke",
+			summary: "Revoke the patient LiveKit invite for a telemedicine appointment",
+			tags: ["Telemedicine"],
+		})
+		.input(PatientInviteActionInputSchema)
+		.output(PatientInviteStatusResponseSchema),
+
+	getPatientInvitePreview: oc
+		.route({
+			method: "GET",
+			path: "/patient-invites/{token}",
+			summary: "Get public appointment preview for a patient LiveKit invite",
+			tags: ["Telemedicine"],
+		})
+		.input(PatientInviteTokenInputSchema)
+		.output(PatientInvitePreviewSchema),
+
+	joinPatientLiveKitRoom: oc
+		.route({
+			method: "POST",
+			path: "/patient-invites/{token}/livekit-token",
+			summary: "Get a patient LiveKit access token for a telemedicine invite",
+			tags: ["Telemedicine"],
+		})
+		.input(JoinPatientLiveKitRoomInputSchema)
+		.output(LiveKitTokenResponseSchema),
 
 	// Encounters
 

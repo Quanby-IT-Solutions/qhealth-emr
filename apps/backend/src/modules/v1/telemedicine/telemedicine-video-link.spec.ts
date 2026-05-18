@@ -12,6 +12,12 @@ describe("assertTelemedicineVideoLink", () => {
 		).not.toThrow()
 	})
 
+	it("accepts HTTPS links for LiveKit without external host restrictions", () => {
+		expect(() =>
+			assertTelemedicineVideoLink("https://telemedicine.example.test/rooms/demo", "livekit")
+		).not.toThrow()
+	})
+
 	it("rejects non-HTTPS links", () => {
 		expect(() => assertTelemedicineVideoLink("http://us02web.zoom.us/j/123", "zoom")).toThrow(
 			BadRequestException

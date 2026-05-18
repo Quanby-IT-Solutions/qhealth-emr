@@ -46,6 +46,7 @@
 		"dotenv": "catalog:",
 		"drizzle-orm": "catalog:",
 		"express": "^5.2.1",
+		"livekit-server-sdk": "^2.15.3",
 		"nestjs-zod": "^5.1.1",
 		"pdf-lib": "^1.17.1",
 		"pg": "catalog:",

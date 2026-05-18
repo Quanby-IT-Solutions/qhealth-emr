@@ -13,7 +13,7 @@ const HttpsUrlSchema = z
 // Enums
 // ============================================================================
 
-export const TelemedicinePlatformEnum = z.enum(["zoom", "teams"])
+export const TelemedicinePlatformEnum = z.enum(["zoom", "teams", "livekit"])
 export const AppointmentStatusEnum = z.enum([
 	"scheduled",
 	"confirmed",
@@ -56,6 +56,14 @@ export const TelemedicineAppointmentSchema = z.object({
 	videoLink: z.string().nullable(),
 	meetingId: z.string().nullable(),
 	meetingPassword: z.string().nullable(),
+	livekitRoomName: z.string().nullable(),
+	livekitSessionStartedAt: z.string().nullable(),
+	livekitSessionEndedAt: z.string().nullable(),
+	patientInviteExpiresAt: z.string().nullable(),
+	patientInviteRevokedAt: z.string().nullable(),
+	patientInviteLastUsedAt: z.string().nullable(),
+	patientJoinedAt: z.string().nullable(),
+	patientInviteToken: z.string().optional(),
 	notes: z.string().nullable(),
 	encounterId: z.string().uuid().nullable(),
 	createdAt: z.string(),
@@ -103,10 +111,7 @@ export const CreateAppointmentInputSchema = z.object({
 	scheduledDate: z.string(),
 	scheduledTime: z.string(),
 	durationMinutes: z.number().int().positive().default(30),
-	platform: TelemedicinePlatformEnum,
-	videoLink: HttpsUrlSchema.optional(),
-	meetingId: z.string().optional(),
-	meetingPassword: z.string().optional(),
+	platform: z.literal("livekit").default("livekit"),
 	notes: z.string().optional(),
 })
 
@@ -133,6 +138,104 @@ export const CancelAppointmentInputSchema = z.object({
 	id: z.string().uuid(),
 	cancellationReason: z.string().optional(),
 })
+
+// ============================================================================
+// LiveKit Room Join
+// ============================================================================
+
+export const LiveKitTokenResponseSchema = z.object({
+	isConfigured: z.boolean(),
+	token: z.string().optional(),
+	wsUrl: z.string().optional(),
+	roomName: z.string().optional(),
+})
+
+export type LiveKitTokenResponse = z.infer<typeof LiveKitTokenResponseSchema>
+
+export const JoinLiveKitRoomInputSchema = z.object({
+	id: z.string().uuid(),
+})
+
+export type JoinLiveKitRoomInput = z.infer<typeof JoinLiveKitRoomInputSchema>
+
+export const EndLiveKitSessionInputSchema = z.object({
+	id: z.string().uuid(),
+})
+
+export type EndLiveKitSessionInput = z.infer<typeof EndLiveKitSessionInputSchema>
+
+export const LiveKitSessionEndResponseSchema = z.object({
+	appointmentId: z.string().uuid(),
+	livekitSessionEndedAt: z.string(),
+})
+
+export type LiveKitSessionEndResponse = z.infer<typeof LiveKitSessionEndResponseSchema>
+
+// ============================================================================
+// Patient Invite
+// ============================================================================
+
+export const PatientInviteActionInputSchema = z.object({
+	id: z.string().uuid(),
+})
+
+export type PatientInviteActionInput = z.infer<typeof PatientInviteActionInputSchema>
+
+export const PatientInviteResponseSchema = z.object({
+	appointmentId: z.string().uuid(),
+	patientInviteToken: z.string(),
+	patientInviteExpiresAt: z.string(),
+	patientInviteRevokedAt: z.string().nullable(),
+})
+
+export type PatientInviteResponse = z.infer<typeof PatientInviteResponseSchema>
+
+export const PatientInviteStatusResponseSchema = z.object({
+	appointmentId: z.string().uuid(),
+	hasPatientInvite: z.boolean(),
+	patientInviteExpiresAt: z.string().nullable(),
+	patientInviteRevokedAt: z.string().nullable(),
+})
+
+export type PatientInviteStatusResponse = z.infer<typeof PatientInviteStatusResponseSchema>
+
+export const PatientInviteTokenInputSchema = z.object({
+	token: z.string().min(20),
+})
+
+export type PatientInviteTokenInput = z.infer<typeof PatientInviteTokenInputSchema>
+
+export const PatientInvitePreviewSchema = z.object({
+	isValid: z.boolean(),
+	isRevoked: z.boolean(),
+	isExpired: z.boolean(),
+	canJoinNow: z.boolean(),
+	appointmentStatus: AppointmentStatusEnum,
+	scheduledDate: z.string(),
+	scheduledTime: z.string(),
+	durationMinutes: z.number(),
+	clinicianName: z.string(),
+	facilityName: z.string(),
+	joinWindowStartsAt: z.string(),
+	joinWindowEndsAt: z.string(),
+})
+
+export type PatientInvitePreview = z.infer<typeof PatientInvitePreviewSchema>
+
+export const JoinPatientLiveKitRoomInputSchema = PatientInviteTokenInputSchema.extend({
+	dateOfBirth: z.string().optional(),
+	mrn: z.string().optional(),
+}).superRefine((data, ctx) => {
+	if (!data.dateOfBirth?.trim() && !data.mrn?.trim()) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: "Enter the patient date of birth or MRN.",
+			path: ["dateOfBirth"],
+		})
+	}
+})
+
+export type JoinPatientLiveKitRoomInput = z.infer<typeof JoinPatientLiveKitRoomInputSchema>
 
 // ============================================================================
 // Vital Signs

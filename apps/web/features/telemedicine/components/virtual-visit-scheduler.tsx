@@ -17,13 +17,9 @@ import {
 	useCreateAppointmentMutation,
 	type AppointmentStatus,
 	type CreateAppointmentInput,
-	type TelemedicinePlatform,
+	type TelemedicineAppointment,
 } from "@/features/telemedicine/api/telemedicine.hooks"
-import {
-	getVideoLaunchPath,
-	getVideoLinkValidationMessage,
-	isValidVideoLinkForPlatform,
-} from "@/features/telemedicine/lib/video-links"
+import { getVideoLaunchPath } from "@/features/telemedicine/lib/video-links"
 
 // ============================================================================
 // Types
@@ -32,7 +28,7 @@ import {
 interface VirtualVisitSchedulerProps {
 	facilityId: string
 	selectedAppointmentId?: string | null
-	onAppointmentCreated?: (appointmentId: string) => void
+	onAppointmentCreated?: (appointment: TelemedicineAppointment) => void
 	onAppointmentSelected?: (appointmentId: string, encounterId?: string | null) => void
 }
 
@@ -48,10 +44,6 @@ interface BookingFormState {
 	scheduledDate: string
 	scheduledTime: string
 	durationMinutes: number
-	platform: TelemedicinePlatform
-	videoLink: string
-	meetingId: string
-	meetingPassword: string
 	notes: string
 }
 
@@ -73,10 +65,6 @@ const EMPTY_FORM: BookingFormState = {
 	scheduledDate: "",
 	scheduledTime: "",
 	durationMinutes: 30,
-	platform: "zoom",
-	videoLink: "",
-	meetingId: "",
-	meetingPassword: "",
 	notes: "",
 }
 
@@ -100,39 +88,6 @@ function isValidEmail(value: string): boolean {
 function isFutureAppointment(date: string, time: string): boolean {
 	const scheduled = new Date(`${date}T${time}`)
 	return Number.isFinite(scheduled.getTime()) && scheduled.getTime() > Date.now()
-}
-
-// ============================================================================
-// Sub-components
-// ============================================================================
-
-function PlatformSelector({
-	value,
-	onChange,
-}: {
-	value: TelemedicinePlatform
-	onChange: (v: TelemedicinePlatform) => void
-}) {
-	return (
-		<div className="flex gap-3">
-			{(["zoom", "teams"] as const).map(p => (
-				<button
-					key={p}
-					type="button"
-					onClick={() => onChange(p)}
-					className={[
-						"flex flex-1 items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors",
-						value === p
-							? "border-primary bg-primary/10 text-primary"
-							: "border-muted bg-background text-muted-foreground hover:border-primary/40",
-					].join(" ")}
-				>
-					<Video className="size-4" />
-					{getPlatformLabel(p)}
-				</button>
-			))}
-		</div>
-	)
 }
 
 function AppointmentStatusBadge({ status }: { status: AppointmentStatus }) {
@@ -232,11 +187,6 @@ export function VirtualVisitScheduler({
 			setError("Enter a valid patient email address.")
 			return
 		}
-		const trimmedVideoLink = form.videoLink.trim()
-		if (trimmedVideoLink && !isValidVideoLinkForPlatform(trimmedVideoLink, form.platform)) {
-			setError(getVideoLinkValidationMessage(form.platform))
-			return
-		}
 
 		const input: CreateAppointmentInput = {
 			facilityId,
@@ -245,10 +195,7 @@ export function VirtualVisitScheduler({
 			scheduledDate: form.scheduledDate,
 			scheduledTime: form.scheduledTime,
 			durationMinutes: form.durationMinutes,
-			platform: form.platform,
-			videoLink: trimmedVideoLink || undefined,
-			meetingId: form.meetingId.trim() || undefined,
-			meetingPassword: form.meetingPassword.trim() || undefined,
+			platform: "livekit",
 			notes: form.notes.trim() || undefined,
 		}
 
@@ -257,7 +204,7 @@ export function VirtualVisitScheduler({
 			setForm(EMPTY_FORM)
 			setPatientSearch("")
 			setShowForm(false)
-			onAppointmentCreated?.(appt.id)
+			onAppointmentCreated?.(appt)
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to create appointment.")
 		}
@@ -273,7 +220,7 @@ export function VirtualVisitScheduler({
 				<div>
 					<h2 className="text-lg font-semibold">Virtual Visit Scheduler</h2>
 					<p className="text-muted-foreground text-sm">
-						Book telemedicine appointments via Zoom or Microsoft Teams
+						Book LiveKit telemedicine appointments and secure patient invite links
 					</p>
 				</div>
 				<Button onClick={() => setShowForm(v => !v)} variant={showForm ? "outline" : "default"}>
@@ -289,57 +236,6 @@ export function VirtualVisitScheduler({
 					</CardHeader>
 					<CardContent>
 						<form onSubmit={handleSubmit} className="space-y-5">
-							{/* Platform */}
-							<div className="space-y-1.5">
-								<label className="text-sm font-medium">Video Platform</label>
-								<PlatformSelector value={form.platform} onChange={v => patch("platform", v)} />
-							</div>
-
-							{/* Meeting Details */}
-							<div className="grid grid-cols-2 gap-4">
-								<div className="col-span-2 space-y-1.5">
-									<label htmlFor="videoLink" className="text-sm font-medium">
-										Meeting Link (optional)
-									</label>
-									<input
-										id="videoLink"
-										type="url"
-										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-										value={form.videoLink}
-										onChange={e => patch("videoLink", e.target.value)}
-										placeholder={
-											form.platform === "zoom"
-												? "https://us02web.zoom.us/j/..."
-												: "https://teams.microsoft.com/l/meetup-join/..."
-										}
-									/>
-								</div>
-								<div className="space-y-1.5">
-									<label htmlFor="meetingId" className="text-sm font-medium">
-										Meeting ID
-									</label>
-									<input
-										id="meetingId"
-										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-										value={form.meetingId}
-										onChange={e => patch("meetingId", e.target.value)}
-										placeholder="Meeting ID"
-									/>
-								</div>
-								<div className="space-y-1.5">
-									<label htmlFor="meetingPassword" className="text-sm font-medium">
-										Passcode
-									</label>
-									<input
-										id="meetingPassword"
-										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-										value={form.meetingPassword}
-										onChange={e => patch("meetingPassword", e.target.value)}
-										placeholder="Passcode"
-									/>
-								</div>
-							</div>
-
 							{/* Patient Info */}
 							<div className="grid grid-cols-2 gap-4">
 								<div className="relative col-span-2 space-y-1.5">
@@ -587,17 +483,15 @@ export function VirtualVisitScheduler({
 												{appt.encounterId ? "Continue Encounter" : "Start Virtual Encounter"}
 												<ArrowRight className="ml-1.5 size-3.5" />
 											</Button>
-											{appt.videoLink && (
-												<Link
-													href={getVideoLaunchPath(appt.id)}
-													target="_blank"
-													rel="noopener noreferrer"
-													className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium"
-												>
-													<Video className="size-3" />
-													Launch Video
-												</Link>
-											)}
+											<Link
+												href={getVideoLaunchPath(appt.id)}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium"
+											>
+												<Video className="size-3" />
+												Open Video
+											</Link>
 										</div>
 									</div>
 								)

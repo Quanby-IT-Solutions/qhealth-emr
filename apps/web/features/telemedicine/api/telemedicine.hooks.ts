@@ -8,8 +8,8 @@ import { env } from "@/env"
 
 const API_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/telemedicine`
 
-export const TELEMEDICINE_PLATFORMS = ["zoom", "teams"] as const
-export type TelemedicinePlatform = (typeof TELEMEDICINE_PLATFORMS)[number]
+export const TELEMEDICINE_PLATFORMS = ["livekit"] as const
+export type TelemedicinePlatform = "zoom" | "teams" | "livekit"
 
 export const APPOINTMENT_STATUSES = [
 	"scheduled",
@@ -57,6 +57,14 @@ export interface TelemedicineAppointment {
 	videoLink: string | null
 	meetingId: string | null
 	meetingPassword: string | null
+	livekitRoomName: string | null
+	livekitSessionStartedAt: string | null
+	livekitSessionEndedAt: string | null
+	patientInviteExpiresAt: string | null
+	patientInviteRevokedAt: string | null
+	patientInviteLastUsedAt: string | null
+	patientJoinedAt: string | null
+	patientInviteToken?: string
 	notes: string | null
 	encounterId: string | null
 	createdAt: string
@@ -68,6 +76,47 @@ export interface AppointmentListResponse {
 	total: number
 	page: number
 	limit: number
+}
+
+export interface LiveKitTokenResponse {
+	isConfigured: boolean
+	token?: string
+	wsUrl?: string
+	roomName?: string
+}
+
+export interface LiveKitSessionEndResponse {
+	appointmentId: string
+	livekitSessionEndedAt: string
+}
+
+export interface PatientInviteResponse {
+	appointmentId: string
+	patientInviteToken: string
+	patientInviteExpiresAt: string
+	patientInviteRevokedAt: string | null
+}
+
+export interface PatientInviteStatusResponse {
+	appointmentId: string
+	hasPatientInvite: boolean
+	patientInviteExpiresAt: string | null
+	patientInviteRevokedAt: string | null
+}
+
+export interface PatientInvitePreview {
+	isValid: boolean
+	isRevoked: boolean
+	isExpired: boolean
+	canJoinNow: boolean
+	appointmentStatus: AppointmentStatus
+	scheduledDate: string
+	scheduledTime: string
+	durationMinutes: number
+	clinicianName: string
+	facilityName: string
+	joinWindowStartsAt: string
+	joinWindowEndsAt: string
 }
 
 export interface TelemedicineEncounter {
@@ -147,10 +196,7 @@ export interface CreateAppointmentInput {
 	scheduledDate: string
 	scheduledTime: string
 	durationMinutes: number
-	platform: TelemedicinePlatform
-	videoLink?: string
-	meetingId?: string
-	meetingPassword?: string
+	platform?: "livekit"
 	notes?: string
 }
 
@@ -245,7 +291,8 @@ export interface SendPrescriptionInput {
 
 export const telemedicineKeys = {
 	all: ["telemedicine"] as const,
-	appointments: (facilityId: string) => [...telemedicineKeys.all, "appointments", facilityId] as const,
+	appointments: (facilityId: string) =>
+		[...telemedicineKeys.all, "appointments", facilityId] as const,
 	appointment: (id: string) => [...telemedicineKeys.all, "appointments", id] as const,
 	encounters: (appointmentId: string) =>
 		[...telemedicineKeys.all, "encounters", appointmentId] as const,
@@ -253,14 +300,35 @@ export const telemedicineKeys = {
 	prescriptions: (encounterId: string) =>
 		[...telemedicineKeys.all, "prescriptions", encounterId] as const,
 	prescription: (id: string) => [...telemedicineKeys.all, "prescription", id] as const,
-	abstracts: (encounterId: string) =>
-		[...telemedicineKeys.all, "abstracts", encounterId] as const,
+	abstracts: (encounterId: string) => [...telemedicineKeys.all, "abstracts", encounterId] as const,
 	abstract: (id: string) => [...telemedicineKeys.all, "abstract", id] as const,
+	patientInvite: (appointmentId: string) =>
+		[...telemedicineKeys.all, "appointments", appointmentId, "patient-invite"] as const,
+	patientInvitePreview: (token: string) =>
+		[...telemedicineKeys.all, "patient-invites", token] as const,
 }
 
 // ============================================================================
 // Fetch helpers
 // ============================================================================
+
+function getErrorMessageFromResponseBody(body: string, fallback: string): string {
+	if (!body) return fallback
+
+	try {
+		const parsed = JSON.parse(body) as { message?: unknown; error?: unknown }
+		if (typeof parsed.message === "string" && parsed.message.trim()) {
+			return parsed.message
+		}
+		if (typeof parsed.error === "string" && parsed.error.trim()) {
+			return parsed.error
+		}
+	} catch {
+		return body
+	}
+
+	return body
+}
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 	const res = await fetch(url, {
@@ -269,8 +337,8 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 		...init,
 	})
 	if (!res.ok) {
-		const err = await res.text().catch(() => res.statusText)
-		throw new Error(err || `HTTP ${res.status}`)
+		const err = await res.text().catch(() => "")
+		throw new Error(getErrorMessageFromResponseBody(err, res.statusText || `HTTP ${res.status}`))
 	}
 	return res.json() as Promise<T>
 }
@@ -289,13 +357,13 @@ export function useAppointmentsQuery(
 	facilityId: string,
 	page = 1,
 	limit = 20,
-	status?: AppointmentStatus,
+	status?: AppointmentStatus
 ) {
 	return useQuery<AppointmentListResponse>({
 		queryKey: [...telemedicineKeys.appointments(facilityId), page, limit, status],
 		queryFn: () =>
 			fetchJson<AppointmentListResponse>(
-				`${API_BASE}/appointments${buildQueryString({ facilityId, page, limit, status })}`,
+				`${API_BASE}/appointments${buildQueryString({ facilityId, page, limit, status })}`
 			),
 		enabled: Boolean(facilityId),
 	})
@@ -328,7 +396,8 @@ export function usePrescriptionQuery(prescriptionId: string) {
 export function useEncounterPrescriptionsQuery(encounterId: string) {
 	return useQuery<EPrescription[]>({
 		queryKey: telemedicineKeys.prescriptions(encounterId),
-		queryFn: () => fetchJson<EPrescription[]>(`${API_BASE}/prescriptions?encounterId=${encounterId}`),
+		queryFn: () =>
+			fetchJson<EPrescription[]>(`${API_BASE}/prescriptions?encounterId=${encounterId}`),
 		enabled: Boolean(encounterId),
 	})
 }
@@ -340,7 +409,7 @@ export function useEncounterPrescriptionsQuery(encounterId: string) {
 export function useCreateAppointmentMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<TelemedicineAppointment, Error, CreateAppointmentInput>({
-		mutationFn: (input) =>
+		mutationFn: input =>
 			fetchJson<TelemedicineAppointment>(`${API_BASE}/appointments`, {
 				method: "POST",
 				body: JSON.stringify(input),
@@ -354,7 +423,7 @@ export function useCreateAppointmentMutation() {
 export function useCancelAppointmentMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<void, Error, string>({
-		mutationFn: (appointmentId) =>
+		mutationFn: appointmentId =>
 			fetchJson<void>(`${API_BASE}/appointments/${appointmentId}/cancel`, { method: "POST" }),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.all })
@@ -365,7 +434,7 @@ export function useCancelAppointmentMutation() {
 export function useUpdateAppointmentMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<TelemedicineAppointment, Error, UpdateAppointmentInput>({
-		mutationFn: (input) =>
+		mutationFn: input =>
 			fetchJson<TelemedicineAppointment>(`${API_BASE}/appointments/${input.id}`, {
 				method: "PATCH",
 				body: JSON.stringify(input),
@@ -376,10 +445,90 @@ export function useUpdateAppointmentMutation() {
 	})
 }
 
+export function useJoinLiveKitRoomMutation() {
+	return useMutation<LiveKitTokenResponse, Error, string>({
+		mutationFn: appointmentId =>
+			fetchJson<LiveKitTokenResponse>(`${API_BASE}/appointments/${appointmentId}/livekit-token`, {
+				method: "POST",
+			}),
+	})
+}
+
+export function useEndLiveKitSessionMutation() {
+	const queryClient = useQueryClient()
+	return useMutation<LiveKitSessionEndResponse, Error, string>({
+		mutationFn: appointmentId =>
+			fetchJson<LiveKitSessionEndResponse>(
+				`${API_BASE}/appointments/${appointmentId}/livekit-session/end`,
+				{ method: "POST" }
+			),
+		onSuccess: (_data, appointmentId) => {
+			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.appointment(appointmentId) })
+			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.all })
+		},
+	})
+}
+
+export function useRegeneratePatientInviteMutation() {
+	const queryClient = useQueryClient()
+	return useMutation<PatientInviteResponse, Error, string>({
+		mutationFn: appointmentId =>
+			fetchJson<PatientInviteResponse>(
+				`${API_BASE}/appointments/${appointmentId}/patient-invite/regenerate`,
+				{ method: "POST" }
+			),
+		onSuccess: (_data, appointmentId) => {
+			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.appointment(appointmentId) })
+			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.patientInvite(appointmentId) })
+		},
+	})
+}
+
+export function useRevokePatientInviteMutation() {
+	const queryClient = useQueryClient()
+	return useMutation<PatientInviteStatusResponse, Error, string>({
+		mutationFn: appointmentId =>
+			fetchJson<PatientInviteStatusResponse>(
+				`${API_BASE}/appointments/${appointmentId}/patient-invite/revoke`,
+				{ method: "POST" }
+			),
+		onSuccess: (_data, appointmentId) => {
+			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.appointment(appointmentId) })
+			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.patientInvite(appointmentId) })
+		},
+	})
+}
+
+export function usePatientInvitePreviewQuery(token: string) {
+	return useQuery<PatientInvitePreview>({
+		queryKey: telemedicineKeys.patientInvitePreview(token),
+		queryFn: () => fetchJson<PatientInvitePreview>(`${API_BASE}/patient-invites/${token}`),
+		enabled: Boolean(token),
+		retry: false,
+	})
+}
+
+export function useJoinPatientLiveKitRoomMutation() {
+	return useMutation<
+		LiveKitTokenResponse,
+		Error,
+		{ token: string; dateOfBirth?: string; mrn?: string }
+	>({
+		mutationFn: input =>
+			fetchJson<LiveKitTokenResponse>(`${API_BASE}/patient-invites/${input.token}/livekit-token`, {
+				method: "POST",
+				body: JSON.stringify({
+					dateOfBirth: input.dateOfBirth,
+					mrn: input.mrn,
+				}),
+			}),
+	})
+}
+
 export function useCreateEncounterMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<TelemedicineEncounter, Error, CreateEncounterInput>({
-		mutationFn: (input) =>
+		mutationFn: input =>
 			fetchJson<TelemedicineEncounter>(`${API_BASE}/encounters`, {
 				method: "POST",
 				body: JSON.stringify(input),
@@ -393,7 +542,7 @@ export function useCreateEncounterMutation() {
 export function useCreatePrescriptionMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<EPrescription, Error, CreatePrescriptionInput>({
-		mutationFn: (input) =>
+		mutationFn: input =>
 			fetchJson<EPrescription>(`${API_BASE}/prescriptions`, {
 				method: "POST",
 				body: JSON.stringify(input),
@@ -407,7 +556,7 @@ export function useCreatePrescriptionMutation() {
 export function useSignPrescriptionMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<EPrescription, Error, SignPrescriptionInput>({
-		mutationFn: (input) =>
+		mutationFn: input =>
 			fetchJson<EPrescription>(`${API_BASE}/prescriptions/${input.id}/sign`, {
 				method: "POST",
 				body: JSON.stringify(input),
@@ -421,7 +570,7 @@ export function useSignPrescriptionMutation() {
 export function useSendPrescriptionMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<EPrescription, Error, SendPrescriptionInput>({
-		mutationFn: (input) =>
+		mutationFn: input =>
 			fetchJson<EPrescription>(`${API_BASE}/prescriptions/${input.id}/send`, {
 				method: "POST",
 				body: JSON.stringify(input),
@@ -435,8 +584,7 @@ export function useSendPrescriptionMutation() {
 export function useEncounterAbstractsQuery(encounterId: string) {
 	return useQuery<TeleAbstract[]>({
 		queryKey: telemedicineKeys.abstracts(encounterId),
-		queryFn: () =>
-			fetchJson<TeleAbstract[]>(`${API_BASE}/abstracts?encounterId=${encounterId}`),
+		queryFn: () => fetchJson<TeleAbstract[]>(`${API_BASE}/abstracts?encounterId=${encounterId}`),
 		enabled: Boolean(encounterId),
 	})
 }
@@ -452,7 +600,7 @@ export function useAbstractQuery(abstractId: string) {
 export function useGenerateAbstractMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<TeleAbstract, Error, GenerateAbstractInput>({
-		mutationFn: (input) =>
+		mutationFn: input =>
 			fetchJson<TeleAbstract>(`${API_BASE}/abstracts`, {
 				method: "POST",
 				body: JSON.stringify(input),
@@ -466,7 +614,7 @@ export function useGenerateAbstractMutation() {
 export function useSignAbstractMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<TeleAbstract, Error, SignAbstractInput>({
-		mutationFn: (input) =>
+		mutationFn: input =>
 			fetchJson<TeleAbstract>(`${API_BASE}/abstracts/${input.id}/sign`, {
 				method: "POST",
 				body: JSON.stringify(input),
@@ -480,7 +628,7 @@ export function useSignAbstractMutation() {
 export function useSendAbstractMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<TeleAbstract, Error, SendAbstractInput>({
-		mutationFn: (input) =>
+		mutationFn: input =>
 			fetchJson<TeleAbstract>(`${API_BASE}/abstracts/${input.id}/send`, {
 				method: "POST",
 				body: JSON.stringify(input),
@@ -497,27 +645,40 @@ export function useSendAbstractMutation() {
 
 export function getAppointmentStatusColor(status: AppointmentStatus): string {
 	const map: Record<AppointmentStatus, string> = {
-		scheduled: "bg-blue-100 text-blue-800",
-		confirmed: "bg-green-100 text-green-800",
+		"scheduled": "bg-blue-100 text-blue-800",
+		"confirmed": "bg-green-100 text-green-800",
 		"in-progress": "bg-yellow-100 text-yellow-800",
-		completed: "bg-gray-100 text-gray-800",
-		cancelled: "bg-red-100 text-red-800",
+		"completed": "bg-gray-100 text-gray-800",
+		"cancelled": "bg-red-100 text-red-800",
 		"no-show": "bg-orange-100 text-orange-800",
 	}
 	return map[status] ?? "bg-gray-100 text-gray-800"
 }
 
 export function getPlatformLabel(platform: TelemedicinePlatform): string {
-	return platform === "zoom" ? "Zoom" : "Microsoft Teams"
+	const map: Record<TelemedicinePlatform, string> = {
+		zoom: "Zoom",
+		teams: "Microsoft Teams",
+		livekit: "LiveKit",
+	}
+	return map[platform]
+}
+
+export function getPatientInvitePath(token: string): string {
+	return `/telemedicine/join/${encodeURIComponent(token)}`
+}
+
+export function getPatientInviteUrl(token: string): string {
+	return `${env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}${getPatientInvitePath(token)}`
 }
 
 export function formatAppointmentStatusLabel(status: AppointmentStatus): string {
 	const map: Record<AppointmentStatus, string> = {
-		scheduled: "Scheduled",
-		confirmed: "Confirmed",
+		"scheduled": "Scheduled",
+		"confirmed": "Confirmed",
 		"in-progress": "In Progress",
-		completed: "Completed",
-		cancelled: "Cancelled",
+		"completed": "Completed",
+		"cancelled": "Cancelled",
 		"no-show": "No Show",
 	}
 	return map[status] ?? status

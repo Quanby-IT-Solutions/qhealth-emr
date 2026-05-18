@@ -1,6 +1,11 @@
 import { createEnv } from "@t3-oss/env-core"
 import { z } from "zod"
 
+const emptyStringToUndefined = (value: unknown) => (value === "" ? undefined : value)
+
+const optionalString = z.preprocess(emptyStringToUndefined, z.string().optional())
+const optionalUrl = z.preprocess(emptyStringToUndefined, z.string().url().optional())
+
 /**
  * Type-safe environment variable validation for Backend API
  *
@@ -53,6 +58,12 @@ export const env = createEnv({
 		PHILHEALTH_MOCK_EXPIRY_DATE: z.string().default("2026-12-31"),
 		PHILHEALTH_MOCK_REMAINING_BENEFIT: z.coerce.number().default(45000),
 		PHILHEALTH_MOCK_ERROR_MESSAGE: z.string().default("Mock PhilHealth error response."),
+
+		// LiveKit video conferencing
+		LIVEKIT_MODE: z.enum(["mock", "real"]).default("mock"),
+		LIVEKIT_API_KEY: optionalString,
+		LIVEKIT_API_SECRET: optionalString,
+		LIVEKIT_WS_URL: optionalUrl,
 
 		// NHDR (National Health Data Repository) integration
 		NHDR_MODE: z.enum(["mock", "real"]).default("mock"),
