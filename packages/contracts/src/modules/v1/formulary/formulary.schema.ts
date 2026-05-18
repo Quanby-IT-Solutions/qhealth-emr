@@ -121,6 +121,7 @@ export const FormularyItemSchema = z.object({
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 	genericName: z.string(),
+	brandName: z.string().nullable(),
 })
 
 export type FormularyItem = z.infer<typeof FormularyItemSchema>

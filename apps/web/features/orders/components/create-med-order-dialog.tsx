@@ -701,7 +701,7 @@ export function CreateMedOrderDialog({
 							>
 								<ShieldAlert className="size-4" />
 								{evaluateCds.isPending
-									? "Checking…"
+									? "Checking..."
 									: hasFreshCdsCheck
 										? "Re-run Drug Safety Check"
 										: "Run Drug Safety Check"}
@@ -710,7 +710,7 @@ export function CreateMedOrderDialog({
 								<p className="text-muted-foreground text-xs">
 									{hasFreshCdsCheck
 										? cdsResult.alerts.length === 0
-											? "✓ Safety check complete - no alerts"
+											? "Safety check complete - no medication-safety alerts for this order"
 											: `${cdsResult.alerts.length} alert(s) found`
 										: "Safety check out of date - re-run before creating the order"}
 								</p>

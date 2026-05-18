@@ -21,10 +21,22 @@ import {
 	users,
 } from "@repo/db/schema"
 
+import { CommonAuditService } from "@/common/audit/audit.service"
 import { db } from "@/common/database/database.client"
+import { LiveKitService } from "@/common/livekit/livekit.service"
 import type { V1Inputs } from "@/config/contract-types"
+import { env } from "@/config/env.config"
 import { NotificationService } from "@/modules/v1/notifications/notification.service"
 
+import {
+	generatePatientInviteToken,
+	getPatientInviteExpiresAt,
+	getTelemedicineJoinWindow,
+	hashPatientInviteToken,
+	isTelemedicineStatusJoinable,
+	isWithinTelemedicineJoinWindow,
+	parseTelemedicineAppointmentDateTime,
+} from "./telemedicine-invites"
 import { assertTelemedicineVideoLink } from "./telemedicine-video-link"
 
 type ListAppointmentsInput = V1Inputs["telemedicine"]["listAppointments"]
@@ -32,6 +44,7 @@ type GetAppointmentInput = V1Inputs["telemedicine"]["getAppointment"]
 type CreateAppointmentInput = V1Inputs["telemedicine"]["createAppointment"]
 type UpdateAppointmentInput = V1Inputs["telemedicine"]["updateAppointment"]
 type CancelAppointmentInput = V1Inputs["telemedicine"]["cancelAppointment"]
+type JoinPatientLiveKitRoomInput = V1Inputs["telemedicine"]["joinPatientLiveKitRoom"]
 type GetEncounterInput = V1Inputs["telemedicine"]["getEncounter"]
 type CreateEncounterInput = V1Inputs["telemedicine"]["createEncounter"]
 type GetPrescriptionInput = V1Inputs["telemedicine"]["getPrescription"]
@@ -49,7 +62,11 @@ type SendPrescriptionInput = V1Inputs["telemedicine"]["sendPrescription"]
 export class TelemedicineService {
 	private readonly logger = new Logger(TelemedicineService.name)
 
-	constructor(private readonly notificationService: NotificationService) {}
+	constructor(
+		private readonly notificationService: NotificationService,
+		private readonly liveKitService: LiveKitService,
+		private readonly auditService: CommonAuditService
+	) {}
 
 	// =========================================================================
 	// Private helpers
@@ -87,6 +104,13 @@ export class TelemedicineService {
 			videoLink: appt.videoLink ?? null,
 			meetingId: appt.meetingId ?? null,
 			meetingPassword: appt.meetingPassword ?? null,
+			livekitRoomName: appt.livekitRoomName ?? null,
+			livekitSessionStartedAt: this.serializeDate(appt.livekitSessionStartedAt),
+			livekitSessionEndedAt: this.serializeDate(appt.livekitSessionEndedAt),
+			patientInviteExpiresAt: this.serializeDate(appt.patientInviteExpiresAt),
+			patientInviteRevokedAt: this.serializeDate(appt.patientInviteRevokedAt),
+			patientInviteLastUsedAt: this.serializeDate(appt.patientInviteLastUsedAt),
+			patientJoinedAt: this.serializeDate(appt.patientJoinedAt),
 			notes: appt.notes ?? null,
 			encounterId: appt.encounterId ?? null,
 			createdAt: appt.createdAt.toISOString(),
@@ -108,13 +132,91 @@ export class TelemedicineService {
 	}
 
 	private assertFutureAppointment(scheduledDate: string, scheduledTime: string) {
-		const scheduledAt = new Date(`${scheduledDate}T${scheduledTime}`)
+		const scheduledAt = parseTelemedicineAppointmentDateTime(scheduledDate, scheduledTime)
 		if (!Number.isFinite(scheduledAt.getTime())) {
 			throw new BadRequestException("Appointment date and time are invalid.")
 		}
 		if (scheduledAt.getTime() <= Date.now()) {
 			throw new BadRequestException("Appointment date and time must be in the future.")
 		}
+	}
+
+	private serializeDate(value?: Date | null) {
+		return value ? value.toISOString() : null
+	}
+
+	private buildPatientInvite(appointment: {
+		scheduledDate: string
+		scheduledTime: string
+		durationMinutes: number
+	}) {
+		const patientInviteToken = generatePatientInviteToken()
+		return {
+			patientInviteToken,
+			patientInviteTokenHash: hashPatientInviteToken(patientInviteToken),
+			patientInviteExpiresAt: getPatientInviteExpiresAt(appointment),
+		}
+	}
+
+	private buildInviteStatus(appointment: {
+		id: string
+		patientInviteTokenHash?: string | null
+		patientInviteExpiresAt?: Date | null
+		patientInviteRevokedAt?: Date | null
+	}) {
+		return {
+			appointmentId: appointment.id,
+			hasPatientInvite: Boolean(
+				appointment.patientInviteTokenHash && !appointment.patientInviteRevokedAt
+			),
+			patientInviteExpiresAt: this.serializeDate(appointment.patientInviteExpiresAt),
+			patientInviteRevokedAt: this.serializeDate(appointment.patientInviteRevokedAt),
+		}
+	}
+
+	private assertAppointmentStatusJoinable(status: string) {
+		if (!isTelemedicineStatusJoinable(status)) {
+			throw new BadRequestException(`Video room is unavailable for ${status} appointments.`)
+		}
+	}
+
+	private shouldStartLiveKitSession(status: string) {
+		return status === "scheduled" || status === "confirmed"
+	}
+
+	private assertLiveKitSessionCanEnd(status: string) {
+		if (status !== "in-progress") {
+			throw new BadRequestException(
+				`Video session can only be ended for in-progress appointments, not ${status} appointments.`
+			)
+		}
+	}
+
+	private formatJoinWindowDateTime(value: Date) {
+		return new Intl.DateTimeFormat("en-PH", {
+			timeZone: "Asia/Manila",
+			year: "numeric",
+			month: "short",
+			day: "numeric",
+			hour: "2-digit",
+			minute: "2-digit",
+			timeZoneName: "short",
+		}).format(value)
+	}
+
+	private assertAppointmentWithinJoinWindow(appointment: {
+		scheduledDate: string
+		scheduledTime: string
+		durationMinutes: number
+	}) {
+		const joinWindow = getTelemedicineJoinWindow(appointment)
+		if (!isWithinTelemedicineJoinWindow(joinWindow)) {
+			throw new BadRequestException(
+				`Video room can be joined from ${this.formatJoinWindowDateTime(joinWindow.startsAt)} until ${this.formatJoinWindowDateTime(joinWindow.endsAt)}.`
+			)
+		}
+
+		return joinWindow
 	}
 
 	private async assertAppointmentScope(input: CreateAppointmentInput) {
@@ -135,7 +237,9 @@ export class TelemedicineService {
 			throw new BadRequestException("Patient must belong to the appointment facility.")
 		}
 		if (!patient.isActive) {
-			throw new BadRequestException("Cannot book a telemedicine appointment for an inactive patient.")
+			throw new BadRequestException(
+				"Cannot book a telemedicine appointment for an inactive patient."
+			)
 		}
 
 		const [clinician] = await db
@@ -155,7 +259,9 @@ export class TelemedicineService {
 			throw new BadRequestException("Clinician must belong to the appointment facility.")
 		}
 		if (!clinician.isActive) {
-			throw new BadRequestException("Cannot book a telemedicine appointment with an inactive clinician.")
+			throw new BadRequestException(
+				"Cannot book a telemedicine appointment with an inactive clinician."
+			)
 		}
 	}
 
@@ -293,6 +399,13 @@ export class TelemedicineService {
 					videoLink: telemedicineAppointments.videoLink,
 					meetingId: telemedicineAppointments.meetingId,
 					meetingPassword: telemedicineAppointments.meetingPassword,
+					livekitRoomName: telemedicineAppointments.livekitRoomName,
+					livekitSessionStartedAt: telemedicineAppointments.livekitSessionStartedAt,
+					livekitSessionEndedAt: telemedicineAppointments.livekitSessionEndedAt,
+					patientInviteExpiresAt: telemedicineAppointments.patientInviteExpiresAt,
+					patientInviteRevokedAt: telemedicineAppointments.patientInviteRevokedAt,
+					patientInviteLastUsedAt: telemedicineAppointments.patientInviteLastUsedAt,
+					patientJoinedAt: telemedicineAppointments.patientJoinedAt,
 					notes: telemedicineAppointments.notes,
 					teleEncounterId: telemedicineEncounters.id,
 					createdAt: telemedicineAppointments.createdAt,
@@ -344,6 +457,13 @@ export class TelemedicineService {
 			videoLink: r.videoLink ?? null,
 			meetingId: r.meetingId ?? null,
 			meetingPassword: r.meetingPassword ?? null,
+			livekitRoomName: r.livekitRoomName ?? null,
+			livekitSessionStartedAt: this.serializeDate(r.livekitSessionStartedAt),
+			livekitSessionEndedAt: this.serializeDate(r.livekitSessionEndedAt),
+			patientInviteExpiresAt: this.serializeDate(r.patientInviteExpiresAt),
+			patientInviteRevokedAt: this.serializeDate(r.patientInviteRevokedAt),
+			patientInviteLastUsedAt: this.serializeDate(r.patientInviteLastUsedAt),
+			patientJoinedAt: this.serializeDate(r.patientJoinedAt),
 			notes: r.notes ?? null,
 			encounterId: r.teleEncounterId ?? null,
 			createdAt: r.createdAt.toISOString(),
@@ -384,6 +504,13 @@ export class TelemedicineService {
 				videoLink: telemedicineAppointments.videoLink,
 				meetingId: telemedicineAppointments.meetingId,
 				meetingPassword: telemedicineAppointments.meetingPassword,
+				livekitRoomName: telemedicineAppointments.livekitRoomName,
+				livekitSessionStartedAt: telemedicineAppointments.livekitSessionStartedAt,
+				livekitSessionEndedAt: telemedicineAppointments.livekitSessionEndedAt,
+				patientInviteExpiresAt: telemedicineAppointments.patientInviteExpiresAt,
+				patientInviteRevokedAt: telemedicineAppointments.patientInviteRevokedAt,
+				patientInviteLastUsedAt: telemedicineAppointments.patientInviteLastUsedAt,
+				patientJoinedAt: telemedicineAppointments.patientJoinedAt,
 				notes: telemedicineAppointments.notes,
 				teleEncounterId: telemedicineEncounters.id,
 				createdAt: telemedicineAppointments.createdAt,
@@ -429,6 +556,13 @@ export class TelemedicineService {
 			videoLink: row.videoLink ?? null,
 			meetingId: row.meetingId ?? null,
 			meetingPassword: row.meetingPassword ?? null,
+			livekitRoomName: row.livekitRoomName ?? null,
+			livekitSessionStartedAt: this.serializeDate(row.livekitSessionStartedAt),
+			livekitSessionEndedAt: this.serializeDate(row.livekitSessionEndedAt),
+			patientInviteExpiresAt: this.serializeDate(row.patientInviteExpiresAt),
+			patientInviteRevokedAt: this.serializeDate(row.patientInviteRevokedAt),
+			patientInviteLastUsedAt: this.serializeDate(row.patientInviteLastUsedAt),
+			patientJoinedAt: this.serializeDate(row.patientJoinedAt),
 			notes: row.notes ?? null,
 			encounterId: row.teleEncounterId ?? null,
 			createdAt: row.createdAt.toISOString(),
@@ -443,7 +577,13 @@ export class TelemedicineService {
 	async createAppointment(input: CreateAppointmentInput, createdByStaffId?: string) {
 		this.assertFutureAppointment(input.scheduledDate, input.scheduledTime)
 		await this.assertAppointmentScope(input)
-		assertTelemedicineVideoLink(input.videoLink, input.platform)
+		const durationMinutes = input.durationMinutes ?? 30
+		const appointmentTiming = {
+			scheduledDate: input.scheduledDate,
+			scheduledTime: input.scheduledTime,
+			durationMinutes,
+		}
+		const patientInvite = this.buildPatientInvite(appointmentTiming)
 
 		const [created] = await db
 			.insert(telemedicineAppointments)
@@ -453,11 +593,10 @@ export class TelemedicineService {
 				clinicianStaffId: input.clinicianId,
 				scheduledDate: input.scheduledDate,
 				scheduledTime: input.scheduledTime,
-				durationMinutes: input.durationMinutes,
-				platform: input.platform,
-				videoLink: input.videoLink ?? null,
-				meetingId: input.meetingId ?? null,
-				meetingPassword: input.meetingPassword ?? null,
+				durationMinutes,
+				platform: "livekit",
+				patientInviteTokenHash: patientInvite.patientInviteTokenHash,
+				patientInviteExpiresAt: patientInvite.patientInviteExpiresAt,
 				notes: input.notes ?? null,
 				createdByStaffId: createdByStaffId ?? null,
 			})
@@ -467,8 +606,17 @@ export class TelemedicineService {
 			throw new Error("Failed to create telemedicine appointment")
 		}
 
+		const roomName = this.liveKitService.getRoomName(created.id)
+		await db
+			.update(telemedicineAppointments)
+			.set({ livekitRoomName: roomName, updatedAt: new Date() })
+			.where(eq(telemedicineAppointments.id, created.id))
+
 		this.logger.log(`Created telemedicine appointment: ${created.id}`)
-		return this.getAppointment({ id: created.id })
+		return {
+			...(await this.getAppointment({ id: created.id })),
+			patientInviteToken: patientInvite.patientInviteToken,
+		}
 	}
 
 	async updateAppointment(input: UpdateAppointmentInput, updatedByStaffId?: string) {
@@ -533,6 +681,515 @@ export class TelemedicineService {
 			.where(eq(telemedicineAppointments.id, input.id))
 
 		this.logger.log(`Cancelled telemedicine appointment: ${input.id}`)
+	}
+
+	async joinClinicianLiveKitRoom(appointmentId: string, staffProfileId: string) {
+		const clinicianStaff = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("clinician_staff")
+
+		const [appointment] = await db
+			.select({
+				id: telemedicineAppointments.id,
+				facilityId: telemedicineAppointments.facilityId,
+				clinicianStaffId: telemedicineAppointments.clinicianStaffId,
+				scheduledDate: telemedicineAppointments.scheduledDate,
+				scheduledTime: telemedicineAppointments.scheduledTime,
+				durationMinutes: telemedicineAppointments.durationMinutes,
+				status: telemedicineAppointments.status,
+				livekitRoomName: telemedicineAppointments.livekitRoomName,
+				livekitSessionStartedAt: telemedicineAppointments.livekitSessionStartedAt,
+				clinicianName: clinicianStaff.name,
+			})
+			.from(telemedicineAppointments)
+			.leftJoin(clinicianStaff, eq(telemedicineAppointments.clinicianStaffId, clinicianStaff.id))
+			.where(eq(telemedicineAppointments.id, appointmentId))
+			.limit(1)
+
+		if (!appointment) {
+			throw new NotFoundException(`Telemedicine appointment ${appointmentId} not found`)
+		}
+
+		this.assertAssignedClinician(
+			staffProfileId,
+			appointment.clinicianStaffId,
+			"join this video room"
+		)
+		this.assertAppointmentStatusJoinable(appointment.status)
+		this.assertAppointmentWithinJoinWindow(appointment)
+
+		if (!this.liveKitService.isConfigured()) {
+			return { isConfigured: false }
+		}
+
+		const roomName = appointment.livekitRoomName ?? this.liveKitService.getRoomName(appointmentId)
+		const token = await this.liveKitService.generateToken({
+			roomName,
+			identity: `clinician:${staffProfileId}`,
+			name: appointment.clinicianName ?? "Clinician",
+			role: "clinician",
+			appointmentId,
+			ttl: "2h",
+		})
+
+		const shouldStartSession = this.shouldStartLiveKitSession(appointment.status)
+		if (!appointment.livekitRoomName || !appointment.livekitSessionStartedAt || shouldStartSession) {
+			const now = new Date()
+			const updates: Partial<typeof telemedicineAppointments.$inferInsert> = {
+				updatedAt: now,
+			}
+
+			if (!appointment.livekitRoomName) {
+				updates.livekitRoomName = roomName
+			}
+			if (!appointment.livekitSessionStartedAt) {
+				updates.livekitSessionStartedAt = now
+			}
+			if (shouldStartSession) {
+				updates.status = "in-progress"
+			}
+
+			await db
+				.update(telemedicineAppointments)
+				.set(updates)
+				.where(eq(telemedicineAppointments.id, appointmentId))
+		}
+
+		return {
+			isConfigured: true,
+			token,
+			wsUrl: env.LIVEKIT_WS_URL,
+			roomName,
+		}
+	}
+
+	async endClinicianLiveKitSession(appointmentId: string, staffProfileId: string) {
+		const [appointment] = await db
+			.select({
+				id: telemedicineAppointments.id,
+				clinicianStaffId: telemedicineAppointments.clinicianStaffId,
+				status: telemedicineAppointments.status,
+				livekitSessionStartedAt: telemedicineAppointments.livekitSessionStartedAt,
+				livekitSessionEndedAt: telemedicineAppointments.livekitSessionEndedAt,
+			})
+			.from(telemedicineAppointments)
+			.where(eq(telemedicineAppointments.id, appointmentId))
+			.limit(1)
+
+		if (!appointment) {
+			throw new NotFoundException(`Telemedicine appointment ${appointmentId} not found`)
+		}
+
+		this.assertAssignedClinician(
+			staffProfileId,
+			appointment.clinicianStaffId,
+			"end this video session"
+		)
+
+		if (appointment.livekitSessionEndedAt) {
+			return {
+				appointmentId,
+				livekitSessionEndedAt: appointment.livekitSessionEndedAt.toISOString(),
+			}
+		}
+
+		this.assertLiveKitSessionCanEnd(appointment.status)
+
+		if (!appointment.livekitSessionStartedAt) {
+			throw new BadRequestException("Video session has not started yet.")
+		}
+
+		const endedAt = new Date()
+		await db
+			.update(telemedicineAppointments)
+			.set({ livekitSessionEndedAt: endedAt, updatedAt: endedAt })
+			.where(eq(telemedicineAppointments.id, appointmentId))
+
+		return {
+			appointmentId,
+			livekitSessionEndedAt: endedAt.toISOString(),
+		}
+	}
+
+	private parseAppointmentIdFromRoomName(roomName: string | undefined | null): string | null {
+		if (!roomName) return null
+		const match = /^telemed-([0-9a-fA-F-]{36})$/.exec(roomName)
+		return match?.[1] ?? null
+	}
+
+	private parseParticipantIdentity(identity: string | undefined | null): {
+		role: "clinician" | "patient" | "unknown"
+		actorId: string | null
+	} {
+		if (!identity) return { role: "unknown", actorId: null }
+		const [prefix, ...rest] = identity.split(":")
+		const actorId = rest.join(":") || null
+		if (prefix === "clinician") return { role: "clinician", actorId }
+		if (prefix === "patient") return { role: "patient", actorId }
+		return { role: "unknown", actorId }
+	}
+
+	async handleLiveKitWebhook(body: string, authHeader: string | undefined): Promise<void> {
+		let event: Awaited<ReturnType<LiveKitService["verifyWebhook"]>>
+		try {
+			event = await this.liveKitService.verifyWebhook(body, authHeader)
+		} catch (error) {
+			this.logger.warn(`Rejected LiveKit webhook: ${error instanceof Error ? error.message : error}`)
+			throw new ForbiddenException("Invalid LiveKit webhook signature.")
+		}
+
+		const eventName = event.event
+		const roomName = event.room?.name
+		const appointmentId = this.parseAppointmentIdFromRoomName(roomName)
+		if (!appointmentId) {
+			this.logger.debug(`Ignoring LiveKit webhook ${eventName} for unrelated room ${roomName}`)
+			return
+		}
+
+		const [appointment] = await db
+			.select({
+				id: telemedicineAppointments.id,
+				facilityId: telemedicineAppointments.facilityId,
+				clinicianStaffId: telemedicineAppointments.clinicianStaffId,
+				livekitSessionStartedAt: telemedicineAppointments.livekitSessionStartedAt,
+				livekitSessionEndedAt: telemedicineAppointments.livekitSessionEndedAt,
+				patientJoinedAt: telemedicineAppointments.patientJoinedAt,
+			})
+			.from(telemedicineAppointments)
+			.where(eq(telemedicineAppointments.id, appointmentId))
+			.limit(1)
+
+		if (!appointment) {
+			this.logger.warn(`LiveKit webhook ${eventName} references unknown appointment ${appointmentId}`)
+			return
+		}
+
+		const [clinician] = await db
+			.select({ userId: staffProfiles.userId })
+			.from(staffProfiles)
+			.where(eq(staffProfiles.id, appointment.clinicianStaffId))
+			.limit(1)
+
+		const actorUserId = clinician?.userId ?? "system"
+		const participantIdentity = event.participant?.identity ?? null
+		const participantName = event.participant?.name ?? null
+		const participantSid = event.participant?.sid ?? null
+		const { role: participantRole } = this.parseParticipantIdentity(participantIdentity)
+		const eventTimestamp =
+			typeof event.createdAt === "bigint" && event.createdAt > 0n
+				? new Date(Number(event.createdAt) * 1000)
+				: new Date()
+		const auditMetadata = {
+			liveKitEvent: eventName,
+			liveKitEventId: event.id || null,
+			roomName: roomName ?? null,
+			participantIdentity,
+			participantName,
+			participantSid,
+			participantRole,
+			occurredAt: eventTimestamp.toISOString(),
+		}
+
+		switch (eventName) {
+			case "room_started": {
+				if (!appointment.livekitSessionStartedAt) {
+					await db
+						.update(telemedicineAppointments)
+						.set({ livekitSessionStartedAt: eventTimestamp, updatedAt: new Date() })
+						.where(eq(telemedicineAppointments.id, appointmentId))
+				}
+				break
+			}
+			case "participant_joined": {
+				const updates: Partial<typeof telemedicineAppointments.$inferInsert> = {
+					updatedAt: new Date(),
+				}
+				if (!appointment.livekitSessionStartedAt) {
+					updates.livekitSessionStartedAt = eventTimestamp
+				}
+				if (participantRole === "patient" && !appointment.patientJoinedAt) {
+					updates.patientJoinedAt = eventTimestamp
+				}
+				if (Object.keys(updates).length > 1) {
+					await db
+						.update(telemedicineAppointments)
+						.set(updates)
+						.where(eq(telemedicineAppointments.id, appointmentId))
+				}
+				break
+			}
+			case "participant_left":
+			case "participant_connection_aborted": {
+				break
+			}
+			case "room_finished": {
+				if (!appointment.livekitSessionEndedAt) {
+					await db
+						.update(telemedicineAppointments)
+						.set({ livekitSessionEndedAt: eventTimestamp, updatedAt: new Date() })
+						.where(eq(telemedicineAppointments.id, appointmentId))
+				}
+				break
+			}
+			default: {
+				this.logger.debug(`Unhandled LiveKit webhook event: ${eventName}`)
+				return
+			}
+		}
+
+		try {
+			await this.auditService.log({
+				facilityId: appointment.facilityId,
+				userId: actorUserId,
+				staffProfileId: appointment.clinicianStaffId,
+				action: "update",
+				entityType: "telemedicine_appointment_session",
+				entityId: appointmentId,
+				beforeState: null,
+				afterState: null,
+				ipAddress: null,
+				userAgent: null,
+				metadata: auditMetadata,
+				severity: "info",
+				outcome: "success",
+			})
+		} catch (error) {
+			this.logger.error(
+				`Failed to write LiveKit webhook audit log for appointment ${appointmentId}: ${error}`
+			)
+		}
+	}
+
+	async regeneratePatientInvite(appointmentId: string, staffProfileId: string) {
+		const [appointment] = await db
+			.select({
+				id: telemedicineAppointments.id,
+				clinicianStaffId: telemedicineAppointments.clinicianStaffId,
+				scheduledDate: telemedicineAppointments.scheduledDate,
+				scheduledTime: telemedicineAppointments.scheduledTime,
+				durationMinutes: telemedicineAppointments.durationMinutes,
+			})
+			.from(telemedicineAppointments)
+			.where(eq(telemedicineAppointments.id, appointmentId))
+			.limit(1)
+
+		if (!appointment) {
+			throw new NotFoundException(`Telemedicine appointment ${appointmentId} not found`)
+		}
+
+		this.assertAssignedClinician(
+			staffProfileId,
+			appointment.clinicianStaffId,
+			"manage this patient invite"
+		)
+
+		const patientInvite = this.buildPatientInvite(appointment)
+		const [updated] = await db
+			.update(telemedicineAppointments)
+			.set({
+				patientInviteTokenHash: patientInvite.patientInviteTokenHash,
+				patientInviteExpiresAt: patientInvite.patientInviteExpiresAt,
+				patientInviteRevokedAt: null,
+				patientInviteLastUsedAt: null,
+				updatedAt: new Date(),
+			})
+			.where(eq(telemedicineAppointments.id, appointmentId))
+			.returning({
+				id: telemedicineAppointments.id,
+				patientInviteExpiresAt: telemedicineAppointments.patientInviteExpiresAt,
+				patientInviteRevokedAt: telemedicineAppointments.patientInviteRevokedAt,
+			})
+
+		if (!updated?.patientInviteExpiresAt) {
+			throw new Error("Failed to regenerate patient invite")
+		}
+
+		return {
+			appointmentId,
+			patientInviteToken: patientInvite.patientInviteToken,
+			patientInviteExpiresAt: updated.patientInviteExpiresAt.toISOString(),
+			patientInviteRevokedAt: this.serializeDate(updated.patientInviteRevokedAt),
+		}
+	}
+
+	async revokePatientInvite(appointmentId: string, staffProfileId: string) {
+		const [appointment] = await db
+			.select({
+				id: telemedicineAppointments.id,
+				clinicianStaffId: telemedicineAppointments.clinicianStaffId,
+				patientInviteTokenHash: telemedicineAppointments.patientInviteTokenHash,
+				patientInviteExpiresAt: telemedicineAppointments.patientInviteExpiresAt,
+				patientInviteRevokedAt: telemedicineAppointments.patientInviteRevokedAt,
+			})
+			.from(telemedicineAppointments)
+			.where(eq(telemedicineAppointments.id, appointmentId))
+			.limit(1)
+
+		if (!appointment) {
+			throw new NotFoundException(`Telemedicine appointment ${appointmentId} not found`)
+		}
+
+		this.assertAssignedClinician(
+			staffProfileId,
+			appointment.clinicianStaffId,
+			"manage this patient invite"
+		)
+
+		const revokedAt = appointment.patientInviteRevokedAt ?? new Date()
+		const [updated] = await db
+			.update(telemedicineAppointments)
+			.set({ patientInviteRevokedAt: revokedAt, updatedAt: new Date() })
+			.where(eq(telemedicineAppointments.id, appointmentId))
+			.returning({
+				id: telemedicineAppointments.id,
+				patientInviteTokenHash: telemedicineAppointments.patientInviteTokenHash,
+				patientInviteExpiresAt: telemedicineAppointments.patientInviteExpiresAt,
+				patientInviteRevokedAt: telemedicineAppointments.patientInviteRevokedAt,
+			})
+
+		return this.buildInviteStatus(updated ?? { ...appointment, patientInviteRevokedAt: revokedAt })
+	}
+
+	private async resolvePatientInvite(token: string) {
+		const tokenHash = hashPatientInviteToken(token)
+		const clinicianStaff = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("clinician_staff")
+
+		const [appointment] = await db
+			.select({
+				id: telemedicineAppointments.id,
+				facilityId: telemedicineAppointments.facilityId,
+				patientId: telemedicineAppointments.patientId,
+				clinicianStaffId: telemedicineAppointments.clinicianStaffId,
+				scheduledDate: telemedicineAppointments.scheduledDate,
+				scheduledTime: telemedicineAppointments.scheduledTime,
+				durationMinutes: telemedicineAppointments.durationMinutes,
+				status: telemedicineAppointments.status,
+				livekitRoomName: telemedicineAppointments.livekitRoomName,
+				livekitSessionStartedAt: telemedicineAppointments.livekitSessionStartedAt,
+				patientInviteExpiresAt: telemedicineAppointments.patientInviteExpiresAt,
+				patientInviteRevokedAt: telemedicineAppointments.patientInviteRevokedAt,
+				patientJoinedAt: telemedicineAppointments.patientJoinedAt,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+				patientMrn: patients.mrn,
+				patientDateOfBirth: patients.dateOfBirth,
+				clinicianName: clinicianStaff.name,
+				facilityName: facilities.name,
+			})
+			.from(telemedicineAppointments)
+			.innerJoin(patients, eq(telemedicineAppointments.patientId, patients.id))
+			.innerJoin(facilities, eq(telemedicineAppointments.facilityId, facilities.id))
+			.leftJoin(clinicianStaff, eq(telemedicineAppointments.clinicianStaffId, clinicianStaff.id))
+			.where(eq(telemedicineAppointments.patientInviteTokenHash, tokenHash))
+			.limit(1)
+
+		if (!appointment) {
+			throw new NotFoundException("Patient invite was not found.")
+		}
+
+		return appointment
+	}
+
+	async getPatientInvitePreview(input: { token: string }) {
+		const appointment = await this.resolvePatientInvite(input.token)
+		const now = new Date()
+		const joinWindow = getTelemedicineJoinWindow(appointment)
+		const isRevoked = Boolean(appointment.patientInviteRevokedAt)
+		const isExpired =
+			!appointment.patientInviteExpiresAt ||
+			appointment.patientInviteExpiresAt <= now ||
+			now > joinWindow.endsAt
+		const canJoinNow =
+			!isRevoked &&
+			!isExpired &&
+			isTelemedicineStatusJoinable(appointment.status) &&
+			isWithinTelemedicineJoinWindow(joinWindow, now)
+
+		return {
+			isValid: true,
+			isRevoked,
+			isExpired,
+			canJoinNow,
+			appointmentStatus: appointment.status,
+			scheduledDate: appointment.scheduledDate,
+			scheduledTime: appointment.scheduledTime,
+			durationMinutes: appointment.durationMinutes,
+			clinicianName: appointment.clinicianName ?? "Clinician",
+			facilityName: appointment.facilityName,
+			joinWindowStartsAt: joinWindow.startsAt.toISOString(),
+			joinWindowEndsAt: joinWindow.endsAt.toISOString(),
+		}
+	}
+
+	async joinPatientLiveKitRoom(input: JoinPatientLiveKitRoomInput) {
+		const appointment = await this.resolvePatientInvite(input.token)
+
+		if (appointment.patientInviteRevokedAt) {
+			throw new BadRequestException("Patient invite has been revoked.")
+		}
+
+		this.assertAppointmentStatusJoinable(appointment.status)
+		const joinWindow = this.assertAppointmentWithinJoinWindow(appointment)
+
+		if (!appointment.patientInviteExpiresAt || appointment.patientInviteExpiresAt <= new Date()) {
+			throw new BadRequestException("Patient invite has expired.")
+		}
+
+		const submittedMrn = input.mrn?.trim().toLowerCase()
+		const submittedDateOfBirth = input.dateOfBirth?.trim()
+		const storedDateOfBirth = appointment.patientDateOfBirth
+		const mrnMatches = submittedMrn && submittedMrn === appointment.patientMrn.toLowerCase()
+		const dateOfBirthMatches = submittedDateOfBirth && submittedDateOfBirth === storedDateOfBirth
+
+		if (!mrnMatches && !dateOfBirthMatches) {
+			throw new ForbiddenException("Patient verification failed.")
+		}
+
+		if (!this.liveKitService.isConfigured()) {
+			return { isConfigured: false }
+		}
+
+		const now = new Date()
+		const roomName = appointment.livekitRoomName ?? this.liveKitService.getRoomName(appointment.id)
+		const remainingSeconds = Math.max(
+			1,
+			Math.floor((joinWindow.endsAt.getTime() - now.getTime()) / 1000)
+		)
+		const token = await this.liveKitService.generateToken({
+			roomName,
+			identity: `patient:${appointment.id}`,
+			name: `${appointment.patientFirstName} ${appointment.patientLastName}`,
+			role: "patient",
+			appointmentId: appointment.id,
+			ttl: Math.min(7200, remainingSeconds),
+		})
+
+		const updates: Partial<typeof telemedicineAppointments.$inferInsert> = {
+			patientInviteLastUsedAt: now,
+			patientJoinedAt: appointment.patientJoinedAt ?? now,
+			updatedAt: now,
+		}
+		if (!appointment.livekitRoomName) updates.livekitRoomName = roomName
+		if (!appointment.livekitSessionStartedAt) updates.livekitSessionStartedAt = now
+		if (this.shouldStartLiveKitSession(appointment.status)) updates.status = "in-progress"
+
+		await db
+			.update(telemedicineAppointments)
+			.set(updates)
+			.where(eq(telemedicineAppointments.id, appointment.id))
+
+		return {
+			isConfigured: true,
+			token,
+			wsUrl: env.LIVEKIT_WS_URL,
+			roomName,
+		}
 	}
 
 	// =========================================================================

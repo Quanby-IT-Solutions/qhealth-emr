@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, count, desc, eq, getTableColumns, ilike, isNull, or, sql } from "drizzle-orm"
+import { and, count, desc, eq, getTableColumns, ilike, or } from "drizzle-orm"
 
 import {
 	catalogVersions,
@@ -172,7 +172,7 @@ export class FormularyService {
 		const { id, ...updates } = input
 
 		// FORM-003: Validate new rxnormCode against catalog if being changed
-		if (updates.rxnormCode != null) {
+		if (updates.rxnormCode !== null && updates.rxnormCode !== undefined) {
 			const [rxRow] = await db
 				.select({ id: rxnormCodes.id })
 				.from(rxnormCodes)
@@ -353,6 +353,7 @@ export class FormularyService {
 			const escaped = this.escapeLikePattern(filter.search)
 			const searchCondition = or(
 				ilike(drugGenerics.genericName, `%${escaped}%`),
+				ilike(drugBrands.brandName, `%${escaped}%`),
 				ilike(formularyItems.doseForm, `%${escaped}%`),
 				ilike(formularyItems.strength, `%${escaped}%`),
 				ilike(formularyItems.route, `%${escaped}%`)
@@ -369,9 +370,11 @@ export class FormularyService {
 				.select({
 					...getTableColumns(formularyItems),
 					genericName: drugGenerics.genericName,
+					brandName: drugBrands.brandName,
 				})
 				.from(formularyItems)
 				.innerJoin(drugGenerics, eq(formularyItems.drugGenericId, drugGenerics.id))
+				.leftJoin(drugBrands, eq(formularyItems.drugBrandId, drugBrands.id))
 				.where(whereClause)
 				.orderBy(desc(formularyItems.createdAt))
 				.limit(limit)
@@ -380,6 +383,7 @@ export class FormularyService {
 				.select({ count: count() })
 				.from(formularyItems)
 				.innerJoin(drugGenerics, eq(formularyItems.drugGenericId, drugGenerics.id))
+				.leftJoin(drugBrands, eq(formularyItems.drugBrandId, drugBrands.id))
 				.where(whereClause),
 		])
 
@@ -393,9 +397,11 @@ export class FormularyService {
 			.select({
 				...getTableColumns(formularyItems),
 				genericName: drugGenerics.genericName,
+				brandName: drugBrands.brandName,
 			})
 			.from(formularyItems)
 			.innerJoin(drugGenerics, eq(formularyItems.drugGenericId, drugGenerics.id))
+			.leftJoin(drugBrands, eq(formularyItems.drugBrandId, drugBrands.id))
 			.where(eq(formularyItems.id, id))
 
 		if (!item) {

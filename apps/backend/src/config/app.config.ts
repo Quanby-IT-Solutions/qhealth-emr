@@ -35,6 +35,10 @@ export type IntegrationCredentialRef = (typeof INTEGRATION_CREDENTIAL_ENV_VARS)[
  */
 function configureBodyParser(app: INestApplication): void {
 	const httpAdapter = app.getHttpAdapter()
+	// LiveKit webhooks deliver an HMAC-signed body that must be verified against
+	// the exact raw text. Register a text parser for the webhook route before
+	// express.json() so req.body arrives as a string.
+	httpAdapter.use("/api/v1/webhooks/livekit", express.text({ type: () => true, limit: "1mb" }))
 	httpAdapter.use(express.json())
 	httpAdapter.use(express.urlencoded({ extended: true }))
 	logger.log("Body parser middleware configured")

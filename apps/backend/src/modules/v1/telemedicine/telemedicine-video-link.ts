@@ -1,8 +1,8 @@
 import { BadRequestException } from "@nestjs/common"
 
-export type TelemedicineVideoPlatform = "zoom" | "teams"
+export type TelemedicineVideoPlatform = "zoom" | "teams" | "livekit"
 
-const PLATFORM_HOSTS: Record<TelemedicineVideoPlatform, string[]> = {
+const PLATFORM_HOSTS: Record<Exclude<TelemedicineVideoPlatform, "livekit">, string[]> = {
 	zoom: ["zoom.us", "zoom.com", "zoomgov.com"],
 	teams: ["teams.microsoft.com", "teams.live.com", "teams.microsoft.us", "teams.cloud.microsoft"],
 }
@@ -29,7 +29,7 @@ export function assertTelemedicineVideoLink(
 		throw new BadRequestException("Video link must be a valid HTTPS URL.")
 	}
 
-	if (platform && !isAllowedHost(url.hostname, PLATFORM_HOSTS[platform])) {
+	if (platform && platform !== "livekit" && !isAllowedHost(url.hostname, PLATFORM_HOSTS[platform])) {
 		const label = platform === "zoom" ? "Zoom" : "Microsoft Teams"
 		throw new BadRequestException(`Video link must use an approved ${label} meeting domain.`)
 	}

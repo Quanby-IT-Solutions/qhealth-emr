@@ -133,6 +133,85 @@
 	}
 }
 
+/* LiveKit rooms need an explicit stage height. Without it, the default
+   provider can shrink to the control bar when camera tracks are muted. */
+.qhealth-livekit-room {
+	min-height: 520px;
+	background: #050505;
+}
+
+.lk-room-container {
+	display: flex !important;
+	min-height: 520px !important;
+	height: auto !important;
+	flex-direction: column !important;
+	background: #050505;
+}
+
+.lk-room-container:not(:has([data-qhealth-livekit-layout])),
+.lk-room-container:not(.qhealth-livekit-custom-room) {
+	display: grid !important;
+	grid-template-rows: minmax(420px, 1fr) auto !important;
+	min-height: 520px !important;
+}
+
+.lk-room-container:not(:has([data-qhealth-livekit-layout]))::before,
+.lk-room-container:not(.qhealth-livekit-custom-room)::before {
+	content: "Camera off";
+	display: flex;
+	min-height: 420px;
+	align-items: center;
+	justify-content: center;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+	background:
+		radial-gradient(circle at center, rgba(38, 38, 38, 0.92), rgba(5, 5, 5, 1) 62%);
+	color: rgba(255, 255, 255, 0.74);
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+
+.lk-room-container.qhealth-livekit-custom-room::before {
+	content: none;
+	display: none;
+}
+
+.lk-room-container:not(:has([data-qhealth-livekit-layout])):has(video)::before,
+.lk-room-container:not(.qhealth-livekit-custom-room):has(video)::before {
+	content: none;
+	display: none;
+}
+
+.qhealth-livekit-room > .lk-room-container,
+.qhealth-livekit-room .lk-room-container {
+	display: flex !important;
+	min-height: 520px !important;
+	height: auto !important;
+	flex-direction: column !important;
+	background: #050505;
+}
+
+.qhealth-livekit-room [data-qhealth-livekit-layout] {
+	display: flex;
+	min-height: 520px;
+	flex: 1 1 auto;
+	flex-direction: column;
+}
+
+.qhealth-livekit-room [data-qhealth-livekit-grid] {
+	min-height: 420px;
+	flex: 1 1 auto;
+}
+
+.qhealth-livekit-room .lk-control-bar {
+	flex-shrink: 0;
+}
+
+.qhealth-livekit-room .lk-room-container:not(:has([data-qhealth-livekit-layout])),
+.qhealth-livekit-room .lk-room-container:not(.qhealth-livekit-custom-room) {
+	display: grid !important;
+	grid-template-rows: minmax(420px, 1fr) auto !important;
+}
+
 /* ==========================================================================
    Editorial App Shell — Institutional Design Refinements
    Targets existing Shadcn sidebar primitives via data-attributes.

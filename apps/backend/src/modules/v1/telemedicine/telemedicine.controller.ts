@@ -1,7 +1,15 @@
-import { Controller, Get, NotFoundException, Param, Res, Version } from "@nestjs/common"
+import {
+	Controller,
+	Get,
+	NotFoundException,
+	Param,
+	Res,
+	Version,
+} from "@nestjs/common"
 import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
-import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
+import { Throttle } from "@nestjs/throttler"
+import { AllowAnonymous, Session, type UserSession } from "@thallesp/nestjs-better-auth"
 import { and, eq } from "drizzle-orm"
 import type { Response } from "express"
 
@@ -135,6 +143,83 @@ export class TelemedicineController {
 		})
 	}
 
+	@RequirePermission("telemedicine", "view")
+	@Implement(v1.telemedicine.joinLiveKitRoom)
+	async joinLiveKitRoom(@Session() session: UserSession) {
+		return implement(v1.telemedicine.joinLiveKitRoom).handler(async ({ input }) => {
+			const facilityId = await this.resolveAppointmentFacilityId(input.id)
+			const staffProfileId = facilityId
+				? await this.resolveStaffProfileId(session.user.id, facilityId)
+				: undefined
+			if (!staffProfileId) {
+				throw new NotFoundException(`Telemedicine appointment ${input.id} not found`)
+			}
+			return this.telemedicineService.joinClinicianLiveKitRoom(input.id, staffProfileId)
+		})
+	}
+
+	@RequirePermission("telemedicine", "view")
+	@Implement(v1.telemedicine.endLiveKitSession)
+	async endLiveKitSession(@Session() session: UserSession) {
+		return implement(v1.telemedicine.endLiveKitSession).handler(async ({ input }) => {
+			const facilityId = await this.resolveAppointmentFacilityId(input.id)
+			const staffProfileId = facilityId
+				? await this.resolveStaffProfileId(session.user.id, facilityId)
+				: undefined
+			if (!staffProfileId) {
+				throw new NotFoundException(`Telemedicine appointment ${input.id} not found`)
+			}
+			return this.telemedicineService.endClinicianLiveKitSession(input.id, staffProfileId)
+		})
+	}
+
+	@RequirePermission("telemedicine", "edit")
+	@Implement(v1.telemedicine.regeneratePatientInvite)
+	async regeneratePatientInvite(@Session() session: UserSession) {
+		return implement(v1.telemedicine.regeneratePatientInvite).handler(async ({ input }) => {
+			const facilityId = await this.resolveAppointmentFacilityId(input.id)
+			const staffProfileId = facilityId
+				? await this.resolveStaffProfileId(session.user.id, facilityId)
+				: undefined
+			if (!staffProfileId) {
+				throw new NotFoundException(`Telemedicine appointment ${input.id} not found`)
+			}
+			return this.telemedicineService.regeneratePatientInvite(input.id, staffProfileId)
+		})
+	}
+
+	@RequirePermission("telemedicine", "edit")
+	@Implement(v1.telemedicine.revokePatientInvite)
+	async revokePatientInvite(@Session() session: UserSession) {
+		return implement(v1.telemedicine.revokePatientInvite).handler(async ({ input }) => {
+			const facilityId = await this.resolveAppointmentFacilityId(input.id)
+			const staffProfileId = facilityId
+				? await this.resolveStaffProfileId(session.user.id, facilityId)
+				: undefined
+			if (!staffProfileId) {
+				throw new NotFoundException(`Telemedicine appointment ${input.id} not found`)
+			}
+			return this.telemedicineService.revokePatientInvite(input.id, staffProfileId)
+		})
+	}
+
+	@AllowAnonymous()
+	@Implement(v1.telemedicine.getPatientInvitePreview)
+	async getPatientInvitePreview() {
+		return implement(v1.telemedicine.getPatientInvitePreview).handler(async ({ input }) => {
+			return this.telemedicineService.getPatientInvitePreview(input)
+		})
+	}
+
+	@AllowAnonymous()
+	@Throttle({ default: { limit: 5, ttl: 60000 } })
+	@Implement(v1.telemedicine.joinPatientLiveKitRoom)
+	async joinPatientLiveKitRoom() {
+		return implement(v1.telemedicine.joinPatientLiveKitRoom).handler(async ({ input }) => {
+			return this.telemedicineService.joinPatientLiveKitRoom(input)
+		})
+	}
+
 	// Encounters
 
 	@RequirePermission("telemedicine", "view")
@@ -214,7 +299,11 @@ export class TelemedicineController {
 	@RequirePermission("telemedicine", "view")
 	@Version("1")
 	@Get("telemedicine/prescriptions/:id/pdf")
-	async getPrescriptionPdf(@Session() session: UserSession, @Param("id") id: string, @Res() res: Response) {
+	async getPrescriptionPdf(
+		@Session() session: UserSession,
+		@Param("id") id: string,
+		@Res() res: Response
+	) {
 		const facilityId = await this.resolvePrescriptionFacilityId(id)
 		const staffProfileId = facilityId
 			? await this.resolveStaffProfileId(session.user.id, facilityId)
