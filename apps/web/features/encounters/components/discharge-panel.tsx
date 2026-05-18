@@ -1,34 +1,18 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, Printer } from "lucide-react"
+import { Printer } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/core/components/ui/alert"
+import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import { Label } from "@/core/components/ui/label"
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/core/components/ui/select"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useNotesQuery } from "@/features/clinical-docs/api/clinical-docs.hooks"
 import {
-	isDeathReportSubmitted,
-	isMaternalDeathCandidate,
-	isNeonatalDeathCandidate,
-	useDeathReportStatusQuery,
-} from "@/features/death-reporting/api/death-reporting.hooks"
-import { DeathReportModal } from "@/features/death-reporting/components/death-report-modal"
-import {
 	useCloseEncounterMutation,
 	useDischargeChecklistQuery,
-	useDischargeEncounterMutation,
 	useEncounterDetailQuery,
 	useSignMayGoHomeOrderMutation,
 } from "@/features/encounters/api/encounters.hooks"
@@ -49,8 +33,6 @@ export function DischargePanel({
 	encounterId,
 	encounterType,
 	patientId,
-	patientSex,
-	patientDateOfBirth,
 }: DischargePanelProps) {
 	const router = useRouter()
 	const { data: profile } = useMyProfile()
@@ -59,10 +41,8 @@ export function DischargePanel({
 	)
 	const { data: checklist, isLoading: checklistLoading } = useDischargeChecklistQuery(encounterId)
 	const { data: encounter } = useEncounterDetailQuery(encounterId)
-	const discharge = useDischargeEncounterMutation()
 	const close = useCloseEncounterMutation()
 	const mayGoHome = useSignMayGoHomeOrderMutation()
-	const { data: deathReportStatus } = useDeathReportStatusQuery(encounterId)
 
 	const isOutpatient = encounterType === "outpatient"
 
@@ -75,8 +55,6 @@ export function DischargePanel({
 	const signedNoteCount = (notesData?.data ?? []).filter(n => n.status === "signed").length
 	const prescriptionCount = prescriptionsData?.data.length ?? 0
 
-	const [disposition, setDisposition] = useState("")
-	const [deathReportModalOpen, setDeathReportModalOpen] = useState(false)
 	const [abstractOpen, setAbstractOpen] = useState(false)
 	const [rxPrintOpen, setRxPrintOpen] = useState(false)
 	// PS-017: track that required release documents were opened before close
@@ -86,54 +64,9 @@ export function DischargePanel({
 	const mayGoHomeSigned =
 		isOutpatient || mayGoHomeSignedLocal || encounter?.status === "pending_discharge"
 
-	const needsDeathReport =
-		disposition === "deceased" &&
-		!!patientDateOfBirth &&
-		(isMaternalDeathCandidate(patientSex ?? "", patientDateOfBirth) ||
-			isNeonatalDeathCandidate(patientDateOfBirth))
-	const requiredDeathReportType =
-		needsDeathReport && isMaternalDeathCandidate(patientSex ?? "", patientDateOfBirth ?? "")
-			? "fmdrf"
-			: needsDeathReport && isNeonatalDeathCandidate(patientDateOfBirth ?? "")
-				? "fndrf"
-				: null
-	const requiredDeathReportLabel =
-		requiredDeathReportType === "fmdrf"
-			? "FMDRF"
-			: requiredDeathReportType === "fndrf"
-				? "FNDRF"
-				: null
-
-	const deathReportComplete =
-		!needsDeathReport ||
-		((!isMaternalDeathCandidate(patientSex ?? "", patientDateOfBirth ?? "") ||
-			isDeathReportSubmitted(deathReportStatus?.fmdrfStatus)) &&
-			(!isNeonatalDeathCandidate(patientDateOfBirth ?? "") ||
-				isDeathReportSubmitted(deathReportStatus?.fndrfStatus)))
-
-	useEffect(() => {
-		if (needsDeathReport && !deathReportComplete) {
-			// eslint-disable-next-line react-hooks/set-state-in-effect
-			setDeathReportModalOpen(true)
-		}
-	}, [deathReportComplete, needsDeathReport])
-
 	const handleDischarge = async () => {
-		if (isOutpatient) {
-			await close.mutateAsync({ encounterId })
-		} else {
-			if (!disposition) return
-
-			if (needsDeathReport && !deathReportComplete) {
-				setDeathReportModalOpen(true)
-				return
-			}
-
-			await discharge.mutateAsync({
-				encounterId,
-				disposition: disposition as "home" | "transfer" | "deceased" | "ama",
-			})
-		}
+		if (!isOutpatient) return
+		await close.mutateAsync({ encounterId })
 		router.push(`/patients/${patientId}`)
 	}
 
@@ -205,7 +138,7 @@ export function DischargePanel({
 			{/* Discharge / Close action */}
 			<Card>
 				<CardHeader>
-					<CardTitle>{isOutpatient ? "Close Encounter" : "Discharge Patient"}</CardTitle>
+					<CardTitle>{isOutpatient ? "Close Encounter" : "May Go Home Order"}</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					{!isOutpatient && (
@@ -234,85 +167,34 @@ export function DischargePanel({
 								)}
 							</div>
 
-							<div className="space-y-1.5">
-								<Label>Disposition *</Label>
-								<Select
-									value={disposition}
-									onValueChange={v => setDisposition(v ?? "")}
-									disabled={!mayGoHomeSigned}
-								>
-									<SelectTrigger className="w-full">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="home">Discharged to Home</SelectItem>
-										<SelectItem value="transfer">Transferred to Another Facility</SelectItem>
-										<SelectItem value="deceased">Deceased</SelectItem>
-										<SelectItem value="ama">Against Medical Advice</SelectItem>
-									</SelectContent>
-								</Select>
-							</div>
-
-							{needsDeathReport && requiredDeathReportType && requiredDeathReportLabel && (
-								<Alert className="border-amber-300 bg-amber-50">
-									<AlertTriangle className="size-4 text-amber-700" />
-									<AlertTitle className="text-amber-900">Death review form required</AlertTitle>
-									<AlertDescription className="space-y-3 text-amber-800">
-										<p>
-											This patient requires completion of the {requiredDeathReportLabel} before
-											discharge can be finalized.
-										</p>
-										<Button
-											type="button"
-											variant="outline"
-											onClick={() =>
-												router.push(
-													`/patients/${patientId}/encounters/${encounterId}/death-report?type=${requiredDeathReportType}`
-												)
-											}
-										>
-											Complete {requiredDeathReportLabel}
-										</Button>
+							{mayGoHomeSigned && (
+								<Alert>
+									<AlertDescription>
+										This encounter is now pending discharge. It will appear in the Registrar
+										Discharge Processing queue after Pharmacy, Nursing, and Billing clearances
+										are ready for gate-pass processing.
 									</AlertDescription>
 								</Alert>
 							)}
 						</>
 					)}
 
-					<Button
-						onClick={handleDischarge}
-						disabled={
-							!checklist?.allComplete ||
-							(!isOutpatient && !mayGoHomeSigned) ||
-							(!isOutpatient && !disposition) ||
-							(!isOutpatient && needsDeathReport && !deathReportComplete) ||
-							// PS-017: require release documents to be opened before OPD close
-							(isOutpatient && signedNoteCount > 0 && !abstractOpened) ||
-							(isOutpatient && prescriptionCount > 0 && !rxOpened) ||
-							discharge.isPending ||
-							close.isPending
-						}
-						variant={isOutpatient ? "default" : "destructive"}
-					>
-						{discharge.isPending || close.isPending
-							? "Processing…"
-							: isOutpatient
-								? "Close Encounter"
-								: "Confirm Discharge"}
-					</Button>
+					{isOutpatient && (
+						<Button
+							onClick={handleDischarge}
+							disabled={
+								!checklist?.allComplete ||
+								// PS-017: require release documents to be opened before OPD close
+								(signedNoteCount > 0 && !abstractOpened) ||
+								(prescriptionCount > 0 && !rxOpened) ||
+								close.isPending
+							}
+						>
+							{close.isPending ? "Processing…" : "Close Encounter"}
+						</Button>
+					)}
 				</CardContent>
 			</Card>
-
-			{needsDeathReport && (
-				<DeathReportModal
-					open={deathReportModalOpen}
-					onOpenChange={setDeathReportModalOpen}
-					encounterId={encounterId}
-					patientId={patientId}
-					patientSex={patientSex ?? ""}
-					patientDateOfBirth={patientDateOfBirth ?? ""}
-				/>
-			)}
 
 			{/* OPD print dialogs */}
 			{isOutpatient && (

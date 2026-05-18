@@ -3,19 +3,19 @@
 import { useState } from "react"
 
 import { Button } from "@/core/components/ui/button"
+import { Badge } from "@/core/components/ui/badge"
 import {
 	Dialog,
 	DialogContent,
+	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Separator } from "@/core/components/ui/separator"
 import { useListCliniciansQuery, usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
 import { useMergePreEncounterMutation, useMergePreviewQuery } from "@/features/ed/api/ed.hooks"
-
-import { MergePreview } from "./merge-preview"
+import { acuityColor, acuityLabel } from "@/features/ed/lib/acuity-utils"
 
 interface MergeDialogProps {
 	preEncounterId: string
@@ -89,16 +89,40 @@ export function MergeDialog({
 	const selectedClinician = clinicians.find(
 		clinician => clinician.staffProfileId === attendingStaffId
 	)
+	const isConfirmStep = !!selectedPatientId
+	const totalRecords = preview
+		? Object.values(preview.clinicalRecordCounts).reduce((total, count) => total + count, 0)
+		: 0
 
 	return (
 		<Dialog open={open} onOpenChange={handleOpenChange}>
-			<DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto">
+			<DialogContent className="max-w-2xl">
 				<DialogHeader>
 					<DialogTitle>Merge Pre-Encounter — {traumaAlias}</DialogTitle>
+					<div className="flex items-center gap-2 text-xs">
+						<span
+							className={
+								isConfirmStep
+									? "text-muted-foreground"
+									: "bg-primary text-primary-foreground rounded-full px-2 py-0.5"
+							}
+						>
+							1. Select patient
+						</span>
+						<span className="text-muted-foreground">/</span>
+						<span
+							className={
+								isConfirmStep
+									? "bg-primary text-primary-foreground rounded-full px-2 py-0.5"
+									: "text-muted-foreground"
+							}
+						>
+							2. Confirm merge
+						</span>
+					</div>
 				</DialogHeader>
 
-				<div className="space-y-4">
-					{/* Step 1: Patient Search */}
+				<div className="min-h-[24rem] space-y-4">
 					{!selectedPatientId && (
 						<>
 							<div className="space-y-2">
@@ -111,7 +135,7 @@ export function MergeDialog({
 							</div>
 
 							{searchTerm.length > 0 && (
-								<div className="max-h-60 space-y-1 overflow-y-auto">
+								<div className="h-72 space-y-1 overflow-y-auto rounded-lg border p-1">
 									{patients.length === 0 ? (
 										<p className="text-muted-foreground py-4 text-center text-sm">
 											No patients found.
@@ -143,34 +167,62 @@ export function MergeDialog({
 						</>
 					)}
 
-					{/* Step 2: Merge Preview */}
 					{selectedPatientId && (
 						<>
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => {
-									setSelectedPatientId(null)
-									setAttendingStaffId(null)
-								}}
-							>
-								← Back to Search
-							</Button>
-
 							{previewLoading ? (
 								<p className="text-muted-foreground py-4 text-center text-sm">
 									Loading preview…
 								</p>
 							) : preview ? (
 								<div className="space-y-4">
-									<MergePreview
-										patientName={preview.patientName}
-										patientMrn={preview.patientMrn}
-										preEncounter={preview.preEncounter}
-										clinicalRecordCounts={preview.clinicalRecordCounts}
-									/>
+									<div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
+										<div>
+											<p className="text-muted-foreground text-xs">Registered patient</p>
+											<p className="font-medium">{preview.patientName}</p>
+											<p className="text-muted-foreground text-xs">MRN: {preview.patientMrn}</p>
+										</div>
+										<div>
+											<p className="text-muted-foreground text-xs">Trauma alias</p>
+											<div className="flex flex-wrap items-center gap-2">
+												<p className="font-medium">{preview.preEncounter.traumaAlias}</p>
+												{preview.preEncounter.triageAcuityLevel !== null && (
+													<Badge
+														className={`text-xs ${acuityColor(preview.preEncounter.triageAcuityLevel)}`}
+													>
+														L{preview.preEncounter.triageAcuityLevel}
+													</Badge>
+												)}
+											</div>
+											{preview.preEncounter.triageAcuityLevel !== null && (
+												<p className="text-muted-foreground text-xs">
+													{acuityLabel(preview.preEncounter.triageAcuityLevel)}
+													{preview.preEncounter.triageAcuityScale
+														? ` (${preview.preEncounter.triageAcuityScale.toUpperCase()})`
+														: ""}
+												</p>
+											)}
+										</div>
+									</div>
 
-									<Separator />
+									<div className="rounded-lg border p-3">
+										<div className="mb-2 flex items-center justify-between">
+											<p className="text-sm font-medium">Records to transfer</p>
+											<Badge variant="secondary">{totalRecords} total</Badge>
+										</div>
+										<div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+											{Object.entries(preview.clinicalRecordCounts).map(([key, count]) => (
+												<div
+													key={key}
+													className="bg-muted/40 flex items-center justify-between rounded-md px-2 py-1 text-xs"
+												>
+													<span className="text-muted-foreground">
+														{key.replace(/([A-Z])/g, " $1")}
+													</span>
+													<span className="font-medium">{count}</span>
+												</div>
+											))}
+										</div>
+									</div>
 
 									<div className="space-y-2">
 										<Label htmlFor="attendingStaffId">
@@ -197,7 +249,7 @@ export function MergeDialog({
 											</button>
 
 											{attendingPickerOpen && (
-												<div className="bg-popover text-popover-foreground ring-foreground/10 absolute top-full right-0 left-0 z-50 mt-1 h-72 overflow-hidden rounded-lg border shadow-md ring-1">
+												<div className="bg-popover text-popover-foreground ring-foreground/10 absolute top-full right-0 left-0 z-50 mt-1 h-44 overflow-hidden rounded-lg border shadow-md ring-1">
 													<div
 														className="h-full overflow-y-auto overscroll-contain p-1"
 														role="listbox"
@@ -237,25 +289,6 @@ export function MergeDialog({
 										</p>
 									</div>
 
-									<Separator />
-
-									<div className="flex justify-end gap-2">
-										<Button
-											variant="outline"
-											onClick={() => handleOpenChange(false)}
-										>
-											Cancel
-										</Button>
-										<Button
-											onClick={handleMerge}
-											disabled={merge.isPending || !attendingStaffId}
-										>
-											{merge.isPending
-												? "Merging…"
-												: "Confirm Merge"}
-										</Button>
-									</div>
-
 									{merge.isError && (
 										<p className="text-destructive text-sm">
 											{merge.error.message}
@@ -266,6 +299,32 @@ export function MergeDialog({
 						</>
 					)}
 				</div>
+
+				<DialogFooter className="items-center">
+					{selectedPatientId && (
+						<Button
+							variant="outline"
+							onClick={() => {
+								setSelectedPatientId(null)
+								setAttendingStaffId(null)
+								setAttendingPickerOpen(false)
+							}}
+						>
+							Back
+						</Button>
+					)}
+					<Button variant="outline" onClick={() => handleOpenChange(false)}>
+						Cancel
+					</Button>
+					{selectedPatientId && (
+						<Button
+							onClick={handleMerge}
+							disabled={previewLoading || merge.isPending || !attendingStaffId}
+						>
+							{merge.isPending ? "Merging..." : "Confirm Merge"}
+						</Button>
+					)}
+				</DialogFooter>
 			</DialogContent>
 		</Dialog>
 	)
