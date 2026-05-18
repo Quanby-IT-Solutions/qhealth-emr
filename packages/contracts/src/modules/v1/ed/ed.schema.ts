@@ -129,6 +129,7 @@ export const MergePreEncounterSchema = z.object({
 	patientId: z.string().uuid(),
 	encounterType: z.enum(["inpatient", "outpatient", "emergency"]).default("emergency"),
 	admittingStaffId: z.string().uuid(),
+	attendingStaffId: z.string().uuid().optional(),
 	bedId: z.string().uuid().optional(),
 })
 

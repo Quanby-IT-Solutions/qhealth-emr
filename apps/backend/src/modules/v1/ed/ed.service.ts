@@ -215,6 +215,32 @@ export class EdService {
 		return updated!
 	}
 
+	async cancelPreEncounter(id: string) {
+		const [existing] = await db.select().from(preEncounters).where(eq(preEncounters.id, id))
+
+		if (!existing) {
+			throw new NotFoundException(`Pre-encounter ${id} not found`)
+		}
+
+		if (existing.status !== "active") {
+			throw new BadRequestException("Can only cancel active pre-encounters")
+		}
+
+		const [updated] = await db
+			.update(preEncounters)
+			.set({ status: "cancelled", updatedAt: new Date() })
+			.where(eq(preEncounters.id, id))
+			.returning()
+
+		this.notificationService.broadcast(
+			"ed_queue",
+			"ED Queue Updated",
+			"Trauma alias pre-encounter removed from queue"
+		)
+
+		return updated!
+	}
+
 	async listPreEncounters(filter: PreEncounterListInput) {
 		const page = Number(filter.page) || 1
 		const limit = Number(filter.limit) || 50
@@ -435,7 +461,7 @@ export class EdService {
 					encounterType: input.encounterType ?? "emergency",
 					chiefComplaint: preEnc.chiefComplaint,
 					admittingStaffId: input.admittingStaffId,
-					attendingStaffId: input.admittingStaffId,
+					attendingStaffId: input.attendingStaffId ?? input.admittingStaffId,
 					bedId: input.bedId ?? null,
 					admissionDatetime: preEnc.triageDatetime ?? new Date(),
 					mergedFromPreEncounterId: preEnc.id,

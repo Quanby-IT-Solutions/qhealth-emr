@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react"
 import { useForm } from "@tanstack/react-form"
 import { CalendarDays, Clock3, Plus, Trash2 } from "lucide-react"
-import { z } from "zod"
 import { toast } from "sonner"
+import { z } from "zod"
 
 import {
 	CreateClinicTemplateSchema,
@@ -13,14 +13,37 @@ import {
 	type UpdateClinicTemplateInput,
 } from "@repo/contracts"
 
-import { EmptyState, ErrorState } from "@/features/admin/components/state-views"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogTitle } from "@/core/components/ui/alert-dialog"
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogMedia,
+	AlertDialogTitle,
+} from "@/core/components/ui/alert-dialog"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Checkbox } from "@/core/components/ui/checkbox"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet, FieldLegend } from "@/core/components/ui/field"
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/core/components/ui/dialog"
+import {
+	Field,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@/core/components/ui/field"
 import { Input } from "@/core/components/ui/input"
 import {
 	Select,
@@ -30,7 +53,16 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Skeleton } from "@/core/components/ui/skeleton"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
+import { EmptyState, ErrorState } from "@/features/admin/components/state-views"
 import {
 	useClinicsQuery,
 	useCreateScheduleTemplateMutation,
@@ -164,7 +196,10 @@ function buildInitialWeeklyHours(template: ClinicTemplate | null): WeeklyHoursEn
 	return weeklyHours
 }
 
-function buildInitialValues(template: ClinicTemplate | null, fallbackFacilityId: string): TemplateFormValues {
+function buildInitialValues(
+	template: ClinicTemplate | null,
+	fallbackFacilityId: string
+): TemplateFormValues {
 	if (!template) {
 		return {
 			...DEFAULT_FORM_VALUES,
@@ -249,9 +284,9 @@ function getDisabledReasons(params: {
 	if (!validationResult.success) {
 		for (const issue of validationResult.error.issues) {
 			const friendlyReason = toFriendlyDisabledReason(
-					issue as { message: string; path: Array<string | number> },
-					params.values
-				)
+				issue as { message: string; path: Array<string | number> },
+				params.values
+			)
 			if (!reasons.includes(friendlyReason)) {
 				reasons.push(friendlyReason)
 			}
@@ -291,7 +326,9 @@ function TemplateDialog({
 		() => buildInitialValues(template, facilityId),
 		[template, facilityId]
 	)
-	const [selectedFacilityId, setSelectedFacilityId] = useState(initialValues.facilityId || facilityId)
+	const [selectedFacilityId, setSelectedFacilityId] = useState(
+		initialValues.facilityId || facilityId
+	)
 
 	const form = useForm({
 		defaultValues: initialValues,
@@ -351,9 +388,7 @@ function TemplateDialog({
 				const failed = results.length - succeeded
 
 				if (failed === 0) {
-					toast.success(
-						`${succeeded} template${succeeded === 1 ? "" : "s"} created successfully.`
-					)
+					toast.success(`${succeeded} template${succeeded === 1 ? "" : "s"} created successfully.`)
 					onOpenChange(false)
 					return
 				}
@@ -387,7 +422,9 @@ function TemplateDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent size="xl" className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden">
 				<DialogHeader>
-					<DialogTitle>{isEditing ? "Edit Schedule Template" : "New Schedule Template"}</DialogTitle>
+					<DialogTitle>
+						{isEditing ? "Edit Schedule Template" : "New Schedule Template"}
+					</DialogTitle>
 				</DialogHeader>
 
 				<form
@@ -417,7 +454,8 @@ function TemplateDialog({
 												<SelectTrigger className="w-full" aria-invalid={isInvalid}>
 													<SelectValue>
 														{field.state.value
-															? clinicsQuery.data.find(clinic => clinic.id === field.state.value)?.name
+															? clinicsQuery.data.find(clinic => clinic.id === field.state.value)
+																	?.name
 															: "Select a facility"}
 													</SelectValue>
 												</SelectTrigger>
@@ -449,8 +487,9 @@ function TemplateDialog({
 												<SelectTrigger className="w-full" aria-invalid={isInvalid}>
 													<SelectValue>
 														{field.state.value
-															? cliniciansQuery.data.find(clinician => clinician.id === field.state.value)
-																	?.name
+															? cliniciansQuery.data.find(
+																	clinician => clinician.id === field.state.value
+																)?.name
 															: "Select a clinician"}
 													</SelectValue>
 												</SelectTrigger>
@@ -484,7 +523,9 @@ function TemplateDialog({
 											placeholder="OPD AM, Telemedicine, Nutrition Clinic"
 											aria-invalid={isInvalid}
 										/>
-										<FieldDescription>Visible label used for this recurring clinic template.</FieldDescription>
+										<FieldDescription>
+											Visible label used for this recurring clinic template.
+										</FieldDescription>
 										{isInvalid && <FieldError errors={toFieldErrors(field.state.meta.errors)} />}
 									</Field>
 								)
@@ -501,13 +542,14 @@ function TemplateDialog({
 										<div className="space-y-3">
 											{field.state.value.map((day, dayIndex) => {
 												const dayLabel =
-													DAY_OPTIONS.find(option => option.value === day.dayOfWeek)?.label ?? "Unknown"
+													DAY_OPTIONS.find(option => option.value === day.dayOfWeek)?.label ??
+													"Unknown"
 												const isEditableDay = !isEditing || day.dayOfWeek === template?.dayOfWeek
 
 												return (
 													<div
 														key={day.dayOfWeek}
-														className="rounded-2xl border bg-card px-4 py-2.5"
+														className="bg-card rounded-2xl border px-4 py-2.5"
 													>
 														<div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-4">
 															<div className="w-full max-w-32 shrink-0">
@@ -519,7 +561,7 @@ function TemplateDialog({
 																	<Button
 																		type="button"
 																		variant="ghost"
-																		className="justify-start px-0 text-muted-foreground"
+																		className="text-muted-foreground justify-start px-0"
 																		disabled={!isEditableDay}
 																		onClick={() => {
 																			if (!isEditableDay) return
@@ -549,45 +591,49 @@ function TemplateDialog({
 																				disabled={!isEditableDay}
 																				className="w-full lg:w-44"
 																				onChange={event => {
-																					const nextValue = field.state.value.map((entry, entryIndex) =>
-																						entryIndex === dayIndex
-																							? {
-																									...entry,
-																									periods: entry.periods.map((candidate, candidateIndex) =>
-																										candidateIndex === periodIndex
-																											? {
-																													...candidate,
-																													startTime: event.target.value,
-																												}
-																											: candidate
-																									),
-																								}
-																							: entry
+																					const nextValue = field.state.value.map(
+																						(entry, entryIndex) =>
+																							entryIndex === dayIndex
+																								? {
+																										...entry,
+																										periods: entry.periods.map(
+																											(candidate, candidateIndex) =>
+																												candidateIndex === periodIndex
+																													? {
+																															...candidate,
+																															startTime: event.target.value,
+																														}
+																													: candidate
+																										),
+																									}
+																								: entry
 																					)
 																					field.handleChange(nextValue)
 																				}}
 																			/>
-																			<div className="px-1 text-sm text-muted-foreground">to</div>
+																			<div className="text-muted-foreground px-1 text-sm">to</div>
 																			<Input
 																				type="time"
 																				value={period.endTime}
 																				disabled={!isEditableDay}
 																				className="w-full lg:w-44"
 																				onChange={event => {
-																					const nextValue = field.state.value.map((entry, entryIndex) =>
-																						entryIndex === dayIndex
-																							? {
-																									...entry,
-																									periods: entry.periods.map((candidate, candidateIndex) =>
-																										candidateIndex === periodIndex
-																											? {
-																													...candidate,
-																													endTime: event.target.value,
-																												}
-																											: candidate
-																									),
-																								}
-																							: entry
+																					const nextValue = field.state.value.map(
+																						(entry, entryIndex) =>
+																							entryIndex === dayIndex
+																								? {
+																										...entry,
+																										periods: entry.periods.map(
+																											(candidate, candidateIndex) =>
+																												candidateIndex === periodIndex
+																													? {
+																															...candidate,
+																															endTime: event.target.value,
+																														}
+																													: candidate
+																										),
+																									}
+																								: entry
 																					)
 																					field.handleChange(nextValue)
 																				}}
@@ -604,13 +650,14 @@ function TemplateDialog({
 																						const nextPeriods = day.periods.filter(
 																							(_, index) => index !== periodIndex
 																						)
-																						const nextValue = field.state.value.map((entry, entryIndex) =>
-																							entryIndex === dayIndex
-																								? {
-																										...entry,
-																										periods: nextPeriods,
-																									}
-																								: entry
+																						const nextValue = field.state.value.map(
+																							(entry, entryIndex) =>
+																								entryIndex === dayIndex
+																									? {
+																											...entry,
+																											periods: nextPeriods,
+																										}
+																									: entry
 																						)
 																						field.handleChange(nextValue)
 																					}}
@@ -624,13 +671,17 @@ function TemplateDialog({
 																					disabled={!isEditableDay}
 																					onClick={() => {
 																						if (!isEditableDay) return
-																						const nextValue = field.state.value.map((entry, entryIndex) =>
-																							entryIndex === dayIndex
-																								? {
-																										...entry,
-																										periods: [...entry.periods, { ...EMPTY_PERIOD }],
-																									}
-																								: entry
+																						const nextValue = field.state.value.map(
+																							(entry, entryIndex) =>
+																								entryIndex === dayIndex
+																									? {
+																											...entry,
+																											periods: [
+																												...entry.periods,
+																												{ ...EMPTY_PERIOD },
+																											],
+																										}
+																									: entry
 																						)
 																						field.handleChange(nextValue)
 																					}}
@@ -643,8 +694,10 @@ function TemplateDialog({
 																)}
 
 																{isEditing && day.dayOfWeek !== template?.dayOfWeek ? (
-																	<p className="text-xs text-muted-foreground">
-																		Editing keeps this template on {formatDay(template?.dayOfWeek ?? 0)}. Create a new template to add another day.
+																	<p className="text-muted-foreground text-xs">
+																		Editing keeps this template on{" "}
+																		{formatDay(template?.dayOfWeek ?? 0)}. Create a new template to
+																		add another day.
 																	</p>
 																) : null}
 															</div>
@@ -720,7 +773,7 @@ function TemplateDialog({
 											/>
 											<div className="flex flex-col">
 												<span>Active template</span>
-												<span className="text-xs text-muted-foreground">
+												<span className="text-muted-foreground text-xs">
 													Turn this off to stop future slot generation.
 												</span>
 											</div>
@@ -749,11 +802,7 @@ function TemplateDialog({
 								if (canSubmit) {
 									return (
 										<Button type="submit" disabled={isPending}>
-											{isPending
-												? "Saving..."
-												: isEditing
-													? "Save Changes"
-													: "Create Templates"}
+											{isPending ? "Saving..." : isEditing ? "Save Changes" : "Create Templates"}
 										</Button>
 									)
 								}
@@ -797,10 +846,7 @@ export function TemplateBuilder({ facilityId }: TemplateBuilderProps) {
 	const [deleteTarget, setDeleteTarget] = useState<ClinicTemplate | null>(null)
 
 	const clinicianNameById = useMemo(
-		() =>
-			new Map(
-				cliniciansQuery.data.map(clinician => [clinician.id, clinician.name] as const)
-			),
+		() => new Map(cliniciansQuery.data.map(clinician => [clinician.id, clinician.name] as const)),
 		[cliniciansQuery.data]
 	)
 
@@ -808,9 +854,7 @@ export function TemplateBuilder({ facilityId }: TemplateBuilderProps) {
 		() =>
 			(templatesQuery.data ?? []).map(template => ({
 				...template,
-				clinicianName:
-					clinicianNameById.get(template.clinicianStaffId) ??
-					"Unknown clinician",
+				clinicianName: clinicianNameById.get(template.clinicianStaffId) ?? "Unknown clinician",
 			})),
 		[clinicianNameById, templatesQuery.data]
 	)
@@ -844,7 +888,7 @@ export function TemplateBuilder({ facilityId }: TemplateBuilderProps) {
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="text-lg font-semibold">Clinic Schedule Templates</h2>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Define recurring clinic days, provider coverage, operating hours, and slot capacity.
 					</p>
 				</div>
@@ -883,62 +927,66 @@ export function TemplateBuilder({ facilityId }: TemplateBuilderProps) {
 					) : templates.length === 0 ? (
 						<EmptyState title="No templates configured yet." />
 					) : (
-						<div className="space-y-3">
-							{templates.map(template => (
-								<div
-									key={template.id}
-									className="flex flex-col gap-4 rounded-xl border p-4 lg:flex-row lg:items-center lg:justify-between"
-								>
-									<div className="grid flex-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-										<div>
-											<p className="text-xs uppercase tracking-wide text-muted-foreground">Clinic</p>
-											<p className="font-medium">{template.clinicName}</p>
-										</div>
-										<div>
-											<p className="text-xs uppercase tracking-wide text-muted-foreground">Clinician</p>
-											<p className="font-medium">{template.clinicianName}</p>
-										</div>
-										<div>
-											<p className="text-xs uppercase tracking-wide text-muted-foreground">Day</p>
-											<p className="font-medium">{formatDay(template.dayOfWeek)}</p>
-										</div>
-										<div>
-											<p className="text-xs uppercase tracking-wide text-muted-foreground">Hours</p>
-											<p className="flex items-center gap-2 font-medium">
-												<Clock3 className="size-4 text-muted-foreground" />
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>Clinic</TableHead>
+									<TableHead>Clinician</TableHead>
+									<TableHead>Day</TableHead>
+									<TableHead>Hours</TableHead>
+									<TableHead>Capacity</TableHead>
+									<TableHead>Status</TableHead>
+									<TableHead className="text-right">Actions</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{templates.map(template => (
+									<TableRow key={template.id}>
+										<TableCell className="font-medium">{template.clinicName}</TableCell>
+										<TableCell>{template.clinicianName}</TableCell>
+										<TableCell>{formatDay(template.dayOfWeek)}</TableCell>
+										<TableCell>
+											<span className="flex items-center gap-2">
+												<Clock3 className="text-muted-foreground size-4" />
 												{template.startTime} - {template.endTime}
-											</p>
-										</div>
-										<div>
-											<p className="text-xs uppercase tracking-wide text-muted-foreground">Capacity</p>
-											<p className="flex items-center gap-2 font-medium">
-												<CalendarDays className="size-4 text-muted-foreground" />
+											</span>
+										</TableCell>
+										<TableCell>
+											<span className="flex items-center gap-2">
+												<CalendarDays className="text-muted-foreground size-4" />
 												{template.slotDurationMinutes} min / {template.maxPatients} patients
-											</p>
-										</div>
-									</div>
-
-									<div className="flex items-center gap-2">
-										<Badge variant={template.isActive ? "default" : "secondary"}>
-											{template.isActive ? "Active" : "Inactive"}
-										</Badge>
-										<Button variant="outline" size="sm" onClick={() => openEditDialog(template)}>
-											Edit
-										</Button>
-										<Button
-											variant="ghost"
-											size="sm"
-											className="text-destructive"
-											disabled={!template.isActive || deactivateTemplateMutation.isPending}
-											onClick={() => setDeleteTarget(template)}
-										>
-											<Trash2 className="mr-1 size-4" />
-											Delete
-										</Button>
-									</div>
-								</div>
-							))}
-						</div>
+											</span>
+										</TableCell>
+										<TableCell>
+											<Badge variant={template.isActive ? "default" : "secondary"}>
+												{template.isActive ? "Active" : "Inactive"}
+											</Badge>
+										</TableCell>
+										<TableCell className="text-right">
+											<div className="flex justify-end gap-2">
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => openEditDialog(template)}
+												>
+													Edit
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													className="text-destructive"
+													disabled={!template.isActive || deactivateTemplateMutation.isPending}
+													onClick={() => setDeleteTarget(template)}
+												>
+													<Trash2 className="mr-1 size-4" />
+													Delete
+												</Button>
+											</div>
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
 					)}
 				</CardContent>
 			</Card>
@@ -964,11 +1012,12 @@ export function TemplateBuilder({ facilityId }: TemplateBuilderProps) {
 				<AlertDialogContent size="default">
 					<AlertDialogHeader>
 						<AlertDialogMedia>
-							<Trash2 className="size-5 text-destructive" />
+							<Trash2 className="text-destructive size-5" />
 						</AlertDialogMedia>
 						<AlertDialogTitle>Delete template?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This workspace currently deactivates the template instead of hard-deleting it, so future slot generation stops without removing historical records.
+							This workspace currently deactivates the template instead of hard-deleting it, so
+							future slot generation stops without removing historical records.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
