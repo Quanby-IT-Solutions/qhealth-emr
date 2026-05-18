@@ -38,6 +38,14 @@ export class EdController {
 		})
 	}
 
+	@RequirePermission("ed", "create")
+	@Implement(v1.ed.cancelPreEncounter)
+	async cancelPreEncounter(@Session() _session: UserSession) {
+		return implement(v1.ed.cancelPreEncounter).handler(async ({ input }) => {
+			return this.edService.cancelPreEncounter(input.id)
+		})
+	}
+
 	@RequireAnyPermissions([
 		{ module: "ed", action: "view" },
 		{ module: "adt", action: "edit" },

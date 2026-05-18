@@ -74,6 +74,17 @@ export function useUpdatePreEncounterMutation() {
 	)
 }
 
+export function useCancelPreEncounterMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.ed.cancelPreEncounter.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+		})
+	)
+}
+
 // ============================================================================
 // Merge
 // ============================================================================
@@ -177,4 +188,3 @@ export function useCancelInboundTriageMutation() {
 		})
 	)
 }
-

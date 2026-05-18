@@ -62,6 +62,16 @@ export const edContract = {
 		.input(UpdatePreEncounterSchema)
 		.output(PreEncounterSchema),
 
+	cancelPreEncounter: oc
+		.route({
+			method: "POST",
+			path: "/pre-encounters/{id}/cancel",
+			summary: "Cancel an active trauma alias pre-encounter",
+			tags: ["Emergency Department"],
+		})
+		.input(PreEncounterIdSchema)
+		.output(PreEncounterSchema),
+
 	listPreEncounters: oc
 		.route({
 			method: "GET",

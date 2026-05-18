@@ -1,8 +1,19 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Activity, Clock, Stethoscope } from "lucide-react"
+import { Activity, Clock, Stethoscope, Trash2 } from "lucide-react"
 
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from "@/core/components/ui/alert-dialog"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
@@ -16,10 +27,11 @@ import {
 import { Skeleton } from "@/core/components/ui/skeleton"
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { useEdQueueQuery } from "@/features/ed/api/ed.hooks"
+import { useCancelPreEncounterMutation, useEdQueueQuery } from "@/features/ed/api/ed.hooks"
 import { TraumaAliasBadge } from "@/features/ed/components/trauma-alias-badge"
 import { TriageForm } from "@/features/ed/components/triage-form"
 import { acuityColor, acuityLabel } from "@/features/ed/lib/acuity-utils"
+import { toast } from "sonner"
 
 const ACUITY_COLUMNS = [1, 2, 3, 4, 5] as const
 
@@ -93,10 +105,16 @@ function AcuityColumn({
 	level,
 	items,
 	now,
+	canRemoveTraumaAlias,
+	onRemoveTraumaAlias,
+	removingId,
 }: {
 	level: number
 	items: TriageQueueItem[]
 	now: number
+	canRemoveTraumaAlias: boolean
+	onRemoveTraumaAlias: (item: TriageQueueItem) => void
+	removingId: string | null
 }) {
 	return (
 		<div className="min-w-64 space-y-3">
@@ -194,10 +212,49 @@ function AcuityColumn({
 								</div>
 
 								{item.type === "pre_encounter" ? (
-									<TraumaAliasBadge
-										alias={item.traumaAlias ?? item.id}
-										acuityLevel={item.acuityLevel}
-									/>
+									<div className="flex items-center justify-between gap-2">
+										<TraumaAliasBadge
+											alias={item.traumaAlias ?? item.id}
+											acuityLevel={item.acuityLevel}
+										/>
+										{canRemoveTraumaAlias ? (
+											<AlertDialog>
+												<AlertDialogTrigger
+													render={
+														<Button
+															size="icon-sm"
+															variant="ghost"
+															disabled={removingId === item.id}
+															aria-label="Remove trauma alias"
+														>
+															<Trash2 className="size-4" />
+														</Button>
+													}
+												/>
+												<AlertDialogContent className="!h-auto !max-h-[calc(100svh-2rem)] !w-[min(30rem,calc(100vw-2rem))] !max-w-none">
+													<AlertDialogHeader>
+														<AlertDialogTitle>Remove trauma alias?</AlertDialogTitle>
+														<AlertDialogDescription>
+															This will remove {item.traumaAlias ?? "this trauma alias"} from the
+															triage queue. It can only be done before the alias is merged.
+														</AlertDialogDescription>
+													</AlertDialogHeader>
+													<AlertDialogFooter>
+														<AlertDialogCancel disabled={removingId === item.id}>
+															Cancel
+														</AlertDialogCancel>
+														<AlertDialogAction
+															variant="destructive"
+															disabled={removingId === item.id}
+															onClick={() => onRemoveTraumaAlias(item)}
+														>
+															{removingId === item.id ? "Removing..." : "Remove"}
+														</AlertDialogAction>
+													</AlertDialogFooter>
+												</AlertDialogContent>
+											</AlertDialog>
+										) : null}
+									</div>
 								) : null}
 							</CardContent>
 						</Card>
@@ -214,8 +271,15 @@ export default function TriageDashboardPage() {
 	const staffProfileId = profile?.staffProfiles?.[0]?.id ?? ""
 	const [now, setNow] = useState(() => Date.now())
 	const [triageOpen, setTriageOpen] = useState(false)
+	const [removingId, setRemovingId] = useState<string | null>(null)
 
 	const { data: queue, isLoading } = useEdQueueQuery(facilityId)
+	const cancelPreEncounter = useCancelPreEncounterMutation()
+	const permissions = profile?.activeRole?.permissions ?? []
+	const canRemoveTraumaAlias = permissions.some(
+		(permission: { module: string; action: string }) =>
+			permission.module === "ed" && permission.action === "create"
+	)
 
 	useEffect(() => {
 		const interval = window.setInterval(() => setNow(Date.now()), 30_000)
@@ -237,6 +301,19 @@ export default function TriageDashboardPage() {
 	}, [queue?.items])
 
 	const total = queue?.summary.total ?? 0
+
+	function handleRemoveTraumaAlias(item: TriageQueueItem) {
+		setRemovingId(item.id)
+		cancelPreEncounter.mutate(
+			{ id: item.id },
+			{
+				onSuccess: () => {
+					toast.success(`${item.traumaAlias ?? "Trauma alias"} removed from queue.`)
+				},
+				onSettled: () => setRemovingId(null),
+			}
+		)
+	}
 
 	return (
 		<div className="space-y-6">
@@ -283,6 +360,9 @@ export default function TriageDashboardPage() {
 							level={level}
 							items={itemsByAcuity.get(level) ?? []}
 							now={now}
+							canRemoveTraumaAlias={canRemoveTraumaAlias}
+							onRemoveTraumaAlias={handleRemoveTraumaAlias}
+							removingId={removingId}
 						/>
 					))}
 				</div>
