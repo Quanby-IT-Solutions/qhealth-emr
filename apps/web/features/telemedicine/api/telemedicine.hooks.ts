@@ -24,7 +24,14 @@ export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number]
 export const ENCOUNTER_TYPES = ["standalone", "linked"] as const
 export type EncounterType = (typeof ENCOUNTER_TYPES)[number]
 
-export const PRESCRIPTION_STATUSES = ["draft", "active", "dispensed", "cancelled"] as const
+export const PRESCRIPTION_STATUSES = [
+	"draft",
+	"active",
+	"signed",
+	"sent",
+	"dispensed",
+	"cancelled",
+] as const
 export type PrescriptionStatus = (typeof PRESCRIPTION_STATUSES)[number]
 
 // ============================================================================
@@ -103,6 +110,7 @@ export interface EPrescription {
 	patientSex: string
 	clinicianName: string
 	clinicianPrcNumber: string
+	clinicianPtrNumber: string
 	clinicianSignature: string | null
 	facilityName: string
 	facilityAddress: string
@@ -111,6 +119,10 @@ export interface EPrescription {
 	status: PrescriptionStatus
 	medications: EPrescriptionItem[]
 	dispensingInstructions: string | null
+	signedAt: string | null
+	signedByName: string | null
+	sentAt: string | null
+	sentToEmail: string | null
 	createdAt: string
 }
 
@@ -217,6 +229,10 @@ export interface SignAbstractInput {
 export interface SendAbstractInput {
 	id: string
 	email: string
+}
+
+export interface SignPrescriptionInput {
+	id: string
 }
 
 export interface SendPrescriptionInput {
@@ -376,6 +392,20 @@ export function useCreatePrescriptionMutation() {
 	return useMutation<EPrescription, Error, CreatePrescriptionInput>({
 		mutationFn: (input) =>
 			fetchJson<EPrescription>(`${API_BASE}/prescriptions`, {
+				method: "POST",
+				body: JSON.stringify(input),
+			}),
+		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.all })
+		},
+	})
+}
+
+export function useSignPrescriptionMutation() {
+	const queryClient = useQueryClient()
+	return useMutation<EPrescription, Error, SignPrescriptionInput>({
+		mutationFn: (input) =>
+			fetchJson<EPrescription>(`${API_BASE}/prescriptions/${input.id}/sign`, {
 				method: "POST",
 				body: JSON.stringify(input),
 			}),

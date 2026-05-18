@@ -4,9 +4,10 @@ import { z } from "zod"
 // Helpers
 // ============================================================================
 
-const dateOrString = z
-	.union([z.date(), z.string()])
-	.transform(v => (typeof v === "string" ? new Date(v) : v))
+const HttpsUrlSchema = z
+	.string()
+	.url()
+	.refine(value => value.startsWith("https://"), "Video link must use HTTPS")
 
 // ============================================================================
 // Enums
@@ -23,7 +24,14 @@ export const AppointmentStatusEnum = z.enum([
 ])
 export const TeleEncounterTypeEnum = z.enum(["standalone", "linked"])
 export const EncounterStatusEnum = z.enum(["open", "signed", "finalized"])
-export const PrescriptionStatusEnum = z.enum(["draft", "active", "dispensed", "cancelled"])
+export const PrescriptionStatusEnum = z.enum([
+	"draft",
+	"active",
+	"signed",
+	"sent",
+	"dispensed",
+	"cancelled",
+])
 
 // ============================================================================
 // Telemedicine Appointment
@@ -96,7 +104,7 @@ export const CreateAppointmentInputSchema = z.object({
 	scheduledTime: z.string(),
 	durationMinutes: z.number().int().positive().default(30),
 	platform: TelemedicinePlatformEnum,
-	videoLink: z.string().optional(),
+	videoLink: HttpsUrlSchema.optional(),
 	meetingId: z.string().optional(),
 	meetingPassword: z.string().optional(),
 	notes: z.string().optional(),
@@ -110,7 +118,7 @@ export type CreateAppointmentInput = z.infer<typeof CreateAppointmentInputSchema
 
 export const UpdateAppointmentInputSchema = z.object({
 	id: z.string().uuid(),
-	videoLink: z.string().url().nullable().optional(),
+	videoLink: HttpsUrlSchema.nullable().optional(),
 	meetingId: z.string().nullable().optional(),
 	meetingPassword: z.string().nullable().optional(),
 })
@@ -243,6 +251,7 @@ export const EPrescriptionSchema = z.object({
 	patientSex: z.string(),
 	clinicianName: z.string(),
 	clinicianPrcNumber: z.string(),
+	clinicianPtrNumber: z.string(),
 	clinicianSignature: z.string().nullable(),
 	facilityName: z.string(),
 	facilityAddress: z.string(),
@@ -251,6 +260,10 @@ export const EPrescriptionSchema = z.object({
 	status: PrescriptionStatusEnum,
 	medications: z.array(EPrescriptionItemSchema),
 	dispensingInstructions: z.string().nullable(),
+	signedAt: z.string().nullable(),
+	signedByName: z.string().nullable(),
+	sentAt: z.string().nullable(),
+	sentToEmail: z.string().nullable(),
 	createdAt: z.string(),
 })
 
@@ -283,6 +296,10 @@ export const CreatePrescriptionInputSchema = z.object({
 })
 
 export type CreatePrescriptionInput = z.infer<typeof CreatePrescriptionInputSchema>
+
+export const SignPrescriptionInputSchema = z.object({
+	id: z.string().uuid(),
+})
 
 // ============================================================================
 // Tele-Abstract

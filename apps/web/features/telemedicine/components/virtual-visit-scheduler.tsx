@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Calendar, Clock, User, Video } from "lucide-react"
+import { ArrowRight, Calendar, Clock, User, Video } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -9,14 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
 import { useStaffClinicianListQuery } from "@/features/scheduling/api/scheduling.hooks"
 import {
-	type AppointmentStatus,
-	type CreateAppointmentInput,
-	type TelemedicinePlatform,
 	formatAppointmentStatusLabel,
 	getAppointmentStatusColor,
 	getPlatformLabel,
 	useAppointmentsQuery,
 	useCreateAppointmentMutation,
+	type AppointmentStatus,
+	type CreateAppointmentInput,
+	type TelemedicinePlatform,
 } from "@/features/telemedicine/api/telemedicine.hooks"
 
 // ============================================================================
@@ -25,7 +25,9 @@ import {
 
 interface VirtualVisitSchedulerProps {
 	facilityId: string
+	selectedAppointmentId?: string | null
 	onAppointmentCreated?: (appointmentId: string) => void
+	onAppointmentSelected?: (appointmentId: string, encounterId?: string | null) => void
 }
 
 interface BookingFormState {
@@ -71,7 +73,7 @@ const EMPTY_FORM: BookingFormState = {
 // ============================================================================
 
 function formatDate(val: string): string {
-	if (!val) return "—"
+	if (!val) return "-"
 	return new Date(val).toLocaleDateString("en-PH", {
 		month: "short",
 		day: "numeric",
@@ -101,7 +103,7 @@ function PlatformSelector({
 }) {
 	return (
 		<div className="flex gap-3">
-			{(["zoom", "teams"] as const).map((p) => (
+			{(["zoom", "teams"] as const).map(p => (
 				<button
 					key={p}
 					type="button"
@@ -134,7 +136,12 @@ function AppointmentStatusBadge({ status }: { status: AppointmentStatus }) {
 // Main Component
 // ============================================================================
 
-export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: VirtualVisitSchedulerProps) {
+export function VirtualVisitScheduler({
+	facilityId,
+	selectedAppointmentId,
+	onAppointmentCreated,
+	onAppointmentSelected,
+}: VirtualVisitSchedulerProps) {
 	const [showForm, setShowForm] = useState(false)
 	const [form, setForm] = useState<BookingFormState>(EMPTY_FORM)
 	const [patientSearch, setPatientSearch] = useState("")
@@ -142,10 +149,12 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 	const [error, setError] = useState<string | null>(null)
 
 	const { data: appointments, isLoading } = useAppointmentsQuery(facilityId)
-	const { data: clinicians, isLoading: cliniciansLoading } = useStaffClinicianListQuery({ facilityId })
+	const { data: clinicians, isLoading: cliniciansLoading } = useStaffClinicianListQuery({
+		facilityId,
+	})
 	const { data: patientResults, isLoading: patientsLoading } = usePatientSearchQuery(
 		{ facilityId, search: debouncedPatientSearch, limit: 10 },
-		{ enabled: showForm && Boolean(facilityId) && debouncedPatientSearch.trim().length >= 2 },
+		{ enabled: showForm && Boolean(facilityId) && debouncedPatientSearch.trim().length >= 2 }
 	)
 	const createMutation = useCreateAppointmentMutation()
 
@@ -155,13 +164,13 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 	}, [patientSearch])
 
 	function patch(key: keyof BookingFormState, value: string | number) {
-		setForm((prev) => ({ ...prev, [key]: value }))
+		setForm(prev => ({ ...prev, [key]: value }))
 	}
 
 	function handleClinicianSelect(clinicianId: string) {
-		const clinician = clinicians.find((c) => c.id === clinicianId)
+		const clinician = clinicians.find(c => c.id === clinicianId)
 		if (clinician) {
-			setForm((prev) => ({
+			setForm(prev => ({
 				...prev,
 				clinicianId,
 				clinicianName: clinician.name,
@@ -171,10 +180,13 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 	}
 
 	function handlePatientSelect(patient: NonNullable<typeof patientResults>["data"][number]) {
-		const patientWithContact = patient as typeof patient & { phone?: string | null; email?: string | null }
+		const patientWithContact = patient as typeof patient & {
+			phone?: string | null
+			email?: string | null
+		}
 		const patientName = `${patient.lastName}, ${patient.firstName}`
 		setPatientSearch(`${patientName} (${patient.mrn})`)
-		setForm((prev) => ({
+		setForm(prev => ({
 			...prev,
 			patientId: patient.id,
 			patientName,
@@ -240,9 +252,11 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="text-lg font-semibold">Virtual Visit Scheduler</h2>
-					<p className="text-muted-foreground text-sm">Book telemedicine appointments via Zoom or Microsoft Teams</p>
+					<p className="text-muted-foreground text-sm">
+						Book telemedicine appointments via Zoom or Microsoft Teams
+					</p>
 				</div>
-				<Button onClick={() => setShowForm((v) => !v)} variant={showForm ? "outline" : "default"}>
+				<Button onClick={() => setShowForm(v => !v)} variant={showForm ? "outline" : "default"}>
 					{showForm ? "Cancel" : "New Appointment"}
 				</Button>
 			</div>
@@ -258,10 +272,7 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 							{/* Platform */}
 							<div className="space-y-1.5">
 								<label className="text-sm font-medium">Video Platform</label>
-								<PlatformSelector
-									value={form.platform}
-									onChange={(v) => patch("platform", v)}
-								/>
+								<PlatformSelector value={form.platform} onChange={v => patch("platform", v)} />
 							</div>
 
 							{/* Patient Info */}
@@ -274,9 +285,9 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 										id="patientSearch"
 										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
 										value={patientSearch}
-										onChange={(e) => {
+										onChange={e => {
 											setPatientSearch(e.target.value)
-											setForm((prev) => ({
+											setForm(prev => ({
 												...prev,
 												patientId: "",
 												patientName: "",
@@ -291,9 +302,11 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 									{debouncedPatientSearch.length >= 2 && !form.patientId && (
 										<div className="bg-background absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border shadow-sm">
 											{patientsLoading ? (
-												<p className="text-muted-foreground px-3 py-2 text-sm">Searching patients...</p>
+												<p className="text-muted-foreground px-3 py-2 text-sm">
+													Searching patients...
+												</p>
 											) : patientResults?.data.length ? (
-												patientResults.data.map((patient) => (
+												patientResults.data.map(patient => (
 													<button
 														key={patient.id}
 														type="button"
@@ -307,7 +320,9 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 													</button>
 												))
 											) : (
-												<p className="text-muted-foreground px-3 py-2 text-sm">No matching patients found.</p>
+												<p className="text-muted-foreground px-3 py-2 text-sm">
+													No matching patients found.
+												</p>
 											)}
 										</div>
 									)}
@@ -320,7 +335,7 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 										id="patientContact"
 										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
 										value={form.patientContactNumber}
-										onChange={(e) => patch("patientContactNumber", e.target.value)}
+										onChange={e => patch("patientContactNumber", e.target.value)}
 										placeholder="+63 9XX XXX XXXX"
 									/>
 								</div>
@@ -333,7 +348,7 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 										type="email"
 										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
 										value={form.patientEmail}
-										onChange={(e) => patch("patientEmail", e.target.value)}
+										onChange={e => patch("patientEmail", e.target.value)}
 										placeholder="patient@email.com"
 									/>
 								</div>
@@ -348,12 +363,14 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 									id="clinicianId"
 									className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
 									value={form.clinicianId}
-									onChange={(e) => handleClinicianSelect(e.target.value)}
+									onChange={e => handleClinicianSelect(e.target.value)}
 									required
 									disabled={cliniciansLoading}
 								>
-									<option value="">{cliniciansLoading ? "Loading clinicians..." : "Select clinician"}</option>
-									{clinicians.map((c) => (
+									<option value="">
+										{cliniciansLoading ? "Loading clinicians..." : "Select clinician"}
+									</option>
+									{clinicians.map(c => (
 										<option key={c.id} value={c.id}>
 											{c.name} - {c.department ?? "Clinician"}
 										</option>
@@ -373,7 +390,7 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 										min={today}
 										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
 										value={form.scheduledDate}
-										onChange={(e) => patch("scheduledDate", e.target.value)}
+										onChange={e => patch("scheduledDate", e.target.value)}
 										required
 									/>
 								</div>
@@ -386,7 +403,7 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 										type="time"
 										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
 										value={form.scheduledTime}
-										onChange={(e) => patch("scheduledTime", e.target.value)}
+										onChange={e => patch("scheduledTime", e.target.value)}
 										required
 									/>
 								</div>
@@ -398,9 +415,9 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 										id="duration"
 										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
 										value={form.durationMinutes}
-										onChange={(e) => patch("durationMinutes", Number(e.target.value))}
+										onChange={e => patch("durationMinutes", Number(e.target.value))}
 									>
-										{DURATION_OPTIONS.map((d) => (
+										{DURATION_OPTIONS.map(d => (
 											<option key={d} value={d}>
 												{d} min
 											</option>
@@ -419,7 +436,7 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 									className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
 									rows={2}
 									value={form.notes}
-									onChange={(e) => patch("notes", e.target.value)}
+									onChange={e => patch("notes", e.target.value)}
 									placeholder="Reason for visit, special instructions..."
 								/>
 							</div>
@@ -448,59 +465,78 @@ export function VirtualVisitScheduler({ facilityId, onAppointmentCreated }: Virt
 				</CardHeader>
 				<CardContent>
 					{isLoading ? (
-						<p className="text-muted-foreground py-8 text-center text-sm">Loading appointments...</p>
+						<p className="text-muted-foreground py-8 text-center text-sm">
+							Loading appointments...
+						</p>
 					) : !appointments?.data.length ? (
 						<p className="text-muted-foreground py-8 text-center text-sm">No appointments found</p>
 					) : (
 						<div className="divide-y">
-							{appointments.data.map((appt) => (
-								<div key={appt.id} className="flex items-start gap-4 py-4">
-									<div className="bg-primary/10 flex size-10 shrink-0 items-center justify-center rounded-full">
-										<Video className="text-primary size-5" />
-									</div>
-									<div className="min-w-0 flex-1 space-y-1">
-										<div className="flex items-center gap-2">
-											<span className="text-sm font-medium">{appt.patientName}</span>
-											<Badge variant="outline" className="text-xs">
-												{appt.patientMrn}
-											</Badge>
-											<AppointmentStatusBadge status={appt.status} />
+							{appointments.data.map(appt => {
+								const isSelected = selectedAppointmentId === appt.id
+								return (
+									<div key={appt.id} className="flex items-start gap-4 py-4">
+										<div className="bg-primary/10 flex size-10 shrink-0 items-center justify-center rounded-full">
+											<Video className="text-primary size-5" />
 										</div>
-										<div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
-											<span className="flex items-center gap-1">
-												<User className="size-3" />
-												{appt.clinicianName}
-											</span>
-											<span className="flex items-center gap-1">
-												<Calendar className="size-3" />
-												{formatDate(appt.scheduledDate)}
-											</span>
-											<span className="flex items-center gap-1">
-												<Clock className="size-3" />
-												{appt.scheduledTime} ({appt.durationMinutes} min)
-											</span>
-											<span className="flex items-center gap-1">
-												<Video className="size-3" />
-												{getPlatformLabel(appt.platform)}
-											</span>
+										<div className="min-w-0 flex-1 space-y-1">
+											<div className="flex items-center gap-2">
+												<span className="text-sm font-medium">{appt.patientName}</span>
+												<Badge variant="outline" className="text-xs">
+													{appt.patientMrn}
+												</Badge>
+												<AppointmentStatusBadge status={appt.status} />
+												{isSelected && (
+													<Badge className="bg-primary/10 text-primary text-xs">Selected</Badge>
+												)}
+											</div>
+											<div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
+												<span className="flex items-center gap-1">
+													<User className="size-3" />
+													{appt.clinicianName}
+												</span>
+												<span className="flex items-center gap-1">
+													<Calendar className="size-3" />
+													{formatDate(appt.scheduledDate)}
+												</span>
+												<span className="flex items-center gap-1">
+													<Clock className="size-3" />
+													{appt.scheduledTime} ({appt.durationMinutes} min)
+												</span>
+												<span className="flex items-center gap-1">
+													<Video className="size-3" />
+													{getPlatformLabel(appt.platform)}
+												</span>
+											</div>
+											{appt.notes && (
+												<p className="text-muted-foreground truncate text-xs">{appt.notes}</p>
+											)}
 										</div>
-										{appt.notes && (
-											<p className="text-muted-foreground truncate text-xs">{appt.notes}</p>
-										)}
+										<div className="flex shrink-0 flex-wrap justify-end gap-2">
+											<Button
+												type="button"
+												size="sm"
+												variant={isSelected ? "secondary" : "outline"}
+												onClick={() => onAppointmentSelected?.(appt.id, appt.encounterId)}
+											>
+												{appt.encounterId ? "Continue" : "Open"}
+												<ArrowRight className="ml-1.5 size-3.5" />
+											</Button>
+											{appt.videoLink && (
+												<a
+													href={appt.videoLink}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium"
+												>
+													<Video className="size-3" />
+													Join
+												</a>
+											)}
+										</div>
 									</div>
-									{appt.videoLink && (
-										<a
-											href={appt.videoLink}
-											target="_blank"
-											rel="noopener noreferrer"
-											className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium"
-										>
-											<Video className="size-3" />
-											Join
-										</a>
-									)}
-								</div>
-							))}
+								)
+							})}
 						</div>
 					)}
 				</CardContent>

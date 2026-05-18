@@ -19,6 +19,7 @@ import {
 	SendAbstractInputSchema,
 	SendPrescriptionInputSchema,
 	SignAbstractInputSchema,
+	SignPrescriptionInputSchema,
 	TeleAbstractSchema,
 	TelemedicineAppointmentSchema,
 	TelemedicineEncounterSchema,
@@ -26,7 +27,7 @@ import {
 } from "./telemedicine.schema.js"
 
 export const telemedicineContract = {
-	// ─── Appointments ──────────────────────────────────────────────────────────
+	// Appointments
 
 	listAppointments: oc
 		.route({
@@ -78,7 +79,7 @@ export const telemedicineContract = {
 		.input(CancelAppointmentInputSchema)
 		.output(z.void()),
 
-	// ─── Encounters ────────────────────────────────────────────────────────────
+	// Encounters
 
 	getEncounter: oc
 		.route({
@@ -100,7 +101,7 @@ export const telemedicineContract = {
 		.input(CreateEncounterInputSchema)
 		.output(TelemedicineEncounterSchema),
 
-	// ─── Prescriptions ─────────────────────────────────────────────────────────
+	// Prescriptions
 
 	getPrescription: oc
 		.route({
@@ -132,7 +133,17 @@ export const telemedicineContract = {
 		.input(CreatePrescriptionInputSchema)
 		.output(EPrescriptionSchema),
 
-	// ─── Abstracts ─────────────────────────────────────────────────────────────
+	// Prescription Actions
+
+	signPrescription: oc
+		.route({
+			method: "POST",
+			path: "/prescriptions/{id}/sign",
+			summary: "Sign a telemedicine e-prescription",
+			tags: ["Telemedicine"],
+		})
+		.input(SignPrescriptionInputSchema)
+		.output(EPrescriptionSchema),
 
 	sendPrescription: oc
 		.route({
@@ -143,6 +154,8 @@ export const telemedicineContract = {
 		})
 		.input(SendPrescriptionInputSchema)
 		.output(EPrescriptionSchema),
+
+	// Abstracts
 
 	generateAbstract: oc
 		.route({

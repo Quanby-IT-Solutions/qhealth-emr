@@ -81,17 +81,27 @@ export function TelemedicineDashboard() {
 	const facilityId = staffProfile?.facilityId ?? ""
 	const clinicianName = profile?.user?.name ?? ""
 	const clinicianPrcNumber = staffProfile?.prcLicenseNumber ?? ""
+	const clinicianPtrNumber = staffProfile?.ptrNumber ?? ""
 	const clinicianPrcExpiry = staffProfile?.prcExpiry
 	const clinicianPtrExpiry = staffProfile?.ptrExpiry
 	const facilityName = staffProfile?.facility?.name ?? ""
 
 	const patientName = appointment?.patientName ?? ""
 	const patientMrn = appointment?.patientMrn ?? ""
+	const patientEmail = appointment?.patientEmail ?? ""
+	const currentEncounterId = activeEncounterId ?? appointment?.encounterId ?? null
 
 	function handleAppointmentCreated(appointmentId: string) {
 		setSelectedAppointmentId(appointmentId)
+		setActiveEncounterId(null)
 		// Auto-advance to encounter tab after booking
 		setActiveTab("encounter")
+	}
+
+	function handleAppointmentSelected(appointmentId: string, encounterId?: string | null) {
+		setSelectedAppointmentId(appointmentId)
+		setActiveEncounterId(encounterId ?? null)
+		setActiveTab(encounterId ? "abstract" : "encounter")
 	}
 
 	function handleEncounterCreated(encounterId: string) {
@@ -132,7 +142,9 @@ export function TelemedicineDashboard() {
 						<div
 							className={[
 								"flex size-9 items-center justify-center rounded-lg",
-								activeTab === id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+								activeTab === id
+									? "bg-primary text-primary-foreground"
+									: "bg-muted text-muted-foreground",
 							].join(" ")}
 						>
 							<Icon className="size-4" />
@@ -151,7 +163,9 @@ export function TelemedicineDashboard() {
 			{activeTab === "scheduler" && (
 				<VirtualVisitScheduler
 					facilityId={facilityId}
+					selectedAppointmentId={selectedAppointmentId}
 					onAppointmentCreated={handleAppointmentCreated}
+					onAppointmentSelected={handleAppointmentSelected}
 				/>
 			)}
 
@@ -190,9 +204,11 @@ export function TelemedicineDashboard() {
 
 			{activeTab === "abstract" && (
 				<>
-					{activeEncounterId ? (
+					{currentEncounterId ? (
 						<TeleAbstractPage
-							encounterId={activeEncounterId}
+							key={currentEncounterId}
+							encounterId={currentEncounterId}
+							defaultPatientEmail={patientEmail}
 							onAbstractSigned={handleAbstractSigned}
 						/>
 					) : (
@@ -217,16 +233,19 @@ export function TelemedicineDashboard() {
 
 			{activeTab === "prescription" && (
 				<>
-					{activeEncounterId ? (
+					{currentEncounterId ? (
 						<EPrescriptionCard
-							encounterId={activeEncounterId}
+							key={currentEncounterId}
+							encounterId={currentEncounterId}
 							patientName={patientName}
 							patientMrn={patientMrn}
 							clinicianName={clinicianName}
 							clinicianPrcNumber={clinicianPrcNumber}
+							clinicianPtrNumber={clinicianPtrNumber}
 							clinicianPrcExpiry={clinicianPrcExpiry}
 							clinicianPtrExpiry={clinicianPtrExpiry}
 							facilityName={facilityName}
+							defaultPatientEmail={patientEmail}
 						/>
 					) : (
 						<Card>

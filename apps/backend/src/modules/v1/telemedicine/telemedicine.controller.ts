@@ -10,6 +10,7 @@ import {
 	telemedicineAbstracts,
 	telemedicineAppointments,
 	telemedicineEncounters,
+	telemedicinePrescriptions,
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
@@ -73,7 +74,20 @@ export class TelemedicineController {
 		return abstract?.facilityId
 	}
 
-	// ─── Appointments ──────────────────────────────────────────────────────────
+	private async resolvePrescriptionFacilityId(prescriptionId: string) {
+		const [prescription] = await db
+			.select({ facilityId: telemedicineAppointments.facilityId })
+			.from(telemedicinePrescriptions)
+			.innerJoin(
+				telemedicineAppointments,
+				eq(telemedicinePrescriptions.appointmentId, telemedicineAppointments.id)
+			)
+			.where(eq(telemedicinePrescriptions.id, prescriptionId))
+
+		return prescription?.facilityId
+	}
+
+	// Appointments
 
 	@RequirePermission("telemedicine", "view")
 	@Implement(v1.telemedicine.listAppointments)
@@ -117,7 +131,7 @@ export class TelemedicineController {
 		})
 	}
 
-	// ─── Encounters ────────────────────────────────────────────────────────────
+	// Encounters
 
 	@RequirePermission("telemedicine", "view")
 	@Implement(v1.telemedicine.getEncounter)
@@ -139,7 +153,7 @@ export class TelemedicineController {
 		})
 	}
 
-	// ─── Prescriptions ─────────────────────────────────────────────────────────
+	// Prescriptions
 
 	@RequirePermission("telemedicine", "view")
 	@Implement(v1.telemedicine.getPrescription)
@@ -170,24 +184,44 @@ export class TelemedicineController {
 	}
 
 	@RequirePermission("telemedicine", "edit")
+	@Implement(v1.telemedicine.signPrescription)
+	async signPrescription(@Session() session: UserSession) {
+		return implement(v1.telemedicine.signPrescription).handler(async ({ input }) => {
+			const facilityId = await this.resolvePrescriptionFacilityId(input.id)
+			const staffProfileId = facilityId
+				? await this.resolveStaffProfileId(session.user.id, facilityId)
+				: undefined
+			return this.telemedicineService.signPrescription(input, staffProfileId)
+		})
+	}
+
+	@RequirePermission("telemedicine", "edit")
 	@Implement(v1.telemedicine.sendPrescription)
-	async sendPrescription() {
+	async sendPrescription(@Session() session: UserSession) {
 		return implement(v1.telemedicine.sendPrescription).handler(async ({ input }) => {
-			return this.telemedicineService.sendPrescription(input)
+			const facilityId = await this.resolvePrescriptionFacilityId(input.id)
+			const staffProfileId = facilityId
+				? await this.resolveStaffProfileId(session.user.id, facilityId)
+				: undefined
+			return this.telemedicineService.sendPrescription(input, staffProfileId)
 		})
 	}
 
 	@RequirePermission("telemedicine", "view")
 	@Version("1")
 	@Get("telemedicine/prescriptions/:id/pdf")
-	async getPrescriptionPdf(@Param("id") id: string, @Res() res: Response) {
-		const pdf = await this.telemedicineService.generatePrescriptionPdf(id)
+	async getPrescriptionPdf(@Session() session: UserSession, @Param("id") id: string, @Res() res: Response) {
+		const facilityId = await this.resolvePrescriptionFacilityId(id)
+		const staffProfileId = facilityId
+			? await this.resolveStaffProfileId(session.user.id, facilityId)
+			: undefined
+		const pdf = await this.telemedicineService.generatePrescriptionPdf(id, staffProfileId)
 		res.setHeader("Content-Type", "application/pdf")
 		res.setHeader("Content-Disposition", `attachment; filename="prescription-${id}.pdf"`)
 		res.send(Buffer.from(pdf))
 	}
 
-	// ─── Abstracts ─────────────────────────────────────────────────────────────
+	// Abstracts
 
 	@RequirePermission("telemedicine", "create")
 	@Implement(v1.telemedicine.generateAbstract)
