@@ -5,7 +5,7 @@ import { encounters, patients } from "./core.js"
 import { facilities, staffProfiles } from "./rbac.js"
 
 // ============================================================================
-// TELEMEDICINE — Appointments, Encounters, Prescriptions
+// TELEMEDICINE - Appointments, Encounters, Prescriptions
 // ============================================================================
 
 export const telemedicineAppointments = createTable(
@@ -127,11 +127,19 @@ export const telemedicinePrescriptions = createTable(
 			.text("status")
 			.notNull()
 			.default("draft")
-			.$type<"draft" | "active" | "dispensed" | "cancelled">(),
+			.$type<"draft" | "active" | "signed" | "sent" | "dispensed" | "cancelled">(),
+		prcLicenseNumber: t.text("prc_license_number"),
+		ptrNumber: t.text("ptr_number"),
 		dispensingInstructions: t.text("dispensing_instructions"),
 		createdByStaffId: t
 			.uuid("created_by_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		signedAt: t.timestamp("signed_at"),
+		signedByStaffId: t
+			.uuid("signed_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		sentAt: t.timestamp("sent_at"),
+		sentToEmail: t.text("sent_to_email"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 	}),

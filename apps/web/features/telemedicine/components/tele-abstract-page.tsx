@@ -18,11 +18,11 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Separator } from "@/core/components/ui/separator"
 import {
-	type TeleAbstract,
 	useEncounterAbstractsQuery,
 	useGenerateAbstractMutation,
 	useSendAbstractMutation,
 	useSignAbstractMutation,
+	type TeleAbstract,
 } from "@/features/telemedicine/api/telemedicine.hooks"
 
 function escapeHtml(value: string | null | undefined): string {
@@ -123,6 +123,7 @@ export function openAbstractPrintWindow(abstract: TeleAbstract): void {
 
 interface TeleAbstractPageProps {
 	encounterId: string
+	defaultPatientEmail?: string | null
 	onAbstractSigned?: (abstractId: string) => void
 }
 
@@ -150,10 +151,10 @@ function AbstractStatusBadge({ status }: { status: TeleAbstract["status"] }) {
 
 function AbstractPreview({ abstract }: { abstract: TeleAbstract }) {
 	const soapSections = [
-		{ label: "S — Subjective", value: abstract.subjectiveNotes },
-		{ label: "O — Objective", value: abstract.objectiveNotes },
-		{ label: "A — Assessment", value: abstract.assessmentNotes },
-		{ label: "P — Plan", value: abstract.planNotes },
+		{ label: "S - Subjective", value: abstract.subjectiveNotes },
+		{ label: "O - Objective", value: abstract.objectiveNotes },
+		{ label: "A - Assessment", value: abstract.assessmentNotes },
+		{ label: "P - Plan", value: abstract.planNotes },
 	]
 
 	return (
@@ -194,30 +195,30 @@ function AbstractPreview({ abstract }: { abstract: TeleAbstract }) {
 
 			{/* Chief Complaint */}
 			<div className="rounded-lg border p-4">
-				<p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+				<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 					Chief Complaint
 				</p>
-				<p className="text-sm">{abstract.chiefComplaint || "—"}</p>
+				<p className="text-sm">{abstract.chiefComplaint || "-"}</p>
 			</div>
 
 			{/* SOAP Notes */}
 			<div className="space-y-3">
 				{soapSections.map(({ label, value }) => (
 					<div key={label} className="rounded-lg border p-4">
-						<p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							{label}
 						</p>
-						<p className="whitespace-pre-wrap text-sm">{value || "—"}</p>
+						<p className="text-sm whitespace-pre-wrap">{value || "-"}</p>
 					</div>
 				))}
 			</div>
 
 			{/* Diagnosis */}
 			<div className="rounded-lg border p-4">
-				<p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+				<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 					Diagnosis
 				</p>
-				<p className="text-sm font-medium">{abstract.diagnosis || "—"}</p>
+				<p className="text-sm font-medium">{abstract.diagnosis || "-"}</p>
 				{abstract.icdCode && (
 					<p className="text-muted-foreground text-xs">ICD-10: {abstract.icdCode}</p>
 				)}
@@ -226,10 +227,10 @@ function AbstractPreview({ abstract }: { abstract: TeleAbstract }) {
 			{/* Additional Notes */}
 			{abstract.additionalNotes && (
 				<div className="rounded-lg border p-4">
-					<p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+					<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 						Additional Notes
 					</p>
-					<p className="whitespace-pre-wrap text-sm">{abstract.additionalNotes}</p>
+					<p className="text-sm whitespace-pre-wrap">{abstract.additionalNotes}</p>
 				</div>
 			)}
 
@@ -246,9 +247,7 @@ function AbstractPreview({ abstract }: { abstract: TeleAbstract }) {
 						</p>
 					)}
 					<div className="mt-2 border-t pt-2">
-						<p className="text-muted-foreground text-xs">
-							Physician Signature over Printed Name
-						</p>
+						<p className="text-muted-foreground text-xs">Physician Signature over Printed Name</p>
 					</div>
 				</div>
 			)}
@@ -258,8 +257,7 @@ function AbstractPreview({ abstract }: { abstract: TeleAbstract }) {
 				<div className="rounded-lg bg-blue-50 p-3">
 					<p className="text-xs font-medium text-blue-800">
 						Sent to: {abstract.sentToEmail}
-						{abstract.sentAt &&
-							` on ${new Date(abstract.sentAt).toLocaleString("en-PH")}`}
+						{abstract.sentAt && ` on ${new Date(abstract.sentAt).toLocaleString("en-PH")}`}
 					</p>
 				</div>
 			)}
@@ -273,11 +271,12 @@ function AbstractPreview({ abstract }: { abstract: TeleAbstract }) {
 
 export function TeleAbstractPage({
 	encounterId,
+	defaultPatientEmail,
 	onAbstractSigned,
 }: TeleAbstractPageProps) {
 	const [additionalNotes, setAdditionalNotes] = useState("")
 	const [showSendForm, setShowSendForm] = useState(false)
-	const [sendEmail, setSendEmail] = useState("")
+	const [sendEmailOverride, setSendEmailOverride] = useState<string | null>(null)
 	const [error, setError] = useState<string | null>(null)
 	const [activeAbstractId, setActiveAbstractId] = useState<string | null>(null)
 
@@ -286,8 +285,8 @@ export function TeleAbstractPage({
 	const signMutation = useSignAbstractMutation()
 	const sendMutation = useSendAbstractMutation()
 
-	const abstract =
-		abstracts?.find((a) => a.id === activeAbstractId) ?? abstracts?.[0] ?? null
+	const abstract = abstracts?.find(a => a.id === activeAbstractId) ?? abstracts?.[0] ?? null
+	const sendEmail = sendEmailOverride ?? defaultPatientEmail ?? ""
 
 	async function handleGenerate() {
 		setError(null)
@@ -328,14 +327,18 @@ export function TeleAbstractPage({
 			const result = await sendMutation.mutateAsync({ id: abstract.id, email })
 			setActiveAbstractId(result.id)
 			setShowSendForm(false)
-			setSendEmail("")
+			setSendEmailOverride(null)
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to send abstract.")
+			setError(err instanceof Error ? err.message : "Failed to mark abstract sent.")
 		}
 	}
 
 	function handlePrint() {
 		if (!abstract) return
+		if (abstract.status === "draft") {
+			setError("Sign the abstract before printing or saving it.")
+			return
+		}
 		const style = document.createElement("style")
 		style.media = "print"
 		style.dataset.teleAbstractPrint = "true"
@@ -387,8 +390,8 @@ export function TeleAbstractPage({
 							<div>
 								<p className="text-sm font-medium">No abstract generated yet</p>
 								<p className="text-muted-foreground text-xs">
-									Generate an abstract to auto-populate SOAP notes, diagnosis, and plan from
-									the encounter.
+									Generate an abstract to auto-populate SOAP notes, diagnosis, and plan from the
+									encounter.
 								</p>
 							</div>
 						</div>
@@ -402,7 +405,7 @@ export function TeleAbstractPage({
 								className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
 								rows={3}
 								value={additionalNotes}
-								onChange={(e) => setAdditionalNotes(e.target.value)}
+								onChange={e => setAdditionalNotes(e.target.value)}
 								placeholder="Any supplementary notes to include in the abstract..."
 							/>
 						</div>
@@ -441,13 +444,23 @@ export function TeleAbstractPage({
 
 						{/* Actions */}
 						<div data-tele-abstract-actions className="flex flex-wrap gap-3">
-							<Button variant="outline" size="sm" onClick={handlePrint}>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={handlePrint}
+								disabled={abstract.status === "draft"}
+							>
 								<Printer className="mr-1.5 size-3.5" />
 								Print
 							</Button>
-							<Button variant="outline" size="sm" onClick={() => openAbstractPrintWindow(abstract)}>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => openAbstractPrintWindow(abstract)}
+								disabled={abstract.status === "draft"}
+							>
 								<Download className="mr-1.5 size-3.5" />
-								Download PDF
+								Print / Save PDF
 							</Button>
 
 							{abstract.status === "draft" && (
@@ -467,11 +480,7 @@ export function TeleAbstractPage({
 							)}
 
 							{abstract.status === "signed" && !showSendForm && (
-								<Button
-									size="sm"
-									variant="outline"
-									onClick={() => setShowSendForm(true)}
-								>
+								<Button size="sm" variant="outline" onClick={() => setShowSendForm(true)}>
 									<Mail className="mr-1.5 size-3.5" />
 									Send to Patient
 								</Button>
@@ -498,7 +507,7 @@ export function TeleAbstractPage({
 										type="email"
 										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
 										value={sendEmail}
-										onChange={(e) => setSendEmail(e.target.value)}
+										onChange={e => setSendEmailOverride(e.target.value)}
 										placeholder="patient@example.com"
 										required
 									/>
@@ -510,7 +519,7 @@ export function TeleAbstractPage({
 										size="sm"
 										onClick={() => {
 											setShowSendForm(false)
-											setSendEmail("")
+											setSendEmailOverride(null)
 										}}
 									>
 										Cancel

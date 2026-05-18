@@ -106,22 +106,22 @@ function EncounterTypeToggle({
 const SOAP_SECTIONS = [
 	{
 		key: "subjectiveNotes" as const,
-		label: "S — Subjective",
+		label: "S - Subjective",
 		placeholder: "Patient's reported symptoms, history, complaints...",
 	},
 	{
 		key: "objectiveNotes" as const,
-		label: "O — Objective",
+		label: "O - Objective",
 		placeholder: "Observations from video consultation, vitals, examination findings...",
 	},
 	{
 		key: "assessmentNotes" as const,
-		label: "A — Assessment",
+		label: "A - Assessment",
 		placeholder: "Clinical interpretation, differential diagnoses...",
 	},
 	{
 		key: "planNotes" as const,
-		label: "P — Plan",
+		label: "P - Plan",
 		placeholder: "Treatment plan, medications ordered, follow-up instructions...",
 	},
 ] as const
@@ -255,7 +255,7 @@ export function TelemedicineEncounterForm({
 					<div>
 						<CardTitle className="text-base">Telemedicine Clinical Note</CardTitle>
 						<p className="text-muted-foreground text-xs">
-							{patientName} — {clinicianName}
+							{patientName} - {clinicianName}
 						</p>
 					</div>
 				</div>

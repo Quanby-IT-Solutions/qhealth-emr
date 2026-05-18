@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
+import {
+	BadRequestException,
+	ForbiddenException,
+	Injectable,
+	Logger,
+	NotFoundException,
+} from "@nestjs/common"
 import { and, count, desc, eq } from "drizzle-orm"
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib"
 
@@ -29,6 +35,7 @@ type CreateEncounterInput = V1Inputs["telemedicine"]["createEncounter"]
 type GetPrescriptionInput = V1Inputs["telemedicine"]["getPrescription"]
 type ListPrescriptionsInput = V1Inputs["telemedicine"]["listPrescriptions"]
 type CreatePrescriptionInput = V1Inputs["telemedicine"]["createPrescription"]
+type SignPrescriptionInput = V1Inputs["telemedicine"]["signPrescription"]
 type GenerateAbstractInput = V1Inputs["telemedicine"]["generateAbstract"]
 type GetAbstractInput = V1Inputs["telemedicine"]["getAbstract"]
 type ListEncounterAbstractsInput = V1Inputs["telemedicine"]["listEncounterAbstracts"]
@@ -85,6 +92,123 @@ export class TelemedicineService {
 		}
 	}
 
+	private assertHttpsVideoLink(videoLink?: string | null) {
+		if (!videoLink) return
+		let url: URL
+		try {
+			url = new URL(videoLink)
+		} catch {
+			throw new BadRequestException("Video link must be a valid HTTPS URL.")
+		}
+		if (url.protocol !== "https:" || !url.hostname) {
+			throw new BadRequestException("Video link must be a valid HTTPS URL.")
+		}
+	}
+
+	private assertAssignedClinician(
+		requestingStaffId: string | undefined,
+		assignedStaffId: string,
+		action: string
+	) {
+		if (!requestingStaffId) {
+			throw new ForbiddenException(`Unable to verify clinician assignment for ${action}.`)
+		}
+		if (requestingStaffId !== assignedStaffId) {
+			throw new ForbiddenException(`Only the assigned clinician can ${action}.`)
+		}
+	}
+
+	private async getPrescribingStaff(staffProfileId: string | undefined) {
+		if (!staffProfileId) {
+			throw new ForbiddenException("Unable to verify prescribing clinician.")
+		}
+
+		const [staff] = await db
+			.select({
+				id: staffProfiles.id,
+				prcLicenseNumber: staffProfiles.prcLicenseNumber,
+				prcExpiry: staffProfiles.prcExpiry,
+				ptrNumber: staffProfiles.ptrNumber,
+				ptrExpiry: staffProfiles.ptrExpiry,
+				isActive: staffProfiles.isActive,
+			})
+			.from(staffProfiles)
+			.where(eq(staffProfiles.id, staffProfileId))
+			.limit(1)
+
+		if (!staff) {
+			throw new NotFoundException("Prescribing staff profile not found.")
+		}
+		if (!staff.isActive) {
+			throw new BadRequestException("Prescribing staff profile is inactive.")
+		}
+
+		this.assertActivePrescriberCredentials(staff)
+		return staff
+	}
+
+	private async getClinicalSigningStaff(staffProfileId: string | undefined) {
+		if (!staffProfileId) {
+			throw new ForbiddenException("Unable to verify signing clinician.")
+		}
+
+		const [staff] = await db
+			.select({
+				id: staffProfiles.id,
+				prcLicenseNumber: staffProfiles.prcLicenseNumber,
+				prcExpiry: staffProfiles.prcExpiry,
+				isActive: staffProfiles.isActive,
+			})
+			.from(staffProfiles)
+			.where(eq(staffProfiles.id, staffProfileId))
+			.limit(1)
+
+		if (!staff) {
+			throw new NotFoundException("Signing staff profile not found.")
+		}
+		if (!staff.isActive) {
+			throw new BadRequestException("Signing staff profile is inactive.")
+		}
+		if (!staff.prcLicenseNumber) {
+			throw new BadRequestException("Signing clinician does not have a PRC license number.")
+		}
+
+		this.assertCredentialNotExpired("PRC license", staff.prcExpiry)
+		return staff
+	}
+
+	private assertActivePrescriberCredentials(staff: {
+		prcLicenseNumber?: string | null
+		prcExpiry?: string | Date | null
+		ptrNumber?: string | null
+		ptrExpiry?: string | Date | null
+	}) {
+		if (!staff.prcLicenseNumber) {
+			throw new BadRequestException("Prescriber does not have a PRC license number.")
+		}
+		if (!staff.ptrNumber) {
+			throw new BadRequestException("Prescriber does not have a PTR number.")
+		}
+		this.assertCredentialNotExpired("PRC license", staff.prcExpiry)
+		this.assertCredentialNotExpired("PTR number", staff.ptrExpiry)
+	}
+
+	private assertCredentialNotExpired(label: string, expiresAt?: string | Date | null) {
+		if (!expiresAt) {
+			throw new BadRequestException(`Physician ${label} expiry is not recorded.`)
+		}
+
+		const expiryDate = new Date(expiresAt)
+		expiryDate.setHours(0, 0, 0, 0)
+
+		const today = new Date()
+		today.setHours(0, 0, 0, 0)
+
+		if (expiryDate < today) {
+			throw new BadRequestException(`Physician ${label} is expired.`)
+		}
+	}
+
 	// =========================================================================
 	// List Appointments
 	// =========================================================================
@@ -129,7 +253,7 @@ export class TelemedicineService {
 					meetingId: telemedicineAppointments.meetingId,
 					meetingPassword: telemedicineAppointments.meetingPassword,
 					notes: telemedicineAppointments.notes,
-					encounterId: telemedicineAppointments.encounterId,
+					teleEncounterId: telemedicineEncounters.id,
 					createdAt: telemedicineAppointments.createdAt,
 					patientFirstName: patients.firstName,
 					patientLastName: patients.lastName,
@@ -141,6 +265,10 @@ export class TelemedicineService {
 					createdByName: createdByStaff.name,
 				})
 				.from(telemedicineAppointments)
+				.leftJoin(
+					telemedicineEncounters,
+					eq(telemedicineEncounters.appointmentId, telemedicineAppointments.id)
+				)
 				.innerJoin(patients, eq(telemedicineAppointments.patientId, patients.id))
 				.leftJoin(clinicianStaff, eq(telemedicineAppointments.clinicianStaffId, clinicianStaff.id))
 				.leftJoin(createdByStaff, eq(telemedicineAppointments.createdByStaffId, createdByStaff.id))
@@ -176,7 +304,7 @@ export class TelemedicineService {
 			meetingId: r.meetingId ?? null,
 			meetingPassword: r.meetingPassword ?? null,
 			notes: r.notes ?? null,
-			encounterId: r.encounterId ?? null,
+			encounterId: r.teleEncounterId ?? null,
 			createdAt: r.createdAt.toISOString(),
 			createdByName: r.createdByName ?? "",
 		}))
@@ -216,7 +344,7 @@ export class TelemedicineService {
 				meetingId: telemedicineAppointments.meetingId,
 				meetingPassword: telemedicineAppointments.meetingPassword,
 				notes: telemedicineAppointments.notes,
-				encounterId: telemedicineAppointments.encounterId,
+				teleEncounterId: telemedicineEncounters.id,
 				createdAt: telemedicineAppointments.createdAt,
 				patientFirstName: patients.firstName,
 				patientLastName: patients.lastName,
@@ -228,6 +356,10 @@ export class TelemedicineService {
 				createdByName: createdByStaff.name,
 			})
 			.from(telemedicineAppointments)
+			.leftJoin(
+				telemedicineEncounters,
+				eq(telemedicineEncounters.appointmentId, telemedicineAppointments.id)
+			)
 			.innerJoin(patients, eq(telemedicineAppointments.patientId, patients.id))
 			.leftJoin(clinicianStaff, eq(telemedicineAppointments.clinicianStaffId, clinicianStaff.id))
 			.leftJoin(createdByStaff, eq(telemedicineAppointments.createdByStaffId, createdByStaff.id))
@@ -257,7 +389,7 @@ export class TelemedicineService {
 			meetingId: row.meetingId ?? null,
 			meetingPassword: row.meetingPassword ?? null,
 			notes: row.notes ?? null,
-			encounterId: row.encounterId ?? null,
+			encounterId: row.teleEncounterId ?? null,
 			createdAt: row.createdAt.toISOString(),
 			createdByName: row.createdByName ?? "",
 		}
@@ -268,6 +400,8 @@ export class TelemedicineService {
 	// =========================================================================
 
 	async createAppointment(input: CreateAppointmentInput, createdByStaffId?: string) {
+		this.assertHttpsVideoLink(input.videoLink)
+
 		const [created] = await db
 			.insert(telemedicineAppointments)
 			.values({
@@ -302,6 +436,10 @@ export class TelemedicineService {
 
 		if (!appt) {
 			throw new NotFoundException(`Telemedicine appointment ${input.id} not found`)
+		}
+
+		if ("videoLink" in input) {
+			this.assertHttpsVideoLink(input.videoLink)
 		}
 
 		const updates: Partial<typeof telemedicineAppointments.$inferInsert> = {
@@ -453,7 +591,45 @@ export class TelemedicineService {
 			throw new NotFoundException(`Telemedicine appointment ${input.appointmentId} not found`)
 		}
 
-		const staffId = createdByStaffId ?? appt.clinicianStaffId
+		this.assertAssignedClinician(createdByStaffId, appt.clinicianStaffId, "start this encounter")
+
+		if (appt.status === "cancelled" || appt.status === "no-show" || appt.status === "completed") {
+			throw new BadRequestException(`Cannot start an encounter for a ${appt.status} appointment.`)
+		}
+
+		const [existingEncounter] = await db
+			.select({ id: telemedicineEncounters.id })
+			.from(telemedicineEncounters)
+			.where(eq(telemedicineEncounters.appointmentId, input.appointmentId))
+			.limit(1)
+
+		if (existingEncounter) {
+			throw new BadRequestException("A telemedicine encounter already exists for this appointment.")
+		}
+
+		if (input.linkedEncounterId) {
+			const [linkedEncounter] = await db
+				.select({
+					id: encounters.id,
+					facilityId: encounters.facilityId,
+					patientId: encounters.patientId,
+				})
+				.from(encounters)
+				.where(eq(encounters.id, input.linkedEncounterId))
+				.limit(1)
+
+			if (!linkedEncounter) {
+				throw new NotFoundException(`Linked encounter ${input.linkedEncounterId} not found`)
+			}
+			if (
+				linkedEncounter.facilityId !== appt.facilityId ||
+				linkedEncounter.patientId !== appt.patientId
+			) {
+				throw new BadRequestException(
+					"Linked encounter must belong to the same facility and patient."
+				)
+			}
+		}
 
 		const [created] = await db
 			.insert(telemedicineEncounters)
@@ -487,7 +663,6 @@ export class TelemedicineService {
 		this.logger.log(
 			`Created telemedicine encounter: ${created.id} for appointment: ${input.appointmentId}`
 		)
-		void staffId
 		return this.getEncounter({ id: created.id })
 	}
 
@@ -496,6 +671,12 @@ export class TelemedicineService {
 	// =========================================================================
 
 	async getPrescription(input: GetPrescriptionInput) {
+		const signedByStaff = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("signed_by_staff")
+
 		const [row] = await db
 			.select({
 				id: telemedicinePrescriptions.id,
@@ -504,7 +685,12 @@ export class TelemedicineService {
 				prescriptionDate: telemedicinePrescriptions.prescriptionDate,
 				validUntil: telemedicinePrescriptions.validUntil,
 				status: telemedicinePrescriptions.status,
+				prcLicenseNumber: telemedicinePrescriptions.prcLicenseNumber,
+				ptrNumber: telemedicinePrescriptions.ptrNumber,
 				dispensingInstructions: telemedicinePrescriptions.dispensingInstructions,
+				signedAt: telemedicinePrescriptions.signedAt,
+				sentAt: telemedicinePrescriptions.sentAt,
+				sentToEmail: telemedicinePrescriptions.sentToEmail,
 				createdAt: telemedicinePrescriptions.createdAt,
 				patientFirstName: patients.firstName,
 				patientLastName: patients.lastName,
@@ -512,9 +698,11 @@ export class TelemedicineService {
 				patientDateOfBirth: patients.dateOfBirth,
 				patientSex: patients.sex,
 				clinicianName: users.name,
-				clinicianPrcNumber: staffProfiles.prcLicenseNumber,
+				currentPrcNumber: staffProfiles.prcLicenseNumber,
+				currentPtrNumber: staffProfiles.ptrNumber,
 				facilityName: facilities.name,
 				facilityAddress: facilities.address,
+				signedByName: signedByStaff.name,
 			})
 			.from(telemedicinePrescriptions)
 			.innerJoin(
@@ -529,6 +717,7 @@ export class TelemedicineService {
 			.innerJoin(staffProfiles, eq(telemedicineEncounters.clinicianStaffId, staffProfiles.id))
 			.innerJoin(users, eq(staffProfiles.userId, users.id))
 			.innerJoin(facilities, eq(telemedicineAppointments.facilityId, facilities.id))
+			.leftJoin(signedByStaff, eq(telemedicinePrescriptions.signedByStaffId, signedByStaff.id))
 			.where(eq(telemedicinePrescriptions.id, input.id))
 
 		if (!row) {
@@ -552,8 +741,9 @@ export class TelemedicineService {
 			patientAge,
 			patientSex: row.patientSex,
 			clinicianName: row.clinicianName,
-			clinicianPrcNumber: row.clinicianPrcNumber ?? "",
-			clinicianSignature: null,
+			clinicianPrcNumber: row.prcLicenseNumber ?? row.currentPrcNumber ?? "",
+			clinicianPtrNumber: row.ptrNumber ?? row.currentPtrNumber ?? "",
+			clinicianSignature: row.signedAt ? (row.signedByName ?? row.clinicianName) : null,
 			facilityName: row.facilityName,
 			facilityAddress: row.facilityAddress ?? "",
 			prescriptionDate: row.prescriptionDate,
@@ -573,6 +763,10 @@ export class TelemedicineService {
 				instructions: item.instructions ?? null,
 			})),
 			dispensingInstructions: row.dispensingInstructions ?? null,
+			signedAt: row.signedAt?.toISOString() ?? null,
+			signedByName: row.signedByName ?? null,
+			sentAt: row.sentAt?.toISOString() ?? null,
+			sentToEmail: row.sentToEmail ?? null,
 			createdAt: row.createdAt.toISOString(),
 		}
 	}
@@ -606,12 +800,38 @@ export class TelemedicineService {
 			throw new NotFoundException(`Telemedicine encounter ${input.encounterId} not found`)
 		}
 
+		this.assertAssignedClinician(
+			createdByStaffId,
+			enc.clinicianStaffId,
+			"create prescriptions for this encounter"
+		)
+		if (enc.status === "finalized") {
+			throw new BadRequestException("Cannot create prescriptions for a finalized encounter.")
+		}
+		const staff = await this.getPrescribingStaff(createdByStaffId)
+
 		const today = new Date()
 		const validUntil = new Date(today)
 		validUntil.setDate(validUntil.getDate() + 30)
 
 		const prescriptionDate = today.toISOString().split("T")[0]!
 		const validUntilDate = validUntil.toISOString().split("T")[0]!
+
+		const hasInvalidMedication = input.medications.some(
+			med =>
+				!med.genericName.trim() ||
+				!med.dosage.trim() ||
+				!med.form.trim() ||
+				!med.unit.trim() ||
+				!med.frequency.trim() ||
+				!med.duration.trim() ||
+				!med.route.trim()
+		)
+		if (hasInvalidMedication) {
+			throw new BadRequestException(
+				"Each medication requires generic name, dosage, form, unit, frequency, duration, and route."
+			)
+		}
 
 		const [created] = await db
 			.insert(telemedicinePrescriptions)
@@ -620,7 +840,9 @@ export class TelemedicineService {
 				appointmentId: enc.appointmentId,
 				prescriptionDate,
 				validUntil: validUntilDate,
-				status: "active",
+				status: "draft",
+				prcLicenseNumber: staff.prcLicenseNumber,
+				ptrNumber: staff.ptrNumber,
 				dispensingInstructions: input.dispensingInstructions ?? null,
 				createdByStaffId: createdByStaffId ?? null,
 			})
@@ -635,16 +857,16 @@ export class TelemedicineService {
 			await db.insert(telemedicinePrescriptionItems).values(
 				input.medications.map((med, idx) => ({
 					prescriptionId: created.id,
-					genericName: med.genericName,
-					brandName: med.brandName ?? null,
-					dosage: med.dosage,
-					form: med.form,
+					genericName: med.genericName.trim(),
+					brandName: med.brandName?.trim() || null,
+					dosage: med.dosage.trim(),
+					form: med.form.trim(),
 					quantity: med.quantity,
-					unit: med.unit,
-					frequency: med.frequency,
-					duration: med.duration,
-					route: med.route,
-					instructions: med.instructions ?? null,
+					unit: med.unit.trim(),
+					frequency: med.frequency.trim(),
+					duration: med.duration.trim(),
+					route: med.route.trim(),
+					instructions: med.instructions?.trim() || null,
 					sortOrder: idx,
 				}))
 			)
@@ -654,8 +876,74 @@ export class TelemedicineService {
 		return this.getPrescription({ id: created.id })
 	}
 
-	async generatePrescriptionPdf(id: string): Promise<Uint8Array> {
+	async signPrescription(input: SignPrescriptionInput, signedByStaffId?: string) {
+		const [row] = await db
+			.select({
+				id: telemedicinePrescriptions.id,
+				status: telemedicinePrescriptions.status,
+				clinicianStaffId: telemedicineEncounters.clinicianStaffId,
+			})
+			.from(telemedicinePrescriptions)
+			.innerJoin(
+				telemedicineEncounters,
+				eq(telemedicinePrescriptions.encounterId, telemedicineEncounters.id)
+			)
+			.where(eq(telemedicinePrescriptions.id, input.id))
+			.limit(1)
+
+		if (!row) {
+			throw new NotFoundException(`Prescription ${input.id} not found`)
+		}
+
+		this.assertAssignedClinician(signedByStaffId, row.clinicianStaffId, "sign this prescription")
+
+		if (row.status !== "draft" && row.status !== "active") {
+			throw new BadRequestException(`Prescription is already ${row.status}.`)
+		}
+
+		const staff = await this.getPrescribingStaff(signedByStaffId)
+
+		await db
+			.update(telemedicinePrescriptions)
+			.set({
+				status: "signed",
+				prcLicenseNumber: staff.prcLicenseNumber,
+				ptrNumber: staff.ptrNumber,
+				signedAt: new Date(),
+				signedByStaffId: signedByStaffId ?? null,
+				updatedAt: new Date(),
+			})
+			.where(eq(telemedicinePrescriptions.id, input.id))
+
+		this.logger.log(`Signed telemedicine prescription: ${input.id}`)
+		return this.getPrescription({ id: input.id })
+	}
+
+	async generatePrescriptionPdf(id: string, requesterStaffId?: string): Promise<Uint8Array> {
 		const rx = await this.getPrescription({ id })
+		const [row] = await db
+			.select({ clinicianStaffId: telemedicineEncounters.clinicianStaffId })
+			.from(telemedicinePrescriptions)
+			.innerJoin(
+				telemedicineEncounters,
+				eq(telemedicinePrescriptions.encounterId, telemedicineEncounters.id)
+			)
+			.where(eq(telemedicinePrescriptions.id, id))
+			.limit(1)
+
+		if (!row) {
+			throw new NotFoundException(`Prescription ${id} not found`)
+		}
+
+		this.assertAssignedClinician(
+			requesterStaffId,
+			row.clinicianStaffId,
+			"download this prescription"
+		)
+		if (rx.status === "draft" || !rx.signedAt) {
+			throw new BadRequestException("Prescription must be signed before PDF generation.")
+		}
+
 		const pdf = await PDFDocument.create()
 		const page = pdf.addPage([612, 792])
 		const font = await pdf.embedFont(StandardFonts.Helvetica)
@@ -705,6 +993,8 @@ export class TelemedicineService {
 		y = Math.max(y - 24, 120)
 		drawText(rx.clinicianName, 360, 11, true)
 		drawText(`PRC #${rx.clinicianPrcNumber}`, 360)
+		drawText(`PTR #${rx.clinicianPtrNumber}`, 360)
+		if (rx.signedAt) drawText(`Signed: ${new Date(rx.signedAt).toLocaleString("en-PH")}`, 360, 8)
 		page.drawLine({
 			start: { x: 360, y: y + 8 },
 			end: { x: 540, y: y + 8 },
@@ -716,10 +1006,12 @@ export class TelemedicineService {
 		return pdf.save()
 	}
 
-	async sendPrescription(input: SendPrescriptionInput) {
+	async sendPrescription(input: SendPrescriptionInput, sentByStaffId?: string) {
 		const [row] = await db
 			.select({
 				id: telemedicinePrescriptions.id,
+				status: telemedicinePrescriptions.status,
+				signedAt: telemedicinePrescriptions.signedAt,
 				facilityId: telemedicineAppointments.facilityId,
 				clinicianStaffId: telemedicineEncounters.clinicianStaffId,
 				patientFirstName: patients.firstName,
@@ -741,13 +1033,35 @@ export class TelemedicineService {
 			throw new NotFoundException(`Prescription ${input.id} not found`)
 		}
 
+		this.assertAssignedClinician(sentByStaffId, row.clinicianStaffId, "send this prescription")
+
+		if (row.status === "draft" || !row.signedAt) {
+			throw new BadRequestException("Prescription must be signed before sending.")
+		}
+		if (row.status === "cancelled") {
+			throw new BadRequestException("Cancelled prescriptions cannot be sent.")
+		}
+
+		await db
+			.update(telemedicinePrescriptions)
+			.set({
+				status: "sent",
+				sentAt: new Date(),
+				sentToEmail: input.email,
+				updatedAt: new Date(),
+			})
+			.where(eq(telemedicinePrescriptions.id, input.id))
+
 		await this.notificationService.send({
 			facilityId: row.facilityId,
 			recipientStaffId: row.clinicianStaffId,
 			topic: "system",
 			title: "Prescription Sent",
 			body: `E-prescription for ${row.patientLastName}, ${row.patientFirstName} marked sent to ${input.email}. Email delivery requires a mailer integration.`,
-			data: { prescriptionId: input.id, email: input.email },
+			data: {
+				prescriptionId: input.id,
+				email: input.email,
+			},
 		})
 
 		this.logger.log(`Marked telemedicine prescription ${input.id} sent to ${input.email}`)
@@ -863,16 +1177,6 @@ export class TelemedicineService {
 	// =========================================================================
 
 	async generateAbstract(input: GenerateAbstractInput, createdByStaffId?: string) {
-		// Return existing abstract if already generated for this encounter
-		const [existing] = await db
-			.select({ id: telemedicineAbstracts.id })
-			.from(telemedicineAbstracts)
-			.where(eq(telemedicineAbstracts.encounterId, input.encounterId))
-
-		if (existing) {
-			return this.getAbstract({ id: existing.id })
-		}
-
 		// Fetch encounter data to populate the abstract
 		const [enc] = await db
 			.select()
@@ -881,6 +1185,22 @@ export class TelemedicineService {
 
 		if (!enc) {
 			throw new NotFoundException(`Telemedicine encounter ${input.encounterId} not found`)
+		}
+
+		this.assertAssignedClinician(
+			createdByStaffId,
+			enc.clinicianStaffId,
+			"generate an abstract for this encounter"
+		)
+
+		// Return existing abstract only after assignment has been verified.
+		const [existing] = await db
+			.select({ id: telemedicineAbstracts.id })
+			.from(telemedicineAbstracts)
+			.where(eq(telemedicineAbstracts.encounterId, input.encounterId))
+
+		if (existing) {
+			return this.getAbstract({ id: existing.id })
 		}
 
 		const [created] = await db
@@ -924,9 +1244,23 @@ export class TelemedicineService {
 			throw new NotFoundException(`Tele-abstract ${input.id} not found`)
 		}
 
+		const [enc] = await db
+			.select({ clinicianStaffId: telemedicineEncounters.clinicianStaffId })
+			.from(telemedicineEncounters)
+			.where(eq(telemedicineEncounters.id, abstract.encounterId))
+			.limit(1)
+
+		if (!enc) {
+			throw new NotFoundException(`Telemedicine encounter ${abstract.encounterId} not found`)
+		}
+
+		this.assertAssignedClinician(signedByStaffId, enc.clinicianStaffId, "sign this abstract")
+
 		if (abstract.status !== "draft") {
 			throw new BadRequestException(`Abstract is already ${abstract.status}`)
 		}
+
+		await this.getClinicalSigningStaff(signedByStaffId)
 
 		await db
 			.update(telemedicineAbstracts)
@@ -941,7 +1275,12 @@ export class TelemedicineService {
 		// Mark encounter as signed
 		await db
 			.update(telemedicineEncounters)
-			.set({ status: "signed", signedAt: new Date(), updatedAt: new Date() })
+			.set({
+				status: "signed",
+				signedAt: new Date(),
+				signedByStaffId: signedByStaffId ?? null,
+				updatedAt: new Date(),
+			})
 			.where(eq(telemedicineEncounters.id, abstract.encounterId))
 
 		this.logger.log(`Signed tele-abstract: ${input.id}`)
@@ -962,6 +1301,18 @@ export class TelemedicineService {
 			throw new NotFoundException(`Tele-abstract ${input.id} not found`)
 		}
 
+		const [enc] = await db
+			.select({ clinicianStaffId: telemedicineEncounters.clinicianStaffId })
+			.from(telemedicineEncounters)
+			.where(eq(telemedicineEncounters.id, abstract.encounterId))
+			.limit(1)
+
+		if (!enc) {
+			throw new NotFoundException(`Telemedicine encounter ${abstract.encounterId} not found`)
+		}
+
+		this.assertAssignedClinician(sentByStaffId, enc.clinicianStaffId, "send this abstract")
+
 		if (abstract.status === "draft") {
 			throw new BadRequestException("Abstract must be signed before sending")
 		}
@@ -981,6 +1332,11 @@ export class TelemedicineService {
 			.update(telemedicineEncounters)
 			.set({ status: "finalized", updatedAt: new Date() })
 			.where(eq(telemedicineEncounters.id, abstract.encounterId))
+
+		await db
+			.update(telemedicineAppointments)
+			.set({ status: "completed", updatedAt: new Date() })
+			.where(eq(telemedicineAppointments.id, abstract.appointmentId))
 
 		const [notificationTarget] = await db
 			.select({
@@ -1008,11 +1364,15 @@ export class TelemedicineService {
 				topic: "system",
 				title: "Abstract Sent",
 				body: `Tele-abstract for ${notificationTarget.patientLastName}, ${notificationTarget.patientFirstName} marked sent to ${input.email}. Email delivery requires a mailer integration.`,
-				data: { abstractId: input.id, email: input.email, sentByStaffId: sentByStaffId ?? null },
+				data: {
+					abstractId: input.id,
+					email: input.email,
+					sentByStaffId: sentByStaffId ?? null,
+				},
 			})
 		}
 
-		this.logger.log(`Sent tele-abstract: ${input.id} to ${input.email}`)
+		this.logger.log(`Marked tele-abstract ${input.id} sent to ${input.email}`)
 		return this.getAbstract({ id: input.id })
 	}
 
