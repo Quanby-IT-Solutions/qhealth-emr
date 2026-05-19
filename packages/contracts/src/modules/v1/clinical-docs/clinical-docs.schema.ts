@@ -182,6 +182,15 @@ export const ClinicalNoteIdSchema = z.object({
 	id: z.string().uuid(),
 })
 
+/**
+ * Filters accepted by `clinicalDocs.listNotes`.
+ *
+ * Facility isolation is enforced server-side: the backend derives the target
+ * `facilityId` from the supplied `encounterId` / `preEncounterId` via an
+ * encounter join, and additionally requires the caller to hold an active staff
+ * profile at that facility. Clients neither pass nor need to pass a
+ * `facilityId` here — adding one would have no effect.
+ */
 export const ClinicalNoteListSchema = PaginationInputSchema.extend({
 	encounterId: z.string().uuid().optional(),
 	preEncounterId: z.string().uuid().optional(),

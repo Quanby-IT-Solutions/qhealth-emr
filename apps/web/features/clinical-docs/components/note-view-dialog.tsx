@@ -103,7 +103,7 @@ export function NoteViewDialog({
 
 	function handleSignAddendum(addendumId: string) {
 		if (!note) return
-		signAddendum.mutate({ id: addendumId, noteId: note.id })
+		signAddendum.mutate({ id: addendumId })
 	}
 
 	return (

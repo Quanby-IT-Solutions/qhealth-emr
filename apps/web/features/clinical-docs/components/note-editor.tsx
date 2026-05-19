@@ -8,7 +8,9 @@ import {
 	Clock3,
 	FlaskConical,
 	HeartPulse,
+	Keyboard,
 	ListPlus,
+	Mic,
 	Save,
 	ShieldAlert,
 	Stethoscope,
@@ -594,13 +596,47 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 								<Icd10DiagnosisField value={selectedIcd10} onChange={updateIcd10Diagnosis} />
 							)}
 							<Card className="rounded-lg">
-								<CardHeader className="pb-2">
+								<CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
 									<CardTitle className="text-sm">
 										{section.label}
 										{(section.key === assessmentKey || section.key === planKey) && (
 											<span className="text-destructive"> *</span>
 										)}
 									</CardTitle>
+									<div className="flex items-center gap-1">
+										<Tooltip>
+											<TooltipTrigger
+												render={
+													<Button
+														type="button"
+														size="icon"
+														variant="ghost"
+														aria-label={`Voice-to-text for ${section.label} (coming soon)`}
+														disabled
+													/>
+												}
+											>
+												<Mic className="size-4" />
+											</TooltipTrigger>
+											<TooltipContent>Voice-to-text — coming soon</TooltipContent>
+										</Tooltip>
+										<Tooltip>
+											<TooltipTrigger
+												render={
+													<Button
+														type="button"
+														size="icon"
+														variant="ghost"
+														aria-label={`Dot-phrases for ${section.label} (coming soon)`}
+														disabled
+													/>
+												}
+											>
+												<Keyboard className="size-4" />
+											</TooltipTrigger>
+											<TooltipContent>Dot-phrases (.hpi, .ros…) — coming soon</TooltipContent>
+										</Tooltip>
+									</div>
 								</CardHeader>
 								<CardContent>
 									<Label className="sr-only" htmlFor={`note-section-${section.key}`}>
