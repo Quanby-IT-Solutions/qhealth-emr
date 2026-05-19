@@ -385,6 +385,7 @@ const GROUP_MAPPING: Record<string, string> = {
 	"/pharmacy/opd": "CLINICAL PRACTICE",
 	"/pharmacy/formulary": "CLINICAL PRACTICE",
 	"/nursing": "CLINICAL PRACTICE",
+	"/nursing/transfers": "CLINICAL PRACTICE",
 	"/nutrition": "CLINICAL PRACTICE",
 	"/telemedicine": "ADMINISTRATIVE",
 	"/billing": "ADMINISTRATIVE",
@@ -798,7 +799,7 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 
 				{/* Page Content Area */}
 				<main className="flex-1 overflow-x-hidden overflow-y-auto">
-					<div className={cn("mx-auto w-full max-w-[1440px]", isNoPaddingRoute ? "p-0" : "p-4 md:p-6 lg:p-8")}>
+					<div className={cn("mx-auto w-full max-w-[1440px]", isNoPaddingRoute ? "p-0" : "p-4 md:p-5 lg:p-6")}>
 						<AnimatePresence mode="wait">
 							<motion.div key={pathname} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}>
 								{children}

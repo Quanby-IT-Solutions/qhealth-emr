@@ -56,7 +56,7 @@ export default function NursingTransfersPage() {
 	}
 
 	return (
-		<div className="space-y-6 p-4 md:p-6">
+		<div className="space-y-4">
 			<div>
 				<h1 className="text-2xl font-semibold">Pending Transfers</h1>
 				<p className="text-muted-foreground mt-1 text-sm">
