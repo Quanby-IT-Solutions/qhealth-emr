@@ -11,6 +11,7 @@ import {
 	Clock,
 	Copy,
 	ExternalLink,
+	Info,
 	Loader2,
 	Mail,
 	RefreshCw,
@@ -33,6 +34,14 @@ import {
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/core/components/ui/dialog"
 import { Separator } from "@/core/components/ui/separator"
 import {
 	formatAppointmentStatusLabel,
@@ -162,7 +171,7 @@ function CopyButton({
 		>
 			{isCopied ? (
 				<>
-					<Check className="size-3.5 text-green-600" />
+					<Check className="size-3.5 text-success" />
 					Copied
 				</>
 			) : (
@@ -275,12 +284,12 @@ function VideoCallContent({
 
 	return (
 		<div className="space-y-4">
-			<div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3">
-				<p className="flex items-center gap-2 text-sm font-medium text-green-800">
+			<div className="rounded-2xl border border-success/30 bg-success/10 px-4 py-3">
+				<p className="flex items-center gap-2 text-sm font-medium text-success">
 					<Video className="size-4" />
 					{platformLabel} room is ready for this appointment
 				</p>
-				<p className="mt-1 text-xs text-green-700">
+				<p className="text-success/90 mt-1 text-xs">
 					Clinician access is authenticated. Patient access uses the invite link plus DOB or MRN
 					verification.
 				</p>
@@ -365,7 +374,7 @@ function VideoCallContent({
 				</div>
 
 				{error && (
-					<div className="border-destructive/30 text-destructive flex items-start gap-2 rounded-xl border bg-red-50 px-3 py-2 text-sm">
+					<div className="border-destructive/30 text-destructive bg-destructive/10 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm">
 						<AlertTriangle className="mt-0.5 size-4 shrink-0" />
 						<p>{error}</p>
 					</div>
@@ -389,30 +398,30 @@ function VideoCallContent({
 							{patientInviteUrl}
 						</p>
 						{expiryState.tone === "danger" && (
-							<p className="mt-2 flex items-center gap-1 text-xs text-red-700">
+							<p className="text-destructive mt-2 flex items-center gap-1 text-xs">
 								<AlertTriangle className="size-3" />
 								This link has expired. Regenerate before sharing.
 							</p>
 						)}
 						{expiryState.tone === "warning" && (
-							<p className="mt-2 flex items-center gap-1 text-xs text-amber-700">
+							<p className="mt-2 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300">
 								<Clock className="size-3" />
 								{expiryState.label}. Regenerate if the patient hasn&apos;t joined yet.
 							</p>
 						)}
 					</div>
 				) : inviteHidden ? (
-					<div className="flex items-start gap-2 rounded-2xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+					<div className="border-primary/30 bg-primary/10 text-primary flex items-start gap-2 rounded-2xl border p-3 text-sm">
 						<ShieldCheck className="mt-0.5 size-4 shrink-0" />
 						<div>
 							<p className="font-medium">An active invite exists, but the link is hidden</p>
-							<p className="text-xs text-blue-800">
+							<p className="text-primary/80 text-xs">
 								Tokens are only shown once at creation. Regenerate to copy a fresh secure link.
 							</p>
 						</div>
 					</div>
 				) : inviteRevoked ? (
-					<div className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+					<div className="border-destructive/30 bg-destructive/10 text-destructive flex items-start gap-2 rounded-2xl border p-3 text-sm">
 						<Ban className="mt-0.5 size-4 shrink-0" />
 						<div>
 							<p className="font-medium">Invite revoked</p>
@@ -435,8 +444,8 @@ function VideoCallContent({
 								variant="outline"
 								className={`mt-1 text-xs ${
 									expiryState.tone === "danger"
-										? "border-red-300 text-red-700"
-										: "border-amber-300 text-amber-700"
+										? "border-destructive/40 text-destructive"
+										: "border-amber-500/40 text-amber-700 dark:text-amber-300"
 								}`}
 							>
 								{expiryState.label}
@@ -451,7 +460,7 @@ function VideoCallContent({
 						<p className="text-muted-foreground mb-1 text-xs">Patient Joined</p>
 						<p className="font-medium">{formatDateTime(currentAppt.patientJoinedAt)}</p>
 						{patientJoined && (
-							<Badge className="mt-1 bg-emerald-100 text-emerald-800 text-xs">
+							<Badge className="bg-success/15 text-success border-success/30 mt-1 text-xs">
 								<CheckCircle2 className="mr-1 size-3" />
 								Verified
 							</Badge>
@@ -462,47 +471,79 @@ function VideoCallContent({
 
 			<Separator />
 
-			<div className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-				<div>
-					<span className="text-muted-foreground inline-flex items-center gap-1">
-						<User className="size-3" />
-						Patient:
-					</span>{" "}
+			<div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+				<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
 					<span className="font-medium">{currentAppt.patientName}</span>
-				</div>
-				<div>
-					<span className="text-muted-foreground inline-flex items-center gap-1">
-						<User className="size-3" />
-						Clinician:
-					</span>{" "}
-					<span className="font-medium">{currentAppt.clinicianName}</span>
-				</div>
-				<div>
-					<span className="text-muted-foreground inline-flex items-center gap-1">
-						<Calendar className="size-3" />
-						Date:
-					</span>{" "}
-					<span className="font-medium">{formatDate(currentAppt.scheduledDate)}</span>
-				</div>
-				<div>
-					<span className="text-muted-foreground inline-flex items-center gap-1">
-						<Clock className="size-3" />
-						Time:
-					</span>{" "}
-					<span className="font-medium">
-						{formatTime(currentAppt.scheduledTime)} ({currentAppt.durationMinutes} min)
+					<span className="text-muted-foreground text-xs">
+						{formatDate(currentAppt.scheduledDate)} · {formatTime(currentAppt.scheduledTime)}
 					</span>
-				</div>
-				<div>
-					<span className="text-muted-foreground">Platform:</span>{" "}
 					<Badge variant="outline" className="text-xs">
 						{platformLabel}
 					</Badge>
 				</div>
-				<div>
-					<span className="text-muted-foreground">Status:</span>{" "}
-					<span className="font-medium">{formatAppointmentStatusLabel(currentAppt.status)}</span>
-				</div>
+				<Dialog>
+					<DialogTrigger className="border-border bg-muted text-foreground hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2">
+						<Info className="size-3.5" />
+						Details
+					</DialogTrigger>
+					<DialogContent className="sm:max-w-lg">
+						<DialogHeader>
+							<DialogTitle className="flex items-center gap-2">
+								<Info className="text-primary size-4" />
+								Appointment Details
+							</DialogTitle>
+							<DialogDescription>
+								{currentAppt.patientName} — {platformLabel} consultation
+							</DialogDescription>
+						</DialogHeader>
+						<div className="grid gap-3 sm:grid-cols-2">
+							<div>
+								<p className="text-muted-foreground flex items-center gap-1 text-xs">
+									<User className="size-3" />
+									Patient
+								</p>
+								<p className="text-foreground text-sm font-medium">{currentAppt.patientName}</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground flex items-center gap-1 text-xs">
+									<User className="size-3" />
+									Clinician
+								</p>
+								<p className="text-foreground text-sm font-medium">{currentAppt.clinicianName}</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground flex items-center gap-1 text-xs">
+									<Calendar className="size-3" />
+									Date
+								</p>
+								<p className="text-foreground text-sm font-medium">
+									{formatDate(currentAppt.scheduledDate)}
+								</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground flex items-center gap-1 text-xs">
+									<Clock className="size-3" />
+									Time
+								</p>
+								<p className="text-foreground text-sm font-medium">
+									{formatTime(currentAppt.scheduledTime)} ({currentAppt.durationMinutes} min)
+								</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground text-xs">Platform</p>
+								<Badge variant="outline" className="mt-1 text-xs">
+									{platformLabel}
+								</Badge>
+							</div>
+							<div>
+								<p className="text-muted-foreground text-xs">Status</p>
+								<p className="text-foreground text-sm font-medium">
+									{formatAppointmentStatusLabel(currentAppt.status)}
+								</p>
+							</div>
+						</div>
+					</DialogContent>
+				</Dialog>
 			</div>
 
 			<AlertDialog

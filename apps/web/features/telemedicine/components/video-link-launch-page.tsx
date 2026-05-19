@@ -6,8 +6,6 @@ import {
 	AlertTriangle,
 	ArrowLeft,
 	Calendar,
-	ChevronDown,
-	ChevronUp,
 	Clock,
 	Info,
 	Loader2,
@@ -20,6 +18,14 @@ import {
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent } from "@/core/components/ui/card"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/core/components/ui/dialog"
 import { Skeleton } from "@/core/components/ui/skeleton"
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
@@ -106,10 +112,10 @@ interface BannerProps {
 function TopBanner({ tone, message, onDismiss }: BannerProps) {
 	const toneClass =
 		tone === "danger"
-			? "bg-rose-500/10 border-b border-rose-500/20 text-rose-200"
+			? "bg-destructive/10 border-b border-destructive/30 text-destructive"
 			: tone === "info"
-				? "bg-sky-500/10 border-b border-sky-500/20 text-sky-200"
-				: "bg-amber-500/10 border-b border-amber-500/20 text-amber-200"
+				? "bg-primary/10 border-b border-primary/30 text-primary"
+				: "bg-amber-500/10 border-b border-amber-500/30 text-amber-700 dark:text-amber-300"
 
 	return (
 		<div className={cn("flex items-center gap-2 px-4 py-2 text-xs", toneClass)}>
@@ -137,7 +143,6 @@ export function VideoLinkLaunchPage({ appointmentId }: VideoLinkLaunchPageProps)
 	}, [profile?.activeRole?.permissions])
 	const { data: appointment, isLoading, error, refetch } = useAppointmentQuery(appointmentId)
 
-	const [detailsOpen, setDetailsOpen] = useState(false)
 	const [dismissedBanners, setDismissedBanners] = useState<Set<BannerKind>>(new Set())
 
 	const patientInviteUrl = useMemo(() => {
@@ -234,21 +239,50 @@ export function VideoLinkLaunchPage({ appointmentId }: VideoLinkLaunchPageProps)
 							{getPlatformLabel(appointment.platform)}
 						</span>
 					)}
-					<button
-						type="button"
-						onClick={() => setDetailsOpen(open => !open)}
-						aria-expanded={detailsOpen}
-						aria-controls="appointment-details-panel"
-						className="border-border bg-muted text-foreground hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-2"
-					>
-						<Info className="size-3.5" />
-						<span className="hidden sm:inline">Details</span>
-						{detailsOpen ? (
-							<ChevronUp className="size-3.5" />
-						) : (
-							<ChevronDown className="size-3.5" />
-						)}
-					</button>
+					<Dialog>
+						<DialogTrigger
+							className="border-border bg-muted text-foreground hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-2"
+						>
+							<Info className="size-3.5" />
+							<span className="hidden sm:inline">Details</span>
+						</DialogTrigger>
+						<DialogContent className="sm:max-w-lg">
+							<DialogHeader>
+								<DialogTitle className="flex items-center gap-2">
+									<Info className="text-primary size-4" />
+									Appointment Details
+								</DialogTitle>
+								<DialogDescription>
+									{appointment
+										? `${appointment.patientName} — ${getPlatformLabel(appointment.platform)} consultation`
+										: "Telemedicine appointment details"}
+								</DialogDescription>
+							</DialogHeader>
+							{isLoading ? (
+								<div className="grid gap-3 sm:grid-cols-2">
+									{Array.from({ length: 8 }).map((_, i) => (
+										<Skeleton key={i} className="bg-muted h-10" />
+									))}
+								</div>
+							) : appointment ? (
+								<div className="grid gap-3 sm:grid-cols-2">
+									<Field icon={User} label="Patient" value={appointment.patientName} />
+									<Field label="MRN" value={appointment.patientMrn} />
+									<Field icon={User} label="Clinician" value={appointment.clinicianName} />
+									<Field icon={Video} label="Platform" value={getPlatformLabel(appointment.platform)} />
+									<Field icon={Calendar} label="Date" value={formatDate(appointment.scheduledDate)} />
+									<Field icon={Clock} label="Time" value={formatTime(appointment.scheduledTime)} />
+									<Field label="Duration" value={`${appointment.durationMinutes} min`} />
+									<Field
+										label="Patient Joined"
+										value={appointment.patientJoinedAt ? "Yes" : "Not yet"}
+									/>
+								</div>
+							) : (
+								<p className="text-muted-foreground text-sm">No appointment details available.</p>
+							)}
+						</DialogContent>
+					</Dialog>
 				</div>
 			</header>
 
@@ -272,37 +306,6 @@ export function VideoLinkLaunchPage({ appointmentId }: VideoLinkLaunchPageProps)
 					message="Patient invite revoked. The patient cannot join unless a new invite is generated."
 					onDismiss={() => dismissBanner("revoked")}
 				/>
-			)}
-
-			{detailsOpen && (
-				<section
-					id="appointment-details-panel"
-					className="border-border bg-card/60 shrink-0 border-b px-4 py-3"
-				>
-					{isLoading ? (
-						<div className="grid gap-3 md:grid-cols-4">
-							{Array.from({ length: 8 }).map((_, i) => (
-								<Skeleton key={i} className="bg-muted h-10" />
-							))}
-						</div>
-					) : appointment ? (
-						<div className="grid gap-3 md:grid-cols-4">
-							<Field icon={User} label="Patient" value={appointment.patientName} />
-							<Field label="MRN" value={appointment.patientMrn} />
-							<Field icon={User} label="Clinician" value={appointment.clinicianName} />
-							<Field icon={Video} label="Platform" value={getPlatformLabel(appointment.platform)} />
-							<Field icon={Calendar} label="Date" value={formatDate(appointment.scheduledDate)} />
-							<Field icon={Clock} label="Time" value={formatTime(appointment.scheduledTime)} />
-							<Field label="Duration" value={`${appointment.durationMinutes} min`} />
-							<Field
-								label="Patient Joined"
-								value={appointment.patientJoinedAt ? "Yes" : "Not yet"}
-							/>
-						</div>
-					) : (
-						<p className="text-muted-foreground text-xs">No appointment details available.</p>
-					)}
-				</section>
 			)}
 
 			<main className="relative flex min-h-[360px] flex-1 flex-col overflow-hidden">

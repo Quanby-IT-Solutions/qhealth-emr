@@ -368,7 +368,7 @@ export function TelemedicineEncounterForm({
 			<Card>
 				<CardContent className="py-10">
 					<div className="flex flex-col items-center gap-3 text-center">
-						<CheckCircle2 className="size-12 text-green-500" />
+						<CheckCircle2 className="text-success size-12" />
 						<h3 className="text-lg font-semibold">Encounter Saved</h3>
 						<p className="text-muted-foreground text-sm">
 							The telemedicine clinical note has been recorded.
@@ -553,7 +553,7 @@ export function TelemedicineEncounterForm({
 						{(submitError || hasFieldErrors) && (
 							<div
 								role="alert"
-								className="border-destructive/30 bg-red-50 text-destructive flex items-start gap-2 rounded-md border px-3 py-2 text-sm"
+								className="border-destructive/30 bg-destructive/10 text-destructive flex items-start gap-2 rounded-md border px-3 py-2 text-sm"
 							>
 								<AlertCircle className="mt-0.5 size-4 shrink-0" />
 								<div>

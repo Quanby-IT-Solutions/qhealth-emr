@@ -165,7 +165,7 @@ function TabNavigation<TTab extends string>({
 						].join(" ")}
 					>
 						{completed && !disabled && (
-							<span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+							<span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-success text-success-foreground">
 								<CheckCircle2 className="size-3.5" />
 							</span>
 						)}
@@ -653,9 +653,9 @@ function PhysicianTelemedicineDashboard({ profile }: { profile?: MyProfile }) {
 				<>
 					{hasEncounter && currentEncounterId ? (
 						<div className="space-y-4">
-							<div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+							<div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
 								<p className="font-medium">Documents for {patientName}</p>
-								<p className="text-blue-800 text-xs">
+								<p className="text-primary/80 text-xs">
 									Generate the medical abstract and sign before issuing the e-prescription. Both
 									documents can be emailed to the patient when finalised.
 								</p>

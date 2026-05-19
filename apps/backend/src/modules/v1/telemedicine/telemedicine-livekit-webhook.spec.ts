@@ -102,10 +102,15 @@ describe("TelemedicineService.handleLiveKitWebhook", () => {
 
 		liveKitService = { verifyWebhook: jest.fn() }
 		auditService = { log: jest.fn().mockResolvedValue(undefined) }
+		const mailerService = {
+			isConfigured: jest.fn(() => false),
+			send: jest.fn().mockResolvedValue({ delivered: false, messageId: null, transport: "log" }),
+		}
 		service = new TelemedicineService(
 			{} as never,
 			liveKitService as never,
-			auditService as never
+			auditService as never,
+			mailerService as never
 		)
 	})
 

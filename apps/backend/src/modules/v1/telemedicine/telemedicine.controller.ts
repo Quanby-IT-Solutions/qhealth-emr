@@ -138,8 +138,11 @@ export class TelemedicineController {
 	@Implement(v1.telemedicine.cancelAppointment)
 	async cancelAppointment(@Session() session: UserSession) {
 		return implement(v1.telemedicine.cancelAppointment).handler(async ({ input }) => {
-			void session
-			return this.telemedicineService.cancelAppointment(input)
+			const facilityId = await this.resolveAppointmentFacilityId(input.id)
+			const staffProfileId = facilityId
+				? await this.resolveStaffProfileId(session.user.id, facilityId)
+				: undefined
+			return this.telemedicineService.cancelAppointment(input, staffProfileId)
 		})
 	}
 
@@ -204,6 +207,7 @@ export class TelemedicineController {
 	}
 
 	@AllowAnonymous()
+	@Throttle({ default: { limit: 10, ttl: 60000 } })
 	@Implement(v1.telemedicine.getPatientInvitePreview)
 	async getPatientInvitePreview() {
 		return implement(v1.telemedicine.getPatientInvitePreview).handler(async ({ input }) => {
@@ -354,6 +358,24 @@ export class TelemedicineController {
 				: undefined
 			return this.telemedicineService.signAbstract(input, staffProfileId)
 		})
+	}
+
+	@RequirePermission("telemedicine", "view")
+	@Version("1")
+	@Get("telemedicine/abstracts/:id/pdf")
+	async getAbstractPdf(
+		@Session() session: UserSession,
+		@Param("id") id: string,
+		@Res() res: Response
+	) {
+		const facilityId = await this.resolveAbstractFacilityId(id)
+		const staffProfileId = facilityId
+			? await this.resolveStaffProfileId(session.user.id, facilityId)
+			: undefined
+		const pdf = await this.telemedicineService.generateAbstractPdf(id, staffProfileId)
+		res.setHeader("Content-Type", "application/pdf")
+		res.setHeader("Content-Disposition", `attachment; filename="abstract-${id}.pdf"`)
+		res.send(Buffer.from(pdf))
 	}
 
 	@RequirePermission("telemedicine", "edit")

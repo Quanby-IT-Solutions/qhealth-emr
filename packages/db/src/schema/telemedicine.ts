@@ -45,11 +45,13 @@ export const telemedicineAppointments = createTable(
 		patientInviteLastUsedAt: t.timestamp("patient_invite_last_used_at", { withTimezone: true }),
 		patientJoinedAt: t.timestamp("patient_joined_at", { withTimezone: true }),
 		notes: t.text("notes"),
-		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
+		linkedCoreEncounterId: t
+			.uuid("linked_core_encounter_id")
+			.references(() => encounters.id, { onDelete: "set null" }),
 		createdByStaffId: t
 			.uuid("created_by_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
-		cancelledAt: t.timestamp("cancelled_at"),
+		cancelledAt: t.timestamp("cancelled_at", { withTimezone: true }),
 		cancellationReason: t.text("cancellation_reason"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),

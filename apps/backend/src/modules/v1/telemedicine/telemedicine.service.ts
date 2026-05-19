@@ -24,6 +24,7 @@ import {
 import { CommonAuditService } from "@/common/audit/audit.service"
 import { db } from "@/common/database/database.client"
 import { LiveKitService } from "@/common/livekit/livekit.service"
+import { MailerService } from "@/common/mail/mailer.service"
 import type { V1Inputs } from "@/config/contract-types"
 import { env } from "@/config/env.config"
 import { NotificationService } from "@/modules/v1/notifications/notification.service"
@@ -65,7 +66,8 @@ export class TelemedicineService {
 	constructor(
 		private readonly notificationService: NotificationService,
 		private readonly liveKitService: LiveKitService,
-		private readonly auditService: CommonAuditService
+		private readonly auditService: CommonAuditService,
+		private readonly mailerService: MailerService
 	) {}
 
 	// =========================================================================
@@ -112,7 +114,7 @@ export class TelemedicineService {
 			patientInviteLastUsedAt: this.serializeDate(appt.patientInviteLastUsedAt),
 			patientJoinedAt: this.serializeDate(appt.patientJoinedAt),
 			notes: appt.notes ?? null,
-			encounterId: appt.encounterId ?? null,
+			encounterId: appt.linkedCoreEncounterId ?? null,
 			createdAt: appt.createdAt.toISOString(),
 			createdByName,
 		}
@@ -353,6 +355,61 @@ export class TelemedicineService {
 
 		if (expiryDate < today) {
 			throw new BadRequestException(`Physician ${label} is expired.`)
+		}
+	}
+
+	// =========================================================================
+	// Audit helpers
+	// =========================================================================
+
+	private static readonly ANONYMOUS_USER_ID = "telemedicine:anonymous"
+
+	private async resolveUserIdForStaff(staffProfileId: string | null | undefined): Promise<string | null> {
+		if (!staffProfileId) return null
+		const [row] = await db
+			.select({ userId: staffProfiles.userId })
+			.from(staffProfiles)
+			.where(eq(staffProfiles.id, staffProfileId))
+			.limit(1)
+		return row?.userId ?? null
+	}
+
+	private async writeTelemedicineAudit(input: {
+		facilityId: string
+		staffProfileId: string | null
+		userId?: string | null
+		action: "create" | "read" | "update" | "delete" | "sign" | "verify" | "override"
+		entityType: string
+		entityId: string
+		beforeState?: Record<string, unknown> | null
+		afterState?: Record<string, unknown> | null
+		metadata?: Record<string, unknown> | null
+		severity?: "info" | "warning" | "critical"
+		outcome?: "success" | "failure"
+	}): Promise<void> {
+		try {
+			const userId =
+				input.userId ?? (await this.resolveUserIdForStaff(input.staffProfileId)) ??
+				TelemedicineService.ANONYMOUS_USER_ID
+			await this.auditService.log({
+				facilityId: input.facilityId,
+				userId,
+				staffProfileId: input.staffProfileId,
+				action: input.action,
+				entityType: input.entityType,
+				entityId: input.entityId,
+				beforeState: input.beforeState ?? null,
+				afterState: input.afterState ?? null,
+				ipAddress: null,
+				userAgent: null,
+				metadata: input.metadata ?? null,
+				severity: input.severity ?? "info",
+				outcome: input.outcome ?? "success",
+			})
+		} catch (error) {
+			this.logger.error(
+				`Failed to write telemedicine audit (${input.entityType}/${input.action}/${input.entityId}): ${error}`
+			)
 		}
 	}
 
@@ -612,6 +669,24 @@ export class TelemedicineService {
 			.set({ livekitRoomName: roomName, updatedAt: new Date() })
 			.where(eq(telemedicineAppointments.id, created.id))
 
+		await this.writeTelemedicineAudit({
+			facilityId: input.facilityId,
+			staffProfileId: createdByStaffId ?? null,
+			action: "create",
+			entityType: "telemedicine_appointment",
+			entityId: created.id,
+			beforeState: null,
+			afterState: {
+				patientId: input.patientId,
+				clinicianId: input.clinicianId,
+				scheduledDate: input.scheduledDate,
+				scheduledTime: input.scheduledTime,
+				durationMinutes,
+				platform: "livekit",
+			},
+			metadata: { roomName },
+		})
+
 		this.logger.log(`Created telemedicine appointment: ${created.id}`)
 		return {
 			...(await this.getAppointment({ id: created.id })),
@@ -652,6 +727,24 @@ export class TelemedicineService {
 			throw new Error("Failed to update telemedicine appointment")
 		}
 
+		await this.writeTelemedicineAudit({
+			facilityId: appt.facilityId,
+			staffProfileId: updatedByStaffId ?? null,
+			action: "update",
+			entityType: "telemedicine_appointment",
+			entityId: input.id,
+			beforeState: {
+				videoLink: appt.videoLink ?? null,
+				meetingId: appt.meetingId ?? null,
+				meetingPassword: appt.meetingPassword ?? null,
+			},
+			afterState: {
+				videoLink: updates.videoLink ?? appt.videoLink ?? null,
+				meetingId: updates.meetingId ?? appt.meetingId ?? null,
+				meetingPassword: updates.meetingPassword ?? appt.meetingPassword ?? null,
+			},
+		})
+
 		this.logger.log(`Updated telemedicine appointment: ${input.id}`)
 		return this.getAppointment({ id: input.id })
 	}
@@ -660,7 +753,7 @@ export class TelemedicineService {
 	// Cancel Appointment
 	// =========================================================================
 
-	async cancelAppointment(input: CancelAppointmentInput) {
+	async cancelAppointment(input: CancelAppointmentInput, cancelledByStaffId?: string) {
 		const [appt] = await db
 			.select()
 			.from(telemedicineAppointments)
@@ -679,6 +772,18 @@ export class TelemedicineService {
 				updatedAt: new Date(),
 			})
 			.where(eq(telemedicineAppointments.id, input.id))
+
+		await this.writeTelemedicineAudit({
+			facilityId: appt.facilityId,
+			staffProfileId: cancelledByStaffId ?? null,
+			action: "update",
+			entityType: "telemedicine_appointment",
+			entityId: input.id,
+			beforeState: { status: appt.status },
+			afterState: { status: "cancelled" },
+			metadata: { cancellationReason: input.cancellationReason ?? null },
+			severity: "warning",
+		})
 
 		this.logger.log(`Cancelled telemedicine appointment: ${input.id}`)
 	}
@@ -757,6 +862,16 @@ export class TelemedicineService {
 				.where(eq(telemedicineAppointments.id, appointmentId))
 		}
 
+		await this.writeTelemedicineAudit({
+			facilityId: appointment.facilityId,
+			staffProfileId,
+			action: "create",
+			entityType: "telemedicine_livekit_token",
+			entityId: appointmentId,
+			afterState: { role: "clinician", roomName, identity: `clinician:${staffProfileId}` },
+			metadata: { ttlSeconds: 7200 },
+		})
+
 		return {
 			isConfigured: true,
 			token,
@@ -769,6 +884,7 @@ export class TelemedicineService {
 		const [appointment] = await db
 			.select({
 				id: telemedicineAppointments.id,
+				facilityId: telemedicineAppointments.facilityId,
 				clinicianStaffId: telemedicineAppointments.clinicianStaffId,
 				status: telemedicineAppointments.status,
 				livekitSessionStartedAt: telemedicineAppointments.livekitSessionStartedAt,
@@ -806,6 +922,20 @@ export class TelemedicineService {
 			.update(telemedicineAppointments)
 			.set({ livekitSessionEndedAt: endedAt, updatedAt: endedAt })
 			.where(eq(telemedicineAppointments.id, appointmentId))
+
+		await this.writeTelemedicineAudit({
+			facilityId: appointment.facilityId,
+			staffProfileId,
+			action: "update",
+			entityType: "telemedicine_appointment_session",
+			entityId: appointmentId,
+			beforeState: {
+				livekitSessionStartedAt: appointment.livekitSessionStartedAt.toISOString(),
+				livekitSessionEndedAt: null,
+			},
+			afterState: { livekitSessionEndedAt: endedAt.toISOString() },
+			metadata: { trigger: "clinician_end" },
+		})
 
 		return {
 			appointmentId,
@@ -966,6 +1096,7 @@ export class TelemedicineService {
 		const [appointment] = await db
 			.select({
 				id: telemedicineAppointments.id,
+				facilityId: telemedicineAppointments.facilityId,
 				clinicianStaffId: telemedicineAppointments.clinicianStaffId,
 				scheduledDate: telemedicineAppointments.scheduledDate,
 				scheduledTime: telemedicineAppointments.scheduledTime,
@@ -1006,6 +1137,19 @@ export class TelemedicineService {
 			throw new Error("Failed to regenerate patient invite")
 		}
 
+		await this.writeTelemedicineAudit({
+			facilityId: appointment.facilityId,
+			staffProfileId,
+			action: "update",
+			entityType: "telemedicine_patient_invite",
+			entityId: appointmentId,
+			afterState: {
+				patientInviteExpiresAt: updated.patientInviteExpiresAt.toISOString(),
+				patientInviteRevokedAt: this.serializeDate(updated.patientInviteRevokedAt),
+			},
+			metadata: { action: "regenerate" },
+		})
+
 		return {
 			appointmentId,
 			patientInviteToken: patientInvite.patientInviteToken,
@@ -1018,6 +1162,7 @@ export class TelemedicineService {
 		const [appointment] = await db
 			.select({
 				id: telemedicineAppointments.id,
+				facilityId: telemedicineAppointments.facilityId,
 				clinicianStaffId: telemedicineAppointments.clinicianStaffId,
 				patientInviteTokenHash: telemedicineAppointments.patientInviteTokenHash,
 				patientInviteExpiresAt: telemedicineAppointments.patientInviteExpiresAt,
@@ -1037,6 +1182,7 @@ export class TelemedicineService {
 			"manage this patient invite"
 		)
 
+		const wasAlreadyRevoked = Boolean(appointment.patientInviteRevokedAt)
 		const revokedAt = appointment.patientInviteRevokedAt ?? new Date()
 		const [updated] = await db
 			.update(telemedicineAppointments)
@@ -1048,6 +1194,19 @@ export class TelemedicineService {
 				patientInviteExpiresAt: telemedicineAppointments.patientInviteExpiresAt,
 				patientInviteRevokedAt: telemedicineAppointments.patientInviteRevokedAt,
 			})
+
+		if (!wasAlreadyRevoked) {
+			await this.writeTelemedicineAudit({
+				facilityId: appointment.facilityId,
+				staffProfileId,
+				action: "update",
+				entityType: "telemedicine_patient_invite",
+				entityId: appointmentId,
+				afterState: { patientInviteRevokedAt: revokedAt.toISOString() },
+				metadata: { action: "revoke" },
+				severity: "warning",
+			})
+		}
 
 		return this.buildInviteStatus(updated ?? { ...appointment, patientInviteRevokedAt: revokedAt })
 	}
@@ -1131,6 +1290,16 @@ export class TelemedicineService {
 		const appointment = await this.resolvePatientInvite(input.token)
 
 		if (appointment.patientInviteRevokedAt) {
+			await this.writeTelemedicineAudit({
+				facilityId: appointment.facilityId,
+				staffProfileId: null,
+				action: "verify",
+				entityType: "telemedicine_patient_invite",
+				entityId: appointment.id,
+				metadata: { reason: "invite_revoked", patientId: appointment.patientId },
+				severity: "warning",
+				outcome: "failure",
+			})
 			throw new BadRequestException("Patient invite has been revoked.")
 		}
 
@@ -1138,6 +1307,16 @@ export class TelemedicineService {
 		const joinWindow = this.assertAppointmentWithinJoinWindow(appointment)
 
 		if (!appointment.patientInviteExpiresAt || appointment.patientInviteExpiresAt <= new Date()) {
+			await this.writeTelemedicineAudit({
+				facilityId: appointment.facilityId,
+				staffProfileId: null,
+				action: "verify",
+				entityType: "telemedicine_patient_invite",
+				entityId: appointment.id,
+				metadata: { reason: "invite_expired", patientId: appointment.patientId },
+				severity: "warning",
+				outcome: "failure",
+			})
 			throw new BadRequestException("Patient invite has expired.")
 		}
 
@@ -1148,6 +1327,21 @@ export class TelemedicineService {
 		const dateOfBirthMatches = submittedDateOfBirth && submittedDateOfBirth === storedDateOfBirth
 
 		if (!mrnMatches && !dateOfBirthMatches) {
+			await this.writeTelemedicineAudit({
+				facilityId: appointment.facilityId,
+				staffProfileId: null,
+				action: "verify",
+				entityType: "telemedicine_patient_invite",
+				entityId: appointment.id,
+				metadata: {
+					reason: "verification_failed",
+					patientId: appointment.patientId,
+					submittedMrnProvided: Boolean(submittedMrn),
+					submittedDobProvided: Boolean(submittedDateOfBirth),
+				},
+				severity: "warning",
+				outcome: "failure",
+			})
 			throw new ForbiddenException("Patient verification failed.")
 		}
 
@@ -1183,6 +1377,20 @@ export class TelemedicineService {
 			.update(telemedicineAppointments)
 			.set(updates)
 			.where(eq(telemedicineAppointments.id, appointment.id))
+
+		await this.writeTelemedicineAudit({
+			facilityId: appointment.facilityId,
+			staffProfileId: null,
+			action: "create",
+			entityType: "telemedicine_livekit_token",
+			entityId: appointment.id,
+			afterState: { role: "patient", roomName, identity: `patient:${appointment.id}` },
+			metadata: {
+				patientId: appointment.patientId,
+				verifiedWith: mrnMatches ? "mrn" : "dob",
+				ttlSeconds: Math.min(7200, remainingSeconds),
+			},
+		})
 
 		return {
 			isConfigured: true,
@@ -1361,6 +1569,21 @@ export class TelemedicineService {
 			.update(telemedicineAppointments)
 			.set({ status: "in-progress", updatedAt: new Date() })
 			.where(eq(telemedicineAppointments.id, input.appointmentId))
+
+		await this.writeTelemedicineAudit({
+			facilityId: appt.facilityId,
+			staffProfileId: createdByStaffId ?? null,
+			action: "create",
+			entityType: "telemedicine_encounter",
+			entityId: created.id,
+			afterState: {
+				appointmentId: input.appointmentId,
+				encounterType: input.encounterType,
+				linkedEncounterId: input.linkedEncounterId ?? null,
+				diagnosis: input.diagnosis,
+				icdCode: input.icdCode ?? null,
+			},
+		})
 
 		this.logger.log(
 			`Created telemedicine encounter: ${created.id} for appointment: ${input.appointmentId}`
@@ -1574,8 +1797,37 @@ export class TelemedicineService {
 			)
 		}
 
+		const apptFacilityId = await this.resolveAppointmentFacilityForAudit(enc.appointmentId)
+		if (apptFacilityId) {
+			await this.writeTelemedicineAudit({
+				facilityId: apptFacilityId,
+				staffProfileId: createdByStaffId ?? null,
+				action: "create",
+				entityType: "telemedicine_prescription",
+				entityId: created.id,
+				afterState: {
+					encounterId: input.encounterId,
+					medicationsCount: input.medications.length,
+					prcLicenseNumber: staff.prcLicenseNumber,
+					ptrNumber: staff.ptrNumber,
+				},
+				metadata: {
+					genericNames: input.medications.map(m => m.genericName.trim()),
+				},
+			})
+		}
+
 		this.logger.log(`Created telemedicine prescription: ${created.id}`)
 		return this.getPrescription({ id: created.id })
+	}
+
+	private async resolveAppointmentFacilityForAudit(appointmentId: string): Promise<string | null> {
+		const [row] = await db
+			.select({ facilityId: telemedicineAppointments.facilityId })
+			.from(telemedicineAppointments)
+			.where(eq(telemedicineAppointments.id, appointmentId))
+			.limit(1)
+		return row?.facilityId ?? null
 	}
 
 	async signPrescription(input: SignPrescriptionInput, signedByStaffId?: string) {
@@ -1584,11 +1836,16 @@ export class TelemedicineService {
 				id: telemedicinePrescriptions.id,
 				status: telemedicinePrescriptions.status,
 				clinicianStaffId: telemedicineEncounters.clinicianStaffId,
+				facilityId: telemedicineAppointments.facilityId,
 			})
 			.from(telemedicinePrescriptions)
 			.innerJoin(
 				telemedicineEncounters,
 				eq(telemedicinePrescriptions.encounterId, telemedicineEncounters.id)
+			)
+			.innerJoin(
+				telemedicineAppointments,
+				eq(telemedicinePrescriptions.appointmentId, telemedicineAppointments.id)
 			)
 			.where(eq(telemedicinePrescriptions.id, input.id))
 			.limit(1)
@@ -1605,17 +1862,33 @@ export class TelemedicineService {
 
 		const staff = await this.getPrescribingStaff(signedByStaffId)
 
+		const signedAt = new Date()
 		await db
 			.update(telemedicinePrescriptions)
 			.set({
 				status: "signed",
 				prcLicenseNumber: staff.prcLicenseNumber,
 				ptrNumber: staff.ptrNumber,
-				signedAt: new Date(),
+				signedAt,
 				signedByStaffId: signedByStaffId ?? null,
-				updatedAt: new Date(),
+				updatedAt: signedAt,
 			})
 			.where(eq(telemedicinePrescriptions.id, input.id))
+
+		await this.writeTelemedicineAudit({
+			facilityId: row.facilityId,
+			staffProfileId: signedByStaffId ?? null,
+			action: "sign",
+			entityType: "telemedicine_prescription",
+			entityId: input.id,
+			beforeState: { status: row.status },
+			afterState: {
+				status: "signed",
+				signedAt: signedAt.toISOString(),
+				prcLicenseNumber: staff.prcLicenseNumber,
+				ptrNumber: staff.ptrNumber,
+			},
+		})
 
 		this.logger.log(`Signed telemedicine prescription: ${input.id}`)
 		return this.getPrescription({ id: input.id })
@@ -1744,29 +2017,84 @@ export class TelemedicineService {
 			throw new BadRequestException("Cancelled prescriptions cannot be sent.")
 		}
 
+		const sentAt = new Date()
 		await db
 			.update(telemedicinePrescriptions)
 			.set({
 				status: "sent",
-				sentAt: new Date(),
+				sentAt,
 				sentToEmail: input.email,
-				updatedAt: new Date(),
+				updatedAt: sentAt,
 			})
 			.where(eq(telemedicinePrescriptions.id, input.id))
+
+		// Attempt SMTP delivery with the signed PDF as attachment. Falls back to
+		// log-only when MAILER_MODE != "smtp" or SMTP env is incomplete.
+		let mailResult: { delivered: boolean; messageId: string | null; transport: "smtp" | "log" } = {
+			delivered: false,
+			messageId: null,
+			transport: "log",
+		}
+		let mailerError: string | null = null
+		try {
+			const pdf = await this.generatePrescriptionPdf(input.id, sentByStaffId)
+			mailResult = await this.mailerService.send({
+				to: input.email,
+				subject: `E-Prescription from ${row.facilityId ? "your clinician" : "the clinic"}`,
+				text: `Your signed e-prescription is attached.\n\nPatient: ${row.patientLastName}, ${row.patientFirstName}\nIf you have questions, contact your clinic.`,
+				attachments: [
+					{
+						filename: `prescription-${input.id}.pdf`,
+						content: pdf,
+						contentType: "application/pdf",
+					},
+				],
+			})
+		} catch (error) {
+			mailerError = error instanceof Error ? error.message : String(error)
+			this.logger.error(`Mailer send failed for prescription ${input.id}: ${mailerError}`)
+		}
 
 		await this.notificationService.send({
 			facilityId: row.facilityId,
 			recipientStaffId: row.clinicianStaffId,
 			topic: "system",
 			title: "Prescription Sent",
-			body: `E-prescription for ${row.patientLastName}, ${row.patientFirstName} marked sent to ${input.email}. Email delivery requires a mailer integration.`,
+			body: mailResult.delivered
+				? `E-prescription for ${row.patientLastName}, ${row.patientFirstName} emailed to ${input.email}.`
+				: `E-prescription for ${row.patientLastName}, ${row.patientFirstName} marked sent to ${input.email}. ${mailerError ? `Email delivery failed: ${mailerError}` : "SMTP is not configured; email was not delivered."}`,
 			data: {
 				prescriptionId: input.id,
 				email: input.email,
+				mailDelivered: mailResult.delivered,
+				mailTransport: mailResult.transport,
 			},
 		})
 
-		this.logger.log(`Marked telemedicine prescription ${input.id} sent to ${input.email}`)
+		await this.writeTelemedicineAudit({
+			facilityId: row.facilityId,
+			staffProfileId: sentByStaffId ?? null,
+			action: "update",
+			entityType: "telemedicine_prescription",
+			entityId: input.id,
+			afterState: {
+				status: "sent",
+				sentAt: sentAt.toISOString(),
+				sentToEmail: input.email,
+			},
+			metadata: {
+				mailerConfigured: this.mailerService.isConfigured(),
+				mailDelivered: mailResult.delivered,
+				mailTransport: mailResult.transport,
+				messageId: mailResult.messageId,
+				mailerError,
+			},
+			severity: mailResult.delivered ? "info" : "warning",
+		})
+
+		this.logger.log(
+			`Marked telemedicine prescription ${input.id} sent to ${input.email} (delivered=${mailResult.delivered})`
+		)
 		return this.getPrescription({ id: input.id })
 	}
 
@@ -1860,6 +2188,119 @@ export class TelemedicineService {
 		}
 	}
 
+	async generateAbstractPdf(id: string, requesterStaffId?: string): Promise<Uint8Array> {
+		const abstract = await this.getAbstract({ id })
+		const [row] = await db
+			.select({ clinicianStaffId: telemedicineEncounters.clinicianStaffId })
+			.from(telemedicineAbstracts)
+			.innerJoin(
+				telemedicineEncounters,
+				eq(telemedicineAbstracts.encounterId, telemedicineEncounters.id)
+			)
+			.where(eq(telemedicineAbstracts.id, id))
+			.limit(1)
+
+		if (!row) {
+			throw new NotFoundException(`Tele-abstract ${id} not found`)
+		}
+
+		this.assertAssignedClinician(
+			requesterStaffId,
+			row.clinicianStaffId,
+			"download this abstract"
+		)
+		if (abstract.status === "draft" || !abstract.signedAt) {
+			throw new BadRequestException("Abstract must be signed before PDF generation.")
+		}
+
+		const pdf = await PDFDocument.create()
+		const page = pdf.addPage([612, 792])
+		const font = await pdf.embedFont(StandardFonts.Helvetica)
+		const bold = await pdf.embedFont(StandardFonts.HelveticaBold)
+		const margin = 48
+		const contentWidth = 612 - margin * 2
+		let y = 744
+
+		const drawText = (text: string, x: number, size = 10, useBold = false) => {
+			page.drawText(text, {
+				x,
+				y,
+				size,
+				font: useBold ? bold : font,
+				color: rgb(0.08, 0.08, 0.08),
+			})
+			y -= size + 8
+		}
+
+		const drawWrapped = (text: string, size = 10) => {
+			if (!text) {
+				drawText("--", margin, size)
+				return
+			}
+			const avgCharWidth = size * 0.5
+			const maxChars = Math.max(20, Math.floor(contentWidth / avgCharWidth))
+			for (const paragraph of text.split(/\r?\n/)) {
+				if (paragraph.length === 0) {
+					y -= size + 8
+					continue
+				}
+				const words = paragraph.split(/\s+/)
+				let line = ""
+				for (const word of words) {
+					const next = line ? `${line} ${word}` : word
+					if (next.length > maxChars && line) {
+						drawText(line, margin, size)
+						line = word
+					} else {
+						line = next
+					}
+				}
+				if (line) drawText(line, margin, size)
+			}
+		}
+
+		drawText(abstract.facilityName, margin, 16, true)
+		y -= 4
+		drawText("TELEMEDICINE ENCOUNTER ABSTRACT", margin, 14, true)
+		y -= 4
+		drawText(`Patient: ${abstract.patientName}`, margin, 10, true)
+		drawText(`Clinician: ${abstract.clinicianName}    PRC #${abstract.clinicianPrcNumber || "--"}`, margin)
+		drawText(`Generated: ${new Date(abstract.createdAt).toLocaleString("en-PH")}`, margin)
+		y -= 6
+
+		const section = (title: string, body: string) => {
+			drawText(title, margin, 11, true)
+			drawWrapped(body, 10)
+			y -= 4
+		}
+
+		section("Chief Complaint", abstract.chiefComplaint || "--")
+		section("Subjective", abstract.subjectiveNotes || "--")
+		section("Objective", abstract.objectiveNotes || "--")
+		section("Assessment", abstract.assessmentNotes || "--")
+		section("Plan", abstract.planNotes || "--")
+		section(
+			"Diagnosis",
+			`${abstract.diagnosis || "--"}${abstract.icdCode ? `\nICD-10: ${abstract.icdCode}` : ""}`
+		)
+		if (abstract.additionalNotes) section("Additional Notes", abstract.additionalNotes)
+
+		y = Math.max(y - 24, 120)
+		drawText(abstract.clinicianName, 360, 11, true)
+		drawText(`PRC #${abstract.clinicianPrcNumber || "--"}`, 360)
+		if (abstract.signedAt)
+			drawText(`Signed: ${new Date(abstract.signedAt).toLocaleString("en-PH")}`, 360, 8)
+		page.drawLine({
+			start: { x: 360, y: y + 8 },
+			end: { x: 540, y: y + 8 },
+			thickness: 1,
+			color: rgb(0.2, 0.2, 0.2),
+		})
+		drawText("Physician Signature over Printed Name", 360, 8)
+
+		return pdf.save()
+	}
+
 	// =========================================================================
 	// List Abstracts by Encounter
 	// =========================================================================
@@ -1928,6 +2369,22 @@ export class TelemedicineService {
 			throw new Error("Failed to generate abstract")
 		}
 
+		const apptFacilityId = await this.resolveAppointmentFacilityForAudit(enc.appointmentId)
+		if (apptFacilityId) {
+			await this.writeTelemedicineAudit({
+				facilityId: apptFacilityId,
+				staffProfileId: createdByStaffId ?? null,
+				action: "create",
+				entityType: "telemedicine_abstract",
+				entityId: created.id,
+				afterState: {
+					encounterId: input.encounterId,
+					diagnosis: enc.diagnosis,
+					icdCode: enc.icdCode ?? null,
+				},
+			})
+		}
+
 		this.logger.log(`Generated tele-abstract: ${created.id} for encounter: ${input.encounterId}`)
 		return this.getAbstract({ id: created.id })
 	}
@@ -1962,15 +2419,16 @@ export class TelemedicineService {
 			throw new BadRequestException(`Abstract is already ${abstract.status}`)
 		}
 
-		await this.getClinicalSigningStaff(signedByStaffId)
+		const signingStaff = await this.getClinicalSigningStaff(signedByStaffId)
 
+		const signedAt = new Date()
 		await db
 			.update(telemedicineAbstracts)
 			.set({
 				status: "signed",
-				signedAt: new Date(),
+				signedAt,
 				signedByStaffId: signedByStaffId ?? null,
-				updatedAt: new Date(),
+				updatedAt: signedAt,
 			})
 			.where(eq(telemedicineAbstracts.id, input.id))
 
@@ -1979,11 +2437,29 @@ export class TelemedicineService {
 			.update(telemedicineEncounters)
 			.set({
 				status: "signed",
-				signedAt: new Date(),
+				signedAt,
 				signedByStaffId: signedByStaffId ?? null,
-				updatedAt: new Date(),
+				updatedAt: signedAt,
 			})
 			.where(eq(telemedicineEncounters.id, abstract.encounterId))
+
+		const apptFacilityId = await this.resolveAppointmentFacilityForAudit(abstract.appointmentId)
+		if (apptFacilityId) {
+			await this.writeTelemedicineAudit({
+				facilityId: apptFacilityId,
+				staffProfileId: signedByStaffId ?? null,
+				action: "sign",
+				entityType: "telemedicine_abstract",
+				entityId: input.id,
+				beforeState: { status: abstract.status },
+				afterState: {
+					status: "signed",
+					signedAt: signedAt.toISOString(),
+					encounterStatus: "signed",
+					prcLicenseNumber: signingStaff.prcLicenseNumber,
+				},
+			})
+		}
 
 		this.logger.log(`Signed tele-abstract: ${input.id}`)
 		return this.getAbstract({ id: input.id })
@@ -2019,25 +2495,26 @@ export class TelemedicineService {
 			throw new BadRequestException("Abstract must be signed before sending")
 		}
 
+		const sentAt = new Date()
 		await db
 			.update(telemedicineAbstracts)
 			.set({
 				status: "sent",
-				sentAt: new Date(),
+				sentAt,
 				sentToEmail: input.email,
-				updatedAt: new Date(),
+				updatedAt: sentAt,
 			})
 			.where(eq(telemedicineAbstracts.id, input.id))
 
 		// Mark encounter as finalized after abstract is sent
 		await db
 			.update(telemedicineEncounters)
-			.set({ status: "finalized", updatedAt: new Date() })
+			.set({ status: "finalized", updatedAt: sentAt })
 			.where(eq(telemedicineEncounters.id, abstract.encounterId))
 
 		await db
 			.update(telemedicineAppointments)
-			.set({ status: "completed", updatedAt: new Date() })
+			.set({ status: "completed", updatedAt: sentAt })
 			.where(eq(telemedicineAppointments.id, abstract.appointmentId))
 
 		const [notificationTarget] = await db
@@ -2060,17 +2537,69 @@ export class TelemedicineService {
 			.where(eq(telemedicineAbstracts.id, input.id))
 
 		if (notificationTarget) {
+			let mailResult: { delivered: boolean; messageId: string | null; transport: "smtp" | "log" } = {
+				delivered: false,
+				messageId: null,
+				transport: "log",
+			}
+			let mailerError: string | null = null
+			try {
+				const pdf = await this.generateAbstractPdf(input.id, sentByStaffId)
+				mailResult = await this.mailerService.send({
+					to: input.email,
+					subject: `Telemedicine Encounter Abstract`,
+					text: `Your signed clinical abstract is attached.\n\nPatient: ${notificationTarget.patientLastName}, ${notificationTarget.patientFirstName}\nIf you have questions, contact your clinic.`,
+					attachments: [
+						{
+							filename: `abstract-${input.id}.pdf`,
+							content: pdf,
+							contentType: "application/pdf",
+						},
+					],
+				})
+			} catch (error) {
+				mailerError = error instanceof Error ? error.message : String(error)
+				this.logger.error(`Mailer send failed for abstract ${input.id}: ${mailerError}`)
+			}
+
 			await this.notificationService.send({
 				facilityId: notificationTarget.facilityId,
 				recipientStaffId: notificationTarget.clinicianStaffId,
 				topic: "system",
 				title: "Abstract Sent",
-				body: `Tele-abstract for ${notificationTarget.patientLastName}, ${notificationTarget.patientFirstName} marked sent to ${input.email}. Email delivery requires a mailer integration.`,
+				body: mailResult.delivered
+					? `Tele-abstract for ${notificationTarget.patientLastName}, ${notificationTarget.patientFirstName} emailed to ${input.email}.`
+					: `Tele-abstract for ${notificationTarget.patientLastName}, ${notificationTarget.patientFirstName} marked sent to ${input.email}. ${mailerError ? `Email delivery failed: ${mailerError}` : "SMTP is not configured; email was not delivered."}`,
 				data: {
 					abstractId: input.id,
 					email: input.email,
 					sentByStaffId: sentByStaffId ?? null,
+					mailDelivered: mailResult.delivered,
+					mailTransport: mailResult.transport,
 				},
+			})
+
+			await this.writeTelemedicineAudit({
+				facilityId: notificationTarget.facilityId,
+				staffProfileId: sentByStaffId ?? null,
+				action: "update",
+				entityType: "telemedicine_abstract",
+				entityId: input.id,
+				afterState: {
+					status: "sent",
+					sentAt: sentAt.toISOString(),
+					sentToEmail: input.email,
+					encounterStatus: "finalized",
+					appointmentStatus: "completed",
+				},
+				metadata: {
+					mailerConfigured: this.mailerService.isConfigured(),
+					mailDelivered: mailResult.delivered,
+					mailTransport: mailResult.transport,
+					messageId: mailResult.messageId,
+					mailerError,
+				},
+				severity: mailResult.delivered ? "info" : "warning",
 			})
 		}
 
