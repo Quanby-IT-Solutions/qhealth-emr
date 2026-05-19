@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, asc, count, desc, eq, inArray, isNull, like } from "drizzle-orm"
+import { and, asc, count, desc, eq, inArray, isNull, like, or } from "drizzle-orm"
 
 import {
 	beds,
@@ -683,7 +683,10 @@ export class EdService {
 			.where(
 				and(
 					eq(encounters.facilityId, input.facilityId),
-					eq(encounters.encounterType, "emergency"),
+					or(
+						eq(encounters.encounterType, "emergency"),
+						eq(wards.wardType, "er")
+					),
 					eq(encounters.status, "active")
 				)
 			)

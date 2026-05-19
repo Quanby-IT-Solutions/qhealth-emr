@@ -394,6 +394,9 @@ importers:
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      philippine-administrative-divisions:
+        specifier: ^2.0.3
+        version: 2.0.3
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
@@ -6985,6 +6988,9 @@ packages:
 
   pgpass@1.0.5:
     resolution: {integrity: sha512-FdW9r/jQZhSeohs1Z3sI1yxFQNFvMcnmfuj4WBMUTxOrAyLMaTcE1aAMBiTlbMNaXvBCQuVi0R7hd8udDSP7ug==}
+
+  philippine-administrative-divisions@2.0.3:
+    resolution: {integrity: sha512-Px6ADpIzyWZAXxvwqOTHyjrqqN9E9xvAacGXaTdLRkcaBp6P6sSd2G+CKUtzy95tSmxthZWJc4e9Psaq4bPp7Q==}
 
   picocolors@1.0.1:
     resolution: {integrity: sha512-anP1Z8qwhkbmu7MFP5iTt+wQKXgwzf7zTyGlcdzabySa9vd0Xt392U0rVmz9poOaBj0uHJKyyo9/upk0HrEQew==}
@@ -15114,6 +15120,8 @@ snapshots:
   pgpass@1.0.5:
     dependencies:
       split2: 4.2.0
+
+  philippine-administrative-divisions@2.0.3: {}
 
   picocolors@1.0.1: {}
 

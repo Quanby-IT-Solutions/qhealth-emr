@@ -13,14 +13,10 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/core/components/ui/dropdown-menu"
+import { NotificationCenter } from "@/core/components/notification-center"
 import { cn, getInitials } from "@/core/lib/utils"
-import { useUnreadNotificationCount } from "@/features/app-shell/api/notification.hooks"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import {
-	filterNavItems,
-	PRIMARY_NAV_ITEMS,
-	SECONDARY_NAV_ITEMS,
-} from "@/features/app-shell/lib/navigation"
+import { filterNavItems, PRIMARY_NAV_ITEMS, SECONDARY_NAV_ITEMS } from "@/features/app-shell/lib/navigation"
 import { useSignOutMutation } from "@/features/auth/api/session.hooks"
 import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 
@@ -749,6 +745,7 @@ const GROUP_MAPPING: Record<string, string> = {
 	"/pharmacy/opd": "CLINICAL PRACTICE",
 	"/pharmacy/formulary": "CLINICAL PRACTICE",
 	"/nursing": "CLINICAL PRACTICE",
+	"/nursing/transfers": "CLINICAL PRACTICE",
 	"/nutrition": "CLINICAL PRACTICE",
 	"/telemedicine": "ADMINISTRATIVE",
 	"/billing": "ADMINISTRATIVE",
@@ -1020,9 +1017,6 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 		getDesktopBreakpointSnapshot,
 		getDesktopBreakpointServerSnapshot
 	)
-
-	const { data: unreadData } = useUnreadNotificationCount(profile?.staffProfiles?.[0]?.facilityId)
-	const notificationCount = unreadData?.count ?? 0
 
 	/* eslint-disable react-hooks/set-state-in-effect */
 	useEffect(() => {
@@ -1346,18 +1340,7 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 						</div>
 
 						{/* Alerts */}
-						<button className="text-muted-foreground hover:text-foreground focus-visible:ring-ring relative shrink-0 rounded-full p-1 transition-colors outline-none focus-visible:ring-2">
-							<Icons.Bell className="size-5" />
-							{notificationCount > 0 && (
-								<motion.span
-									initial={{ scale: 0 }}
-									animate={{ scale: 1 }}
-									className="bg-destructive text-destructive-foreground ring-card absolute top-0 right-0 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-1 text-[8px] font-bold ring-2"
-								>
-									{notificationCount > 99 ? "99+" : notificationCount}
-								</motion.span>
-							)}
-						</button>
+						<NotificationCenter className="text-muted-foreground hover:text-foreground focus-visible:ring-ring relative shrink-0 rounded-full p-1 transition-colors outline-none focus-visible:ring-2" />
 
 						{/* Theme Toggle */}
 						{mounted && (

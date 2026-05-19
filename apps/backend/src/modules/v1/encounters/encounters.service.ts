@@ -284,7 +284,11 @@ export class EncountersService {
 			.as("admitting_staff")
 
 		const attendingStaffSq = db
-			.select({ id: staffProfiles.id, name: users.name })
+			.select({
+				id: staffProfiles.id,
+				name: users.name,
+				prcLicenseNumber: staffProfiles.prcLicenseNumber,
+			})
 			.from(staffProfiles)
 			.innerJoin(users, eq(staffProfiles.userId, users.id))
 			.as("attending_staff")
@@ -326,6 +330,7 @@ export class EncountersService {
 				bedNumber: beds.bedNumber,
 				admittingStaffName: admittingStaffSq.name,
 				attendingStaffName: attendingStaffSq.name,
+				attendingStaffLicenseNo: attendingStaffSq.prcLicenseNumber,
 			})
 			.from(encounters)
 			.innerJoin(patients, eq(encounters.patientId, patients.id))
@@ -393,6 +398,7 @@ export class EncountersService {
 			patientSex: row.patientSex,
 			admittingStaffName: row.admittingStaffName ?? null,
 			attendingStaffName: row.attendingStaffName ?? null,
+			attendingStaffLicenseNo: row.attendingStaffLicenseNo ?? null,
 			wardName: row.wardName ?? null,
 			bedNumber: row.bedNumber ?? null,
 			queueNumber: row.queueNumber ?? null,
