@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { and, count, desc, eq } from "drizzle-orm"
 
 import { birthRegistrations, staffProfiles } from "@repo/db/schema"
@@ -21,6 +21,14 @@ interface CreateBirthRegistrationInput {
 	birthDatetime: string | Date
 	registeredByStaffId?: string
 	certificateNumber?: string
+	attendantAtBirth?: string
+	placeOfBirthBarangay?: string
+	placeOfBirthMunicipality?: string
+	placeOfBirthProvince?: string
+	placeOfBirthRegion?: string
+	physicianName?: string
+	physicianLicenseNo?: string
+	attendingStaffId?: string
 }
 
 interface UpdateBirthRegistrationInput {
@@ -87,6 +95,19 @@ export class CivilRegistryService {
 	async createBirthRegistration(input: CreateBirthRegistrationInput, userId?: string) {
 		let resolvedStaffId = input.registeredByStaffId ?? null
 
+		const placeOfBirthComponents = [
+			input.placeOfBirthBarangay,
+			input.placeOfBirthMunicipality,
+			input.placeOfBirthProvince,
+			input.placeOfBirthRegion,
+		]
+		const hasLocationInput = placeOfBirthComponents.some(component => component !== undefined)
+		const hasLocationValue = placeOfBirthComponents.some(component => component?.trim())
+
+		if (hasLocationInput && !hasLocationValue) {
+			throw new BadRequestException("At least one place of birth location component is required")
+		}
+
 		if (!resolvedStaffId && userId) {
 			const [staff] = await db
 				.select({ id: staffProfiles.id })
@@ -105,6 +126,14 @@ export class CivilRegistryService {
 				birthDatetime: new Date(input.birthDatetime),
 				registeredByStaffId: resolvedStaffId,
 				certificateNumber: input.certificateNumber ?? null,
+				attendantAtBirth: input.attendantAtBirth ?? null,
+				placeOfBirthBarangay: input.placeOfBirthBarangay ?? null,
+				placeOfBirthMunicipality: input.placeOfBirthMunicipality ?? null,
+				placeOfBirthProvince: input.placeOfBirthProvince ?? null,
+				placeOfBirthRegion: input.placeOfBirthRegion ?? null,
+				physicianName: input.physicianName ?? null,
+				physicianLicenseNo: input.physicianLicenseNo ?? null,
+				attendingStaffId: input.attendingStaffId ?? null,
 				status: "draft",
 				// SLA-017: record the moment the birth certificate request was formally submitted
 				requestedAt: new Date(),

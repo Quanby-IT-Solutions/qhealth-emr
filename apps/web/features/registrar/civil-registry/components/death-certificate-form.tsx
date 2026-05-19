@@ -6,27 +6,78 @@ import Link from "next/link"
 import { ArrowLeft01FreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 
-import { Button } from "@/core/components/ui/button"
-import { buttonVariants } from "@/core/components/ui/button"
+import { Button, buttonVariants } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
 import { cn } from "@/core/lib/utils"
+import { useCreateFmdrfMutation, useCreateFndrfMutation } from "@/features/death-reporting/api/death-reporting.hooks"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { usePatientProfileQuery } from "@/features/patients/api/patients.hooks"
+import { PatientSearchStep } from "@/features/registrar/civil-registry/components/patient-search-step"
 
 type ReportType = "fmdrf" | "fndrf"
+
+function parsePositiveInt(value: string, fallback: number) {
+	const parsed = Number(value)
+	return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback
+}
+
+function formatPatientName({
+	firstName,
+	middleName,
+	lastName,
+}: {
+	firstName: string
+	middleName?: string | null
+	lastName: string
+}) {
+	return [firstName, middleName, lastName].filter(Boolean).join(" ")
+}
+
+function formatAddress({
+	addressLine1,
+	addressLine2,
+	city,
+	province,
+	zipCode,
+}: {
+	addressLine1?: string | null
+	addressLine2?: string | null
+	city?: string | null
+	province?: string | null
+	zipCode?: string | null
+}) {
+	return [addressLine1, addressLine2, city, province, zipCode].filter(Boolean).join(", ")
+}
+
+function calculateAgeYears(dateOfBirth: string) {
+	const dob = new Date(dateOfBirth)
+	if (Number.isNaN(dob.getTime())) return ""
+
+	const today = new Date()
+	let age = today.getFullYear() - dob.getFullYear()
+	const birthdayThisYear = new Date(today.getFullYear(), dob.getMonth(), dob.getDate())
+	if (today < birthdayThisYear) age -= 1
+	return String(Math.max(0, age))
+}
 
 export function DeathCertificateForm() {
 	const router = useRouter()
 	const searchParams = useSearchParams()
 	const encounterId = searchParams.get("encounterId") ?? undefined
+	const patientId = searchParams.get("patientId") ?? undefined
 
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+	const createFmdrf = useCreateFmdrfMutation()
+	const createFndrf = useCreateFndrfMutation()
+	const { data: patient } = usePatientProfileQuery(patientId ?? "")
 
 	const [reportType, setReportType] = useState<ReportType>("fmdrf")
 	const [signatureDataUrl, setSignatureDataUrl] = useState<string>("")
+	const [submitError, setSubmitError] = useState<string | null>(null)
 	const signatureInputRef = useRef<HTMLInputElement>(null)
 
 	// FMDRF fields
@@ -64,6 +115,17 @@ export function DeathCertificateForm() {
 		certificationDate: "",
 	})
 
+	const patientName = patient ? formatPatientName(patient) : ""
+	const patientAddress = patient ? formatAddress(patient) : ""
+	const patientAge = patient ? calculateAgeYears(patient.dateOfBirth) : ""
+	const resolvedFmdrfPatientName = fmdrfForm.patientName || patientName
+	const resolvedFmdrfPatientMrn = fmdrfForm.patientMrn || patient?.mrn || ""
+	const resolvedFmdrfPatientAge = fmdrfForm.patientAge || patientAge
+	const resolvedFmdrfPatientAddress = fmdrfForm.patientAddress || patientAddress
+	const resolvedFndrfNewbornName = fndrfForm.newbornName || patientName
+	const resolvedFndrfNewbornMrn = fndrfForm.newbornMrn || patient?.mrn || ""
+	const resolvedFndrfNewbornDateOfBirth = fndrfForm.newbornDateOfBirth || patient?.dateOfBirth || ""
+
 	function handleSignatureUpload(e: React.ChangeEvent<HTMLInputElement>) {
 		const file = e.target.files?.[0]
 		if (!file) return
@@ -74,13 +136,104 @@ export function DeathCertificateForm() {
 
 	const canSubmit =
 		!!facilityId &&
-		!!encounterId &&
-		!!(reportType === "fmdrf" ? fmdrfForm.dateOfDeath && fmdrfForm.patientName : fndrfForm.dateOfDeath && fndrfForm.newbornName)
+		!!patientId &&
+		!createFmdrf.isPending &&
+		!createFndrf.isPending &&
+		!!(reportType === "fmdrf" ? fmdrfForm.dateOfDeath && resolvedFmdrfPatientName : fndrfForm.dateOfDeath && resolvedFndrfNewbornName)
 
-	function handleSubmit(e: React.FormEvent) {
+	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault()
-		if (!canSubmit) return
+		if (!canSubmit || !patientId) return
+
+		if (!encounterId) {
+			setSubmitError("The current death-reporting API requires an encounter before saving.")
+			return
+		}
+
+		setSubmitError(null)
+
+		if (reportType === "fmdrf") {
+			await createFmdrf.mutateAsync({
+				encounterId,
+				patientId,
+				facilityId,
+				patientName: resolvedFmdrfPatientName,
+				patientMrn: resolvedFmdrfPatientMrn,
+				patientAge: parsePositiveInt(resolvedFmdrfPatientAge, 1),
+				patientAddress: resolvedFmdrfPatientAddress,
+				dateOfDeath: new Date(fmdrfForm.dateOfDeath).toISOString(),
+				placeOfDeath: fmdrfForm.placeOfDeath,
+				causeOfDeathImmediate: fmdrfForm.causeOfDeathImmediate,
+				causeOfDeathAntecedent: fmdrfForm.causeOfDeathAntecedent,
+				causeOfDeathUnderlying: fmdrfForm.causeOfDeathUnderlying,
+				causeOfDeathContributing: fmdrfForm.causeOfDeathContributing || null,
+				gravidity: 0,
+				parity: 0,
+				lastMenstrualPeriod: null,
+				gestationalAgeWeeks: null,
+				antenatalCare: false,
+				antenatalVisitCount: null,
+				complicationType: null,
+				factorHemorrhage: false,
+				factorSepsis: false,
+				factorEclampsia: false,
+				factorObstructedLabor: false,
+				factorUnsafeAbortion: false,
+				factorOther: null,
+				avoidableFactors: false,
+				avoidableRemark: null,
+				physicianName: fmdrfForm.physicianName,
+				physicianLicenseNo: fmdrfForm.physicianLicenseNo,
+				physicianSignatureDataUrl: signatureDataUrl,
+				certificationDate: fmdrfForm.certificationDate,
+			})
+		} else {
+			await createFndrf.mutateAsync({
+				encounterId,
+				patientId,
+				facilityId,
+				newbornName: resolvedFndrfNewbornName,
+				newbornMrn: resolvedFndrfNewbornMrn,
+				newbornDateOfBirth: resolvedFndrfNewbornDateOfBirth,
+				gestationalAgeWeeks: 0,
+				birthWeightGrams: 1,
+				deliveryType: "other",
+				apgarScore1Min: null,
+				apgarScore5Min: null,
+				resuscitationRequired: false,
+				motherName: fndrfForm.motherName,
+				motherAge: parsePositiveInt(fndrfForm.motherAge, 1),
+				motherGravidity: 0,
+				motherParity: 0,
+				motherAncVisits: null,
+				dateOfDeath: new Date(fndrfForm.dateOfDeath).toISOString(),
+				ageAtDeathHours: null,
+				ageAtDeathDays: null,
+				placeOfDeath: fndrfForm.placeOfDeath,
+				causePrematurity: false,
+				causeBirthAsphyxia: false,
+				causeSepsis: false,
+				causeCongenitalAnomaly: false,
+				causeRds: false,
+				causeOther: null,
+				contributingRemarks: null,
+				physicianName: fndrfForm.physicianName,
+				physicianLicenseNo: fndrfForm.physicianLicenseNo,
+				physicianSignatureDataUrl: signatureDataUrl,
+				certificationDate: fndrfForm.certificationDate,
+			})
+		}
+
 		router.push("/registrar/civil-registry/tracking")
+	}
+
+	if (!patientId) {
+		return (
+			<PatientSearchStep
+				title="Select Patient for Death Certificate"
+				onSelect={id => router.replace(`/registrar/civil-registry/death?patientId=${id}`)}
+			/>
+		)
 	}
 
 	return (
@@ -132,7 +285,7 @@ export function DeathCertificateForm() {
 								<div className="space-y-1.5">
 									<Label>Full Name <span className="text-destructive">*</span></Label>
 									<Input
-										value={fmdrfForm.patientName}
+										value={resolvedFmdrfPatientName}
 										onChange={e => setFmdrfForm(f => ({ ...f, patientName: e.target.value }))}
 										required
 									/>
@@ -140,7 +293,7 @@ export function DeathCertificateForm() {
 								<div className="space-y-1.5">
 									<Label>MRN</Label>
 									<Input
-										value={fmdrfForm.patientMrn}
+										value={resolvedFmdrfPatientMrn}
 										onChange={e => setFmdrfForm(f => ({ ...f, patientMrn: e.target.value }))}
 									/>
 								</div>
@@ -149,7 +302,7 @@ export function DeathCertificateForm() {
 									<Input
 										type="number"
 										min={0}
-										value={fmdrfForm.patientAge}
+										value={resolvedFmdrfPatientAge}
 										onChange={e => setFmdrfForm(f => ({ ...f, patientAge: e.target.value }))}
 									/>
 								</div>
@@ -166,7 +319,7 @@ export function DeathCertificateForm() {
 							<div className="space-y-1.5">
 								<Label>Address</Label>
 								<Input
-									value={fmdrfForm.patientAddress}
+									value={resolvedFmdrfPatientAddress}
 									onChange={e => setFmdrfForm(f => ({ ...f, patientAddress: e.target.value }))}
 								/>
 							</div>
@@ -230,7 +383,7 @@ export function DeathCertificateForm() {
 								<div className="space-y-1.5">
 									<Label>Newborn Name <span className="text-destructive">*</span></Label>
 									<Input
-										value={fndrfForm.newbornName}
+										value={resolvedFndrfNewbornName}
 										onChange={e => setFndrfForm(f => ({ ...f, newbornName: e.target.value }))}
 										required
 									/>
@@ -238,7 +391,7 @@ export function DeathCertificateForm() {
 								<div className="space-y-1.5">
 									<Label>MRN</Label>
 									<Input
-										value={fndrfForm.newbornMrn}
+										value={resolvedFndrfNewbornMrn}
 										onChange={e => setFndrfForm(f => ({ ...f, newbornMrn: e.target.value }))}
 									/>
 								</div>
@@ -246,7 +399,7 @@ export function DeathCertificateForm() {
 									<Label>Date of Birth</Label>
 									<Input
 										type="datetime-local"
-										value={fndrfForm.newbornDateOfBirth}
+										value={resolvedFndrfNewbornDateOfBirth}
 										onChange={e => setFndrfForm(f => ({ ...f, newbornDateOfBirth: e.target.value }))}
 									/>
 								</div>
@@ -397,16 +550,11 @@ export function DeathCertificateForm() {
 					Cancel
 				</Link>
 				<Button type="submit" disabled={!canSubmit}>
-					Save Death Certificate
+					{createFmdrf.isPending || createFndrf.isPending ? "Saving…" : "Save Death Certificate"}
 				</Button>
 			</div>
 
-			{!encounterId && (
-				<p className="text-sm text-destructive">
-					No encounter selected. Navigate here from a patient encounter or provide a{" "}
-					<code className="text-xs">?encounterId=...</code> query parameter.
-				</p>
-			)}
+			{submitError && <p className="text-sm text-destructive">{submitError}</p>}
 		</form>
 	)
 }

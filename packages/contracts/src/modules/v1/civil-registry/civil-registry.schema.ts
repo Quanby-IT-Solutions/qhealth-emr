@@ -18,6 +18,14 @@ export const BirthRegistrationSchema = z.object({
 	birthDatetime: dateOrString,
 	registeredByStaffId: z.string().uuid().nullable(),
 	certificateNumber: z.string().nullable(),
+	attendantAtBirth: z.string().nullable().optional(),
+	placeOfBirthBarangay: z.string().nullable().optional(),
+	placeOfBirthMunicipality: z.string().nullable().optional(),
+	placeOfBirthProvince: z.string().nullable().optional(),
+	placeOfBirthRegion: z.string().nullable().optional(),
+	physicianName: z.string().nullable().optional(),
+	physicianLicenseNo: z.string().nullable().optional(),
+	attendingStaffId: z.string().uuid().nullable().optional(),
 	status: BirthRegistrationStatusEnum,
 	/** SLA-017: set when the family submits the registration request */
 	requestedAt: dateOrString.nullable().optional(),
@@ -42,6 +50,14 @@ export const CreateBirthRegistrationSchema = z.object({
 	birthDatetime: z.string().datetime(),
 	registeredByStaffId: z.string().uuid().optional(),
 	certificateNumber: z.string().optional(),
+	attendantAtBirth: z.string().optional(),
+	placeOfBirthBarangay: z.string().optional(),
+	placeOfBirthMunicipality: z.string().optional(),
+	placeOfBirthProvince: z.string().optional(),
+	placeOfBirthRegion: z.string().optional(),
+	physicianName: z.string().optional(),
+	physicianLicenseNo: z.string().optional(),
+	attendingStaffId: z.string().uuid().optional(),
 })
 
 export const UpdateBirthRegistrationSchema = z.object({
