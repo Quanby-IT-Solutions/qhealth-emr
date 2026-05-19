@@ -50,6 +50,7 @@
 }
 
 :root {
+	color-scheme: light;
 	--background: oklch(0.99 0.005 85); /* Slightly warm off-white paper */
 	--foreground: oklch(0.18 0.01 250); /* Dark sophisticated blue-gray */
 	--card: oklch(1 0 0); /* Pure white */
@@ -88,6 +89,7 @@
 }
 
 .dark {
+	color-scheme: dark;
 	--background: oklch(0.12 0.01 250); /* Deep midnight blue */
 	--foreground: oklch(0.95 0.005 250);
 	--card: oklch(0.15 0.01 250);
@@ -137,7 +139,67 @@
    provider can shrink to the control bar when camera tracks are muted. */
 .qhealth-livekit-room {
 	min-height: 520px;
-	background: #050505;
+	background: var(--card);
+	color: var(--foreground);
+}
+
+.qhealth-livekit-room.qhealth-livekit-full-room {
+	height: 100%;
+	min-height: 0;
+}
+
+.qhealth-livekit-room [data-lk-theme="default"] {
+	--lk-bg: var(--background);
+	--lk-bg2: var(--card);
+	--lk-bg3: var(--muted);
+	--lk-bg4: var(--secondary);
+	--lk-bg5: color-mix(in oklch, var(--secondary) 78%, var(--primary));
+	--lk-fg: var(--foreground);
+	--lk-fg2: var(--foreground);
+	--lk-fg3: var(--muted-foreground);
+	--lk-fg4: var(--muted-foreground);
+	--lk-fg5: var(--muted-foreground);
+	--lk-border-color: var(--border);
+	--lk-accent-fg: var(--primary-foreground);
+	--lk-accent-bg: var(--primary);
+	--lk-accent2: color-mix(in oklch, var(--primary) 88%, white);
+	--lk-accent3: color-mix(in oklch, var(--primary) 82%, white);
+	--lk-accent4: color-mix(in oklch, var(--primary) 76%, white);
+	--lk-danger-fg: var(--destructive-foreground);
+	--lk-danger: var(--destructive);
+	--lk-danger2: color-mix(in oklch, var(--destructive) 88%, white);
+	--lk-danger3: color-mix(in oklch, var(--destructive) 82%, white);
+	--lk-danger4: color-mix(in oklch, var(--destructive) 76%, white);
+	--lk-success-fg: var(--success-foreground);
+	--lk-success: var(--success);
+	--lk-success2: color-mix(in oklch, var(--success) 88%, white);
+	--lk-success3: color-mix(in oklch, var(--success) 82%, white);
+	--lk-success4: color-mix(in oklch, var(--success) 76%, white);
+	--lk-control-fg: var(--foreground);
+	--lk-control-bg: var(--card);
+	--lk-control-hover-bg: var(--muted);
+	--lk-control-active-bg: var(--secondary);
+	--lk-control-active-hover-bg: color-mix(in oklch, var(--secondary) 82%, var(--primary));
+	--lk-border-radius: var(--radius);
+	--lk-box-shadow: 0 0.5rem 1.5rem rgba(15, 23, 42, 0.12);
+	--lk-drop-shadow: rgba(15, 23, 42, 0.14) 0px 0px 24px;
+}
+
+.dark .qhealth-livekit-room [data-lk-theme="default"] {
+	color-scheme: dark;
+	--lk-bg: var(--background);
+	--lk-bg2: var(--card);
+	--lk-bg3: var(--muted);
+	--lk-bg4: var(--secondary);
+	--lk-bg5: color-mix(in oklch, var(--secondary) 78%, var(--primary));
+	--lk-border-color: var(--border);
+	--lk-control-fg: var(--foreground);
+	--lk-control-bg: var(--card);
+	--lk-control-hover-bg: var(--muted);
+	--lk-control-active-bg: var(--secondary);
+	--lk-control-active-hover-bg: color-mix(in oklch, var(--secondary) 82%, var(--primary));
+	--lk-box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.32);
+	--lk-drop-shadow: rgba(255, 255, 255, 0.2) 0px 0px 24px;
 }
 
 .lk-room-container {
@@ -145,7 +207,8 @@
 	min-height: 520px !important;
 	height: auto !important;
 	flex-direction: column !important;
-	background: #050505;
+	background: var(--card);
+	color: var(--foreground);
 }
 
 .lk-room-container:not(:has([data-qhealth-livekit-layout])),
@@ -162,10 +225,9 @@
 	min-height: 420px;
 	align-items: center;
 	justify-content: center;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-	background:
-		radial-gradient(circle at center, rgba(38, 38, 38, 0.92), rgba(5, 5, 5, 1) 62%);
-	color: rgba(255, 255, 255, 0.74);
+	border-bottom: 1px solid var(--border);
+	background: radial-gradient(circle at center, var(--secondary), var(--card) 65%);
+	color: var(--muted-foreground);
 	font-size: 0.875rem;
 	font-weight: 600;
 }
@@ -187,7 +249,14 @@
 	min-height: 520px !important;
 	height: auto !important;
 	flex-direction: column !important;
-	background: #050505;
+	background: var(--card);
+}
+
+.qhealth-livekit-room.qhealth-livekit-full-room > .lk-room-container,
+.qhealth-livekit-room.qhealth-livekit-full-room .lk-room-container.qhealth-livekit-custom-room {
+	height: 100% !important;
+	min-height: 0 !important;
+	flex: 1 1 auto !important;
 }
 
 .qhealth-livekit-room [data-qhealth-livekit-layout] {
@@ -197,6 +266,11 @@
 	flex-direction: column;
 }
 
+.qhealth-livekit-room.qhealth-livekit-full-room [data-qhealth-livekit-layout] {
+	height: 100%;
+	min-height: 0;
+}
+
 .qhealth-livekit-room [data-qhealth-livekit-grid] {
 	min-height: 420px;
 	flex: 1 1 auto;
@@ -204,6 +278,95 @@
 
 .qhealth-livekit-room .lk-control-bar {
 	flex-shrink: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	justify-content: center;
+	align-items: center;
+	padding: 0.75rem 1rem;
+	background: color-mix(in oklch, var(--card) 92%, transparent);
+	-webkit-backdrop-filter: blur(12px);
+	backdrop-filter: blur(12px);
+	border-top: 1px solid var(--border);
+	color: var(--foreground);
+}
+
+/* Discord-style circular control buttons */
+.qhealth-livekit-room .lk-control-bar .lk-button,
+.qhealth-livekit-room .lk-control-bar > button {
+	width: 3rem;
+	height: 3rem;
+	min-width: 3rem;
+	padding: 0;
+	border-radius: 9999px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--muted);
+	color: var(--foreground);
+	border: 1px solid var(--border);
+	transition:
+		background-color 0.15s ease,
+		transform 0.1s ease,
+		color 0.15s ease;
+}
+
+.qhealth-livekit-room .lk-control-bar .lk-button:hover,
+.qhealth-livekit-room .lk-control-bar > button:hover {
+	background: color-mix(in oklch, var(--muted) 70%, var(--primary));
+	color: var(--foreground);
+}
+
+.qhealth-livekit-room .lk-control-bar .lk-button[data-lk-enabled="true"],
+.qhealth-livekit-room .lk-control-bar .lk-button[aria-pressed="true"],
+.qhealth-livekit-room .lk-control-bar > button[data-lk-enabled="true"],
+.qhealth-livekit-room .lk-control-bar > button[aria-pressed="true"] {
+	background: color-mix(in oklch, var(--muted) 70%, var(--primary));
+	color: var(--foreground);
+}
+
+/* Hide verbose text labels — keep icon-only buttons */
+.qhealth-livekit-room
+	.lk-control-bar
+	.lk-button
+	> span:not([class*="lk-source-icon"]):not([class*="icon"]),
+.qhealth-livekit-room
+	.lk-control-bar
+	> button
+	> span:not([class*="lk-source-icon"]):not([class*="icon"]) {
+	display: none;
+}
+
+.qhealth-livekit-room .lk-control-bar svg {
+	width: 1.25rem;
+	height: 1.25rem;
+}
+
+/* Red disconnect/leave button */
+.qhealth-livekit-room .lk-control-bar .lk-disconnect-button {
+	background: var(--destructive);
+	color: var(--destructive-foreground);
+	border-color: transparent;
+}
+
+.qhealth-livekit-room .lk-control-bar .lk-disconnect-button:hover {
+	background: color-mix(in oklch, var(--destructive) 85%, black);
+	color: var(--destructive-foreground);
+}
+
+/* Small companion chevron for device-selector menus */
+.qhealth-livekit-room .lk-control-bar .lk-button-group-menu {
+	width: 1.75rem;
+	height: 1.75rem;
+	min-width: 1.75rem;
+	border-radius: 9999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qhealth-livekit-room .lk-control-bar .lk-button,
+	.qhealth-livekit-room .lk-control-bar > button {
+		transition: none;
+	}
 }
 
 .qhealth-livekit-room .lk-room-container:not(:has([data-qhealth-livekit-layout])),
@@ -252,7 +415,10 @@
 	border-radius: var(--radius);
 	font-size: 0.8125rem;
 	font-weight: 450;
-	transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+	transition:
+		background-color 0.15s ease,
+		color 0.15s ease,
+		opacity 0.15s ease;
 }
 [data-slot="sidebar-menu-button"]:not([data-active="true"]) {
 	opacity: 0.72;
@@ -381,4 +547,3 @@ header.bg-background {
 		transition-duration: 0.01ms !important;
 	}
 }
-

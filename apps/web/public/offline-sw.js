@@ -1,4 +1,4 @@
-const CACHE_NAME = "qhealth-emr-offline-v1"
+const CACHE_NAME = "qhealth-emr-offline-v2"
 const OFFLINE_ENTRY = "/patients/offline"
 const NAVIGATION_ALLOWLIST = ["/patients/offline", "/dashboard"]
 
@@ -40,7 +40,7 @@ self.addEventListener("fetch", event => {
 		url.pathname.startsWith("/_next/image") ||
 		url.pathname === "/favicon.ico"
 	) {
-		event.respondWith(cacheFirst(request))
+		event.respondWith(networkFirst(request))
 	}
 })
 
@@ -64,16 +64,19 @@ async function handleNavigation(request, url) {
 	}
 }
 
-async function cacheFirst(request) {
+async function networkFirst(request) {
 	const cache = await caches.open(CACHE_NAME)
-	const cached = await cache.match(request)
-	if (cached) return cached
-
-	const response = await fetch(request)
-	if (response.ok) {
-		await cache.put(request, response.clone())
+	try {
+		const response = await fetch(request)
+		if (response.ok) {
+			cache.put(request, response.clone()).catch(() => undefined)
+		}
+		return response
+	} catch (error) {
+		const cached = await cache.match(request)
+		if (cached) return cached
+		throw error
 	}
-	return response
 }
 
 function shouldCacheNavigation(pathname) {
