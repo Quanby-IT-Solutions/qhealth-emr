@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { ArrowRight, Calendar, Loader2, Search, User, UserRound, X } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -8,10 +8,14 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { OpdFlow } from "@/features/opd/components/opd-flow"
+import {
+	canRoleActOnOpdStep,
+	getPatientActiveOpdStep,
+	OpdFlow,
+} from "@/features/opd/components/opd-flow"
 import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
 
-const OPD_PATIENTS_PAGE_SIZE = 8
+const OPD_PATIENTS_PAGE_SIZE = 50
 
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
@@ -40,6 +44,7 @@ function getActiveStaffProfile(
 interface SelectedPatient {
 	id: string
 	mrn: string
+	philhealthMemberId: string | null
 	firstName: string
 	lastName: string
 	dateOfBirth: string | null
@@ -49,16 +54,13 @@ export default function OpdPage() {
 	const permSet = usePermissionSet()
 	const { data: profile } = useMyProfile()
 	const activeStaffProfile = getActiveStaffProfile(profile)
+	const activeRoleName = profile?.activeRole?.name
 	const facilityId = activeStaffProfile?.facilityId ?? ""
 
 	const [search, setSearch] = useState("")
 	const [page, setPage] = useState(1)
 	const [selectedPatient, setSelectedPatient] = useState<SelectedPatient | null>(null)
 	const trimmedSearch = search.trim()
-
-	useEffect(() => {
-		setPage(1)
-	}, [trimmedSearch])
 
 	const searchQuery = usePatientSearchQuery(
 		{
@@ -81,6 +83,32 @@ export default function OpdPage() {
 
 	if (selectedPatient) {
 		const patientName = `${selectedPatient.lastName}, ${selectedPatient.firstName}`
+		const activeStep = getPatientActiveOpdStep(selectedPatient.id)
+		const canOpenSelectedPatient = activeStep
+			? canRoleActOnOpdStep(permSet, activeRoleName, activeStep)
+			: false
+
+		if (!canOpenSelectedPatient) {
+			return (
+				<div className="flex h-full flex-col p-3 md:p-4">
+					<Card className="border-border/60 bg-card shadow-sm">
+						<CardHeader>
+							<CardTitle>OPD Patient Not Ready For Your Role</CardTitle>
+							<CardDescription>
+								This patient is currently waiting for {activeStep?.responsibleRole ?? "another role"}.
+							</CardDescription>
+						</CardHeader>
+						<CardContent>
+							<Button variant="outline" onClick={() => setSelectedPatient(null)}>
+								<X className="mr-1 size-3.5" />
+								Back to eligible patients
+							</Button>
+						</CardContent>
+					</Card>
+				</div>
+			)
+		}
+
 		return (
 			<div>
 				{/* Patient context bar */}
@@ -113,21 +141,29 @@ export default function OpdPage() {
 						Change Patient
 					</Button>
 				</div>
-				<OpdFlow patientId={selectedPatient.id} patientName={patientName} />
+				<OpdFlow
+					patientId={selectedPatient.id}
+					patientName={patientName}
+					patientMrn={selectedPatient.mrn}
+					patientPhilhealthMemberId={selectedPatient.philhealthMemberId}
+				/>
 			</div>
 		)
 	}
 
 	const patients = searchQuery.data?.data ?? []
-	const totalPatients = searchQuery.data?.total ?? 0
+	const visiblePatients = patients
+		.map(patient => ({ patient, activeStep: getPatientActiveOpdStep(patient.id) }))
+		.filter(({ activeStep }) =>
+			activeStep ? canRoleActOnOpdStep(permSet, activeRoleName, activeStep) : false,
+		)
 	const totalPages = Math.max(searchQuery.data?.totalPages ?? 1, 1)
 	const currentPage = Math.min(page, totalPages)
 	const isLoading = searchQuery.isLoading
 	const isFetching = searchQuery.isFetching
 	const hasPreviousPage = currentPage > 1
 	const hasNextPage = currentPage < totalPages
-	const pageStart = totalPatients === 0 ? 0 : (currentPage - 1) * OPD_PATIENTS_PAGE_SIZE + 1
-	const pageEnd = Math.min(currentPage * OPD_PATIENTS_PAGE_SIZE, totalPatients)
+	const visiblePatientCount = visiblePatients.length
 
 	return (
 		<div className="flex h-full flex-col p-3 md:p-4">
@@ -152,7 +188,10 @@ export default function OpdPage() {
 						<Input
 							placeholder="Filter by name or MRN..."
 							value={search}
-							onChange={e => setSearch(e.target.value)}
+							onChange={e => {
+								setSearch(e.target.value)
+								setPage(1)
+							}}
 							className="h-9 rounded-xl border-border/60 bg-background pl-9"
 							autoFocus
 						/>
@@ -169,16 +208,20 @@ export default function OpdPage() {
 						<div className="border-border/60 bg-secondary/40 text-muted-foreground rounded-2xl border border-dashed px-6 py-10 text-center text-sm">
 							{trimmedSearch ? `No patients match "${search}".` : "No active patients found."}
 						</div>
+					) : visiblePatientCount === 0 ? (
+						<div className="border-border/60 bg-secondary/40 text-muted-foreground rounded-2xl border border-dashed px-6 py-10 text-center text-sm">
+							No OPD patients are waiting for your role on this page.
+						</div>
 					) : (
 						<>
 							<p className="text-xs text-muted-foreground px-0.5">
-								Showing {pageStart}-{pageEnd} of {totalPatients} {totalPatients === 1 ? "patient" : "patients"}
+								Showing {visiblePatientCount} {visiblePatientCount === 1 ? "patient" : "patients"} waiting for your role
 								{trimmedSearch && ` matching "${search}"`}
 								{isFetching && " · Updating..."}
 							</p>
 
 							<div className="border-border/60 bg-background overflow-hidden rounded-2xl border divide-y divide-border/60">
-								{patients.map(p => (
+								{visiblePatients.map(({ patient: p, activeStep }) => (
 									<div
 										key={p.id}
 										className="hover:bg-secondary/30 flex flex-col gap-2 px-4 py-2.5 transition-colors md:flex-row md:items-center md:justify-between"
@@ -200,6 +243,11 @@ export default function OpdPage() {
 												>
 													{p.isActive ? "Active" : "Inactive"}
 												</Badge>
+												{activeStep ? (
+													<Badge variant="outline" className="rounded-full px-2 py-0.5 text-[0.68rem]">
+														Next: {activeStep.label}
+													</Badge>
+												) : null}
 											</div>
 											<p className="text-muted-foreground text-xs">
 												{p.dateOfBirth ? `DOB ${new Date(String(p.dateOfBirth)).toLocaleDateString()}` : "DOB —"}
@@ -217,6 +265,7 @@ export default function OpdPage() {
 												setSelectedPatient({
 													id: p.id,
 													mrn: p.mrn,
+													philhealthMemberId: p.philhealthMemberId,
 													firstName: p.firstName,
 													lastName: p.lastName,
 													dateOfBirth: p.dateOfBirth ? String(p.dateOfBirth) : null,
