@@ -157,6 +157,7 @@ function CopyButton({
 			type="button"
 			variant={variant}
 			size={size}
+			className="rounded-full"
 			onClick={() => onCopy(text, copyKey, successMessage)}
 		>
 			{isCopied ? (
@@ -274,7 +275,7 @@ function VideoCallContent({
 
 	return (
 		<div className="space-y-4">
-			<div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+			<div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3">
 				<p className="flex items-center gap-2 text-sm font-medium text-green-800">
 					<Video className="size-4" />
 					{platformLabel} room is ready for this appointment
@@ -286,7 +287,7 @@ function VideoCallContent({
 			</div>
 
 			<div className="flex flex-wrap gap-2">
-				<Button asChild>
+				<Button asChild className="rounded-full">
 					<Link href={getVideoLaunchPath(currentAppt.id)} target="_blank" rel="noopener noreferrer">
 						<Video className="size-4" />
 						Open Clinician Room
@@ -304,7 +305,7 @@ function VideoCallContent({
 							successMessage="Patient link copied"
 						/>
 						{mailtoHref && (
-							<Button asChild variant="outline">
+							<Button asChild variant="outline" className="rounded-full">
 								<a href={mailtoHref}>
 									<Mail className="size-3.5" />
 									Email to Patient
@@ -334,6 +335,7 @@ function VideoCallContent({
 							type="button"
 							size="sm"
 							variant="outline"
+							className="rounded-full"
 							onClick={handleRegenerateInvite}
 							disabled={isInviteActionPending}
 						>
@@ -348,6 +350,7 @@ function VideoCallContent({
 							type="button"
 							size="sm"
 							variant="destructive"
+							className="rounded-full"
 							onClick={() => setRevokeDialogOpen(true)}
 							disabled={!hasStoredInvite || isInviteActionPending}
 						>
@@ -362,14 +365,14 @@ function VideoCallContent({
 				</div>
 
 				{error && (
-					<div className="border-destructive/30 text-destructive flex items-start gap-2 rounded-md border bg-red-50 px-3 py-2 text-sm">
+					<div className="border-destructive/30 text-destructive flex items-start gap-2 rounded-xl border bg-red-50 px-3 py-2 text-sm">
 						<AlertTriangle className="mt-0.5 size-4 shrink-0" />
 						<p>{error}</p>
 					</div>
 				)}
 
 				{patientInviteUrl ? (
-					<div className="rounded-lg border bg-white p-3">
+					<div className="rounded-2xl border border-border/60 bg-white p-3">
 						<div className="mb-2 flex flex-wrap items-center justify-between gap-2">
 							<span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
 								Patient Join Link
@@ -394,12 +397,12 @@ function VideoCallContent({
 						{expiryState.tone === "warning" && (
 							<p className="mt-2 flex items-center gap-1 text-xs text-amber-700">
 								<Clock className="size-3" />
-								{expiryState.label}. Regenerate if the patient hasn't joined yet.
+								{expiryState.label}. Regenerate if the patient hasn&apos;t joined yet.
 							</p>
 						)}
 					</div>
 				) : inviteHidden ? (
-					<div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+					<div className="flex items-start gap-2 rounded-2xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
 						<ShieldCheck className="mt-0.5 size-4 shrink-0" />
 						<div>
 							<p className="font-medium">An active invite exists, but the link is hidden</p>
@@ -409,7 +412,7 @@ function VideoCallContent({
 						</div>
 					</div>
 				) : inviteRevoked ? (
-					<div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+					<div className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
 						<Ban className="mt-0.5 size-4 shrink-0" />
 						<div>
 							<p className="font-medium">Invite revoked</p>
@@ -417,14 +420,14 @@ function VideoCallContent({
 						</div>
 					</div>
 				) : (
-					<div className="text-muted-foreground rounded-lg border p-3 text-sm">
+					<div className="text-muted-foreground rounded-2xl border border-border/60 p-3 text-sm">
 						<p>No invite has been generated yet.</p>
 						<p className="text-xs">Click <strong>Generate</strong> when you are ready to share access with the patient.</p>
 					</div>
 				)}
 
 				<div className="grid gap-3 text-sm md:grid-cols-3">
-					<div className="rounded-lg border p-3">
+					<div className="rounded-2xl border border-border/60 p-3">
 						<p className="text-muted-foreground mb-1 text-xs">Expires</p>
 						<p className="font-medium">{formatDateTime(currentAppt.patientInviteExpiresAt)}</p>
 						{expiryState.tone !== "neutral" && (
@@ -440,11 +443,11 @@ function VideoCallContent({
 							</Badge>
 						)}
 					</div>
-					<div className="rounded-lg border p-3">
+					<div className="rounded-2xl border border-border/60 p-3">
 						<p className="text-muted-foreground mb-1 text-xs">Last Used</p>
 						<p className="font-medium">{formatDateTime(currentAppt.patientInviteLastUsedAt)}</p>
 					</div>
-					<div className="rounded-lg border p-3">
+					<div className="rounded-2xl border border-border/60 p-3">
 						<p className="text-muted-foreground mb-1 text-xs">Patient Joined</p>
 						<p className="font-medium">{formatDateTime(currentAppt.patientJoinedAt)}</p>
 						{patientJoined && (
@@ -511,7 +514,7 @@ function VideoCallContent({
 						<AlertDialogTitle>Revoke patient invite?</AlertDialogTitle>
 						<AlertDialogDescription>
 							The patient will no longer be able to join with the current secure link. If they
-							still need access, you'll need to generate a fresh invite and share it again.
+							still need access, you&apos;ll need to generate a fresh invite and share it again.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
