@@ -8,7 +8,6 @@ import {
 	ArrowRight,
 	CalendarDays,
 	Search,
-	ShieldCheck,
 	Sparkles,
 	UserRound,
 	UserRoundPlus,
@@ -190,7 +189,7 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 	)
 	const [nameFilter, setNameFilter] = useState("")
 	const [birthdateFilter, setBirthdateFilter] = useState("")
-	const [philhealthFilter, setPhilhealthFilter] = useState("")
+	const [mrnFilter, setMrnFilter] = useState("")
 	const [selectedForTriage, setSelectedForTriage] = useState<string | null>(null)
 	const [triageQueueResult, setTriageQueueResult] = useState<{
 		queueNumber: number
@@ -201,20 +200,20 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 		facilityId: string
 		search?: string
 		dateOfBirth?: string
-		philhealthMemberId?: string
+		mrn?: string
 		page: number
 		limit: number
 		clinicianStaffId?: string
 	} | null>(null)
 
 	const trimmedNameFilter = nameFilter.trim()
-	const trimmedPhilhealthFilter = philhealthFilter.trim()
+	const trimmedMrnFilter = mrnFilter.trim()
 	const hasNameFilter = trimmedNameFilter.length > 0
 	const hasBirthdateFilter = birthdateFilter.length > 0
-	const hasPhilhealthFilter = trimmedPhilhealthFilter.length > 0
-	const hasSearchInput = hasNameFilter || hasBirthdateFilter || hasPhilhealthFilter
-	const hasBirthdateOnly = hasBirthdateFilter && !hasNameFilter && !hasPhilhealthFilter
-	const canRunSearch = !!facilityId && canSearchPatients && (hasPhilhealthFilter || hasNameFilter)
+	const hasMrnFilter = trimmedMrnFilter.length > 0
+	const hasSearchInput = hasNameFilter || hasBirthdateFilter || hasMrnFilter
+	const hasBirthdateOnly = hasBirthdateFilter && !hasNameFilter && !hasMrnFilter
+	const canRunSearch = !!facilityId && canSearchPatients && (hasMrnFilter || hasNameFilter)
 
 	const createEncounter = useCreateEncounterMutation()
 	const { isOnline, offlinePatients, cachedAt } = useOfflinePatients()
@@ -236,7 +235,7 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 	const primaryButtonClassName = "bg-foreground text-background hover:bg-foreground/90"
 
 	const filteredOfflinePatients = useMemo(() => {
-		if (isOnline || !committedParams || committedParams.philhealthMemberId) return []
+		if (isOnline || !committedParams || committedParams.mrn) return []
 		const searchTerm = (committedParams.search ?? "").toLowerCase()
 		const dateOfBirth = committedParams.dateOfBirth
 		return offlinePatients.filter(patient => {
@@ -249,8 +248,8 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault()
 		if (!facilityId || !canSearchPatients) return
-		if (!hasPhilhealthFilter && !hasNameFilter) {
-			toast.error("Enter a patient name or PhilHealth number to search. Date of birth is optional.")
+		if (!hasMrnFilter && !hasNameFilter) {
+			toast.error("Enter a patient name or MRN to search. Date of birth is optional.")
 			return
 		}
 		setSelectedForTriage(null)
@@ -258,7 +257,7 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 			facilityId,
 			search: trimmedNameFilter || undefined,
 			dateOfBirth: birthdateFilter || undefined,
-			philhealthMemberId: trimmedPhilhealthFilter || undefined,
+			mrn: trimmedMrnFilter || undefined,
 			page: 1,
 			limit: 50,
 			clinicianStaffId: isBreakGlassEnforced && staffId ? staffId : undefined,
@@ -268,7 +267,7 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 	const handleClear = () => {
 		setNameFilter("")
 		setBirthdateFilter("")
-		setPhilhealthFilter("")
+		setMrnFilter("")
 		setSelectedForTriage(null)
 		setCommittedParams(null)
 	}
@@ -316,7 +315,7 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 		: "Find an existing record before you register"
 	const searchSubtitle = pendingTriageId
 		? "Search for an existing patient to reconcile this walk-in triage intake, or continue to new-patient registration when no record exists."
-		: "Search by patient name, optionally add date of birth to narrow the results, or use a PhilHealth number to avoid duplicate charts before issuing a new MRN."
+		: "Search by patient name, optionally add date of birth to narrow the results, or use an MRN to avoid duplicate charts before issuing a new record."
 	const helperCopy = pendingTriageId
 		? "Search for the patient who already has a chart, or continue with new-patient registration if this is the first visit."
 		: "Check the registry first so we only create a chart when a match does not already exist."
@@ -410,13 +409,13 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 									<Separator className="bg-border/60 flex-1" />
 								</div>
 
-								<SearchField htmlFor="philhealth-number" label="PhilHealth number" icon={ShieldCheck}>
+								<SearchField htmlFor="patient-mrn" label="MRN" icon={Search}>
 									<Input
-										id="philhealth-number"
-										placeholder="Enter the PhilHealth number"
-										value={philhealthFilter}
+										id="patient-mrn"
+										placeholder="Enter the patient MRN"
+										value={mrnFilter}
 										className="border-border/60 bg-background h-11 rounded-xl"
-										onChange={e => setPhilhealthFilter(e.target.value)}
+										onChange={e => setMrnFilter(e.target.value)}
 									/>
 								</SearchField>
 							</div>
@@ -425,10 +424,10 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 						<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 							<div className="text-muted-foreground text-sm">
 								{hasBirthdateOnly
-									? "Add a patient name or PhilHealth number. Date of birth only narrows the results."
+									? "Add a patient name or MRN. Date of birth only narrows the results."
 									: !canSearchPatients
 										? "Search is unavailable for your current role."
-										: "Search by patient name, optionally add date of birth, or use a PhilHealth number."}
+										: "Search by patient name, optionally add date of birth, or use an MRN."}
 							</div>
 
 							<div className="flex justify-end gap-3">
