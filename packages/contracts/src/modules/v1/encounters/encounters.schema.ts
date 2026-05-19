@@ -120,6 +120,7 @@ export const EncounterDetailSchema = EncounterSchema.extend({
 	patientSex: z.enum(["male", "female", "other"]),
 	admittingStaffName: z.string().nullable(),
 	attendingStaffName: z.string().nullable(),
+	attendingStaffLicenseNo: z.string().nullable().optional(),
 	wardName: z.string().nullable(),
 	bedNumber: z.string().nullable(),
 	transfers: z.array(EncounterTransferSchema),

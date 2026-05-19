@@ -27,6 +27,16 @@ export const birthRegistrations = createTable(
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
 		// PSA/LCR reference once the certificate is submitted
 		certificateNumber: t.text("certificate_number"),
+		attendantAtBirth: t.text("attendant_at_birth"),
+		placeOfBirthBarangay: t.text("place_of_birth_barangay"),
+		placeOfBirthMunicipality: t.text("place_of_birth_municipality"),
+		placeOfBirthProvince: t.text("place_of_birth_province"),
+		placeOfBirthRegion: t.text("place_of_birth_region"),
+		physicianName: t.text("physician_name"),
+		physicianLicenseNo: t.text("physician_license_no"),
+		attendingStaffId: t
+			.uuid("attending_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
 		status: t
 			.text("status")
 			.notNull()
