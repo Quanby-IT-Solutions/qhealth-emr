@@ -12,11 +12,13 @@ import {
 	Printer,
 	Send,
 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Separator } from "@/core/components/ui/separator"
+import { env } from "@/env"
 import {
 	useEncounterAbstractsQuery,
 	useGenerateAbstractMutation,
@@ -133,9 +135,9 @@ interface TeleAbstractPageProps {
 
 function AbstractStatusBadge({ status }: { status: TeleAbstract["status"] }) {
 	const colorMap: Record<TeleAbstract["status"], string> = {
-		draft: "bg-yellow-100 text-yellow-800",
-		signed: "bg-green-100 text-green-800",
-		sent: "bg-blue-100 text-blue-800",
+		draft: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+		signed: "bg-success/15 text-success border-success/30",
+		sent: "bg-primary/15 text-primary border-primary/30",
 	}
 	const labelMap: Record<TeleAbstract["status"], string> = {
 		draft: "Draft",
@@ -254,8 +256,8 @@ function AbstractPreview({ abstract }: { abstract: TeleAbstract }) {
 
 			{/* Sent notice */}
 			{abstract.status === "sent" && abstract.sentToEmail && (
-				<div className="rounded-lg bg-blue-50 p-3">
-					<p className="text-xs font-medium text-blue-800">
+				<div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
+					<p className="text-xs font-medium text-primary">
 						Sent to: {abstract.sentToEmail}
 						{abstract.sentAt && ` on ${new Date(abstract.sentAt).toLocaleString("en-PH")}`}
 					</p>
@@ -333,6 +335,34 @@ export function TeleAbstractPage({
 		}
 	}
 
+	async function handleDownloadPdf() {
+		if (!abstract) return
+		if (abstract.status === "draft") {
+			setError("Sign the abstract before downloading the PDF.")
+			return
+		}
+		try {
+			const response = await fetch(
+				`${env.NEXT_PUBLIC_API_BASE_URL}/v1/telemedicine/abstracts/${abstract.id}/pdf`,
+				{ credentials: "include" }
+			)
+			if (!response.ok) {
+				throw new Error(await response.text().catch(() => "Failed to download PDF."))
+			}
+			const blob = await response.blob()
+			const url = URL.createObjectURL(blob)
+			const link = document.createElement("a")
+			link.href = url
+			link.download = `abstract-${abstract.id}.pdf`
+			document.body.appendChild(link)
+			link.click()
+			link.remove()
+			URL.revokeObjectURL(url)
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : "Failed to download PDF.")
+		}
+	}
+
 	function handlePrint() {
 		if (!abstract) return
 		if (abstract.status === "draft") {
@@ -358,7 +388,7 @@ export function TeleAbstractPage({
 	if (isLoading) {
 		return (
 			<Card>
-				<CardContent className="flex items-center gap-2 py-6 text-sm text-gray-500">
+				<CardContent className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
 					<Loader2 className="size-4 animate-spin" />
 					Loading abstract...
 				</CardContent>
@@ -411,7 +441,7 @@ export function TeleAbstractPage({
 						</div>
 
 						{error && (
-							<p className="text-destructive rounded-md bg-red-50 px-3 py-2 text-sm">{error}</p>
+							<p className="text-destructive rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">{error}</p>
 						)}
 
 						<Button
@@ -439,7 +469,7 @@ export function TeleAbstractPage({
 						</div>
 
 						{error && (
-							<p className="text-destructive rounded-md bg-red-50 px-3 py-2 text-sm">{error}</p>
+							<p className="text-destructive rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">{error}</p>
 						)}
 
 						{/* Actions */}
@@ -459,8 +489,17 @@ export function TeleAbstractPage({
 								onClick={() => openAbstractPrintWindow(abstract)}
 								disabled={abstract.status === "draft"}
 							>
+								<Printer className="mr-1.5 size-3.5" />
+								Print Preview
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={handleDownloadPdf}
+								disabled={abstract.status === "draft"}
+							>
 								<Download className="mr-1.5 size-3.5" />
-								Print / Save PDF
+								Download PDF
 							</Button>
 
 							{abstract.status === "draft" && (
@@ -487,7 +526,7 @@ export function TeleAbstractPage({
 							)}
 
 							{abstract.status === "sent" && (
-								<span className="flex items-center gap-1.5 text-sm text-green-600">
+								<span className="flex items-center gap-1.5 text-sm text-success">
 									<CheckCircle2 className="size-4" />
 									Sent to patient
 								</span>

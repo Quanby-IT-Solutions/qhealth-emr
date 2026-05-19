@@ -818,7 +818,7 @@ function FloatingControlDock({ visible }: { visible: boolean }) {
 					<AlertDialogHeader>
 						<div
 							aria-hidden="true"
-							className="flex size-10 items-center justify-center rounded-full bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
+							className="bg-destructive/10 text-destructive flex size-10 items-center justify-center rounded-full"
 						>
 							<PhoneOff className="size-5" />
 						</div>
@@ -831,7 +831,7 @@ function FloatingControlDock({ visible }: { visible: boolean }) {
 					<AlertDialogFooter>
 						<AlertDialogCancel>Stay in call</AlertDialogCancel>
 						<AlertDialogAction
-							className="bg-rose-600 text-white hover:bg-rose-500"
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
 							onClick={() => void room.disconnect()}
 						>
 							End call

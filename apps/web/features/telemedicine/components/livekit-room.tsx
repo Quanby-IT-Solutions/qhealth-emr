@@ -241,7 +241,7 @@ function MicVisualizer({ stream, audioEnabled }: MicVisualizerProps) {
 						key={i}
 						className={cn(
 							"block w-1 rounded-full",
-							audioEnabled ? "bg-emerald-500 dark:bg-emerald-400" : "bg-muted-foreground/40"
+							audioEnabled ? "bg-success" : "bg-muted-foreground/40"
 						)}
 						initial={false}
 						animate={{ height }}
@@ -351,8 +351,8 @@ function LiveKitPreJoin({
 
 	const toggleBase =
 		"focus-visible:ring-ring focus-visible:ring-offset-background flex size-12 items-center justify-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-	const toggleOn = "border-border bg-muted text-emerald-500 dark:text-emerald-400"
-	const toggleOff = "border-rose-500/30 bg-rose-500/10 text-rose-500 dark:text-rose-400"
+	const toggleOn = "border-border bg-muted text-success"
+	const toggleOff = "border-destructive/30 bg-destructive/10 text-destructive"
 
 	return (
 		<div
@@ -445,7 +445,7 @@ function LiveKitPreJoin({
 								onAudioDeviceChange={preview.setAudioDeviceId}
 							/>
 							{preview.permissionError && (
-								<p className="text-xs text-rose-400" role="alert">
+								<p className="text-destructive text-xs" role="alert">
 									{preview.permissionError}
 								</p>
 							)}
@@ -518,43 +518,43 @@ function VideoTileSkeleton() {
 
 export function LiveKitSetupBanner() {
 	return (
-		<Alert className="border-yellow-300 bg-yellow-50 px-4 py-4 text-yellow-950 dark:border-yellow-900/60 dark:bg-yellow-950/30 dark:text-yellow-100">
+		<Alert className="border-amber-500/40 bg-amber-500/10 px-4 py-4 text-amber-900 dark:text-amber-100">
 			<Settings className="size-4" />
 			<AlertTitle>Video conferencing not yet configured</AlertTitle>
-			<AlertDescription className="text-yellow-900 dark:text-yellow-100/90">
+			<AlertDescription className="text-amber-900/90 dark:text-amber-100/90">
 				<p>
 					LiveKit credentials have not been set up on this server yet. An administrator needs to
 					enable the integration before video sessions can be started.
 				</p>
-				<div className="mt-3 rounded-md border border-yellow-200 bg-white p-3 dark:border-yellow-900/70 dark:bg-yellow-950/40">
-					<p className="mb-2 text-xs font-semibold text-yellow-900 dark:text-yellow-100">
+				<div className="border-amber-500/40 bg-card mt-3 rounded-md border p-3">
+					<p className="mb-2 text-xs font-semibold text-amber-900 dark:text-amber-100">
 						Administrator setup required:
 					</p>
 					<ul className="list-disc space-y-1 pl-5 text-xs">
 						<li>
 							Set{" "}
-							<code className="rounded bg-yellow-100 px-1 dark:bg-yellow-900/60">
+							<code className="bg-amber-500/15 rounded px-1 text-amber-900 dark:text-amber-100">
 								LIVEKIT_MODE=real
 							</code>{" "}
 							in the backend environment.
 						</li>
 						<li>
 							Set{" "}
-							<code className="rounded bg-yellow-100 px-1 dark:bg-yellow-900/60">
+							<code className="bg-amber-500/15 rounded px-1 text-amber-900 dark:text-amber-100">
 								LIVEKIT_API_KEY
 							</code>{" "}
 							in the backend environment.
 						</li>
 						<li>
 							Set{" "}
-							<code className="rounded bg-yellow-100 px-1 dark:bg-yellow-900/60">
+							<code className="bg-amber-500/15 rounded px-1 text-amber-900 dark:text-amber-100">
 								LIVEKIT_API_SECRET
 							</code>{" "}
 							in the backend environment.
 						</li>
 						<li>
 							Set{" "}
-							<code className="rounded bg-yellow-100 px-1 dark:bg-yellow-900/60">
+							<code className="bg-amber-500/15 rounded px-1 text-amber-900 dark:text-amber-100">
 								LIVEKIT_WS_URL
 							</code>{" "}
 							in the backend environment.

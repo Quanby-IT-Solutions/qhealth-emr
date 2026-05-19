@@ -65,6 +65,18 @@ export const env = createEnv({
 		LIVEKIT_API_SECRET: optionalString,
 		LIVEKIT_WS_URL: optionalUrl,
 
+		// Outbound SMTP for clinical document delivery (abstract, e-Rx).
+		// When MAILER_MODE=smtp and host/user/pass/from are set, NodemailerMailer
+		// is used. Otherwise LogOnlyMailer logs the send and the document is still
+		// marked sent with a warning audit entry (mailerConfigured: false).
+		MAILER_MODE: z.enum(["log", "smtp"]).default("log"),
+		SMTP_HOST: optionalString,
+		SMTP_PORT: z.coerce.number().int().positive().optional(),
+		SMTP_USER: optionalString,
+		SMTP_PASS: optionalString,
+		SMTP_FROM: optionalString,
+		SMTP_SECURE: z.coerce.boolean().default(false),
+
 		// NHDR (National Health Data Repository) integration
 		NHDR_MODE: z.enum(["mock", "real"]).default("mock"),
 		NHDR_BASE_URL: z.string().url().optional(),

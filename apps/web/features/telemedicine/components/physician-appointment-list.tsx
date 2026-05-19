@@ -176,7 +176,9 @@ function AppointmentRow({
 			<div
 				className={[
 					"flex size-10 shrink-0 items-center justify-center rounded-full",
-					isLive ? "bg-yellow-100 text-yellow-700" : "bg-primary/10 text-primary",
+					isLive
+						? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+						: "bg-primary/10 text-primary",
 				].join(" ")}
 			>
 				<Video className="size-5" />
@@ -189,13 +191,13 @@ function AppointmentRow({
 					</Badge>
 					<AppointmentStatusBadge status={appt.status} />
 					{hasEncounter && (
-						<Badge className="bg-emerald-100 text-emerald-800 text-xs">
+						<Badge className="bg-success/15 text-success border-success/30 text-xs">
 							<CheckCircle2 className="mr-1 size-3" />
 							Encounter started
 						</Badge>
 					)}
 					{startingSoon && !isCompleted && !isCancelled && (
-						<Badge className="bg-amber-100 text-amber-800 text-xs">
+						<Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-xs">
 							{startsInMin !== null && startsInMin <= 0
 								? `Started ${Math.abs(startsInMin)}m ago`
 								: `Starts in ${startsInMin}m`}
@@ -297,11 +299,11 @@ export function PhysicianAppointmentList({
 
 	return (
 		<div className="space-y-4">
-			<div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+			<div className="border-primary/30 bg-primary/10 text-primary flex items-start gap-2 rounded-lg border px-4 py-3 text-sm">
 				<Info className="mt-0.5 size-4 shrink-0" />
 				<div className="space-y-1">
 					<p className="font-medium">Only your assigned consultations are shown</p>
-					<p className="text-blue-800">
+					<p className="text-primary/80">
 						Contact the scheduler to book new appointments. Encounters can only be started when an
 						appointment is assigned to you.
 					</p>

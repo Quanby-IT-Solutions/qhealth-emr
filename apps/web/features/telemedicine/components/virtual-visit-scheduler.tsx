@@ -403,7 +403,7 @@ export function VirtualVisitScheduler({
 							</div>
 
 							{error && (
-								<p className="text-destructive rounded-md bg-red-50 px-3 py-2 text-sm">{error}</p>
+								<p className="text-destructive rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">{error}</p>
 							)}
 
 							<div className="flex justify-end gap-3">
