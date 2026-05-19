@@ -6,14 +6,14 @@ import Link from "next/link"
 import { ArrowLeft01FreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 
-import { Button } from "@/core/components/ui/button"
-import { buttonVariants } from "@/core/components/ui/button"
+import { Button, buttonVariants } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useCreateBirthRegistrationMutation } from "@/features/registrar/civil-registry/api/lcr.hooks"
+import { PatientSearchStep } from "@/features/registrar/civil-registry/components/patient-search-step"
 
 export function BirthCertificateForm() {
 	const router = useRouter()
@@ -68,6 +68,15 @@ export function BirthCertificateForm() {
 		})
 
 		router.push("/registrar/civil-registry/tracking")
+	}
+
+	if (!patientId) {
+		return (
+			<PatientSearchStep
+				title="Select Patient for Birth Certificate"
+				onSelect={id => router.replace(`/registrar/civil-registry/birth?patientId=${id}`)}
+			/>
+		)
 	}
 
 	return (
@@ -214,13 +223,6 @@ export function BirthCertificateForm() {
 					{createBirthRegistration.isPending ? "Saving…" : "Create Birth Registration"}
 				</Button>
 			</div>
-
-			{!patientId && (
-				<p className="text-sm text-destructive">
-					No patient selected. Navigate here from a patient encounter or provide a{" "}
-					<code className="text-xs">?patientId=...</code> query parameter.
-				</p>
-			)}
 		</form>
 	)
 }
