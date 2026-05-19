@@ -43,6 +43,10 @@ function wardRuleExplanation(encounterType: string, wardType: string | null): st
 	return "Available bed — no specific ward preference for this encounter type"
 }
 
+function formatBedLabel(bed: BedOption) {
+	return `${bed.wardName} — Bed ${bed.bedNumber}`
+}
+
 export function BedSuggestionPanel({
 	encounterType,
 	availableBeds,
@@ -71,6 +75,7 @@ export function BedSuggestionPanel({
 	const explanation = suggestedBed
 		? wardRuleExplanation(encounterType, suggestedBed.wardType)
 		: ""
+	const selectedBed = availableBeds.find(bed => bed.id === selectedBedId)
 
 	const handleAccept = () => {
 		if (suggestedBed) {
@@ -131,12 +136,14 @@ export function BedSuggestionPanel({
 							<Label className="text-xs">Select a Different Bed</Label>
 							<Select value={selectedBedId} onValueChange={v => onSelect(v ?? "")}>
 								<SelectTrigger className="w-full">
-									<SelectValue placeholder="Choose available bed…" />
+									<SelectValue placeholder="Choose available bed…">
+										{selectedBed ? formatBedLabel(selectedBed) : undefined}
+									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
 									{availableBeds.map(bed => (
-										<SelectItem key={bed.id} value={bed.id}>
-											{bed.wardName} — {bed.bedNumber}{" "}
+										<SelectItem key={bed.id} value={bed.id} label={formatBedLabel(bed)}>
+											{formatBedLabel(bed)}{" "}
 											<span className="text-muted-foreground capitalize">({bed.wardType})</span>
 										</SelectItem>
 									))}
