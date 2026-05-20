@@ -101,6 +101,7 @@ export interface ClinicalNote {
 	facilityId: string
 	encounterId: string | null
 	preEncounterId: string | null
+	patientName?: string | null
 	templateId: string | null
 	templateName: string | null
 	noteType: ClinicalNoteType
@@ -312,6 +313,10 @@ export function useNotesQuery(params: {
 	noteType?: string
 	status?: string
 }) {
+	const hasAnyFilter = Boolean(
+		params.encounterId || params.preEncounterId || params.noteType || params.status
+	)
+
 	return useQuery({
 		queryKey: clinicalDocsKeys.notes(
 			params.encounterId,
@@ -329,7 +334,7 @@ export function useNotesQuery(params: {
 					limit: 100,
 				})}`
 			),
-		enabled: !!(params.encounterId || params.preEncounterId),
+		enabled: hasAnyFilter,
 	})
 }
 
