@@ -32,8 +32,11 @@ export const birthRegistrations = createTable(
 		placeOfBirthMunicipality: t.text("place_of_birth_municipality"),
 		placeOfBirthProvince: t.text("place_of_birth_province"),
 		placeOfBirthRegion: t.text("place_of_birth_region"),
+		fatherName: t.text("father_name"),
+		motherName: t.text("mother_name"),
 		physicianName: t.text("physician_name"),
 		physicianLicenseNo: t.text("physician_license_no"),
+		physicianSignature: t.text("physician_signature"),
 		attendingStaffId: t
 			.uuid("attending_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),

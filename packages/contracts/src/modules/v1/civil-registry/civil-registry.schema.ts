@@ -23,8 +23,11 @@ export const BirthRegistrationSchema = z.object({
 	placeOfBirthMunicipality: z.string().nullable().optional(),
 	placeOfBirthProvince: z.string().nullable().optional(),
 	placeOfBirthRegion: z.string().nullable().optional(),
+	fatherName: z.string().nullable().optional(),
+	motherName: z.string().nullable().optional(),
 	physicianName: z.string().nullable().optional(),
 	physicianLicenseNo: z.string().nullable().optional(),
+	physicianSignature: z.string().nullable().optional(),
 	attendingStaffId: z.string().uuid().nullable().optional(),
 	status: BirthRegistrationStatusEnum,
 	/** SLA-017: set when the family submits the registration request */
@@ -55,8 +58,11 @@ export const CreateBirthRegistrationSchema = z.object({
 	placeOfBirthMunicipality: z.string().optional(),
 	placeOfBirthProvince: z.string().optional(),
 	placeOfBirthRegion: z.string().optional(),
+	fatherName: z.string().optional(),
+	motherName: z.string().optional(),
 	physicianName: z.string().optional(),
 	physicianLicenseNo: z.string().optional(),
+	physicianSignature: z.string().optional(),
 	attendingStaffId: z.string().uuid().optional(),
 })
 
@@ -64,6 +70,17 @@ export const UpdateBirthRegistrationSchema = z.object({
 	id: z.string().uuid(),
 	status: BirthRegistrationStatusEnum.optional(),
 	certificateNumber: z.string().optional(),
+	attendantAtBirth: z.string().optional(),
+	placeOfBirthBarangay: z.string().optional(),
+	placeOfBirthMunicipality: z.string().optional(),
+	placeOfBirthProvince: z.string().optional(),
+	placeOfBirthRegion: z.string().optional(),
+	fatherName: z.string().optional(),
+	motherName: z.string().optional(),
+	physicianName: z.string().optional(),
+	physicianLicenseNo: z.string().optional(),
+	physicianSignature: z.string().optional(),
+	attendingStaffId: z.string().uuid().optional(),
 	completedAt: dateOrString.optional(),
 	submittedAt: dateOrString.optional(),
 })
@@ -71,8 +88,6 @@ export const UpdateBirthRegistrationSchema = z.object({
 // SLA-021: mark a birth certificate as released (Flow 7 Step 3 authoritative evidence)
 export const MarkBirthRegistrationReleasedInputSchema = z.object({
 	id: z.string().uuid(),
-	/** UUID of the staff member who physically released the certificate */
-	releasedByStaffId: z.string().uuid(),
 	/** ISO datetime of release; defaults to now if omitted */
 	releasedAt: z.string().datetime().optional(),
 })
