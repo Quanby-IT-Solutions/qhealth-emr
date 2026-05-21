@@ -418,8 +418,8 @@ export function SlotManagement({ facilityId }: SlotManagementProps) {
 						</CardHeader>
 						<CardContent className="space-y-6">
 							{templateSlotsLoading ? (
-								<div className="grid gap-4 lg:grid-cols-[auto_1fr]">
-									<Skeleton className="h-[24rem] w-[21rem] rounded-xl" />
+								<div className="grid gap-4 lg:grid-cols-[minmax(0,28rem)_1fr]">
+									<Skeleton className="h-[24rem] w-full max-w-[28rem] rounded-xl" />
 									<div className="space-y-1.5">
 										{Array.from({ length: 8 }).map((_, index) => (
 											<Skeleton key={index} className="h-9 w-full rounded-lg" />
@@ -437,14 +437,20 @@ export function SlotManagement({ facilityId }: SlotManagementProps) {
 									}}
 								/>
 							) : (
-								<div className="grid gap-4 lg:grid-cols-[minmax(0,24rem)_1fr]">
-									<div className="rounded-xl border p-3">
+								<div className="grid gap-4 lg:grid-cols-[minmax(0,28rem)_1fr]">
+									<div className="w-full max-w-[24rem] overflow-hidden rounded-xl border p-3">
 										<Calendar
 											mode="single"
 											month={month}
 											selected={selectedDate}
 											onMonthChange={setMonth}
 											onSelect={handleSelectDate}
+											className="w-full p-1 [--cell-size:2.75rem]"
+											classNames={{
+												root: "w-full",
+												months: "w-full",
+												month: "w-full",
+											}}
 											components={{
 												DayButton: ({
 													day,
@@ -461,7 +467,7 @@ export function SlotManagement({ facilityId }: SlotManagementProps) {
 															day={day}
 															modifiers={modifiers}
 															className={cn(
-																"h-14 items-start px-1.5 py-1",
+																"h-12 items-start px-1.5 py-1",
 																isSelected && "ring-primary/30 ring-2",
 																className
 															)}
