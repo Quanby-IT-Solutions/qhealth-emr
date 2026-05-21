@@ -648,14 +648,17 @@ export function CreateMedOrderDialog({
 		}
 	}
 
-	function handleOrderCreated(orderId: string) {
-		if (requiresDoubleVerification && pendingHighAlertVerification) {
+	function handleOrderCreated(
+		orderId: string,
+		highAlertVerificationDraft = pendingHighAlertVerification
+	) {
+		if (requiresDoubleVerification && highAlertVerificationDraft) {
 			createHighAlertVerification.mutate(
 				{
 					medicationOrderId: orderId,
-					verifyingStaffId: pendingHighAlertVerification.verifyingStaffId,
-					coSignerPassword: pendingHighAlertVerification.coSignerPassword,
-					notes: pendingHighAlertVerification.notes,
+					verifyingStaffId: highAlertVerificationDraft.verifyingStaffId,
+					coSignerPassword: highAlertVerificationDraft.coSignerPassword,
+					notes: highAlertVerificationDraft.notes,
 				},
 				{
 					onSuccess: () => handleOpenChange(false),
@@ -694,7 +697,12 @@ export function CreateMedOrderDialog({
 		return overrides.length > 0 ? { overrides } : undefined
 	}
 
-	function doSubmit(trancheNumber?: number, trancheTotal?: number, trancheDays?: number) {
+	function doSubmit(
+		trancheNumber?: number,
+		trancheTotal?: number,
+		trancheDays?: number,
+		highAlertVerificationDraft?: HighAlertVerificationDraft | null
+	) {
 		const cdsOverrides = buildCdsOverrides()
 
 		setSubmitError(null)
@@ -724,13 +732,16 @@ export function CreateMedOrderDialog({
 				cdsOverrides,
 			},
 			{
-				onSuccess: order => handleOrderCreated(order.id),
+				onSuccess: order => handleOrderCreated(order.id, highAlertVerificationDraft),
 				onError: err => setSubmitError(err instanceof Error ? err.message : "Failed to create order"),
 			}
 		)
 	}
 
-	function submitTranchedOrder(startDate?: string) {
+	function submitTranchedOrder(
+		startDate?: string,
+		highAlertVerificationDraft?: HighAlertVerificationDraft | null
+	) {
 		const cdsOverrides = buildCdsOverrides()
 
 		createTranchedOrders.mutate(
@@ -757,7 +768,8 @@ export function CreateMedOrderDialog({
 				cdsOverrides,
 			},
 			{
-				onSuccess: result => handleOrderCreated(result.parentOrder.id),
+				onSuccess: result =>
+					handleOrderCreated(result.parentOrder.id, highAlertVerificationDraft),
 				onError: err => setSubmitError(err instanceof Error ? err.message : "Failed to create order"),
 			}
 		)
@@ -807,7 +819,13 @@ export function CreateMedOrderDialog({
 		setHighAlertVerificationError(null)
 	}
 
-	function handleHighAlertVerified() {
+	function handleHighAlertVerified(draft?: HighAlertVerificationDraft) {
+		const verificationDraft = draft ?? pendingHighAlertVerification
+
+		if (draft) {
+			setPendingHighAlertVerification(draft)
+		}
+
 		if (pendingHighAlertOrderId) {
 			setHighAlertVerified(true)
 			setHighAlertVerificationError(null)
@@ -822,11 +840,16 @@ export function CreateMedOrderDialog({
 		setPendingSubmitOptions(null)
 
 		if (submitOptions.useTranchedOrders) {
-			submitTranchedOrder(submitOptions.trancheStartDate)
+			submitTranchedOrder(submitOptions.trancheStartDate, verificationDraft)
 			return
 		}
 
-		doSubmit(submitOptions.trancheNumber, submitOptions.trancheTotal, submitOptions.trancheDays)
+		doSubmit(
+			submitOptions.trancheNumber,
+			submitOptions.trancheTotal,
+			submitOptions.trancheDays,
+			verificationDraft
+		)
 	}
 
 	return (

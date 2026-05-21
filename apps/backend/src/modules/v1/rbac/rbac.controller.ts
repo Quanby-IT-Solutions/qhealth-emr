@@ -93,17 +93,6 @@ export class RbacController {
 		})
 	}
 
-	@RequireAnyPermissions([
-		{ module: "admin.users", action: "read" },
-		{ module: "admin", action: "view" },
-	])
-	@Implement(v1.rbac.getStaffUser)
-	async getStaffUser() {
-		return implement(v1.rbac.getStaffUser).handler(async ({ input }) => {
-			return this.rbacService.getStaffUser(input)
-		})
-	}
-
 	@RequirePermission("orders", "view")
 	@Implement(v1.rbac.searchClinicians)
 	async searchClinicians() {
@@ -116,6 +105,17 @@ export class RbacController {
 	async verifyCoSignCredentials() {
 		return implement(v1.rbac.verifyCoSignCredentials).handler(async ({ input }) => {
 			return this.rbacService.verifyCoSignCredentials(input)
+		})
+	}
+
+	@RequireAnyPermissions([
+		{ module: "admin.users", action: "read" },
+		{ module: "admin", action: "view" },
+	])
+	@Implement(v1.rbac.getStaffUser)
+	async getStaffUser() {
+		return implement(v1.rbac.getStaffUser).handler(async ({ input }) => {
+			return this.rbacService.getStaffUser(input)
 		})
 	}
 

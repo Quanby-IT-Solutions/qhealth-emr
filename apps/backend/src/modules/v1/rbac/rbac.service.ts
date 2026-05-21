@@ -403,7 +403,6 @@ export class RbacService {
 					excludeStaffProfileId ? sql`${staffProfiles.id} != ${excludeStaffProfileId}` : undefined
 				)
 			)
-			.limit(20)
 
 		if (profileRows.length === 0) return []
 

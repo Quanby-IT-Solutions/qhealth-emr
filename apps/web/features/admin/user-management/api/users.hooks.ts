@@ -31,12 +31,10 @@ export function useSearchCliniciansQuery(input: {
 	search?: string
 	excludeStaffProfileId?: string
 }) {
-	return useQuery(
-		orpc.rbac.searchClinicians.queryOptions({
-			input,
-			enabled: !!input.facilityId && (input.search?.trim().length ?? 0) >= 2,
-		})
-	)
+	return useQuery({
+		...orpc.rbac.searchClinicians.queryOptions({ input }),
+		enabled: !!input.facilityId && (input.search?.trim().length ?? 0) >= 2,
+	})
 }
 
 export function useVerifyCoSignCredentialsMutation() {
