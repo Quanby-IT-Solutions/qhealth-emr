@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useForm } from "@tanstack/react-form"
-import { CalendarDays, Clock3, Plus, Trash2 } from "lucide-react"
+import { CalendarDays, Clock3, Pencil, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -31,6 +31,7 @@ import { Checkbox } from "@/core/components/ui/checkbox"
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
@@ -81,6 +82,21 @@ type WorkingHoursPeriod = {
 type WeeklyHoursEntry = {
 	dayOfWeek: DayOfWeek
 	periods: WorkingHoursPeriod[]
+}
+
+type TemplateWithClinicianName = ClinicTemplate & {
+	clinicianName: string
+}
+
+type ClinicianTemplateGroup = {
+	clinicianStaffId: string
+	clinicianName: string
+	templates: TemplateWithClinicianName[]
+	clinicNames: string[]
+	activeCount: number
+	days: DayOfWeek[]
+	slotDurations: number[]
+	maxPatients: number[]
 }
 
 const DAY_OPTIONS: Array<{ value: DayOfWeek; label: string; shortLabel: string }> = [
@@ -181,26 +197,26 @@ function cloneWeeklyHours(weeklyHours: WeeklyHoursEntry[]) {
 	}))
 }
 
-function buildInitialWeeklyHours(template: ClinicTemplate | null): WeeklyHoursEntry[] {
+function buildInitialWeeklyHours(templates: ClinicTemplate[]): WeeklyHoursEntry[] {
 	const weeklyHours = cloneWeeklyHours(EMPTY_WEEKLY_HOURS)
 
-	if (!template) {
-		return weeklyHours
-	}
-
-	const targetDay = weeklyHours.find(day => day.dayOfWeek === template.dayOfWeek)
-	if (targetDay) {
-		targetDay.periods = [{ startTime: template.startTime, endTime: template.endTime }]
-	}
+	templates.forEach(template => {
+		const targetDay = weeklyHours.find(day => day.dayOfWeek === template.dayOfWeek)
+		if (targetDay) {
+			targetDay.periods.push({ startTime: template.startTime, endTime: template.endTime })
+		}
+	})
 
 	return weeklyHours
 }
 
 function buildInitialValues(
-	template: ClinicTemplate | null,
+	templates: ClinicTemplate[],
 	fallbackFacilityId: string
 ): TemplateFormValues {
-	if (!template) {
+	const primaryTemplate = templates[0]
+
+	if (!primaryTemplate) {
 		return {
 			...DEFAULT_FORM_VALUES,
 			facilityId: fallbackFacilityId,
@@ -209,18 +225,77 @@ function buildInitialValues(
 	}
 
 	return {
-		facilityId: template.facilityId,
-		clinicName: template.clinicName,
-		clinicianStaffId: template.clinicianStaffId,
-		weeklyHours: buildInitialWeeklyHours(template),
-		slotDurationMinutes: template.slotDurationMinutes,
-		maxPatients: template.maxPatients,
-		isActive: template.isActive,
+		facilityId: primaryTemplate.facilityId,
+		clinicName: primaryTemplate.clinicName,
+		clinicianStaffId: primaryTemplate.clinicianStaffId,
+		weeklyHours: buildInitialWeeklyHours(templates),
+		slotDurationMinutes: primaryTemplate.slotDurationMinutes,
+		maxPatients: primaryTemplate.maxPatients,
+		isActive: templates.some(template => template.isActive),
 	}
 }
 
 function formatDay(dayOfWeek: DayOfWeek) {
 	return DAY_OPTIONS.find(option => option.value === dayOfWeek)?.label ?? "Unknown"
+}
+
+function formatShortDay(dayOfWeek: DayOfWeek) {
+	return DAY_OPTIONS.find(option => option.value === dayOfWeek)?.shortLabel ?? "?"
+}
+
+function formatCapacitySummary(group: ClinicianTemplateGroup) {
+	const durations = Array.from(new Set(group.slotDurations)).sort((a, b) => a - b)
+	const patientCounts = Array.from(new Set(group.maxPatients)).sort((a, b) => a - b)
+
+	const durationLabel =
+		durations.length === 1 ? `${durations[0]} min` : `${durations[0]}-${durations.at(-1)} min`
+	const patientLabel =
+		patientCounts.length === 1
+			? `${patientCounts[0]} patients`
+			: `${patientCounts[0]}-${patientCounts.at(-1)} patients`
+
+	return `${durationLabel} / ${patientLabel}`
+}
+
+function groupTemplatesByClinician(
+	templates: TemplateWithClinicianName[]
+): ClinicianTemplateGroup[] {
+	const groups = new Map<string, ClinicianTemplateGroup>()
+
+	templates.forEach(template => {
+		const existing = groups.get(template.clinicianStaffId)
+		const group =
+			existing ??
+			({
+				clinicianStaffId: template.clinicianStaffId,
+				clinicianName: template.clinicianName,
+				templates: [],
+				clinicNames: [],
+				activeCount: 0,
+				days: [],
+				slotDurations: [],
+				maxPatients: [],
+			} satisfies ClinicianTemplateGroup)
+
+		group.templates.push(template)
+		group.clinicNames = Array.from(new Set([...group.clinicNames, template.clinicName])).sort()
+		group.activeCount += template.isActive ? 1 : 0
+		group.days = Array.from(new Set([...group.days, template.dayOfWeek])).sort((a, b) => a - b)
+		group.slotDurations.push(template.slotDurationMinutes)
+		group.maxPatients.push(template.maxPatients)
+
+		groups.set(template.clinicianStaffId, group)
+	})
+
+	return Array.from(groups.values())
+		.map(group => ({
+			...group,
+			templates: [...group.templates].sort(
+				(first, second) =>
+					first.dayOfWeek - second.dayOfWeek || first.startTime.localeCompare(second.startTime)
+			),
+		}))
+		.sort((first, second) => first.clinicianName.localeCompare(second.clinicianName))
 }
 
 function toFriendlyDisabledReason(
@@ -296,7 +371,7 @@ function getDisabledReasons(params: {
 	if (params.isEditing) {
 		const activeDay = params.values.weeklyHours.find(day => day.periods.length > 0)
 		if (!activeDay) {
-			reasons.push("Add working hours for this template day.")
+			reasons.push("Add working hours for at least one day.")
 		}
 	}
 
@@ -310,12 +385,12 @@ function getDisabledReasons(params: {
 function TemplateDialog({
 	open,
 	onOpenChange,
-	template,
+	templates,
 	facilityId,
 }: {
 	open: boolean
 	onOpenChange: (open: boolean) => void
-	template: ClinicTemplate | null
+	templates: ClinicTemplate[]
 	facilityId: string
 }) {
 	const clinicsQuery = useClinicsQuery()
@@ -323,12 +398,27 @@ function TemplateDialog({
 	const updateTemplateMutation = useUpdateScheduleTemplateMutation()
 	const [isSubmitting, setIsSubmitting] = useState(false)
 	const initialValues = useMemo(
-		() => buildInitialValues(template, facilityId),
-		[template, facilityId]
+		() => buildInitialValues(templates, facilityId),
+		[templates, facilityId]
 	)
 	const [selectedFacilityId, setSelectedFacilityId] = useState(
 		initialValues.facilityId || facilityId
 	)
+	const templatesByDay = useMemo(() => {
+		const grouped = new Map<DayOfWeek, ClinicTemplate[]>()
+
+		templates.forEach(template => {
+			const dayTemplates = grouped.get(template.dayOfWeek) ?? []
+			dayTemplates.push(template)
+			grouped.set(template.dayOfWeek, dayTemplates)
+		})
+
+		grouped.forEach(dayTemplates => {
+			dayTemplates.sort((first, second) => first.startTime.localeCompare(second.startTime))
+		})
+
+		return grouped
+	}, [templates])
 
 	const form = useForm({
 		defaultValues: initialValues,
@@ -339,26 +429,72 @@ function TemplateDialog({
 			setIsSubmitting(true)
 
 			try {
-				if (template) {
-					const activeDay = value.weeklyHours.find(day => day.dayOfWeek === template.dayOfWeek)
-					const period = activeDay?.periods[0]
-					if (!period) {
-						toast.error("Add working hours for the selected day.")
-						return
-					}
+				if (templates.length > 0) {
+					const retainedTemplateIds = new Set<string>()
+					const updateRequests: Array<Promise<unknown>> = []
+					const createRequests: Array<Promise<unknown>> = []
 
-					const payload: UpdateClinicTemplateInput & { id: string } = {
-						id: template.id,
-						clinicName: value.clinicName.trim(),
-						startTime: period.startTime,
-						endTime: period.endTime,
-						slotDurationMinutes: value.slotDurationMinutes,
-						maxPatients: value.maxPatients,
-						isActive: value.isActive,
-					}
+					value.weeklyHours.forEach(day => {
+						const existingTemplates = templatesByDay.get(day.dayOfWeek) ?? []
 
-					await updateTemplateMutation.mutateAsync(payload)
-					toast.success("Template updated.")
+						day.periods.forEach((period, periodIndex) => {
+							const existingTemplate = existingTemplates[periodIndex]
+
+							if (existingTemplate) {
+								retainedTemplateIds.add(existingTemplate.id)
+								updateRequests.push(
+									updateTemplateMutation.mutateAsync({
+										id: existingTemplate.id,
+										clinicName: value.clinicName.trim(),
+										startTime: period.startTime,
+										endTime: period.endTime,
+										slotDurationMinutes: value.slotDurationMinutes,
+										maxPatients: value.maxPatients,
+										isActive: value.isActive,
+									} satisfies UpdateClinicTemplateInput & { id: string })
+								)
+								return
+							}
+
+							createRequests.push(
+								createTemplateMutation
+									.mutateAsync({
+										facilityId: value.facilityId,
+										clinicName: value.clinicName.trim(),
+										clinicianStaffId: value.clinicianStaffId,
+										dayOfWeek: day.dayOfWeek,
+										startTime: period.startTime,
+										endTime: period.endTime,
+										slotDurationMinutes: value.slotDurationMinutes,
+										maxPatients: value.maxPatients,
+									} satisfies CreateClinicTemplateInput)
+									.then(createdTemplate => {
+										if (!value.isActive) {
+											return updateTemplateMutation.mutateAsync({
+												id: createdTemplate.id,
+												isActive: false,
+											} satisfies UpdateClinicTemplateInput & { id: string })
+										}
+
+										return createdTemplate
+									})
+							)
+						})
+					})
+
+					templates.forEach(existingTemplate => {
+						if (!retainedTemplateIds.has(existingTemplate.id) && existingTemplate.isActive) {
+							updateRequests.push(
+								updateTemplateMutation.mutateAsync({
+									id: existingTemplate.id,
+									isActive: false,
+								} satisfies UpdateClinicTemplateInput & { id: string })
+							)
+						}
+					})
+
+					await Promise.all([...updateRequests, ...createRequests])
+					toast.success("Templates updated.")
 					onOpenChange(false)
 					return
 				}
@@ -414,7 +550,7 @@ function TemplateDialog({
 		facilityId: selectedFacilityId,
 	})
 
-	const isEditing = Boolean(template)
+	const isEditing = templates.length > 0
 	const isPending =
 		isSubmitting || createTemplateMutation.isPending || updateTemplateMutation.isPending
 
@@ -449,7 +585,9 @@ function TemplateDialog({
 													setSelectedFacilityId(value ?? "")
 													form.setFieldValue("clinicianStaffId", "")
 												}}
-												disabled={clinicsQuery.isLoading || clinicsQuery.data.length === 0}
+												disabled={
+													isEditing || clinicsQuery.isLoading || clinicsQuery.data.length === 0
+												}
 											>
 												<SelectTrigger className="w-full" aria-invalid={isInvalid}>
 													<SelectValue>
@@ -482,7 +620,9 @@ function TemplateDialog({
 											<Select
 												value={field.state.value}
 												onValueChange={value => field.handleChange(value ?? "")}
-												disabled={!form.state.values.facilityId || cliniciansQuery.isLoading}
+												disabled={
+													isEditing || !form.state.values.facilityId || cliniciansQuery.isLoading
+												}
 											>
 												<SelectTrigger className="w-full" aria-invalid={isInvalid}>
 													<SelectValue>
@@ -544,7 +684,6 @@ function TemplateDialog({
 												const dayLabel =
 													DAY_OPTIONS.find(option => option.value === day.dayOfWeek)?.label ??
 													"Unknown"
-												const isEditableDay = !isEditing || day.dayOfWeek === template?.dayOfWeek
 
 												return (
 													<div
@@ -562,9 +701,7 @@ function TemplateDialog({
 																		type="button"
 																		variant="ghost"
 																		className="text-muted-foreground justify-start px-0"
-																		disabled={!isEditableDay}
 																		onClick={() => {
-																			if (!isEditableDay) return
 																			const nextValue = field.state.value.map((entry, index) =>
 																				index === dayIndex
 																					? {
@@ -588,7 +725,6 @@ function TemplateDialog({
 																			<Input
 																				type="time"
 																				value={period.startTime}
-																				disabled={!isEditableDay}
 																				className="w-full lg:w-44"
 																				onChange={event => {
 																					const nextValue = field.state.value.map(
@@ -615,7 +751,6 @@ function TemplateDialog({
 																			<Input
 																				type="time"
 																				value={period.endTime}
-																				disabled={!isEditableDay}
 																				className="w-full lg:w-44"
 																				onChange={event => {
 																					const nextValue = field.state.value.map(
@@ -644,9 +779,7 @@ function TemplateDialog({
 																					type="button"
 																					variant="ghost"
 																					size="sm"
-																					disabled={!isEditableDay}
 																					onClick={() => {
-																						if (!isEditableDay) return
 																						const nextPeriods = day.periods.filter(
 																							(_, index) => index !== periodIndex
 																						)
@@ -668,9 +801,7 @@ function TemplateDialog({
 																					type="button"
 																					variant="ghost"
 																					size="sm"
-																					disabled={!isEditableDay}
 																					onClick={() => {
-																						if (!isEditableDay) return
 																						const nextValue = field.state.value.map(
 																							(entry, entryIndex) =>
 																								entryIndex === dayIndex
@@ -692,14 +823,6 @@ function TemplateDialog({
 																		</div>
 																	))
 																)}
-
-																{isEditing && day.dayOfWeek !== template?.dayOfWeek ? (
-																	<p className="text-muted-foreground text-xs">
-																		Editing keeps this template on{" "}
-																		{formatDay(template?.dayOfWeek ?? 0)}. Create a new template to
-																		add another day.
-																	</p>
-																) : null}
 															</div>
 														</div>
 													</div>
@@ -832,6 +955,65 @@ function TemplateDialog({
 	)
 }
 
+function ScheduleListDialog({
+	group,
+	onOpenChange,
+}: {
+	group: ClinicianTemplateGroup | null
+	onOpenChange: (open: boolean) => void
+}) {
+	return (
+		<Dialog open={Boolean(group)} onOpenChange={onOpenChange}>
+			<DialogContent size="lg" className="max-h-[calc(100vh-2rem)] overflow-hidden">
+				<DialogHeader>
+					<DialogTitle>{group?.clinicianName ?? "Schedules"}</DialogTitle>
+					<DialogDescription>
+						{group
+							? `${group.templates.length} configured schedule${group.templates.length === 1 ? "" : "s"}`
+							: ""}
+					</DialogDescription>
+				</DialogHeader>
+
+				<div className="min-h-0 overflow-y-auto">
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead>Clinic</TableHead>
+								<TableHead>Day</TableHead>
+								<TableHead>Hours</TableHead>
+								<TableHead>Capacity</TableHead>
+								<TableHead>Status</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{group?.templates.map(template => (
+								<TableRow key={template.id}>
+									<TableCell className="font-medium">{template.clinicName}</TableCell>
+									<TableCell>{formatDay(template.dayOfWeek)}</TableCell>
+									<TableCell>
+										<span className="flex items-center gap-2">
+											<Clock3 className="text-muted-foreground size-4" />
+											{template.startTime} - {template.endTime}
+										</span>
+									</TableCell>
+									<TableCell>
+										{template.slotDurationMinutes} min / {template.maxPatients} patients
+									</TableCell>
+									<TableCell>
+										<Badge variant={template.isActive ? "default" : "secondary"}>
+											{template.isActive ? "Active" : "Inactive"}
+										</Badge>
+									</TableCell>
+								</TableRow>
+							))}
+						</TableBody>
+					</Table>
+				</div>
+			</DialogContent>
+		</Dialog>
+	)
+}
+
 interface TemplateBuilderProps {
 	facilityId: string
 }
@@ -842,7 +1024,10 @@ export function TemplateBuilder({ facilityId }: TemplateBuilderProps) {
 	const deactivateTemplateMutation = useDeleteScheduleTemplateMutation()
 
 	const [dialogOpen, setDialogOpen] = useState(false)
-	const [selectedTemplate, setSelectedTemplate] = useState<ClinicTemplate | null>(null)
+	const [selectedTemplates, setSelectedTemplates] = useState<ClinicTemplate[]>([])
+	const [scheduleDialogGroup, setScheduleDialogGroup] = useState<ClinicianTemplateGroup | null>(
+		null
+	)
 	const [deleteTarget, setDeleteTarget] = useState<ClinicTemplate | null>(null)
 
 	const clinicianNameById = useMemo(
@@ -858,14 +1043,15 @@ export function TemplateBuilder({ facilityId }: TemplateBuilderProps) {
 			})),
 		[clinicianNameById, templatesQuery.data]
 	)
+	const clinicianTemplateGroups = useMemo(() => groupTemplatesByClinician(templates), [templates])
 
 	function openCreateDialog() {
-		setSelectedTemplate(null)
+		setSelectedTemplates([])
 		setDialogOpen(true)
 	}
 
-	function openEditDialog(template: ClinicTemplate) {
-		setSelectedTemplate(template)
+	function openEditDialog(group: ClinicianTemplateGroup) {
+		setSelectedTemplates(group.templates)
 		setDialogOpen(true)
 	}
 
@@ -924,79 +1110,135 @@ export function TemplateBuilder({ facilityId }: TemplateBuilderProps) {
 								void templatesQuery.refetch()
 							}}
 						/>
-					) : templates.length === 0 ? (
+					) : clinicianTemplateGroups.length === 0 ? (
 						<EmptyState title="No templates configured yet." />
 					) : (
 						<Table>
 							<TableHeader>
 								<TableRow>
-									<TableHead>Clinic</TableHead>
 									<TableHead>Clinician</TableHead>
-									<TableHead>Day</TableHead>
-									<TableHead>Hours</TableHead>
+									<TableHead>Clinics</TableHead>
+									<TableHead>Schedule</TableHead>
 									<TableHead>Capacity</TableHead>
 									<TableHead>Status</TableHead>
 									<TableHead className="text-right">Actions</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{templates.map(template => (
-									<TableRow key={template.id}>
-										<TableCell className="font-medium">{template.clinicName}</TableCell>
-										<TableCell>{template.clinicianName}</TableCell>
-										<TableCell>{formatDay(template.dayOfWeek)}</TableCell>
-										<TableCell>
-											<span className="flex items-center gap-2">
-												<Clock3 className="text-muted-foreground size-4" />
-												{template.startTime} - {template.endTime}
-											</span>
-										</TableCell>
-										<TableCell>
-											<span className="flex items-center gap-2">
-												<CalendarDays className="text-muted-foreground size-4" />
-												{template.slotDurationMinutes} min / {template.maxPatients} patients
-											</span>
-										</TableCell>
-										<TableCell>
-											<Badge variant={template.isActive ? "default" : "secondary"}>
-												{template.isActive ? "Active" : "Inactive"}
-											</Badge>
-										</TableCell>
-										<TableCell className="text-right">
-											<div className="flex justify-end gap-2">
-												<Button
-													variant="outline"
-													size="sm"
-													onClick={() => openEditDialog(template)}
-												>
-													Edit
-												</Button>
-												<Button
-													variant="ghost"
-													size="sm"
-													className="text-destructive"
-													disabled={!template.isActive || deactivateTemplateMutation.isPending}
-													onClick={() => setDeleteTarget(template)}
-												>
-													<Trash2 className="mr-1 size-4" />
-													Delete
-												</Button>
-											</div>
-										</TableCell>
-									</TableRow>
-								))}
+								{clinicianTemplateGroups.map(group => {
+									const inactiveCount = group.templates.length - group.activeCount
+
+									return (
+										<TableRow key={group.clinicianStaffId}>
+											<TableCell className="font-medium">{group.clinicianName}</TableCell>
+											<TableCell>
+												<div className="flex flex-wrap gap-1.5">
+													{group.clinicNames.map(clinicName => (
+														<Badge key={clinicName} variant="outline">
+															{clinicName}
+														</Badge>
+													))}
+												</div>
+											</TableCell>
+											<TableCell>
+												<div className="flex flex-wrap gap-1.5">
+													{group.days.map(day => (
+														<Badge key={day} variant="secondary">
+															{formatShortDay(day)}
+														</Badge>
+													))}
+												</div>
+											</TableCell>
+											<TableCell>
+												<span className="flex items-center gap-2">
+													<CalendarDays className="text-muted-foreground size-4" />
+													{formatCapacitySummary(group)}
+												</span>
+											</TableCell>
+											<TableCell>
+												<div className="flex flex-wrap gap-1.5">
+													<Badge variant={group.activeCount > 0 ? "default" : "secondary"}>
+														{group.activeCount} active
+													</Badge>
+													{inactiveCount > 0 ? (
+														<Badge variant="secondary">{inactiveCount} inactive</Badge>
+													) : null}
+												</div>
+											</TableCell>
+											<TableCell className="text-right">
+												<div className="flex justify-end gap-2">
+													<Tooltip>
+														<TooltipTrigger render={<span className="inline-flex" />}>
+															<Button
+																variant="outline"
+																size="icon-sm"
+																aria-label={`View schedules for ${group.clinicianName}`}
+																onClick={() => setScheduleDialogGroup(group)}
+															>
+																<CalendarDays className="size-4" />
+															</Button>
+														</TooltipTrigger>
+														<TooltipContent>View schedules</TooltipContent>
+													</Tooltip>
+													<Tooltip>
+														<TooltipTrigger render={<span className="inline-flex" />}>
+															<Button
+																variant="outline"
+																size="icon-sm"
+																aria-label={`Edit schedules for ${group.clinicianName}`}
+																onClick={() => openEditDialog(group)}
+															>
+																<Pencil className="size-4" />
+															</Button>
+														</TooltipTrigger>
+														<TooltipContent>Edit schedules</TooltipContent>
+													</Tooltip>
+													{group.templates.length === 1 ? (
+														<Tooltip>
+															<TooltipTrigger render={<span className="inline-flex" />}>
+																<Button
+																	variant="ghost"
+																	size="icon-sm"
+																	className="text-destructive"
+																	disabled={
+																		!group.templates[0]?.isActive ||
+																		deactivateTemplateMutation.isPending
+																	}
+																	aria-label={`Delete schedule for ${group.clinicianName}`}
+																	onClick={() => setDeleteTarget(group.templates[0] ?? null)}
+																>
+																	<Trash2 className="size-4" />
+																</Button>
+															</TooltipTrigger>
+															<TooltipContent>Delete schedule</TooltipContent>
+														</Tooltip>
+													) : null}
+												</div>
+											</TableCell>
+										</TableRow>
+									)
+								})}
 							</TableBody>
 						</Table>
 					)}
 				</CardContent>
 			</Card>
 
+			<ScheduleListDialog
+				group={scheduleDialogGroup}
+				onOpenChange={open => {
+					if (!open) {
+						setScheduleDialogGroup(null)
+					}
+				}}
+			/>
+
 			{dialogOpen ? (
 				<TemplateDialog
-					key={selectedTemplate?.id ?? "new-template"}
+					key={selectedTemplates.map(template => template.id).join(":") || "new-template"}
 					open={dialogOpen}
 					onOpenChange={setDialogOpen}
-					template={selectedTemplate}
+					templates={selectedTemplates}
 					facilityId={facilityId}
 				/>
 			) : null}
