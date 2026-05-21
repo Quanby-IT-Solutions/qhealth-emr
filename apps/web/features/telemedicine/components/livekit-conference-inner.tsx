@@ -596,6 +596,8 @@ function FloatingControlDock({ visible }: { visible: boolean }) {
 	const [controlError, setControlError] = useState<string | null>(null)
 	const localControlsReady = Boolean(localParticipant)
 	const dockIsVisible = visible || settingsOpen || endDialogOpen || Boolean(controlError)
+	const deviceSelectClassName =
+		"w-full min-w-0 [&_*]:min-w-0 [&_button]:w-full [&_button]:max-w-full [&_button]:overflow-hidden [&_button]:truncate [&_button]:whitespace-nowrap [&_button]:rounded-lg [&_button]:px-3 [&_button]:py-2 [&_button]:text-left [&_button]:text-sm [&_button]:text-zinc-200 [&_button]:hover:bg-white/10 [&_li]:max-w-full [&_li]:overflow-hidden [&_li_button]:truncate [&_li_button]:whitespace-nowrap [&_li[data-lk-active=true]_button]:bg-cyan-400/15 [&_li[data-lk-active=true]_button]:text-cyan-200"
 
 	useEffect(() => {
 		if (!controlError) return
@@ -711,7 +713,7 @@ function FloatingControlDock({ visible }: { visible: boolean }) {
 									</p>
 									<MediaDeviceSelect
 										kind="audioinput"
-										className="[&_button]:w-full [&_button]:rounded-lg [&_button]:px-3 [&_button]:py-2 [&_button]:text-left [&_button]:text-sm [&_button]:text-zinc-200 [&_button]:hover:bg-white/10 [&_li[data-lk-active=true]_button]:bg-cyan-400/15 [&_li[data-lk-active=true]_button]:text-cyan-200"
+										className={deviceSelectClassName}
 									/>
 								</div>
 								<div className="space-y-2">
@@ -720,7 +722,7 @@ function FloatingControlDock({ visible }: { visible: boolean }) {
 									</p>
 									<MediaDeviceSelect
 										kind="videoinput"
-										className="[&_button]:w-full [&_button]:rounded-lg [&_button]:px-3 [&_button]:py-2 [&_button]:text-left [&_button]:text-sm [&_button]:text-zinc-200 [&_button]:hover:bg-white/10 [&_li[data-lk-active=true]_button]:bg-cyan-400/15 [&_li[data-lk-active=true]_button]:text-cyan-200"
+										className={deviceSelectClassName}
 									/>
 								</div>
 							</div>
@@ -824,7 +826,7 @@ function FloatingControlDock({ visible }: { visible: boolean }) {
 						</div>
 						<AlertDialogTitle>End this video call?</AlertDialogTitle>
 						<AlertDialogDescription>
-							The LiveKit room will disconnect for you and the session can be joined again if
+							The video room will disconnect for you and the session can be joined again if
 							needed.
 						</AlertDialogDescription>
 					</AlertDialogHeader>

@@ -50,8 +50,8 @@ function noteTypeLabel(type: string) {
 
 interface NoteViewDialogProps {
 	noteId: string
-	encounterId: string
-	patientId: string
+	encounterId?: string
+	patientId?: string
 	open: boolean
 	onOpenChange: (open: boolean) => void
 	canWrite?: boolean
@@ -192,7 +192,7 @@ export function NoteViewDialog({
 												</div>
 											</div>
 										) : (
-											<div className="bg-muted/50 rounded-md border p-4 text-sm break-words whitespace-pre-wrap">
+											<div className="bg-muted/50 rounded-md border p-4 text-sm wrap-break-word whitespace-pre-wrap">
 												{note.content || "No content"}
 											</div>
 										)}
@@ -222,7 +222,7 @@ export function NoteViewDialog({
 																		Reason: {addendum.reason}
 																	</div>
 																)}
-																<div className="text-sm break-words whitespace-pre-wrap">
+																<div className="text-sm wrap-break-word whitespace-pre-wrap">
 																	{addendum.content}
 																</div>
 																{addendum.authorStaffId === staffProfile?.id && (

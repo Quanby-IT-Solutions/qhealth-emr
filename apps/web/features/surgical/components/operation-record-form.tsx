@@ -131,7 +131,7 @@ function StaffSearchCombobox({
 	return (
 		<Popover open={open} onOpenChange={handleOpenChange}>
 			<Command shouldFilter={false} className="h-auto w-full overflow-visible bg-transparent p-0">
-				<PopoverTrigger render={<div className="w-full" />}>
+				<PopoverTrigger render={<div className="w-full" />} nativeButton={false}>
 					<CommandInput
 						id={id}
 						value={inputValue || selectedOption?.name || ""}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowRight, Calendar, Clock, User, Video } from "lucide-react"
+import { AlertCircle, ArrowRight, Calendar, Clock, User, Video } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -12,7 +12,6 @@ import { useStaffClinicianListQuery } from "@/features/scheduling/api/scheduling
 import {
 	formatAppointmentStatusLabel,
 	getAppointmentStatusColor,
-	getPlatformLabel,
 	useAppointmentsQuery,
 	useCreateAppointmentMutation,
 	type AppointmentStatus,
@@ -74,15 +73,13 @@ const EMPTY_FORM: BookingFormState = {
 
 function formatDate(val: string): string {
 	if (!val) return "-"
-	return new Date(val).toLocaleDateString("en-PH", {
+	const date = new Date(val)
+	if (Number.isNaN(date.getTime())) return val
+	return date.toLocaleDateString("en-PH", {
 		month: "short",
 		day: "numeric",
 		year: "numeric",
 	})
-}
-
-function isValidEmail(value: string): boolean {
-	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
 function isFutureAppointment(date: string, time: string): boolean {
@@ -183,11 +180,6 @@ export function VirtualVisitScheduler({
 			setError("Appointment date and time must be in the future.")
 			return
 		}
-		if (form.patientEmail.trim() && !isValidEmail(form.patientEmail.trim())) {
-			setError("Enter a valid patient email address.")
-			return
-		}
-
 		const input: CreateAppointmentInput = {
 			facilityId,
 			patientId: form.patientId,
@@ -216,17 +208,32 @@ export function VirtualVisitScheduler({
 	return (
 		<div className="space-y-4">
 			{/* Header */}
-			<div className="flex items-center justify-between">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div>
 					<h2 className="text-lg font-semibold">Virtual Visit Scheduler</h2>
 					<p className="text-muted-foreground text-sm">
-						Book LiveKit telemedicine appointments and secure patient invite links
+						Book telemedicine appointments and secure patient invite links
 					</p>
 				</div>
-				<Button onClick={() => setShowForm(v => !v)} variant={showForm ? "outline" : "default"}>
+				<Button
+					onClick={() => setShowForm(v => !v)}
+					variant={showForm ? "outline" : "default"}
+					disabled={!facilityId}
+					className="w-full sm:w-auto"
+				>
 					{showForm ? "Cancel" : "New Appointment"}
 				</Button>
 			</div>
+
+			{!facilityId && (
+				<div className="border-destructive/30 bg-destructive/10 text-destructive flex items-start gap-2 rounded-lg border px-4 py-3 text-sm">
+					<AlertCircle className="mt-0.5 size-4 shrink-0" />
+					<p>
+						Your account is not linked to an active facility, so appointments cannot be
+						booked from this screen.
+					</p>
+				</div>
+			)}
 
 			{/* Booking Form */}
 			{showForm && (
@@ -237,8 +244,8 @@ export function VirtualVisitScheduler({
 					<CardContent>
 						<form onSubmit={handleSubmit} className="space-y-5">
 							{/* Patient Info */}
-							<div className="grid grid-cols-2 gap-4">
-								<div className="relative col-span-2 space-y-1.5">
+							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+								<div className="relative space-y-1.5 sm:col-span-2">
 									<label htmlFor="patientSearch" className="text-sm font-medium">
 										Patient <span className="text-destructive">*</span>
 									</label>
@@ -288,31 +295,22 @@ export function VirtualVisitScheduler({
 										</div>
 									)}
 								</div>
-								<div className="space-y-1.5">
-									<label htmlFor="patientContact" className="text-sm font-medium">
-										Contact Number
-									</label>
-									<input
-										id="patientContact"
-										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-										value={form.patientContactNumber}
-										onChange={e => patch("patientContactNumber", e.target.value)}
-										placeholder="+63 9XX XXX XXXX"
-									/>
-								</div>
-								<div className="space-y-1.5">
-									<label htmlFor="patientEmail" className="text-sm font-medium">
-										Email (optional)
-									</label>
-									<input
-										id="patientEmail"
-										type="email"
-										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-										value={form.patientEmail}
-										onChange={e => patch("patientEmail", e.target.value)}
-										placeholder="patient@email.com"
-									/>
-								</div>
+								{form.patientId && (
+									<>
+										<div className="rounded-md border bg-muted/30 px-3 py-2">
+											<p className="text-muted-foreground text-xs">Contact Number</p>
+											<p className="text-sm font-medium">
+												{form.patientContactNumber || "No number on patient record"}
+											</p>
+										</div>
+										<div className="rounded-md border bg-muted/30 px-3 py-2">
+											<p className="text-muted-foreground text-xs">Email</p>
+											<p className="text-sm font-medium">
+												{form.patientEmail || "No email on patient record"}
+											</p>
+										</div>
+									</>
+								)}
 							</div>
 
 							{/* Clinician */}
@@ -340,7 +338,7 @@ export function VirtualVisitScheduler({
 							</div>
 
 							{/* Date, Time, Duration */}
-							<div className="grid grid-cols-3 gap-4">
+							<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 								<div className="space-y-1.5">
 									<label htmlFor="scheduledDate" className="text-sm font-medium">
 										Date <span className="text-destructive">*</span>
@@ -422,7 +420,7 @@ export function VirtualVisitScheduler({
 			{/* Appointments List */}
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base">Upcoming Appointments</CardTitle>
+					<CardTitle className="text-base">Appointments</CardTitle>
 				</CardHeader>
 				<CardContent>
 					{isLoading ? (
@@ -436,7 +434,7 @@ export function VirtualVisitScheduler({
 							{appointments.data.map(appt => {
 								const isSelected = selectedAppointmentId === appt.id
 								return (
-									<div key={appt.id} className="flex items-start gap-4 py-4">
+									<div key={appt.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:gap-4">
 										<div className="bg-primary/10 flex size-10 shrink-0 items-center justify-center rounded-full">
 											<Video className="text-primary size-5" />
 										</div>
@@ -464,21 +462,18 @@ export function VirtualVisitScheduler({
 													<Clock className="size-3" />
 													{appt.scheduledTime} ({appt.durationMinutes} min)
 												</span>
-												<span className="flex items-center gap-1">
-													<Video className="size-3" />
-													{getPlatformLabel(appt.platform)}
-												</span>
 											</div>
 											{appt.notes && (
 												<p className="text-muted-foreground truncate text-xs">{appt.notes}</p>
 											)}
 										</div>
-										<div className="flex shrink-0 flex-wrap justify-end gap-2">
+										<div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
 											<Button
 												type="button"
 												size="sm"
 												variant={isSelected ? "secondary" : "outline"}
 												onClick={() => onAppointmentSelected?.(appt.id, appt.encounterId)}
+												className="w-full sm:w-auto"
 											>
 												{appt.encounterId ? "Continue Encounter" : "Start Virtual Encounter"}
 												<ArrowRight className="ml-1.5 size-3.5" />
@@ -487,7 +482,7 @@ export function VirtualVisitScheduler({
 												href={getVideoLaunchPath(appt.id)}
 												target="_blank"
 												rel="noopener noreferrer"
-												className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium"
+												className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex w-full items-center justify-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium sm:w-auto"
 											>
 												<Video className="size-3" />
 												Open Video

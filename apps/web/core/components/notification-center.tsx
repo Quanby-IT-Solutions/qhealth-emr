@@ -77,6 +77,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger
+					id="notification-center-trigger"
 					render={
 						<button
 							type="button"

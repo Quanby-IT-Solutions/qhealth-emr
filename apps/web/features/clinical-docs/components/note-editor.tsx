@@ -273,7 +273,7 @@ function Icd10DiagnosisField({
 				</p>
 				<Popover open={open} onOpenChange={setOpen}>
 					<Command shouldFilter={false} className="h-auto w-full overflow-visible bg-transparent p-0">
-						<PopoverTrigger render={<div className="w-full" />}>
+						<PopoverTrigger render={<div className="w-full" />} nativeButton={false}>
 							<CommandInput
 								data-element-id="icd10-search"
 								value={inputValue}

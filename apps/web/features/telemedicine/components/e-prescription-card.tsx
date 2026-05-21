@@ -292,11 +292,13 @@ function MedicationRow({
 	index,
 	onChange,
 	onRemove,
+	removeDisabled,
 }: {
 	med: NewMedItem
 	index: number
 	onChange: (key: keyof NewMedItem, value: string | number) => void
 	onRemove: () => void
+	removeDisabled?: boolean
 }) {
 	return (
 		<div className="space-y-3 rounded-lg border p-4">
@@ -305,7 +307,9 @@ function MedicationRow({
 				<button
 					type="button"
 					onClick={onRemove}
-					className="text-muted-foreground hover:text-destructive rounded p-1 transition-colors"
+					disabled={removeDisabled}
+					title={removeDisabled ? "At least one medication row is required" : "Remove medication"}
+					className="text-muted-foreground hover:text-destructive disabled:hover:text-muted-foreground rounded p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
 				>
 					<Trash2 className="size-3.5" />
 				</button>
@@ -742,7 +746,10 @@ export function EPrescriptionCard({
 	}
 
 	function removeMedication(index: number) {
-		setMedications(prev => prev.filter((_, i) => i !== index))
+		setMedications(prev => {
+			if (prev.length <= 1) return [{ ...EMPTY_MED }]
+			return prev.filter((_, i) => i !== index)
+		})
 	}
 
 	function updateMedication(index: number, key: keyof NewMedItem, value: string | number) {
@@ -848,6 +855,7 @@ export function EPrescriptionCard({
 									index={i}
 									onChange={(key, value) => updateMedication(i, key, value)}
 									onRemove={() => removeMedication(i)}
+									removeDisabled={medications.length <= 1}
 								/>
 							))}
 						</div>

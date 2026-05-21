@@ -532,6 +532,8 @@ export class ClinicalDocsService {
 				facilityId: clinicalNotes.facilityId,
 				encounterId: clinicalNotes.encounterId,
 				preEncounterId: clinicalNotes.preEncounterId,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
 				templateId: clinicalNotes.templateId,
 				templateName: noteTemplates.name,
 				noteType: clinicalNotes.noteType,
@@ -548,6 +550,8 @@ export class ClinicalDocsService {
 			.from(clinicalNotes)
 			.leftJoin(staffProfiles, eq(clinicalNotes.authorStaffId, staffProfiles.id))
 			.leftJoin(users, eq(staffProfiles.userId, users.id))
+			.leftJoin(encounters, eq(clinicalNotes.encounterId, encounters.id))
+			.leftJoin(patients, eq(encounters.patientId, patients.id))
 			.leftJoin(noteTemplates, eq(clinicalNotes.templateId, noteTemplates.id))
 			.where(whereClause)
 			.orderBy(desc(clinicalNotes.createdAt))
@@ -555,9 +559,16 @@ export class ClinicalDocsService {
 			.offset(offset)
 
 		const total = totalResult?.count ?? 0
+		const data = rows.map(({ patientFirstName, patientLastName, ...note }) => ({
+			...note,
+			patientName:
+				patientFirstName && patientLastName
+					? `${patientLastName}, ${patientFirstName}`
+					: null,
+		}))
 
 		return {
-			data: rows,
+			data,
 			total,
 			page,
 			limit,

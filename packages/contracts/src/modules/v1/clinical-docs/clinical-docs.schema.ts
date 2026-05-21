@@ -141,6 +141,7 @@ export const ClinicalNoteSchema = z.object({
 	facilityId: z.string().uuid(),
 	encounterId: z.string().uuid().nullable(),
 	preEncounterId: z.string().uuid().nullable(),
+	patientName: z.string().nullable().optional(),
 	templateId: z.string().uuid().nullable(),
 	templateName: z.string().nullable(),
 	noteType: NoteTypeEnum,

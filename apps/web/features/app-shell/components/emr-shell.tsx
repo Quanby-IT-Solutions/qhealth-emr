@@ -22,6 +22,78 @@ import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 
 // --- Custom SVGs ---
 
+const UUID_SEGMENT_RE =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const ROUTE_SEGMENT_LABELS: Record<string, string> = {
+	"admin": "Admin",
+	"appointments": "Appointments",
+	"billing": "Billing",
+	"cf4": "CF4",
+	"cf5": "CF5",
+	"clinical-docs": "Clinical Docs",
+	"dashboard": "Dashboard",
+	"death-report": "Death Report",
+	"discharge": "Discharge",
+	"drg": "DRG",
+	"e-prescription": "E-Prescription",
+	"eligibility-check": "Eligibility Check",
+	"encounters": "Encounters",
+	"esoa": "ESOA",
+	"him": "HIM",
+	"msw": "MSW",
+	"opd": "OPD",
+	"or": "OR",
+	"patients": "Patients",
+	"pidsr": "PIDSR",
+	"pre-op": "Pre-Op",
+	"problems-allergies": "Problems & Allergies",
+	"surgical": "Surgical",
+	"telemedicine": "Telemedicine",
+	"video": "Video Room",
+}
+
+function titleCaseRouteSegment(segment: string): string {
+	return segment
+		.split("-")
+		.filter(Boolean)
+		.map(part => part.charAt(0).toUpperCase() + part.slice(1))
+		.join(" ")
+}
+
+function getDynamicSegmentLabel(segment: string, previousSegment?: string): string | null {
+	if (!UUID_SEGMENT_RE.test(segment)) return null
+
+	switch (previousSegment) {
+		case "appointments":
+			return "Appointment"
+		case "encounters":
+			return "Encounter Chart"
+		case "patients":
+			return "Patient Chart"
+		case "surgical":
+			return "Case Details"
+		default:
+			return "Details"
+	}
+}
+
+function formatBreadcrumbPath(pathname: string): string {
+	if (pathname === "/dashboard") return "Dashboard"
+
+	const labels = pathname
+		.split("/")
+		.filter(Boolean)
+		.map((segment, index, segments) => {
+			const previousSegment = segments[index - 1]
+			const dynamicLabel = getDynamicSegmentLabel(segment, previousSegment)
+			if (dynamicLabel) return dynamicLabel
+			return ROUTE_SEGMENT_LABELS[segment] ?? titleCaseRouteSegment(segment)
+		})
+
+	return labels.join(" > ")
+}
+
 const Icons = {
 	Dashboard: (props: any) => (
 		<svg
@@ -1284,13 +1356,7 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 
 					<div className="flex min-w-0 items-center gap-2">
 						<span className="text-foreground truncate font-sans text-[14px] font-medium">
-							{pathname === "/dashboard"
-								? "Dashboard"
-								: pathname
-										.split("/")
-										.filter(Boolean)
-										.map(p => p.charAt(0).toUpperCase() + p.slice(1))
-										.join(" > ")}
+							{formatBreadcrumbPath(pathname)}
 						</span>
 					</div>
 
