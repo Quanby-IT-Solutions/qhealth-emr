@@ -1,6 +1,6 @@
 "use client"
 
-import { useContext, useRef, useState } from "react"
+import { useContext, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft01FreeIcons } from "@hugeicons/core-free-icons"
@@ -17,6 +17,7 @@ import {
 	useEncounterListQuery,
 } from "@/features/encounters/api/encounters.hooks"
 import { ChartContext } from "@/features/encounters/context/chart-context"
+import { SignatureCanvas } from "@/features/nursing/components/consent-capture"
 import { usePatientProfileQuery } from "@/features/patients/api/patients.hooks"
 import { useCreateBirthRegistrationMutation } from "@/features/registrar/civil-registry/api/lcr.hooks"
 import { LocationPicker } from "@/features/registrar/civil-registry/components/location-picker"
@@ -98,7 +99,6 @@ export function BirthCertificateForm() {
 		placeOfBirthRegion: "",
 	})
 	const [signatureDataUrl, setSignatureDataUrl] = useState<string>("")
-	const signatureInputRef = useRef<HTMLInputElement>(null)
 	const resolvedBirthDatetime =
 		form.birthDatetime || (patient?.dateOfBirth ? formatDateTimeLocal(patient.dateOfBirth) : "")
 
@@ -126,14 +126,6 @@ export function BirthCertificateForm() {
 
 	const canSubmit =
 		!!facilityId && !!patientId && !!resolvedBirthDatetime && !createBirthRegistration.isPending
-
-	function handleSignatureUpload(e: React.ChangeEvent<HTMLInputElement>) {
-		const file = e.target.files?.[0]
-		if (!file) return
-		const reader = new FileReader()
-		reader.onload = ev => setSignatureDataUrl(ev.target?.result as string)
-		reader.readAsDataURL(file)
-	}
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault()
@@ -304,19 +296,15 @@ export function BirthCertificateForm() {
 						</div>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Digital Signature (upload PNG/JPEG)</Label>
-						<Input
-							ref={signatureInputRef}
-							type="file"
-							accept="image/png,image/jpeg"
-							onChange={handleSignatureUpload}
+						<Label>Digital Signature</Label>
+						<SignatureCanvas
+							label="Physician signature"
+							onCapture={dataUrl => setSignatureDataUrl(dataUrl)}
+							onClear={() => setSignatureDataUrl("")}
+							disabled={createBirthRegistration.isPending}
 						/>
 						{signatureDataUrl && (
-							<img
-								src={signatureDataUrl}
-								alt="Physician signature preview"
-								className="mt-2 h-16 rounded border object-contain"
-							/>
+							<p className="text-muted-foreground text-xs">Physician signature captured.</p>
 						)}
 					</div>
 				</CardContent>

@@ -10,7 +10,9 @@ import { and, count, desc, eq } from "drizzle-orm"
 import {
 	birthRegistrations,
 	deathCertificateRegistrations,
+	encounters,
 	lcrTracking,
+	patients,
 	staffProfiles,
 } from "@repo/db/schema"
 
@@ -223,9 +225,20 @@ export class CivilRegistryService {
 			input.sourceRecordId
 		)
 		this.assertCertificateReleased(input.certificateType, source)
+		if (input.certificateType === "birth") {
+			this.assertLcrBirthRegistrationComplete(source as BirthRegistrationRow)
+		} else {
+			this.assertLcrDeathCertificateComplete(source as DeathCertificateRegistrationRow)
+		}
 
 		const now = new Date()
 		const generationFailed = !!input.error
+		const artifactUrl = input.artifactUrl?.trim()
+		if (!generationFailed && !artifactUrl) {
+			throw new BadRequestException(
+				"A non-empty artifact URL is required before marking an LCR artifact as generated"
+			)
+		}
 		const set: Partial<LcrTrackingRow> = {
 			updatedAt: now,
 			lastSubmissionError: generationFailed ? input.error : tracking.lastSubmissionError,
@@ -235,11 +248,11 @@ export class CivilRegistryService {
 		if (input.artifactType === "pdf") {
 			set.pdfStatus = generationFailed ? "failed" : "generated"
 			set.pdfGeneratedAt = generationFailed ? null : now
-			set.pdfUrl = generationFailed ? null : (input.artifactUrl ?? tracking.pdfUrl)
+			set.pdfUrl = generationFailed ? null : artifactUrl
 		} else {
 			set.xmlStatus = generationFailed ? "failed" : "generated"
 			set.xmlGeneratedAt = generationFailed ? null : now
-			set.xmlUrl = generationFailed ? null : (input.artifactUrl ?? tracking.xmlUrl)
+			set.xmlUrl = generationFailed ? null : artifactUrl
 		}
 
 		const nextPdfStatus = set.pdfStatus ?? tracking.pdfStatus
@@ -274,9 +287,14 @@ export class CivilRegistryService {
 
 		if (
 			input.submissionStatus !== "error" &&
-			(tracking.pdfStatus !== "generated" || tracking.xmlStatus !== "generated")
+			(tracking.pdfStatus !== "generated" ||
+				tracking.xmlStatus !== "generated" ||
+				!tracking.pdfUrl?.trim() ||
+				!tracking.xmlUrl?.trim())
 		) {
-			throw new BadRequestException("LCR PDF and XML artifacts must be generated before submission")
+			throw new BadRequestException(
+				"LCR PDF and XML artifacts must be generated with persisted artifact URLs before submission"
+			)
 		}
 
 		const now = new Date()
@@ -571,8 +589,20 @@ export class CivilRegistryService {
 		return row
 	}
 
-	async createDeathCertificateRegistration(input: CreateDeathCertificateRegistrationInput) {
-		const resolvedStaffId = input.registeredByStaffId ?? null
+	async createDeathCertificateRegistration(
+		input: CreateDeathCertificateRegistrationInput,
+		userId?: string
+	) {
+		await this.assertDeathCertificatePatientContext({
+			facilityId: input.facilityId,
+			patientId: input.patientId,
+			encounterId: input.encounterId,
+		})
+		const resolvedStaffId = await this.resolveDeathCertificateRegistrarStaffId({
+			facilityId: input.facilityId,
+			registeredByStaffId: input.registeredByStaffId,
+			userId,
+		})
 
 		const deathDatetime = new Date(input.deathDatetime)
 		if (Number.isNaN(deathDatetime.getTime())) {
@@ -618,6 +648,12 @@ export class CivilRegistryService {
 
 	async updateDeathCertificateRegistration(input: UpdateDeathCertificateRegistrationInput) {
 		const existing = await this.getDeathCertificateRegistration(input.id)
+		await this.assertDeathCertificatePatientContext({
+			facilityId: existing.facilityId,
+			patientId: existing.patientId,
+			encounterId: input.encounterId ?? existing.encounterId ?? undefined,
+		})
+
 		const updateData: Record<string, unknown> = { updatedAt: new Date() }
 
 		if (input.encounterId !== undefined) updateData.encounterId = input.encounterId
@@ -628,8 +664,13 @@ export class CivilRegistryService {
 			}
 			updateData.deathDatetime = deathDatetime
 		}
-		if (input.registeredByStaffId !== undefined)
+		if (input.registeredByStaffId !== undefined) {
+			await this.assertDeathCertificateRegistrarStaffProfile(
+				input.registeredByStaffId,
+				existing.facilityId
+			)
 			updateData.registeredByStaffId = input.registeredByStaffId
+		}
 		if (input.status !== undefined) updateData.status = input.status
 		if (input.certificateNumber !== undefined)
 			updateData.certificateNumber = input.certificateNumber
@@ -866,6 +907,112 @@ export class CivilRegistryService {
 			.where(eq(deathCertificateRegistrations.id, sourceRecordId))
 	}
 
+	private async assertDeathCertificatePatientContext(input: {
+		facilityId: string
+		patientId: string
+		encounterId?: string | null
+	}) {
+		const [patient] = await db
+			.select({
+				id: patients.id,
+				facilityId: patients.facilityId,
+			})
+			.from(patients)
+			.where(eq(patients.id, input.patientId))
+			.limit(1)
+
+		if (!patient) {
+			throw new NotFoundException(`Patient ${input.patientId} not found`)
+		}
+
+		if (patient.facilityId !== input.facilityId) {
+			throw new BadRequestException(
+				"Death certificate facility does not match the patient's facility."
+			)
+		}
+
+		if (!input.encounterId) return
+
+		const [encounter] = await db
+			.select({
+				id: encounters.id,
+				facilityId: encounters.facilityId,
+				patientId: encounters.patientId,
+			})
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+			.limit(1)
+
+		if (!encounter) {
+			throw new NotFoundException(`Encounter ${input.encounterId} not found`)
+		}
+
+		if (encounter.patientId !== input.patientId) {
+			throw new BadRequestException(
+				"Death certificate patient does not match the encounter patient."
+			)
+		}
+
+		if (encounter.facilityId !== input.facilityId) {
+			throw new BadRequestException(
+				"Death certificate facility does not match the encounter facility."
+			)
+		}
+	}
+
+	private async resolveDeathCertificateRegistrarStaffId(input: {
+		facilityId: string
+		registeredByStaffId?: string
+		userId?: string
+	}) {
+		if (input.registeredByStaffId) {
+			await this.assertDeathCertificateRegistrarStaffProfile(
+				input.registeredByStaffId,
+				input.facilityId
+			)
+			return input.registeredByStaffId
+		}
+
+		if (!input.userId) return null
+
+		const [profile] = await db
+			.select({ id: staffProfiles.id })
+			.from(staffProfiles)
+			.where(
+				and(
+					eq(staffProfiles.userId, input.userId),
+					eq(staffProfiles.facilityId, input.facilityId),
+					eq(staffProfiles.isActive, true)
+				)
+			)
+			.limit(1)
+
+		return profile?.id ?? null
+	}
+
+	private async assertDeathCertificateRegistrarStaffProfile(
+		registeredByStaffId: string,
+		facilityId: string
+	) {
+		const [profile] = await db
+			.select({ id: staffProfiles.id })
+			.from(staffProfiles)
+			.where(
+				and(
+					eq(staffProfiles.id, registeredByStaffId),
+					eq(staffProfiles.facilityId, facilityId),
+					eq(staffProfiles.isActive, true)
+				)
+			)
+			.limit(1)
+
+		if (!profile) {
+			throw new ForbiddenException(
+				"An active staff profile in this facility is required to register a death certificate"
+			)
+		}
+	}
+
 	private async assertActiveReleaseStaffProfile(id: string, releasedByStaffId: string) {
 		const [registration] = await db
 			.select({ facilityId: birthRegistrations.facilityId })
@@ -937,8 +1084,6 @@ export class CivilRegistryService {
 		if (registration.releasedAt || registration.releasedByStaffId) {
 			throw new BadRequestException("Birth certificate has already been released")
 		}
-
-		this.assertLcrBirthRegistrationComplete(registration)
 	}
 
 	private assertLcrBirthRegistrationComplete(row: BirthRegistrationRow) {
@@ -957,8 +1102,6 @@ export class CivilRegistryService {
 		if (registration.releasedAt || registration.releasedByStaffId) {
 			throw new BadRequestException("Death certificate has already been released")
 		}
-
-		this.assertLcrDeathCertificateComplete(registration)
 	}
 
 	private assertLcrDeathCertificateComplete(row: DeathCertificateRegistrationRow) {

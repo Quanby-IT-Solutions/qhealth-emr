@@ -193,10 +193,10 @@ export class CivilRegistryController {
 
 	@RequirePermission("civil_registry", "create")
 	@Implement(v1.civilRegistry.createDeathCertificateRegistration)
-	async createDeathCertificateRegistration() {
+	async createDeathCertificateRegistration(@Session() session: UserSession) {
 		return implement(v1.civilRegistry.createDeathCertificateRegistration).handler(
 			async ({ input }) => {
-				return this.civilRegistryService.createDeathCertificateRegistration(input)
+				return this.civilRegistryService.createDeathCertificateRegistration(input, session.user.id)
 			}
 		)
 	}

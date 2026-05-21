@@ -47,12 +47,23 @@ export const LcrTrackingCertificateSourceSchema = z.object({
 	sourceRecordId: z.string().uuid(),
 })
 
+const LcrArtifactReferenceSchema = z.string().trim().min(1).url()
+
 export const GenerateLcrArtifactInputSchema = LcrTrackingCertificateSourceSchema.extend({
 	artifactType: LcrArtifactTypeEnum,
-	artifactUrl: z.string().url().optional(),
-	/** Optional error text when generation fails instead of producing a ready artifact. */
-	error: z.string().min(1).optional(),
+	artifactUrl: LcrArtifactReferenceSchema.optional(),
+	error: z.string().trim().min(1),
 })
+	.partial({ error: true })
+	.superRefine((input, ctx) => {
+		if (!input.error && !input.artifactUrl) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: "artifactUrl is required when recording a generated artifact",
+				path: ["artifactUrl"],
+			})
+		}
+	})
 
 export const MarkLcrSubmittedInputSchema = LcrTrackingCertificateSourceSchema.extend({
 	submissionStatus: LcrSubmissionStatusEnum.exclude(["not_submitted", "ready"]).default(

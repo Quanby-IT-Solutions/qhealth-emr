@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft01FreeIcons } from "@hugeicons/core-free-icons"
@@ -12,6 +12,7 @@ import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { SignatureCanvas } from "@/features/nursing/components/consent-capture"
 import { usePatientProfileQuery } from "@/features/patients/api/patients.hooks"
 import { useCreateDeathCertificateRegistrationMutation } from "@/features/registrar/civil-registry/api/lcr.hooks"
 import { PatientSearchStep } from "@/features/registrar/civil-registry/components/patient-search-step"
@@ -76,7 +77,6 @@ export function DeathCertificateForm() {
 	const { data: patient } = usePatientProfileQuery(patientId ?? "")
 
 	const [signatureDataUrl, setSignatureDataUrl] = useState<string>("")
-	const signatureInputRef = useRef<HTMLInputElement>(null)
 
 	const [form, setForm] = useState({
 		deceasedName: "",
@@ -104,14 +104,6 @@ export function DeathCertificateForm() {
 	const resolvedDeceasedMrn = form.deceasedMrn || patient?.mrn || ""
 	const resolvedAgeAtDeathYears = form.ageAtDeathYears || patientAge
 	const resolvedDeceasedAddress = form.deceasedAddress || patientAddress
-
-	function handleSignatureUpload(e: React.ChangeEvent<HTMLInputElement>) {
-		const file = e.target.files?.[0]
-		if (!file) return
-		const reader = new FileReader()
-		reader.onload = ev => setSignatureDataUrl(ev.target?.result as string)
-		reader.readAsDataURL(file)
-	}
 
 	const canSubmit =
 		!!facilityId &&
@@ -342,19 +334,15 @@ export function DeathCertificateForm() {
 						</div>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Digital Signature (upload PNG/JPEG)</Label>
-						<Input
-							ref={signatureInputRef}
-							type="file"
-							accept="image/png,image/jpeg"
-							onChange={handleSignatureUpload}
+						<Label>Digital Signature</Label>
+						<SignatureCanvas
+							label="Physician signature"
+							onCapture={dataUrl => setSignatureDataUrl(dataUrl)}
+							onClear={() => setSignatureDataUrl("")}
+							disabled={createDeathCertificateRegistration.isPending}
 						/>
 						{signatureDataUrl && (
-							<img
-								src={signatureDataUrl}
-								alt="Physician signature preview"
-								className="mt-2 h-16 rounded border object-contain"
-							/>
+							<p className="text-muted-foreground text-xs">Physician signature captured.</p>
 						)}
 					</div>
 				</CardContent>

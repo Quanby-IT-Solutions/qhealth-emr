@@ -43,7 +43,7 @@ export const civilRegistryContract = {
 		.route({
 			method: "POST",
 			path: "/civil-registry/lcr-tracking/{certificateType}/{sourceRecordId}/artifacts",
-			summary: "Generate or record a PDF/XML artifact for an LCR certificate",
+			summary: "Record a generated or failed PDF/XML artifact for an LCR certificate",
 			tags: ["Civil Registry"],
 		})
 		.input(GenerateLcrArtifactInputSchema)

@@ -19,7 +19,6 @@ import {
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
-	useGenerateLcrArtifactMutation,
 	useListLcrTrackingQuery,
 	useMarkBirthRegistrationPaidMutation,
 	useMarkBirthRegistrationReleasedMutation,
@@ -53,8 +52,10 @@ interface LcrTrackingRecord {
 	tracking: {
 		pdfStatus: "pending" | "generated" | "failed"
 		pdfGeneratedAt: Date | string | null
+		pdfUrl: string | null
 		xmlStatus: "pending" | "generated" | "failed"
 		xmlGeneratedAt: Date | string | null
+		xmlUrl: string | null
 		submissionStatus: LcrSubmissionStatus
 		submittedAt: Date | string | null
 		acknowledgementNumber: string | null
@@ -120,7 +121,6 @@ export function LcrTrackingTable() {
 	const markBirthReleased = useMarkBirthRegistrationReleasedMutation()
 	const markDeathPaid = useMarkDeathCertificateRegistrationPaidMutation()
 	const markDeathReleased = useMarkDeathCertificateRegistrationReleasedMutation()
-	const generateArtifact = useGenerateLcrArtifactMutation()
 	const markSubmitted = useMarkLcrSubmittedMutation()
 
 	const records = (data?.data ?? []) as LcrTrackingRecord[]
@@ -199,9 +199,11 @@ export function LcrTrackingTable() {
 								const tracking = record.tracking
 								const pdfStatus = tracking?.pdfStatus ?? "pending"
 								const xmlStatus = tracking?.xmlStatus ?? "pending"
-								const canGenerateArtifacts = !!record.releasedAt
 								const canSubmit =
-									tracking?.pdfStatus === "generated" && tracking.xmlStatus === "generated"
+									tracking?.pdfStatus === "generated" &&
+									tracking.xmlStatus === "generated" &&
+									!!tracking.pdfUrl?.trim() &&
+									!!tracking.xmlUrl?.trim()
 								const markPaid = isBirth ? markBirthPaid : markDeathPaid
 								const markReleased = isBirth ? markBirthReleased : markDeathReleased
 
@@ -309,18 +311,8 @@ export function LcrTrackingTable() {
 													size="sm"
 													variant="outline"
 													className="h-7 px-2 text-xs"
-													disabled={
-														generateArtifact.isPending ||
-														!canGenerateArtifacts ||
-														pdfStatus === "generated"
-													}
-													onClick={() =>
-														generateArtifact.mutate({
-															certificateType: record.certificateType,
-															sourceRecordId: record.sourceRecordId,
-															artifactType: "pdf",
-														})
-													}
+													disabled
+													title="PDF generation is unavailable until the backend returns a persisted artifact URL."
 												>
 													Generate PDF
 												</Button>
@@ -328,18 +320,8 @@ export function LcrTrackingTable() {
 													size="sm"
 													variant="outline"
 													className="h-7 px-2 text-xs"
-													disabled={
-														generateArtifact.isPending ||
-														!canGenerateArtifacts ||
-														xmlStatus === "generated"
-													}
-													onClick={() =>
-														generateArtifact.mutate({
-															certificateType: record.certificateType,
-															sourceRecordId: record.sourceRecordId,
-															artifactType: "xml",
-														})
-													}
+													disabled
+													title="XML generation is unavailable until the backend returns a persisted artifact URL."
 												>
 													Generate XML
 												</Button>
