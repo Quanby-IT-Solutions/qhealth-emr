@@ -5,8 +5,7 @@ import { ArrowLeft01FreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 
 import { Badge } from "@/core/components/ui/badge"
-import { Button } from "@/core/components/ui/button"
-import { buttonVariants } from "@/core/components/ui/button"
+import { Button, buttonVariants } from "@/core/components/ui/button"
 import { Card, CardContent } from "@/core/components/ui/card"
 import { Skeleton } from "@/core/components/ui/skeleton"
 import {
@@ -25,6 +24,20 @@ import {
 	useMarkBirthRegistrationReleasedMutation,
 } from "@/features/registrar/civil-registry/api/lcr.hooks"
 
+interface BirthRegistrationLcrFields {
+	certificateNumber: string | null
+	attendantAtBirth?: string | null
+	placeOfBirthBarangay?: string | null
+	placeOfBirthMunicipality?: string | null
+	placeOfBirthProvince?: string | null
+	placeOfBirthRegion?: string | null
+	fatherName?: string | null
+	motherName?: string | null
+	physicianName?: string | null
+	physicianLicenseNo?: string | null
+	physicianSignature?: string | null
+}
+
 function formatDate(value: Date | string | null | undefined): string {
 	if (!value) return "—"
 	return new Date(value).toLocaleDateString("en-PH", { dateStyle: "medium" })
@@ -37,16 +50,41 @@ function StatusBadge({ status }: { status: string }) {
 		submitted: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
 	}
 	return (
-		<Badge className={cn("text-[10px] px-1.5 font-medium capitalize", map[status] ?? "")}>
+		<Badge className={cn("px-1.5 text-[10px] font-medium capitalize", map[status] ?? "")}>
 			{status}
 		</Badge>
 	)
 }
 
+function hasRequiredValue(value: string | null | undefined) {
+	return typeof value === "string" && value.trim().length > 0
+}
+
+function getMissingLcrFields(record: BirthRegistrationLcrFields) {
+	const requiredFields: Array<[keyof BirthRegistrationLcrFields, string]> = [
+		["certificateNumber", "certificate #"],
+		["attendantAtBirth", "attendant"],
+		["placeOfBirthBarangay", "barangay"],
+		["placeOfBirthMunicipality", "municipality"],
+		["placeOfBirthProvince", "province"],
+		["placeOfBirthRegion", "region"],
+		["fatherName", "father"],
+		["motherName", "mother"],
+		["physicianName", "physician"],
+		["physicianLicenseNo", "license #"],
+		["physicianSignature", "signature"],
+	]
+
+	return requiredFields.filter(([key]) => !hasRequiredValue(record[key])).map(([, label]) => label)
+}
+
 export function LcrTrackingTable() {
 	const { data: profile } = useMyProfile()
-	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
-	const staffId = profile?.user?.id ?? ""
+	const activeStaffProfile =
+		profile?.staffProfiles.find(p => p.roles.some(r => r.id === profile.activeRole?.id)) ??
+		profile?.staffProfiles?.[0]
+	const facilityId = activeStaffProfile?.facilityId ?? ""
+	const staffId = activeStaffProfile?.id ?? ""
 
 	const { data, isLoading } = useListBirthRegistrationsQuery(
 		{ facilityId },
@@ -72,14 +110,11 @@ export function LcrTrackingTable() {
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-xl font-semibold">LCR Tracking</h1>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Birth certificate SLA checkpoints — SLA-017 (payment) and SLA-021 (release)
 					</p>
 				</div>
-				<Link
-					href="/registrar/civil-registry/birth"
-					className={buttonVariants({ size: "sm" })}
-				>
+				<Link href="/registrar/civil-registry/birth" className={buttonVariants({ size: "sm" })}>
 					New Birth Certificate
 				</Link>
 			</div>
@@ -116,85 +151,97 @@ export function LcrTrackingTable() {
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{records.map(record => (
-								<TableRow key={record.id}>
-									<TableCell>
-										<Badge variant="outline" className="text-[10px]">Birth</Badge>
-									</TableCell>
-									<TableCell className="font-medium">
-										{record.certificateNumber ?? <span className="text-muted-foreground">—</span>}
-									</TableCell>
-									<TableCell>{formatDate(record.birthDatetime)}</TableCell>
-									<TableCell>
-										<StatusBadge status={record.status} />
-									</TableCell>
-									<TableCell className="text-xs text-muted-foreground">
-										{formatDate(record.requestedAt)}
-									</TableCell>
-									<TableCell className="text-xs text-muted-foreground">
-										{record.paidAt ? (
-											<span className="text-green-700 dark:text-green-400">
-												{formatDate(record.paidAt)}
-											</span>
-										) : (
-											"—"
-										)}
-									</TableCell>
-									<TableCell className="text-xs text-muted-foreground">
-										{record.releasedAt ? (
-											<span className="text-green-700 dark:text-green-400">
-												{formatDate(record.releasedAt)}
-											</span>
-										) : (
-											"—"
-										)}
-									</TableCell>
-									<TableCell className="text-right">
-										<div className="flex justify-end gap-1">
-											{!record.paidAt && (
-												<Button
-													size="sm"
-													variant="outline"
-													className="h-7 px-2 text-xs"
-													disabled={markPaid.isPending}
-													onClick={() => markPaid.mutate({ id: record.id })}
-												>
-													Mark Paid
-												</Button>
+							{records.map(record => {
+								const missingLcrFields = getMissingLcrFields(record)
+								const canRelease = missingLcrFields.length === 0
+								const releaseBlockReason = missingLcrFields.length
+									? `Missing LCR fields: ${missingLcrFields.join(", ")}`
+									: undefined
+
+								return (
+									<TableRow key={record.id}>
+										<TableCell>
+											<Badge variant="outline" className="text-[10px]">
+												Birth
+											</Badge>
+										</TableCell>
+										<TableCell className="font-medium">
+											{record.certificateNumber ?? <span className="text-muted-foreground">—</span>}
+										</TableCell>
+										<TableCell>{formatDate(record.birthDatetime)}</TableCell>
+										<TableCell>
+											<StatusBadge status={record.status} />
+										</TableCell>
+										<TableCell className="text-muted-foreground text-xs">
+											{formatDate(record.requestedAt)}
+										</TableCell>
+										<TableCell className="text-muted-foreground text-xs">
+											{record.paidAt ? (
+												<span className="text-green-700 dark:text-green-400">
+													{formatDate(record.paidAt)}
+												</span>
+											) : (
+												"—"
 											)}
-											{record.paidAt && !record.releasedAt && staffId && (
-												<Button
-													size="sm"
-													variant="outline"
-													className="h-7 px-2 text-xs"
-													disabled={markReleased.isPending}
-													onClick={() =>
-														markReleased.mutate({
-															id: record.id,
-															releasedByStaffId: staffId,
-														})
-													}
-												>
-													Mark Released
-												</Button>
+										</TableCell>
+										<TableCell className="text-muted-foreground text-xs">
+											{record.releasedAt ? (
+												<span className="text-green-700 dark:text-green-400">
+													{formatDate(record.releasedAt)}
+												</span>
+											) : releaseBlockReason ? (
+												<span title={releaseBlockReason}>Incomplete</span>
+											) : (
+												"—"
 											)}
-										</div>
-									</TableCell>
-								</TableRow>
-							))}
+										</TableCell>
+										<TableCell className="text-right">
+											<div className="flex justify-end gap-1">
+												{!record.paidAt && (
+													<Button
+														size="sm"
+														variant="outline"
+														className="h-7 px-2 text-xs"
+														disabled={markPaid.isPending}
+														onClick={() => markPaid.mutate({ id: record.id })}
+													>
+														Mark Paid
+													</Button>
+												)}
+												{record.paidAt && !record.releasedAt && staffId && (
+													<Button
+														size="sm"
+														variant="outline"
+														className="h-7 px-2 text-xs"
+														disabled={markReleased.isPending || !canRelease}
+														title={releaseBlockReason}
+														onClick={() =>
+															markReleased.mutate({
+																id: record.id,
+															})
+														}
+													>
+														Mark Released
+													</Button>
+												)}
+											</div>
+										</TableCell>
+									</TableRow>
+								)
+							})}
 						</TableBody>
 					</Table>
-					<div className="px-4 py-2 text-xs text-muted-foreground">
+					<div className="text-muted-foreground px-4 py-2 text-xs">
 						{data?.total ?? 0} total record{(data?.total ?? 0) === 1 ? "" : "s"}
 					</div>
 				</div>
 			)}
 
-			<div className="rounded-lg border border-border/70 p-4">
+			<div className="border-border/70 rounded-lg border p-4">
 				<p className="text-sm font-medium">Death Certificates</p>
-				<p className="mt-1 text-xs text-muted-foreground">
-					Death certificate records (FMDRF/FNDRF) are tracked per encounter.
-					Open a patient encounter and use the Death Reporting section to view or update FMDRF/FNDRF status.
+				<p className="text-muted-foreground mt-1 text-xs">
+					Death certificate records (FMDRF/FNDRF) are tracked per encounter. Open a patient
+					encounter and use the Death Reporting section to view or update FMDRF/FNDRF status.
 				</p>
 				<Link
 					href="/registrar/civil-registry/death"
