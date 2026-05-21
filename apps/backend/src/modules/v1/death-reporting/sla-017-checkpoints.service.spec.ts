@@ -12,7 +12,7 @@
  * - MedicalRecordsService.markMedicalRecordsPaid sets paidAt
  */
 
-import { NotFoundException } from "@nestjs/common"
+import { BadRequestException, NotFoundException } from "@nestjs/common"
 import { Test, type TestingModule } from "@nestjs/testing"
 
 import { CivilRegistryService } from "../civil-registry/civil-registry.service"
@@ -143,9 +143,11 @@ function setupSelectRow(row: Record<string, unknown>) {
 function setupReleaseStaffProfileCheck({
 	facilityId = "fac-001",
 	staffProfileId = "staff-001",
+	readyReport = createReadyDeathReport({ facilityId }),
 }: {
 	facilityId?: string
 	staffProfileId?: string
+	readyReport?: Record<string, unknown>
 } = {}) {
 	const reportLimit = jest.fn().mockResolvedValue([{ facilityId }])
 	const reportWhere = jest.fn().mockReturnValue({ limit: reportLimit })
@@ -155,7 +157,14 @@ function setupReleaseStaffProfileCheck({
 	const staffWhere = jest.fn().mockReturnValue({ limit: staffLimit })
 	const staffFrom = jest.fn().mockReturnValue({ where: staffWhere })
 
-	mockSelect.mockReturnValueOnce({ from: reportFrom }).mockReturnValueOnce({ from: staffFrom })
+	const readyReportLimit = jest.fn().mockResolvedValue([readyReport])
+	const readyReportWhere = jest.fn().mockReturnValue({ limit: readyReportLimit })
+	const readyReportFrom = jest.fn().mockReturnValue({ where: readyReportWhere })
+
+	mockSelect
+		.mockReturnValueOnce({ from: reportFrom })
+		.mockReturnValueOnce({ from: staffFrom })
+		.mockReturnValueOnce({ from: readyReportFrom })
 }
 
 function setupMissingReleaseReportCheck() {
@@ -198,6 +207,56 @@ function bypassFndrfGuards(service: DeathReportingService) {
 			"forwardSubmittedFndrfToSurveillance"
 		)
 		.mockResolvedValue(undefined)
+}
+
+function createReadyDeathReport(overrides: Record<string, unknown> = {}) {
+	return {
+		id: "death-report-uuid",
+		facilityId: "fac-001",
+		reportType: "fmdrf",
+		causeOfDeath: "Hemorrhage",
+		maternalHistory: {
+			patientName: "Jane Doe",
+			patientMrn: "MRN-001",
+			patientAge: 30,
+			patientAddress: "123 Main St",
+			placeOfDeath: "Ward 3",
+			causeOfDeathUnderlying: "Postpartum hemorrhage",
+		},
+		neonatalDetails: null,
+		physicianCertification: {
+			certifyingPhysicianName: "Dr. Smith",
+			prcLicenseNumber: "PRC-001",
+			certificationDate: "2024-06-01",
+			signatureData: "data:image/png;base64,abc",
+		},
+		paidAt: new Date("2024-06-01T10:00:00Z"),
+		releasedAt: null,
+		releasedByStaffId: null,
+		...overrides,
+	}
+}
+
+function createReadyBirthRegistration(overrides: Record<string, unknown> = {}) {
+	return {
+		id: "birth-reg-uuid",
+		facilityId: "fac-001",
+		certificateNumber: "BC-001",
+		attendantAtBirth: "Physician",
+		placeOfBirthBarangay: "Barangay 1",
+		placeOfBirthMunicipality: "Quezon City",
+		placeOfBirthProvince: "Metro Manila",
+		placeOfBirthRegion: "NCR",
+		fatherName: "John Doe",
+		motherName: "Jane Doe",
+		physicianName: "Dr. Smith",
+		physicianLicenseNo: "PRC-001",
+		physicianSignature: "data:image/png;base64,abc",
+		paidAt: new Date("2024-06-01T10:00:00Z"),
+		releasedAt: null,
+		releasedByStaffId: null,
+		...overrides,
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -337,6 +396,86 @@ describe("CivilRegistryService — SLA-017 checkpoints", () => {
 			await expect(service.markBirthRegistrationPaid({ id: "nonexistent" })).rejects.toThrow(
 				NotFoundException
 			)
+		})
+	})
+
+	describe("markBirthRegistrationReleased", () => {
+		it("sets releasedAt, releasedByStaffId, completedAt, and status 'completed'", async () => {
+			const id = "birth-reg-uuid"
+			const releasedAt = new Date("2024-06-02T10:00:00Z")
+			const releasedByStaffId = "staff-001"
+			const returnRow = {
+				id,
+				facilityId: "fac-001",
+				releasedByStaffId,
+				releasedAt,
+				completedAt: releasedAt,
+				status: "completed",
+			}
+
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyBirthRegistration({ id }),
+			})
+			setupUpdate(returnRow)
+
+			const result = await service.markBirthRegistrationReleased({
+				id,
+				releasedByStaffId,
+				releasedAt,
+			})
+
+			expect(mockUpdateSet).toHaveBeenCalledWith(
+				expect.objectContaining({
+					releasedByStaffId,
+					releasedAt,
+					completedAt: releasedAt,
+					status: "completed",
+				})
+			)
+			expect(result.status).toBe("completed")
+			expect(result.releasedByStaffId).toBe(releasedByStaffId)
+			expect(result.releasedAt).toBe(releasedAt.toISOString())
+		})
+
+		it("rejects release before payment is recorded", async () => {
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyBirthRegistration({ paidAt: null }),
+			})
+
+			await expect(
+				service.markBirthRegistrationReleased({
+					id: "birth-reg-uuid",
+					releasedByStaffId: "staff-001",
+				})
+			).rejects.toThrow(BadRequestException)
+		})
+
+		it("rejects release when required LCR fields are incomplete", async () => {
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyBirthRegistration({ certificateNumber: "" }),
+			})
+
+			await expect(
+				service.markBirthRegistrationReleased({
+					id: "birth-reg-uuid",
+					releasedByStaffId: "staff-001",
+				})
+			).rejects.toThrow(BadRequestException)
+		})
+
+		it("rejects repeat release requests", async () => {
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyBirthRegistration({
+					releasedAt: new Date("2024-06-02T10:00:00Z"),
+				}),
+			})
+
+			await expect(
+				service.markBirthRegistrationReleased({
+					id: "birth-reg-uuid",
+					releasedByStaffId: "staff-001",
+				})
+			).rejects.toThrow(BadRequestException)
 		})
 	})
 })
@@ -617,6 +756,36 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 			await expect(
 				service.markDeathReportReleased({ id: "nonexistent", releasedByStaffId: "staff-001" })
 			).rejects.toThrow(NotFoundException)
+		})
+
+		it("rejects release before payment is recorded", async () => {
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyDeathReport({ paidAt: null }),
+			})
+
+			await expect(
+				service.markDeathReportReleased({ id: "fmdrf-uuid", releasedByStaffId: "staff-001" })
+			).rejects.toThrow(BadRequestException)
+		})
+
+		it("rejects release when required certificate fields are incomplete", async () => {
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyDeathReport({ physicianCertification: { prcLicenseNumber: "" } }),
+			})
+
+			await expect(
+				service.markDeathReportReleased({ id: "fmdrf-uuid", releasedByStaffId: "staff-001" })
+			).rejects.toThrow(BadRequestException)
+		})
+
+		it("rejects repeat release requests", async () => {
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyDeathReport({ releasedAt: new Date("2024-06-02T10:00:00Z") }),
+			})
+
+			await expect(
+				service.markDeathReportReleased({ id: "fmdrf-uuid", releasedByStaffId: "staff-001" })
+			).rejects.toThrow(BadRequestException)
 		})
 	})
 })

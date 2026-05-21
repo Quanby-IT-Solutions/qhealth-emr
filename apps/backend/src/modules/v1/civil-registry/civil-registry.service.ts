@@ -313,6 +313,10 @@ export class CivilRegistryService {
 			throw new NotFoundException(`Birth registration ${input.id} not found`)
 		}
 
+		this.logger.log(
+			`workflow.civil_registry.birth_certificate.paid id=${updated.id} facilityId=${updated.facilityId} paidAt=${updated.paidAt?.toISOString() ?? "null"}`
+		)
+
 		return { id: updated.id, paidAt: updated.paidAt?.toISOString() ?? null }
 	}
 
@@ -345,6 +349,10 @@ export class CivilRegistryService {
 		if (!updated) {
 			throw new NotFoundException(`Birth registration ${input.id} not found`)
 		}
+
+		this.logger.log(
+			`workflow.civil_registry.birth_certificate.released id=${updated.id} facilityId=${updated.facilityId} releasedByStaffId=${updated.releasedByStaffId ?? "null"} releasedAt=${updated.releasedAt?.toISOString() ?? "null"}`
+		)
 
 		return {
 			id: updated.id,
@@ -403,7 +411,7 @@ export class CivilRegistryService {
 	}
 
 	async createDeathCertificateRegistration(input: CreateDeathCertificateRegistrationInput) {
-		let resolvedStaffId = input.registeredByStaffId ?? null
+		const resolvedStaffId = input.registeredByStaffId ?? null
 
 		const deathDatetime = new Date(input.deathDatetime)
 		if (Number.isNaN(deathDatetime.getTime())) {
@@ -515,6 +523,10 @@ export class CivilRegistryService {
 			throw new NotFoundException(`Death certificate registration ${input.id} not found`)
 		}
 
+		this.logger.log(
+			`workflow.civil_registry.death_certificate.paid id=${updated.id} facilityId=${updated.facilityId} paidAt=${updated.paidAt?.toISOString() ?? "null"}`
+		)
+
 		return { id: updated.id, paidAt: updated.paidAt?.toISOString() ?? null }
 	}
 
@@ -542,6 +554,10 @@ export class CivilRegistryService {
 		if (!updated) {
 			throw new NotFoundException(`Death certificate registration ${input.id} not found`)
 		}
+
+		this.logger.log(
+			`workflow.civil_registry.death_certificate.released id=${updated.id} facilityId=${updated.facilityId} releasedByStaffId=${updated.releasedByStaffId ?? "null"} releasedAt=${updated.releasedAt?.toISOString() ?? "null"}`
+		)
 
 		return {
 			id: updated.id,
@@ -616,7 +632,15 @@ export class CivilRegistryService {
 	}
 
 	private async assertBirthRegistrationReadyForRelease(id: string) {
-		this.assertLcrBirthRegistrationComplete(await this.getBirthRegistration(id))
+		const registration = await this.getBirthRegistration(id)
+		if (!registration.paidAt) {
+			throw new BadRequestException("Birth certificate payment must be recorded before release")
+		}
+		if (registration.releasedAt || registration.releasedByStaffId) {
+			throw new BadRequestException("Birth certificate has already been released")
+		}
+
+		this.assertLcrBirthRegistrationComplete(registration)
 	}
 
 	private assertLcrBirthRegistrationComplete(row: BirthRegistrationRow) {
@@ -628,7 +652,15 @@ export class CivilRegistryService {
 	}
 
 	private async assertDeathCertificateReadyForRelease(id: string) {
-		this.assertLcrDeathCertificateComplete(await this.getDeathCertificateRegistration(id))
+		const registration = await this.getDeathCertificateRegistration(id)
+		if (!registration.paidAt) {
+			throw new BadRequestException("Death certificate payment must be recorded before release")
+		}
+		if (registration.releasedAt || registration.releasedByStaffId) {
+			throw new BadRequestException("Death certificate has already been released")
+		}
+
+		this.assertLcrDeathCertificateComplete(registration)
 	}
 
 	private assertLcrDeathCertificateComplete(row: DeathCertificateRegistrationRow) {
