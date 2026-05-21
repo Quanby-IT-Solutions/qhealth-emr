@@ -32,7 +32,7 @@ function StepBadge({
 				"flex size-10 items-center justify-center rounded-full border text-sm font-semibold tabular-nums transition-colors",
 				status === "pending"
 					? "border-border/60 bg-background text-muted-foreground"
-					: "border-foreground bg-foreground text-background"
+					: "border-primary bg-primary text-primary-foreground"
 			)}
 		>
 			{status === "completed" ? <Check className="size-4" /> : index + 1}
@@ -91,7 +91,7 @@ export function PatientRegistrationShell({
 										<div
 											className={cn(
 												"mt-5 h-px w-full",
-												index < currentIndex ? "bg-foreground/20" : "bg-border/60"
+												index < currentIndex ? "bg-primary/40" : "bg-border/60"
 											)}
 										/>
 									)}

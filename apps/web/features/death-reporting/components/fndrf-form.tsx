@@ -415,7 +415,6 @@ export function FndrfForm({
 									void markReleasedMutation.mutateAsync({
 										id: existing.id,
 										encounterId,
-										releasedByStaffId: staffProfileId,
 									})
 								}}
 							>

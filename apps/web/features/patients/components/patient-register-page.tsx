@@ -232,7 +232,6 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 	const hasSearched = !!committedParams
 	const selectedPatient = results.find(patient => patient.id === selectedForTriage) ?? null
 	const selectedPatientName = selectedPatient ? formatPatientName(selectedPatient) : null
-	const primaryButtonClassName = "bg-foreground text-background hover:bg-foreground/90"
 
 	const filteredOfflinePatients = useMemo(() => {
 		if (isOnline || !committedParams || committedParams.mrn) return []
@@ -439,7 +438,7 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 								>
 									Clear
 								</Button>
-								<Button type="submit" disabled={!canRunSearch} className={primaryButtonClassName}>
+								<Button type="submit" disabled={!canRunSearch}>
 									<Search className="size-4" />
 									{isFetching ? "Searching..." : "Search"}
 								</Button>
@@ -520,11 +519,6 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 														<Button
 															size="sm"
 															variant={selectedForTriage === patient.id ? "default" : "outline"}
-															className={
-																selectedForTriage === patient.id
-																	? primaryButtonClassName
-																	: "border-border/60 bg-background"
-															}
 															onClick={() =>
 																setSelectedForTriage(
 																	selectedForTriage === patient.id ? null : patient.id
@@ -563,10 +557,7 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 									}
 									action={
 										canCreatePatient ? (
-											<Button
-												className={primaryButtonClassName}
-												onClick={() => setWizardStep("form")}
-											>
+											<Button onClick={() => setWizardStep("form")}>
 												<UserRoundPlus className="size-4" />
 												Register new patient
 											</Button>
@@ -675,15 +666,10 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 						<p className="text-muted-foreground text-xs">Hand this number to the patient</p>
 					</div>
 					<DialogFooter>
-						<Button
-							variant="outline"
-							className="border-border/60 bg-background"
-							onClick={onClose}
-						>
+						<Button variant="outline" className="border-border/60 bg-background" onClick={onClose}>
 							Next patient
 						</Button>
 						<Button
-							className={primaryButtonClassName}
 							onClick={() =>
 								router.push(
 									`/patients/${triageQueueResult?.patientId}/encounters/${triageQueueResult?.encounterId}`
@@ -716,21 +702,15 @@ export function PatientRegisterPageContent() {
 	// Auto-open the wizard when a triage intake is pending
 	const [isDialogOpen, setIsDialogOpen] = useState(!!pendingTriageId)
 
-	const primaryButtonClassName = "bg-foreground text-background hover:bg-foreground/90"
-
 	return (
-		<div className="flex flex-col min-h-svh">
-			<header className="border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60 sticky top-0 z-10">
+		<div className="flex min-h-svh flex-col">
+			<header className="bg-background/80 supports-backdrop-filter:bg-background/60 sticky top-0 z-10 border-b backdrop-blur">
 				<div className="flex h-14 items-center gap-3 px-4">
 					<div className="flex-1">
 						<h1 className="text-base font-semibold tracking-tight">Patient Management</h1>
 					</div>
 					{canCreatePatient && (
-						<Button
-							className={primaryButtonClassName}
-							size="sm"
-							onClick={() => setIsDialogOpen(true)}
-						>
+						<Button size="sm" onClick={() => setIsDialogOpen(true)}>
 							<UserRoundPlus className="size-4" />
 							Register new patient
 						</Button>
@@ -738,7 +718,7 @@ export function PatientRegisterPageContent() {
 				</div>
 			</header>
 
-			<main className="flex-1 p-4 md:p-6 space-y-5">
+			<main className="flex-1 space-y-5 p-4 md:p-6">
 				<PatientListCard />
 			</main>
 

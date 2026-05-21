@@ -29,6 +29,29 @@ import { DeathReportingController } from "./death-reporting.controller"
 // ============================================================================
 const RBAC_PERMISSION_KEY = "rbac"
 
+jest.mock("@thallesp/nestjs-better-auth", () => ({
+	Session: () => () => undefined,
+}))
+
+jest.mock("@/common/database/database.client", () => ({
+	db: {
+		select: jest.fn(),
+	},
+}))
+
+jest.mock("@repo/db/schema", () => ({
+	deathReports: {
+		facilityId: "facilityId",
+		id: "id",
+	},
+	staffProfiles: {
+		facilityId: "facilityId",
+		id: "id",
+		isActive: "isActive",
+		userId: "userId",
+	},
+}))
+
 jest.mock("@/modules/v1/rbac/rbac.guard", () => ({
 	RBAC_PERMISSION_KEY: "rbac",
 	// Functional replica of NestJS SetMetadata: attaches metadata to descriptor.value

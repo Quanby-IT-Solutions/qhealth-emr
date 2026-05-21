@@ -412,7 +412,6 @@ export function FmdrfForm({
 									void markReleasedMutation.mutateAsync({
 										id: existing.id,
 										encounterId,
-										releasedByStaffId: staffProfileId,
 									})
 								}}
 							>
