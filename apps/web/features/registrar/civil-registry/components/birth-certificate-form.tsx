@@ -1,8 +1,8 @@
 "use client"
 
 import { useContext, useRef, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft01FreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 
@@ -11,20 +11,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { cn } from "@/core/lib/utils"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
 	useEncounterDetailQuery,
 	useEncounterListQuery,
 } from "@/features/encounters/api/encounters.hooks"
 import { ChartContext } from "@/features/encounters/context/chart-context"
 import { usePatientProfileQuery } from "@/features/patients/api/patients.hooks"
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useCreateBirthRegistrationMutation } from "@/features/registrar/civil-registry/api/lcr.hooks"
 import { LocationPicker } from "@/features/registrar/civil-registry/components/location-picker"
 import { PatientSearchStep } from "@/features/registrar/civil-registry/components/patient-search-step"
 import { PlaceOfBirthDisplay } from "@/features/registrar/civil-registry/components/place-of-birth-display"
 import {
-	type BirthLocation,
 	findLocationByPatientAddress,
+	type BirthLocation,
 } from "@/features/registrar/civil-registry/lib/philippines-locations"
 
 function formatDateTimeLocal(value: string) {
@@ -117,15 +117,15 @@ export function BirthCertificateForm() {
 	const resolvedPhysicianLicenseNo =
 		form.physicianLicenseNo || encounter?.attendingStaffLicenseNo || ""
 	const resolvedAttendingStaffId = form.attendingStaffId || encounter?.attendingStaffId || ""
-	const facilityBirthLocation = [encounter?.wardName, encounter?.bedNumber ? `Bed ${encounter.bedNumber}` : ""]
+	const facilityBirthLocation = [
+		encounter?.wardName,
+		encounter?.bedNumber ? `Bed ${encounter.bedNumber}` : "",
+	]
 		.filter(Boolean)
 		.join(", ")
 
 	const canSubmit =
-		!!facilityId &&
-		!!patientId &&
-		!!resolvedBirthDatetime &&
-		!createBirthRegistration.isPending
+		!!facilityId && !!patientId && !!resolvedBirthDatetime && !createBirthRegistration.isPending
 
 	function handleSignatureUpload(e: React.ChangeEvent<HTMLInputElement>) {
 		const file = e.target.files?.[0]
@@ -151,8 +151,11 @@ export function BirthCertificateForm() {
 			placeOfBirthMunicipality: resolvedLocation.municipality || undefined,
 			placeOfBirthProvince: resolvedLocation.province || undefined,
 			placeOfBirthRegion: resolvedLocation.region || undefined,
+			fatherName: form.fatherName || undefined,
+			motherName: form.motherName || undefined,
 			physicianName: resolvedPhysicianName || undefined,
 			physicianLicenseNo: resolvedPhysicianLicenseNo || undefined,
+			physicianSignature: signatureDataUrl || undefined,
 			attendingStaffId: resolvedAttendingStaffId || undefined,
 		})
 
@@ -182,8 +185,9 @@ export function BirthCertificateForm() {
 
 			<div>
 				<h1 className="text-xl font-semibold">New Birth Certificate</h1>
-				<p className="text-sm text-muted-foreground">
-					Register a live birth and generate a certificate for submission to the local civil registrar.
+				<p className="text-muted-foreground text-sm">
+					Register a live birth and generate a certificate for submission to the local civil
+					registrar.
 				</p>
 			</div>
 
@@ -195,7 +199,9 @@ export function BirthCertificateForm() {
 				<CardContent className="space-y-4">
 					<div className="grid gap-4 sm:grid-cols-2">
 						<div className="space-y-1.5">
-							<Label>Date &amp; Time of Birth <span className="text-destructive">*</span></Label>
+							<Label>
+								Date &amp; Time of Birth <span className="text-destructive">*</span>
+							</Label>
 							<Input
 								type="datetime-local"
 								value={resolvedBirthDatetime}
@@ -230,7 +236,7 @@ export function BirthCertificateForm() {
 						</div>
 						<PlaceOfBirthDisplay {...resolvedLocation} />
 						{facilityBirthLocation && (
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								Facility location from encounter: {facilityBirthLocation}
 							</p>
 						)}
@@ -317,10 +323,7 @@ export function BirthCertificateForm() {
 			</Card>
 
 			<div className="flex justify-end gap-3">
-				<Link
-					href="/registrar/civil-registry"
-					className={buttonVariants({ variant: "outline" })}
-				>
+				<Link href="/registrar/civil-registry" className={buttonVariants({ variant: "outline" })}>
 					Cancel
 				</Link>
 				<Button type="submit" disabled={!canSubmit}>

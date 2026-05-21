@@ -56,6 +56,7 @@ jest.mock("@/common/database/database.client", () => ({
 jest.mock("@repo/db/schema", () => ({
 	deathReports: {
 		id: "id",
+		facilityId: "facilityId",
 		encounterId: "encounterId",
 		reportType: "reportType",
 		status: "status",
@@ -91,7 +92,7 @@ jest.mock("@repo/db/schema", () => ({
 		status: "status",
 		createdAt: "createdAt",
 	},
-	staffProfiles: { id: "id", userId: "userId" },
+	staffProfiles: { id: "id", userId: "userId", facilityId: "facilityId", isActive: "isActive" },
 	users: { id: "id" },
 	encounters: { id: "id", facilityId: "facilityId", patientId: "patientId" },
 	encounterStatusEvents: {},
@@ -137,6 +138,32 @@ function setupSelectRow(row: Record<string, unknown>) {
 		leftJoin: jest.fn().mockReturnValue({ where: mockSelectWhere }),
 	})
 	mockSelect.mockReturnValue({ from: mockSelectFrom })
+}
+
+function setupReleaseStaffProfileCheck({
+	facilityId = "fac-001",
+	staffProfileId = "staff-001",
+}: {
+	facilityId?: string
+	staffProfileId?: string
+} = {}) {
+	const reportLimit = jest.fn().mockResolvedValue([{ facilityId }])
+	const reportWhere = jest.fn().mockReturnValue({ limit: reportLimit })
+	const reportFrom = jest.fn().mockReturnValue({ where: reportWhere })
+
+	const staffLimit = jest.fn().mockResolvedValue([{ id: staffProfileId }])
+	const staffWhere = jest.fn().mockReturnValue({ limit: staffLimit })
+	const staffFrom = jest.fn().mockReturnValue({ where: staffWhere })
+
+	mockSelect.mockReturnValueOnce({ from: reportFrom }).mockReturnValueOnce({ from: staffFrom })
+}
+
+function setupMissingReleaseReportCheck() {
+	const reportLimit = jest.fn().mockResolvedValue([])
+	const reportWhere = jest.fn().mockReturnValue({ limit: reportLimit })
+	const reportFrom = jest.fn().mockReturnValue({ where: reportWhere })
+
+	mockSelect.mockReturnValueOnce({ from: reportFrom })
 }
 
 function bypassFmdrfGuards(service: DeathReportingService) {
@@ -542,6 +569,7 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 				status: "completed",
 			}
 
+			setupReleaseStaffProfileCheck({ staffProfileId: releasedByStaffId })
 			setupUpdate(returnRow)
 
 			const result = await service.markDeathReportReleased({ id, releasedByStaffId, releasedAt })
@@ -569,6 +597,7 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 				status: "completed",
 			}
 
+			setupReleaseStaffProfileCheck()
 			setupUpdate(returnRow)
 
 			await service.markDeathReportReleased({ id, releasedByStaffId: "staff-001" })
@@ -583,10 +612,7 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 		})
 
 		it("throws NotFoundException when report not found", async () => {
-			mockUpdateReturning.mockResolvedValue([])
-			mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning })
-			mockUpdateSet.mockReturnValue({ where: mockUpdateWhere })
-			mockUpdate.mockReturnValue({ set: mockUpdateSet })
+			setupMissingReleaseReportCheck()
 
 			await expect(
 				service.markDeathReportReleased({ id: "nonexistent", releasedByStaffId: "staff-001" })

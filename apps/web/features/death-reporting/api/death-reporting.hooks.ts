@@ -300,16 +300,7 @@ export function useMarkDeathReportPaidMutation() {
 export function useMarkDeathReportReleasedMutation() {
 	const qc = useQueryClient()
 	return useMutation({
-		mutationFn: ({
-			id,
-			releasedByStaffId,
-			releasedAt,
-		}: {
-			id: string
-			encounterId: string
-			releasedByStaffId: string
-			releasedAt?: string
-		}) =>
+		mutationFn: ({ id, releasedAt }: { id: string; encounterId: string; releasedAt?: string }) =>
 			fetchJson<{
 				id: string
 				releasedByStaffId: string | null
@@ -318,7 +309,7 @@ export function useMarkDeathReportReleasedMutation() {
 				completedAt: string | null
 			}>(`${API_BASE}/${id}/mark-released`, {
 				method: "POST",
-				body: JSON.stringify({ releasedByStaffId, releasedAt }),
+				body: JSON.stringify({ releasedAt }),
 			}),
 		onSuccess: (_data, variables) => {
 			void qc.invalidateQueries({
