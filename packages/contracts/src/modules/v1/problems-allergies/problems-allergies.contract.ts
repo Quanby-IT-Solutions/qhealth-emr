@@ -88,7 +88,7 @@ export const problemsAllergiesContract = {
 		.route({
 			method: "DELETE",
 			path: "/problems/{id}",
-			summary: "Delete a problem",
+			summary: "Mark a problem as entered in error",
 			tags: ["Problems & Allergies"],
 		})
 		.input(DeleteProblemSchema)

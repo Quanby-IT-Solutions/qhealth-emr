@@ -815,7 +815,7 @@ export class OrdersService {
 		if (!formularyItem || !formularyItem.isActive) {
 			alerts.push({
 				type: "formulary_warning",
-				severity: "warning",
+				severity: "soft_block",
 				message: "This drug is off-formulary or inactive at this facility.",
 				details: formularyItem?.formularyNotes
 					? { formularyNotes: formularyItem.formularyNotes }

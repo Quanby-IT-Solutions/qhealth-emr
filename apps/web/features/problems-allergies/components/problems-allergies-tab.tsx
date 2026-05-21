@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import {
+	ArchiveX,
 	Ban,
 	BadgeCheck,
 	CheckCircle2,
@@ -9,7 +10,6 @@ import {
 	Plus,
 	RotateCcw,
 	ShieldAlert,
-	Trash2,
 } from "lucide-react"
 
 import {
@@ -44,7 +44,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/t
 import {
 	useAllergiesQuery,
 	useDeactivateAllergyMutation,
-	useDeleteProblemMutation,
+	useMarkProblemEnteredInErrorMutation,
 	useProblemsQuery,
 	useUpdateProblemMutation,
 	useVerifyAllergyMutation,
@@ -92,6 +92,28 @@ function allergenTypeLabel(type: AllergenType) {
 	}
 }
 
+function problemStatusLabel(status: ProblemStatus) {
+	switch (status) {
+		case "active":
+			return "Active"
+		case "resolved":
+			return "Resolved"
+		case "entered_in_error":
+			return "Entered in error"
+	}
+}
+
+function problemStatusBadgeVariant(status: ProblemStatus) {
+	switch (status) {
+		case "active":
+			return "default" as const
+		case "resolved":
+			return "secondary" as const
+		case "entered_in_error":
+			return "outline" as const
+	}
+}
+
 interface ProblemsAllergiesTabProps {
 	patientId: string
 	facilityId: string
@@ -111,7 +133,9 @@ export function ProblemsAllergiesTab({
 	const [resolveProblemId, setResolveProblemId] = useState<string | null>(null)
 	const [editingProblem, setEditingProblem] = useState<Problem | null>(null)
 	const [editingAllergy, setEditingAllergy] = useState<Allergy | null>(null)
-	const [problemToDelete, setProblemToDelete] = useState<Problem | null>(null)
+	const [problemToMarkEnteredInError, setProblemToMarkEnteredInError] = useState<Problem | null>(
+		null
+	)
 	const [allergyToDeactivate, setAllergyToDeactivate] = useState<Allergy | null>(null)
 
 	const { data: problemsData, isLoading: problemsLoading } = useProblemsQuery({
@@ -124,7 +148,7 @@ export function ProblemsAllergiesTab({
 		allergenType: allergenTypeFilter === "all" ? undefined : allergenTypeFilter,
 	})
 	const updateProblem = useUpdateProblemMutation()
-	const deleteProblem = useDeleteProblemMutation()
+	const markProblemEnteredInError = useMarkProblemEnteredInErrorMutation()
 	const deactivateAllergy = useDeactivateAllergyMutation()
 	const verifyAllergy = useVerifyAllergyMutation()
 
@@ -160,7 +184,7 @@ export function ProblemsAllergiesTab({
 						<CheckCircle2 className="size-4" />
 						Resolve
 					</Button>
-				) : (
+				) : problem.status === "resolved" ? (
 					<Button
 						size="sm"
 						variant="outline"
@@ -171,15 +195,16 @@ export function ProblemsAllergiesTab({
 						<RotateCcw className="size-4" />
 						Reactivate
 					</Button>
-				)}
+				) : null}
 				<Button
 					size="sm"
 					variant="outline"
 					className={compact ? "col-span-2 justify-center" : ""}
-					onClick={() => setProblemToDelete(problem)}
+					onClick={() => setProblemToMarkEnteredInError(problem)}
+					disabled={problem.status === "entered_in_error"}
 				>
-					<Trash2 className="size-4" />
-					Delete
+					<ArchiveX className="size-4" />
+					Entered in Error
 				</Button>
 			</div>
 		)
@@ -286,7 +311,8 @@ export function ProblemsAllergiesTab({
 						<div>
 							<CardTitle>Problem List</CardTitle>
 							<p className="text-muted-foreground text-sm">
-								{problemsData?.total ?? 0} {problemStatusFilter} problems
+								{problemsData?.total ?? 0} {problemStatusLabel(problemStatusFilter).toLowerCase()}{" "}
+								problems
 							</p>
 						</div>
 						{canWrite && (
@@ -303,6 +329,7 @@ export function ProblemsAllergiesTab({
 						<TabsList>
 							<TabsTrigger value="active">Active</TabsTrigger>
 							<TabsTrigger value="resolved">Resolved</TabsTrigger>
+							<TabsTrigger value="entered_in_error">Entered in Error</TabsTrigger>
 						</TabsList>
 					</Tabs>
 				</CardHeader>
@@ -323,8 +350,8 @@ export function ProblemsAllergiesTab({
 													Onset {formatDate(problem.onsetDate)}
 												</p>
 											</div>
-											<Badge variant={problem.status === "active" ? "default" : "secondary"}>
-												{problem.status}
+											<Badge variant={problemStatusBadgeVariant(problem.status)}>
+												{problemStatusLabel(problem.status)}
 											</Badge>
 										</div>
 										<div className="grid gap-3 text-sm sm:grid-cols-2">
@@ -407,8 +434,8 @@ export function ProblemsAllergiesTab({
 												</TableCell>
 												<TableCell>{formatDate(problem.onsetDate)}</TableCell>
 												<TableCell>
-													<Badge variant={problem.status === "active" ? "default" : "secondary"}>
-														{problem.status}
+													<Badge variant={problemStatusBadgeVariant(problem.status)}>
+														{problemStatusLabel(problem.status)}
 													</Badge>
 												</TableCell>
 												<TableCell className="text-muted-foreground max-w-48 text-sm whitespace-normal">
@@ -423,7 +450,7 @@ export function ProblemsAllergiesTab({
 						</>
 					) : (
 						<div className="text-muted-foreground py-8 text-center text-sm">
-							No {problemStatusFilter} problems recorded.
+							No {problemStatusLabel(problemStatusFilter).toLowerCase()} problems recorded.
 						</div>
 					)}
 				</CardContent>
@@ -590,29 +617,30 @@ export function ProblemsAllergiesTab({
 			)}
 
 			<AlertDialog
-				open={!!problemToDelete}
+				open={!!problemToMarkEnteredInError}
 				onOpenChange={open => {
-					if (!open) setProblemToDelete(null)
+					if (!open) setProblemToMarkEnteredInError(null)
 				}}
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Delete problem?</AlertDialogTitle>
+						<AlertDialogTitle>Mark problem as entered in error?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This removes {problemToDelete?.description} from the longitudinal problem list.
+							This hides {problemToMarkEnteredInError?.description} from active and resolved
+							clinical lists while keeping the audited record.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={() => {
-								if (!problemToDelete) return
-								deleteProblem.mutate(problemToDelete.id, {
-									onSuccess: () => setProblemToDelete(null),
+								if (!problemToMarkEnteredInError) return
+								markProblemEnteredInError.mutate(problemToMarkEnteredInError.id, {
+									onSuccess: () => setProblemToMarkEnteredInError(null),
 								})
 							}}
 						>
-							Delete
+							Mark Entered in Error
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

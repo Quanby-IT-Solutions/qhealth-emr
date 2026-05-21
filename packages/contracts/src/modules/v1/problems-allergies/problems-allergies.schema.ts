@@ -24,7 +24,7 @@ const PaginatedResponseSchema = z.object({
 // Enums
 // ============================================================================
 
-export const ProblemStatusEnum = z.enum(["active", "resolved"])
+export const ProblemStatusEnum = z.enum(["active", "resolved", "entered_in_error"])
 export const AllergenTypeEnum = z.enum(["medication", "food", "environmental"])
 export const AllergySeverityEnum = z.enum(["mild", "moderate", "severe"])
 
@@ -235,7 +235,7 @@ export const SnomedCtSearchResponseSchema = PaginatedResponseSchema.extend({
 
 export const AllergenSearchSchema = PaginationInputSchema.extend({
 	search: z.string().optional(),
-	facilityId: z.string().uuid().optional(),
+	facilityId: z.string().uuid(),
 	allergenType: AllergenTypeEnum.optional(),
 })
 

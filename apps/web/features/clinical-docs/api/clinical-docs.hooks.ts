@@ -473,15 +473,17 @@ export function useSignAddendumMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
-		mutationFn: (data: { id: string; noteId: string }) =>
+		mutationFn: (data: { id: string }) =>
 			fetchJson<Addendum>(`${API_BASE}/addenda/${data.id}/sign`, {
 				method: "PUT",
-				body: JSON.stringify(data),
+				body: JSON.stringify({ id: data.id }),
 			}),
-		onSuccess: (_data, variables) => {
-			void queryClient.invalidateQueries({
-				queryKey: clinicalDocsKeys.note(variables.noteId),
-			})
+		onSuccess: data => {
+			if (data?.noteId) {
+				void queryClient.invalidateQueries({
+					queryKey: clinicalDocsKeys.note(data.noteId),
+				})
+			}
 		},
 	})
 }

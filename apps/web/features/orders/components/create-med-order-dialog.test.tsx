@@ -409,6 +409,8 @@ describe("CreateMedOrderDialog", () => {
 		expect(submitBtn).toBeDisabled()
 
 		await user.click(screen.getByRole("button", { name: /override allergy-0/i }))
+		await user.type(screen.getByPlaceholderText(/document the clinical justification/i), "Clinically necessary")
+		await user.click(screen.getByRole("button", { name: /confirm override/i }))
 
 		expect(screen.getByRole("button", { name: /create order/i })).not.toBeDisabled()
 	})
