@@ -7,7 +7,12 @@ import {
 } from "@nestjs/common"
 import { and, count, desc, eq } from "drizzle-orm"
 
-import { birthRegistrations, deathCertificateRegistrations, staffProfiles } from "@repo/db/schema"
+import {
+	birthRegistrations,
+	deathCertificateRegistrations,
+	lcrTracking,
+	staffProfiles,
+} from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 
@@ -101,6 +106,42 @@ interface UpdateDeathCertificateRegistrationInput extends Partial<CreateDeathCer
 
 type BirthRegistrationRow = typeof birthRegistrations.$inferSelect
 type DeathCertificateRegistrationRow = typeof deathCertificateRegistrations.$inferSelect
+type LcrTrackingRow = typeof lcrTracking.$inferSelect
+type LcrCertificateType = "birth" | "death"
+type LcrArtifactType = "pdf" | "xml"
+type LcrSubmissionStatus =
+	| "not_submitted"
+	| "ready"
+	| "submitted"
+	| "acknowledged"
+	| "rejected"
+	| "error"
+
+interface ListLcrTrackingInput {
+	facilityId: string
+	certificateType?: LcrCertificateType
+	submissionStatus?: LcrSubmissionStatus
+	page: number
+	limit: number
+}
+
+interface GenerateLcrArtifactInput {
+	certificateType: LcrCertificateType
+	sourceRecordId: string
+	artifactType: LcrArtifactType
+	artifactUrl?: string
+	error?: string
+}
+
+interface MarkLcrSubmittedInput {
+	certificateType: LcrCertificateType
+	sourceRecordId: string
+	submissionStatus: Exclude<LcrSubmissionStatus, "not_submitted" | "ready">
+	submittedAt?: Date
+	acknowledgementNumber?: string
+	referenceNumber?: string
+	error?: string
+}
 
 const requiredLcrBirthRegistrationFields: Array<{
 	key: keyof BirthRegistrationRow
@@ -151,6 +192,126 @@ function getMissingLcrDeathCertificateFields(row: DeathCertificateRegistrationRo
 @Injectable()
 export class CivilRegistryService {
 	private readonly logger = new Logger(CivilRegistryService.name)
+
+	async listLcrTracking(input: ListLcrTrackingInput) {
+		const page = Number(input.page) || 1
+		const limit = Number(input.limit) || 50
+		const offset = (page - 1) * limit
+
+		const [birthRows, deathRows] = await Promise.all([
+			input.certificateType === "death" ? [] : this.listBirthLcrTrackingRows(input),
+			input.certificateType === "birth" ? [] : this.listDeathLcrTrackingRows(input),
+		])
+
+		const data = [...birthRows, ...deathRows].sort(
+			(a, b) => new Date(b.eventDatetime).getTime() - new Date(a.eventDatetime).getTime()
+		)
+		const total = data.length
+
+		return {
+			data: data.slice(offset, offset + limit),
+			total,
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit),
+		}
+	}
+
+	async generateLcrArtifact(input: GenerateLcrArtifactInput) {
+		const { source, tracking } = await this.ensureLcrTracking(
+			input.certificateType,
+			input.sourceRecordId
+		)
+		this.assertCertificateReleased(input.certificateType, source)
+
+		const now = new Date()
+		const generationFailed = !!input.error
+		const set: Partial<LcrTrackingRow> = {
+			updatedAt: now,
+			lastSubmissionError: generationFailed ? input.error : tracking.lastSubmissionError,
+			lastSubmissionErrorAt: generationFailed ? now : tracking.lastSubmissionErrorAt,
+		}
+
+		if (input.artifactType === "pdf") {
+			set.pdfStatus = generationFailed ? "failed" : "generated"
+			set.pdfGeneratedAt = generationFailed ? null : now
+			set.pdfUrl = generationFailed ? null : (input.artifactUrl ?? tracking.pdfUrl)
+		} else {
+			set.xmlStatus = generationFailed ? "failed" : "generated"
+			set.xmlGeneratedAt = generationFailed ? null : now
+			set.xmlUrl = generationFailed ? null : (input.artifactUrl ?? tracking.xmlUrl)
+		}
+
+		const nextPdfStatus = set.pdfStatus ?? tracking.pdfStatus
+		const nextXmlStatus = set.xmlStatus ?? tracking.xmlStatus
+		if (!generationFailed && nextPdfStatus === "generated" && nextXmlStatus === "generated") {
+			set.submissionStatus = "ready"
+			set.lastSubmissionError = null
+			set.lastSubmissionErrorAt = null
+		}
+
+		const [updated] = await db
+			.update(lcrTracking)
+			.set(set)
+			.where(eq(lcrTracking.id, tracking.id))
+			.returning()
+
+		if (!updated) throw new NotFoundException(`LCR tracking ${tracking.id} not found`)
+
+		this.logger.log(
+			`workflow.civil_registry.${input.certificateType}_certificate.${input.artifactType}_generated sourceRecordId=${input.sourceRecordId} status=${input.error ? "failed" : "generated"}`
+		)
+
+		return updated
+	}
+
+	async markLcrSubmitted(input: MarkLcrSubmittedInput) {
+		const { source, tracking } = await this.ensureLcrTracking(
+			input.certificateType,
+			input.sourceRecordId
+		)
+		this.assertCertificateReleased(input.certificateType, source)
+
+		if (
+			input.submissionStatus !== "error" &&
+			(tracking.pdfStatus !== "generated" || tracking.xmlStatus !== "generated")
+		) {
+			throw new BadRequestException("LCR PDF and XML artifacts must be generated before submission")
+		}
+
+		const now = new Date()
+		const submittedAt = input.submittedAt ?? now
+		const lastSubmissionError =
+			input.submissionStatus === "error" || input.submissionStatus === "rejected"
+				? (input.error ?? null)
+				: null
+
+		const [updated] = await db
+			.update(lcrTracking)
+			.set({
+				submissionStatus: input.submissionStatus,
+				submittedAt,
+				acknowledgementNumber: input.acknowledgementNumber ?? tracking.acknowledgementNumber,
+				referenceNumber: input.referenceNumber ?? tracking.referenceNumber,
+				lastSubmissionError,
+				lastSubmissionErrorAt: lastSubmissionError ? now : null,
+				updatedAt: now,
+			})
+			.where(eq(lcrTracking.id, tracking.id))
+			.returning()
+
+		if (!updated) throw new NotFoundException(`LCR tracking ${tracking.id} not found`)
+
+		if (input.submissionStatus !== "error") {
+			await this.markSourceRecordSubmitted(input.certificateType, input.sourceRecordId, submittedAt)
+		}
+
+		this.logger.log(
+			`workflow.civil_registry.${input.certificateType}_certificate.submission sourceRecordId=${input.sourceRecordId} status=${input.submissionStatus} acknowledgementNumber=${updated.acknowledgementNumber ?? "null"} referenceNumber=${updated.referenceNumber ?? "null"}`
+		)
+
+		return updated
+	}
 
 	async listBirthRegistrations(input: ListBirthRegistrationsInput) {
 		const page = Number(input.page) || 1
@@ -566,6 +727,143 @@ export class CivilRegistryService {
 			status: updated.status,
 			completedAt: updated.completedAt?.toISOString() ?? null,
 		}
+	}
+
+	private async listBirthLcrTrackingRows(input: ListLcrTrackingInput) {
+		const conditions = [eq(birthRegistrations.facilityId, input.facilityId)]
+		if (input.submissionStatus) {
+			conditions.push(eq(lcrTracking.submissionStatus, input.submissionStatus))
+		}
+
+		const rows = await db
+			.select({
+				record: birthRegistrations,
+				tracking: lcrTracking,
+			})
+			.from(birthRegistrations)
+			.leftJoin(
+				lcrTracking,
+				and(
+					eq(lcrTracking.sourceRecordId, birthRegistrations.id),
+					eq(lcrTracking.certificateType, "birth" as const)
+				)
+			)
+			.where(and(...conditions))
+
+		return rows.map(({ record, tracking }) => ({
+			certificateType: "birth" as const,
+			sourceRecordId: record.id,
+			facilityId: record.facilityId,
+			patientId: record.patientId,
+			encounterId: record.encounterId,
+			certificateNumber: record.certificateNumber,
+			eventDatetime: record.birthDatetime,
+			status: record.status,
+			requestedAt: record.requestedAt,
+			paidAt: record.paidAt,
+			releasedAt: record.releasedAt,
+			completedAt: record.completedAt,
+			submittedAt: record.submittedAt,
+			tracking,
+		}))
+	}
+
+	private async listDeathLcrTrackingRows(input: ListLcrTrackingInput) {
+		const conditions = [eq(deathCertificateRegistrations.facilityId, input.facilityId)]
+		if (input.submissionStatus) {
+			conditions.push(eq(lcrTracking.submissionStatus, input.submissionStatus))
+		}
+
+		const rows = await db
+			.select({
+				record: deathCertificateRegistrations,
+				tracking: lcrTracking,
+			})
+			.from(deathCertificateRegistrations)
+			.leftJoin(
+				lcrTracking,
+				and(
+					eq(lcrTracking.sourceRecordId, deathCertificateRegistrations.id),
+					eq(lcrTracking.certificateType, "death" as const)
+				)
+			)
+			.where(and(...conditions))
+
+		return rows.map(({ record, tracking }) => ({
+			certificateType: "death" as const,
+			sourceRecordId: record.id,
+			facilityId: record.facilityId,
+			patientId: record.patientId,
+			encounterId: record.encounterId,
+			certificateNumber: record.certificateNumber,
+			eventDatetime: record.deathDatetime,
+			status: record.status,
+			requestedAt: record.requestedAt,
+			paidAt: record.paidAt,
+			releasedAt: record.releasedAt,
+			completedAt: record.completedAt,
+			submittedAt: record.submittedAt,
+			tracking,
+		}))
+	}
+
+	private async ensureLcrTracking(certificateType: LcrCertificateType, sourceRecordId: string) {
+		const source =
+			certificateType === "birth"
+				? await this.getBirthRegistration(sourceRecordId)
+				: await this.getDeathCertificateRegistration(sourceRecordId)
+
+		const [tracking] = await db
+			.insert(lcrTracking)
+			.values({
+				facilityId: source.facilityId,
+				certificateType,
+				sourceRecordId,
+			})
+			.onConflictDoUpdate({
+				target: [lcrTracking.certificateType, lcrTracking.sourceRecordId],
+				set: {
+					facilityId: source.facilityId,
+					updatedAt: new Date(),
+				},
+			})
+			.returning()
+
+		if (!tracking) {
+			throw new Error("Failed to create LCR tracking record")
+		}
+
+		return { source, tracking }
+	}
+
+	private assertCertificateReleased(
+		certificateType: LcrCertificateType,
+		source: BirthRegistrationRow | DeathCertificateRegistrationRow
+	) {
+		if (!source.releasedAt) {
+			throw new BadRequestException(
+				`${certificateType === "birth" ? "Birth" : "Death"} certificate must be released before generating LCR artifacts`
+			)
+		}
+	}
+
+	private async markSourceRecordSubmitted(
+		certificateType: LcrCertificateType,
+		sourceRecordId: string,
+		submittedAt: Date
+	) {
+		if (certificateType === "birth") {
+			await db
+				.update(birthRegistrations)
+				.set({ status: "submitted", submittedAt, updatedAt: new Date() })
+				.where(eq(birthRegistrations.id, sourceRecordId))
+			return
+		}
+
+		await db
+			.update(deathCertificateRegistrations)
+			.set({ status: "submitted", submittedAt, updatedAt: new Date() })
+			.where(eq(deathCertificateRegistrations.id, sourceRecordId))
 	}
 
 	private async assertActiveReleaseStaffProfile(id: string, releasedByStaffId: string) {

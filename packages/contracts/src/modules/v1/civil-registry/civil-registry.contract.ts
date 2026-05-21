@@ -7,10 +7,14 @@ import {
 	CreateDeathCertificateRegistrationSchema,
 	DeathCertificateRegistrationIdSchema,
 	DeathCertificateRegistrationSchema,
+	GenerateLcrArtifactInputSchema,
+	LcrTrackingSchema,
 	ListBirthRegistrationsResponseSchema,
 	ListBirthRegistrationsSchema,
 	ListDeathCertificateRegistrationsResponseSchema,
 	ListDeathCertificateRegistrationsSchema,
+	ListLcrTrackingResponseSchema,
+	ListLcrTrackingSchema,
 	MarkBirthRegistrationPaidInputSchema,
 	MarkBirthRegistrationPaidResponseSchema,
 	MarkBirthRegistrationReleasedInputSchema,
@@ -19,11 +23,42 @@ import {
 	MarkDeathCertificateRegistrationPaidResponseSchema,
 	MarkDeathCertificateRegistrationReleasedInputSchema,
 	MarkDeathCertificateRegistrationReleasedResponseSchema,
+	MarkLcrSubmittedInputSchema,
 	UpdateBirthRegistrationSchema,
 	UpdateDeathCertificateRegistrationSchema,
 } from "./civil-registry.schema.js"
 
 export const civilRegistryContract = {
+	listLcrTracking: oc
+		.route({
+			method: "GET",
+			path: "/civil-registry/lcr-tracking",
+			summary: "List unified LCR tracking records for birth and death certificates",
+			tags: ["Civil Registry"],
+		})
+		.input(ListLcrTrackingSchema)
+		.output(ListLcrTrackingResponseSchema),
+
+	generateLcrArtifact: oc
+		.route({
+			method: "POST",
+			path: "/civil-registry/lcr-tracking/{certificateType}/{sourceRecordId}/artifacts",
+			summary: "Generate or record a PDF/XML artifact for an LCR certificate",
+			tags: ["Civil Registry"],
+		})
+		.input(GenerateLcrArtifactInputSchema)
+		.output(LcrTrackingSchema),
+
+	markLcrSubmitted: oc
+		.route({
+			method: "POST",
+			path: "/civil-registry/lcr-tracking/{certificateType}/{sourceRecordId}/submission",
+			summary: "Mark an LCR certificate as submitted and store acknowledgement or error details",
+			tags: ["Civil Registry"],
+		})
+		.input(MarkLcrSubmittedInputSchema)
+		.output(LcrTrackingSchema),
+
 	listBirthRegistrations: oc
 		.route({
 			method: "GET",

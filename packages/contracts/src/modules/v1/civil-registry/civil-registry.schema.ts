@@ -9,6 +9,93 @@ const dateOrString = z
 // ============================================================================
 
 export const BirthRegistrationStatusEnum = z.enum(["draft", "completed", "submitted"])
+export const LcrCertificateTypeEnum = z.enum(["birth", "death"])
+export const LcrArtifactTypeEnum = z.enum(["pdf", "xml"])
+export const LcrArtifactStatusEnum = z.enum(["pending", "generated", "failed"])
+export const LcrSubmissionStatusEnum = z.enum([
+	"not_submitted",
+	"ready",
+	"submitted",
+	"acknowledged",
+	"rejected",
+	"error",
+])
+
+export const LcrTrackingSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	certificateType: LcrCertificateTypeEnum,
+	sourceRecordId: z.string().uuid(),
+	pdfStatus: LcrArtifactStatusEnum,
+	pdfGeneratedAt: dateOrString.nullable(),
+	pdfUrl: z.string().nullable(),
+	xmlStatus: LcrArtifactStatusEnum,
+	xmlGeneratedAt: dateOrString.nullable(),
+	xmlUrl: z.string().nullable(),
+	submissionStatus: LcrSubmissionStatusEnum,
+	submittedAt: dateOrString.nullable(),
+	acknowledgementNumber: z.string().nullable(),
+	referenceNumber: z.string().nullable(),
+	lastSubmissionError: z.string().nullable(),
+	lastSubmissionErrorAt: dateOrString.nullable(),
+	createdAt: dateOrString,
+	updatedAt: dateOrString,
+})
+
+export const LcrTrackingCertificateSourceSchema = z.object({
+	certificateType: LcrCertificateTypeEnum,
+	sourceRecordId: z.string().uuid(),
+})
+
+export const GenerateLcrArtifactInputSchema = LcrTrackingCertificateSourceSchema.extend({
+	artifactType: LcrArtifactTypeEnum,
+	artifactUrl: z.string().url().optional(),
+	/** Optional error text when generation fails instead of producing a ready artifact. */
+	error: z.string().min(1).optional(),
+})
+
+export const MarkLcrSubmittedInputSchema = LcrTrackingCertificateSourceSchema.extend({
+	submissionStatus: LcrSubmissionStatusEnum.exclude(["not_submitted", "ready"]).default(
+		"submitted"
+	),
+	submittedAt: z.string().datetime().optional(),
+	acknowledgementNumber: z.string().optional(),
+	referenceNumber: z.string().optional(),
+	error: z.string().optional(),
+})
+
+export const ListLcrTrackingSchema = z.object({
+	facilityId: z.string().uuid(),
+	certificateType: LcrCertificateTypeEnum.optional(),
+	submissionStatus: LcrSubmissionStatusEnum.optional(),
+	page: z.coerce.number().int().positive().default(1),
+	limit: z.coerce.number().int().positive().max(100).default(50),
+})
+
+export const LcrTrackingTableRecordSchema = z.object({
+	certificateType: LcrCertificateTypeEnum,
+	sourceRecordId: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	encounterId: z.string().uuid().nullable(),
+	certificateNumber: z.string().nullable(),
+	eventDatetime: dateOrString,
+	status: BirthRegistrationStatusEnum,
+	requestedAt: dateOrString.nullable().optional(),
+	paidAt: dateOrString.nullable().optional(),
+	releasedAt: dateOrString.nullable().optional(),
+	completedAt: dateOrString.nullable(),
+	submittedAt: dateOrString.nullable(),
+	tracking: LcrTrackingSchema.nullable(),
+})
+
+export const ListLcrTrackingResponseSchema = z.object({
+	data: z.array(LcrTrackingTableRecordSchema),
+	total: z.number(),
+	page: z.number(),
+	limit: z.number(),
+	totalPages: z.number(),
+})
 
 export const BirthRegistrationSchema = z.object({
 	id: z.string().uuid(),
@@ -40,6 +127,7 @@ export const BirthRegistrationSchema = z.object({
 	releasedAt: dateOrString.nullable().optional(),
 	completedAt: dateOrString.nullable(),
 	submittedAt: dateOrString.nullable(),
+	tracking: LcrTrackingSchema.nullable().optional(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 })
@@ -165,6 +253,7 @@ export const DeathCertificateRegistrationSchema = z.object({
 	releasedAt: dateOrString.nullable().optional(),
 	completedAt: dateOrString.nullable(),
 	submittedAt: dateOrString.nullable(),
+	tracking: LcrTrackingSchema.nullable().optional(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 })

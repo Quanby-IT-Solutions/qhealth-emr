@@ -4,9 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { LcrTrackingTable } from "./lcr-tracking-table"
 
 const mockUseMyProfile = vi.fn()
-const mockUseListBirthRegistrationsQuery = vi.fn()
+const mockUseListLcrTrackingQuery = vi.fn()
 const mockMarkPaid = vi.fn()
 const mockMarkReleased = vi.fn()
+const mockMarkDeathPaid = vi.fn()
+const mockMarkDeathReleased = vi.fn()
+const mockGenerateArtifact = vi.fn()
+const mockMarkSubmitted = vi.fn()
 
 vi.mock("next/link", () => ({
 	default: ({
@@ -33,12 +37,14 @@ vi.mock("@/features/app-shell/api/rbac.hooks", () => ({
 }))
 
 vi.mock("@/features/registrar/civil-registry/api/lcr.hooks", () => ({
-	useListBirthRegistrationsQuery: (
-		params: { facilityId: string },
-		options?: { enabled?: boolean }
-	) => mockUseListBirthRegistrationsQuery(params, options),
+	useListLcrTrackingQuery: (params: { facilityId: string }, options?: { enabled?: boolean }) =>
+		mockUseListLcrTrackingQuery(params, options),
 	useMarkBirthRegistrationPaidMutation: () => mockMarkPaid(),
 	useMarkBirthRegistrationReleasedMutation: () => mockMarkReleased(),
+	useMarkDeathCertificateRegistrationPaidMutation: () => mockMarkDeathPaid(),
+	useMarkDeathCertificateRegistrationReleasedMutation: () => mockMarkDeathReleased(),
+	useGenerateLcrArtifactMutation: () => mockGenerateArtifact(),
+	useMarkLcrSubmittedMutation: () => mockMarkSubmitted(),
 }))
 
 const activeRoleId = "11111111-1111-4111-8111-111111111111"
@@ -106,33 +112,50 @@ function mockProfile(
 
 function mockBirthRegistration() {
 	return {
-		id: birthRegistrationId,
+		certificateType: "birth",
+		sourceRecordId: birthRegistrationId,
 		facilityId: activeFacilityId,
 		patientId: "88888888-8888-4888-8888-888888888888",
 		encounterId: null,
-		birthDatetime: new Date("2026-01-15T08:00:00.000Z"),
-		registeredByStaffId: activeStaffProfileId,
 		certificateNumber: "B-2026-001",
-		attendantAtBirth: "Physician",
-		placeOfBirthBarangay: "Poblacion",
-		placeOfBirthMunicipality: "Quezon City",
-		placeOfBirthProvince: "Metro Manila",
-		placeOfBirthRegion: "NCR",
-		fatherName: "Dela Cruz, Juan Santos",
-		motherName: "Dela Cruz, Maria Reyes",
-		physicianName: "Dr. Ana Santos",
-		physicianLicenseNo: "1234567",
-		physicianSignature: "data:image/png;base64,signature",
-		attendingStaffId: null,
+		eventDatetime: new Date("2026-01-15T08:00:00.000Z"),
 		status: "completed",
 		requestedAt: new Date("2026-01-15T09:00:00.000Z"),
 		paidAt: new Date("2026-01-15T10:00:00.000Z"),
-		releasedByStaffId: null,
 		releasedAt: null,
 		completedAt: new Date("2026-01-15T09:30:00.000Z"),
 		submittedAt: null,
-		createdAt: new Date("2026-01-15T08:30:00.000Z"),
-		updatedAt: new Date("2026-01-15T10:00:00.000Z"),
+		tracking: null,
+	}
+}
+
+function mockDeathRegistration() {
+	return {
+		certificateType: "death",
+		sourceRecordId: "99999999-9999-4999-8999-999999999999",
+		facilityId: activeFacilityId,
+		patientId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+		encounterId: null,
+		certificateNumber: "D-2026-001",
+		eventDatetime: new Date("2026-01-16T08:00:00.000Z"),
+		status: "submitted",
+		requestedAt: new Date("2026-01-16T09:00:00.000Z"),
+		paidAt: new Date("2026-01-16T10:00:00.000Z"),
+		releasedAt: new Date("2026-01-16T11:00:00.000Z"),
+		completedAt: new Date("2026-01-16T11:00:00.000Z"),
+		submittedAt: new Date("2026-01-16T12:00:00.000Z"),
+		tracking: {
+			pdfStatus: "generated",
+			pdfGeneratedAt: new Date("2026-01-16T11:10:00.000Z"),
+			xmlStatus: "generated",
+			xmlGeneratedAt: new Date("2026-01-16T11:15:00.000Z"),
+			submissionStatus: "acknowledged",
+			submittedAt: new Date("2026-01-16T12:00:00.000Z"),
+			acknowledgementNumber: "ACK-1",
+			referenceNumber: "REF-1",
+			lastSubmissionError: null,
+			lastSubmissionErrorAt: null,
+		},
 	}
 }
 
@@ -140,15 +163,19 @@ describe("LcrTrackingTable", () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
 		mockUseMyProfile.mockReturnValue({ data: mockProfile() })
-		mockUseListBirthRegistrationsQuery.mockReturnValue({
+		mockUseListLcrTrackingQuery.mockReturnValue({
 			data: {
-				data: [mockBirthRegistration()],
-				total: 1,
+				data: [mockBirthRegistration(), mockDeathRegistration()],
+				total: 2,
 			},
 			isLoading: false,
 		})
 		mockMarkPaid.mockReturnValue({ mutate: vi.fn(), isPending: false })
 		mockMarkReleased.mockReturnValue({ mutate: vi.fn(), isPending: false })
+		mockMarkDeathPaid.mockReturnValue({ mutate: vi.fn(), isPending: false })
+		mockMarkDeathReleased.mockReturnValue({ mutate: vi.fn(), isPending: false })
+		mockGenerateArtifact.mockReturnValue({ mutate: vi.fn(), isPending: false })
+		mockMarkSubmitted.mockReturnValue({ mutate: vi.fn(), isPending: false })
 	})
 
 	it("releases with the active staff-profile UUID instead of the auth user id", () => {
@@ -159,7 +186,7 @@ describe("LcrTrackingTable", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: /mark released/i }))
 
-		expect(mockUseListBirthRegistrationsQuery).toHaveBeenCalledWith(
+		expect(mockUseListLcrTrackingQuery).toHaveBeenCalledWith(
 			{ facilityId: activeFacilityId },
 			{ enabled: true }
 		)
@@ -177,24 +204,16 @@ describe("LcrTrackingTable", () => {
 		render(<LcrTrackingTable />)
 
 		expect(screen.queryByRole("button", { name: /mark released/i })).not.toBeInTheDocument()
-		expect(mockUseListBirthRegistrationsQuery).toHaveBeenCalledWith(
-			{ facilityId: "" },
-			{ enabled: false }
-		)
+		expect(mockUseListLcrTrackingQuery).toHaveBeenCalledWith({ facilityId: "" }, { enabled: false })
 	})
 
-	it("blocks release when required LCR fields are missing", () => {
-		mockUseListBirthRegistrationsQuery.mockReturnValue({
-			data: {
-				data: [{ ...mockBirthRegistration(), fatherName: null, physicianSignature: null }],
-				total: 1,
-			},
-			isLoading: false,
-		})
-
+	it("shows birth and death records with artifact and submission state", () => {
 		render(<LcrTrackingTable />)
 
-		expect(screen.getByText("Incomplete")).toBeInTheDocument()
-		expect(screen.getByRole("button", { name: /mark released/i })).toBeDisabled()
+		expect(screen.getByText("Birth")).toBeInTheDocument()
+		expect(screen.getByText("Death")).toBeInTheDocument()
+		expect(screen.getAllByText("generated")).toHaveLength(2)
+		expect(screen.getByText("acknowledged")).toBeInTheDocument()
+		expect(screen.getByText(/Ack ACK-1/)).toBeInTheDocument()
 	})
 })

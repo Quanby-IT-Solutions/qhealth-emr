@@ -37,7 +37,11 @@
    - Certificate status becomes `completed`.
 
 5. SUBMISSION TO LCR (Registrar)
+   - Registrar generates the LCR PDF artifact.
+   - Registrar generates the LCR XML artifact.
+   - `lcr_tracking` records artifact readiness for the birth registration source record.
    - Registrar submits to Local Civil Registry.
+   - `lcr_tracking` stores submission status, acknowledgement number, reference number, and any last submission error.
    - Certificate status becomes `submitted`.
    - Tracking entry is updated.
 
@@ -102,8 +106,11 @@ sequenceDiagram
     Registrar->>System: Mark as released (SLA-021)
     System-->>Registrar: Certificate status -> completed
 
-    Registrar->>LCR: 7. Submit to Local Civil Registry
-    LCR-->>Registrar: Certificate accepted
+    Registrar->>System: 7. Generate PDF and XML artifacts
+    System-->>Registrar: LCR tracking artifact status -> ready
+    Registrar->>LCR: 8. Submit to Local Civil Registry
+    LCR-->>Registrar: Acknowledgement/reference returned
+    System-->>Registrar: LCR tracking submission status -> submitted/acknowledged
     System-->>Registrar: Certificate status -> submitted
 ```
 
@@ -150,4 +157,15 @@ BIRTH CERTIFICATE GENERATION PHASE
    ├─ physicianLicenseNo
    ├─ attendingStaffId
    └─ status (draft -> completed -> submitted)
+
+LCR TRACKING PHASE
+├─ lcr_tracking
+│  ├─ certificateType = birth
+│  ├─ sourceRecordId = birthRegistrations.id
+│  ├─ pdfStatus / pdfGeneratedAt / pdfUrl
+│  ├─ xmlStatus / xmlGeneratedAt / xmlUrl
+│  ├─ submissionStatus
+│  ├─ acknowledgementNumber
+│  ├─ referenceNumber
+│  └─ lastSubmissionError / lastSubmissionErrorAt
 ```

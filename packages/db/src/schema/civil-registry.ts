@@ -1,4 +1,4 @@
-import { index } from "drizzle-orm/pg-core"
+import { index, uniqueIndex } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
 import { encounters, patients } from "./core.js"
@@ -122,5 +122,50 @@ export const deathCertificateRegistrations = createTable(
 		index("death_certificate_registrations_patient_id_idx").on(t.patientId),
 		index("death_certificate_registrations_status_idx").on(t.status),
 		index("death_certificate_registrations_death_datetime_idx").on(t.deathDatetime),
+	]
+)
+
+export const lcrTracking = createTable(
+	"lcr_tracking",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		certificateType: t.text("certificate_type").notNull().$type<"birth" | "death">(),
+		sourceRecordId: t.uuid("source_record_id").notNull(),
+		pdfStatus: t
+			.text("pdf_status")
+			.notNull()
+			.default("pending")
+			.$type<"pending" | "generated" | "failed">(),
+		pdfGeneratedAt: t.timestamp("pdf_generated_at"),
+		pdfUrl: t.text("pdf_url"),
+		xmlStatus: t
+			.text("xml_status")
+			.notNull()
+			.default("pending")
+			.$type<"pending" | "generated" | "failed">(),
+		xmlGeneratedAt: t.timestamp("xml_generated_at"),
+		xmlUrl: t.text("xml_url"),
+		submissionStatus: t
+			.text("submission_status")
+			.notNull()
+			.default("not_submitted")
+			.$type<"not_submitted" | "ready" | "submitted" | "acknowledged" | "rejected" | "error">(),
+		submittedAt: t.timestamp("submitted_at"),
+		acknowledgementNumber: t.text("acknowledgement_number"),
+		referenceNumber: t.text("reference_number"),
+		lastSubmissionError: t.text("last_submission_error"),
+		lastSubmissionErrorAt: t.timestamp("last_submission_error_at"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		uniqueIndex("lcr_tracking_certificate_source_uniq").on(t.certificateType, t.sourceRecordId),
+		index("lcr_tracking_facility_id_idx").on(t.facilityId),
+		index("lcr_tracking_certificate_type_idx").on(t.certificateType),
+		index("lcr_tracking_submission_status_idx").on(t.submissionStatus),
 	]
 )

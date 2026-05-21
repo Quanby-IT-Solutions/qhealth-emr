@@ -4,6 +4,31 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { orpc } from "@/services/orpc/client"
 
+export function useListLcrTrackingQuery(
+	params: {
+		facilityId: string
+		certificateType?: "birth" | "death"
+		submissionStatus?:
+			| "not_submitted"
+			| "ready"
+			| "submitted"
+			| "acknowledged"
+			| "rejected"
+			| "error"
+		page?: number
+		limit?: number
+	},
+	options?: { enabled?: boolean }
+) {
+	return useQuery(
+		orpc.civilRegistry.listLcrTracking.queryOptions({
+			input: { ...params, page: params.page ?? 1, limit: params.limit ?? 50 },
+			enabled: (options?.enabled ?? true) && !!params.facilityId,
+			staleTime: 30_000,
+		})
+	)
+}
+
 export function useListBirthRegistrationsQuery(
 	params: {
 		facilityId: string
@@ -48,6 +73,24 @@ export function useCreateBirthRegistrationMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.civilRegistry.createBirthRegistration.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+		})
+	)
+}
+
+export function useGenerateLcrArtifactMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.civilRegistry.generateLcrArtifact.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+		})
+	)
+}
+
+export function useMarkLcrSubmittedMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.civilRegistry.markLcrSubmitted.mutationOptions({
 			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
 		})
 	)

@@ -86,6 +86,33 @@ export class CivilRegistryController {
 	}
 
 	@RequirePermission("civil_registry", "view")
+	@Implement(v1.civilRegistry.listLcrTracking)
+	async listLcrTracking() {
+		return implement(v1.civilRegistry.listLcrTracking).handler(async ({ input }) => {
+			return this.civilRegistryService.listLcrTracking(input)
+		})
+	}
+
+	@RequirePermission("civil_registry", "edit")
+	@Implement(v1.civilRegistry.generateLcrArtifact)
+	async generateLcrArtifact() {
+		return implement(v1.civilRegistry.generateLcrArtifact).handler(async ({ input }) => {
+			return this.civilRegistryService.generateLcrArtifact(input)
+		})
+	}
+
+	@RequirePermission("civil_registry", "edit")
+	@Implement(v1.civilRegistry.markLcrSubmitted)
+	async markLcrSubmitted() {
+		return implement(v1.civilRegistry.markLcrSubmitted).handler(async ({ input }) => {
+			return this.civilRegistryService.markLcrSubmitted({
+				...input,
+				submittedAt: input.submittedAt ? new Date(input.submittedAt) : undefined,
+			})
+		})
+	}
+
+	@RequirePermission("civil_registry", "view")
 	@Implement(v1.civilRegistry.listBirthRegistrations)
 	async listBirthRegistrations() {
 		return implement(v1.civilRegistry.listBirthRegistrations).handler(async ({ input }) => {

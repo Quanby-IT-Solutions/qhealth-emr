@@ -19,23 +19,49 @@ import {
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
-	useListBirthRegistrationsQuery,
+	useGenerateLcrArtifactMutation,
+	useListLcrTrackingQuery,
 	useMarkBirthRegistrationPaidMutation,
 	useMarkBirthRegistrationReleasedMutation,
+	useMarkDeathCertificateRegistrationPaidMutation,
+	useMarkDeathCertificateRegistrationReleasedMutation,
+	useMarkLcrSubmittedMutation,
 } from "@/features/registrar/civil-registry/api/lcr.hooks"
 
-interface BirthRegistrationLcrFields {
+type LcrSubmissionStatus =
+	| "not_submitted"
+	| "ready"
+	| "submitted"
+	| "acknowledged"
+	| "rejected"
+	| "error"
+
+interface LcrTrackingRecord {
+	certificateType: "birth" | "death"
+	sourceRecordId: string
+	facilityId: string
+	patientId: string
+	encounterId: string | null
 	certificateNumber: string | null
-	attendantAtBirth?: string | null
-	placeOfBirthBarangay?: string | null
-	placeOfBirthMunicipality?: string | null
-	placeOfBirthProvince?: string | null
-	placeOfBirthRegion?: string | null
-	fatherName?: string | null
-	motherName?: string | null
-	physicianName?: string | null
-	physicianLicenseNo?: string | null
-	physicianSignature?: string | null
+	eventDatetime: Date | string
+	status: "draft" | "completed" | "submitted"
+	requestedAt?: Date | string | null
+	paidAt?: Date | string | null
+	releasedAt?: Date | string | null
+	completedAt: Date | string | null
+	submittedAt: Date | string | null
+	tracking: {
+		pdfStatus: "pending" | "generated" | "failed"
+		pdfGeneratedAt: Date | string | null
+		xmlStatus: "pending" | "generated" | "failed"
+		xmlGeneratedAt: Date | string | null
+		submissionStatus: LcrSubmissionStatus
+		submittedAt: Date | string | null
+		acknowledgementNumber: string | null
+		referenceNumber: string | null
+		lastSubmissionError: string | null
+		lastSubmissionErrorAt: Date | string | null
+	} | null
 }
 
 function formatDate(value: Date | string | null | undefined): string {
@@ -56,26 +82,29 @@ function StatusBadge({ status }: { status: string }) {
 	)
 }
 
-function hasRequiredValue(value: string | null | undefined) {
-	return typeof value === "string" && value.trim().length > 0
+function ArtifactBadge({ status }: { status: "pending" | "generated" | "failed" }) {
+	const map: Record<string, string> = {
+		pending: "bg-muted text-muted-foreground",
+		generated: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+		failed: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+	}
+	return <Badge className={cn("px-1.5 text-[10px] capitalize", map[status])}>{status}</Badge>
 }
 
-function getMissingLcrFields(record: BirthRegistrationLcrFields) {
-	const requiredFields: Array<[keyof BirthRegistrationLcrFields, string]> = [
-		["certificateNumber", "certificate #"],
-		["attendantAtBirth", "attendant"],
-		["placeOfBirthBarangay", "barangay"],
-		["placeOfBirthMunicipality", "municipality"],
-		["placeOfBirthProvince", "province"],
-		["placeOfBirthRegion", "region"],
-		["fatherName", "father"],
-		["motherName", "mother"],
-		["physicianName", "physician"],
-		["physicianLicenseNo", "license #"],
-		["physicianSignature", "signature"],
-	]
-
-	return requiredFields.filter(([key]) => !hasRequiredValue(record[key])).map(([, label]) => label)
+function SubmissionBadge({ status }: { status: LcrSubmissionStatus }) {
+	const map: Record<string, string> = {
+		not_submitted: "bg-muted text-muted-foreground",
+		ready: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+		submitted: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+		acknowledged: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+		rejected: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+		error: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+	}
+	return (
+		<Badge className={cn("px-1.5 text-[10px] capitalize", map[status])}>
+			{status.replace("_", " ")}
+		</Badge>
+	)
 }
 
 export function LcrTrackingTable() {
@@ -86,14 +115,15 @@ export function LcrTrackingTable() {
 	const facilityId = activeStaffProfile?.facilityId ?? ""
 	const staffId = activeStaffProfile?.id ?? ""
 
-	const { data, isLoading } = useListBirthRegistrationsQuery(
-		{ facilityId },
-		{ enabled: !!facilityId }
-	)
-	const markPaid = useMarkBirthRegistrationPaidMutation()
-	const markReleased = useMarkBirthRegistrationReleasedMutation()
+	const { data, isLoading } = useListLcrTrackingQuery({ facilityId }, { enabled: !!facilityId })
+	const markBirthPaid = useMarkBirthRegistrationPaidMutation()
+	const markBirthReleased = useMarkBirthRegistrationReleasedMutation()
+	const markDeathPaid = useMarkDeathCertificateRegistrationPaidMutation()
+	const markDeathReleased = useMarkDeathCertificateRegistrationReleasedMutation()
+	const generateArtifact = useGenerateLcrArtifactMutation()
+	const markSubmitted = useMarkLcrSubmittedMutation()
 
-	const records = data?.data ?? []
+	const records = (data?.data ?? []) as LcrTrackingRecord[]
 
 	return (
 		<div className="space-y-6">
@@ -111,12 +141,20 @@ export function LcrTrackingTable() {
 				<div>
 					<h1 className="text-xl font-semibold">LCR Tracking</h1>
 					<p className="text-muted-foreground text-sm">
-						Birth certificate SLA checkpoints — SLA-017 (payment) and SLA-021 (release)
+						Birth and death certificate release, artifact generation, and LCR submission tracking
 					</p>
 				</div>
-				<Link href="/registrar/civil-registry/birth" className={buttonVariants({ size: "sm" })}>
-					New Birth Certificate
-				</Link>
+				<div className="flex gap-2">
+					<Link href="/registrar/civil-registry/birth" className={buttonVariants({ size: "sm" })}>
+						New Birth Certificate
+					</Link>
+					<Link
+						href="/registrar/civil-registry/death"
+						className={buttonVariants({ variant: "outline", size: "sm" })}
+					>
+						New Death Certificate
+					</Link>
+				</div>
 			</div>
 
 			{isLoading && (
@@ -130,7 +168,9 @@ export function LcrTrackingTable() {
 			{!isLoading && records.length === 0 && (
 				<Card>
 					<CardContent className="py-12 text-center">
-						<p className="text-muted-foreground">No birth registrations found for this facility.</p>
+						<p className="text-muted-foreground">
+							No LCR certificate records found for this facility.
+						</p>
 					</CardContent>
 				</Card>
 			)}
@@ -142,33 +182,40 @@ export function LcrTrackingTable() {
 							<TableRow>
 								<TableHead>Type</TableHead>
 								<TableHead>Certificate #</TableHead>
-								<TableHead>Birth Date</TableHead>
+								<TableHead>Event Date</TableHead>
 								<TableHead>Status</TableHead>
 								<TableHead>Requested</TableHead>
-								<TableHead>Paid (SLA-017)</TableHead>
-								<TableHead>Released (SLA-021)</TableHead>
+								<TableHead>Payment</TableHead>
+								<TableHead>Release</TableHead>
+								<TableHead>Artifacts</TableHead>
+								<TableHead>Submission</TableHead>
+								<TableHead>Last Error</TableHead>
 								<TableHead className="text-right">Actions</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{records.map(record => {
-								const missingLcrFields = getMissingLcrFields(record)
-								const canRelease = missingLcrFields.length === 0
-								const releaseBlockReason = missingLcrFields.length
-									? `Missing LCR fields: ${missingLcrFields.join(", ")}`
-									: undefined
+								const isBirth = record.certificateType === "birth"
+								const tracking = record.tracking
+								const pdfStatus = tracking?.pdfStatus ?? "pending"
+								const xmlStatus = tracking?.xmlStatus ?? "pending"
+								const canGenerateArtifacts = !!record.releasedAt
+								const canSubmit =
+									tracking?.pdfStatus === "generated" && tracking.xmlStatus === "generated"
+								const markPaid = isBirth ? markBirthPaid : markDeathPaid
+								const markReleased = isBirth ? markBirthReleased : markDeathReleased
 
 								return (
-									<TableRow key={record.id}>
+									<TableRow key={`${record.certificateType}-${record.sourceRecordId}`}>
 										<TableCell>
 											<Badge variant="outline" className="text-[10px]">
-												Birth
+												{isBirth ? "Birth" : "Death"}
 											</Badge>
 										</TableCell>
 										<TableCell className="font-medium">
 											{record.certificateNumber ?? <span className="text-muted-foreground">—</span>}
 										</TableCell>
-										<TableCell>{formatDate(record.birthDatetime)}</TableCell>
+										<TableCell>{formatDate(record.eventDatetime)}</TableCell>
 										<TableCell>
 											<StatusBadge status={record.status} />
 										</TableCell>
@@ -181,7 +228,7 @@ export function LcrTrackingTable() {
 													{formatDate(record.paidAt)}
 												</span>
 											) : (
-												"—"
+												"Unpaid"
 											)}
 										</TableCell>
 										<TableCell className="text-muted-foreground text-xs">
@@ -189,21 +236,56 @@ export function LcrTrackingTable() {
 												<span className="text-green-700 dark:text-green-400">
 													{formatDate(record.releasedAt)}
 												</span>
-											) : releaseBlockReason ? (
-												<span title={releaseBlockReason}>Incomplete</span>
 											) : (
-												"—"
+												"Pending"
+											)}
+										</TableCell>
+										<TableCell>
+											<div className="flex gap-1">
+												<ArtifactBadge status={pdfStatus} />
+												<ArtifactBadge status={xmlStatus} />
+											</div>
+										</TableCell>
+										<TableCell className="text-xs">
+											{tracking ? (
+												<div className="space-y-1">
+													<SubmissionBadge status={tracking.submissionStatus} />
+													{(tracking.acknowledgementNumber || tracking.referenceNumber) && (
+														<div className="text-muted-foreground">
+															{tracking.acknowledgementNumber && (
+																<span>Ack {tracking.acknowledgementNumber}</span>
+															)}
+															{tracking.referenceNumber && (
+																<span className="ml-1">Ref {tracking.referenceNumber}</span>
+															)}
+														</div>
+													)}
+												</div>
+											) : (
+												<SubmissionBadge status="not_submitted" />
+											)}
+										</TableCell>
+										<TableCell className="max-w-40 text-xs">
+											{tracking?.lastSubmissionError ? (
+												<span
+													title={tracking.lastSubmissionError}
+													className="text-red-700 dark:text-red-400"
+												>
+													{tracking.lastSubmissionError}
+												</span>
+											) : (
+												<span className="text-muted-foreground">—</span>
 											)}
 										</TableCell>
 										<TableCell className="text-right">
-											<div className="flex justify-end gap-1">
+											<div className="flex flex-wrap justify-end gap-1">
 												{!record.paidAt && (
 													<Button
 														size="sm"
 														variant="outline"
 														className="h-7 px-2 text-xs"
 														disabled={markPaid.isPending}
-														onClick={() => markPaid.mutate({ id: record.id })}
+														onClick={() => markPaid.mutate({ id: record.sourceRecordId })}
 													>
 														Mark Paid
 													</Button>
@@ -213,17 +295,69 @@ export function LcrTrackingTable() {
 														size="sm"
 														variant="outline"
 														className="h-7 px-2 text-xs"
-														disabled={markReleased.isPending || !canRelease}
-														title={releaseBlockReason}
+														disabled={markReleased.isPending}
 														onClick={() =>
 															markReleased.mutate({
-																id: record.id,
+																id: record.sourceRecordId,
 															})
 														}
 													>
 														Mark Released
 													</Button>
 												)}
+												<Button
+													size="sm"
+													variant="outline"
+													className="h-7 px-2 text-xs"
+													disabled={
+														generateArtifact.isPending ||
+														!canGenerateArtifacts ||
+														pdfStatus === "generated"
+													}
+													onClick={() =>
+														generateArtifact.mutate({
+															certificateType: record.certificateType,
+															sourceRecordId: record.sourceRecordId,
+															artifactType: "pdf",
+														})
+													}
+												>
+													Generate PDF
+												</Button>
+												<Button
+													size="sm"
+													variant="outline"
+													className="h-7 px-2 text-xs"
+													disabled={
+														generateArtifact.isPending ||
+														!canGenerateArtifacts ||
+														xmlStatus === "generated"
+													}
+													onClick={() =>
+														generateArtifact.mutate({
+															certificateType: record.certificateType,
+															sourceRecordId: record.sourceRecordId,
+															artifactType: "xml",
+														})
+													}
+												>
+													Generate XML
+												</Button>
+												<Button
+													size="sm"
+													variant="outline"
+													className="h-7 px-2 text-xs"
+													disabled={markSubmitted.isPending || !canSubmit}
+													onClick={() =>
+														markSubmitted.mutate({
+															certificateType: record.certificateType,
+															sourceRecordId: record.sourceRecordId,
+															submissionStatus: "submitted",
+														})
+													}
+												>
+													Mark Submitted
+												</Button>
 											</div>
 										</TableCell>
 									</TableRow>
@@ -236,20 +370,6 @@ export function LcrTrackingTable() {
 					</div>
 				</div>
 			)}
-
-			<div className="border-border/70 rounded-lg border p-4">
-				<p className="text-sm font-medium">Death Certificates</p>
-				<p className="text-muted-foreground mt-1 text-xs">
-					Death certificate records are owned by Civil Registry. Maternal and neonatal death review
-					forms stay in Death Reporting.
-				</p>
-				<Link
-					href="/registrar/civil-registry/death"
-					className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}
-				>
-					New Death Certificate
-				</Link>
-			</div>
 		</div>
 	)
 }
