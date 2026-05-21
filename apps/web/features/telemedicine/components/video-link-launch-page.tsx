@@ -33,7 +33,6 @@ import {
 	formatAppointmentStatusLabel,
 	getAppointmentStatusColor,
 	getPatientInviteUrl,
-	getPlatformLabel,
 	useAppointmentQuery,
 } from "@/features/telemedicine/api/telemedicine.hooks"
 import { LiveKitVideoRoom } from "@/features/telemedicine/components/livekit-room"
@@ -234,11 +233,6 @@ export function VideoLinkLaunchPage({ appointmentId }: VideoLinkLaunchPageProps)
 					)}
 				</div>
 				<div className="flex shrink-0 items-center gap-2">
-					{appointment && (
-						<span className="border-border bg-muted text-muted-foreground hidden items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-medium tracking-wide uppercase md:inline-flex">
-							{getPlatformLabel(appointment.platform)}
-						</span>
-					)}
 					<Dialog>
 						<DialogTrigger
 							className="border-border bg-muted text-foreground hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-2"
@@ -254,7 +248,7 @@ export function VideoLinkLaunchPage({ appointmentId }: VideoLinkLaunchPageProps)
 								</DialogTitle>
 								<DialogDescription>
 									{appointment
-										? `${appointment.patientName} — ${getPlatformLabel(appointment.platform)} consultation`
+										? `${appointment.patientName} video consultation`
 										: "Telemedicine appointment details"}
 								</DialogDescription>
 							</DialogHeader>
@@ -269,7 +263,6 @@ export function VideoLinkLaunchPage({ appointmentId }: VideoLinkLaunchPageProps)
 									<Field icon={User} label="Patient" value={appointment.patientName} />
 									<Field label="MRN" value={appointment.patientMrn} />
 									<Field icon={User} label="Clinician" value={appointment.clinicianName} />
-									<Field icon={Video} label="Platform" value={getPlatformLabel(appointment.platform)} />
 									<Field icon={Calendar} label="Date" value={formatDate(appointment.scheduledDate)} />
 									<Field icon={Clock} label="Time" value={formatTime(appointment.scheduledTime)} />
 									<Field label="Duration" value={`${appointment.durationMinutes} min`} />

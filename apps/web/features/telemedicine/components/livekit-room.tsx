@@ -280,8 +280,8 @@ export function DeviceSelectors({
 		? "text-muted-foreground text-[10px] uppercase tracking-widest font-medium"
 		: "text-muted-foreground text-xs font-medium tracking-wider uppercase"
 	const triggerClass = dark
-		? "w-full bg-muted/60 border-border text-foreground hover:bg-muted focus:ring-ring/40 data-[placeholder]:text-muted-foreground"
-		: "w-full"
+		? "w-full min-w-0 bg-muted/60 border-border text-foreground hover:bg-muted focus:ring-ring/40 data-[placeholder]:text-muted-foreground"
+		: "w-full min-w-0"
 
 	return (
 		<div className="space-y-3">
@@ -297,10 +297,12 @@ export function DeviceSelectors({
 							placeholder={videoEnabled ? "Enable camera to see devices" : "Camera is off"}
 						/>
 					</SelectTrigger>
-					<SelectContent>
+					<SelectContent className="max-w-[var(--anchor-width)]">
 						{videoDevices.map(device => (
 							<SelectItem key={device.deviceId} value={device.deviceId}>
-								{device.label || `Camera (${device.deviceId.slice(0, 6)})`}
+								<span className="block min-w-0 truncate" title={device.label}>
+									{device.label || `Camera (${device.deviceId.slice(0, 6)})`}
+								</span>
 							</SelectItem>
 						))}
 					</SelectContent>
@@ -318,10 +320,12 @@ export function DeviceSelectors({
 							placeholder={audioEnabled ? "Enable microphone to see devices" : "Microphone is off"}
 						/>
 					</SelectTrigger>
-					<SelectContent>
+					<SelectContent className="max-w-[var(--anchor-width)]">
 						{audioDevices.map(device => (
 							<SelectItem key={device.deviceId} value={device.deviceId}>
-								{device.label || `Microphone (${device.deviceId.slice(0, 6)})`}
+								<span className="block min-w-0 truncate" title={device.label}>
+									{device.label || `Microphone (${device.deviceId.slice(0, 6)})`}
+								</span>
 							</SelectItem>
 						))}
 					</SelectContent>
@@ -523,45 +527,12 @@ export function LiveKitSetupBanner() {
 			<AlertTitle>Video conferencing not yet configured</AlertTitle>
 			<AlertDescription className="text-amber-900/90 dark:text-amber-100/90">
 				<p>
-					LiveKit credentials have not been set up on this server yet. An administrator needs to
-					enable the integration before video sessions can be started.
+					Video conferencing credentials have not been set up on this server yet. An
+					administrator needs to enable the integration before video sessions can be started.
 				</p>
-				<div className="border-amber-500/40 bg-card mt-3 rounded-md border p-3">
-					<p className="mb-2 text-xs font-semibold text-amber-900 dark:text-amber-100">
-						Administrator setup required:
-					</p>
-					<ul className="list-disc space-y-1 pl-5 text-xs">
-						<li>
-							Set{" "}
-							<code className="bg-amber-500/15 rounded px-1 text-amber-900 dark:text-amber-100">
-								LIVEKIT_MODE=real
-							</code>{" "}
-							in the backend environment.
-						</li>
-						<li>
-							Set{" "}
-							<code className="bg-amber-500/15 rounded px-1 text-amber-900 dark:text-amber-100">
-								LIVEKIT_API_KEY
-							</code>{" "}
-							in the backend environment.
-						</li>
-						<li>
-							Set{" "}
-							<code className="bg-amber-500/15 rounded px-1 text-amber-900 dark:text-amber-100">
-								LIVEKIT_API_SECRET
-							</code>{" "}
-							in the backend environment.
-						</li>
-						<li>
-							Set{" "}
-							<code className="bg-amber-500/15 rounded px-1 text-amber-900 dark:text-amber-100">
-								LIVEKIT_WS_URL
-							</code>{" "}
-							in the backend environment.
-						</li>
-						<li>Restart the backend after setting credentials.</li>
-					</ul>
-				</div>
+				<p className="mt-2 text-xs">
+					Contact your system administrator to complete video service setup.
+				</p>
 			</AlertDescription>
 		</Alert>
 	)
@@ -638,7 +609,7 @@ export function LiveKitTokenRoom({
 	response,
 	choices = DEFAULT_PREJOIN_CHOICES,
 	className,
-	errorMessage = "The server did not return a usable LiveKit token or websocket URL.",
+	errorMessage = "The server did not return usable video session credentials.",
 	onDisconnected,
 	fullViewport,
 	waitingRoom,
@@ -855,7 +826,7 @@ function LiveKitVideoRoomSession({
 				<div className="flex flex-wrap items-center justify-between gap-3">
 					<CardTitle className="flex items-center gap-2 text-base">
 						<Video className="text-primary size-5" />
-						LiveKit Video Session
+						Video Session
 					</CardTitle>
 					{subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
 				</div>

@@ -30,7 +30,6 @@ import {
 	APPOINTMENT_STATUSES,
 	formatAppointmentStatusLabel,
 	getAppointmentStatusColor,
-	getPlatformLabel,
 	useAppointmentsQuery,
 	type AppointmentStatus,
 	type TelemedicineAppointment,
@@ -214,10 +213,6 @@ function AppointmentRow({
 						<Clock className="size-3" />
 						{formatTime(appt.scheduledTime)} · {appt.durationMinutes} min
 					</span>
-					<span className="flex items-center gap-1">
-						<Video className="size-3" />
-						{getPlatformLabel(appt.platform)}
-					</span>
 					{appt.clinicianName && (
 						<span className="flex items-center gap-1">
 							<User className="size-3" />
@@ -371,7 +366,7 @@ export function PhysicianAppointmentList({
 							<AlertCircle className="text-muted-foreground size-8" />
 							<p className="text-sm font-medium">Staff profile unavailable</p>
 							<p className="text-muted-foreground max-w-md text-xs">
-								Your account is not linked to a facility staff profile, so we can't load assigned
+								Your account is not linked to a facility staff profile, so we can&apos;t load assigned
 								telemedicine appointments. Contact your administrator.
 							</p>
 						</div>
@@ -396,7 +391,7 @@ export function PhysicianAppointmentList({
 							<Calendar className="text-muted-foreground size-8" />
 							<p className="text-sm font-medium">No assigned appointments</p>
 							<p className="text-muted-foreground max-w-md text-xs">
-								You don't have any telemedicine consultations assigned to you yet. New appointments
+								You don&apos;t have any telemedicine consultations assigned to you yet. New appointments
 								will appear here once the scheduler books them with you.
 							</p>
 						</div>

@@ -46,7 +46,6 @@ import { Separator } from "@/core/components/ui/separator"
 import {
 	formatAppointmentStatusLabel,
 	getPatientInviteUrl,
-	getPlatformLabel,
 	type TelemedicineAppointment,
 	useAppointmentQuery,
 	useRegeneratePatientInviteMutation,
@@ -219,7 +218,6 @@ function VideoCallContent({
 		() => (patientInviteToken ? getPatientInviteUrl(patientInviteToken) : null),
 		[patientInviteToken]
 	)
-	const platformLabel = getPlatformLabel(currentAppt.platform)
 	const inviteRevoked = Boolean(currentAppt.patientInviteRevokedAt)
 	const hasStoredInvite = Boolean(currentAppt.patientInviteExpiresAt) && !inviteRevoked
 	const inviteHidden = hasStoredInvite && !patientInviteUrl
@@ -287,7 +285,7 @@ function VideoCallContent({
 			<div className="rounded-2xl border border-success/30 bg-success/10 px-4 py-3">
 				<p className="flex items-center gap-2 text-sm font-medium text-success">
 					<Video className="size-4" />
-					{platformLabel} room is ready for this appointment
+					Video room is ready for this appointment
 				</p>
 				<p className="text-success/90 mt-1 text-xs">
 					Clinician access is authenticated. Patient access uses the invite link plus DOB or MRN
@@ -477,9 +475,6 @@ function VideoCallContent({
 					<span className="text-muted-foreground text-xs">
 						{formatDate(currentAppt.scheduledDate)} · {formatTime(currentAppt.scheduledTime)}
 					</span>
-					<Badge variant="outline" className="text-xs">
-						{platformLabel}
-					</Badge>
 				</div>
 				<Dialog>
 					<DialogTrigger className="border-border bg-muted text-foreground hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2">
@@ -493,7 +488,7 @@ function VideoCallContent({
 								Appointment Details
 							</DialogTitle>
 							<DialogDescription>
-								{currentAppt.patientName} — {platformLabel} consultation
+								{currentAppt.patientName} video consultation
 							</DialogDescription>
 						</DialogHeader>
 						<div className="grid gap-3 sm:grid-cols-2">
@@ -528,12 +523,6 @@ function VideoCallContent({
 								<p className="text-foreground text-sm font-medium">
 									{formatTime(currentAppt.scheduledTime)} ({currentAppt.durationMinutes} min)
 								</p>
-							</div>
-							<div>
-								<p className="text-muted-foreground text-xs">Platform</p>
-								<Badge variant="outline" className="mt-1 text-xs">
-									{platformLabel}
-								</Badge>
 							</div>
 							<div>
 								<p className="text-muted-foreground text-xs">Status</p>

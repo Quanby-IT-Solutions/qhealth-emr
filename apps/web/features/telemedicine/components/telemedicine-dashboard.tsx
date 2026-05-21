@@ -60,7 +60,7 @@ const STANDARD_TABS_BASE: TabConfig<StandardActiveTab>[] = [
 		id: "scheduler",
 		label: "Scheduler",
 		icon: Calendar,
-		description: "Book LiveKit appointments and patient invites",
+		description: "Book video appointments and patient invites",
 	},
 	{
 		id: "encounter",
@@ -641,7 +641,7 @@ function PhysicianTelemedicineDashboard({ profile }: { profile?: MyProfile }) {
 						<GuidedEmpty
 							icon={Video}
 							title="No appointment selected"
-							message="Pick an assigned appointment to join the LiveKit room and manage the patient invite."
+							message="Pick an assigned appointment to join the video room and manage the patient invite."
 							ctaLabel="Go to My Appointments"
 							onCta={() => setActiveTab("appointments")}
 						/>

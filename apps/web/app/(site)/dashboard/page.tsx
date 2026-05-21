@@ -7,6 +7,7 @@ import { getDashboardWidgetsForPermissions } from "@/features/app-shell/lib/navi
 import { NurseRoleDashboard } from "@/features/nursing/components/nurse-role-dashboard"
 import { DietitianDashboard } from "@/features/nutrition/components/dietitian-dashboard"
 import { PharmacyDashboard } from "@/features/pharmacy/components/pharmacy-dashboard"
+import { PhysicianDashboard } from "@/features/physician-dashboard/components/physician-dashboard"
 
 export default function DashboardPage() {
 	const { data: profile, isLoading } = useMyProfile()
@@ -20,17 +21,14 @@ export default function DashboardPage() {
 		permSet.has("nursing:view") && !permSet.has("clinical_docs:sign")
 	const canViewPharmacyDashboard = permSet.has("orders:verify")
 	const canViewNutritionDashboard = permSet.has("nutrition:view")
+	const canViewPhysicianDashboard = permSet.has("clinical_docs:sign")
 
 	if (isLoading) {
 		return (
 			<div className="space-y-6">
 				<div>
 					<h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-					<p className="text-muted-foreground text-sm">
-						{profile?.activeRole
-							? `Viewing as ${profile.activeRole.name}`
-							: "Welcome back"}
-					</p>
+					<p className="text-muted-foreground text-sm">Welcome back</p>
 				</div>
 
 				<div className="text-muted-foreground flex h-48 items-center justify-center">
@@ -54,6 +52,10 @@ export default function DashboardPage() {
 
 	if (canViewNutritionDashboard) {
 		return <DietitianDashboard />
+	}
+
+	if (canViewPhysicianDashboard) {
+		return <PhysicianDashboard profile={profile} />
 	}
 
 	return (
