@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { AlertCircle, Eye, ShieldAlert } from "lucide-react"
+import { AlertCircle, AlertTriangle, Ban, Bell, CheckCircle2, Eye, ShieldAlert } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -35,8 +35,8 @@ import {
 } from "@/features/orders/api/orders.hooks"
 import { DrugSearchCombobox } from "@/features/orders/components/drug-search-combobox"
 
-import { AllergyAlertBanner, type AllergyAlertItem } from "./allergy-alert-banner"
-import { CdsAlertBanner, type CdsAlertItem } from "./cds-alert-banner"
+import type { AllergyAlertItem } from "./allergy-alert-banner"
+import type { CdsAlertItem } from "./cds-alert-banner"
 import {
 	HighAlertVerificationDialog,
 	type HighAlertVerificationDraft,
@@ -54,6 +54,24 @@ const PDEA_SCHEDULE_OPTIONS = [
 ] as const
 
 type CdsResult = CdsEvaluateResponse
+
+type SafetyReviewRow =
+	| {
+			id: string
+			source: "cds"
+			severity: CdsAlertItem["severity"]
+			title: string
+			message: string
+			canOverride: boolean
+	  }
+	| {
+			id: string
+			source: "allergy"
+			severity: AllergyAlertItem["blockType"]
+			title: string
+			message: string
+			canOverride: boolean
+	  }
 
 const FREQUENCY_OPTIONS = [
 	{ value: "stat", label: "STAT (immediately)" },
@@ -116,6 +134,202 @@ function isPastDate(dateStr: string | null | undefined) {
 	return date < today
 }
 
+function formatAllergyDetails(alert: AllergyAlertItem) {
+	return [
+		alert.severity,
+		alert.matchType === "class" && alert.allergyClass ? alert.allergyClass : null,
+		alert.reactionType,
+	]
+		.filter(Boolean)
+		.join(" / ")
+}
+
+function buildSafetyRows(cdsAlerts: CdsAlertItem[], allergyAlerts: AllergyAlertItem[]) {
+	const rows: SafetyReviewRow[] = [
+		...cdsAlerts.map(alert => ({
+			id: alert.id,
+			source: "cds" as const,
+			severity: alert.severity,
+			title:
+				alert.severity === "hard_block"
+					? "Hard block"
+					: alert.severity === "soft_block"
+						? "Override required"
+						: alert.severity === "high_alert"
+							? "High-alert medication"
+							: "Warning",
+			message: alert.message,
+			canOverride: alert.severity === "soft_block",
+		})),
+		...allergyAlerts.map(alert => {
+			const details = formatAllergyDetails(alert)
+			return {
+				id: alert.id,
+				source: "allergy" as const,
+				severity: alert.blockType,
+				title: alert.blockType === "hard_block" ? "Allergy hard block" : "Allergy override required",
+				message: `${alert.allergenName}${details ? ` (${details})` : ""}`,
+				canOverride: alert.blockType === "soft_block",
+			}
+		}),
+	]
+
+	const rank = (row: SafetyReviewRow) =>
+		row.severity === "hard_block"
+			? 0
+			: row.severity === "high_alert"
+				? 1
+				: row.severity === "soft_block"
+					? 2
+					: 3
+
+	return rows.sort((a, b) => rank(a) - rank(b))
+}
+
+function SafetyReviewPanel({
+	rows,
+	overrideReasons,
+	allergyOverrideReasons,
+	overriddenAlerts,
+	allergyOverriddenAlerts,
+	onOverrideReasonChange,
+	onAllergyOverrideReasonChange,
+	onOverride,
+	onAllergyOverride,
+}: {
+	rows: SafetyReviewRow[]
+	overrideReasons: Record<string, string>
+	allergyOverrideReasons: Record<string, string>
+	overriddenAlerts: Set<string>
+	allergyOverriddenAlerts: Set<string>
+	onOverrideReasonChange: (id: string, reason: string) => void
+	onAllergyOverrideReasonChange: (id: string, reason: string) => void
+	onOverride: (id: string, reason: string) => void
+	onAllergyOverride: (id: string, reason: string) => void
+}) {
+	const [openOverrideId, setOpenOverrideId] = useState<string | null>(null)
+
+	if (rows.length === 0) return null
+
+	return (
+		<section className="overflow-hidden rounded-lg border bg-background">
+			<div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-3 py-2.5">
+				<div>
+					<h3 className="text-sm font-semibold">Safety Review</h3>
+					<p className="text-muted-foreground text-xs">
+						{rows.length} alert{rows.length === 1 ? "" : "s"} from the latest drug safety check
+					</p>
+				</div>
+			</div>
+			<div className="divide-y">
+				{rows.map(row => {
+					const key = `${row.source}-${row.id}`
+					const isHardBlock = row.severity === "hard_block"
+					const isSoftBlock = row.severity === "soft_block"
+					const isHighAlert = row.severity === "high_alert"
+					const isAllergy = row.source === "allergy"
+					const reason = isAllergy ? allergyOverrideReasons[row.id] : overrideReasons[row.id]
+					const isOverridden = isAllergy
+						? allergyOverriddenAlerts.has(row.id)
+						: overriddenAlerts.has(row.id)
+					const Icon = isHardBlock ? Ban : isHighAlert ? ShieldAlert : isSoftBlock ? AlertTriangle : Bell
+
+					return (
+						<div
+							key={key}
+							data-testid={`${row.source}-alert-${row.id}`}
+							className={cn(
+								"px-3 py-3",
+								isHardBlock && "bg-red-500/5",
+								isSoftBlock && "bg-amber-500/5"
+							)}
+						>
+							<div className="flex items-start gap-3">
+								<div
+									className={cn(
+										"mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full",
+										isHardBlock && "bg-red-500/10 text-red-600 dark:text-red-400",
+										isSoftBlock && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+										isHighAlert && "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+										!isHardBlock && !isSoftBlock && !isHighAlert && "bg-muted text-muted-foreground"
+									)}
+								>
+									<Icon className="size-4" />
+								</div>
+								<div className="min-w-0 flex-1">
+									<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+										<span className="text-sm font-semibold">{row.title}</span>
+										<span
+											data-testid={row.source === "cds" ? `cds-alert-${row.id}-severity` : undefined}
+											className="sr-only"
+										>
+											{row.severity}
+										</span>
+										{isOverridden ? (
+											<span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+												<CheckCircle2 className="size-3" />
+												Overridden
+											</span>
+										) : null}
+									</div>
+									<p className="text-muted-foreground mt-0.5 text-sm">{row.message}</p>
+								</div>
+								{isHardBlock ? (
+									<span className="text-muted-foreground shrink-0 text-xs font-medium">Cannot proceed</span>
+								) : row.canOverride ? (
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										aria-label={`${isOverridden ? "Edit override" : "Override"} ${row.id}`}
+										className="h-8 shrink-0 text-amber-700 hover:bg-amber-500/10 hover:text-amber-800 dark:text-amber-300"
+										onClick={() => setOpenOverrideId(openOverrideId === key ? null : key)}
+									>
+										{openOverrideId === key ? "Cancel" : isOverridden ? "Edit" : "Override"}
+									</Button>
+								) : null}
+							</div>
+
+							{row.canOverride && openOverrideId === key ? (
+								<div className="mt-3 space-y-2 pl-10">
+									<Label className="text-xs font-medium">Override reason</Label>
+									<Textarea
+										rows={2}
+										value={reason ?? ""}
+										onChange={event =>
+											isAllergy
+												? onAllergyOverrideReasonChange(row.id, event.target.value)
+												: onOverrideReasonChange(row.id, event.target.value)
+										}
+										placeholder="Document the clinical justification..."
+										className="text-sm"
+									/>
+									<Button
+										type="button"
+										size="sm"
+										disabled={!reason?.trim()}
+										onClick={() => {
+											if (!reason?.trim()) return
+											if (isAllergy) {
+												onAllergyOverride(row.id, reason.trim())
+											} else {
+												onOverride(row.id, reason.trim())
+											}
+											setOpenOverrideId(null)
+										}}
+									>
+										Confirm Override
+									</Button>
+								</div>
+							) : null}
+						</div>
+					)
+				})}
+			</div>
+		</section>
+	)
+}
+
 export function CreateMedOrderDialog({
 	open,
 	onOpenChange,
@@ -128,6 +342,7 @@ export function CreateMedOrderDialog({
 	// ── Drug fields ──────────────────────────────────────────────────────────
 	const [genericName, setGenericName] = useState("")
 	const [formularyItemId, setFormularyItemId] = useState<string | undefined>(undefined)
+	const [selectedGenericIsNonFormulary, setSelectedGenericIsNonFormulary] = useState(false)
 	const [brandName, setBrandName] = useState("")
 	const [dose, setDose] = useState("")
 	const [doseUnit, setDoseUnit] = useState("")
@@ -274,6 +489,7 @@ export function CreateMedOrderDialog({
 		a => a.blockType === "soft_block" && !allergyOverriddenAlerts.has(a.id)
 	)
 	const allergyAllSoftBlocksOverridden = unoverriddenAllergySoftBlocks.length === 0
+	const safetyReviewRows = buildSafetyRows(normalizedAlerts, normalizedAllergyAlerts)
 
 	// ── Tranche helpers ──────────────────────────────────────────────────────
 	const durationNum = durationDays ? Number(durationDays) : 0
@@ -338,6 +554,7 @@ export function CreateMedOrderDialog({
 	function resetForm() {
 		setGenericName("")
 		setFormularyItemId(undefined)
+		setSelectedGenericIsNonFormulary(false)
 		setBrandName("")
 		setDose("")
 		setDoseUnit("")
@@ -632,8 +849,13 @@ export function CreateMedOrderDialog({
 									Generic Name <span className="text-destructive">*</span>
 								</Label>
 								<Badge variant="outline" className="border-emerald-400 text-[10px] text-emerald-700 dark:text-emerald-400">
-									RA 6675 — Required
+									RA 6675
 								</Badge>
+								{selectedGenericIsNonFormulary ? (
+									<Badge variant="outline" className="border-amber-400 text-[10px] text-amber-700 dark:text-amber-300">
+										Non-formulary
+									</Badge>
+								) : null}
 							</div>
 							<DrugSearchCombobox
 								id="genericName"
@@ -644,17 +866,19 @@ export function CreateMedOrderDialog({
 
 									if (!item) {
 										setFormularyItemId(undefined)
+										setSelectedGenericIsNonFormulary(false)
 										return
 									}
 
 									setGenericName(item.genericName)
-									setFormularyItemId(item.id)
+									setFormularyItemId(item.formularyItemId)
+									setSelectedGenericIsNonFormulary(!item.isFormulary)
 
-									if (!doseForm.trim()) {
+									if (item.doseForm && !doseForm.trim()) {
 										setDoseForm(item.doseForm)
 									}
 
-									if (!route.trim()) {
+									if (item.route && !route.trim()) {
 										setRoute(item.route)
 									}
 								}}
@@ -663,7 +887,7 @@ export function CreateMedOrderDialog({
 								autoFocus
 							/>
 							<p className="text-muted-foreground text-xs">
-								Per RA 6675 (Generics Act), orders must specify the generic name. Brand name is optional and subordinate.
+								Generic-first ordering is required. Brand and formulary status stay subordinate to the generic name.
 							</p>
 						</div>
 
@@ -691,47 +915,53 @@ export function CreateMedOrderDialog({
 						)}
 
 						{/* ── CDS Check ────────────────────────────────── */}
-						<div className="bg-muted/30 space-y-2 rounded-lg border p-3">
-							<Button
-								type="button"
-								className="w-full justify-center font-semibold"
-								size="lg"
-								disabled={!genericName.trim() || !orderingStaffId || evaluateCds.isPending}
-								onClick={handleCheckCds}
-							>
-								<ShieldAlert className="size-4" />
-								{evaluateCds.isPending
-									? "Checking..."
-									: hasFreshCdsCheck
-										? "Re-run Drug Safety Check"
-										: "Run Drug Safety Check"}
-							</Button>
-							{cdsResult ? (
-								<p className="text-muted-foreground text-xs">
-									{hasFreshCdsCheck
-										? cdsResult.alerts.length === 0
-											? "Safety check complete - no medication-safety alerts for this order"
-											: `${cdsResult.alerts.length} alert(s) found`
-										: "Safety check out of date - re-run before creating the order"}
-								</p>
-							) : (
-								<p className="text-muted-foreground text-xs">
-									Run the safety check before creating the order.
-								</p>
-							)}
+						<div className="rounded-lg border bg-background p-3">
+							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+								<div className="min-w-0">
+									<p className="text-sm font-semibold">Drug Safety Check</p>
+									<p className="text-muted-foreground text-xs">
+										{cdsResult
+											? hasFreshCdsCheck
+												? cdsResult.alerts.length === 0
+													? "Safety check complete - no medication-safety alerts for this order"
+													: `${cdsResult.alerts.length} alert${cdsResult.alerts.length === 1 ? "" : "s"} found`
+												: "Safety check out of date - re-run before creating the order"
+											: "Run once after selecting the generic drug."}
+									</p>
+								</div>
+								<Button
+									type="button"
+									variant={hasFreshCdsCheck ? "outline" : "default"}
+									className="shrink-0 font-semibold"
+									disabled={!genericName.trim() || !orderingStaffId || evaluateCds.isPending}
+									onClick={handleCheckCds}
+								>
+									<ShieldAlert className="size-4" />
+									{evaluateCds.isPending
+										? "Checking..."
+										: hasFreshCdsCheck
+											? "Re-run"
+											: "Run Drug Safety Check"}
+								</Button>
+							</div>
 						</div>
 
 						{/* ── CDS Alert Banner ─────────────────────────── */}
-						{normalizedAlerts.length > 0 && (
-							<CdsAlertBanner
-								alerts={normalizedAlerts}
-								overrideReasons={overrideReasons}
-								onOverrideReasonChange={(id, reason) =>
-									setOverrideReasons(prev => ({ ...prev, [id]: reason }))
-								}
-								onOverride={handleOverride}
-							/>
-						)}
+						<SafetyReviewPanel
+							rows={safetyReviewRows}
+							overrideReasons={overrideReasons}
+							allergyOverrideReasons={allergyOverrideReasons}
+							overriddenAlerts={overriddenAlerts}
+							allergyOverriddenAlerts={allergyOverriddenAlerts}
+							onOverrideReasonChange={(id, reason) =>
+								setOverrideReasons(prev => ({ ...prev, [id]: reason }))
+							}
+							onAllergyOverrideReasonChange={(id, reason) =>
+								setAllergyOverrideReasons(prev => ({ ...prev, [id]: reason }))
+							}
+							onOverride={handleOverride}
+							onAllergyOverride={handleAllergyOverride}
+						/>
 
 						{/* ── Allergy Alert Banner ──────────────────────── */}
 						{requiresDoubleVerification && (
@@ -758,16 +988,6 @@ export function CreateMedOrderDialog({
 							</div>
 						)}
 
-						{normalizedAllergyAlerts.length > 0 && (
-							<AllergyAlertBanner
-								alerts={normalizedAllergyAlerts}
-								overrideReasons={allergyOverrideReasons}
-								onOverrideReasonChange={(id, reason) =>
-									setAllergyOverrideReasons(prev => ({ ...prev, [id]: reason }))
-								}
-								onOverride={handleAllergyOverride}
-							/>
-						)}
 
 						{/* ── Dosing ───────────────────────────────────── */}
 						<div className="grid grid-cols-3 gap-4">

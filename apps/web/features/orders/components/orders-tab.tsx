@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import { AlertTriangle, Printer, X } from "lucide-react"
 
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/core/components/ui/alert"
@@ -64,6 +65,10 @@ function formatDate(dateStr: string | null | undefined) {
 		month: "short",
 		day: "numeric",
 	})
+}
+
+function mutationErrorMessage(error: unknown, fallback: string) {
+	return error instanceof Error ? error.message : fallback
 }
 
 function medStatusVariant(status: string) {
@@ -422,6 +427,34 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 		})),
 	].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
+	function handleGenerateRx(medicationOrderId: string) {
+		if (!canPrescribe) return
+		if (!prescriberHasValidLicense) {
+			toast.error("Cannot generate Rx until PRC and PTR credentials are active.")
+			return
+		}
+
+		const toastId = toast.loading("Generating e-Prescription draft...")
+		createPrescription.mutate(
+			{
+				facilityId,
+				encounterId,
+				medicationOrderId,
+				patientId,
+			},
+			{
+				onSuccess: () => {
+					toast.success("e-Prescription draft generated.", { id: toastId })
+				},
+				onError: error => {
+					toast.error(mutationErrorMessage(error, "Failed to generate e-Prescription."), {
+						id: toastId,
+					})
+				},
+			}
+		)
+	}
+
 	return (
 		<>
 			{showPrescriberLicenseWarning && showLicenseAlert && licenseWarningMessages.length > 0 && (
@@ -535,15 +568,7 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 										canEditOrders ? id => discontinueMed.mutate(id) : undefined
 									}
 									onGenerateRx={
-										canPrescribe
-											? id =>
-												createPrescription.mutate({
-													facilityId,
-													encounterId,
-													medicationOrderId: id,
-													patientId,
-												})
-											: undefined
+										canPrescribe ? handleGenerateRx : undefined
 									}
 									discontinuePending={discontinueMed.isPending}
 									createRxPending={createPrescription.isPending}

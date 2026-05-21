@@ -53,7 +53,7 @@ function buildQueryString(params: Record<string, string | number | boolean | und
 		.join("&")}`
 }
 
-export type ProblemStatus = "active" | "resolved"
+export type ProblemStatus = "active" | "resolved" | "entered_in_error"
 export type AllergenType = "medication" | "food" | "environmental"
 export type AllergySeverity = "mild" | "moderate" | "severe"
 
@@ -319,9 +319,11 @@ export function useDeleteProblemMutation() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: problemsAllergiesKeys.all })
 		},
-		onError: error => showMutationError(error, "Failed to delete problem."),
+		onError: error => showMutationError(error, "Failed to mark problem as entered in error."),
 	})
 }
+
+export const useMarkProblemEnteredInErrorMutation = useDeleteProblemMutation
 
 interface AllergyListParams {
 	patientId: string
@@ -526,7 +528,7 @@ export function useAllergenSearchQuery(params: {
 					limit: params.limit ?? 10,
 				})}`
 			),
-		enabled: !!params.search && params.search.trim().length >= 2,
+		enabled: !!params.facilityId && !!params.search && params.search.trim().length >= 2,
 		staleTime: 5 * 60 * 1000,
 	})
 }

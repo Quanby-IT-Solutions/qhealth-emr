@@ -373,6 +373,7 @@ export class OfflineCacheService implements OnModuleInit, OnModuleDestroy {
 
 		return rows.map(row => ({
 			...row,
+			status: "active" as const,
 			onsetDate: row.onsetDate ? this.formatDateOnly(row.onsetDate) : null,
 		}))
 	}

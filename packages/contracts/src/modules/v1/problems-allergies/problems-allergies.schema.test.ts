@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest"
 import {
 	ActiveAllergiesResponseSchema,
 	AllergenSearchResultSchema,
+	AllergenSearchSchema,
 	AllergySchema,
 	CreateAllergySchema,
 	CreateProblemSchema,
 	PatientSummaryResponseSchema,
+	ProblemSchema,
 } from "./problems-allergies.schema.js"
 
 const FACILITY_ID = "550e8400-e29b-41d4-a716-446655440000"
@@ -87,6 +89,30 @@ describe("CreateProblemSchema", () => {
 		if (result.success) {
 			expect(result.data.status).toBe("active")
 		}
+	})
+})
+
+describe("ProblemSchema", () => {
+	it("accepts a problem marked as entered in error", () => {
+		const result = ProblemSchema.safeParse({
+			id: PROBLEM_ID,
+			facilityId: FACILITY_ID,
+			patientId: PATIENT_ID,
+			icd10Code: "E11.9",
+			icd10Display: "Type 2 diabetes mellitus without complications",
+			snomedCode: null,
+			snomedDisplay: null,
+			description: "Type 2 diabetes mellitus",
+			onsetDate: "2020-01-01",
+			resolutionDate: "2026-05-21",
+			status: "entered_in_error",
+			documentingStaffId: STAFF_ID,
+			documentingStaffName: "Dr. Smith",
+			createdAt: "2024-01-01T00:00:00Z",
+			updatedAt: "2024-01-01T00:00:00Z",
+		})
+
+		expect(result.success).toBe(true)
 	})
 })
 
@@ -210,6 +236,27 @@ describe("AllergenSearchResultSchema", () => {
 		})
 
 		expect(result.success).toBe(false)
+	})
+})
+
+describe("AllergenSearchSchema", () => {
+	it("requires a facilityId so allergy-history suggestions stay facility-scoped", () => {
+		const result = AllergenSearchSchema.safeParse({
+			search: "pen",
+			allergenType: "medication",
+		})
+
+		expect(result.success).toBe(false)
+	})
+
+	it("accepts a facility-scoped search", () => {
+		const result = AllergenSearchSchema.safeParse({
+			search: "pen",
+			facilityId: FACILITY_ID,
+			allergenType: "medication",
+		})
+
+		expect(result.success).toBe(true)
 	})
 })
 

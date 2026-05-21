@@ -36,33 +36,33 @@ export class ProblemsAllergiesController {
 
 	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.createProblem)
-	async createProblem(@Session() session: UserSession) {
+	async createProblem(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.createProblem).handler(async ({ input }) => {
-			return this.service.createProblem(input, session.user.id)
+			return this.service.createProblem(input, session.user.id, buildChartAccessActor(session, req))
 		})
 	}
 
 	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.updateProblem)
-	async updateProblem(@Session() session: UserSession) {
+	async updateProblem(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.updateProblem).handler(async ({ input }) => {
-			return this.service.updateProblem(input, session.user.id)
+			return this.service.updateProblem(input, session.user.id, buildChartAccessActor(session, req))
 		})
 	}
 
 	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.resolveProblem)
-	async resolveProblem(@Session() session: UserSession) {
+	async resolveProblem(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.resolveProblem).handler(async ({ input }) => {
-			return this.service.resolveProblem(input, session.user.id)
+			return this.service.resolveProblem(input, session.user.id, buildChartAccessActor(session, req))
 		})
 	}
 
 	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.deleteProblem)
-	async deleteProblem(@Session() session: UserSession) {
+	async deleteProblem(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.deleteProblem).handler(async ({ input }) => {
-			return this.service.deleteProblem(input.id, session.user.id)
+			return this.service.deleteProblem(input.id, session.user.id, buildChartAccessActor(session, req))
 		})
 	}
 
@@ -88,33 +88,33 @@ export class ProblemsAllergiesController {
 
 	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.createAllergy)
-	async createAllergy(@Session() session: UserSession) {
+	async createAllergy(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.createAllergy).handler(async ({ input }) => {
-			return this.service.createAllergy(input, session.user.id)
+			return this.service.createAllergy(input, session.user.id, buildChartAccessActor(session, req))
 		})
 	}
 
 	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.updateAllergy)
-	async updateAllergy(@Session() session: UserSession) {
+	async updateAllergy(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.updateAllergy).handler(async ({ input }) => {
-			return this.service.updateAllergy(input, session.user.id)
+			return this.service.updateAllergy(input, session.user.id, buildChartAccessActor(session, req))
 		})
 	}
 
 	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.deactivateAllergy)
-	async deactivateAllergy(@Session() session: UserSession) {
+	async deactivateAllergy(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.deactivateAllergy).handler(async ({ input }) => {
-			return this.service.deactivateAllergy(input.id, session.user.id)
+			return this.service.deactivateAllergy(input.id, session.user.id, buildChartAccessActor(session, req))
 		})
 	}
 
 	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.problemsAllergies.verifyAllergy)
-	async verifyAllergy(@Session() session: UserSession) {
+	async verifyAllergy(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.verifyAllergy).handler(async ({ input }) => {
-			return this.service.verifyAllergy(input, session.user.id)
+			return this.service.verifyAllergy(input, session.user.id, buildChartAccessActor(session, req))
 		})
 	}
 

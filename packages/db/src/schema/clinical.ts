@@ -232,7 +232,11 @@ export const problems = createTable(
 		description: t.text("description").notNull(),
 		onsetDate: t.date("onset_date"),
 		resolutionDate: t.date("resolution_date"),
-		status: t.text("status").notNull().default("active").$type<"active" | "resolved">(),
+		status: t
+			.text("status")
+			.notNull()
+			.default("active")
+			.$type<"active" | "resolved" | "entered_in_error">(),
 		documentingStaffId: t
 			.uuid("documenting_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),

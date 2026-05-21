@@ -62,6 +62,38 @@ function createSelectBuilder(result: unknown, options?: SelectBuilderOptions) {
 	return builder
 }
 
+function createMutationBuilder(result: unknown = []) {
+	return {
+		values: jest.fn().mockReturnThis(),
+		set: jest.fn().mockReturnThis(),
+		where: jest.fn().mockResolvedValue(result),
+		returning: jest.fn().mockResolvedValue(result),
+	}
+}
+
+function buildProblem(overrides: Partial<Record<string, unknown>> = {}) {
+	const now = new Date("2026-05-15T00:00:00.000Z")
+
+	return {
+		id: "550e8400-e29b-41d4-a716-446655440020",
+		facilityId: "550e8400-e29b-41d4-a716-446655440000",
+		patientId: "550e8400-e29b-41d4-a716-446655440001",
+		icd10Code: "I10",
+		icd10Display: "Essential (primary) hypertension",
+		snomedCode: null,
+		snomedDisplay: null,
+		description: "Hypertension",
+		onsetDate: "2026-01-01",
+		resolutionDate: null,
+		status: "active",
+		documentingStaffId: "550e8400-e29b-41d4-a716-446655440002",
+		documentingStaffName: "Dr. Test",
+		createdAt: now,
+		updatedAt: now,
+		...overrides,
+	}
+}
+
 function buildAllergy(overrides: Partial<Record<string, unknown>> = {}) {
 	const now = new Date("2026-05-15T00:00:00.000Z")
 
@@ -148,6 +180,67 @@ describe("ProblemsAllergiesService", () => {
 		).rejects.toBeInstanceOf(BadRequestException)
 
 		expect(mockDb.update).not.toHaveBeenCalled()
+		expect(auditService.log).not.toHaveBeenCalled()
+	})
+
+	it("marks problems as entered in error instead of deleting clinical history", async () => {
+		const problem = buildProblem()
+		const updatedProblem = buildProblem({
+			status: "entered_in_error",
+			resolutionDate: "2026-05-21",
+		})
+		const updateBuilder = createMutationBuilder()
+		const actor = { userId: "user-1", facilityId: problem.facilityId }
+
+		mockDb.select
+			.mockImplementationOnce(() => createSelectBuilder([problem], { resolveOnWhere: true }))
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "550e8400-e29b-41d4-a716-446655440002" }])
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([updatedProblem], { resolveOnWhere: true })
+			)
+		mockDb.update.mockReturnValue(updateBuilder)
+
+		const result = await service.deleteProblem(problem.id, "user-1", actor as never)
+
+		expect(result.status).toBe("entered_in_error")
+		expect(mockDb.delete).not.toHaveBeenCalled()
+		expect(mockDb.update).toHaveBeenCalledTimes(1)
+		expect(updateBuilder.set).toHaveBeenCalledWith(
+			expect.objectContaining({ status: "entered_in_error" })
+		)
+		expect(chartAccessService.ensurePatientChartReadAccess).toHaveBeenCalledWith(
+			actor,
+			problem.patientId,
+			expect.objectContaining({ entityType: "problem", entityId: problem.id })
+		)
+		expect(auditService.log).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: "update",
+				entityType: "problem",
+				entityId: problem.id,
+				afterState: expect.objectContaining({ status: "entered_in_error" }),
+				metadata: expect.objectContaining({
+					previousStatus: "active",
+					status: "entered_in_error",
+				}),
+			})
+		)
+	})
+
+	it("returns an existing entered-in-error problem without another update", async () => {
+		const problem = buildProblem({ status: "entered_in_error" })
+
+		mockDb.select.mockImplementationOnce(() =>
+			createSelectBuilder([problem], { resolveOnWhere: true })
+		)
+
+		const result = await service.deleteProblem(problem.id, "user-1")
+
+		expect(result).toEqual(problem)
+		expect(mockDb.update).not.toHaveBeenCalled()
+		expect(mockDb.delete).not.toHaveBeenCalled()
 		expect(auditService.log).not.toHaveBeenCalled()
 	})
 })
