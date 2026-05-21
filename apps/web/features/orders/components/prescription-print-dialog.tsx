@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import * as QRCode from "qrcode"
 import { toast } from "sonner"
 
@@ -104,6 +105,7 @@ interface RxPrintItem {
 	specialInstructions: string | null
 	isPrn: boolean
 	prnReason: string | null
+	missingFields: string[]
 }
 
 interface PrintData {
@@ -115,10 +117,22 @@ interface PrintData {
 	prescriptions: RxPrintItem[]
 }
 
-function openPrintWindow(data: PrintData): void {
-	const win = window.open("", "_blank", "width=870,height=1100")
-	if (!win) return
+interface PrintWindowOptions {
+	qrDataUrl: string
+	qrLink: string
+}
 
+function hasValue(value: unknown): boolean {
+	return typeof value === "string"
+		? value.trim() !== "" && value.trim() !== "--"
+		: value !== null && value !== undefined
+}
+
+function cleanField(value: unknown, fallback = "--"): string {
+	return hasValue(value) ? String(value).trim() : fallback
+}
+
+function openPrintWindow(data: PrintData, options: PrintWindowOptions): void {
 	const rxBlocksHtml = data.prescriptions
 		.map(
 			(rx, i) => `
@@ -154,6 +168,17 @@ function openPrintWindow(data: PrintData): void {
     </div>`
 		)
 		.join("")
+	const verificationHtml = options.qrLink
+		? `
+  <div class="verification-section">
+    <div>
+      <div class="verification-title">e-Prescription Verification</div>
+      <div class="verification-note">Scan the QR code or use the encoded fallback link to verify the signed prescription reference.</div>
+      <div class="verification-link">${escapeHtml(options.qrLink)}</div>
+    </div>
+    ${options.qrDataUrl ? `<img class="verification-qr" src="${escapeHtml(options.qrDataUrl)}" alt="Signed e-Prescription QR">` : ""}
+  </div>`
+		: ""
 
 	const html = `<!DOCTYPE html>
 <html lang="en">
@@ -185,6 +210,11 @@ function openPrintWindow(data: PrintData): void {
     .sig-label { font-size: 9.5pt; }
     .dispensing-note { font-size: 9pt; color: #555; max-width: 200px; text-align: right; }
     .signed-note { font-size: 8pt; color: #888; text-align: right; margin-top: 6px; }
+    .verification-section { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border: 1px solid #000; padding: 10px 12px; margin-top: 16px; page-break-inside: avoid; }
+    .verification-title { font-size: 10pt; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; }
+    .verification-note { font-size: 9pt; color: #444; margin-bottom: 6px; }
+    .verification-link { font-size: 7.5pt; line-height: 1.3; overflow-wrap: anywhere; word-break: break-word; }
+    .verification-qr { width: 105px; height: 105px; object-fit: contain; border: 1px solid #bbb; padding: 4px; }
     @media print {
       @page { size: A4; margin: 2cm; }
       body { padding: 0; }
@@ -209,15 +239,41 @@ function openPrintWindow(data: PrintData): void {
   </div>
 
   ${rxBlocksHtml}
+  ${verificationHtml}
 
 </body>
 </html>`
 
-	win.document.write(html)
-	win.document.close()
-	win.focus()
+	const frame = document.createElement("iframe")
+	frame.title = "e-Prescription print"
+	frame.style.position = "fixed"
+	frame.style.right = "0"
+	frame.style.bottom = "0"
+	frame.style.width = "0"
+	frame.style.height = "0"
+	frame.style.border = "0"
+	frame.style.visibility = "hidden"
+	document.body.appendChild(frame)
+
+	const frameWindow = frame.contentWindow
+	const frameDocument = frameWindow?.document
+	if (!frameWindow || !frameDocument) {
+		frame.remove()
+		return
+	}
+
+	frameDocument.open()
+	frameDocument.write(html)
+	frameDocument.close()
+
+	const removeFrame = () => {
+		setTimeout(() => frame.remove(), 500)
+	}
+	frameWindow.onafterprint = removeFrame
 	setTimeout(() => {
-		win.print()
+		frameWindow.focus()
+		frameWindow.print()
+		removeFrame()
 	}, 500)
 }
 
@@ -236,6 +292,7 @@ export function PrescriptionPrintDialog({
 	patientId,
 	onPrinted,
 }: PrescriptionPrintDialogProps) {
+	const router = useRouter()
 	const [showQr, setShowQr] = useState(false)
 	const [qrDataUrl, setQrDataUrl] = useState("")
 	const { data: encounter, isLoading: encounterLoading } = useEncounterDetailQuery(encounterId, {
@@ -268,11 +325,24 @@ export function PrescriptionPrintDialog({
 					const content = parsePrescriptionContent(rx.prescriptionContent)
 					const isControlled = Boolean(content.isControlledSubstance)
 					const noRefill = Boolean(content.noRefillInscribed || isControlled)
+					const missingFields = [
+						["Medication", content.genericName],
+						["Dose", content.dose],
+						["Form", content.doseForm],
+						["Route", content.route],
+						["Frequency", content.frequency],
+						["Prescriber", rx.prescriberStaffName],
+						["PRC", rx.prcLicenseNumber],
+						["PTR", rx.ptrNumber],
+						["Signature time", rx.signedAt],
+					]
+						.filter(([, value]) => !hasValue(value))
+						.map(([label]) => String(label))
 					return {
 						id: rx.id,
-						prescriberName: rx.prescriberStaffName ?? "--",
-						prcNumber: rx.prcLicenseNumber ?? "--",
-						ptrNumber: rx.ptrNumber ?? "--",
+						prescriberName: cleanField(rx.prescriberStaffName),
+						prcNumber: cleanField(rx.prcLicenseNumber),
+						ptrNumber: cleanField(rx.ptrNumber),
 						pdeaS2License: isControlled ? (rx.pdeaS2License ?? null) : null,
 						noRefill,
 						pdeaSchedule: content.pdeaSchedule ?? null,
@@ -281,21 +351,26 @@ export function PrescriptionPrintDialog({
 						pdeaTrancheNumber: content.pdeaTrancheNumber ?? null,
 						pdeaTrancheTotal: content.pdeaTrancheTotal ?? null,
 						signedAt: formatDateTime(rx.signedAt),
-						genericName: content.genericName ?? "--",
+						genericName: cleanField(content.genericName),
 						brandName: content.brandName ?? null,
-						dose: content.dose ?? "--",
-						doseUnit: content.doseUnit ?? "",
-						doseForm: content.doseForm ?? "--",
-						route: content.route ?? "--",
-						frequency: content.frequency ?? "--",
+						dose: cleanField(content.dose),
+						doseUnit: cleanField(content.doseUnit, ""),
+						doseForm: cleanField(content.doseForm),
+						route: cleanField(content.route),
+						frequency: cleanField(content.frequency),
 						durationDays: content.durationDays ?? null,
 						specialInstructions: content.specialInstructions ?? null,
 						isPrn: content.isPrn ?? false,
 						prnReason: content.prnReason ?? null,
+						missingFields,
 					}
 				}),
 			}
 		: null
+	const hasIncompletePrescriptions =
+		printData?.prescriptions.some(rx => rx.missingFields.length > 0) ?? false
+	const canSendPrescription =
+		printData !== null && printData.prescriptions.length > 0 && !hasIncompletePrescriptions
 	const qrPayload =
 		printData === null
 			? ""
@@ -346,14 +421,29 @@ export function PrescriptionPrintDialog({
 		}
 	}, [showQr, qrLink])
 
-	function handlePrint() {
+	async function getQrDataUrl(): Promise<string> {
+		if (!qrLink) return ""
+		if (qrDataUrl) return qrDataUrl
+		return QRCode.toDataURL(qrLink, {
+			errorCorrectionLevel: "M",
+			margin: 2,
+			width: 220,
+		})
+	}
+
+	async function handlePrint() {
 		if (!printData) return
-		openPrintWindow(printData)
+		if (!canSendPrescription) {
+			toast.error("Complete all signed prescription details before printing.")
+			return
+		}
+		const printQrDataUrl = await getQrDataUrl().catch(() => "")
+		openPrintWindow(printData, { qrDataUrl: printQrDataUrl, qrLink })
 		onPrinted?.()
 	}
 
 	function handleSendToPortal() {
-		if (!printData || printData.prescriptions.length === 0) return
+		if (!printData || !canSendPrescription) return
 		// Patient portal push — queues the signed prescriptions for patient portal access.
 		// The patient will see the e-Rx in their portal dashboard on next login.
 		toast.success(
@@ -366,7 +456,7 @@ export function PrescriptionPrintDialog({
 	}
 
 	function handleSendEmail() {
-		if (!printData) return
+		if (!printData || !canSendPrescription) return
 
 		const bodyLines = [
 			`Patient: ${printData.patientName}`,
@@ -389,6 +479,12 @@ export function PrescriptionPrintDialog({
 			`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
 			"_self"
 		)
+	}
+
+	function handleGoToMedicationOrders() {
+		setShowQr(false)
+		onOpenChange(false)
+		router.push(`/patients/${patientId}/encounters/${encounterId}/orders`)
 	}
 
 	return (
@@ -447,40 +543,46 @@ export function PrescriptionPrintDialog({
 								</p>
 							) : (
 								<div className="space-y-2">
-									{signedPrescriptions.map(rx => {
-										const content = parsePrescriptionContent(rx.prescriptionContent)
-										const noRefill = Boolean(
-											content.noRefillInscribed || content.isControlledSubstance
-										)
+									{printData?.prescriptions.map(rx => {
 										return (
 											<div key={rx.id} className="space-y-1 rounded-md border p-3 text-sm">
 												<div className="flex items-start justify-between">
 													<div>
 														<p className="font-semibold">
-															{content.genericName ?? "--"}
-															{content.brandName && (
+															{rx.genericName}
+															{rx.brandName && (
 																<span className="text-muted-foreground ml-1 font-normal">
-																	({content.brandName})
+																	({rx.brandName})
 																</span>
 															)}
 														</p>
 														<p className="text-muted-foreground text-xs">
-															{content.dose} {content.doseUnit} - {content.doseForm} ·{" "}
-															{content.route} · {content.frequency}
+															{rx.dose} {rx.doseUnit} - {rx.doseForm} · {rx.route} ·{" "}
+															{rx.frequency}
 														</p>
-														{content.pdeaDispensingInstructions && (
+														{rx.pdeaDispensingInstructions && (
 															<p className="text-muted-foreground text-xs">
-																{content.pdeaDispensingInstructions}
+																{rx.pdeaDispensingInstructions}
+															</p>
+														)}
+														{rx.missingFields.length > 0 && (
+															<p className="text-destructive text-xs">
+																Missing: {rx.missingFields.join(", ")}
 															</p>
 														)}
 													</div>
 													<div className="text-muted-foreground text-right text-xs">
-														<p>{rx.prescriberStaffName ?? "--"}</p>
-														<p>PRC: {rx.prcLicenseNumber}</p>
+														<p>{rx.prescriberName}</p>
+														<p>PRC: {rx.prcNumber}</p>
 														<p>PTR: {rx.ptrNumber}</p>
-														{noRefill && (
+														{rx.noRefill && (
 															<Badge variant="destructive" className="mt-1">
 																NO REFILL
+															</Badge>
+														)}
+														{rx.missingFields.length > 0 && (
+															<Badge variant="outline" className="mt-1">
+																INCOMPLETE
 															</Badge>
 														)}
 													</div>
@@ -492,7 +594,27 @@ export function PrescriptionPrintDialog({
 							)}
 						</div>
 
-						{showQr && signedPrescriptions.length > 0 && (
+						{hasIncompletePrescriptions && (
+							<div className="border-destructive/40 bg-destructive/5 text-destructive rounded-md border p-3 text-sm">
+								<p className="font-medium">Prescription details incomplete</p>
+								<p className="mt-1 text-xs">
+									Please complete the missing fields in the medication order, then sign the
+									prescription again before printing, emailing, sending to the portal, or
+									generating the QR code.
+								</p>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="mt-3"
+									onClick={handleGoToMedicationOrders}
+								>
+									Go to Medication Orders
+								</Button>
+							</div>
+						)}
+
+						{showQr && canSendPrescription && (
 							<div className="space-y-3 rounded-md border p-4">
 								<p className="text-sm font-medium">Signed e-Prescription QR</p>
 								<div className="flex justify-center">
@@ -509,16 +631,18 @@ export function PrescriptionPrintDialog({
 										</div>
 									)}
 								</div>
-								<a
-									href={qrLink}
-									className="text-primary inline-flex items-center gap-1 text-sm break-all underline underline-offset-4"
-								>
-									<Link2 className="size-3.5" />
-									{qrLink}
-								</a>
-								<pre className="bg-muted overflow-x-auto rounded-md p-3 text-xs whitespace-pre-wrap">
-									{qrPayload}
-								</pre>
+								<div className="space-y-2">
+									<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+										Encoded fallback
+									</p>
+									<a
+										href={qrLink}
+										className="text-primary inline-flex items-start gap-1 text-xs break-all underline underline-offset-4"
+									>
+										<Link2 className="mt-0.5 size-3.5 shrink-0" />
+										<span>{qrLink}</span>
+									</a>
+								</div>
 							</div>
 						)}
 
@@ -526,7 +650,7 @@ export function PrescriptionPrintDialog({
 							<Button
 								variant="outline"
 								onClick={() => setShowQr(value => !value)}
-								disabled={signedPrescriptions.length === 0}
+								disabled={!canSendPrescription}
 							>
 								<QrCode className="mr-1.5 size-4" />
 								{showQr ? "Hide QR" : "Show QR"}
@@ -534,7 +658,7 @@ export function PrescriptionPrintDialog({
 							<Button
 								variant="outline"
 								onClick={handleSendToPortal}
-								disabled={signedPrescriptions.length === 0}
+								disabled={!canSendPrescription}
 							>
 								<MonitorSmartphone className="mr-1.5 size-4" />
 								Patient Portal
@@ -542,19 +666,20 @@ export function PrescriptionPrintDialog({
 							<Button
 								variant="outline"
 								onClick={handleSendEmail}
-								disabled={signedPrescriptions.length === 0}
+								disabled={!canSendPrescription}
 							>
 								<Mail className="mr-1.5 size-4" />
 								Send via Email
 							</Button>
-							<Button onClick={handlePrint} disabled={signedPrescriptions.length === 0}>
+							<Button onClick={() => void handlePrint()} disabled={!canSendPrescription}>
 								<Printer className="mr-1.5 size-4" />
 								Print e-Prescription
 							</Button>
 						</div>
-						{signedPrescriptions.length === 0 && (
+						{!canSendPrescription && (
 							<p className="text-muted-foreground text-right text-xs">
-								Print, email, and QR actions are disabled until a prescription is signed.
+								Actions are available after all signed prescriptions have complete medication
+								details.
 							</p>
 						)}
 					</div>

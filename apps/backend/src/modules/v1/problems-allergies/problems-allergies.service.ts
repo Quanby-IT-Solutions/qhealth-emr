@@ -264,9 +264,13 @@ export class ProblemsAllergiesService {
 		return row
 	}
 
-	async createProblem(input: CreateProblemInput, userId: string) {
+	async createProblem(input: CreateProblemInput, userId: string, actor?: ChartAccessActor) {
 		const staffProfileId = await this.getStaffProfileId(userId, input.facilityId)
 		await this.assertPatientBelongsToFacility(input.patientId, input.facilityId)
+		await this.chartAccessService.ensurePatientChartReadAccess(actor, input.patientId, {
+			entityType: "problem",
+			entityId: input.patientId,
+		})
 		this.assertProblemHasClinicalCode(input)
 		await this.assertSubmittedProblemCodesAreActive(input)
 
@@ -290,7 +294,7 @@ export class ProblemsAllergiesService {
 
 		this.logger.log(`Created problem ${created!.id} for patient ${input.patientId}`)
 
-		const problem = await this.getProblem(created!.id)
+		const problem = await this.getProblem(created!.id, actor)
 		await this.writeAudit({
 			facilityId: input.facilityId,
 			userId,
@@ -306,8 +310,8 @@ export class ProblemsAllergiesService {
 		return problem
 	}
 
-	async updateProblem(input: UpdateProblemInput, userId: string) {
-		const existing = await this.getProblem(input.id)
+	async updateProblem(input: UpdateProblemInput, userId: string, actor?: ChartAccessActor) {
+		const existing = await this.getProblem(input.id, actor)
 		const staffProfileId = await this.getStaffProfileId(userId, existing.facilityId)
 
 		const updateValues: Record<string, unknown> = { updatedAt: new Date() }
@@ -345,7 +349,7 @@ export class ProblemsAllergiesService {
 
 		await db.update(problems).set(updateValues).where(eq(problems.id, existing.id))
 
-		const updated = await this.getProblem(input.id)
+		const updated = await this.getProblem(input.id, actor)
 		await this.writeAudit({
 			facilityId: updated.facilityId,
 			userId,
@@ -361,8 +365,8 @@ export class ProblemsAllergiesService {
 		return updated
 	}
 
-	async resolveProblem(input: ResolveProblemInput, userId: string) {
-		const existing = await this.getProblem(input.id)
+	async resolveProblem(input: ResolveProblemInput, userId: string, actor?: ChartAccessActor) {
+		const existing = await this.getProblem(input.id, actor)
 
 		if (existing.status === "resolved") {
 			return existing
@@ -380,7 +384,7 @@ export class ProblemsAllergiesService {
 
 		this.logger.log(`Resolved problem ${input.id}`)
 
-		const updated = await this.getProblem(input.id)
+		const updated = await this.getProblem(input.id, actor)
 		await this.writeAudit({
 			facilityId: updated.facilityId,
 			userId,
@@ -396,26 +400,44 @@ export class ProblemsAllergiesService {
 		return updated
 	}
 
-	async deleteProblem(id: string, userId: string) {
-		const existing = await this.getProblem(id)
+	async deleteProblem(id: string, userId: string, actor?: ChartAccessActor) {
+		const existing = await this.getProblem(id, actor)
+
+		if (existing.status === "entered_in_error") {
+			return existing
+		}
+
 		const staffProfileId = await this.getStaffProfileId(userId, existing.facilityId)
 
-		await db.delete(problems).where(eq(problems.id, id))
-		this.logger.log(`Deleted problem ${id}`)
+		await db
+			.update(problems)
+			.set({
+				status: "entered_in_error",
+				resolutionDate: existing.resolutionDate ?? this.todayDateString(),
+				updatedAt: new Date(),
+			})
+			.where(eq(problems.id, id))
+		this.logger.log(`Marked problem ${id} as entered in error`)
+
+		const updated = await this.getProblem(id, actor)
 
 		await this.writeAudit({
 			facilityId: existing.facilityId,
 			userId,
 			staffProfileId,
-			action: "delete",
+			action: "update",
 			entityType: "problem",
 			entityId: existing.id,
 			beforeState: existing as unknown as Record<string, unknown>,
-			afterState: null,
-			metadata: { patientId: existing.patientId },
+			afterState: updated as unknown as Record<string, unknown>,
+			metadata: {
+				patientId: existing.patientId,
+				previousStatus: existing.status,
+				status: "entered_in_error",
+			},
 		})
 
-		return existing
+		return updated
 	}
 
 	// ========================================================================
@@ -526,10 +548,10 @@ export class ProblemsAllergiesService {
 			}
 		}
 
-		const allergyConditions = [ilike(allergies.allergenName, `%${escaped}%`)]
-		if (input.facilityId) {
-			allergyConditions.push(eq(allergies.facilityId, input.facilityId))
-		}
+		const allergyConditions = [
+			ilike(allergies.allergenName, `%${escaped}%`),
+			eq(allergies.facilityId, input.facilityId),
+		]
 		if (input.allergenType) {
 			allergyConditions.push(eq(allergies.allergenType, input.allergenType))
 		}
@@ -703,9 +725,13 @@ export class ProblemsAllergiesService {
 		return row
 	}
 
-	async createAllergy(input: CreateAllergyInput, userId: string) {
+	async createAllergy(input: CreateAllergyInput, userId: string, actor?: ChartAccessActor) {
 		const staffProfileId = await this.getStaffProfileId(userId, input.facilityId)
 		await this.assertPatientBelongsToFacility(input.patientId, input.facilityId)
+		await this.chartAccessService.ensurePatientChartReadAccess(actor, input.patientId, {
+			entityType: "allergy",
+			entityId: input.patientId,
+		})
 
 		const [created] = await db
 			.insert(allergies)
@@ -731,7 +757,7 @@ export class ProblemsAllergiesService {
 			`Created allergy ${created!.id} (${input.allergenName}) for patient ${input.patientId}`
 		)
 
-		const allergy = await this.getAllergy(created!.id)
+		const allergy = await this.getAllergy(created!.id, actor)
 		await this.writeAudit({
 			facilityId: input.facilityId,
 			userId,
@@ -747,8 +773,8 @@ export class ProblemsAllergiesService {
 		return allergy
 	}
 
-	async updateAllergy(input: UpdateAllergyInput, userId: string) {
-		const existing = await this.getAllergy(input.id)
+	async updateAllergy(input: UpdateAllergyInput, userId: string, actor?: ChartAccessActor) {
+		const existing = await this.getAllergy(input.id, actor)
 		const staffProfileId = await this.getStaffProfileId(userId, existing.facilityId)
 
 		const updateValues: Record<string, unknown> = { updatedAt: new Date() }
@@ -775,7 +801,7 @@ export class ProblemsAllergiesService {
 
 		await db.update(allergies).set(updateValues).where(eq(allergies.id, existing.id))
 
-		const updated = await this.getAllergy(input.id)
+		const updated = await this.getAllergy(input.id, actor)
 		await this.writeAudit({
 			facilityId: updated.facilityId,
 			userId,
@@ -794,8 +820,8 @@ export class ProblemsAllergiesService {
 		return updated
 	}
 
-	async verifyAllergy(input: VerifyAllergyInput, userId: string) {
-		const existing = await this.getAllergy(input.id)
+	async verifyAllergy(input: VerifyAllergyInput, userId: string, actor?: ChartAccessActor) {
+		const existing = await this.getAllergy(input.id, actor)
 
 		if (!existing.isActive) {
 			throw new BadRequestException("Cannot verify an inactive allergy.")
@@ -820,7 +846,7 @@ export class ProblemsAllergiesService {
 
 		this.logger.log(`Verified allergy ${input.id} by staff ${staffProfileId}`)
 
-		const updated = await this.getAllergy(input.id)
+		const updated = await this.getAllergy(input.id, actor)
 		await this.writeAudit({
 			facilityId: updated.facilityId,
 			userId,
@@ -836,8 +862,8 @@ export class ProblemsAllergiesService {
 		return updated
 	}
 
-	async deactivateAllergy(id: string, userId: string) {
-		const existing = await this.getAllergy(id)
+	async deactivateAllergy(id: string, userId: string, actor?: ChartAccessActor) {
+		const existing = await this.getAllergy(id, actor)
 
 		if (!existing.isActive) {
 			return existing
@@ -851,7 +877,7 @@ export class ProblemsAllergiesService {
 
 		this.logger.log(`Deactivated allergy ${id}`)
 
-		const updated = await this.getAllergy(id)
+		const updated = await this.getAllergy(id, actor)
 		await this.writeAudit({
 			facilityId: updated.facilityId,
 			userId,

@@ -459,7 +459,56 @@ export class ClinicalDocsService {
 		const limit = Number(input.limit ?? 50)
 		const offset = (page - 1) * limit
 
+		// Derive the target facility from the requested encounter / pre-encounter so that
+		// a clinician who knows another facility's encounter UUID cannot list its notes.
+		let resolvedFacilityId: string | null = null
+		if (input.encounterId) {
+			const [encounter] = await db
+				.select({ facilityId: encounters.facilityId })
+				.from(encounters)
+				.where(eq(encounters.id, input.encounterId))
+				.limit(1)
+			resolvedFacilityId = encounter?.facilityId ?? null
+		} else if (input.preEncounterId) {
+			const [preEncounter] = await db
+				.select({ facilityId: preEncounters.facilityId })
+				.from(preEncounters)
+				.where(eq(preEncounters.id, input.preEncounterId))
+				.limit(1)
+			resolvedFacilityId = preEncounter?.facilityId ?? null
+		}
+
+		if ((input.encounterId || input.preEncounterId) && !resolvedFacilityId) {
+			return {
+				data: [],
+				total: 0,
+				page,
+				limit,
+				totalPages: 0,
+			}
+		}
+
+		// If the caller's RBAC profile is known, require an active staff profile at the
+		// resolved facility. Without one, treat the encounter as out-of-scope and return empty.
+		if (resolvedFacilityId && actor?.rbacProfile) {
+			const hasFacilityProfile = actor.rbacProfile.staffProfiles.some(
+				profile => profile.facilityId === resolvedFacilityId
+			)
+			if (!hasFacilityProfile) {
+				return {
+					data: [],
+					total: 0,
+					page,
+					limit,
+					totalPages: 0,
+				}
+			}
+		}
+
 		const conditions = []
+		if (resolvedFacilityId) {
+			conditions.push(eq(clinicalNotes.facilityId, resolvedFacilityId))
+		}
 		if (input.encounterId) {
 			conditions.push(eq(clinicalNotes.encounterId, input.encounterId))
 		}

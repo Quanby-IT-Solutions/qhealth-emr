@@ -7,7 +7,7 @@ import { ProblemsAllergiesTab } from "./problems-allergies-tab"
 const mockUseProblemsQuery = vi.fn()
 const mockUseAllergiesQuery = vi.fn()
 const mockUseUpdateProblemMutation = vi.fn()
-const mockUseDeleteProblemMutation = vi.fn()
+const mockUseMarkProblemEnteredInErrorMutation = vi.fn()
 const mockUseDeactivateAllergyMutation = vi.fn()
 const mockUseVerifyAllergyMutation = vi.fn()
 
@@ -15,7 +15,8 @@ vi.mock("@/features/problems-allergies/api/problems-allergies.hooks", () => ({
 	useProblemsQuery: (...args: unknown[]) => mockUseProblemsQuery(...args),
 	useAllergiesQuery: (...args: unknown[]) => mockUseAllergiesQuery(...args),
 	useUpdateProblemMutation: (...args: unknown[]) => mockUseUpdateProblemMutation(...args),
-	useDeleteProblemMutation: (...args: unknown[]) => mockUseDeleteProblemMutation(...args),
+	useMarkProblemEnteredInErrorMutation: (...args: unknown[]) =>
+		mockUseMarkProblemEnteredInErrorMutation(...args),
 	useDeactivateAllergyMutation: (...args: unknown[]) => mockUseDeactivateAllergyMutation(...args),
 	useVerifyAllergyMutation: (...args: unknown[]) => mockUseVerifyAllergyMutation(...args),
 }))
@@ -122,7 +123,7 @@ describe("ProblemsAllergiesTab", () => {
 		mockEmptyProblems()
 		mockEmptyAllergies()
 		mockUseUpdateProblemMutation.mockReturnValue({ mutate: vi.fn(), isPending: false })
-		mockUseDeleteProblemMutation.mockReturnValue({ mutate: vi.fn(), isPending: false })
+		mockUseMarkProblemEnteredInErrorMutation.mockReturnValue({ mutate: vi.fn(), isPending: false })
 		mockUseDeactivateAllergyMutation.mockReturnValue({ mutate: vi.fn(), isPending: false })
 		mockUseVerifyAllergyMutation.mockReturnValue({ mutate: vi.fn(), isPending: false })
 	})
@@ -189,17 +190,17 @@ describe("ProblemsAllergiesTab", () => {
 		).toBeInTheDocument()
 	})
 
-	it("opens the delete problem confirmation with the problem description", async () => {
+	it("opens the entered-in-error confirmation with the problem description", async () => {
 		const user = userEvent.setup()
 		mockProblemsWith([buildProblem({ description: "Hypertension" })])
 		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
 
-		const [deleteButton] = screen.getAllByRole("button", { name: /^delete$/i })
-		await user.click(deleteButton!)
+		const [enteredInErrorButton] = screen.getAllByRole("button", { name: /entered in error/i })
+		await user.click(enteredInErrorButton!)
 
 		expect(screen.getByRole("alertdialog")).toBeInTheDocument()
 		expect(
-			screen.getByText(/removes hypertension from the longitudinal problem list/i)
+			screen.getByText(/hides hypertension from active and resolved clinical lists/i)
 		).toBeInTheDocument()
 	})
 
@@ -250,5 +251,18 @@ describe("ProblemsAllergiesTab", () => {
 			call[0]?.status === "resolved"
 		)
 		expect(calledWithResolved).toBe(true)
+	})
+
+	it("queries entered-in-error problems when the Entered in Error tab is selected", async () => {
+		const user = userEvent.setup()
+		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
+
+		mockUseProblemsQuery.mockClear()
+		await user.click(screen.getByRole("tab", { name: /entered in error/i }))
+
+		const calledWithEnteredInError = mockUseProblemsQuery.mock.calls.some(
+			call => call[0]?.status === "entered_in_error"
+		)
+		expect(calledWithEnteredInError).toBe(true)
 	})
 })

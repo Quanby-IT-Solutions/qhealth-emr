@@ -531,6 +531,48 @@ describe("OrdersService", () => {
 		)
 	})
 
+	it("treats off-formulary generics as a soft block that requires override", async () => {
+		problemsAllergiesMock.getActiveAllergies.mockResolvedValue({ allergies: [] })
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withLimit: true }))
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ genericName: "Amoxicillin" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([], { withOrderBy: true, withLimit: true })
+			)
+
+		const result = await service.evaluateCds({
+			patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+			facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+			genericName: "Amoxicillin",
+			orderingStaffId: "staff-1",
+		})
+
+		expect(result.canProceed).toBe(true)
+		expect(result.requiresOverride).toBe(true)
+		expect(result.alerts).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					type: "formulary_warning",
+					severity: "soft_block",
+					message: "This drug is off-formulary or inactive at this facility.",
+				}),
+			])
+		)
+	})
+
 	it("rejects CDS evaluation when the patient is outside the facility", async () => {
 		mockDb.select.mockImplementationOnce(() =>
 			createSelectBuilder(
@@ -785,6 +827,53 @@ describe("OrdersService", () => {
 		).rejects.toThrow(
 			"Provide clinical override justification for each CDS soft block before submitting the medication order."
 		)
+	})
+
+	it("requires an override reason before creating an off-formulary medication order", async () => {
+		problemsAllergiesMock.getActiveAllergies.mockResolvedValue({ allergies: [] })
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "staff-1", userId: "user-1" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withLimit: true }))
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ genericName: "Amoxicillin" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([], { withOrderBy: true, withLimit: true })
+			)
+
+		await expect(
+			service.createMedOrder(
+				{
+					facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+					patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+					genericName: "Amoxicillin",
+					dose: "500",
+					doseUnit: "mg",
+					doseForm: "capsule",
+					route: "PO",
+					frequency: "once",
+					cdsAlerts: [],
+				},
+				"user-1"
+			)
+		).rejects.toThrow(
+			"Provide clinical override justification for each CDS soft block before submitting the medication order."
+		)
+		expect(mockDb.insert).not.toHaveBeenCalled()
 	})
 
 	it("persists server-evaluated CDS alerts when creating a medication order", async () => {
