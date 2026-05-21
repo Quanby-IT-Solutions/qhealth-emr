@@ -190,8 +190,6 @@ export const FndrfIdInputSchema = z.object({
 // SLA-021: mark a death report as released (Flow 7 Step 3 authoritative evidence)
 export const MarkDeathReportReleasedInputSchema = z.object({
 	id: z.string().uuid(),
-	/** UUID of the staff member who physically released the certificate */
-	releasedByStaffId: z.string().uuid(),
 	/** ISO datetime of release; defaults to now if omitted */
 	releasedAt: z.string().datetime().optional(),
 })

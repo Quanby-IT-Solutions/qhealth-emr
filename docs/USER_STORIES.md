@@ -104,6 +104,7 @@ DONE - RICARDO
   - **I want to** generate Birth and Death Certificates with inherited patient data
   - **So that** I can submit official documentation to the Local Civil Registry without duplicate entry
   - **Pages**: Birth Certificate Generation Page, Death Certificate Generation Page, LCR Tracking Page
+  - **Boundary**: Registrar death certificates use Civil Registry records; FMDRF and FNDRF stay under Death Reporting for maternal and neonatal review.
 
 - **Story 2.9 – Post-Discharge Bed Cleaning Status**
   - **As a** Registrar

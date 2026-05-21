@@ -1,13 +1,20 @@
 import {
 	BadRequestException,
 	ConflictException,
+	ForbiddenException,
 	Injectable,
 	Logger,
 	NotFoundException,
 } from "@nestjs/common"
 import { and, eq } from "drizzle-orm"
 
-import { deathReports, encounters, patients, surveillanceFlags } from "@repo/db/schema"
+import {
+	deathReports,
+	encounters,
+	patients,
+	staffProfiles,
+	surveillanceFlags,
+} from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 
@@ -109,6 +116,13 @@ interface UpdateFndrfInput {
 
 type MaternalHistoryPayload = NonNullable<(typeof deathReports.$inferSelect)["maternalHistory"]>
 type NeonatalDetailsPayload = NonNullable<(typeof deathReports.$inferSelect)["neonatalDetails"]>
+type DeathReportRow = typeof deathReports.$inferSelect
+
+function hasRequiredValue(value: unknown) {
+	if (typeof value === "string") return value.trim().length > 0
+	if (typeof value === "number") return Number.isFinite(value)
+	return value !== null && value !== undefined
+}
 
 @Injectable()
 export class DeathReportingService {
@@ -1012,6 +1026,10 @@ export class DeathReportingService {
 			throw new NotFoundException(`Death report ${input.id} not found`)
 		}
 
+		this.logger.log(
+			`workflow.death_reporting.certificate.paid id=${report.id} facilityId=${report.facilityId} reportType=${report.reportType} paidAt=${report.paidAt?.toISOString() ?? "null"}`
+		)
+
 		return { id: report.id, paidAt: report.paidAt?.toISOString() ?? null }
 	}
 
@@ -1026,6 +1044,8 @@ export class DeathReportingService {
 		releasedAt?: Date
 	}) {
 		const releasedAt = input.releasedAt ?? new Date()
+		await this.assertActiveReleaseStaffProfile(input.id, input.releasedByStaffId)
+		await this.assertDeathReportReadyForRelease(input.id)
 
 		const [report] = await db
 			.update(deathReports)
@@ -1043,6 +1063,10 @@ export class DeathReportingService {
 			throw new NotFoundException(`Death report ${input.id} not found`)
 		}
 
+		this.logger.log(
+			`workflow.death_reporting.certificate.released id=${report.id} facilityId=${report.facilityId} reportType=${report.reportType} releasedByStaffId=${report.releasedByStaffId ?? "null"} releasedAt=${report.releasedAt?.toISOString() ?? "null"}`
+		)
+
 		return {
 			id: report.id,
 			releasedByStaffId: report.releasedByStaffId ?? null,
@@ -1050,6 +1074,107 @@ export class DeathReportingService {
 			status: report.status,
 			completedAt: report.completedAt?.toISOString() ?? null,
 		}
+	}
+
+	private async assertActiveReleaseStaffProfile(id: string, releasedByStaffId: string) {
+		const [report] = await db
+			.select({ facilityId: deathReports.facilityId })
+			.from(deathReports)
+			.where(eq(deathReports.id, id))
+			.limit(1)
+
+		if (!report) {
+			throw new NotFoundException(`Death report ${id} not found`)
+		}
+
+		const [profile] = await db
+			.select({ id: staffProfiles.id })
+			.from(staffProfiles)
+			.where(
+				and(
+					eq(staffProfiles.id, releasedByStaffId),
+					eq(staffProfiles.facilityId, report.facilityId),
+					eq(staffProfiles.isActive, true)
+				)
+			)
+			.limit(1)
+
+		if (!profile) {
+			throw new ForbiddenException(
+				"An active staff profile in this facility is required to release a death certificate"
+			)
+		}
+	}
+
+	private async assertDeathReportReadyForRelease(id: string) {
+		const [report] = await db.select().from(deathReports).where(eq(deathReports.id, id)).limit(1)
+
+		if (!report) {
+			throw new NotFoundException(`Death report ${id} not found`)
+		}
+
+		if (!report.paidAt) {
+			throw new BadRequestException("Death certificate payment must be recorded before release")
+		}
+		if (report.releasedAt || report.releasedByStaffId) {
+			throw new BadRequestException("Death certificate has already been released")
+		}
+
+		const missingFields = this.getMissingDeathReportCertificateFields(report)
+		if (missingFields.length > 0) {
+			throw new BadRequestException(
+				`Required death certificate fields are missing: ${missingFields.join(", ")}`
+			)
+		}
+	}
+
+	private getMissingDeathReportCertificateFields(report: DeathReportRow) {
+		const cert = report.physicianCertification ?? {}
+		const commonFields: Array<{ label: string; value: unknown }> = [
+			{ label: "cause of death", value: report.causeOfDeath },
+			{ label: "certifying physician name", value: cert.certifyingPhysicianName },
+			{ label: "PRC license number", value: cert.prcLicenseNumber },
+			{ label: "certification date", value: cert.certificationDate },
+			{ label: "physician signature", value: cert.signatureData },
+		]
+
+		const reportFields =
+			report.reportType === "fmdrf"
+				? this.getFmdrfCertificateFields(report)
+				: this.getFndrfCertificateFields(report)
+
+		return [...reportFields, ...commonFields]
+			.filter(field => !hasRequiredValue(field.value))
+			.map(field => field.label)
+	}
+
+	private getFmdrfCertificateFields(report: DeathReportRow) {
+		const maternal = report.maternalHistory ?? {}
+		return [
+			{ label: "patient full name", value: maternal.patientName },
+			{ label: "patient MRN", value: maternal.patientMrn },
+			{ label: "patient age", value: maternal.patientAge },
+			{ label: "patient address", value: maternal.patientAddress },
+			{ label: "place of death", value: maternal.placeOfDeath },
+			{ label: "underlying cause of death", value: maternal.causeOfDeathUnderlying },
+		]
+	}
+
+	private getFndrfCertificateFields(report: DeathReportRow) {
+		const neonatal = report.neonatalDetails ?? {}
+		return [
+			{ label: "newborn full name", value: neonatal.newbornName },
+			{ label: "newborn MRN", value: neonatal.newbornMrn },
+			{ label: "newborn date of birth", value: neonatal.newbornDateOfBirth },
+			{ label: "gestational age", value: neonatal.gestationalAgeWeeks },
+			{ label: "birth weight", value: neonatal.birthWeight },
+			{ label: "delivery type", value: neonatal.deliveryType },
+			{ label: "mother full name", value: neonatal.motherName },
+			{ label: "mother age", value: neonatal.motherAge },
+			{ label: "mother gravidity", value: neonatal.motherGravidity },
+			{ label: "mother parity", value: neonatal.motherParity },
+			{ label: "place of death", value: neonatal.placeOfDeath },
+		]
 	}
 
 	private mapFndrfReport(

@@ -4,8 +4,40 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { orpc } from "@/services/orpc/client"
 
+export function useListLcrTrackingQuery(
+	params: {
+		facilityId: string
+		certificateType?: "birth" | "death"
+		submissionStatus?:
+			| "not_submitted"
+			| "ready"
+			| "submitted"
+			| "acknowledged"
+			| "rejected"
+			| "error"
+		page?: number
+		limit?: number
+	},
+	options?: { enabled?: boolean }
+) {
+	return useQuery(
+		orpc.civilRegistry.listLcrTracking.queryOptions({
+			input: { ...params, page: params.page ?? 1, limit: params.limit ?? 50 },
+			enabled: (options?.enabled ?? true) && !!params.facilityId,
+			staleTime: 30_000,
+		})
+	)
+}
+
 export function useListBirthRegistrationsQuery(
-	params: { facilityId: string; patientId?: string; encounterId?: string; status?: "draft" | "completed" | "submitted"; page?: number; limit?: number },
+	params: {
+		facilityId: string
+		patientId?: string
+		encounterId?: string
+		status?: "draft" | "completed" | "submitted"
+		page?: number
+		limit?: number
+	},
 	options?: { enabled?: boolean }
 ) {
 	return useQuery(
@@ -17,12 +49,58 @@ export function useListBirthRegistrationsQuery(
 	)
 }
 
+export function useListDeathCertificateRegistrationsQuery(
+	params: {
+		facilityId: string
+		patientId?: string
+		encounterId?: string
+		status?: "draft" | "completed" | "submitted"
+		page?: number
+		limit?: number
+	},
+	options?: { enabled?: boolean }
+) {
+	return useQuery(
+		orpc.civilRegistry.listDeathCertificateRegistrations.queryOptions({
+			input: { ...params, page: params.page ?? 1, limit: params.limit ?? 50 },
+			enabled: (options?.enabled ?? true) && !!params.facilityId,
+			staleTime: 30_000,
+		})
+	)
+}
+
 export function useCreateBirthRegistrationMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.civilRegistry.createBirthRegistration.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+		})
+	)
+}
+
+export function useGenerateLcrArtifactMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.civilRegistry.generateLcrArtifact.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+		})
+	)
+}
+
+export function useMarkLcrSubmittedMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.civilRegistry.markLcrSubmitted.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+		})
+	)
+}
+
+export function useCreateDeathCertificateRegistrationMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.civilRegistry.createDeathCertificateRegistration.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
 		})
 	)
 }
@@ -31,8 +109,7 @@ export function useUpdateBirthRegistrationMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.civilRegistry.updateBirthRegistration.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
 		})
 	)
 }
@@ -41,8 +118,7 @@ export function useMarkBirthRegistrationPaidMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.civilRegistry.markBirthRegistrationPaid.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
 		})
 	)
 }
@@ -51,28 +127,25 @@ export function useMarkBirthRegistrationReleasedMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.civilRegistry.markBirthRegistrationReleased.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
 		})
 	)
 }
 
-export function useMarkDeathReportPaidMutation() {
+export function useMarkDeathCertificateRegistrationPaidMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
-		orpc.deathReporting.markDeathReportPaid.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.deathReporting.key() }),
+		orpc.civilRegistry.markDeathCertificateRegistrationPaid.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
 		})
 	)
 }
 
-export function useMarkDeathReportReleasedMutation() {
+export function useMarkDeathCertificateRegistrationReleasedMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
-		orpc.deathReporting.markDeathReportReleased.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.deathReporting.key() }),
+		orpc.civilRegistry.markDeathCertificateRegistrationReleased.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
 		})
 	)
 }
