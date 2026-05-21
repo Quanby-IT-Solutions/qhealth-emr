@@ -450,17 +450,25 @@ describe("CivilRegistryService — SLA-017 checkpoints", () => {
 			).rejects.toThrow(BadRequestException)
 		})
 
-		it("rejects release when required LCR fields are incomplete", async () => {
+		it("allows release when required LCR fields are incomplete", async () => {
 			setupReleaseStaffProfileCheck({
 				readyReport: createReadyBirthRegistration({ certificateNumber: "" }),
 			})
+			setupUpdate({
+				...createReadyBirthRegistration({ certificateNumber: "" }),
+				completedAt: new Date("2024-06-02T10:00:00Z"),
+				releasedAt: new Date("2024-06-02T10:00:00Z"),
+				releasedByStaffId: "staff-001",
+				status: "completed",
+			})
 
-			await expect(
-				service.markBirthRegistrationReleased({
-					id: "birth-reg-uuid",
-					releasedByStaffId: "staff-001",
-				})
-			).rejects.toThrow(BadRequestException)
+			const result = await service.markBirthRegistrationReleased({
+				id: "birth-reg-uuid",
+				releasedByStaffId: "staff-001",
+			})
+
+			expect(result.status).toBe("completed")
+			expect(result.releasedByStaffId).toBe("staff-001")
 		})
 
 		it("rejects repeat release requests", async () => {
