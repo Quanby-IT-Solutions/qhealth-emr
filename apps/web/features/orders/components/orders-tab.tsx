@@ -354,6 +354,9 @@ interface OrdersTabProps {
 }
 
 export function OrdersTab({ encounterId, facilityId, patientId, encounterType }: OrdersTabProps) {
+	const [ordersTab, setOrdersTab] = useState<
+		"all" | "medications" | "labs" | "imaging" | "prescriptions"
+	>("all")
 	const [createMedOpen, setCreateMedOpen] = useState(false)
 	const [createLabOpen, setCreateLabOpen] = useState(false)
 	const [createImagingOpen, setCreateImagingOpen] = useState(false)
@@ -479,7 +482,7 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 				</Alert>
 			)}
 
-			<Tabs defaultValue="all">
+			<Tabs value={ordersTab} onValueChange={v => setOrdersTab(v as typeof ordersTab)}>
 				<TabsList variant="line">
 					<TabsTrigger value="all">All Orders</TabsTrigger>
 					<TabsTrigger value="medications">Medications</TabsTrigger>

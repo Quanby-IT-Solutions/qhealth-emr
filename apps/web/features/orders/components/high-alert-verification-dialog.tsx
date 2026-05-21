@@ -33,7 +33,7 @@ interface HighAlertVerificationDialogProps {
 	requestingStaffId: string
 	facilityId: string
 	drugName: string
-	onVerified: () => void
+	onVerified: (draft?: HighAlertVerificationDraft) => void
 	onPrepareVerification?: (draft: HighAlertVerificationDraft) => void
 }
 
@@ -104,7 +104,7 @@ export function HighAlertVerificationDialog({
 				return
 			}
 			onPrepareVerification(draft)
-			onVerified()
+			onVerified(draft)
 			handleDialogOpenChange(false)
 			return
 		}
