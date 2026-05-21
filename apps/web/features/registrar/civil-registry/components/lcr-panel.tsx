@@ -16,7 +16,15 @@ import { Skeleton } from "@/core/components/ui/skeleton"
 import { cn } from "@/core/lib/utils"
 import { useCivilRegistryOpsQuery } from "@/features/admin/api/admin-dashboard.hooks"
 
-function StatusBadge({ label, count, variant }: { label: string; count: number; variant: "draft" | "completed" | "submitted" }) {
+function StatusBadge({
+	label,
+	count,
+	variant,
+}: {
+	label: string
+	count: number
+	variant: "draft" | "completed" | "submitted"
+}) {
 	const variantMap = {
 		draft: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
 		completed: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
@@ -24,7 +32,7 @@ function StatusBadge({ label, count, variant }: { label: string; count: number; 
 	}
 	return (
 		<div className="flex items-center gap-2">
-			<Badge className={cn("text-[10px] px-1.5 font-medium", variantMap[variant])}>{label}</Badge>
+			<Badge className={cn("px-1.5 text-[10px] font-medium", variantMap[variant])}>{label}</Badge>
 			<span className="text-sm font-semibold tabular-nums">{count}</span>
 		</div>
 	)
@@ -36,11 +44,12 @@ export function LcrPanel() {
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center gap-3">
-				<HugeiconsIcon icon={Certificate01FreeIcons} className="size-6 text-muted-foreground" />
+				<HugeiconsIcon icon={Certificate01FreeIcons} className="text-muted-foreground size-6" />
 				<div>
 					<h1 className="text-xl font-semibold">Local Civil Registry</h1>
-					<p className="text-sm text-muted-foreground">
-						Birth and death certificate generation, payment tracking, and release — SLA-017 &amp; SLA-021
+					<p className="text-muted-foreground text-sm">
+						Birth and death certificate generation, payment tracking, and release — SLA-017 &amp;
+						SLA-021
 					</p>
 				</div>
 			</div>
@@ -67,7 +76,7 @@ export function LcrPanel() {
 					<div className="grid grid-cols-3 gap-4">
 						<Card>
 							<CardContent className="pt-4">
-								<p className="text-xs text-muted-foreground">Draft / pending</p>
+								<p className="text-muted-foreground text-xs">Draft / pending</p>
 								<p className="text-2xl font-bold tabular-nums text-yellow-600">
 									{data.pendingCertificateCount}
 								</p>
@@ -75,7 +84,7 @@ export function LcrPanel() {
 						</Card>
 						<Card>
 							<CardContent className="pt-4">
-								<p className="text-xs text-muted-foreground">Completed, not submitted</p>
+								<p className="text-muted-foreground text-xs">Completed, not submitted</p>
 								<p className="text-2xl font-bold tabular-nums text-blue-600">
 									{data.completedNotSubmittedCount}
 								</p>
@@ -83,7 +92,7 @@ export function LcrPanel() {
 						</Card>
 						<Card>
 							<CardContent className="pt-4">
-								<p className="text-xs text-muted-foreground">Submitted to registrar</p>
+								<p className="text-muted-foreground text-xs">Submitted to registrar</p>
 								<p className="text-2xl font-bold tabular-nums text-green-700">
 									{data.submittedCount}
 								</p>
@@ -100,9 +109,21 @@ export function LcrPanel() {
 							</CardHeader>
 							<CardContent className="space-y-3">
 								<div className="flex gap-3">
-									<StatusBadge label="Draft" count={data.birthCertificate.draftCount} variant="draft" />
-									<StatusBadge label="Completed" count={data.birthCertificate.completedCount} variant="completed" />
-									<StatusBadge label="Submitted" count={data.birthCertificate.submittedCount} variant="submitted" />
+									<StatusBadge
+										label="Draft"
+										count={data.birthCertificate.draftCount}
+										variant="draft"
+									/>
+									<StatusBadge
+										label="Completed"
+										count={data.birthCertificate.completedCount}
+										variant="completed"
+									/>
+									<StatusBadge
+										label="Submitted"
+										count={data.birthCertificate.submittedCount}
+										variant="submitted"
+									/>
 								</div>
 								<Link
 									href="/registrar/civil-registry/birth"
@@ -120,10 +141,6 @@ export function LcrPanel() {
 								<CardTitle className="text-sm font-semibold">Death Certificates</CardTitle>
 							</CardHeader>
 							<CardContent className="space-y-3">
-								<div className="flex gap-3">
-									<StatusBadge label="FMDRF Draft" count={data.fmdrf.draft} variant="draft" />
-									<StatusBadge label="FNDRF Draft" count={data.fndrf.draft} variant="draft" />
-								</div>
 								<Link
 									href="/registrar/civil-registry/death"
 									className={cn(buttonVariants({ size: "sm", variant: "outline" }), "gap-1.5")}
@@ -136,10 +153,10 @@ export function LcrPanel() {
 					</div>
 
 					{/* LCR Tracking link */}
-					<div className="flex items-center justify-between rounded-lg border border-border/70 p-4">
+					<div className="border-border/70 flex items-center justify-between rounded-lg border p-4">
 						<div>
 							<p className="text-sm font-medium">LCR Tracking</p>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								View all certificates, SLA checkpoints, and payment / release status
 							</p>
 						</div>
@@ -156,9 +173,10 @@ export function LcrPanel() {
 					<Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/20">
 						<CardContent className="pt-4">
 							<p className="text-xs text-blue-800 dark:text-blue-300">
-								<strong>Compliance note:</strong> Under the Civil Registration Law (Act 3753) and DOH
-								Administrative Order No. 2012-0011, all births and deaths must be registered within 30
-								days. Ensure certificates in <em>completed</em> status are submitted promptly.
+								<strong>Compliance note:</strong> Under the Civil Registration Law (Act 3753) and
+								DOH Administrative Order No. 2012-0011, all births and deaths must be registered
+								within 30 days. Ensure certificates in <em>completed</em> status are submitted
+								promptly.
 							</p>
 						</CardContent>
 					</Card>

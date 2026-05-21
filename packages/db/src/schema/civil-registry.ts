@@ -5,7 +5,7 @@ import { encounters, patients } from "./core.js"
 import { facilities, staffProfiles } from "./rbac.js"
 
 // ============================================================================
-// CIVIL REGISTRY — Birth Registration Tracking
+// CIVIL REGISTRY — Birth and Death Certificate Registration Tracking
 // ============================================================================
 
 export const birthRegistrations = createTable(
@@ -65,5 +65,62 @@ export const birthRegistrations = createTable(
 		index("birth_registrations_patient_id_idx").on(t.patientId),
 		index("birth_registrations_status_idx").on(t.status),
 		index("birth_registrations_birth_datetime_idx").on(t.birthDatetime),
+	]
+)
+
+export const deathCertificateRegistrations = createTable(
+	"death_certificate_registrations",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		patientId: t
+			.uuid("patient_id")
+			.notNull()
+			.references(() => patients.id, { onDelete: "restrict" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
+		deathDatetime: t.timestamp("death_datetime").notNull(),
+		registeredByStaffId: t
+			.uuid("registered_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		certificateNumber: t.text("certificate_number"),
+		deceasedName: t.text("deceased_name"),
+		deceasedMrn: t.text("deceased_mrn"),
+		ageAtDeathYears: t.integer("age_at_death_years"),
+		deceasedAddress: t.text("deceased_address"),
+		placeOfDeath: t.text("place_of_death"),
+		causeOfDeathImmediate: t.text("cause_of_death_immediate"),
+		causeOfDeathAntecedent: t.text("cause_of_death_antecedent"),
+		causeOfDeathUnderlying: t.text("cause_of_death_underlying"),
+		causeOfDeathContributing: t.text("cause_of_death_contributing"),
+		informantName: t.text("informant_name"),
+		informantRelationship: t.text("informant_relationship"),
+		physicianName: t.text("physician_name"),
+		physicianLicenseNo: t.text("physician_license_no"),
+		physicianSignature: t.text("physician_signature"),
+		certificationDate: t.date("certification_date"),
+		status: t
+			.text("status")
+			.notNull()
+			.default("draft")
+			.$type<"draft" | "completed" | "submitted">(),
+		requestedAt: t.timestamp("requested_at"),
+		paidAt: t.timestamp("paid_at"),
+		releasedByStaffId: t
+			.uuid("released_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		releasedAt: t.timestamp("released_at"),
+		completedAt: t.timestamp("completed_at"),
+		submittedAt: t.timestamp("submitted_at"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("death_certificate_registrations_facility_id_idx").on(t.facilityId),
+		index("death_certificate_registrations_patient_id_idx").on(t.patientId),
+		index("death_certificate_registrations_status_idx").on(t.status),
+		index("death_certificate_registrations_death_datetime_idx").on(t.deathDatetime),
 	]
 )

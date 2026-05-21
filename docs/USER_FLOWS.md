@@ -358,7 +358,7 @@
 2. Open Patient Profile of newborn / decedent
 3. Navigate to **Birth Certificate Generation Page** (or Death Certificate)
 4. System pre-fills inherited demographic & encounter data
-5. Registrar verifies fields, fills LCR-specific items (place of birth, parents)
+5. Registrar verifies fields, fills LCR-specific items (place of birth and parents for births; date, place, cause, informant, and physician certification for deaths)
 6. Attending Physician signs digitally
 7. Click **"Generate"**
 8. Certificate exported in LCR-compliant format (PDF + XML)
@@ -370,6 +370,8 @@
 - **Birth Certificate Generation Page** (form + preview)
 - **Death Certificate Generation Page**
 - **LCR Tracking Page** (submission status list)
+
+FMDRF and FNDRF remain separate physician-owned death review forms under Death Reporting; they are not the registrar death certificate workflow.
 
 ---
 

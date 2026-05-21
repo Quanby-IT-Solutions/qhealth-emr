@@ -128,3 +128,122 @@ export const ListBirthRegistrationsResponseSchema = z.object({
 	limit: z.number(),
 	totalPages: z.number(),
 })
+
+// ============================================================================
+// Death Certificate Registration Schemas (Civil Registry)
+// ============================================================================
+
+export const DeathCertificateRegistrationStatusEnum = BirthRegistrationStatusEnum
+
+export const DeathCertificateRegistrationSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	encounterId: z.string().uuid().nullable(),
+	deathDatetime: dateOrString,
+	registeredByStaffId: z.string().uuid().nullable(),
+	certificateNumber: z.string().nullable(),
+	deceasedName: z.string().nullable().optional(),
+	deceasedMrn: z.string().nullable().optional(),
+	ageAtDeathYears: z.number().int().nullable().optional(),
+	deceasedAddress: z.string().nullable().optional(),
+	placeOfDeath: z.string().nullable().optional(),
+	causeOfDeathImmediate: z.string().nullable().optional(),
+	causeOfDeathAntecedent: z.string().nullable().optional(),
+	causeOfDeathUnderlying: z.string().nullable().optional(),
+	causeOfDeathContributing: z.string().nullable().optional(),
+	informantName: z.string().nullable().optional(),
+	informantRelationship: z.string().nullable().optional(),
+	physicianName: z.string().nullable().optional(),
+	physicianLicenseNo: z.string().nullable().optional(),
+	physicianSignature: z.string().nullable().optional(),
+	certificationDate: dateOrString.nullable().optional(),
+	status: DeathCertificateRegistrationStatusEnum,
+	requestedAt: dateOrString.nullable().optional(),
+	paidAt: dateOrString.nullable().optional(),
+	releasedByStaffId: z.string().uuid().nullable().optional(),
+	releasedAt: dateOrString.nullable().optional(),
+	completedAt: dateOrString.nullable(),
+	submittedAt: dateOrString.nullable(),
+	createdAt: dateOrString,
+	updatedAt: dateOrString,
+})
+
+export const DeathCertificateRegistrationIdSchema = z.object({ id: z.string().uuid() })
+
+export const CreateDeathCertificateRegistrationSchema = z.object({
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	encounterId: z.string().uuid().optional(),
+	deathDatetime: z.string().datetime(),
+	registeredByStaffId: z.string().uuid().optional(),
+	certificateNumber: z.string().optional(),
+	deceasedName: z.string().optional(),
+	deceasedMrn: z.string().optional(),
+	ageAtDeathYears: z.number().int().min(0).optional(),
+	deceasedAddress: z.string().optional(),
+	placeOfDeath: z.string().optional(),
+	causeOfDeathImmediate: z.string().optional(),
+	causeOfDeathAntecedent: z.string().optional(),
+	causeOfDeathUnderlying: z.string().optional(),
+	causeOfDeathContributing: z.string().optional(),
+	informantName: z.string().optional(),
+	informantRelationship: z.string().optional(),
+	physicianName: z.string().optional(),
+	physicianLicenseNo: z.string().optional(),
+	physicianSignature: z.string().optional(),
+	certificationDate: z.string().date().optional(),
+})
+
+export const UpdateDeathCertificateRegistrationSchema =
+	CreateDeathCertificateRegistrationSchema.omit({
+		facilityId: true,
+		patientId: true,
+		deathDatetime: true,
+	}).extend({
+		id: z.string().uuid(),
+		deathDatetime: z.string().datetime().optional(),
+		status: DeathCertificateRegistrationStatusEnum.optional(),
+		completedAt: dateOrString.optional(),
+		submittedAt: dateOrString.optional(),
+	})
+
+export const MarkDeathCertificateRegistrationReleasedInputSchema = z.object({
+	id: z.string().uuid(),
+	releasedAt: z.string().datetime().optional(),
+})
+
+export const MarkDeathCertificateRegistrationReleasedResponseSchema = z.object({
+	id: z.string().uuid(),
+	releasedByStaffId: z.string().nullable(),
+	releasedAt: z.string().nullable(),
+	status: z.string(),
+	completedAt: z.string().nullable(),
+})
+
+export const MarkDeathCertificateRegistrationPaidInputSchema = z.object({
+	id: z.string().uuid(),
+	paidAt: z.string().datetime().optional(),
+})
+
+export const MarkDeathCertificateRegistrationPaidResponseSchema = z.object({
+	id: z.string().uuid(),
+	paidAt: z.string().nullable(),
+})
+
+export const ListDeathCertificateRegistrationsSchema = z.object({
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid().optional(),
+	encounterId: z.string().uuid().optional(),
+	status: DeathCertificateRegistrationStatusEnum.optional(),
+	page: z.coerce.number().int().positive().default(1),
+	limit: z.coerce.number().int().positive().max(100).default(50),
+})
+
+export const ListDeathCertificateRegistrationsResponseSchema = z.object({
+	data: z.array(DeathCertificateRegistrationSchema),
+	total: z.number(),
+	page: z.number(),
+	limit: z.number(),
+	totalPages: z.number(),
+})

@@ -4,13 +4,23 @@ import {
 	BirthRegistrationIdSchema,
 	BirthRegistrationSchema,
 	CreateBirthRegistrationSchema,
+	CreateDeathCertificateRegistrationSchema,
+	DeathCertificateRegistrationIdSchema,
+	DeathCertificateRegistrationSchema,
 	ListBirthRegistrationsResponseSchema,
 	ListBirthRegistrationsSchema,
+	ListDeathCertificateRegistrationsResponseSchema,
+	ListDeathCertificateRegistrationsSchema,
 	MarkBirthRegistrationPaidInputSchema,
 	MarkBirthRegistrationPaidResponseSchema,
 	MarkBirthRegistrationReleasedInputSchema,
 	MarkBirthRegistrationReleasedResponseSchema,
+	MarkDeathCertificateRegistrationPaidInputSchema,
+	MarkDeathCertificateRegistrationPaidResponseSchema,
+	MarkDeathCertificateRegistrationReleasedInputSchema,
+	MarkDeathCertificateRegistrationReleasedResponseSchema,
 	UpdateBirthRegistrationSchema,
+	UpdateDeathCertificateRegistrationSchema,
 } from "./civil-registry.schema.js"
 
 export const civilRegistryContract = {
@@ -75,4 +85,64 @@ export const civilRegistryContract = {
 		})
 		.input(MarkBirthRegistrationReleasedInputSchema)
 		.output(MarkBirthRegistrationReleasedResponseSchema),
+
+	listDeathCertificateRegistrations: oc
+		.route({
+			method: "GET",
+			path: "/civil-registry/death-certificate-registrations",
+			summary: "List death certificate registrations",
+			tags: ["Civil Registry"],
+		})
+		.input(ListDeathCertificateRegistrationsSchema)
+		.output(ListDeathCertificateRegistrationsResponseSchema),
+
+	getDeathCertificateRegistration: oc
+		.route({
+			method: "GET",
+			path: "/civil-registry/death-certificate-registrations/{id}",
+			summary: "Get a death certificate registration by ID",
+			tags: ["Civil Registry"],
+		})
+		.input(DeathCertificateRegistrationIdSchema)
+		.output(DeathCertificateRegistrationSchema),
+
+	createDeathCertificateRegistration: oc
+		.route({
+			method: "POST",
+			path: "/civil-registry/death-certificate-registrations",
+			summary: "Create a death certificate registration",
+			tags: ["Civil Registry"],
+		})
+		.input(CreateDeathCertificateRegistrationSchema)
+		.output(DeathCertificateRegistrationSchema),
+
+	updateDeathCertificateRegistration: oc
+		.route({
+			method: "PUT",
+			path: "/civil-registry/death-certificate-registrations/{id}",
+			summary: "Update a death certificate registration",
+			tags: ["Civil Registry"],
+		})
+		.input(UpdateDeathCertificateRegistrationSchema)
+		.output(DeathCertificateRegistrationSchema),
+
+	markDeathCertificateRegistrationPaid: oc
+		.route({
+			method: "POST",
+			path: "/civil-registry/death-certificate-registrations/{id}/mark-paid",
+			summary: "Record payment receipt for a death certificate",
+			tags: ["Civil Registry"],
+		})
+		.input(MarkDeathCertificateRegistrationPaidInputSchema)
+		.output(MarkDeathCertificateRegistrationPaidResponseSchema),
+
+	markDeathCertificateRegistrationReleased: oc
+		.route({
+			method: "POST",
+			path: "/civil-registry/death-certificate-registrations/{id}/mark-released",
+			summary: "Record release of a death certificate to the family",
+			tags: ["Civil Registry"],
+		})
+		.input(MarkDeathCertificateRegistrationReleasedInputSchema)
+		.output(MarkDeathCertificateRegistrationReleasedResponseSchema),
 }

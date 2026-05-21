@@ -240,8 +240,8 @@ export function LcrTrackingTable() {
 			<div className="border-border/70 rounded-lg border p-4">
 				<p className="text-sm font-medium">Death Certificates</p>
 				<p className="text-muted-foreground mt-1 text-xs">
-					Death certificate records (FMDRF/FNDRF) are tracked per encounter. Open a patient
-					encounter and use the Death Reporting section to view or update FMDRF/FNDRF status.
+					Death certificate records are owned by Civil Registry. Maternal and neonatal death review
+					forms stay in Death Reporting.
 				</p>
 				<Link
 					href="/registrar/civil-registry/death"
