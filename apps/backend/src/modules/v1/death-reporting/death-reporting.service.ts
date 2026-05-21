@@ -1,13 +1,20 @@
 import {
 	BadRequestException,
 	ConflictException,
+	ForbiddenException,
 	Injectable,
 	Logger,
 	NotFoundException,
 } from "@nestjs/common"
 import { and, eq } from "drizzle-orm"
 
-import { deathReports, encounters, patients, surveillanceFlags } from "@repo/db/schema"
+import {
+	deathReports,
+	encounters,
+	patients,
+	staffProfiles,
+	surveillanceFlags,
+} from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 
@@ -1026,6 +1033,7 @@ export class DeathReportingService {
 		releasedAt?: Date
 	}) {
 		const releasedAt = input.releasedAt ?? new Date()
+		await this.assertActiveReleaseStaffProfile(input.id, input.releasedByStaffId)
 
 		const [report] = await db
 			.update(deathReports)
@@ -1049,6 +1057,36 @@ export class DeathReportingService {
 			releasedAt: report.releasedAt?.toISOString() ?? null,
 			status: report.status,
 			completedAt: report.completedAt?.toISOString() ?? null,
+		}
+	}
+
+	private async assertActiveReleaseStaffProfile(id: string, releasedByStaffId: string) {
+		const [report] = await db
+			.select({ facilityId: deathReports.facilityId })
+			.from(deathReports)
+			.where(eq(deathReports.id, id))
+			.limit(1)
+
+		if (!report) {
+			throw new NotFoundException(`Death report ${id} not found`)
+		}
+
+		const [profile] = await db
+			.select({ id: staffProfiles.id })
+			.from(staffProfiles)
+			.where(
+				and(
+					eq(staffProfiles.id, releasedByStaffId),
+					eq(staffProfiles.facilityId, report.facilityId),
+					eq(staffProfiles.isActive, true)
+				)
+			)
+			.limit(1)
+
+		if (!profile) {
+			throw new ForbiddenException(
+				"An active staff profile in this facility is required to release a death certificate"
+			)
 		}
 	}
 
