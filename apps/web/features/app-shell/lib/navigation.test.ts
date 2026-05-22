@@ -52,7 +52,13 @@ describe("filterNavItems", () => {
 			item => item.title
 		)
 
-		expect(primaryTitles).toEqual(["Dashboard", "Triage Queue", "Trauma Alias", "Tele-Triage"])
+		expect(primaryTitles).toEqual([
+			"Dashboard",
+			"Triage Queue",
+			"Trauma Alias",
+			"Tele-Triage",
+			"OPD Tele-Triage",
+		])
 		expect(secondaryTitles).toEqual([])
 	})
 
@@ -73,7 +79,7 @@ describe("filterNavItems", () => {
 			"Chart Merge",
 			"Civil Registry",
 			"Patient Transfers",
-			"Discharge Processing"
+			"Discharge Processing",
 		])
 		expect(secondaryTitles).toEqual([])
 	})

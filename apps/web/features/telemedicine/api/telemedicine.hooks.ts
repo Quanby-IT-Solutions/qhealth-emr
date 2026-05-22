@@ -357,7 +357,8 @@ export function useAppointmentsQuery(
 	facilityId: string,
 	page = 1,
 	limit = 20,
-	status?: AppointmentStatus
+	status?: AppointmentStatus,
+	enabled = true
 ) {
 	return useQuery<AppointmentListResponse>({
 		queryKey: [...telemedicineKeys.appointments(facilityId), page, limit, status],
@@ -365,7 +366,7 @@ export function useAppointmentsQuery(
 			fetchJson<AppointmentListResponse>(
 				`${API_BASE}/appointments${buildQueryString({ facilityId, page, limit, status })}`
 			),
-		enabled: Boolean(facilityId),
+		enabled: enabled && Boolean(facilityId),
 	})
 }
 

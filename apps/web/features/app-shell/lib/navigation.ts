@@ -181,6 +181,13 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		],
 	},
 	{
+		title: "OPD Tele-Triage",
+		href: "/triage/opd-tele",
+		iconName: "video",
+		requiredPermissions: [{ module: "opd", action: "view" }],
+		requireAllPermissions: [{ module: "nursing", action: "create" }],
+	},
+	{
 		// Nurse-specific patient list: browse & filter all active patients without
 		// the strict Name+DOB dedup requirement of the registrar workflow.
 		title: "Patients",
