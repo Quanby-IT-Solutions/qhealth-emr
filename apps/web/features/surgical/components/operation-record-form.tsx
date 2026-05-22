@@ -134,6 +134,7 @@ function StaffSearchCombobox({
 				<PopoverTrigger render={<div className="w-full" />} nativeButton={false}>
 					<CommandInput
 						id={id}
+						data-testid={id}
 						value={inputValue || selectedOption?.name || ""}
 						onValueChange={handleInputChange}
 						onFocus={() => {
@@ -172,6 +173,16 @@ function StaffSearchCombobox({
 	)
 }
 
+function toDatetimeLocalValue(value: string | null | undefined) {
+	if (!value) return ""
+
+	const date = new Date(value)
+	if (Number.isNaN(date.getTime())) return ""
+
+	const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+	return localDate.toISOString().slice(0, 16)
+}
+
 function buildInitialState(
 	existing: OperationRecord | null | undefined,
 	defaultAnesthesiologistStaffId: string | null | undefined
@@ -187,8 +198,8 @@ function buildInitialState(
 		estimatedBloodLoss: existing?.estimatedBloodLoss?.toString() ?? "",
 		fluidIn: existing?.fluidIn?.toString() ?? "",
 		fluidOut: existing?.fluidOut?.toString() ?? "",
-		incisionDatetime: existing?.incisionDatetime?.slice(0, 16) ?? "",
-		closureDatetime: existing?.closureDatetime?.slice(0, 16) ?? "",
+		incisionDatetime: toDatetimeLocalValue(existing?.incisionDatetime),
+		closureDatetime: toDatetimeLocalValue(existing?.closureDatetime),
 		firstAssistantStaffId: existing?.firstAssistantStaffId ?? "",
 		secondAssistantStaffId: existing?.secondAssistantStaffId ?? "",
 		scrubNurseStaffId: existing?.scrubNurseStaffId ?? "",

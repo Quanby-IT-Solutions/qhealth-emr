@@ -710,7 +710,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 	"Billing Officer": [
 		["adt", ["view"]],
 		["patients", ["view"]], // Patient record access for billing reconciliation
-		["billing", ["view", "create", "edit", "export"]], // Legacy fallback for shell-level access
+		["billing", ["view", "create", "edit", "sign", "export"]], // Legacy fallback for shell-level access and RVS finalization
 		["billing.charges", ["read", "write"]],
 		["billing.invoices", ["read", "write"]],
 		["billing.payments", ["read", "write"]],
