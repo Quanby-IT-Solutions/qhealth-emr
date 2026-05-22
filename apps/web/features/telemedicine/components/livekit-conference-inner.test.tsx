@@ -8,6 +8,7 @@ interface MockParticipant {
 	sid?: string
 	name?: string
 	metadata?: string
+	joinedAt?: Date
 	isLocal?: boolean
 	isSpeaking?: boolean
 	isMicrophoneEnabled?: boolean
@@ -126,6 +127,11 @@ vi.mock("@livekit/components-react", async () => {
 		isTrackReference: (track: MockTrackReference) => Boolean(track.publication),
 		useConnectionQualityIndicator: () => ({ quality: liveKitState.quality }),
 		useConnectionState: () => liveKitState.connectionState,
+		useChat: () => ({
+			chatMessages: [],
+			send: vi.fn().mockResolvedValue(undefined),
+			isSending: false,
+		}),
 		useLocalParticipant: () => {
 			const localParticipant =
 				liveKitState.localParticipant ??
@@ -152,6 +158,8 @@ function buildParticipant(overrides: Partial<MockParticipant> = {}): MockPartici
 		identity: "clinician-1",
 		sid: "sid-clinician-1",
 		name: "Dr. Miguel Santos",
+		metadata: JSON.stringify({ role: "clinician" }),
+		joinedAt: new Date("2026-05-22T00:00:00.000Z"),
 		isLocal: true,
 		isSpeaking: false,
 		isMicrophoneEnabled: false,
@@ -205,7 +213,7 @@ describe("LiveKitConferenceInner", () => {
 		)
 		expect(screen.getByText("Camera off")).toBeVisible()
 		expect(screen.getByTestId("floating-control-dock")).toBeVisible()
-		expect(screen.getByTestId("consultation-timer")).toHaveTextContent("00:00")
+		expect(screen.getByTestId("consultation-timer")).toHaveTextContent("Waiting for patient")
 		expect(screen.getByTestId("network-quality-badge")).toHaveAccessibleName(
 			/connection quality good/i
 		)

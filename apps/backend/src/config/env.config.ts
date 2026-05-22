@@ -65,6 +65,9 @@ export const env = createEnv({
 		LIVEKIT_API_SECRET: optionalString,
 		LIVEKIT_WS_URL: optionalUrl,
 
+		// ElevenLabs speech-to-text
+		ELEVENLABS_API_KEY: optionalString,
+
 		// Outbound SMTP for clinical document delivery (abstract, e-Rx).
 		// When MAILER_MODE=smtp and host/user/pass/from are set, NodemailerMailer
 		// is used. Otherwise LogOnlyMailer logs the send and the document is still
