@@ -1,465 +1,386 @@
 "use client"
 
-import React, { useState } from "react"
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { useVerifyMrnMutation } from "@/features/patients/api/patients.hooks"
-import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
-import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import { Button } from "@/core/components/ui/button"
-import { Input } from "@/core/components/ui/input"
-import { Textarea } from "@/core/components/ui/textarea"
-import { Scan, User, Droplet, FileText, CheckCircle2 } from "lucide-react"
-import {
-	Dialog,
-	DialogClose,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/core/components/ui/dialog"
-import { Label } from "@/core/components/ui/label"
+import { useMemo, useState } from "react"
+import { CheckCircle2, Scan, XCircle } from "lucide-react"
 import { toast } from "sonner"
 
-function usePermissionSet() {
-    const { data: profile } = useMyProfile()
-    const permissions = profile?.activeRole?.permissions ?? []
-    return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+import { Button } from "@/core/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import { Input } from "@/core/components/ui/input"
+import { Label } from "@/core/components/ui/label"
+import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
+import { cn } from "@/core/lib/utils"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { NURSE_ROLE_NAMES, roleNameMatches } from "@/features/app-shell/lib/navigation"
+import {
+	useBedsideVerifyMutation,
+	useCrossMatchListQuery,
+	type BedsideVerifyResult,
+} from "@/features/lab/api/lab.hooks"
+
+function useAccessContext() {
+	const { data: profile } = useMyProfile()
+	const permissions = profile?.activeRole?.permissions ?? []
+	return {
+		permSet: new Set(
+			permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+		),
+		roleName: profile?.activeRole?.name,
+	}
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
-    return permSet.has(`${module}:${action}`)
+	return permSet.has(`${module}:${action}`)
+}
+
+type VerificationFieldProps = {
+	id: string
+	label: string
+	value: string
+	placeholder: string
+	onChange: (value: string) => void
+	error?: string
+	maxLength?: number
+	readOnly?: boolean
+	verified?: boolean | null
+}
+
+function VerificationField({
+	id,
+	label,
+	value,
+	placeholder,
+	onChange,
+	error,
+	maxLength,
+	readOnly,
+	verified,
+}: VerificationFieldProps) {
+	return (
+		<div className="space-y-2">
+			<Label htmlFor={id} className="flex items-center gap-1 text-sm">
+				<Scan className="size-3.5" />
+				{label}
+				<span className="text-destructive">*</span>
+			</Label>
+			<div className="relative">
+				<Input
+					id={id}
+					value={value}
+					placeholder={placeholder}
+					maxLength={maxLength}
+					readOnly={readOnly}
+					onChange={e => onChange(e.target.value)}
+					className={cn(
+						"pr-8 font-mono",
+						readOnly && "bg-muted/50 text-muted-foreground",
+						error && "border-destructive focus-visible:ring-destructive",
+						verified === true &&
+							"border-green-500 ring-1 ring-green-500 focus-visible:ring-green-500",
+						verified === false &&
+							"border-destructive ring-destructive focus-visible:ring-destructive ring-1"
+					)}
+				/>
+				{verified === true && (
+					<CheckCircle2 className="absolute top-2.5 right-2 size-4 text-green-600" />
+				)}
+				{verified === false && (
+					<XCircle className="text-destructive absolute top-2.5 right-2 size-4" />
+				)}
+			</div>
+			{error && <p className="text-destructive text-xs">{error}</p>}
+		</div>
+	)
+}
+
+function VerificationResult({ result }: { result: BedsideVerifyResult }) {
+	return (
+		<div
+			className={cn(
+				"rounded-md border p-4 text-sm",
+				result.verified
+					? "border-green-500 bg-green-50 text-green-800 dark:bg-green-950/30 dark:text-green-300"
+					: "border-destructive bg-destructive/10 text-destructive dark:bg-destructive/20"
+			)}
+		>
+			<div className="flex items-center gap-2 font-semibold">
+				{result.verified ? <CheckCircle2 className="size-5" /> : <XCircle className="size-5" />}
+				{result.verified ? "Verification successful" : "Verification failed"}
+			</div>
+			<div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+				<div className="flex items-center gap-2">
+					{result.patientMatch ? (
+						<CheckCircle2 className="size-4 text-green-600" />
+					) : (
+						<XCircle className="text-destructive size-4" />
+					)}
+					Patient wristband {result.patientMatch ? "matched" : "mismatched"}
+				</div>
+				<div className="flex items-center gap-2">
+					{result.unitMatch ? (
+						<CheckCircle2 className="size-4 text-green-600" />
+					) : (
+						<XCircle className="text-destructive size-4" />
+					)}
+					Blood unit {result.unitMatch ? "matched" : "mismatched"}
+				</div>
+			</div>
+			<p className="mt-3 text-xs font-medium">{result.message}</p>
+		</div>
+	)
 }
 
 export default function TransfusionPage() {
-    const permSet = usePermissionSet()
-    const facilityId = useActiveFacilityId()
-    const verifyMrnMutation = useVerifyMrnMutation()
-    const [modalOpen, setModalOpen] = useState(false)
-    const [mrnModalOpen, setMrnModalOpen] = useState(false)
-    const [mrnInput, setMrnInput] = useState("")
-    const [verifiedPatient, setVerifiedPatient] = useState<{ mrn: string; firstName: string; lastName: string } | null>(null)
-    const [witness, setWitness] = useState("")
-    const [bp, setBp] = useState("")
-    const [hr, setHr] = useState("")
-    const [temp, setTemp] = useState("")
-    const [reactions, setReactions] = useState("")
-    const [showErrors, setShowErrors] = useState(false)
+	const { permSet, roleName } = useAccessContext()
+	const facilityId = useActiveFacilityId()
+	const verifyMutation = useBedsideVerifyMutation()
+	const [patientMrn, setPatientMrn] = useState("")
+	const [unitBarcode, setUnitBarcode] = useState("")
+	const [patientWristbandBarcode, setPatientWristbandBarcode] = useState("")
+	const [showErrors, setShowErrors] = useState(false)
+	const [verifyResult, setVerifyResult] = useState<BedsideVerifyResult | null>(null)
 
-    const [scanned, setScanned] = useState({
-        wristband: false,
-        bloodProduct: false,
-        cpoe: false,
-    })
+	const isNurse = roleNameMatches(roleName, NURSE_ROLE_NAMES)
+	const hasViewPermission = isNurse && can(permSet, "nursing", "view")
+	const hasVerifyPermission = isNurse && can(permSet, "nursing", "edit")
+	const trimmedPatientMrn = patientMrn.trim()
+	const crossMatchesQuery = useCrossMatchListQuery({
+		facilityId: hasViewPermission && trimmedPatientMrn ? (facilityId ?? "") : "",
+		patientMrn: trimmedPatientMrn || undefined,
+		limit: 10,
+	})
+	const crossMatches = useMemo(
+		() => crossMatchesQuery.data?.data ?? [],
+		[crossMatchesQuery.data?.data]
+	)
+	const selectedCrossMatch = useMemo(() => {
+		if (!trimmedPatientMrn) return null
 
-    const allDone = scanned.wristband && scanned.bloodProduct && scanned.cpoe
-    const completedCount = Object.values(scanned).filter(Boolean).length
+		return (
+			crossMatches.find(request => request.status === "issued" || request.status === "approved") ??
+			crossMatches[0] ??
+			null
+		)
+	}, [crossMatches, trimmedPatientMrn])
+	const crossMatchId = selectedCrossMatch?.id ?? ""
+	const crossMatchLookupError =
+		!trimmedPatientMrn || crossMatchesQuery.isFetching
+			? ""
+			: !facilityId
+				? "Active facility is required to find cross-match requests."
+				: crossMatchesQuery.isError
+					? "Unable to find cross-match requests for this MRN."
+					: !selectedCrossMatch
+						? "No cross-match request was found for this MRN."
+						: ""
+	const errors = {
+		patientMrn: !trimmedPatientMrn ? "Patient MRN is required." : "",
+		crossMatchId: !crossMatchId.trim() ? "Cross-match request ID is required." : "",
+		unitBarcode: !unitBarcode.trim() ? "Blood unit barcode is required." : "",
+		patientWristbandBarcode: !patientWristbandBarcode.trim()
+			? "Patient wristband barcode is required."
+			: "",
+	}
+	const hasErrors = Object.values(errors).some(Boolean)
+	const canSubmit = hasVerifyPermission && !hasErrors && !verifyMutation.isPending
 
-    const statusBorderClass = allDone ? "border-green-500" : "border-orange-400"
-    const statusTextClass = allDone ? "text-green-100" : "text-orange-100"
-    const statusMessage = allDone
-        ? "All three scans verified — Ready to start transfusion."
-        : `Awaiting all three scans — ${completedCount} of 3 completed.`
+	function clearResult() {
+		setVerifyResult(null)
+		verifyMutation.reset()
+	}
 
-    const toggleScan = (key: keyof typeof scanned) => {
-        if (key === "wristband") {
-            if (!scanned.wristband) {
-                setMrnModalOpen(true)
-            } else {
-                setScanned(prev => ({ ...prev, [key]: false }))
-                setVerifiedPatient(null)
-            }
-        } else {
-            setScanned(prev => ({ ...prev, [key]: !prev[key] }))
-        }
-    }
+	function handleVerify() {
+		setShowErrors(true)
+		if (hasErrors) {
+			toast.error("Please complete all required verification fields.")
+			return
+		}
 
-    async function handleVerifyMrn() {
-        if (!mrnInput.trim()) {
-            toast.error("Please enter an MRN")
-            return
-        }
-        
-        if (!facilityId) {
-            toast.error("Facility not found. Please ensure you have an active facility.")
-            return
-        }
+		if (!hasVerifyPermission) {
+			toast.error("You do not have permission to verify transfusions.")
+			return
+		}
 
-        verifyMrnMutation.mutate(
-            { facilityId, mrn: mrnInput.trim() },
-            {
-                onSuccess: (data) => {
-                    setVerifiedPatient({
-                        mrn: data.mrn,
-                        firstName: data.firstName,
-                        lastName: data.lastName,
-                    })
-                    setScanned(prev => ({ ...prev, wristband: true }))
-                    setMrnModalOpen(false)
-                    setMrnInput("")
-                    toast.success("MRN verified successfully")
-                },
-                onError: () => {
-                    toast.error("Cannot find the MRN of the patient.")
-                },
-            }
-        )
-    }
+		clearResult()
+		verifyMutation.mutate(
+			{
+				crossMatchId: crossMatchId.trim(),
+				unitBarcode: unitBarcode.trim(),
+				patientWristbandBarcode: patientWristbandBarcode.trim(),
+			},
+			{
+				onSuccess: data => {
+					setVerifyResult(data)
+					if (data.verified) {
+						toast.success("Transfusion verification recorded successfully.")
+					} else {
+						toast.error(data.message)
+					}
+				},
+				onError: error => {
+					toast.error(error instanceof Error ? error.message : "Failed to verify transfusion.")
+				},
+			}
+		)
+	}
 
-    function handleStartTransfusion() {
-        if (!witness.trim() || !bp.trim() || !hr.trim() || !temp.trim()) {
-            setShowErrors(true)
-            toast.error("Please complete all documentation fields before starting transfusion")
-            return
-        }
-        setShowErrors(false)
-        setModalOpen(true)
-    }
+	function handleReset() {
+		setPatientMrn("")
+		setUnitBarcode("")
+		setPatientWristbandBarcode("")
+		setShowErrors(false)
+		clearResult()
+	}
 
-    function handleConfirmStart() {
-        toast.success("Transfusion started successfully")
-        setModalOpen(false)
-        setScanned({ wristband: false, bloodProduct: false, cpoe: false })
-        setWitness("")
-        setBp("")
-        setHr("")
-        setTemp("")
-        setReactions("")
-        setShowErrors(false)
-    }
+	if (!hasViewPermission) {
+		return (
+			<div className="text-muted-foreground flex items-center justify-center p-8">
+				You do not have permission to access transfusion verification.
+			</div>
+		)
+	}
 
-    if (!can(permSet, "laboratory", "view")) {
-        return (
-            <div className="flex items-center justify-center p-8 text-muted-foreground">
-                You do not have permission to access transfusion verification.
-            </div>
-        )
-    }
+	return (
+		<div className="space-y-6">
+			<div>
+				<h1 className="text-2xl font-semibold">Bedside Transfusion Verification</h1>
+				<p className="text-muted-foreground text-sm">
+					Verify the cross-match request, patient wristband, and blood unit before transfusion.
+				</p>
+			</div>
 
-    return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-2xl font-semibold">Bedside Transfusion Verification</h1>
-                <p className="text-muted-foreground text-sm">
-                    Scan patient, product, and CPOE order — system enforces 3-way match
-                </p>
-            </div>
+			<div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+				<Card>
+					<CardHeader>
+						<CardTitle className="flex items-center gap-2 text-base">
+							<Scan className="size-4" />
+							Transfusion verification
+						</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-4">
+						<VerificationField
+							id="patient-mrn"
+							label="Patient MRN"
+							value={patientMrn}
+							placeholder="Enter patient MRN"
+							onChange={value => {
+								setPatientMrn(value)
+								clearResult()
+							}}
+							error={showErrors ? errors.patientMrn : ""}
+						/>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* LEFT SIDE */}
-                <div className="md:col-span-2 space-y-4">
+						<VerificationField
+							id="cross-match-request-id"
+							label="Cross-match request ID"
+							value={crossMatchId}
+							placeholder={
+								crossMatchesQuery.isFetching
+									? "Looking up cross-match request..."
+									: "Auto-filled from patient MRN"
+							}
+							onChange={() => undefined}
+							error={
+								showErrors ? crossMatchLookupError || errors.crossMatchId : crossMatchLookupError
+							}
+							readOnly
+						/>
+						{selectedCrossMatch && (
+							<div className="bg-muted/40 text-muted-foreground rounded-md border p-3 text-xs">
+								Matched {selectedCrossMatch.patientName} - Status {selectedCrossMatch.status} -
+								Requested {new Date(selectedCrossMatch.requestedAt).toLocaleString()}
+							</div>
+						)}
 
-                    {/* Patient Card */}
-                    <Card className="p-4 mb-3">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-full bg-muted">
-                                <User className="w-6 h-6 text-muted-foreground" />
-                            </div>
-                            <div>
-                                <div className="font-medium">Yusuf Mansour</div>
-                                <div className="text-sm text-muted-foreground">
-                                    MRN 551003 · 62M · Surg-2 · Bed 8 · Blood group A+
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
+						<div className="grid gap-4 md:grid-cols-2">
+							<VerificationField
+								id="patient-wristband-barcode"
+								label="Patient wristband barcode"
+								value={patientWristbandBarcode}
+								placeholder="Scan or type wristband barcode"
+								maxLength={50}
+								onChange={value => {
+									setPatientWristbandBarcode(value)
+									clearResult()
+								}}
+								error={showErrors ? errors.patientWristbandBarcode : ""}
+								verified={verifyResult ? verifyResult.patientMatch : null}
+							/>
+							<VerificationField
+								id="blood-unit-barcode"
+								label="Blood unit barcode"
+								value={unitBarcode}
+								placeholder="Scan or type blood unit barcode"
+								maxLength={50}
+								onChange={value => {
+									setUnitBarcode(value)
+									clearResult()
+								}}
+								error={showErrors ? errors.unitBarcode : ""}
+								verified={verifyResult ? verifyResult.unitMatch : null}
+							/>
+						</div>
 
-                    {/* Scan Cards */}
-                    <div className="space-y-3">
-                    
-                        {/* Patient Wristband */}
-                        <Card
-                            className={`p-4 transition-all duration-150 cursor-pointer select-none
-                                border-2
-                                hover:shadow-md hover:scale-[1.01]
-                                active:scale-[0.99] active:shadow-inner
-                                ${scanned.wristband
-                                    ? "border-solid"
-                                    : "border-dashed border-muted-foreground/30 hover:border-muted-foreground/60"
-                                }`}
-                            onClick={() => toggleScan("wristband")}
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-xl border-2 bg-background transition-colors
-                                    ${scanned.wristband ? "border-green-500" : "border-muted-foreground/30"}`}>
-                                    {scanned.wristband
-                                        ? <CheckCircle2 className="w-6 h-6 text-green-500" />
-                                        : <Scan className="w-6 h-6 text-muted-foreground" />
-                                    }
-                                </div>
-                                <div className="flex-1">
-                                    <div className="font-medium text-sm">Patient wristband</div>
-                                    <div className="text-xs text-muted-foreground">
-                                        {scanned.wristband ? "Scanned successfully" : "Tap to scan barcode on patient ID band"}
-                                    </div>
-                                </div>
-                                {scanned.wristband && verifiedPatient ? (
-                                    <div className="text-sm font-mono text-muted-foreground">
-                                        MRN: {verifiedPatient.mrn}
-                                    </div>
-                                ) : (
-                                    <div className="text-xs text-muted-foreground/50 font-mono tracking-wide uppercase">
-                                        Upload
-                                    </div>
-                                )}
-                            </div>
-                        </Card>
-                    
-                        {/* Blood Product */}
-                        <Card
-                            className={`p-4 transition-all duration-150 cursor-pointer select-none
-                                border-2
-                                hover:shadow-md hover:scale-[1.01]
-                                active:scale-[0.99] active:shadow-inner
-                                ${scanned.bloodProduct
-                                    ? "border-solid"
-                                    : "border-dashed border-muted-foreground/30 hover:border-muted-foreground/60"
-                                }`}
-                            onClick={() => toggleScan("bloodProduct")}
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-xl border-2 bg-background transition-colors
-                                    ${scanned.bloodProduct ? "border-green-500" : "border-muted-foreground/30"}`}>
-                                    {scanned.bloodProduct
-                                        ? <CheckCircle2 className="w-6 h-6 text-green-500" />
-                                        : <Droplet className="w-6 h-6 text-red-500" />
-                                    }
-                                </div>
-                                <div className="flex-1">
-                                    <div className="font-medium text-sm">Blood product unit</div>
-                                    <div className="text-xs text-muted-foreground">
-                                        {scanned.bloodProduct ? "Scanned successfully" : "Tap to scan ISBT-128 label on bag"}
-                                    </div>
-                                </div>
-                                {!scanned.bloodProduct && (
-                                    <div className="text-xs text-muted-foreground/50 font-mono tracking-wide uppercase">
-                                        Upload
-                                    </div>
-                                )}
-                            </div>
-                        </Card>
-                    
-                        {/* CPOE */}
-                        <Card
-                            className={`p-4 transition-all duration-150 cursor-pointer select-none
-                                border-2
-                                hover:shadow-md hover:scale-[1.01]
-                                active:scale-[0.99] active:shadow-inner
-                                ${scanned.cpoe
-                                    ? "border-solid"
-                                    : "border-dashed border-muted-foreground/30 hover:border-muted-foreground/60"
-                                }`}
-                            onClick={() => toggleScan("cpoe")}
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-xl border-2 bg-background transition-colors
-                                    ${scanned.cpoe ? "border-green-500" : "border-muted-foreground/30"}`}>
-                                    {scanned.cpoe
-                                        ? <CheckCircle2 className="w-6 h-6 text-green-500" />
-                                        : <FileText className="w-6 h-6 text-muted-foreground" />
-                                    }
-                                </div>
-                                <div className="flex-1">
-                                    <div className="font-medium text-sm">CPOE order</div>
-                                    <div className="text-xs text-muted-foreground">
-                                        {scanned.cpoe ? "Scanned successfully" : "Tap to scan order barcode on chart/printout"}
-                                    </div>
-                                </div>
-                                {!scanned.cpoe && (
-                                    <div className="text-xs text-muted-foreground/50 font-mono tracking-wide uppercase">
-                                        Upload
-                                    </div>
-                                )}
-                            </div>
-                        </Card>
+						{verifyMutation.isPending && (
+							<div className="text-muted-foreground flex justify-center py-2 text-sm">
+								Verifying transfusion match...
+							</div>
+						)}
 
-                        {/* Status */}
-                        <div className={`bg-muted rounded-lg p-4 flex items-center justify-between border-2 transition-colors duration-300 ${statusBorderClass} ${statusTextClass}`}>
-                            <div className="text-sm">
-                                {statusMessage}
-                            </div>
-                            <Button
-                                disabled={!allDone}
-                                onClick={handleStartTransfusion}
-                                className={`transition-all duration-200 font-medium px-5 py-2 rounded-md
-                                    ${allDone
-                                        ? "bg-green-600 hover:bg-green-500 active:scale-95 text-white shadow-md hover:shadow-green-500/30 cursor-pointer"
-                                        : "bg-muted-foreground/10 text-muted-foreground/40 border border-muted-foreground/20 cursor-not-allowed"
-                                    }`}
-                            >
-                                Start transfusion
-                            </Button>
-                        </div>
+						{verifyResult && <VerificationResult result={verifyResult} />}
 
-                    </div>
-                </div>
+						<div className="flex flex-wrap gap-2 pt-2">
+							<Button className="min-w-36" onClick={handleVerify} disabled={!canSubmit}>
+								<Scan className="mr-2 size-4" />
+								{verifyMutation.isPending ? "Verifying..." : "Verify match"}
+							</Button>
+							<Button variant="outline" onClick={handleReset} disabled={verifyMutation.isPending}>
+								Reset
+							</Button>
+						</div>
+					</CardContent>
+				</Card>
 
-                {/* RIGHT SIDE */}
-                <div className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Documentation</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-
-                            <div>
-                                <label className="text-xs text-muted-foreground block mb-1">
-                                    Witness
-                                </label>
-                                <Input 
-                                    placeholder="Second nurse name" 
-                                    value={witness} 
-                                    onChange={e => setWitness(e.target.value)} 
-                                    className={showErrors && !witness.trim() ? "border-red-500" : ""}
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-2">
-                                <Input 
-                                    placeholder="BP" 
-                                    value={bp} 
-                                    onChange={e => setBp(e.target.value)} 
-                                    className={showErrors && !bp.trim() ? "border-red-500" : ""}
-                                />
-                                <Input 
-                                    placeholder="HR" 
-                                    value={hr} 
-                                    onChange={e => setHr(e.target.value)} 
-                                    className={showErrors && !hr.trim() ? "border-red-500" : ""}
-                                />
-                                <Input 
-                                    placeholder="Temp" 
-                                    value={temp} 
-                                    onChange={e => setTemp(e.target.value)} 
-                                    className={showErrors && !temp.trim() ? "border-red-500" : ""}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-xs text-muted-foreground block mb-1">
-                                    Reactions
-                                </label>
-                                <Textarea placeholder="None observed..." value={reactions} onChange={e => setReactions(e.target.value)} />
-                            </div>
-
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-
-            {/* MRN Verification Modal */}
-            <Dialog open={mrnModalOpen} onOpenChange={setMrnModalOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Verify Patient MRN</DialogTitle>
-                        <DialogDescription>
-                            Enter the patient's Medical Record Number to verify identity.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div>
-                            <Label htmlFor="mrn" className="text-sm">Medical Record Number (MRN)</Label>
-                            <Input
-                                id="mrn"
-                                placeholder="Enter MRN"
-                                value={mrnInput}
-                                onChange={(e) => setMrnInput(e.target.value)}
-                                onKeyDown={(e) => e.key === "Enter" && handleVerifyMrn()}
-                                className="mt-2"
-                                autoFocus
-                                disabled={verifyMrnMutation.isPending}
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
-                        <Button onClick={handleVerifyMrn} disabled={verifyMrnMutation.isPending}>
-                            {verifyMrnMutation.isPending ? "Verifying..." : "Verify"}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Start Transfusion Modal */}
-            <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-                <DialogContent className="max-w-lg p-0 gap-0 max-h-[85vh] flex flex-col overflow-hidden">
-                    <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
-                        <DialogTitle>Start Transfusion</DialogTitle>
-                        <DialogDescription>
-                            Confirm all verification steps and documentation before starting transfusion.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-4 px-6 overflow-y-auto flex-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                        <style jsx>{`
-                            div::-webkit-scrollbar {
-                                display: none;
-                            }
-                        `}</style>
-                        <div className="rounded-md border bg-muted/30 p-3 text-sm">
-                            <div className="font-medium mb-2">Patient Information</div>
-                            <div className="space-y-1 text-xs text-muted-foreground">
-                                <p>Name: Yusuf Mansour</p>
-                                <p>MRN: 551003</p>
-                                <p>Blood Group: A+</p>
-                                <p>Location: Surg-2, Bed 8</p>
-                            </div>
-                        </div>
-
-                        <div className="rounded-md border bg-muted/30 p-3 text-sm">
-                            <div className="font-medium mb-2">Verification Status</div>
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-xs">
-                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                    <span>Patient wristband scanned</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs">
-                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                    <span>Blood product unit scanned</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs">
-                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                    <span>CPOE order scanned</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <Label className="mb-2 text-xs text-muted-foreground">Witness Nurse</Label>
-                            <Input value={witness} readOnly />
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2">
-                            <div>
-                                <Label className="mb-2 text-xs text-muted-foreground">BP</Label>
-                                <Input value={bp} readOnly />
-                            </div>
-                            <div>
-                                <Label className="mb-2 text-xs text-muted-foreground">HR</Label>
-                                <Input value={hr} readOnly />
-                            </div>
-                            <div>
-                                <Label className="mb-2 text-xs text-muted-foreground">Temp</Label>
-                                <Input value={temp} readOnly />
-                            </div>
-                        </div>
-
-                        <div className="pb-4">
-                            <Label className="mb-2 text-xs text-muted-foreground">Reactions</Label>
-                            <Textarea value={reactions} readOnly className="min-h-20" />
-                        </div>
-                    </div>
-
-                    <DialogFooter className="px-6 py-2 mb-0 border-t bg-background flex-shrink-0">
-                        <DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
-                        <Button onClick={handleConfirmStart} className="bg-green-600 hover:bg-green-700">
-                            <CheckCircle2 className="mr-2 size-4" />
-                            Confirm & Start
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </div>
-    )
+				<Card>
+					<CardHeader>
+						<CardTitle className="text-base">Verification record</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-3 text-sm">
+						<div className="flex items-center justify-between gap-3">
+							<span className="text-muted-foreground">cross_match_request_id</span>
+							<span className={crossMatchId.trim() ? "text-green-700" : "text-muted-foreground"}>
+								{crossMatchId.trim() ? "Ready" : "Missing"}
+							</span>
+						</div>
+						<div className="flex items-center justify-between gap-3">
+							<span className="text-muted-foreground">patient_wristband_barcode</span>
+							<span
+								className={
+									patientWristbandBarcode.trim() ? "text-green-700" : "text-muted-foreground"
+								}
+							>
+								{patientWristbandBarcode.trim() ? "Ready" : "Missing"}
+							</span>
+						</div>
+						<div className="flex items-center justify-between gap-3">
+							<span className="text-muted-foreground">unit_barcode</span>
+							<span className={unitBarcode.trim() ? "text-green-700" : "text-muted-foreground"}>
+								{unitBarcode.trim() ? "Ready" : "Missing"}
+							</span>
+						</div>
+						<div className="bg-muted/40 text-muted-foreground rounded-md border p-3 text-xs">
+							Patient, blood unit, staff, match flags, message, and timestamps are resolved by the
+							bedside verification service when the match is submitted.
+						</div>
+						{!hasVerifyPermission && (
+							<div className="border-destructive bg-destructive/10 text-destructive rounded-md border p-3 text-xs">
+								You can view this page, but laboratory edit permission is required to submit a
+								transfusion verification.
+							</div>
+						)}
+					</CardContent>
+				</Card>
+			</div>
+		</div>
+	)
 }

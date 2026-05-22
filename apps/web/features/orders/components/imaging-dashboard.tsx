@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { ChevronDown, ChevronUp, ImageOff } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -83,9 +82,25 @@ interface ReportStatus {
 }
 
 function getReportStatus(order: ImagingOrderItem): ReportStatus {
+	const structured =
+		order.structuredResults && typeof order.structuredResults === "object"
+			? (order.structuredResults as {
+					reportStatus?: "draft" | "signed"
+					findings?: string
+					impression?: string
+					recommendations?: string
+					attachments?: unknown[]
+				})
+			: null
+	const structuredIsReleased = !structured?.reportStatus || structured.reportStatus === "signed"
 	const hasReport =
 		!!order.report ||
-		(!!order.structuredResults && typeof order.structuredResults === "object")
+		(!!structured &&
+			structuredIsReleased &&
+			(!!structured.findings ||
+				!!structured.impression ||
+				!!structured.recommendations ||
+				!!structured.attachments?.length))
 
 	if (hasReport) return { label: "Report Available", variant: "default" }
 	if (COMPLETED_STATUSES.has(order.status) && order.status !== "cancelled") {
@@ -110,10 +125,10 @@ export function ImagingDashboard({ orders, isLoading, onNewOrder }: ImagingDashb
 	const [statusTab, setStatusTab] = useState<StatusTab>("pending")
 	const [expandedId, setExpandedId] = useState<string | null>(null)
 
-	const pendingCount = orders.filter((o) => classifyOrder(o) === "pending").length
-	const inProgressCount = orders.filter((o) => classifyOrder(o) === "in_progress").length
+	const pendingCount = orders.filter(o => classifyOrder(o) === "pending").length
+	const inProgressCount = orders.filter(o => classifyOrder(o) === "in_progress").length
 
-	const filtered = orders.filter((o) => classifyOrder(o) === statusTab)
+	const filtered = orders.filter(o => classifyOrder(o) === statusTab)
 
 	return (
 		<Card>
@@ -127,10 +142,10 @@ export function ImagingDashboard({ orders, isLoading, onNewOrder }: ImagingDashb
 			</CardHeader>
 			<CardContent className="p-0">
 				{/* Status tabs */}
-				<div className="border-b px-4 pb-0 pt-1">
+				<div className="border-b px-4 pt-1 pb-0">
 					<Tabs
 						value={statusTab}
-						onValueChange={(v) => {
+						onValueChange={v => {
 							setStatusTab(v as StatusTab)
 							setExpandedId(null)
 						}}
@@ -181,7 +196,7 @@ export function ImagingDashboard({ orders, isLoading, onNewOrder }: ImagingDashb
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{filtered.map((order) => {
+							{filtered.map(order => {
 								const reportStatus = getReportStatus(order)
 								const pacsUrl = getPacsUrl(order.structuredResults)
 								const isExpanded = expandedId === order.id
@@ -189,14 +204,10 @@ export function ImagingDashboard({ orders, isLoading, onNewOrder }: ImagingDashb
 								return (
 									<>
 										<TableRow key={order.id}>
-											<TableCell className="font-medium capitalize">
-												{order.modality}
-											</TableCell>
+											<TableCell className="font-medium capitalize">{order.modality}</TableCell>
 											<TableCell>{order.bodyPart}</TableCell>
 											<TableCell>
-												<Badge variant={priorityVariant(order.priority)}>
-													{order.priority}
-												</Badge>
+												<Badge variant={priorityVariant(order.priority)}>{order.priority}</Badge>
 											</TableCell>
 											<TableCell>
 												<Badge variant={statusVariant(order.status)}>
@@ -204,14 +215,10 @@ export function ImagingDashboard({ orders, isLoading, onNewOrder }: ImagingDashb
 												</Badge>
 											</TableCell>
 											<TableCell>
-												<Badge variant={reportStatus.variant}>
-													{reportStatus.label}
-												</Badge>
+												<Badge variant={reportStatus.variant}>{reportStatus.label}</Badge>
 											</TableCell>
 											<TableCell>{order.orderingStaffName ?? "—"}</TableCell>
-											<TableCell>
-												{formatDateTime(order.createdAt)}
-											</TableCell>
+											<TableCell>{formatDateTime(order.createdAt)}</TableCell>
 											<TableCell className="text-right">
 												<div className="flex items-center justify-end gap-2">
 													<PacsLink
@@ -224,11 +231,7 @@ export function ImagingDashboard({ orders, isLoading, onNewOrder }: ImagingDashb
 														variant="ghost"
 														size="sm"
 														className="gap-1"
-														onClick={() =>
-															setExpandedId(
-																isExpanded ? null : order.id,
-															)
-														}
+														onClick={() => setExpandedId(isExpanded ? null : order.id)}
 													>
 														{isExpanded ? (
 															<>
@@ -253,9 +256,7 @@ export function ImagingDashboard({ orders, isLoading, onNewOrder }: ImagingDashb
 														structuredResults={order.structuredResults}
 														modality={order.modality}
 														bodyPart={order.bodyPart}
-														clinicalIndication={
-															order.clinicalIndication
-														}
+														clinicalIndication={order.clinicalIndication}
 														completedDatetime={order.completedDatetime}
 													/>
 												</TableCell>

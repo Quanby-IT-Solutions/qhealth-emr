@@ -331,8 +331,8 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 	const initials = user?.name ? getInitials(user.name) : "?"
 	const permissions = activeRole?.permissions ?? []
 	
-	const primaryItems = filterNavItems(PRIMARY_NAV_ITEMS, permissions)
-	const secondaryItems = filterNavItems(SECONDARY_NAV_ITEMS, permissions)
+	const primaryItems = filterNavItems(PRIMARY_NAV_ITEMS, permissions, activeRole?.name)
+	const secondaryItems = filterNavItems(SECONDARY_NAV_ITEMS, permissions, activeRole?.name)
 	const allAllowedItems = [...primaryItems, ...secondaryItems]
 	
 	// Create dynamic filtered groups based on the actual RBAC allowed items

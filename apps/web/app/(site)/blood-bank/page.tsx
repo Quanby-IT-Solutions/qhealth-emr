@@ -1,14 +1,20 @@
 "use client"
 
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { BLOOD_BANK_ROLE_NAMES, roleNameMatches } from "@/features/app-shell/lib/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { BedsideMatching } from "@/features/lab/components/bedside-matching"
 import { CrossMatchForm } from "@/features/lab/components/cross-match-form"
 
-function usePermissionSet() {
+function useAccessContext() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return {
+		permSet: new Set(
+			permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+		),
+		roleName: profile?.activeRole?.name,
+	}
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -16,9 +22,9 @@ function can(permSet: Set<string>, module: string, action: string) {
 }
 
 export default function BloodBankPage() {
-	const permSet = usePermissionSet()
+	const { permSet, roleName } = useAccessContext()
 
-	if (!can(permSet, "laboratory", "view")) {
+	if (!can(permSet, "laboratory", "view") || !roleNameMatches(roleName, BLOOD_BANK_ROLE_NAMES)) {
 		return (
 			<div className="flex items-center justify-center p-8 text-muted-foreground">
 				You do not have permission to access blood bank records.

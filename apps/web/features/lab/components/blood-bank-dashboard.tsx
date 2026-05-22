@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState, type ReactElement } from "react"
-
 import { CheckCircle2, Droplets, Package, ShieldAlert, XCircle } from "lucide-react"
 import { toast } from "sonner"
 
@@ -21,20 +20,13 @@ import {
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Progress } from "@/core/components/ui/progress"
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
-	type CrossMatchRequest,
 	useApproveCrossMatchMutation,
 	useCrossMatchListQuery,
+	type CrossMatchRequest,
 } from "@/features/lab/api/lab.hooks"
 import { env } from "@/env"
 
@@ -42,10 +34,17 @@ function requestStatusBadge(status: CrossMatchRequest["status"]) {
 	if (status === "approved") {
 		return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Approved</Badge>
 	}
+	if (status === "cancelled") {
+		return <Badge className="bg-rose-100 text-rose-700 hover:bg-rose-100">Rejected</Badge>
+	}
 	if (status === "cross_matched") {
 		return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Cross-matched</Badge>
 	}
 	return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Pending approval</Badge>
+}
+
+function canResolveCrossMatch(status: CrossMatchRequest["status"]) {
+	return status === "pending" || status === "cross_matched"
 }
 
 type BloodBankActionModalProps = {
@@ -84,6 +83,8 @@ const resolutionLabels = {
 	cancelled_by_clinician: "Cancelled by clinician",
 } satisfies Record<string, string>
 
+type ResolutionCode = keyof typeof resolutionLabels
+
 function formatDateTime(value: string | null | undefined) {
 	if (!value) return "N/A"
 	return new Date(value).toLocaleString("en-PH", {
@@ -96,25 +97,26 @@ function formatDateTime(value: string | null | undefined) {
 
 function BloodBankActionModal({ request, action, children }: BloodBankActionModalProps) {
 	const [open, setOpen] = useState(false)
-	const [compatibilityResult, setCompatibilityResult] = useState<"compatible" | "incompatible">(
-		action === "approve" ? "compatible" : "incompatible",
-	)
-	const [resolution, setResolution] = useState(
-		action === "approve" ? "routine" : "compatibility_failed",
-	)
-	const [notes, setNotes] = useState(
+	const compatibilityResult: "compatible" | "incompatible" =
+		action === "approve" ? "compatible" : "incompatible"
+	const resolution: ResolutionCode = action === "approve" ? "routine" : "compatibility_failed"
+	const notes =
 		action === "approve"
 			? `${request.componentType} cross-match reviewed for ${request.patientName}. Units verified and ready for issue.`
-			: `Cross-match request for ${request.patientName} rejected pending correction or clinical review.`,
-	)
+			: `Cross-match request for ${request.patientName} rejected pending correction or clinical review.`
 	const approveCrossMatch = useApproveCrossMatchMutation()
 	const copy = actionModalCopy[action]
 	const unitBarcodes = request.bloodUnits.map(unit => unit.unitBarcode).join(", ")
 	const isMockRequest = request.id.startsWith("mock-")
+	const actionDisabled = !canResolveCrossMatch(request.status)
 
 	function handleConfirm() {
+		if (actionDisabled) return
+
 		if (isMockRequest) {
-			toast.success(action === "approve" ? "Cross-match approved." : "Cross-match request rejected.")
+			toast.success(
+				action === "approve" ? "Cross-match approved." : "Cross-match request rejected."
+			)
 			setOpen(false)
 			return
 		}
@@ -128,36 +130,36 @@ function BloodBankActionModal({ request, action, children }: BloodBankActionModa
 			},
 			{
 				onSuccess: () => {
-					toast.success(action === "approve" ? "Cross-match approved." : "Cross-match request rejected.")
+					toast.success(
+						action === "approve" ? "Cross-match approved." : "Cross-match request rejected."
+					)
 					setOpen(false)
 				},
 				onError: () => {
 					toast.error("Unable to save blood bank action.")
 				},
-			},
+			}
 		)
 	}
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger render={children} />
-			<DialogContent className="max-w-xl p-0 gap-0 max-h-[90vh] flex flex-col overflow-hidden">
-				<DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
+			<DialogContent className="flex max-h-[90vh] max-w-xl flex-col gap-0 overflow-hidden p-0">
+				<DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4">
 					<DialogTitle>{copy.title}</DialogTitle>
 					<DialogDescription>{copy.description}</DialogDescription>
 				</DialogHeader>
 
-				<div className="space-y-4 px-6 overflow-y-auto flex-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-					<style jsx>{`
-						div::-webkit-scrollbar {
-							display: none;
-						}
-					`}</style>
-					<div className="rounded-md border bg-muted/30 p-3 text-sm">
+				<div
+					className="flex-1 space-y-4 overflow-y-auto px-6"
+					style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+				>
+					<div className="bg-muted/30 rounded-md border p-3 text-sm">
 						<div className="flex items-start justify-between gap-3">
 							<div>
 								<p className="font-medium">{request.patientName}</p>
-								<p className="text-xs text-muted-foreground">
+								<p className="text-muted-foreground text-xs">
 									MRN {request.patientId.slice(0, 8).toUpperCase()} &middot; Requested{" "}
 									{formatDateTime(request.requestedAt)}
 								</p>
@@ -167,24 +169,24 @@ function BloodBankActionModal({ request, action, children }: BloodBankActionModa
 						<Separator className="my-3" />
 						<div className="grid gap-2 sm:grid-cols-2">
 							<div>
-								<p className="text-xs text-muted-foreground">Blood type</p>
+								<p className="text-muted-foreground text-xs">Blood type</p>
 								<p className="font-medium text-blue-700">{request.bloodType ?? "Unknown"}</p>
 							</div>
 							<div>
-								<p className="text-xs text-muted-foreground">Component</p>
+								<p className="text-muted-foreground text-xs">Component</p>
 								<p>{request.componentType}</p>
 							</div>
 							<div>
-								<p className="text-xs text-muted-foreground">Units requested</p>
+								<p className="text-muted-foreground text-xs">Units requested</p>
 								<p>{request.unitsRequested}</p>
 							</div>
 							<div>
-								<p className="text-xs text-muted-foreground">Urgency</p>
+								<p className="text-muted-foreground text-xs">Urgency</p>
 								<p className="capitalize">{request.urgency}</p>
 							</div>
 						</div>
 						{request.clinicalIndication ? (
-							<p className="mt-3 text-xs text-muted-foreground">
+							<p className="text-muted-foreground mt-3 text-xs">
 								Indication: {request.clinicalIndication}
 							</p>
 						) : null}
@@ -192,11 +194,14 @@ function BloodBankActionModal({ request, action, children }: BloodBankActionModa
 
 					<div className="grid gap-4 sm:grid-cols-2">
 						<div>
-							<Label className="mb-2 text-xs text-muted-foreground">Compatibility result</Label>
-							<Input value={compatibilityResult === "compatible" ? "Compatible" : "Incompatible"} readOnly />
+							<Label className="text-muted-foreground mb-2 text-xs">Compatibility result</Label>
+							<Input
+								value={compatibilityResult === "compatible" ? "Compatible" : "Incompatible"}
+								readOnly
+							/>
 						</div>
 						<div>
-							<Label className="mb-2 text-xs text-muted-foreground">
+							<Label className="text-muted-foreground mb-2 text-xs">
 								{action === "approve" ? "Release priority" : "Rejection reason"}
 							</Label>
 							<Input value={resolutionLabels[resolution]} readOnly />
@@ -204,26 +209,22 @@ function BloodBankActionModal({ request, action, children }: BloodBankActionModa
 					</div>
 
 					<div>
-						<Label className="mb-2 text-xs text-muted-foreground">Assigned unit barcodes</Label>
+						<Label className="text-muted-foreground mb-2 text-xs">Assigned unit barcodes</Label>
 						<Input value={unitBarcodes || "No units assigned"} readOnly />
 					</div>
 
 					<div className="pb-4">
-						<Label className="mb-2 text-xs text-muted-foreground">
+						<Label className="text-muted-foreground mb-2 text-xs">
 							{action === "approve" ? "Cross-match notes" : "Rejection notes"}
 						</Label>
-						<Textarea
-							value={notes}
-							readOnly
-							className="min-h-24"
-						/>
+						<Textarea value={notes} readOnly className="min-h-24" />
 					</div>
 				</div>
 
-				<DialogFooter className="px-6 py-4 -mb-2 pt-2 border-t bg-background flex-shrink-0">
+				<DialogFooter className="bg-background -mb-2 flex-shrink-0 border-t px-6 py-4 pt-2">
 					<DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
 					<Button
-						disabled={approveCrossMatch.isPending}
+						disabled={approveCrossMatch.isPending || actionDisabled}
 						onClick={handleConfirm}
 						className={
 							action === "reject"
@@ -331,16 +332,27 @@ export function BloodBankDashboard() {
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 
 	const pendingQuery = useCrossMatchListQuery({ facilityId, status: "pending", limit: 50 })
-	const crossMatchedQuery = useCrossMatchListQuery({ facilityId, status: "cross_matched", limit: 50 })
+	const crossMatchedQuery = useCrossMatchListQuery({
+		facilityId,
+		status: "cross_matched",
+		limit: 50,
+	})
 	const approvedQuery = useCrossMatchListQuery({ facilityId, status: "approved", limit: 50 })
+	const cancelledQuery = useCrossMatchListQuery({ facilityId, status: "cancelled", limit: 50 })
 
 	const queryRequests = useMemo(
 		() => [
 			...(pendingQuery.data?.data ?? []),
 			...(crossMatchedQuery.data?.data ?? []),
 			...(approvedQuery.data?.data ?? []),
+			...(cancelledQuery.data?.data ?? []),
 		],
-		[pendingQuery.data?.data, crossMatchedQuery.data?.data, approvedQuery.data?.data],
+		[
+			pendingQuery.data?.data,
+			crossMatchedQuery.data?.data,
+			approvedQuery.data?.data,
+			cancelledQuery.data?.data,
+		]
 	)
 
 	// Use mock requests during development when API returns none
@@ -361,7 +373,10 @@ export function BloodBankDashboard() {
 		)
 	}).length
 
-	const totalUnits = requests.reduce((acc, req) => acc + (req.bloodUnits?.length ?? req.unitsRequested), 0)
+	const totalUnits = requests.reduce(
+		(acc, req) => acc + (req.bloodUnits?.length ?? req.unitsRequested),
+		0
+	)
 	const oNegStock = requests
 		.flatMap(req => req.bloodUnits ?? [])
 		.filter(unit => unit.bloodType === "O-" && unit.status === "available").length
@@ -380,81 +395,114 @@ export function BloodBankDashboard() {
 			<div className="flex items-start justify-between gap-3">
 				<div>
 					<h1 className="text-2xl font-semibold">Blood Bank</h1>
-					<p className="text-sm text-muted-foreground">Digital cross-match approval and live product inventory</p>
+					<p className="text-muted-foreground text-sm">
+						Digital cross-match approval and live product inventory
+					</p>
 				</div>
-				<Button variant="outline" size="sm">Stock report</Button>
+				<Button variant="outline" size="sm">
+					Stock report
+				</Button>
 			</div>
 
 			<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
 				<Card>
-					<CardHeader className="pb-2"><CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Pending Approvals</CardTitle></CardHeader>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-muted-foreground text-xs tracking-wide uppercase">
+							Pending Approvals
+						</CardTitle>
+					</CardHeader>
 					<CardContent className="flex items-end justify-between">
 						<p className="text-3xl font-semibold">{pendingApprovals}</p>
-						<ShieldAlert className="size-4 text-muted-foreground" />
+						<ShieldAlert className="text-muted-foreground size-4" />
 					</CardContent>
 				</Card>
 				<Card>
-					<CardHeader className="pb-2"><CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Issued Today</CardTitle></CardHeader>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-muted-foreground text-xs tracking-wide uppercase">
+							Issued Today
+						</CardTitle>
+					</CardHeader>
 					<CardContent className="flex items-end justify-between">
 						<p className="text-3xl font-semibold text-blue-600">{issuedToday}</p>
 						<Droplets className="size-4 text-blue-500" />
 					</CardContent>
 				</Card>
 				<Card>
-					<CardHeader className="pb-2"><CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">O- Stock</CardTitle></CardHeader>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-muted-foreground text-xs tracking-wide uppercase">
+							O- Stock
+						</CardTitle>
+					</CardHeader>
 					<CardContent className="space-y-1">
 						<p className="text-3xl font-semibold text-rose-600">{oNegStock}</p>
-						<p className="text-xs text-muted-foreground">Threshold: 6</p>
+						<p className="text-muted-foreground text-xs">Threshold: 6</p>
 					</CardContent>
 				</Card>
 				<Card>
-					<CardHeader className="pb-2"><CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Total Units</CardTitle></CardHeader>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-muted-foreground text-xs tracking-wide uppercase">
+							Total Units
+						</CardTitle>
+					</CardHeader>
 					<CardContent className="flex items-end justify-between">
 						<p className="text-3xl font-semibold">{totalUnits}</p>
-						<Package className="size-4 text-muted-foreground" />
+						<Package className="text-muted-foreground size-4" />
 					</CardContent>
 				</Card>
 			</div>
 
 			<div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
 				<Card>
-					<CardHeader className="pb-2"><CardTitle className="text-base">Cross-match requests</CardTitle></CardHeader>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-base">Cross-match requests</CardTitle>
+					</CardHeader>
 					<CardContent className="space-y-3">
-						{requests.slice(0, 6).map(req => (
-							<div key={req.id} className="rounded-md border p-3">
-								<div className="flex items-start justify-between gap-3">
-									<div>
-										<p className="mb-1">{requestStatusBadge(req.status)}</p>
-										<p className="font-medium">{req.patientName}</p>
-										<p className="text-xs text-muted-foreground">
-											MRN {req.patientId.slice(0, 8).toUpperCase()} · {req.clinicalIndication ?? "Cross-match requested"}
-										</p>
+						{requests.slice(0, 6).map(req => {
+							const actionsDisabled = !canResolveCrossMatch(req.status)
+
+							return (
+								<div key={req.id} className="rounded-md border p-3">
+									<div className="flex items-start justify-between gap-3">
+										<div>
+											<p className="mb-1">{requestStatusBadge(req.status)}</p>
+											<p className="font-medium">{req.patientName}</p>
+											<p className="text-muted-foreground text-xs">
+												MRN {req.patientId.slice(0, 8).toUpperCase()} ·{" "}
+												{req.clinicalIndication ?? "Cross-match requested"}
+											</p>
+										</div>
+										<div className="text-right">
+											<p className="text-muted-foreground text-xs uppercase">{req.componentType}</p>
+											<p className="text-2xl font-semibold text-blue-700">{req.bloodType ?? "—"}</p>
+										</div>
 									</div>
-									<div className="text-right">
-										<p className="text-xs uppercase text-muted-foreground">{req.componentType}</p>
-										<p className="text-2xl font-semibold text-blue-700">{req.bloodType ?? "—"}</p>
+									<div className="mt-3 flex flex-wrap gap-2">
+										<BloodBankActionModal request={req} action="approve">
+											<Button
+												size="sm"
+												disabled={actionsDisabled}
+												className="bg-emerald-600 hover:bg-emerald-700"
+											>
+												<CheckCircle2 className="mr-1 size-3.5" />
+												Approve & cross-match
+											</Button>
+										</BloodBankActionModal>
+										<BloodBankActionModal request={req} action="reject">
+											<Button size="sm" variant="outline" disabled={actionsDisabled}>
+												Reject
+											</Button>
+										</BloodBankActionModal>
 									</div>
 								</div>
-								<div className="mt-3 flex flex-wrap gap-2">
-									<BloodBankActionModal request={req} action="approve">
-										<Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
-											<CheckCircle2 className="mr-1 size-3.5" />
-											Approve & cross-match
-										</Button>
-									</BloodBankActionModal>
-									<BloodBankActionModal request={req} action="reject">
-										<Button size="sm" variant="outline">
-											Reject
-										</Button>
-									</BloodBankActionModal>
-								</div>
-							</div>
-						))}
+							)
+						})}
 					</CardContent>
 				</Card>
 
 				<Card>
-					<CardHeader className="pb-2"><CardTitle className="text-base">Product inventory</CardTitle></CardHeader>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-base">Product inventory</CardTitle>
+					</CardHeader>
 					<CardContent className="space-y-4">
 						{inventory.map(item => (
 							<div key={item.type} className="space-y-1">

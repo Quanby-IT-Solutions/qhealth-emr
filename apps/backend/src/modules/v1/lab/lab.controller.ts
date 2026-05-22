@@ -4,7 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { LabService } from "./lab.service"
 
@@ -32,7 +32,10 @@ export class LabController {
 		})
 	}
 
-	@RequirePermission("laboratory", "create")
+	@RequireAnyPermissions([
+		{ module: "laboratory", action: "create" },
+		{ module: "laboratory", action: "view" },
+	])
 	@Implement(v1.lab.createCrossMatch)
 	async createCrossMatch(@Session() session: UserSession) {
 		return implement(v1.lab.createCrossMatch).handler(async ({ input }) => {

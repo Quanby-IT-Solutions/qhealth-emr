@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type FormEvent } from "react"
 import { CheckCircle, Droplets, XCircle } from "lucide-react"
+import { toast } from "sonner"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -15,14 +16,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/core/components/ui/select"
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/core/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
@@ -106,6 +99,14 @@ function compatibilityIcon(result: CrossMatchRequest["compatibilityResult"]) {
 	}
 }
 
+function formatDonorIds(units: CrossMatchRequest["bloodUnits"]) {
+	return [
+		...new Set(
+			units.map(unit => unit.donorId).filter((donorId): donorId is string => Boolean(donorId))
+		),
+	].join(", ")
+}
+
 // ============================================================================
 // New Cross-Match Request Form
 // ============================================================================
@@ -113,11 +114,11 @@ function compatibilityIcon(result: CrossMatchRequest["compatibilityResult"]) {
 function NewCrossMatchForm({
 	facilityId,
 	onSuccess,
-	canCreate,
+	canSubmitRequest,
 }: {
 	facilityId: string
 	onSuccess: () => void
-	canCreate: boolean
+	canSubmitRequest: boolean
 }) {
 	const [patientId, setPatientId] = useState("")
 	const [bloodType, setBloodType] = useState<BloodType | "">("")
@@ -128,8 +129,17 @@ function NewCrossMatchForm({
 
 	const createCrossMatch = useCreateCrossMatchMutation()
 
-	function handleSubmit() {
+	function handleSubmit(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault()
 		if (!patientId.trim() || !componentType || !unitsRequested) return
+		if (!facilityId) {
+			toast.error("Unable to submit until your facility is loaded.")
+			return
+		}
+		if (!canSubmitRequest) {
+			toast.error("You do not have permission to submit cross-match requests.")
+			return
+		}
 		createCrossMatch.mutate(
 			{
 				facilityId,
@@ -148,21 +158,23 @@ function NewCrossMatchForm({
 					setUnitsRequested("1")
 					setUrgency("routine")
 					setClinicalIndication("")
+					toast.success("Cross-match request saved.")
 					onSuccess()
+				},
+				onError: error => {
+					toast.error(error.message || "Unable to save cross-match request.")
 				},
 			}
 		)
 	}
 
-	const canSubmit =
-		canCreate &&
-		patientId.trim() &&
-		componentType &&
-		Number(unitsRequested) > 0 &&
-		!createCrossMatch.isPending
+	const requiredFieldsFilled = Boolean(
+		patientId.trim() && componentType && Number(unitsRequested) > 0 && urgency
+	)
+	const canSubmit = requiredFieldsFilled && !createCrossMatch.isPending
 
 	return (
-		<div className="grid gap-4">
+		<form onSubmit={handleSubmit} className="grid gap-4">
 			<div className="grid grid-cols-2 gap-4">
 				<div className="space-y-2">
 					<Label>
@@ -230,7 +242,10 @@ function NewCrossMatchForm({
 
 			<div className="space-y-2">
 				<Label>Urgency</Label>
-				<Select value={urgency} onValueChange={v => setUrgency(v as CrossMatchRequest["urgency"])}>
+				<Select
+					value={urgency}
+					onValueChange={v => setUrgency(v as CrossMatchRequest["urgency"])}
+				>
 					<SelectTrigger>
 						<SelectValue />
 					</SelectTrigger>
@@ -251,18 +266,18 @@ function NewCrossMatchForm({
 				/>
 			</div>
 
-			<Button disabled={!canSubmit} onClick={handleSubmit} className="w-full">
+			<Button type="submit" disabled={!canSubmit} className="w-full">
 				{createCrossMatch.isPending ? "Submitting…" : "Submit Cross-Match Request"}
 			</Button>
-		</div>
+		</form>
 	)
 }
 
 // ============================================================================
-// Cross-Match List Table
+// Cross-Match Request Cards
 // ============================================================================
 
-function CrossMatchTable({
+function CrossMatchRequestCards({
 	requests,
 	isLoading,
 	onApprove,
@@ -287,54 +302,77 @@ function CrossMatchTable({
 	}
 
 	return (
-		<Table>
-			<TableHeader>
-				<TableRow>
-					<TableHead>Patient</TableHead>
-					<TableHead>Component</TableHead>
-					<TableHead>Units</TableHead>
-					<TableHead>Urgency</TableHead>
-					<TableHead>Requested</TableHead>
-					<TableHead>Compatibility</TableHead>
-					<TableHead>Status</TableHead>
-					<TableHead />
-				</TableRow>
-			</TableHeader>
-			<TableBody>
-				{requests.map(req => (
-					<TableRow key={req.id}>
-						<TableCell>
-							<div>
-								<p className="font-medium">{req.patientName}</p>
-								{req.bloodType && (
-									<p className="text-muted-foreground text-xs">Blood type: {req.bloodType}</p>
-								)}
+		<div className="grid gap-3">
+			{requests.map(req => {
+				const donorIds = formatDonorIds(req.bloodUnits)
+				const unitBarcodes = req.bloodUnits.map(unit => unit.unitBarcode).join(", ")
+
+				return (
+					<div key={req.id} className="rounded-md border bg-background p-4">
+						<div className="flex flex-wrap items-start justify-between gap-3">
+							<div className="min-w-0 space-y-1">
+								<div className="flex flex-wrap items-center gap-2">
+									<p className="font-medium">{req.patientName}</p>
+									{statusBadge(req.status)}
+									{urgencyBadge(req.urgency)}
+								</div>
+								<p className="text-muted-foreground text-xs">
+									{req.patientMrn ? `MRN ${req.patientMrn}` : `Patient ID ${req.patientId}`}
+								</p>
 							</div>
-						</TableCell>
-						<TableCell>{req.componentType}</TableCell>
-						<TableCell>{req.unitsRequested}</TableCell>
-						<TableCell>{urgencyBadge(req.urgency)}</TableCell>
-						<TableCell>{formatDateTime(req.requestedAt)}</TableCell>
-						<TableCell>
-							<div className="flex items-center gap-1">
-								{compatibilityIcon(req.compatibilityResult)}
-								{req.compatibilityResult && (
-									<span className="text-xs capitalize">{req.compatibilityResult}</span>
-								)}
-							</div>
-						</TableCell>
-						<TableCell>{statusBadge(req.status)}</TableCell>
-						<TableCell>
-							{["pending", "cross_matched"].includes(req.status) && canApprove && (
+
+							{/* {["pending", "cross_matched"].includes(req.status) && canApprove && (
 								<Button variant="outline" size="sm" onClick={() => onApprove(req)}>
 									Approve
 								</Button>
-							)}
-						</TableCell>
-					</TableRow>
-				))}
-			</TableBody>
-		</Table>
+							)} */}
+						</div>
+
+						<div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+							<div>
+								<p className="text-muted-foreground text-xs">Blood Type</p>
+								<p className="font-medium">{req.bloodType ?? "Unknown"}</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground text-xs">Component</p>
+								<p className="font-medium">{req.componentType}</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground text-xs">Units Requested</p>
+								<p className="font-medium">{req.unitsRequested}</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground text-xs">Requested</p>
+								<p className="font-medium">{formatDateTime(req.requestedAt)}</p>
+							</div>
+						</div>
+
+						<div className="mt-4 grid gap-3 sm:grid-cols-2">
+							<div>
+								<p className="text-muted-foreground text-xs">Compatibility</p>
+								<div className="flex items-center gap-1 font-medium capitalize">
+									{compatibilityIcon(req.compatibilityResult)}
+									<span>{req.compatibilityResult ?? "Pending"}</span>
+								</div>
+							</div>
+							<div>
+								<p className="text-muted-foreground text-xs">Donor / Units</p>
+								<p className="font-medium">{donorIds || "Not assigned"}</p>
+								{unitBarcodes && (
+									<p className="text-muted-foreground text-xs">Units: {unitBarcodes}</p>
+								)}
+							</div>
+						</div>
+
+						{req.clinicalIndication && (
+							<p className="text-muted-foreground mt-4 text-sm">
+								Indication: {req.clinicalIndication}
+							</p>
+						)}
+					</div>
+				)
+			})}
+		</div>
 	)
 }
 
@@ -362,16 +400,20 @@ function ApproveDialog({
 
 	function handleApprove() {
 		if (!compatibilityResult || !request) return
+		const parsedBloodUnitIds = bloodUnitIds
+			.split(/[\n,]/)
+			.map(id => id.trim())
+			.filter(Boolean)
+		const assignedBloodUnitIds = request.bloodUnits.map(unit => unit.id)
 		approveMutation.mutate(
 			{
 				id: request.id,
 				compatibilityResult,
 				bloodUnitIds:
 					compatibilityResult === "compatible"
-						? bloodUnitIds
-								.split(/[\n,]/)
-								.map(id => id.trim())
-								.filter(Boolean)
+						? parsedBloodUnitIds.length > 0
+							? parsedBloodUnitIds
+							: assignedBloodUnitIds
 						: [],
 				rejectionReason: rejectionReason.trim() || undefined,
 			},
@@ -390,9 +432,12 @@ function ApproveDialog({
 		.split(/[\n,]/)
 		.map(id => id.trim())
 		.filter(Boolean)
+	const assignedBloodUnitIds = request.bloodUnits.map(unit => unit.id)
 	const canConfirm =
 		compatibilityResult === "incompatible" ||
-		(compatibilityResult === "compatible" && parsedBloodUnitIds.length >= request.unitsRequested)
+		(compatibilityResult === "compatible" &&
+			(parsedBloodUnitIds.length >= request.unitsRequested ||
+				assignedBloodUnitIds.length >= request.unitsRequested))
 
 	return (
 		<div
@@ -443,7 +488,8 @@ function ApproveDialog({
 							/>
 							<p className="text-muted-foreground text-xs">
 								Enter at least {request.unitsRequested} compatible available unit ID
-								{request.unitsRequested === 1 ? "" : "s"}.
+								{request.unitsRequested === 1 ? "" : "s"}, or leave blank to use assigned donor
+								units.
 							</p>
 						</div>
 					)}
@@ -487,7 +533,7 @@ export function CrossMatchForm() {
 	const permSet = new Set(
 		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
 	)
-	const canCreate = permSet.has("laboratory:create")
+	const canSubmitRequest = permSet.has("laboratory:create") || permSet.has("laboratory:view")
 	const canApprove = permSet.has("laboratory:edit")
 
 	const [approveTarget, setApproveTarget] = useState<CrossMatchRequest | null>(null)
@@ -535,9 +581,10 @@ export function CrossMatchForm() {
 					<CardContent>
 						<NewCrossMatchForm
 							facilityId={facilityId}
-							canCreate={canCreate}
+							canSubmitRequest={canSubmitRequest}
 							onSuccess={() => {
 								pendingQuery.refetch()
+								activeQuery.refetch()
 							}}
 						/>
 					</CardContent>
@@ -571,7 +618,7 @@ export function CrossMatchForm() {
 							</TabsList>
 
 							<TabsContent value="pending">
-								<CrossMatchTable
+								<CrossMatchRequestCards
 									requests={pendingQuery.data?.data ?? []}
 									isLoading={pendingQuery.isLoading}
 									onApprove={handleApprove}
@@ -579,7 +626,7 @@ export function CrossMatchForm() {
 								/>
 							</TabsContent>
 							<TabsContent value="cross_matched">
-								<CrossMatchTable
+								<CrossMatchRequestCards
 									requests={activeQuery.data?.data ?? []}
 									isLoading={activeQuery.isLoading}
 									onApprove={handleApprove}
@@ -587,7 +634,7 @@ export function CrossMatchForm() {
 								/>
 							</TabsContent>
 							<TabsContent value="approved">
-								<CrossMatchTable
+								<CrossMatchRequestCards
 									requests={approvedQuery.data?.data ?? []}
 									isLoading={approvedQuery.isLoading}
 									onApprove={handleApprove}

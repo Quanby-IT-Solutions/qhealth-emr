@@ -514,12 +514,25 @@ export function useImagingOrderDetailQuery(id: string) {
 }
 
 type CreateImagingOrderData = V1Inputs["orders"]["createImagingOrder"]
+export type UpdateImagingOrderData = V1Inputs["orders"]["updateImagingOrder"]
 
 export function useCreateImagingOrderMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation(
 		orpc.orders.createImagingOrder.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
+			},
+		})
+	)
+}
+
+export function useUpdateImagingOrderMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.orders.updateImagingOrder.mutationOptions({
 			onSuccess: () => {
 				queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
 			},

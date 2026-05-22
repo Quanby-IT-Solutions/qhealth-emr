@@ -48,8 +48,9 @@ export function AppSidebar() {
 	const { data: profile } = useMyProfile()
 
 	const permissions = profile?.activeRole?.permissions ?? []
-	const primaryItems = filterNavItems(PRIMARY_NAV_ITEMS, permissions)
-	const allSecondaryItems = filterNavItems(SECONDARY_NAV_ITEMS, permissions)
+	const activeRoleName = profile?.activeRole?.name
+	const primaryItems = filterNavItems(PRIMARY_NAV_ITEMS, permissions, activeRoleName)
+	const allSecondaryItems = filterNavItems(SECONDARY_NAV_ITEMS, permissions, activeRoleName)
 	const secondaryItems = allSecondaryItems.filter(item => !item.adminGroup)
 
 	const adminGroupMap = new Map(

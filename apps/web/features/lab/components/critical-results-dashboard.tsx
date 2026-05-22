@@ -132,6 +132,10 @@ type CriticalActionModalProps = {
 	children: ReactElement
 }
 
+type FlagCriticalModalProps = {
+	onCriticalItemAdded: (item: CriticalQueueItem) => void
+}
+
 const actionModalCopy = {
 	"inbox": {
 		title: "Send inbox message",
@@ -186,13 +190,13 @@ function CriticalActionModal({ item, action, children }: CriticalActionModalProp
 	return (
 		<Dialog>
 			<DialogTrigger render={children} />
-			<DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+			<DialogContent className="flex max-h-[90vh] max-w-lg flex-col overflow-hidden">
 				<DialogHeader className="flex-shrink-0">
 					<DialogTitle>{copy.title}</DialogTitle>
 					<DialogDescription>{copy.description}</DialogDescription>
 				</DialogHeader>
 
-				<div className="space-y-4 overflow-y-auto flex-1 -mr-4 pr-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+				<div className="-mr-4 flex-1 space-y-4 overflow-y-auto pr-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 					<div className="bg-muted/30 rounded-md border p-3 text-sm">
 						<div className="flex items-start justify-between gap-3">
 							<div>
@@ -292,7 +296,7 @@ function CriticalActionModal({ item, action, children }: CriticalActionModalProp
 	)
 }
 
-function FlagCriticalModal() {
+function FlagCriticalModal({ onCriticalItemAdded }: FlagCriticalModalProps) {
 	const [open, setOpen] = useState(false)
 	const [confirmOpen, setConfirmOpen] = useState(false)
 	const { data: profile } = useMyProfile()
@@ -304,7 +308,10 @@ function FlagCriticalModal() {
 		limit: 100,
 	})
 
-	const labOrders = allLabOrdersQuery.data?.data ?? []
+	const labOrders = useMemo(
+		() => allLabOrdersQuery.data?.data ?? [],
+		[allLabOrdersQuery.data?.data]
+	)
 
 	// Get unique patients from lab orders
 	const patients = useMemo(() => {
@@ -353,7 +360,9 @@ function FlagCriticalModal() {
 	const [errors, setErrors] = useState<Record<string, string>>({})
 
 	// Handle patient selection
-	const handlePatientSelect = (patientId: string) => {
+	const handlePatientSelect = (patientId: string | null) => {
+		if (!patientId) return
+
 		const selectedOrder = labOrders.find(order => order.patientId === patientId)
 		if (selectedOrder) {
 			setForm(prev => ({
@@ -361,7 +370,9 @@ function FlagCriticalModal() {
 				selectedPatientId: patientId,
 				patientName: selectedOrder.patientName ?? "",
 				mrn: selectedOrder.patientId?.slice(0, 10) ?? "",
-				ward: selectedOrder.encounterId ? `Ward-${selectedOrder.encounterId.slice(0, 3).toUpperCase()}` : "",
+				ward: selectedOrder.encounterId
+					? `Ward-${selectedOrder.encounterId.slice(0, 3).toUpperCase()}`
+					: "",
 				accession: `L-${selectedOrder.id.slice(0, 4).toUpperCase()}-${selectedOrder.id.slice(4, 8).toUpperCase()}`,
 				physician: selectedOrder.orderingStaffName ?? "",
 			}))
@@ -403,13 +414,7 @@ function FlagCriticalModal() {
 			elapsedMinutes: 0,
 		}
 
-		// Store in localStorage to persist across renders
-		const existingItems = JSON.parse(localStorage.getItem("manualCriticalItems") || "[]")
-		existingItems.push(newCriticalItem)
-		localStorage.setItem("manualCriticalItems", JSON.stringify(existingItems))
-
-		// Trigger a custom event to notify the parent component
-		window.dispatchEvent(new CustomEvent("criticalItemAdded", { detail: newCriticalItem }))
+		onCriticalItemAdded(newCriticalItem)
 
 		// Close modals and reset form
 		setConfirmOpen(false)
@@ -442,7 +447,7 @@ function FlagCriticalModal() {
 				</Button>
 			</DialogTrigger>
 
-			<DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+			<DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden">
 				<DialogHeader className="flex-shrink-0">
 					<DialogTitle>Flag new critical result</DialogTitle>
 					<DialogDescription>
@@ -450,7 +455,7 @@ function FlagCriticalModal() {
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="overflow-y-auto flex-1 -mr-4 pr-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+				<div className="-mr-4 flex-1 overflow-y-auto pr-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 					<div className="space-y-4">
 						<div className="grid grid-cols-2 gap-4">
 							<div>
@@ -458,11 +463,12 @@ function FlagCriticalModal() {
 									Patient name <span className="text-rose-600">*</span>
 								</label>
 								<Select value={form.selectedPatientId} onValueChange={handlePatientSelect}>
-									<SelectTrigger className={errors.selectedPatientId ? "border-rose-500" : " w-full"}>
+									<SelectTrigger
+										className={errors.selectedPatientId ? "border-rose-500" : "w-full"}
+									>
 										<SelectValue>
-										{patients.find(
-											patient => patient.patientId === form.selectedPatientId
-										)?.patientName || "Select patient"}
+											{patients.find(patient => patient.patientId === form.selectedPatientId)
+												?.patientName || "Select patient"}
 										</SelectValue>
 									</SelectTrigger>
 									<SelectContent className="w-auto">
@@ -474,7 +480,7 @@ function FlagCriticalModal() {
 									</SelectContent>
 								</Select>
 								{errors.selectedPatientId && (
-									<p className="text-rose-600 text-xs mt-1">{errors.selectedPatientId}</p>
+									<p className="mt-1 text-xs text-rose-600">{errors.selectedPatientId}</p>
 								)}
 							</div>
 							<div>
@@ -487,19 +493,14 @@ function FlagCriticalModal() {
 									readOnly
 									className={`bg-muted/50 ${errors.mrn ? "border-rose-500" : ""}`}
 								/>
-								{errors.mrn && <p className="text-rose-600 text-xs mt-1">{errors.mrn}</p>}
+								{errors.mrn && <p className="mt-1 text-xs text-rose-600">{errors.mrn}</p>}
 							</div>
 						</div>
 
 						<div className="grid grid-cols-2 gap-4">
 							<div>
 								<label className="text-muted-foreground text-xs">Ward / location</label>
-								<Input
-									placeholder="ICU-3"
-									value={form.ward}
-									readOnly
-									className="bg-muted/50"
-								/>
+								<Input placeholder="ICU-3" value={form.ward} readOnly className="bg-muted/50" />
 							</div>
 							<div>
 								<label className="text-muted-foreground text-xs">Accession #</label>
@@ -523,7 +524,7 @@ function FlagCriticalModal() {
 									onChange={e => setForm({ ...form, analyte: e.target.value })}
 									className={errors.analyte ? "border-rose-500" : ""}
 								/>
-								{errors.analyte && <p className="text-rose-600 text-xs mt-1">{errors.analyte}</p>}
+								{errors.analyte && <p className="mt-1 text-xs text-rose-600">{errors.analyte}</p>}
 							</div>
 							<div>
 								<label className="text-muted-foreground text-xs">
@@ -535,7 +536,7 @@ function FlagCriticalModal() {
 									onChange={e => setForm({ ...form, value: e.target.value })}
 									className={errors.value ? "border-rose-500" : ""}
 								/>
-								{errors.value && <p className="text-rose-600 text-xs mt-1">{errors.value}</p>}
+								{errors.value && <p className="mt-1 text-xs text-rose-600">{errors.value}</p>}
 							</div>
 							<div>
 								<label className="text-muted-foreground text-xs">
@@ -547,11 +548,19 @@ function FlagCriticalModal() {
 									onChange={e => setForm({ ...form, unit: e.target.value })}
 									className={errors.unit ? "border-rose-500" : ""}
 								/>
-								{errors.unit && <p className="text-rose-600 text-xs mt-1">{errors.unit}</p>}
+								{errors.unit && <p className="mt-1 text-xs text-rose-600">{errors.unit}</p>}
 							</div>
 							<div>
 								<label className="text-muted-foreground text-xs">Severity</label>
-								<Select value={form.severity} onValueChange={v => setForm(prev => ({ ...prev, severity: (v ?? "critical") as FlagForm["severity"] }))}>
+								<Select
+									value={form.severity}
+									onValueChange={v =>
+										setForm(prev => ({
+											...prev,
+											severity: (v ?? "critical") as FlagForm["severity"],
+										}))
+									}
+								>
 									<SelectTrigger className="w-full">
 										<SelectValue />
 									</SelectTrigger>
@@ -595,12 +604,17 @@ function FlagCriticalModal() {
 									className={`bg-muted/50 ${errors.physician ? "border-rose-500" : ""}`}
 								/>
 								{errors.physician && (
-									<p className="text-rose-600 text-xs mt-1">{errors.physician}</p>
+									<p className="mt-1 text-xs text-rose-600">{errors.physician}</p>
 								)}
 							</div>
 							<div>
 								<label className="text-muted-foreground text-xs">Initial channel</label>
-								<Select value={form.channel} onValueChange={v => setForm(prev => ({ ...prev, channel: (v ?? "inbox") as FlagForm["channel"] }))}>
+								<Select
+									value={form.channel}
+									onValueChange={v =>
+										setForm(prev => ({ ...prev, channel: (v ?? "inbox") as FlagForm["channel"] }))
+									}
+								>
 									<SelectTrigger className="w-full">
 										<SelectValue />
 									</SelectTrigger>
@@ -648,7 +662,7 @@ function FlagCriticalModal() {
 						</DialogDescription>
 					</DialogHeader>
 
-					<div className="bg-muted/30 rounded-md border p-3 text-sm space-y-2">
+					<div className="bg-muted/30 space-y-2 rounded-md border p-3 text-sm">
 						<div className="flex justify-between">
 							<span className="text-muted-foreground">Patient:</span>
 							<span className="font-medium">{form.patientName}</span>
@@ -663,11 +677,15 @@ function FlagCriticalModal() {
 						</div>
 						<div className="flex justify-between">
 							<span className="text-muted-foreground">Value:</span>
-							<span className="font-medium text-rose-700">{form.value} {form.unit}</span>
+							<span className="font-medium text-rose-700">
+								{form.value} {form.unit}
+							</span>
 						</div>
 						<div className="flex justify-between">
 							<span className="text-muted-foreground">Reference:</span>
-							<span className="font-medium">{form.refLow && form.refHigh ? `${form.refLow}-${form.refHigh}` : "N/A"}</span>
+							<span className="font-medium">
+								{form.refLow && form.refHigh ? `${form.refLow}-${form.refHigh}` : "N/A"}
+							</span>
 						</div>
 						<div className="flex justify-between">
 							<span className="text-muted-foreground">Physician:</span>
@@ -680,7 +698,9 @@ function FlagCriticalModal() {
 					</div>
 
 					<DialogFooter>
-						<Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+						<Button variant="ghost" onClick={() => setConfirmOpen(false)}>
+							Cancel
+						</Button>
 						<Button onClick={handleConfirm} className="bg-rose-600 text-white hover:bg-rose-700">
 							<Send className="mr-2 size-4" />
 							Confirm & Notify
@@ -695,6 +715,7 @@ function FlagCriticalModal() {
 export function CriticalResultsDashboard() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+	const [manualCriticalItems, setManualCriticalItems] = useState<CriticalQueueItem[]>([])
 
 	const completedQuery = useLabDashboardQuery({
 		facilityId,
@@ -720,7 +741,7 @@ export function CriticalResultsDashboard() {
 
 		candidates = candidates.filter(order => order.hasCriticalValues).slice(0, 6)
 
-		return candidates.map((order: LabOrder, index: number) => {
+		const labCriticalItems = candidates.map((order: LabOrder, index: number) => {
 			const queueStatus: QueueStatus =
 				index % 3 === 0 ? "pending_ack" : index % 3 === 1 ? "sms_escalated" : "acknowledged"
 			const minutes = index === 0 ? 2 : index === 1 ? 8 : 14 + index
@@ -738,7 +759,16 @@ export function CriticalResultsDashboard() {
 				elapsedMinutes: minutes,
 			}
 		})
-	}, [completedQuery.data?.data, inProgressQuery.data?.data])
+
+		return [...manualCriticalItems, ...labCriticalItems]
+	}, [completedQuery.data?.data, inProgressQuery.data?.data, manualCriticalItems])
+
+	const handleCriticalItemAdded = (item: CriticalQueueItem) => {
+		setManualCriticalItems(currentItems => [
+			item,
+			...currentItems.filter(currentItem => currentItem.id !== item.id),
+		])
+	}
 
 	const activeCriticals = criticalQueue.length
 	const pendingAck = criticalQueue.filter(item => item.status !== "acknowledged").length
@@ -763,7 +793,7 @@ export function CriticalResultsDashboard() {
 						Life-threatening values routed directly to the ordering physician
 					</p>
 				</div>
-				<FlagCriticalModal />
+				<FlagCriticalModal onCriticalItemAdded={handleCriticalItemAdded} />
 			</div>
 
 			<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

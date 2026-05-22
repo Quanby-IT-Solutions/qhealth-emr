@@ -4,7 +4,7 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { OrdersService } from "./orders.service"
 
@@ -108,7 +108,10 @@ export class OrdersController {
 	// Imaging Orders
 	// ========================================================================
 
-	@RequirePermission("orders", "view")
+	@RequireAnyPermissions([
+		{ module: "orders", action: "view" },
+		{ module: "radiology", action: "view" },
+	])
 	@Implement(v1.orders.listImagingOrders)
 	async listImagingOrders() {
 		return implement(v1.orders.listImagingOrders).handler(async ({ input }) => {
@@ -116,7 +119,10 @@ export class OrdersController {
 		})
 	}
 
-	@RequirePermission("orders", "view")
+	@RequireAnyPermissions([
+		{ module: "orders", action: "view" },
+		{ module: "radiology", action: "view" },
+	])
 	@Implement(v1.orders.getImagingOrder)
 	async getImagingOrder() {
 		return implement(v1.orders.getImagingOrder).handler(async ({ input }) => {
@@ -132,7 +138,10 @@ export class OrdersController {
 		})
 	}
 
-	@RequirePermission("orders", "edit")
+	@RequireAnyPermissions([
+		{ module: "orders", action: "edit" },
+		{ module: "radiology", action: "edit" },
+	])
 	@Implement(v1.orders.updateImagingOrder)
 	async updateImagingOrder() {
 		return implement(v1.orders.updateImagingOrder).handler(async ({ input }) => {
