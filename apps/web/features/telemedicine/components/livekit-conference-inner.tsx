@@ -16,6 +16,7 @@ import {
 	LiveKitRoom as LiveKitRoomProvider,
 	MediaDeviceSelect,
 	RoomAudioRenderer,
+	useChat,
 	useConnectionQualityIndicator,
 	useConnectionState,
 	useLocalParticipant,
@@ -23,6 +24,7 @@ import {
 	useRoomContext,
 	useTracks,
 	VideoTrack,
+	type ReceivedChatMessage,
 	type TrackReferenceOrPlaceholder,
 } from "@livekit/components-react"
 import { AnimatePresence, motion, useAnimationControls, type PanInfo } from "framer-motion"
@@ -34,12 +36,15 @@ import {
 	AlertTriangle,
 	Check,
 	Copy,
+	MessageSquare,
 	Mic,
 	MicOff,
 	Monitor,
 	MonitorOff,
+	Paperclip,
 	PhoneOff,
 	Repeat2,
+	Send,
 	Settings2,
 	Video,
 	VideoOff,
@@ -102,6 +107,14 @@ function parseRoleFromMetadata(metadata?: string): string | null {
 	}
 }
 
+function detectParticipantRole(participant: Participant): "clinician" | "patient" | null {
+	const fromMeta = parseRoleFromMetadata(participant.metadata)
+	if (fromMeta === "clinician" || fromMeta === "patient") return fromMeta
+	if (participant.identity.startsWith("clinician:")) return "clinician"
+	if (participant.identity.startsWith("patient:")) return "patient"
+	return null
+}
+
 function formatRoleLabel(role: string | null): string | null {
 	if (!role) return null
 	const map: Record<string, string> = {
@@ -140,21 +153,56 @@ function formatElapsed(seconds: number): string {
 	return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`
 }
 
-function useConsultationTimer() {
-	const startedAtRef = useRef<number | null>(null)
-	const [elapsedSeconds, setElapsedSeconds] = useState(0)
+type ConsultationTimerState =
+	| { state: "connecting"; elapsed: null }
+	| { state: "waiting-clinician"; elapsed: null }
+	| { state: "waiting-patient"; elapsed: null }
+	| { state: "active"; elapsed: string }
+
+function useConsultationTimer(): ConsultationTimerState {
+	const participants = useParticipants()
+	const anchorRef = useRef<number | null>(null)
+	const [, forceTick] = useState(0)
 
 	useEffect(() => {
-		startedAtRef.current = Date.now()
-		const interval = window.setInterval(() => {
-			if (startedAtRef.current === null) return
-			setElapsedSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000))
-		}, 1000)
-
+		const interval = window.setInterval(() => forceTick(value => value + 1), 1000)
 		return () => window.clearInterval(interval)
 	}, [])
 
-	return formatElapsed(elapsedSeconds)
+	let clinicianJoin: number | null = null
+	let patientJoin: number | null = null
+	for (const participant of participants) {
+		const role = detectParticipantRole(participant)
+		const joinedAt = participant.joinedAt
+		if (!role || !joinedAt) continue
+		const time = joinedAt.getTime()
+		if (role === "clinician" && (clinicianJoin === null || time < clinicianJoin)) {
+			clinicianJoin = time
+		} else if (role === "patient" && (patientJoin === null || time < patientJoin)) {
+			patientJoin = time
+		}
+	}
+
+	useEffect(() => {
+		if (anchorRef.current !== null) return
+		if (clinicianJoin !== null && patientJoin !== null) {
+			anchorRef.current = Math.max(clinicianJoin, patientJoin)
+			forceTick(value => value + 1)
+		}
+	}, [clinicianJoin, patientJoin])
+
+	if (anchorRef.current !== null) {
+		const elapsedSeconds = Math.max(0, Math.floor((Date.now() - anchorRef.current) / 1000))
+		return { state: "active", elapsed: formatElapsed(elapsedSeconds) }
+	}
+
+	if (clinicianJoin !== null && patientJoin === null) {
+		return { state: "waiting-patient", elapsed: null }
+	}
+	if (patientJoin !== null && clinicianJoin === null) {
+		return { state: "waiting-clinician", elapsed: null }
+	}
+	return { state: "connecting", elapsed: null }
 }
 
 function useDockVisibility(timeoutMs = 3000) {
@@ -489,19 +537,45 @@ function findNearestPipCorner(
 // ============================================================================
 
 function ConsultationTimer() {
-	const elapsed = useConsultationTimer()
+	const { state, elapsed } = useConsultationTimer()
+
+	if (state === "connecting") return null
+
+	const isWaiting = state === "waiting-clinician" || state === "waiting-patient"
+	const label =
+		state === "waiting-patient"
+			? "Waiting for patient"
+			: state === "waiting-clinician"
+				? "Waiting for clinician"
+				: elapsed
 
 	return (
 		<div
 			data-testid="consultation-timer"
-			aria-label={`Consultation time ${elapsed}`}
-			className="absolute top-3 left-3 z-30 inline-flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white shadow-sm backdrop-blur-md sm:top-4 sm:left-4"
+			data-state={state}
+			aria-label={
+				state === "active" ? `Consultation time ${elapsed}` : label ?? "Consultation timer"
+			}
+			className={cn(
+				"absolute top-3 left-3 z-30 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-white shadow-sm backdrop-blur-md sm:top-4 sm:left-4",
+				isWaiting ? "bg-amber-600/85" : "bg-black/60"
+			)}
 		>
 			<span className="relative flex size-1.5">
-				<span className="absolute inline-flex size-full animate-ping rounded-full bg-rose-500 opacity-75" />
-				<span className="relative inline-flex size-1.5 rounded-full bg-rose-500" />
+				<span
+					className={cn(
+						"absolute inline-flex size-full animate-ping rounded-full opacity-75",
+						isWaiting ? "bg-amber-300" : "bg-rose-500"
+					)}
+				/>
+				<span
+					className={cn(
+						"relative inline-flex size-1.5 rounded-full",
+						isWaiting ? "bg-amber-300" : "bg-rose-500"
+					)}
+				/>
 			</span>
-			<span className="tabular-nums">{elapsed}</span>
+			<span className="tabular-nums">{label}</span>
 		</div>
 	)
 }
@@ -584,7 +658,19 @@ function DockButton({
 	)
 }
 
-function FloatingControlDock({ visible }: { visible: boolean }) {
+interface FloatingControlDockProps {
+	visible: boolean
+	chatOpen: boolean
+	unreadCount: number
+	onToggleChat: () => void
+}
+
+function FloatingControlDock({
+	visible,
+	chatOpen,
+	unreadCount,
+	onToggleChat,
+}: FloatingControlDockProps) {
 	const room = useRoomContext()
 	const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } =
 		useLocalParticipant()
@@ -800,6 +886,31 @@ function FloatingControlDock({ visible }: { visible: boolean }) {
 							<Monitor className="size-5" />
 						)}
 					</DockButton>
+					<div className="relative">
+						<DockButton
+							label={
+								unreadCount > 0
+									? `Open chat (${unreadCount} unread)`
+									: chatOpen
+										? "Close chat"
+										: "Open chat"
+							}
+							pressed={chatOpen}
+							variant={chatOpen ? "active" : "default"}
+							onClick={onToggleChat}
+						>
+							<MessageSquare className="size-5" />
+						</DockButton>
+						{unreadCount > 0 && (
+							<span
+								aria-hidden="true"
+								data-testid="chat-unread-badge"
+								className="pointer-events-none absolute -top-0.5 -right-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-md ring-2 ring-zinc-900"
+							>
+								{unreadCount > 9 ? "9+" : unreadCount}
+							</span>
+						)}
+					</div>
 					<DockButton
 						label="Settings"
 						pressed={settingsOpen}
@@ -842,6 +953,258 @@ function FloatingControlDock({ visible }: { visible: boolean }) {
 				</AlertDialogContent>
 			</AlertDialog>
 		</>
+	)
+}
+
+// ============================================================================
+// Chat panel
+// ============================================================================
+
+function formatChatTimestamp(timestamp: number): string {
+	try {
+		return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+	} catch {
+		return ""
+	}
+}
+
+function getMessageSenderName(message: ReceivedChatMessage): string {
+	const from = message.from
+	if (!from) return "Unknown"
+	if (from.name && from.name.trim().length > 0) return from.name
+	const role = parseRoleFromMetadata(from.metadata)
+	if (role) return role
+	return from.identity || "Unknown"
+}
+
+interface ChatPanelProps {
+	open: boolean
+	onClose: () => void
+	messages: ReceivedChatMessage[]
+	send: (message: string) => Promise<unknown>
+	isSending: boolean
+}
+
+function ChatPanel({ open, onClose, messages, send, isSending }: ChatPanelProps) {
+	const { localParticipant } = useLocalParticipant()
+	const [draft, setDraft] = useState("")
+	const [sendError, setSendError] = useState<string | null>(null)
+	const messagesEndRef = useRef<HTMLDivElement>(null)
+	const textareaRef = useRef<HTMLTextAreaElement>(null)
+	const localIdentity = localParticipant?.identity
+
+	useEffect(() => {
+		if (!open) return
+		messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+	}, [messages.length, open])
+
+	useEffect(() => {
+		if (open) {
+			const id = window.setTimeout(() => textareaRef.current?.focus(), 120)
+			return () => window.clearTimeout(id)
+		}
+	}, [open])
+
+	useEffect(() => {
+		if (!open) return
+		function handleKey(event: KeyboardEvent) {
+			if (event.key === "Escape") {
+				event.preventDefault()
+				onClose()
+			}
+		}
+		window.addEventListener("keydown", handleKey)
+		return () => window.removeEventListener("keydown", handleKey)
+	}, [open, onClose])
+
+	useEffect(() => {
+		if (!sendError) return
+		const id = window.setTimeout(() => setSendError(null), 5000)
+		return () => window.clearTimeout(id)
+	}, [sendError])
+
+	const handleSend = useCallback(async () => {
+		const trimmed = draft.trim()
+		if (!trimmed || isSending) return
+		setSendError(null)
+		try {
+			await send(trimmed)
+			setDraft("")
+		} catch (error) {
+			setSendError(error instanceof Error ? error.message : "Unable to send message")
+		}
+	}, [draft, isSending, send])
+
+	const handleKeyDown = useCallback(
+		(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+			if (event.key === "Enter" && !event.shiftKey) {
+				event.preventDefault()
+				void handleSend()
+			}
+		},
+		[handleSend]
+	)
+
+	return (
+		<aside
+			aria-label="In-call chat"
+			aria-hidden={!open}
+			data-testid="chat-panel"
+			data-state={open ? "open" : "closed"}
+			className={cn(
+				"bg-card text-card-foreground shrink-0 overflow-hidden shadow-2xl backdrop-blur-xl transition-[width,border-color] duration-300 ease-out",
+				open ? "border-border w-full border-l sm:w-[380px]" : "w-0 border-l-0"
+			)}
+		>
+			<div className="flex h-full w-full flex-col sm:w-[380px]">
+				<header className="border-border flex items-center justify-between border-b px-4 py-3">
+					<div className="min-w-0">
+						<p className="text-foreground text-sm font-semibold">In-call chat</p>
+						<p className="text-muted-foreground text-xs">
+							Messages are visible to everyone in the room.
+						</p>
+					</div>
+					<button
+						type="button"
+						aria-label="Close chat"
+						tabIndex={open ? 0 : -1}
+						onClick={onClose}
+						className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring inline-flex size-8 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2"
+					>
+						<X className="size-4" />
+					</button>
+				</header>
+
+				<div
+					data-testid="chat-message-list"
+					className="flex-1 space-y-3 overflow-y-auto px-4 py-3"
+				>
+					{messages.length === 0 ? (
+						<div className="text-muted-foreground flex h-full flex-col items-center justify-center text-center text-xs">
+							<MessageSquare className="text-muted-foreground/70 mb-2 size-6" />
+							<p className="text-foreground font-medium">No messages yet</p>
+							<p className="text-muted-foreground mt-1 max-w-[16rem]">
+								Send a note, share a link, or confirm next steps without interrupting the
+								conversation.
+							</p>
+						</div>
+					) : (
+						messages.map((message, index) => {
+							const isLocal =
+								message.from?.isLocal === true ||
+								(localIdentity != null && message.from?.identity === localIdentity)
+							const sender = getMessageSenderName(message)
+							const previous = messages[index - 1]
+							const showSenderHeader =
+								!previous ||
+								previous.from?.identity !== message.from?.identity ||
+								message.timestamp - (previous.timestamp ?? 0) > 5 * 60 * 1000
+							return (
+								<div
+									key={`${message.timestamp}-${index}`}
+									className={cn(
+										"flex flex-col gap-1",
+										isLocal ? "items-end" : "items-start"
+									)}
+								>
+									{showSenderHeader && (
+										<div
+											className={cn(
+												"text-muted-foreground flex items-center gap-2 text-[11px]",
+												isLocal && "flex-row-reverse"
+											)}
+										>
+											<span className="text-foreground font-medium">
+												{isLocal ? "You" : sender}
+											</span>
+											<span aria-hidden="true">·</span>
+											<span className="tabular-nums">
+												{formatChatTimestamp(message.timestamp)}
+											</span>
+										</div>
+									)}
+									<div
+										className={cn(
+											"max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words shadow-sm",
+											isLocal
+												? "bg-primary text-primary-foreground rounded-br-sm"
+												: "bg-muted text-foreground rounded-bl-sm"
+										)}
+									>
+										{message.message}
+									</div>
+								</div>
+							)
+						})
+					)}
+					<div ref={messagesEndRef} />
+				</div>
+
+				{sendError && (
+					<div
+						role="alert"
+						className="border-destructive/30 bg-destructive/10 text-destructive mx-4 mb-2 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs"
+					>
+						<AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />
+						<span className="min-w-0 flex-1">{sendError}</span>
+					</div>
+				)}
+
+				<form
+					className="border-border bg-background/60 flex items-end gap-2 border-t px-3 pt-3 pb-5"
+					onSubmit={event => {
+						event.preventDefault()
+						void handleSend()
+					}}
+				>
+					<label htmlFor="telemed-chat-input" className="sr-only">
+						Type a message
+					</label>
+					<Tooltip>
+						<TooltipTrigger
+							type="button"
+							aria-label="Attach file (coming soon)"
+							aria-disabled="true"
+							disabled
+							tabIndex={open ? 0 : -1}
+							className="text-muted-foreground hover:bg-muted relative inline-flex size-10 shrink-0 items-center justify-center rounded-full outline-none disabled:cursor-not-allowed disabled:opacity-60"
+						>
+							<Paperclip className="size-4" />
+							<span
+								aria-hidden="true"
+								className="bg-accent text-accent-foreground absolute -top-1 -right-1 rounded-full px-1.5 py-[1px] text-[8px] font-bold tracking-wide uppercase shadow-sm"
+							>
+								Soon
+							</span>
+						</TooltipTrigger>
+						<TooltipContent side="top">
+							File attachments coming soon — labs, photos, prescriptions
+						</TooltipContent>
+					</Tooltip>
+					<textarea
+						id="telemed-chat-input"
+						ref={textareaRef}
+						value={draft}
+						onChange={event => setDraft(event.target.value)}
+						onKeyDown={handleKeyDown}
+						placeholder="Type a message"
+						rows={1}
+						maxLength={2000}
+						tabIndex={open ? 0 : -1}
+						className="border-border bg-background text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-ring/40 max-h-32 min-h-[40px] flex-1 resize-none rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2"
+					/>
+					<button
+						type="submit"
+						aria-label="Send message"
+						disabled={isSending || draft.trim().length === 0}
+						tabIndex={open ? 0 : -1}
+						className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring inline-flex size-10 shrink-0 items-center justify-center rounded-full shadow-sm transition-transform duration-150 outline-none hover:scale-105 focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50"
+					>
+						<Send className="size-4" />
+					</button>
+				</form>
+			</div>
+		</aside>
 	)
 }
 
@@ -919,8 +1282,21 @@ const FloatingSelfView = forwardRef<HTMLDivElement, FloatingSelfViewProps>(
 			}
 
 			window.addEventListener("resize", handleResize)
-			return () => window.removeEventListener("resize", handleResize)
-		}, [animateToCorner])
+
+			const stage = stageRef.current
+			let observer: ResizeObserver | null = null
+			if (stage && typeof ResizeObserver !== "undefined") {
+				observer = new ResizeObserver(() => {
+					animateToCorner(cornerRef.current, true)
+				})
+				observer.observe(stage)
+			}
+
+			return () => {
+				window.removeEventListener("resize", handleResize)
+				observer?.disconnect()
+			}
+		}, [animateToCorner, stageRef])
 
 		function handleDragEnd(_event: MouseEvent | TouchEvent | PointerEvent, _info: PanInfo) {
 			const stage = stageRef.current
@@ -1208,6 +1584,22 @@ function VideoConferenceLayout({ fullViewport, waitingRoom }: VideoConferenceLay
 		onlySubscribed: false,
 	})
 	const dockVisible = useDockVisibility()
+	const { chatMessages, send: sendChatMessage, isSending: isSendingChat } = useChat()
+	const [chatOpen, setChatOpen] = useState(false)
+	const [lastSeenChatCount, setLastSeenChatCount] = useState(0)
+
+	useEffect(() => {
+		if (chatOpen) {
+			setLastSeenChatCount(chatMessages.length)
+		}
+	}, [chatOpen, chatMessages.length])
+
+	const unreadChatCount = chatOpen
+		? 0
+		: Math.max(0, chatMessages.length - lastSeenChatCount)
+
+	const toggleChat = useCallback(() => setChatOpen(open => !open), [])
+	const closeChat = useCallback(() => setChatOpen(false), [])
 	const cameraTiles = useMemo(() => {
 		const tiles: CameraTile[] = []
 		const trackedParticipants = new Set<string>()
@@ -1246,31 +1638,51 @@ function VideoConferenceLayout({ fullViewport, waitingRoom }: VideoConferenceLay
 			style={fullViewport ? { minHeight: 0 } : { minHeight: 560 }}
 		>
 			<div
-				ref={stageRef}
-				data-testid="livekit-spotlight-stage"
 				className={cn(
-					"bg-background relative isolate flex-1 overflow-hidden",
-					fullViewport ? "h-full min-h-0" : "min-h-[560px] sm:min-h-[640px]"
+					"flex flex-1 min-h-0 flex-row",
+					fullViewport ? "h-full" : "min-h-[560px] sm:min-h-[640px]"
 				)}
-				style={fullViewport ? { minHeight: 0 } : { minHeight: 560 }}
 			>
-				<div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.06),transparent_34%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.10),transparent_34%),linear-gradient(145deg,#09090b,#18181b_55%,#09090b)]" />
-				{isConnecting ? (
-					<ConnectingStage />
-				) : hasScreen ? (
-					<ScreenShareStage screenTracks={screenTracks} cameraTiles={cameraTiles} />
-				) : showWaitingRoom && waitingRoom ? (
-					<WaitingRoomStage
-						cameraTiles={cameraTiles}
-						stageRef={stageRef}
-						waitingRoom={waitingRoom}
+				<div
+					ref={stageRef}
+					data-testid="livekit-spotlight-stage"
+					className={cn(
+						"bg-background relative isolate min-w-0 flex-1 overflow-hidden",
+						fullViewport ? "h-full min-h-0" : "min-h-[560px] sm:min-h-[640px]",
+						chatOpen && "hidden sm:block"
+					)}
+					style={fullViewport ? { minHeight: 0 } : { minHeight: 560 }}
+				>
+					<div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.06),transparent_34%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.10),transparent_34%),linear-gradient(145deg,#09090b,#18181b_55%,#09090b)]" />
+					{isConnecting ? (
+						<ConnectingStage />
+					) : hasScreen ? (
+						<ScreenShareStage screenTracks={screenTracks} cameraTiles={cameraTiles} />
+					) : showWaitingRoom && waitingRoom ? (
+						<WaitingRoomStage
+							cameraTiles={cameraTiles}
+							stageRef={stageRef}
+							waitingRoom={waitingRoom}
+						/>
+					) : (
+						<SpotlightStage cameraTiles={cameraTiles} stageRef={stageRef} />
+					)}
+					<ConsultationTimer />
+					<NetworkQualityBadge />
+					<FloatingControlDock
+						visible={dockVisible}
+						chatOpen={chatOpen}
+						unreadCount={unreadChatCount}
+						onToggleChat={toggleChat}
 					/>
-				) : (
-					<SpotlightStage cameraTiles={cameraTiles} stageRef={stageRef} />
-				)}
-				<ConsultationTimer />
-				<NetworkQualityBadge />
-				<FloatingControlDock visible={dockVisible} />
+				</div>
+				<ChatPanel
+					open={chatOpen}
+					onClose={closeChat}
+					messages={chatMessages}
+					send={sendChatMessage}
+					isSending={isSendingChat}
+				/>
 			</div>
 			<RoomAudioRenderer />
 			<ConnectionStateToast />

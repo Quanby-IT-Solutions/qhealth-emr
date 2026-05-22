@@ -188,7 +188,8 @@
       "Read(//c/Users/thanbags/.traycer/yolo_artifacts/**)",
       "Bash(pnpm *)",
       "Bash(DRIZZLE_KIT_DEBUG=1 npx drizzle-kit generate)",
-      "Bash(npx vitest *)"
+      "Bash(npx vitest *)",
+      "Bash(npx jest *)"
     ]
   }
 }
