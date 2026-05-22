@@ -29,6 +29,13 @@ import {
 	CommandItem,
 	CommandList,
 } from "@/core/components/ui/command"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/core/components/ui/dialog"
 import { Label } from "@/core/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/core/components/ui/popover"
 import { Separator } from "@/core/components/ui/separator"
@@ -41,11 +48,14 @@ import {
 	type NoteContext,
 	type TemplateSection,
 } from "@/features/clinical-docs/api/clinical-docs.hooks"
+import { useSpeechToText } from "@/features/clinical-docs/api/use-speech-to-text"
+import { expandDotPhrase } from "@/features/clinical-docs/lib/dot-phrases"
 import {
 	useIcd10ProblemSearchQuery,
 	type Icd10SearchResult,
 } from "@/features/problems-allergies/api/problems-allergies.hooks"
 
+import { DOT_PHRASES } from "../lib/dot-phrases"
 import { NOTE_TYPE_LABELS } from "./template-selector"
 import type { AuthoringTemplate } from "./template-selector-page"
 
@@ -369,6 +379,43 @@ function InsertButton({
 	)
 }
 
+function DotPhrasesDialog({
+	open,
+	onOpenChange,
+}: {
+	open: boolean
+	onOpenChange: (open: boolean) => void
+}) {
+	const phrases = Object.entries(DOT_PHRASES)
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+				<DialogHeader>
+					<DialogTitle>Dot Phrases</DialogTitle>
+					<DialogDescription>
+						Available commands that expand after typing the dot phrase followed by space,
+						comma, period, colon, or a new line.
+					</DialogDescription>
+				</DialogHeader>
+				<div className="divide-y rounded-md border">
+					{phrases.map(([phrase, expansion]) => (
+						<div
+							key={phrase}
+							className="grid gap-2 p-3 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-start"
+						>
+							<code className="bg-muted text-foreground w-fit rounded px-2 py-1 font-mono text-sm font-semibold">
+								{phrase}
+							</code>
+							<div className="text-sm whitespace-pre-wrap">{expansion.trim()}</div>
+						</div>
+					))}
+				</div>
+			</DialogContent>
+		</Dialog>
+	)
+}
+
 export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }: NoteEditorProps) {
 	const sections = useMemo(() => ensureRequiredSections(template.sections), [template.sections])
 	const [structuredData, setStructuredData] = useState<StructuredData>(() =>
@@ -378,10 +425,42 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 	const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
 	const [hasLocalChanges, setHasLocalChanges] = useState(false)
 	const [isDraftCreateLocked, setIsDraftCreateLocked] = useState(false)
+	const [liveTranscripts, setLiveTranscripts] = useState<Record<string, string>>({})
+	const [dotPhrasesOpen, setDotPhrasesOpen] = useState(false)
 
 	const noteContext = useNoteContextQuery(encounterId)
 	const createNote = useCreateNoteMutation()
 	const updateNote = useUpdateNoteMutation()
+
+	const {
+		recordingKey,
+		isTranscribing,
+		error: sttError,
+		startRecording,
+		stopRecording,
+	} = useSpeechToText({
+		onTranscript: (key, text) => {
+			insertIntoSection(key, text)
+			setLiveTranscripts(prev => {
+				if (!(key in prev)) return prev
+				const next = { ...prev }
+				delete next[key]
+				return next
+			})
+		},
+		onLiveTranscript: (key, text) => {
+			setLiveTranscripts(prev => {
+				if (!text) {
+					if (!(key in prev)) return prev
+					const next = { ...prev }
+					delete next[key]
+					return next
+				}
+				if (prev[key] === text) return prev
+				return { ...prev, [key]: text }
+			})
+		},
+	})
 
 	const content = useMemo(
 		() => composeNoteContent(sections, structuredData),
@@ -513,6 +592,7 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 
 	return (
 		<div className="space-y-4">
+			<DotPhrasesDialog open={dotPhrasesOpen} onOpenChange={setDotPhrasesOpen} />
 			<div className="flex flex-wrap items-center justify-between gap-3">
 				<div className="flex min-w-0 items-center gap-3">
 					<Button type="button" variant="outline" size="icon" onClick={onBack}>
@@ -588,6 +668,13 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 				</Alert>
 			)}
 
+			{sttError && (
+				<Alert variant="destructive">
+					<AlertCircle className="size-4" />
+					<AlertDescription>{sttError}</AlertDescription>
+				</Alert>
+			)}
+
 			<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
 				<div className="space-y-3">
 					{sections.map(section => (
@@ -595,12 +682,24 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 							{showIcd10Field && section.key === assessmentKey && (
 								<Icd10DiagnosisField value={selectedIcd10} onChange={updateIcd10Diagnosis} />
 							)}
-							<Card className="rounded-lg">
+							<Card
+								className={
+									recordingKey === section.key
+										? "rounded-lg border-red-500 ring-2 ring-red-500/40 bg-red-50/40 transition-colors"
+										: "rounded-lg transition-colors"
+								}
+							>
 								<CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
 									<CardTitle className="text-sm">
 										{section.label}
 										{(section.key === assessmentKey || section.key === planKey) && (
 											<span className="text-destructive"> *</span>
+										)}
+										{recordingKey === section.key && (
+											<span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-red-500">
+												<span className="inline-block size-1.5 animate-pulse rounded-full bg-red-500" />
+												Recording
+											</span>
 										)}
 									</CardTitle>
 									<div className="flex items-center gap-1">
@@ -611,14 +710,39 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 														type="button"
 														size="icon"
 														variant="ghost"
-														aria-label={`Voice-to-text for ${section.label} (coming soon)`}
-														disabled
+														aria-label={
+															recordingKey === section.key
+																? `Stop recording ${section.label}`
+																: `Start voice-to-text for ${section.label}`
+														}
+														disabled={
+															isTranscribing ||
+															(recordingKey !== null && recordingKey !== section.key)
+														}
+														onClick={() => {
+															if (recordingKey === section.key) {
+																stopRecording()
+															} else {
+																void startRecording(section.key)
+															}
+														}}
+														className={
+															recordingKey === section.key
+																? "text-red-500 animate-pulse"
+																: undefined
+														}
 													/>
 												}
 											>
 												<Mic className="size-4" />
 											</TooltipTrigger>
-											<TooltipContent>Voice-to-text — coming soon</TooltipContent>
+											<TooltipContent>
+												{isTranscribing && recordingKey === null
+													? "Transcribing…"
+													: recordingKey === section.key
+														? "Recording… click to stop"
+														: "Voice-to-text"}
+											</TooltipContent>
 										</Tooltip>
 										<Tooltip>
 											<TooltipTrigger
@@ -627,14 +751,14 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 														type="button"
 														size="icon"
 														variant="ghost"
-														aria-label={`Dot-phrases for ${section.label} (coming soon)`}
-														disabled
+														aria-label={`Dot-phrases for ${section.label}`}
+														onClick={() => setDotPhrasesOpen(true)}
 													/>
 												}
 											>
 												<Keyboard className="size-4" />
 											</TooltipTrigger>
-											<TooltipContent>Dot-phrases (.hpi, .ros…) — coming soon</TooltipContent>
+											<TooltipContent>Dot-phrases (.hpi, .ros…)</TooltipContent>
 										</Tooltip>
 									</div>
 								</CardHeader>
@@ -642,13 +766,31 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 									<Label className="sr-only" htmlFor={`note-section-${section.key}`}>
 										{section.label}
 									</Label>
-									<Textarea
-										id={`note-section-${section.key}`}
-										value={sectionText(structuredData, section.key)}
-										onChange={event => updateSection(section.key, event.target.value)}
-										rows={section.key === "assessment" || section.key === "plan" ? 5 : 4}
-										className="min-h-28 resize-y"
-									/>
+									{(() => {
+										const baseText = sectionText(structuredData, section.key)
+										const live = liveTranscripts[section.key] ?? ""
+										const isLive = recordingKey === section.key && live.length > 0
+										const separator =
+											isLive && baseText && !baseText.endsWith("\n") && !baseText.endsWith(" ")
+												? " "
+												: ""
+										const displayValue = isLive ? `${baseText}${separator}${live}` : baseText
+										return (
+											<Textarea
+												id={`note-section-${section.key}`}
+												value={displayValue}
+												readOnly={recordingKey === section.key}
+												onChange={event => {
+													if (recordingKey === section.key) return
+													const value = event.target.value
+													const expanded = expandDotPhrase(value)
+													updateSection(section.key, expanded ?? value)
+												}}
+												rows={section.key === "assessment" || section.key === "plan" ? 5 : 4}
+												className="min-h-28 resize-y"
+											/>
+										)
+									})()}
 									{section.key === assessmentKey && !assessmentText && (
 										<p className="text-destructive mt-2 text-xs">
 											Assessment is required before this draft can be saved.
