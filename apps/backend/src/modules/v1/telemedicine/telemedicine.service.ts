@@ -1002,7 +1002,7 @@ export class TelemedicineService {
 			.where(eq(staffProfiles.id, appointment.clinicianStaffId))
 			.limit(1)
 
-		const actorUserId = clinician?.userId ?? "system"
+		const actorUserId = clinician?.userId ?? TelemedicineService.ANONYMOUS_USER_ID
 		const participantIdentity = event.participant?.identity ?? null
 		const participantName = event.participant?.name ?? null
 		const participantSid = event.participant?.sid ?? null

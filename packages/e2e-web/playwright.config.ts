@@ -3,6 +3,10 @@ import { defineConfig, devices } from "@playwright/test"
 import { AUTH_FILE } from "./constants"
 
 const hasBackend = !!process.env.E2E_AUTH_API_URL
+const liveKitE2EArgs =
+	process.env.LIVEKIT_E2E === "1"
+		? ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]
+		: []
 
 export default defineConfig({
 	globalSetup: "./global-setup.ts",
@@ -33,7 +37,10 @@ export default defineConfig({
 		// ── Unauthenticated tests ──────────────────────────────────────────────
 		{
 			name: "chromium",
-			use: { ...devices["Desktop Chrome"] },
+			use: {
+				...devices["Desktop Chrome"],
+				launchOptions: { args: liveKitE2EArgs },
+			},
 			testIgnore: /authenticated\.spec\.ts/,
 		},
 
@@ -45,6 +52,7 @@ export default defineConfig({
 						use: {
 							...devices["Desktop Chrome"],
 							storageState: AUTH_FILE,
+							launchOptions: { args: liveKitE2EArgs },
 						},
 						testMatch: /authenticated\.spec\.ts/,
 						dependencies: ["setup"],

@@ -58,7 +58,11 @@ export class SurgicalController {
 		})
 	}
 
-	@RequirePermission("surgical", "view")
+	@RequireAnyPermissions([
+		{ module: "surgical", action: "view" },
+		{ module: "billing", action: "edit" },
+		{ module: "billing", action: "sign" },
+	])
 	@Implement(v1.surgical.getCase)
 	async getCase() {
 		return implement(v1.surgical.getCase).handler(async ({ input }) => {
@@ -90,7 +94,11 @@ export class SurgicalController {
 	// Operation Record
 	// ========================================================================
 
-	@RequirePermission("surgical", "view")
+	@RequireAnyPermissions([
+		{ module: "surgical", action: "view" },
+		{ module: "billing", action: "edit" },
+		{ module: "billing", action: "sign" },
+	])
 	@Implement(v1.surgical.getOperationRecord)
 	async getOperationRecord() {
 		return implement(v1.surgical.getOperationRecord).handler(async ({ input }) => {
@@ -166,7 +174,11 @@ export class SurgicalController {
 	// RVS Codes
 	// ========================================================================
 
-	@RequirePermission("surgical", "view")
+	@RequireAnyPermissions([
+		{ module: "surgical", action: "view" },
+		{ module: "billing", action: "edit" },
+		{ module: "billing", action: "sign" },
+	])
 	@Implement(v1.surgical.searchRvsCodes)
 	async searchRvsCodes() {
 		return implement(v1.surgical.searchRvsCodes).handler(async ({ input }) => {
@@ -178,7 +190,11 @@ export class SurgicalController {
 	// RVS Assignments
 	// ========================================================================
 
-	@RequirePermission("surgical", "view")
+	@RequireAnyPermissions([
+		{ module: "surgical", action: "view" },
+		{ module: "billing", action: "edit" },
+		{ module: "billing", action: "sign" },
+	])
 	@Implement(v1.surgical.listRvsAssignments)
 	async listRvsAssignments() {
 		return implement(v1.surgical.listRvsAssignments).handler(async ({ input }) => {
