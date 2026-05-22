@@ -47,3 +47,65 @@ export function useLinkTriageToPatientMutation() {
 		})
 	)
 }
+
+export function useCreateOpdRemoteTriageMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.opdTriage.createRemoteIntake.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.opdTriage.key() }),
+		})
+	)
+}
+
+export function useOpdRemoteTriageListQuery(
+	params: {
+		facilityId: string
+		status?: "pending_arrival" | "arrived" | "cancelled" | "no_show"
+	},
+	options?: { enabled?: boolean }
+) {
+	return useQuery(
+		orpc.opdTriage.listRemoteIntakes.queryOptions({
+			input: params,
+			enabled: (options?.enabled ?? true) && !!params.facilityId,
+			refetchInterval: 30_000,
+			staleTime: 15_000,
+		})
+	)
+}
+
+export function useMarkOpdRemoteArrivedMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.opdTriage.markRemoteArrived.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.opdTriage.key() }),
+		})
+	)
+}
+
+export function useCancelOpdRemoteTriageMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.opdTriage.cancelRemoteIntake.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.opdTriage.key() }),
+		})
+	)
+}
+
+export function useJoinOpdRemoteLiveKitRoomMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.opdTriage.joinRemoteLiveKitRoom.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.opdTriage.key() }),
+		})
+	)
+}
+
+export function useEndOpdRemoteLiveKitSessionMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.opdTriage.endRemoteLiveKitSession.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.opdTriage.key() }),
+		})
+	)
+}

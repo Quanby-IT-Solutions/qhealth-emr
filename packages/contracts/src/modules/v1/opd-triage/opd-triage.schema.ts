@@ -99,3 +99,127 @@ export const LinkOpdTriageToPatientSchema = z.object({
 })
 
 export type LinkOpdTriageToPatientInput = z.infer<typeof LinkOpdTriageToPatientSchema>
+
+// ============================================================================
+// OPD Tele-Triage Intake — full resource
+// ============================================================================
+
+export const OpdTeleTriageChannelEnum = z.enum(["phone", "video"])
+export const OpdTeleTriageCallerRelationshipEnum = z.enum(["self", "family", "caregiver", "other"])
+export const OpdTeleTriageAcuityEnum = z.enum(["urgent", "routine", "scheduled"])
+export const OpdTeleTriageStatusEnum = z.enum([
+	"pending_arrival",
+	"arrived",
+	"cancelled",
+	"no_show",
+])
+
+export const OpdTeleTriageIntakeSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	callerName: z.string(),
+	callerRelationship: OpdTeleTriageCallerRelationshipEnum.nullable(),
+	patientId: z.string().uuid().nullable(),
+	patientLocation: z.string(),
+	channelType: OpdTeleTriageChannelEnum,
+	videoLink: z.string().nullable(),
+	videoSessionId: z.string().nullable(),
+	livekitSessionStartedAt: dateOrString.nullable(),
+	livekitSessionEndedAt: dateOrString.nullable(),
+	scheduledArrivalTime: dateOrString.nullable(),
+	etaMinutes: z.number().int().nullable(),
+	etaAt: dateOrString.nullable(),
+	chiefComplaint: z.string(),
+	assessmentNotes: z.string(),
+	provisionalAcuity: OpdTeleTriageAcuityEnum,
+	systolicBp: z.number().int().nullable(),
+	diastolicBp: z.number().int().nullable(),
+	temperatureCelsius: z.number().nullable(),
+	heartRateBpm: z.number().int().nullable(),
+	respiratoryRate: z.number().int().nullable(),
+	oxygenSatPct: z.number().nullable(),
+	status: OpdTeleTriageStatusEnum,
+	arrivedAt: dateOrString.nullable(),
+	linkedTriageIntakeId: z.string().uuid().nullable(),
+	triageStaffId: z.string().uuid(),
+	cancelReason: z.string().nullable(),
+	createdAt: dateOrString,
+	updatedAt: dateOrString,
+})
+
+export type OpdTeleTriageIntake = z.infer<typeof OpdTeleTriageIntakeSchema>
+
+export const CreateOpdTeleTriageIntakeSchema = z
+	.object({
+		facilityId: z.string().uuid(),
+		callerName: z.string().min(1).max(500),
+		callerRelationship: OpdTeleTriageCallerRelationshipEnum.optional(),
+		patientId: z.string().uuid().optional(),
+		patientLocation: z.string().min(1).max(1000),
+		channelType: OpdTeleTriageChannelEnum,
+		videoLink: z.string().url().optional(),
+		videoSessionId: z.string().max(500).optional(),
+		scheduledArrivalTime: dateOrString.optional(),
+		etaMinutes: z.number().int().min(0).max(480).optional(),
+		chiefComplaint: z.string().min(1, "Chief complaint is required").max(2000),
+		assessmentNotes: z.string().max(5000).optional(),
+		provisionalAcuity: OpdTeleTriageAcuityEnum,
+		systolicBp: z.number().int().positive().optional(),
+		diastolicBp: z.number().int().positive().optional(),
+		temperatureCelsius: z.number().min(30).max(45).optional(),
+		heartRateBpm: z.number().int().positive().optional(),
+		respiratoryRate: z.number().int().positive().optional(),
+		oxygenSatPct: z.number().min(0).max(100).optional(),
+		triageStaffId: z.string().uuid(),
+	})
+	.refine(input => input.etaMinutes !== undefined || input.scheduledArrivalTime !== undefined, {
+		message: "Provide either ETA minutes or scheduled arrival time",
+		path: ["etaMinutes"],
+	})
+
+export type CreateOpdTeleTriageIntakeInput = z.infer<typeof CreateOpdTeleTriageIntakeSchema>
+
+export const ListOpdTeleTriageIntakesSchema = z.object({
+	facilityId: z.string().uuid(),
+	status: OpdTeleTriageStatusEnum.optional(),
+})
+
+export type ListOpdTeleTriageIntakesInput = z.infer<typeof ListOpdTeleTriageIntakesSchema>
+
+export const OpdTeleTriageIntakeIdSchema = z.object({
+	id: z.string().uuid(),
+})
+
+export type OpdTeleTriageIntakeIdInput = z.infer<typeof OpdTeleTriageIntakeIdSchema>
+
+export const CancelOpdTeleTriageIntakeSchema = OpdTeleTriageIntakeIdSchema.extend({
+	reason: z.string().max(1000).optional(),
+	status: z.enum(["cancelled", "no_show"]).default("cancelled"),
+})
+
+export type CancelOpdTeleTriageIntakeInput = z.infer<typeof CancelOpdTeleTriageIntakeSchema>
+
+export const MarkOpdTeleTriageArrivedResultSchema = z.object({
+	id: z.string().uuid(),
+	triageIntakeId: z.string().uuid(),
+})
+
+export const OpdTeleTriageLiveKitTokenResponseSchema = z.object({
+	isConfigured: z.boolean(),
+	token: z.string().optional(),
+	wsUrl: z.string().optional(),
+	roomName: z.string().optional(),
+})
+
+export type OpdTeleTriageLiveKitTokenResponse = z.infer<
+	typeof OpdTeleTriageLiveKitTokenResponseSchema
+>
+
+export const OpdTeleTriageLiveKitSessionEndResponseSchema = z.object({
+	id: z.string().uuid(),
+	livekitSessionEndedAt: z.string(),
+})
+
+export type OpdTeleTriageLiveKitSessionEndResponse = z.infer<
+	typeof OpdTeleTriageLiveKitSessionEndResponseSchema
+>
