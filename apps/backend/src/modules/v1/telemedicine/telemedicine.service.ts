@@ -12,12 +12,14 @@ import {
 	encounters,
 	facilities,
 	patients,
+	roles,
 	staffProfiles,
 	telemedicineAbstracts,
 	telemedicineAppointments,
 	telemedicineEncounters,
 	telemedicinePrescriptionItems,
 	telemedicinePrescriptions,
+	userRoles,
 	users,
 } from "@repo/db/schema"
 
@@ -58,10 +60,21 @@ type ListEncounterAbstractsInput = V1Inputs["telemedicine"]["listEncounterAbstra
 type SignAbstractInput = V1Inputs["telemedicine"]["signAbstract"]
 type SendAbstractInput = V1Inputs["telemedicine"]["sendAbstract"]
 type SendPrescriptionInput = V1Inputs["telemedicine"]["sendPrescription"]
+type StaffRole = { id: string; name: string }
+type AuditRoleContext = {
+	userRoles: string[]
+	isSchedulerAction: boolean
+	isPhysicianAction: boolean
+}
 
 @Injectable()
 export class TelemedicineService {
 	private readonly logger = new Logger(TelemedicineService.name)
+	private static readonly PHYSICIAN_ROLE_NAMES = new Set([
+		"Physician",
+		"Surgeon",
+		"Anesthesiologist",
+	])
 
 	constructor(
 		private readonly notificationService: NotificationService,
@@ -173,6 +186,81 @@ export class TelemedicineService {
 			),
 			patientInviteExpiresAt: this.serializeDate(appointment.patientInviteExpiresAt),
 			patientInviteRevokedAt: this.serializeDate(appointment.patientInviteRevokedAt),
+		}
+	}
+
+	private hasPhysicianRole(staffRoles: StaffRole[]) {
+		return staffRoles.some(role => TelemedicineService.PHYSICIAN_ROLE_NAMES.has(role.name))
+	}
+
+	private async getUserRoles(userId: string): Promise<StaffRole[]> {
+		const rows = await db
+			.select({
+				roleId: userRoles.roleId,
+				roleName: roles.name,
+			})
+			.from(staffProfiles)
+			.innerJoin(userRoles, eq(userRoles.staffProfileId, staffProfiles.id))
+			.innerJoin(roles, eq(roles.id, userRoles.roleId))
+			.where(eq(staffProfiles.userId, userId))
+
+		return rows.map(row => ({ id: row.roleId, name: row.roleName }))
+	}
+
+	private async getStaffProfileWithUser(staffProfileId: string) {
+		const [profile] = await db
+			.select({
+				id: staffProfiles.id,
+				userId: staffProfiles.userId,
+				facilityId: staffProfiles.facilityId,
+				isActive: staffProfiles.isActive,
+			})
+			.from(staffProfiles)
+			.where(eq(staffProfiles.id, staffProfileId))
+			.limit(1)
+
+		if (!profile) {
+			throw new NotFoundException(`Staff profile ${staffProfileId} not found`)
+		}
+
+		return profile
+	}
+
+	private async assertSchedulerCanCreateAppointment(
+		input: CreateAppointmentInput,
+		createdByStaffId: string | undefined
+	) {
+		if (!createdByStaffId) {
+			return
+		}
+
+		const creatorProfile = await this.getStaffProfileWithUser(createdByStaffId)
+		const creatorRoles = await this.getUserRoles(creatorProfile.userId)
+		const isScheduler = creatorRoles.some(role => role.name === "Scheduler")
+
+		if (!isScheduler || this.hasPhysicianRole(creatorRoles)) {
+			return
+		}
+
+		if (!input.clinicianId) {
+			throw new BadRequestException(
+				"Schedulers must assign a physician to telemedicine appointments. Please select a clinician from the dropdown."
+			)
+		}
+
+		if (input.clinicianId === createdByStaffId) {
+			throw new BadRequestException(
+				"Schedulers cannot assign themselves as the treating physician. Please select a different clinician."
+			)
+		}
+
+		const clinicianProfile = await this.getStaffProfileWithUser(input.clinicianId)
+		const clinicianRoles = await this.getUserRoles(clinicianProfile.userId)
+
+		if (!this.hasPhysicianRole(clinicianRoles)) {
+			throw new BadRequestException(
+				"The assigned clinician must have a Physician, Surgeon, or Anesthesiologist role."
+			)
 		}
 	}
 
@@ -364,14 +452,12 @@ export class TelemedicineService {
 
 	private static readonly ANONYMOUS_USER_ID = "telemedicine:anonymous"
 
-	private async resolveUserIdForStaff(staffProfileId: string | null | undefined): Promise<string | null> {
-		if (!staffProfileId) return null
-		const [row] = await db
-			.select({ userId: staffProfiles.userId })
-			.from(staffProfiles)
-			.where(eq(staffProfiles.id, staffProfileId))
-			.limit(1)
-		return row?.userId ?? null
+	private buildAuditRoleContext(staffRoles: StaffRole[]) {
+		return {
+			userRoles: staffRoles.map(role => role.name),
+			isSchedulerAction: staffRoles.some(role => role.name === "Scheduler"),
+			isPhysicianAction: this.hasPhysicianRole(staffRoles),
+		}
 	}
 
 	private async writeTelemedicineAudit(input: {
@@ -388,9 +474,16 @@ export class TelemedicineService {
 		outcome?: "success" | "failure"
 	}): Promise<void> {
 		try {
-			const userId =
-				input.userId ?? (await this.resolveUserIdForStaff(input.staffProfileId)) ??
-				TelemedicineService.ANONYMOUS_USER_ID
+			let userId = input.userId ?? TelemedicineService.ANONYMOUS_USER_ID
+			let roleContext: AuditRoleContext | null = null
+
+			if (input.staffProfileId) {
+				const profile = await this.getStaffProfileWithUser(input.staffProfileId)
+				const staffRoles = await this.getUserRoles(profile.userId)
+				userId = input.userId ?? profile.userId
+				roleContext = this.buildAuditRoleContext(staffRoles)
+			}
+
 			await this.auditService.log({
 				facilityId: input.facilityId,
 				userId,
@@ -402,7 +495,9 @@ export class TelemedicineService {
 				afterState: input.afterState ?? null,
 				ipAddress: null,
 				userAgent: null,
-				metadata: input.metadata ?? null,
+				metadata: roleContext
+					? { ...(input.metadata ?? {}), ...roleContext }
+					: (input.metadata ?? null),
 				severity: input.severity ?? "info",
 				outcome: input.outcome ?? "success",
 			})
@@ -633,6 +728,7 @@ export class TelemedicineService {
 
 	async createAppointment(input: CreateAppointmentInput, createdByStaffId?: string) {
 		this.assertFutureAppointment(input.scheduledDate, input.scheduledTime)
+		await this.assertSchedulerCanCreateAppointment(input, createdByStaffId)
 		await this.assertAppointmentScope(input)
 		const durationMinutes = input.durationMinutes ?? 30
 		const appointmentTiming = {
