@@ -112,6 +112,45 @@ export class CivilRegistryController {
 		})
 	}
 
+	@RequirePermission("civil_registry", "edit")
+	@Implement(v1.civilRegistry.retryLcrSubmission)
+	async retryLcrSubmission() {
+		return implement(v1.civilRegistry.retryLcrSubmission).handler(async ({ input }) => {
+			return this.civilRegistryService.retryLcrSubmission(input)
+		})
+	}
+
+	@RequirePermission("civil_registry", "view")
+	@Implement(v1.civilRegistry.getPrefillDataForBirthCertificate)
+	async getPrefillDataForBirthCertificate() {
+		return implement(v1.civilRegistry.getPrefillDataForBirthCertificate).handler(
+			async ({ input }) => {
+				return this.civilRegistryService.getPrefillDataForBirthCertificate(
+					input.patientId,
+					input.encounterId
+				)
+			}
+		)
+	}
+
+	@RequirePermission("civil_registry", "edit")
+	@Implement(v1.civilRegistry.generateBirthCertificateArtifacts)
+	async generateBirthCertificateArtifacts() {
+		return implement(v1.civilRegistry.generateBirthCertificateArtifacts).handler(
+			async ({ input }) => {
+				return this.civilRegistryService.generateBirthCertificateArtifacts(input.id)
+			}
+		)
+	}
+
+	@RequirePermission("civil_registry", "edit")
+	@Implement(v1.civilRegistry.submitBirthCertificateToLcr)
+	async submitBirthCertificateToLcr() {
+		return implement(v1.civilRegistry.submitBirthCertificateToLcr).handler(async ({ input }) => {
+			return this.civilRegistryService.submitBirthCertificateToLcr(input.id)
+		})
+	}
+
 	@RequirePermission("civil_registry", "view")
 	@Implement(v1.civilRegistry.listBirthRegistrations)
 	async listBirthRegistrations() {
@@ -168,6 +207,37 @@ export class CivilRegistryController {
 				releasedByStaffId,
 				releasedAt: input.releasedAt ? new Date(input.releasedAt) : undefined,
 			})
+		})
+	}
+
+	@RequirePermission("civil_registry", "view")
+	@Implement(v1.civilRegistry.getPrefillDataForDeathCertificate)
+	async getPrefillDataForDeathCertificate() {
+		return implement(v1.civilRegistry.getPrefillDataForDeathCertificate).handler(
+			async ({ input }) => {
+				return this.civilRegistryService.getPrefillDataForDeathCertificate(
+					input.patientId,
+					input.encounterId
+				)
+			}
+		)
+	}
+
+	@RequirePermission("civil_registry", "edit")
+	@Implement(v1.civilRegistry.generateDeathCertificateArtifacts)
+	async generateDeathCertificateArtifacts() {
+		return implement(v1.civilRegistry.generateDeathCertificateArtifacts).handler(
+			async ({ input }) => {
+				return this.civilRegistryService.generateDeathCertificateArtifacts(input.id)
+			}
+		)
+	}
+
+	@RequirePermission("civil_registry", "edit")
+	@Implement(v1.civilRegistry.submitDeathCertificateToLcr)
+	async submitDeathCertificateToLcr() {
+		return implement(v1.civilRegistry.submitDeathCertificateToLcr).handler(async ({ input }) => {
+			return this.civilRegistryService.submitDeathCertificateToLcr(input.id)
 		})
 	}
 

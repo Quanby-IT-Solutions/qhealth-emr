@@ -1,13 +1,21 @@
 import { oc } from "@orpc/contract"
 
 import {
+	BirthCertificatePrefillDataSchema,
 	BirthRegistrationIdSchema,
 	BirthRegistrationSchema,
 	CreateBirthRegistrationSchema,
 	CreateDeathCertificateRegistrationSchema,
+	DeathCertificatePrefillDataSchema,
 	DeathCertificateRegistrationIdSchema,
 	DeathCertificateRegistrationSchema,
+	GenerateArtifactsResponseSchema,
+	GenerateBirthCertificateArtifactsSchema,
+	GenerateDeathCertificateArtifactsSchema,
 	GenerateLcrArtifactInputSchema,
+	GetPrefillDataForBirthCertificateSchema,
+	GetPrefillDataForDeathCertificateSchema,
+	LcrSubmissionResponseSchema,
 	LcrTrackingSchema,
 	ListBirthRegistrationsResponseSchema,
 	ListBirthRegistrationsSchema,
@@ -24,6 +32,9 @@ import {
 	MarkDeathCertificateRegistrationReleasedInputSchema,
 	MarkDeathCertificateRegistrationReleasedResponseSchema,
 	MarkLcrSubmittedInputSchema,
+	RetryLcrSubmissionSchema,
+	SubmitBirthCertificateToLcrSchema,
+	SubmitDeathCertificateToLcrSchema,
 	UpdateBirthRegistrationSchema,
 	UpdateDeathCertificateRegistrationSchema,
 } from "./civil-registry.schema.js"
@@ -58,6 +69,46 @@ export const civilRegistryContract = {
 		})
 		.input(MarkLcrSubmittedInputSchema)
 		.output(LcrTrackingSchema),
+
+	retryLcrSubmission: oc
+		.route({
+			method: "POST",
+			path: "/civil-registry/lcr-tracking/{certificateType}/{sourceRecordId}/submission/retry",
+			summary: "Retry LCR certificate submission",
+			tags: ["Civil Registry"],
+		})
+		.input(RetryLcrSubmissionSchema)
+		.output(LcrSubmissionResponseSchema),
+
+	getPrefillDataForBirthCertificate: oc
+		.route({
+			method: "GET",
+			path: "/civil-registry/birth-registrations/prefill",
+			summary: "Get pre-filled birth certificate data from patient and encounter records",
+			tags: ["Civil Registry"],
+		})
+		.input(GetPrefillDataForBirthCertificateSchema)
+		.output(BirthCertificatePrefillDataSchema),
+
+	generateBirthCertificateArtifacts: oc
+		.route({
+			method: "POST",
+			path: "/civil-registry/birth-registrations/{id}/generate-artifacts",
+			summary: "Generate PDF and XML artifacts for a birth certificate",
+			tags: ["Civil Registry"],
+		})
+		.input(GenerateBirthCertificateArtifactsSchema)
+		.output(GenerateArtifactsResponseSchema),
+
+	submitBirthCertificateToLcr: oc
+		.route({
+			method: "POST",
+			path: "/civil-registry/birth-registrations/{id}/submit-lcr",
+			summary: "Submit a birth certificate to LCR",
+			tags: ["Civil Registry"],
+		})
+		.input(SubmitBirthCertificateToLcrSchema)
+		.output(LcrSubmissionResponseSchema),
 
 	listBirthRegistrations: oc
 		.route({
@@ -120,6 +171,36 @@ export const civilRegistryContract = {
 		})
 		.input(MarkBirthRegistrationReleasedInputSchema)
 		.output(MarkBirthRegistrationReleasedResponseSchema),
+
+	getPrefillDataForDeathCertificate: oc
+		.route({
+			method: "GET",
+			path: "/civil-registry/death-certificate-registrations/prefill",
+			summary: "Get pre-filled death certificate data from patient and encounter records",
+			tags: ["Civil Registry"],
+		})
+		.input(GetPrefillDataForDeathCertificateSchema)
+		.output(DeathCertificatePrefillDataSchema),
+
+	generateDeathCertificateArtifacts: oc
+		.route({
+			method: "POST",
+			path: "/civil-registry/death-certificate-registrations/{id}/generate-artifacts",
+			summary: "Generate PDF and XML artifacts for a death certificate",
+			tags: ["Civil Registry"],
+		})
+		.input(GenerateDeathCertificateArtifactsSchema)
+		.output(GenerateArtifactsResponseSchema),
+
+	submitDeathCertificateToLcr: oc
+		.route({
+			method: "POST",
+			path: "/civil-registry/death-certificate-registrations/{id}/submit-lcr",
+			summary: "Submit a death certificate to LCR",
+			tags: ["Civil Registry"],
+		})
+		.input(SubmitDeathCertificateToLcrSchema)
+		.output(LcrSubmissionResponseSchema),
 
 	listDeathCertificateRegistrations: oc
 		.route({

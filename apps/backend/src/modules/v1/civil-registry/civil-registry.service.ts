@@ -11,12 +11,17 @@ import {
 	birthRegistrations,
 	deathCertificateRegistrations,
 	encounters,
+	facilities,
 	lcrTracking,
 	patients,
 	staffProfiles,
+	users,
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
+
+import { LcrArtifactGeneratorService } from "./lcr-artifact-generator.service"
+import { LcrSubmissionService } from "./lcr-submission.service"
 
 interface ListBirthRegistrationsInput {
 	facilityId: string
@@ -109,6 +114,7 @@ interface UpdateDeathCertificateRegistrationInput extends Partial<CreateDeathCer
 type BirthRegistrationRow = typeof birthRegistrations.$inferSelect
 type DeathCertificateRegistrationRow = typeof deathCertificateRegistrations.$inferSelect
 type LcrTrackingRow = typeof lcrTracking.$inferSelect
+type PatientRow = typeof patients.$inferSelect
 type LcrCertificateType = "birth" | "death"
 type LcrArtifactType = "pdf" | "xml"
 type LcrSubmissionStatus =
@@ -195,6 +201,11 @@ function getMissingLcrDeathCertificateFields(row: DeathCertificateRegistrationRo
 export class CivilRegistryService {
 	private readonly logger = new Logger(CivilRegistryService.name)
 
+	constructor(
+		private readonly artifactGenerator: LcrArtifactGeneratorService,
+		private readonly lcrSubmissionService: LcrSubmissionService
+	) {}
+
 	async listLcrTracking(input: ListLcrTrackingInput) {
 		const page = Number(input.page) || 1
 		const limit = Number(input.limit) || 50
@@ -224,11 +235,12 @@ export class CivilRegistryService {
 			input.certificateType,
 			input.sourceRecordId
 		)
-		this.assertCertificateReleased(input.certificateType, source)
 		if (input.certificateType === "birth") {
-			this.assertLcrBirthRegistrationComplete(source as BirthRegistrationRow)
+			this.assertBirthRegistrationReadyForArtifactGeneration(source as BirthRegistrationRow)
 		} else {
-			this.assertLcrDeathCertificateComplete(source as DeathCertificateRegistrationRow)
+			this.assertDeathCertificateReadyForArtifactGeneration(
+				source as DeathCertificateRegistrationRow
+			)
 		}
 
 		const now = new Date()
@@ -331,6 +343,199 @@ export class CivilRegistryService {
 		return updated
 	}
 
+	async getPrefillDataForBirthCertificate(patientId: string, encounterId?: string) {
+		const patient = await this.getPatientForPrefill(patientId)
+		const encounter = encounterId
+			? await this.getEncounterForPrefill({
+					encounterId,
+					patientId,
+					facilityId: patient.facilityId,
+				})
+			: null
+		const physician = encounter?.attendingStaffId
+			? await this.getStaffPhysician(encounter.attendingStaffId)
+			: null
+
+		return {
+			birthDatetime: new Date(patient.dateOfBirth).toISOString(),
+			placeOfBirthMunicipality: patient.city ?? undefined,
+			placeOfBirthProvince: patient.province ?? undefined,
+			motherName: undefined,
+			fatherName: undefined,
+			physicianName: physician?.name,
+			physicianLicenseNo: physician?.licenseNo,
+			attendingStaffId: physician?.staffId,
+		}
+	}
+
+	async getPrefillDataForDeathCertificate(patientId: string, encounterId?: string) {
+		const patient = await this.getPatientForPrefill(patientId)
+		const encounter = encounterId
+			? await this.getEncounterForPrefill({
+					encounterId,
+					patientId,
+					facilityId: patient.facilityId,
+				})
+			: null
+		const physician = encounter?.attendingStaffId
+			? await this.getStaffPhysician(encounter.attendingStaffId)
+			: null
+		const facility = encounter?.facilityId
+			? await this.getFacilityForPrefill(encounter.facilityId)
+			: null
+		const deathDatetime = encounter?.dischargeDatetime ?? new Date()
+
+		return {
+			deathDatetime: deathDatetime.toISOString(),
+			deceasedName: this.formatPatientName(patient),
+			deceasedMrn: patient.mrn,
+			ageAtDeathYears: this.calculateAgeYears(new Date(patient.dateOfBirth), deathDatetime),
+			deceasedAddress: this.formatPatientAddress(patient),
+			placeOfDeath: facility ? [facility.name, facility.address].filter(Boolean).join(", ") : "",
+			causeOfDeathImmediate:
+				encounter?.disposition === "deceased" ? (encounter.chiefComplaint ?? undefined) : undefined,
+			causeOfDeathAntecedent: undefined,
+			causeOfDeathUnderlying: undefined,
+			causeOfDeathContributing: undefined,
+			physicianName: physician?.name,
+			physicianLicenseNo: physician?.licenseNo,
+		}
+	}
+
+	async generateBirthCertificateArtifacts(registrationId: string) {
+		const registration = await this.getBirthRegistration(registrationId)
+		this.assertBirthRegistrationReadyForArtifactGeneration(registration)
+
+		try {
+			const artifacts = await this.artifactGenerator.generateBirthCertificateArtifacts(registration)
+			await this.generateLcrArtifact({
+				certificateType: "birth",
+				sourceRecordId: registrationId,
+				artifactType: "pdf",
+				artifactUrl: artifacts.pdfUrl,
+			})
+			await this.generateLcrArtifact({
+				certificateType: "birth",
+				sourceRecordId: registrationId,
+				artifactType: "xml",
+				artifactUrl: artifacts.xmlUrl,
+			})
+			return { success: true, ...artifacts }
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "Unknown artifact generation error"
+			await Promise.all([
+				this.generateLcrArtifact({
+					certificateType: "birth",
+					sourceRecordId: registrationId,
+					artifactType: "pdf",
+					error: message,
+				}).catch(() => undefined),
+				this.generateLcrArtifact({
+					certificateType: "birth",
+					sourceRecordId: registrationId,
+					artifactType: "xml",
+					error: message,
+				}).catch(() => undefined),
+			])
+			throw error
+		}
+	}
+
+	async generateDeathCertificateArtifacts(registrationId: string) {
+		const registration = await this.getDeathCertificateRegistration(registrationId)
+		this.assertDeathCertificateReadyForArtifactGeneration(registration)
+
+		try {
+			const artifacts = await this.artifactGenerator.generateDeathCertificateArtifacts(registration)
+			await this.generateLcrArtifact({
+				certificateType: "death",
+				sourceRecordId: registrationId,
+				artifactType: "pdf",
+				artifactUrl: artifacts.pdfUrl,
+			})
+			await this.generateLcrArtifact({
+				certificateType: "death",
+				sourceRecordId: registrationId,
+				artifactType: "xml",
+				artifactUrl: artifacts.xmlUrl,
+			})
+			return { success: true, ...artifacts }
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "Unknown artifact generation error"
+			await Promise.all([
+				this.generateLcrArtifact({
+					certificateType: "death",
+					sourceRecordId: registrationId,
+					artifactType: "pdf",
+					error: message,
+				}).catch(() => undefined),
+				this.generateLcrArtifact({
+					certificateType: "death",
+					sourceRecordId: registrationId,
+					artifactType: "xml",
+					error: message,
+				}).catch(() => undefined),
+			])
+			throw error
+		}
+	}
+
+	async submitBirthCertificateToLcr(registrationId: string) {
+		const result = await this.lcrSubmissionService.submitBirthCertificate(registrationId)
+		const submissionStatus: LcrSubmissionStatus = result.success
+			? result.acknowledgementNumber
+				? "acknowledged"
+				: "submitted"
+			: "error"
+		await this.markLcrSubmitted({
+			certificateType: "birth",
+			sourceRecordId: registrationId,
+			submissionStatus,
+			acknowledgementNumber: result.acknowledgementNumber,
+			referenceNumber: result.referenceNumber,
+			error: result.error,
+		})
+
+		return {
+			success: result.success,
+			submissionStatus,
+			acknowledgementNumber: result.acknowledgementNumber ?? null,
+			referenceNumber: result.referenceNumber ?? null,
+			error: result.error ?? null,
+		}
+	}
+
+	async submitDeathCertificateToLcr(registrationId: string) {
+		const result = await this.lcrSubmissionService.submitDeathCertificate(registrationId)
+		const submissionStatus: LcrSubmissionStatus = result.success
+			? result.acknowledgementNumber
+				? "acknowledged"
+				: "submitted"
+			: "error"
+		await this.markLcrSubmitted({
+			certificateType: "death",
+			sourceRecordId: registrationId,
+			submissionStatus,
+			acknowledgementNumber: result.acknowledgementNumber,
+			referenceNumber: result.referenceNumber,
+			error: result.error,
+		})
+
+		return {
+			success: result.success,
+			submissionStatus,
+			acknowledgementNumber: result.acknowledgementNumber ?? null,
+			referenceNumber: result.referenceNumber ?? null,
+			error: result.error ?? null,
+		}
+	}
+
+	async retryLcrSubmission(input: { certificateType: LcrCertificateType; sourceRecordId: string }) {
+		return input.certificateType === "birth"
+			? this.submitBirthCertificateToLcr(input.sourceRecordId)
+			: this.submitDeathCertificateToLcr(input.sourceRecordId)
+	}
+
 	async listBirthRegistrations(input: ListBirthRegistrationsInput) {
 		const page = Number(input.page) || 1
 		const limit = Number(input.limit) || 50
@@ -381,6 +586,12 @@ export class CivilRegistryService {
 	 * Sets requestedAt to now.
 	 */
 	async createBirthRegistration(input: CreateBirthRegistrationInput, userId?: string) {
+		this.validateBirthRegistrationData(input)
+		await this.assertBirthRegistrationPatientContext({
+			facilityId: input.facilityId,
+			patientId: input.patientId,
+			encounterId: input.encounterId,
+		})
 		let resolvedStaffId = input.registeredByStaffId ?? null
 
 		const placeOfBirthComponents = [
@@ -441,6 +652,7 @@ export class CivilRegistryService {
 
 	async updateBirthRegistration(input: UpdateBirthRegistrationInput) {
 		const existing = await this.getBirthRegistration(input.id)
+		this.validateBirthRegistrationData(input)
 
 		const updateData: Record<string, unknown> = { updatedAt: new Date() }
 		if (input.status !== undefined) updateData.status = input.status
@@ -593,6 +805,7 @@ export class CivilRegistryService {
 		input: CreateDeathCertificateRegistrationInput,
 		userId?: string
 	) {
+		this.validateDeathCertificateData(input)
 		await this.assertDeathCertificatePatientContext({
 			facilityId: input.facilityId,
 			patientId: input.patientId,
@@ -648,6 +861,7 @@ export class CivilRegistryService {
 
 	async updateDeathCertificateRegistration(input: UpdateDeathCertificateRegistrationInput) {
 		const existing = await this.getDeathCertificateRegistration(input.id)
+		this.validateDeathCertificateData(input)
 		await this.assertDeathCertificatePatientContext({
 			facilityId: existing.facilityId,
 			patientId: existing.patientId,
@@ -907,6 +1121,235 @@ export class CivilRegistryService {
 			.where(eq(deathCertificateRegistrations.id, sourceRecordId))
 	}
 
+	private validateBirthRegistrationData(
+		data: CreateBirthRegistrationInput | UpdateBirthRegistrationInput
+	): void {
+		const errors: string[] = []
+		if ("birthDatetime" in data && data.birthDatetime !== undefined) {
+			const birthDate = new Date(data.birthDatetime)
+			if (Number.isNaN(birthDate.getTime())) errors.push("Invalid birth datetime")
+			if (birthDate > new Date()) errors.push("Birth datetime cannot be in the future")
+		}
+
+		const hasLocationInput =
+			"placeOfBirthBarangay" in data ||
+			"placeOfBirthMunicipality" in data ||
+			"placeOfBirthProvince" in data ||
+			"placeOfBirthRegion" in data
+		if (hasLocationInput) {
+			const hasLocation = [
+				data.placeOfBirthBarangay,
+				data.placeOfBirthMunicipality,
+				data.placeOfBirthProvince,
+				data.placeOfBirthRegion,
+			].some(value => value?.trim())
+			if (!hasLocation) {
+				errors.push("At least one place of birth location component is required")
+			}
+		}
+
+		if ("motherName" in data || "fatherName" in data) {
+			const hasParent = data.motherName?.trim() || data.fatherName?.trim()
+			if (!hasParent) errors.push("At least one parent name is required")
+		}
+
+		if (data.physicianSignature?.trim()) {
+			if (!data.physicianName?.trim()) {
+				errors.push("Physician name is required when signature is provided")
+			}
+			if (!data.physicianLicenseNo?.trim()) {
+				errors.push("Physician license number is required when signature is provided")
+			}
+		}
+
+		if (errors.length > 0) throw new BadRequestException(errors.join("; "))
+	}
+
+	private validateDeathCertificateData(
+		data: CreateDeathCertificateRegistrationInput | UpdateDeathCertificateRegistrationInput
+	): void {
+		const errors: string[] = []
+		if ("deathDatetime" in data && data.deathDatetime !== undefined) {
+			const deathDate = new Date(data.deathDatetime)
+			if (Number.isNaN(deathDate.getTime())) errors.push("Invalid death datetime")
+			if (deathDate > new Date()) errors.push("Death datetime cannot be in the future")
+		}
+		if ("deceasedName" in data && data.deceasedName !== undefined && !data.deceasedName.trim()) {
+			errors.push("Deceased name is required")
+		}
+		if (
+			"causeOfDeathImmediate" in data ||
+			"causeOfDeathAntecedent" in data ||
+			"causeOfDeathUnderlying" in data ||
+			"causeOfDeathContributing" in data
+		) {
+			const hasCause = [
+				data.causeOfDeathImmediate,
+				data.causeOfDeathAntecedent,
+				data.causeOfDeathUnderlying,
+				data.causeOfDeathContributing,
+			].some(value => value?.trim())
+			if (!hasCause) errors.push("At least one cause of death field is required")
+		}
+		if ("placeOfDeath" in data && data.placeOfDeath !== undefined && !data.placeOfDeath.trim()) {
+			errors.push("Place of death is required")
+		}
+		if (data.ageAtDeathYears !== undefined && data.ageAtDeathYears < 0) {
+			errors.push("Age at death cannot be negative")
+		}
+		if (data.physicianSignature?.trim()) {
+			if (!data.physicianName?.trim()) {
+				errors.push("Physician name is required when signature is provided")
+			}
+			if (!data.physicianLicenseNo?.trim()) {
+				errors.push("Physician license number is required when signature is provided")
+			}
+		}
+		if (data.informantRelationship?.trim() && !data.informantName?.trim()) {
+			errors.push("Informant name is required when relationship is provided")
+		}
+
+		if (errors.length > 0) throw new BadRequestException(errors.join("; "))
+	}
+
+	private async getPatientForPrefill(patientId: string) {
+		const [patient] = await db.select().from(patients).where(eq(patients.id, patientId)).limit(1)
+		if (!patient) throw new NotFoundException(`Patient ${patientId} not found`)
+		return patient
+	}
+
+	private async getEncounterForPrefill(input: {
+		encounterId: string
+		patientId: string
+		facilityId: string
+	}) {
+		const [encounter] = await db
+			.select()
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+			.limit(1)
+		if (!encounter) throw new NotFoundException(`Encounter ${input.encounterId} not found`)
+		if (encounter.patientId !== input.patientId) {
+			throw new BadRequestException("Prefill encounter does not belong to the selected patient")
+		}
+		if (encounter.facilityId !== input.facilityId) {
+			throw new BadRequestException(
+				"Prefill encounter facility does not match the patient facility"
+			)
+		}
+		return encounter
+	}
+
+	private async getStaffPhysician(staffId: string) {
+		const [staff] = await db
+			.select({
+				staffId: staffProfiles.id,
+				name: users.name,
+				licenseNo: staffProfiles.prcLicenseNumber,
+			})
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.where(eq(staffProfiles.id, staffId))
+			.limit(1)
+
+		if (!staff) return null
+		return {
+			staffId: staff.staffId,
+			name: staff.name,
+			licenseNo: staff.licenseNo ?? "",
+		}
+	}
+
+	private async getFacilityForPrefill(facilityId: string) {
+		const [facility] = await db
+			.select({ name: facilities.name, address: facilities.address })
+			.from(facilities)
+			.where(eq(facilities.id, facilityId))
+			.limit(1)
+		return facility ?? null
+	}
+
+	private formatPatientName(patient: Pick<PatientRow, "firstName" | "middleName" | "lastName">) {
+		return [patient.firstName, patient.middleName, patient.lastName].filter(Boolean).join(" ")
+	}
+
+	private formatPatientAddress(
+		patient: Pick<PatientRow, "addressLine1" | "addressLine2" | "city" | "province" | "zipCode">
+	) {
+		return [
+			patient.addressLine1,
+			patient.addressLine2,
+			patient.city,
+			patient.province,
+			patient.zipCode,
+		]
+			.filter(Boolean)
+			.join(", ")
+	}
+
+	private calculateAgeYears(dateOfBirth: Date, referenceDate: Date): number {
+		let age = referenceDate.getFullYear() - dateOfBirth.getFullYear()
+		const monthDiff = referenceDate.getMonth() - dateOfBirth.getMonth()
+		if (monthDiff < 0 || (monthDiff === 0 && referenceDate.getDate() < dateOfBirth.getDate())) {
+			age--
+		}
+		return Math.max(0, age)
+	}
+
+	private async assertBirthRegistrationPatientContext(input: {
+		facilityId: string
+		patientId: string
+		encounterId?: string | null
+	}) {
+		const [patient] = await db
+			.select({
+				id: patients.id,
+				facilityId: patients.facilityId,
+				dateOfBirth: patients.dateOfBirth,
+			})
+			.from(patients)
+			.where(eq(patients.id, input.patientId))
+			.limit(1)
+
+		if (!patient) {
+			throw new NotFoundException(`Patient ${input.patientId} not found`)
+		}
+		if (patient.facilityId !== input.facilityId) {
+			throw new BadRequestException(
+				"Birth registration facility does not match the patient's facility."
+			)
+		}
+
+		const birthDate = new Date(patient.dateOfBirth)
+		const ageYears = this.calculateAgeYears(birthDate, new Date())
+		if (ageYears > 1) {
+			throw new BadRequestException("Birth registrations can only be created for newborn patients")
+		}
+
+		if (!input.encounterId) return
+		const [encounter] = await db
+			.select({
+				id: encounters.id,
+				facilityId: encounters.facilityId,
+				patientId: encounters.patientId,
+			})
+			.from(encounters)
+			.where(eq(encounters.id, input.encounterId))
+			.limit(1)
+
+		if (!encounter) throw new NotFoundException(`Encounter ${input.encounterId} not found`)
+		if (encounter.patientId !== input.patientId) {
+			throw new BadRequestException(
+				"Birth registration patient does not match the encounter patient."
+			)
+		}
+		if (encounter.facilityId !== input.facilityId) {
+			throw new BadRequestException(
+				"Birth registration facility does not match the encounter facility."
+			)
+		}
+	}
+
 	private async assertDeathCertificatePatientContext(input: {
 		facilityId: string
 		patientId: string
@@ -1094,6 +1537,38 @@ export class CivilRegistryService {
 		}
 	}
 
+	private assertBirthRegistrationReadyForArtifactGeneration(row: BirthRegistrationRow) {
+		const errors: string[] = []
+		if (Number.isNaN(row.birthDatetime.getTime())) {
+			errors.push("valid birth date/time")
+		}
+		if (
+			![
+				row.placeOfBirthBarangay,
+				row.placeOfBirthMunicipality,
+				row.placeOfBirthProvince,
+				row.placeOfBirthRegion,
+			].some(value => value?.trim())
+		) {
+			errors.push("at least one place of birth component")
+		}
+		if (!row.motherName?.trim() && !row.fatherName?.trim()) {
+			errors.push("at least one parent name")
+		}
+		if (row.physicianSignature?.trim()) {
+			if (!row.physicianName?.trim()) errors.push("physician name for captured signature")
+			if (!row.physicianLicenseNo?.trim()) {
+				errors.push("physician license number for captured signature")
+			}
+		}
+
+		if (errors.length > 0) {
+			throw new BadRequestException(
+				`Required artifact generation fields are missing: ${errors.join(", ")}`
+			)
+		}
+	}
+
 	private async assertDeathCertificateReadyForRelease(id: string) {
 		const registration = await this.getDeathCertificateRegistration(id)
 		if (!registration.paidAt) {
@@ -1109,6 +1584,37 @@ export class CivilRegistryService {
 
 		if (missingFields.length > 0) {
 			throw new BadRequestException(`Required LCR fields are missing: ${missingFields.join(", ")}`)
+		}
+	}
+
+	private assertDeathCertificateReadyForArtifactGeneration(row: DeathCertificateRegistrationRow) {
+		const errors: string[] = []
+		if (Number.isNaN(row.deathDatetime.getTime())) {
+			errors.push("valid death date/time")
+		}
+		if (!row.deceasedName?.trim()) errors.push("deceased name")
+		if (!row.placeOfDeath?.trim()) errors.push("place of death")
+		if (
+			![
+				row.causeOfDeathImmediate,
+				row.causeOfDeathAntecedent,
+				row.causeOfDeathUnderlying,
+				row.causeOfDeathContributing,
+			].some(value => value?.trim())
+		) {
+			errors.push("at least one cause of death")
+		}
+		if (row.physicianSignature?.trim()) {
+			if (!row.physicianName?.trim()) errors.push("physician name for captured signature")
+			if (!row.physicianLicenseNo?.trim()) {
+				errors.push("physician license number for captured signature")
+			}
+		}
+
+		if (errors.length > 0) {
+			throw new BadRequestException(
+				`Required artifact generation fields are missing: ${errors.join(", ")}`
+			)
 		}
 	}
 }
