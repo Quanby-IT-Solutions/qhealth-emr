@@ -15,9 +15,22 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common"
 import { Test, type TestingModule } from "@nestjs/testing"
 
+import { LcrArtifactGeneratorService } from "../civil-registry/lcr-artifact-generator.service"
+import { LcrSubmissionService } from "../civil-registry/lcr-submission.service"
 import { CivilRegistryService } from "../civil-registry/civil-registry.service"
 import { MedicalRecordsService } from "../medical-records/medical-records.service"
 import { DeathReportingService } from "./death-reporting.service"
+
+jest.mock("@/config/env.config", () => ({
+	env: {
+		FILE_STORAGE_BASE_URL: "/storage",
+		FILE_STORAGE_TYPE: "local",
+		LCR_API_BASE_URL: undefined,
+		LCR_API_ENABLED: false,
+		LCR_API_KEY: undefined,
+		LCR_API_TIMEOUT_MS: 30000,
+	},
+}))
 
 // ---------------------------------------------------------------------------
 // DB Mock shared by all services
@@ -38,6 +51,16 @@ const mockDb = {
 	insert: mockInsert,
 	update: mockUpdate,
 	select: mockSelect,
+}
+
+const mockLcrArtifactGenerator = {
+	generateBirthCertificateArtifacts: jest.fn(),
+	generateDeathCertificateArtifacts: jest.fn(),
+}
+
+const mockLcrSubmissionService = {
+	submitBirthCertificate: jest.fn(),
+	submitDeathCertificate: jest.fn(),
 }
 
 jest.mock("@/common/database/database.client", () => ({
@@ -327,7 +350,11 @@ describe("CivilRegistryService — SLA-017 checkpoints", () => {
 		jest.clearAllMocks()
 
 		const module: TestingModule = await Test.createTestingModule({
-			providers: [CivilRegistryService],
+			providers: [
+				CivilRegistryService,
+				{ provide: LcrArtifactGeneratorService, useValue: mockLcrArtifactGenerator },
+				{ provide: LcrSubmissionService, useValue: mockLcrSubmissionService },
+			],
 		}).compile()
 
 		service = module.get<CivilRegistryService>(CivilRegistryService)
@@ -353,6 +380,11 @@ describe("CivilRegistryService — SLA-017 checkpoints", () => {
 			}
 
 			setupInsert(created)
+			setupSelectRow({
+				id: "pat-001",
+				facilityId: "fac-001",
+				dateOfBirth: new Date(),
+			})
 
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
