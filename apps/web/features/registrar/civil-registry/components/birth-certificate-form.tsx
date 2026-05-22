@@ -19,7 +19,10 @@ import {
 import { ChartContext } from "@/features/encounters/context/chart-context"
 import { SignatureCanvas } from "@/features/nursing/components/consent-capture"
 import { usePatientProfileQuery } from "@/features/patients/api/patients.hooks"
-import { useCreateBirthRegistrationMutation } from "@/features/registrar/civil-registry/api/lcr.hooks"
+import {
+	useCreateBirthRegistrationMutation,
+	useGetBirthCertificatePrefillDataQuery,
+} from "@/features/registrar/civil-registry/api/lcr.hooks"
 import { LocationPicker } from "@/features/registrar/civil-registry/components/location-picker"
 import { PatientSearchStep } from "@/features/registrar/civil-registry/components/patient-search-step"
 import { PlaceOfBirthDisplay } from "@/features/registrar/civil-registry/components/place-of-birth-display"
@@ -83,6 +86,10 @@ export function BirthCertificateForm() {
 	const resolvedEncounterId = (encounter?.id ?? inferredEncounterId) || undefined
 
 	const createBirthRegistration = useCreateBirthRegistrationMutation()
+	const birthPrefillQuery = useGetBirthCertificatePrefillDataQuery(
+		{ patientId: patientId ?? "", encounterId: resolvedEncounterId },
+		{ enabled: !!patientId }
+	)
 
 	const [form, setForm] = useState({
 		birthDatetime: "",
@@ -99,24 +106,39 @@ export function BirthCertificateForm() {
 		placeOfBirthRegion: "",
 	})
 	const [signatureDataUrl, setSignatureDataUrl] = useState<string>("")
+	const prefill = birthPrefillQuery.data
 	const resolvedBirthDatetime =
-		form.birthDatetime || (patient?.dateOfBirth ? formatDateTimeLocal(patient.dateOfBirth) : "")
+		form.birthDatetime ||
+		(prefill?.birthDatetime ? formatDateTimeLocal(prefill.birthDatetime) : "") ||
+		(patient?.dateOfBirth ? formatDateTimeLocal(patient.dateOfBirth) : "")
 
 	const inferredLocation = findLocationByPatientAddress({
 		city: patient?.city,
 		province: patient?.province,
 	})
 	const resolvedLocation: BirthLocation = {
-		barangay: form.placeOfBirthBarangay || inferredLocation.barangay,
-		municipality: form.placeOfBirthMunicipality || inferredLocation.municipality,
-		province: form.placeOfBirthProvince || inferredLocation.province,
-		region: form.placeOfBirthRegion || inferredLocation.region,
+		barangay:
+			form.placeOfBirthBarangay || prefill?.placeOfBirthBarangay || inferredLocation.barangay,
+		municipality:
+			form.placeOfBirthMunicipality ||
+			prefill?.placeOfBirthMunicipality ||
+			inferredLocation.municipality,
+		province:
+			form.placeOfBirthProvince || prefill?.placeOfBirthProvince || inferredLocation.province,
+		region: form.placeOfBirthRegion || prefill?.placeOfBirthRegion || inferredLocation.region,
 	}
 	const resolvedAttendantAtBirth = form.attendantAtBirth || encounter?.attendingStaffName || ""
-	const resolvedPhysicianName = form.physicianName || encounter?.attendingStaffName || ""
+	const resolvedFatherName = form.fatherName || prefill?.fatherName || ""
+	const resolvedMotherName = form.motherName || prefill?.motherName || ""
+	const resolvedPhysicianName =
+		form.physicianName || prefill?.physicianName || encounter?.attendingStaffName || ""
 	const resolvedPhysicianLicenseNo =
-		form.physicianLicenseNo || encounter?.attendingStaffLicenseNo || ""
-	const resolvedAttendingStaffId = form.attendingStaffId || encounter?.attendingStaffId || ""
+		form.physicianLicenseNo ||
+		prefill?.physicianLicenseNo ||
+		encounter?.attendingStaffLicenseNo ||
+		""
+	const resolvedAttendingStaffId =
+		form.attendingStaffId || prefill?.attendingStaffId || encounter?.attendingStaffId || ""
 	const facilityBirthLocation = [
 		encounter?.wardName,
 		encounter?.bedNumber ? `Bed ${encounter.bedNumber}` : "",
@@ -143,8 +165,8 @@ export function BirthCertificateForm() {
 			placeOfBirthMunicipality: resolvedLocation.municipality || undefined,
 			placeOfBirthProvince: resolvedLocation.province || undefined,
 			placeOfBirthRegion: resolvedLocation.region || undefined,
-			fatherName: form.fatherName || undefined,
-			motherName: form.motherName || undefined,
+			fatherName: resolvedFatherName || undefined,
+			motherName: resolvedMotherName || undefined,
 			physicianName: resolvedPhysicianName || undefined,
 			physicianLicenseNo: resolvedPhysicianLicenseNo || undefined,
 			physicianSignature: signatureDataUrl || undefined,
@@ -255,7 +277,7 @@ export function BirthCertificateForm() {
 							<Label>Father&apos;s Full Name</Label>
 							<Input
 								placeholder="Last, First Middle"
-								value={form.fatherName}
+								value={resolvedFatherName}
 								onChange={e => setForm(f => ({ ...f, fatherName: e.target.value }))}
 							/>
 						</div>
@@ -263,7 +285,7 @@ export function BirthCertificateForm() {
 							<Label>Mother&apos;s Full Name</Label>
 							<Input
 								placeholder="Last, First Middle"
-								value={form.motherName}
+								value={resolvedMotherName}
 								onChange={e => setForm(f => ({ ...f, motherName: e.target.value }))}
 							/>
 						</div>

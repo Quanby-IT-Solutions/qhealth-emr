@@ -1,4 +1,5 @@
 import { Logger, type INestApplication } from "@nestjs/common"
+import path from "node:path"
 import * as express from "express"
 
 import { env } from "@/config/env.config"
@@ -54,6 +55,29 @@ function configureCors(app: INestApplication): void {
 }
 
 /**
+ * Serve local generated artifacts when FILE_STORAGE_TYPE=local.
+ * S3 deployments return signed S3 URLs and do not need this middleware.
+ */
+function configureLocalFileStorage(app: INestApplication): void {
+	if (env.FILE_STORAGE_TYPE !== "local") return
+
+	const storageBasePath = env.FILE_STORAGE_BASE_URL.startsWith("http")
+		? new URL(env.FILE_STORAGE_BASE_URL).pathname
+		: env.FILE_STORAGE_BASE_URL
+	const mountPath = `/${storageBasePath.replace(/^\/+|\/+$/g, "")}`
+	const storagePath = path.resolve(env.FILE_STORAGE_PATH)
+
+	app.getHttpAdapter().use(
+		mountPath,
+		express.static(storagePath, {
+			fallthrough: false,
+			index: false,
+		})
+	)
+	logger.log(`Local file storage mounted at ${mountPath} from ${storagePath}`)
+}
+
+/**
  * Enable graceful shutdown handlers for SIGTERM and SIGINT signals
  */
 function enableGracefulShutdown(app: INestApplication): void {
@@ -81,5 +105,6 @@ function enableGracefulShutdown(app: INestApplication): void {
 export function configureApp(app: INestApplication): void {
 	configureBodyParser(app)
 	configureCors(app)
+	configureLocalFileStorage(app)
 	enableGracefulShutdown(app)
 }

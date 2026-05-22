@@ -96,6 +96,77 @@ export function useMarkLcrSubmittedMutation() {
 	)
 }
 
+export function useRetryLcrSubmissionMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.civilRegistry.retryLcrSubmission.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+		})
+	)
+}
+
+export function useGetBirthCertificatePrefillDataQuery(
+	params: { patientId: string; encounterId?: string },
+	options?: { enabled?: boolean }
+) {
+	return useQuery(
+		orpc.civilRegistry.getPrefillDataForBirthCertificate.queryOptions({
+			input: params,
+			enabled: (options?.enabled ?? true) && !!params.patientId,
+			staleTime: 60_000,
+		})
+	)
+}
+
+export function useGetDeathCertificatePrefillDataQuery(
+	params: { patientId: string; encounterId?: string },
+	options?: { enabled?: boolean }
+) {
+	return useQuery(
+		orpc.civilRegistry.getPrefillDataForDeathCertificate.queryOptions({
+			input: params,
+			enabled: (options?.enabled ?? true) && !!params.patientId,
+			staleTime: 60_000,
+		})
+	)
+}
+
+export function useGenerateBirthCertificateArtifactsMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.civilRegistry.generateBirthCertificateArtifacts.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+		})
+	)
+}
+
+export function useGenerateDeathCertificateArtifactsMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.civilRegistry.generateDeathCertificateArtifacts.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+		})
+	)
+}
+
+export function useSubmitBirthCertificateToLcrMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.civilRegistry.submitBirthCertificateToLcr.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+		})
+	)
+}
+
+export function useSubmitDeathCertificateToLcrMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.civilRegistry.submitDeathCertificateToLcr.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.civilRegistry.key() }),
+		})
+	)
+}
+
 export function useCreateDeathCertificateRegistrationMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(

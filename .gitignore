@@ -79,6 +79,7 @@ dist/
 /build
 
 apps/backend/uploads/
+apps/backend/storage/
 
 # Logs
 logs

@@ -14,12 +14,26 @@ import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { SignatureCanvas } from "@/features/nursing/components/consent-capture"
 import { usePatientProfileQuery } from "@/features/patients/api/patients.hooks"
-import { useCreateDeathCertificateRegistrationMutation } from "@/features/registrar/civil-registry/api/lcr.hooks"
+import {
+	useCreateDeathCertificateRegistrationMutation,
+	useGetDeathCertificatePrefillDataQuery,
+} from "@/features/registrar/civil-registry/api/lcr.hooks"
 import { PatientSearchStep } from "@/features/registrar/civil-registry/components/patient-search-step"
 
 function parseNonNegativeInt(value: string) {
 	const parsed = Number(value)
 	return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : undefined
+}
+
+function formatDateTimeLocal(value: string) {
+	const date = new Date(value)
+	if (Number.isNaN(date.getTime())) return ""
+	const year = date.getFullYear()
+	const month = String(date.getMonth() + 1).padStart(2, "0")
+	const day = String(date.getDate()).padStart(2, "0")
+	const hours = String(date.getHours()).padStart(2, "0")
+	const minutes = String(date.getMinutes()).padStart(2, "0")
+	return `${year}-${month}-${day}T${hours}:${minutes}`
 }
 
 function formatPatientName({
@@ -75,6 +89,10 @@ export function DeathCertificateForm() {
 	const staffId = activeStaffProfile?.id ?? ""
 	const createDeathCertificateRegistration = useCreateDeathCertificateRegistrationMutation()
 	const { data: patient } = usePatientProfileQuery(patientId ?? "")
+	const deathPrefillQuery = useGetDeathCertificatePrefillDataQuery(
+		{ patientId: patientId ?? "", encounterId },
+		{ enabled: !!patientId }
+	)
 
 	const [signatureDataUrl, setSignatureDataUrl] = useState<string>("")
 
@@ -96,20 +114,35 @@ export function DeathCertificateForm() {
 		physicianLicenseNo: "",
 		certificationDate: "",
 	})
+	const prefill = deathPrefillQuery.data
 
 	const patientName = patient ? formatPatientName(patient) : ""
 	const patientAddress = patient ? formatAddress(patient) : ""
 	const patientAge = patient ? calculateAgeYears(patient.dateOfBirth) : ""
-	const resolvedDeceasedName = form.deceasedName || patientName
-	const resolvedDeceasedMrn = form.deceasedMrn || patient?.mrn || ""
-	const resolvedAgeAtDeathYears = form.ageAtDeathYears || patientAge
-	const resolvedDeceasedAddress = form.deceasedAddress || patientAddress
+	const resolvedDeceasedName = form.deceasedName || prefill?.deceasedName || patientName
+	const resolvedDeceasedMrn = form.deceasedMrn || prefill?.deceasedMrn || patient?.mrn || ""
+	const resolvedAgeAtDeathYears =
+		form.ageAtDeathYears || String(prefill?.ageAtDeathYears ?? "") || patientAge
+	const resolvedDeceasedAddress = form.deceasedAddress || prefill?.deceasedAddress || patientAddress
+	const resolvedDateOfDeath =
+		form.dateOfDeath || (prefill?.deathDatetime ? formatDateTimeLocal(prefill.deathDatetime) : "")
+	const resolvedPlaceOfDeath = form.placeOfDeath || prefill?.placeOfDeath || ""
+	const resolvedCauseOfDeathImmediate =
+		form.causeOfDeathImmediate || prefill?.causeOfDeathImmediate || ""
+	const resolvedCauseOfDeathAntecedent =
+		form.causeOfDeathAntecedent || prefill?.causeOfDeathAntecedent || ""
+	const resolvedCauseOfDeathUnderlying =
+		form.causeOfDeathUnderlying || prefill?.causeOfDeathUnderlying || ""
+	const resolvedCauseOfDeathContributing =
+		form.causeOfDeathContributing || prefill?.causeOfDeathContributing || ""
+	const resolvedPhysicianName = form.physicianName || prefill?.physicianName || ""
+	const resolvedPhysicianLicenseNo = form.physicianLicenseNo || prefill?.physicianLicenseNo || ""
 
 	const canSubmit =
 		!!facilityId &&
 		!!patientId &&
 		!createDeathCertificateRegistration.isPending &&
-		!!form.dateOfDeath &&
+		!!resolvedDateOfDeath &&
 		!!resolvedDeceasedName
 
 	async function handleSubmit(e: React.FormEvent) {
@@ -120,22 +153,22 @@ export function DeathCertificateForm() {
 			facilityId,
 			patientId,
 			encounterId,
-			deathDatetime: new Date(form.dateOfDeath).toISOString(),
+			deathDatetime: new Date(resolvedDateOfDeath).toISOString(),
 			registeredByStaffId: staffId || undefined,
 			certificateNumber: form.registryNumber || undefined,
 			deceasedName: resolvedDeceasedName || undefined,
 			deceasedMrn: resolvedDeceasedMrn || undefined,
 			ageAtDeathYears: parseNonNegativeInt(resolvedAgeAtDeathYears),
 			deceasedAddress: resolvedDeceasedAddress || undefined,
-			placeOfDeath: form.placeOfDeath || undefined,
-			causeOfDeathImmediate: form.causeOfDeathImmediate || undefined,
-			causeOfDeathAntecedent: form.causeOfDeathAntecedent || undefined,
-			causeOfDeathUnderlying: form.causeOfDeathUnderlying || undefined,
-			causeOfDeathContributing: form.causeOfDeathContributing || undefined,
+			placeOfDeath: resolvedPlaceOfDeath || undefined,
+			causeOfDeathImmediate: resolvedCauseOfDeathImmediate || undefined,
+			causeOfDeathAntecedent: resolvedCauseOfDeathAntecedent || undefined,
+			causeOfDeathUnderlying: resolvedCauseOfDeathUnderlying || undefined,
+			causeOfDeathContributing: resolvedCauseOfDeathContributing || undefined,
 			informantName: form.informantName || undefined,
 			informantRelationship: form.informantRelationship || undefined,
-			physicianName: form.physicianName || undefined,
-			physicianLicenseNo: form.physicianLicenseNo || undefined,
+			physicianName: resolvedPhysicianName || undefined,
+			physicianLicenseNo: resolvedPhysicianLicenseNo || undefined,
 			physicianSignature: signatureDataUrl || undefined,
 			certificationDate: form.certificationDate || undefined,
 		})
@@ -209,7 +242,7 @@ export function DeathCertificateForm() {
 							</Label>
 							<Input
 								type="datetime-local"
-								value={form.dateOfDeath}
+								value={resolvedDateOfDeath}
 								onChange={e => setForm(f => ({ ...f, dateOfDeath: e.target.value }))}
 								required
 							/>
@@ -226,7 +259,7 @@ export function DeathCertificateForm() {
 						<Label>Place of Death</Label>
 						<Input
 							placeholder="Room / ward / facility"
-							value={form.placeOfDeath}
+							value={resolvedPlaceOfDeath}
 							onChange={e => setForm(f => ({ ...f, placeOfDeath: e.target.value }))}
 						/>
 					</div>
@@ -241,28 +274,28 @@ export function DeathCertificateForm() {
 					<div className="space-y-1.5">
 						<Label>Immediate cause</Label>
 						<Input
-							value={form.causeOfDeathImmediate}
+							value={resolvedCauseOfDeathImmediate}
 							onChange={e => setForm(f => ({ ...f, causeOfDeathImmediate: e.target.value }))}
 						/>
 					</div>
 					<div className="space-y-1.5">
 						<Label>Antecedent cause</Label>
 						<Input
-							value={form.causeOfDeathAntecedent}
+							value={resolvedCauseOfDeathAntecedent}
 							onChange={e => setForm(f => ({ ...f, causeOfDeathAntecedent: e.target.value }))}
 						/>
 					</div>
 					<div className="space-y-1.5">
 						<Label>Underlying cause</Label>
 						<Input
-							value={form.causeOfDeathUnderlying}
+							value={resolvedCauseOfDeathUnderlying}
 							onChange={e => setForm(f => ({ ...f, causeOfDeathUnderlying: e.target.value }))}
 						/>
 					</div>
 					<div className="space-y-1.5">
 						<Label>Contributing cause (optional)</Label>
 						<Input
-							value={form.causeOfDeathContributing}
+							value={resolvedCauseOfDeathContributing}
 							onChange={e => setForm(f => ({ ...f, causeOfDeathContributing: e.target.value }))}
 						/>
 					</div>
@@ -313,14 +346,14 @@ export function DeathCertificateForm() {
 						<div className="space-y-1.5">
 							<Label>Certifying Physician Name</Label>
 							<Input
-								value={form.physicianName}
+								value={resolvedPhysicianName}
 								onChange={e => setForm(f => ({ ...f, physicianName: e.target.value }))}
 							/>
 						</div>
 						<div className="space-y-1.5">
 							<Label>PRC License Number</Label>
 							<Input
-								value={form.physicianLicenseNo}
+								value={resolvedPhysicianLicenseNo}
 								onChange={e => setForm(f => ({ ...f, physicianLicenseNo: e.target.value }))}
 							/>
 						</div>

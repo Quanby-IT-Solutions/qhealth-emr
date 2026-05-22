@@ -11,6 +11,8 @@ const mockMarkDeathPaid = vi.fn()
 const mockMarkDeathReleased = vi.fn()
 const mockGenerateArtifact = vi.fn()
 const mockMarkSubmitted = vi.fn()
+const mockSubmitCertificate = vi.fn()
+const mockRetrySubmission = vi.fn()
 
 vi.mock("next/link", () => ({
 	default: ({
@@ -44,7 +46,12 @@ vi.mock("@/features/registrar/civil-registry/api/lcr.hooks", () => ({
 	useMarkDeathCertificateRegistrationPaidMutation: () => mockMarkDeathPaid(),
 	useMarkDeathCertificateRegistrationReleasedMutation: () => mockMarkDeathReleased(),
 	useGenerateLcrArtifactMutation: () => mockGenerateArtifact(),
+	useGenerateBirthCertificateArtifactsMutation: () => mockGenerateArtifact(),
+	useGenerateDeathCertificateArtifactsMutation: () => mockGenerateArtifact(),
 	useMarkLcrSubmittedMutation: () => mockMarkSubmitted(),
+	useSubmitBirthCertificateToLcrMutation: () => mockSubmitCertificate(),
+	useSubmitDeathCertificateToLcrMutation: () => mockSubmitCertificate(),
+	useRetryLcrSubmissionMutation: () => mockRetrySubmission(),
 }))
 
 const activeRoleId = "11111111-1111-4111-8111-111111111111"
@@ -147,8 +154,10 @@ function mockDeathRegistration() {
 		tracking: {
 			pdfStatus: "generated",
 			pdfGeneratedAt: new Date("2026-01-16T11:10:00.000Z"),
+			pdfUrl: "/storage/lcr-certificates/death/facility/2026/registration.pdf",
 			xmlStatus: "generated",
 			xmlGeneratedAt: new Date("2026-01-16T11:15:00.000Z"),
+			xmlUrl: "/storage/lcr-certificates/death/facility/2026/registration.xml",
 			submissionStatus: "acknowledged",
 			submittedAt: new Date("2026-01-16T12:00:00.000Z"),
 			acknowledgementNumber: "ACK-1",
@@ -176,6 +185,8 @@ describe("LcrTrackingTable", () => {
 		mockMarkDeathReleased.mockReturnValue({ mutate: vi.fn(), isPending: false })
 		mockGenerateArtifact.mockReturnValue({ mutate: vi.fn(), isPending: false })
 		mockMarkSubmitted.mockReturnValue({ mutate: vi.fn(), isPending: false })
+		mockSubmitCertificate.mockReturnValue({ mutate: vi.fn(), isPending: false })
+		mockRetrySubmission.mockReturnValue({ mutate: vi.fn(), isPending: false })
 	})
 
 	it("releases with the active staff-profile UUID instead of the auth user id", () => {

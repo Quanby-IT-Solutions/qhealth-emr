@@ -68,6 +68,15 @@ export const env = createEnv({
 		// ElevenLabs speech-to-text
 		ELEVENLABS_API_KEY: optionalString,
 
+		// File storage for generated artifacts
+		FILE_STORAGE_TYPE: z.enum(["local", "s3"]).default("local"),
+		FILE_STORAGE_PATH: z.string().default("./storage"),
+		FILE_STORAGE_BASE_URL: z.string().default("/storage"),
+		AWS_S3_BUCKET: optionalString,
+		AWS_REGION: z.string().default("ap-southeast-1"),
+		AWS_ACCESS_KEY_ID: optionalString,
+		AWS_SECRET_ACCESS_KEY: optionalString,
+
 		// Outbound SMTP for clinical document delivery (abstract, e-Rx).
 		// When MAILER_MODE=smtp and host/user/pass/from are set, NodemailerMailer
 		// is used. Otherwise LogOnlyMailer logs the send and the document is still
@@ -88,6 +97,10 @@ export const env = createEnv({
 		// Additional integration credential env-vars
 		FHIR_API_KEY: z.string().optional(),
 		CIVIL_REGISTRY_API_KEY: z.string().optional(),
+		LCR_API_ENABLED: z.coerce.boolean().default(false),
+		LCR_API_BASE_URL: optionalUrl,
+		LCR_API_KEY: optionalString,
+		LCR_API_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
 		HAI_API_KEY: z.string().optional(),
 		ERP_API_KEY: z.string().optional(),
 		LIS_API_KEY: z.string().optional(),

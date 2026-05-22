@@ -47,7 +47,7 @@ export const LcrTrackingCertificateSourceSchema = z.object({
 	sourceRecordId: z.string().uuid(),
 })
 
-const LcrArtifactReferenceSchema = z.string().trim().min(1).url()
+const LcrArtifactReferenceSchema = z.string().trim().min(1)
 
 export const GenerateLcrArtifactInputSchema = LcrTrackingCertificateSourceSchema.extend({
 	artifactType: LcrArtifactTypeEnum,
@@ -73,6 +73,76 @@ export const MarkLcrSubmittedInputSchema = LcrTrackingCertificateSourceSchema.ex
 	acknowledgementNumber: z.string().optional(),
 	referenceNumber: z.string().optional(),
 	error: z.string().optional(),
+})
+
+export const GenerateBirthCertificateArtifactsSchema = z.object({
+	id: z.string().uuid(),
+})
+
+export const GenerateDeathCertificateArtifactsSchema = z.object({
+	id: z.string().uuid(),
+})
+
+export const GenerateArtifactsResponseSchema = z.object({
+	success: z.boolean(),
+	pdfUrl: LcrArtifactReferenceSchema,
+	xmlUrl: LcrArtifactReferenceSchema,
+})
+
+export const SubmitBirthCertificateToLcrSchema = z.object({
+	id: z.string().uuid(),
+})
+
+export const SubmitDeathCertificateToLcrSchema = z.object({
+	id: z.string().uuid(),
+})
+
+export const RetryLcrSubmissionSchema = LcrTrackingCertificateSourceSchema
+
+export const LcrSubmissionResponseSchema = z.object({
+	success: z.boolean(),
+	submissionStatus: LcrSubmissionStatusEnum,
+	acknowledgementNumber: z.string().nullable(),
+	referenceNumber: z.string().nullable(),
+	error: z.string().nullable(),
+})
+
+export const GetPrefillDataForBirthCertificateSchema = z.object({
+	patientId: z.string().uuid(),
+	encounterId: z.string().uuid().optional(),
+})
+
+export const BirthCertificatePrefillDataSchema = z.object({
+	birthDatetime: z.string(),
+	placeOfBirthBarangay: z.string().optional(),
+	placeOfBirthMunicipality: z.string().optional(),
+	placeOfBirthProvince: z.string().optional(),
+	placeOfBirthRegion: z.string().optional(),
+	motherName: z.string().optional(),
+	fatherName: z.string().optional(),
+	physicianName: z.string().optional(),
+	physicianLicenseNo: z.string().optional(),
+	attendingStaffId: z.string().uuid().optional(),
+})
+
+export const GetPrefillDataForDeathCertificateSchema = z.object({
+	patientId: z.string().uuid(),
+	encounterId: z.string().uuid().optional(),
+})
+
+export const DeathCertificatePrefillDataSchema = z.object({
+	deathDatetime: z.string(),
+	deceasedName: z.string(),
+	deceasedMrn: z.string(),
+	ageAtDeathYears: z.number().int().min(0),
+	deceasedAddress: z.string(),
+	placeOfDeath: z.string(),
+	causeOfDeathImmediate: z.string().optional(),
+	causeOfDeathAntecedent: z.string().optional(),
+	causeOfDeathUnderlying: z.string().optional(),
+	causeOfDeathContributing: z.string().optional(),
+	physicianName: z.string().optional(),
+	physicianLicenseNo: z.string().optional(),
 })
 
 export const ListLcrTrackingSchema = z.object({

@@ -19,13 +19,19 @@ import {
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
+	useGenerateBirthCertificateArtifactsMutation,
+	useGenerateDeathCertificateArtifactsMutation,
 	useListLcrTrackingQuery,
 	useMarkBirthRegistrationPaidMutation,
 	useMarkBirthRegistrationReleasedMutation,
 	useMarkDeathCertificateRegistrationPaidMutation,
 	useMarkDeathCertificateRegistrationReleasedMutation,
 	useMarkLcrSubmittedMutation,
+	useRetryLcrSubmissionMutation,
+	useSubmitBirthCertificateToLcrMutation,
+	useSubmitDeathCertificateToLcrMutation,
 } from "@/features/registrar/civil-registry/api/lcr.hooks"
+import { env } from "@/env"
 
 type LcrSubmissionStatus =
 	| "not_submitted"
@@ -122,8 +128,30 @@ export function LcrTrackingTable() {
 	const markDeathPaid = useMarkDeathCertificateRegistrationPaidMutation()
 	const markDeathReleased = useMarkDeathCertificateRegistrationReleasedMutation()
 	const markSubmitted = useMarkLcrSubmittedMutation()
+	const generateBirthArtifacts = useGenerateBirthCertificateArtifactsMutation()
+	const generateDeathArtifacts = useGenerateDeathCertificateArtifactsMutation()
+	const submitBirthCertificate = useSubmitBirthCertificateToLcrMutation()
+	const submitDeathCertificate = useSubmitDeathCertificateToLcrMutation()
+	const retrySubmission = useRetryLcrSubmissionMutation()
 
 	const records = (data?.data ?? []) as LcrTrackingRecord[]
+	const isArtifactActionPending =
+		generateBirthArtifacts.isPending || generateDeathArtifacts.isPending
+	const isSubmissionActionPending =
+		submitBirthCertificate.isPending ||
+		submitDeathCertificate.isPending ||
+		retrySubmission.isPending ||
+		markSubmitted.isPending
+
+	function downloadArtifact(url: string, filename: string) {
+		const link = document.createElement("a")
+		link.href = resolveArtifactUrl(url)
+		link.download = filename
+		link.rel = "noopener noreferrer"
+		document.body.appendChild(link)
+		link.click()
+		document.body.removeChild(link)
+	}
 
 	return (
 		<div className="space-y-6">
@@ -204,8 +232,11 @@ export function LcrTrackingTable() {
 									tracking.xmlStatus === "generated" &&
 									!!tracking.pdfUrl?.trim() &&
 									!!tracking.xmlUrl?.trim()
+								const canGenerateArtifacts = record.status !== "draft"
 								const markPaid = isBirth ? markBirthPaid : markDeathPaid
 								const markReleased = isBirth ? markBirthReleased : markDeathReleased
+								const generateArtifacts = isBirth ? generateBirthArtifacts : generateDeathArtifacts
+								const submitCertificate = isBirth ? submitBirthCertificate : submitDeathCertificate
 
 								return (
 									<TableRow key={`${record.certificateType}-${record.sourceRecordId}`}>
@@ -311,35 +342,66 @@ export function LcrTrackingTable() {
 													size="sm"
 													variant="outline"
 													className="h-7 px-2 text-xs"
-													disabled
-													title="PDF generation is unavailable until the backend returns a persisted artifact URL."
+													disabled={isArtifactActionPending || !canGenerateArtifacts}
+													onClick={() => generateArtifacts.mutate({ id: record.sourceRecordId })}
 												>
-													Generate PDF
+													Generate
 												</Button>
+												{tracking?.pdfUrl && (
+													<Button
+														size="sm"
+														variant="outline"
+														className="h-7 px-2 text-xs"
+														onClick={() =>
+															downloadArtifact(
+																tracking.pdfUrl!,
+																`${record.certificateType}-${record.sourceRecordId}.pdf`
+															)
+														}
+													>
+														PDF
+													</Button>
+												)}
+												{tracking?.xmlUrl && (
+													<Button
+														size="sm"
+														variant="outline"
+														className="h-7 px-2 text-xs"
+														onClick={() =>
+															downloadArtifact(
+																tracking.xmlUrl!,
+																`${record.certificateType}-${record.sourceRecordId}.xml`
+															)
+														}
+													>
+														XML
+													</Button>
+												)}
 												<Button
 													size="sm"
 													variant="outline"
 													className="h-7 px-2 text-xs"
-													disabled
-													title="XML generation is unavailable until the backend returns a persisted artifact URL."
+													disabled={isSubmissionActionPending || !canSubmit}
+													onClick={() => submitCertificate.mutate({ id: record.sourceRecordId })}
 												>
-													Generate XML
+													Submit
 												</Button>
-												<Button
-													size="sm"
-													variant="outline"
-													className="h-7 px-2 text-xs"
-													disabled={markSubmitted.isPending || !canSubmit}
-													onClick={() =>
-														markSubmitted.mutate({
-															certificateType: record.certificateType,
-															sourceRecordId: record.sourceRecordId,
-															submissionStatus: "submitted",
-														})
-													}
-												>
-													Mark Submitted
-												</Button>
+												{tracking?.submissionStatus === "error" && (
+													<Button
+														size="sm"
+														variant="outline"
+														className="h-7 px-2 text-xs"
+														disabled={isSubmissionActionPending}
+														onClick={() =>
+															retrySubmission.mutate({
+																certificateType: record.certificateType,
+																sourceRecordId: record.sourceRecordId,
+															})
+														}
+													>
+														Retry
+													</Button>
+												)}
 											</div>
 										</TableCell>
 									</TableRow>
@@ -354,4 +416,11 @@ export function LcrTrackingTable() {
 			)}
 		</div>
 	)
+}
+
+function resolveArtifactUrl(url: string) {
+	if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) return url
+
+	const apiOrigin = new URL(env.NEXT_PUBLIC_API_BASE_URL).origin
+	return new URL(url.startsWith("/") ? url : `/${url}`, apiOrigin).toString()
 }
