@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { MapPin, Video } from "lucide-react"
+import { toast } from "sonner"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -21,6 +23,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/core/components/ui/select"
+import { usePermissions } from "@/core/hooks/use-permissions"
 import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
 import {
 	useAvailableSlotsQuery,
@@ -28,6 +31,11 @@ import {
 	useStaffClinicianListQuery,
 	type TimeSlot,
 } from "@/features/scheduling/api/scheduling.hooks"
+import {
+	TelemedicineAppointmentFields,
+	type TelemedicinePlatformChoice,
+} from "@/features/scheduling/components/telemedicine-appointment-fields"
+import { useCreateAppointmentMutation as useCreateTelemedicineAppointmentMutation } from "@/features/telemedicine/api/telemedicine.hooks"
 
 interface AppointmentBookingProps {
 	facilityId: string
@@ -44,9 +52,14 @@ function formatSlotTime(time: string) {
 	return `${hour}:${(m ?? 0).toString().padStart(2, "0")} ${period}`
 }
 
+type AppointmentType = "in-person" | "telemedicine"
+
 export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 	const [date, setDate] = useState(todayIso())
 	const [clinicianId, setClinicianId] = useState<string>("")
+	const [appointmentType, setAppointmentType] = useState<AppointmentType>("in-person")
+	const [platform, setPlatform] = useState<TelemedicinePlatformChoice>("livekit")
+	const [durationMinutes, setDurationMinutes] = useState(30)
 	const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null)
 	const [bookingOpen, setBookingOpen] = useState(false)
 	const [patientSearch, setPatientSearch] = useState("")
@@ -55,6 +68,8 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 	const [chiefComplaint, setChiefComplaint] = useState("")
 	const [notes, setNotes] = useState("")
 
+	const { canCreateTelemedicine } = usePermissions()
+	const isTelemedicine = appointmentType === "telemedicine"
 	const cliniciansQuery = useStaffClinicianListQuery({ facilityId })
 	const clinicians = cliniciansQuery.data ?? []
 	const selectedClinician = clinicians.find(c => c.id === clinicianId)
@@ -70,6 +85,8 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 	)
 
 	const bookMut = useBookAppointmentMutation()
+	const telemedicineBookMut = useCreateTelemedicineAppointmentMutation()
+	const isBooking = bookMut.isPending || telemedicineBookMut.isPending
 
 	const slots = slotsQuery.data?.slots ?? []
 	const clinicName = slotsQuery.data?.clinicName
@@ -87,6 +104,35 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 
 	function handleBook() {
 		if (!selectedSlot || !selectedPatientId || !clinicianId) return
+		if (isTelemedicine) {
+			if (platform !== "livekit") {
+				toast.error("Only LiveKit telemedicine appointments are available right now.")
+				return
+			}
+			telemedicineBookMut.mutate(
+				{
+					facilityId,
+					patientId: selectedPatientId,
+					clinicianId,
+					scheduledDate: date,
+					scheduledTime: selectedSlot.time.slice(0, 5),
+					durationMinutes,
+					platform: "livekit",
+					notes: notes || undefined,
+				},
+				{
+					onSuccess: () => {
+						setBookingOpen(false)
+						toast.success("Telemedicine appointment booked.")
+					},
+					onError: error => {
+						toast.error(error instanceof Error ? error.message : "Failed to book appointment.")
+					},
+				}
+			)
+			return
+		}
+
 		bookMut.mutate(
 			{
 				facilityId,
@@ -102,6 +148,10 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 			{
 				onSuccess: () => {
 					setBookingOpen(false)
+					toast.success("Appointment booked.")
+				},
+				onError: error => {
+					toast.error(error instanceof Error ? error.message : "Failed to book appointment.")
 				},
 			}
 		)
@@ -117,7 +167,44 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 				<CardContent>
 					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 						<div className="space-y-1">
-							<Label>Clinician</Label>
+							<Label>Appointment Type</Label>
+							<Select
+								value={appointmentType}
+								onValueChange={value => {
+									if (!value) return
+									const nextType = value as AppointmentType
+									setAppointmentType(nextType)
+									setSelectedSlot(null)
+									setBookingOpen(false)
+									if (nextType === "telemedicine") {
+										setChiefComplaint("")
+									}
+								}}
+							>
+								<SelectTrigger className="w-full">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="in-person">
+										<span className="inline-flex items-center gap-2">
+											<MapPin className="size-4" />
+											In-person
+										</span>
+									</SelectItem>
+									{canCreateTelemedicine && (
+										<SelectItem value="telemedicine">
+											<span className="inline-flex items-center gap-2">
+												<Video className="size-4" />
+												Telemedicine
+											</span>
+										</SelectItem>
+									)}
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="space-y-1">
+							<Label>{isTelemedicine ? "Physician" : "Clinician"}</Label>
 							<Select
 								value={clinicianId}
 								onValueChange={v => {
@@ -128,7 +215,9 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 									<SelectValue className="min-w-0 truncate">
 										{selectedClinician
 											? `${selectedClinician.name}${selectedClinician.department ? ` — ${selectedClinician.department}` : ""}`
-											: "Select clinician"}
+											: isTelemedicine
+												? "Select physician"
+												: "Select clinician"}
 									</SelectValue>
 								</SelectTrigger>
 								<SelectContent className="max-w-[calc(100vw-2rem)] min-w-72 sm:min-w-96">
@@ -212,6 +301,13 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 						<div className="space-y-4 text-sm">
 							<div className="space-y-1 rounded-md border p-3">
 								<div className="flex justify-between">
+									<span className="text-muted-foreground">Type</span>
+									<Badge variant={isTelemedicine ? "secondary" : "outline"} className="gap-1">
+										{isTelemedicine ? <Video className="size-3" /> : <MapPin className="size-3" />}
+										{isTelemedicine ? "Telemedicine" : "In-person"}
+									</Badge>
+								</div>
+								<div className="flex justify-between">
 									<span className="text-muted-foreground">Date</span>
 									<span className="font-medium">{date}</span>
 								</div>
@@ -226,6 +322,18 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 									</div>
 								)}
 							</div>
+
+							{isTelemedicine && (
+								<TelemedicineAppointmentFields
+									facilityId={facilityId}
+									clinicianId={clinicianId}
+									onClinicianChange={setClinicianId}
+									platform={platform}
+									onPlatformChange={setPlatform}
+									durationMinutes={durationMinutes}
+									onDurationChange={setDurationMinutes}
+								/>
+							)}
 
 							<div className="space-y-1">
 								<Label>Search Patient</Label>
@@ -269,14 +377,16 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 								{selectedPatientId && <p className="text-xs text-green-600">Patient selected</p>}
 							</div>
 
-							<div className="space-y-1">
-								<Label>Chief Complaint</Label>
-								<Input
-									placeholder="Chief complaint"
-									value={chiefComplaint}
-									onChange={e => setChiefComplaint(e.target.value)}
-								/>
-							</div>
+							{!isTelemedicine && (
+								<div className="space-y-1">
+									<Label>Chief Complaint</Label>
+									<Input
+										placeholder="Chief complaint"
+										value={chiefComplaint}
+										onChange={e => setChiefComplaint(e.target.value)}
+									/>
+								</div>
+							)}
 
 							<div className="space-y-1">
 								<Label>Notes (optional)</Label>
@@ -293,8 +403,8 @@ export function AppointmentBooking({ facilityId }: AppointmentBookingProps) {
 						<Button variant="outline" onClick={() => setBookingOpen(false)}>
 							Cancel
 						</Button>
-						<Button onClick={handleBook} disabled={bookMut.isPending || !selectedPatientId}>
-							{bookMut.isPending ? "Booking…" : "Confirm Booking"}
+						<Button onClick={handleBook} disabled={isBooking || !selectedPatientId || !clinicianId}>
+							{isBooking ? "Booking…" : isTelemedicine ? "Book Telemedicine" : "Confirm Booking"}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
