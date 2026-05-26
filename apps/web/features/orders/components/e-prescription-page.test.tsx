@@ -180,6 +180,123 @@ describe("EPrescriptionPage", () => {
 		expect(screen.getByRole("button", { name: /generate rx/i })).toBeDisabled()
 	})
 
+	it("blocks e-prescription generation when PRC or PTR credentials are expired", () => {
+		const createMutate = vi.fn()
+		mockUseMyProfile.mockReturnValue({
+			data: {
+				activeRole: {
+					permissions: [
+						{ module: "orders", action: "view" },
+						{ module: "orders", action: "create" },
+						{ module: "orders", action: "sign" },
+					],
+				},
+				staffProfiles: [
+					{
+						id: "staff-1",
+						facilityId: "facility-1",
+						prcLicenseNumber: "PRC-EXPIRED",
+						prcExpiry: "2020-01-01",
+						ptrNumber: "PTR-EXPIRED",
+						ptrExpiry: "2020-01-01",
+					},
+				],
+				user: { name: "Dr. Expired" },
+			},
+		})
+		mockUseMedOrderListQuery.mockReturnValue({
+			data: {
+				data: [
+					{
+						id: "order-1",
+						status: "verified",
+						genericName: "Paracetamol",
+						dose: "500",
+						doseUnit: "mg",
+						doseForm: "tablet",
+						route: "oral",
+						frequency: "once",
+						pdeaTrancheNumber: null,
+					},
+				],
+			},
+			isLoading: false,
+		})
+		mockUseCreatePrescriptionMutation.mockReturnValue({
+			mutate: createMutate,
+			isPending: false,
+		})
+
+		render(
+			<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />
+		)
+
+		expect(screen.getByText(/PRC license expired/i)).toBeInTheDocument()
+		expect(screen.getByText(/PTR expired/i)).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: /generate rx/i })).toBeDisabled()
+		expect(createMutate).not.toHaveBeenCalled()
+	})
+
+	it("shows expiring PRC/PTR alerts without blocking active credentials", () => {
+		const createMutate = vi.fn()
+		const soon = new Date()
+		soon.setDate(soon.getDate() + 10)
+		const soonDate = soon.toISOString().split("T")[0]!
+		mockUseMyProfile.mockReturnValue({
+			data: {
+				activeRole: {
+					permissions: [
+						{ module: "orders", action: "view" },
+						{ module: "orders", action: "create" },
+						{ module: "orders", action: "sign" },
+					],
+				},
+				staffProfiles: [
+					{
+						id: "staff-1",
+						facilityId: "facility-1",
+						prcLicenseNumber: "PRC-SOON",
+						prcExpiry: soonDate,
+						ptrNumber: "PTR-SOON",
+						ptrExpiry: soonDate,
+					},
+				],
+				user: { name: "Dr. Soon" },
+			},
+		})
+		mockUseMedOrderListQuery.mockReturnValue({
+			data: {
+				data: [
+					{
+						id: "order-1",
+						status: "verified",
+						genericName: "Paracetamol",
+						dose: "500",
+						doseUnit: "mg",
+						doseForm: "tablet",
+						route: "oral",
+						frequency: "once",
+						pdeaTrancheNumber: null,
+					},
+				],
+			},
+			isLoading: false,
+		})
+		mockUseCreatePrescriptionMutation.mockReturnValue({
+			mutate: createMutate,
+			isPending: false,
+		})
+
+		render(
+			<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />
+		)
+
+		expect(screen.getByText(/PRC license expires/i)).toBeInTheDocument()
+		expect(screen.getByText(/PTR expires/i)).toBeInTheDocument()
+		expect(screen.queryByText(/prescription generation blocked/i)).toBeNull()
+		expect(screen.getByRole("button", { name: /generate rx/i })).toBeEnabled()
+	})
+
 	it("offers the first PDEA tranche for prescribing, not the parent course order", () => {
 		mockUseMedOrderListQuery.mockReturnValue({
 			data: {

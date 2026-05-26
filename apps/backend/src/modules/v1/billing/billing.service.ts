@@ -1422,7 +1422,11 @@ export class BillingService {
 		const total = countResult[0]?.total ?? 0
 
 		return {
-			encounters: result,
+			encounters: result.map(row => ({
+				...row,
+				totalCharges: Number(row.totalCharges ?? 0),
+				chargeCount: Number(row.chargeCount ?? 0),
+			})),
 			total,
 			page,
 			limit,
