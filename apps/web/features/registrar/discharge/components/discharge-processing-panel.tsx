@@ -6,7 +6,11 @@ import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Skeleton } from "@/core/components/ui/skeleton"
-import { useEncounterDetailQuery } from "@/features/encounters/api/encounters.hooks"
+import {
+	useDischargeChecklistQuery,
+	useEncounterDetailQuery,
+} from "@/features/encounters/api/encounters.hooks"
+import { DischargeChecklist } from "@/features/encounters/components/discharge-checklist"
 import { useClearanceStatusQuery, useGatePassQuery, useIssueGatePassMutation } from "../api/discharge.hooks"
 import { ClearanceStatusCard } from "./clearance-status-card"
 
@@ -53,10 +57,11 @@ export function DischargeProcessingPanel({ encounterId }: { encounterId: string 
 
 	const { data: encounter, isLoading: encounterLoading } = useEncounterDetailQuery(encounterId)
 	const { data: clearance, isLoading: clearanceLoading } = useClearanceStatusQuery(encounterId)
+	const { data: checklist, isLoading: checklistLoading } = useDischargeChecklistQuery(encounterId)
 	const { data: gatePass } = useGatePassQuery(encounterId)
 	const issueGatePass = useIssueGatePassMutation()
 
-	if (encounterLoading || clearanceLoading) {
+	if (encounterLoading || clearanceLoading || checklistLoading) {
 		return (
 			<div className="space-y-4">
 				<Skeleton className="h-32 w-full" />
@@ -75,6 +80,7 @@ export function DischargeProcessingPanel({ encounterId }: { encounterId: string 
 	const deathClass = isDeceased
 		? computeDeathClassification(encounter.admissionDatetime, encounter.dischargeDatetime)
 		: null
+	const canIssueGatePass = Boolean(clearance?.allConfirmed && checklist?.allComplete)
 
 	const handleIssueGatePass = () => {
 		issueGatePass.mutate(
@@ -141,6 +147,20 @@ export function DischargeProcessingPanel({ encounterId }: { encounterId: string 
 
 			{clearance && <ClearanceStatusCard status={clearance} />}
 
+			{checklist && (
+				<Card>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-base">Discharge Checklist</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<DischargeChecklist
+							items={checklist.items}
+							encounterType={checklist.encounterType}
+						/>
+					</CardContent>
+				</Card>
+			)}
+
 			<div className="flex gap-3">
 				{gatePass ? (
 					<Button
@@ -151,16 +171,17 @@ export function DischargeProcessingPanel({ encounterId }: { encounterId: string 
 					</Button>
 				) : (
 					<Button
-						disabled={!clearance?.allConfirmed || issueGatePass.isPending}
+						disabled={!canIssueGatePass || issueGatePass.isPending}
 						onClick={handleIssueGatePass}
 					>
 						{issueGatePass.isPending ? "Issuing…" : "Issue Gate Pass"}
 					</Button>
 				)}
 			</div>
-			{!clearance?.allConfirmed && !gatePass && (
+			{!canIssueGatePass && !gatePass && (
 				<p className="text-muted-foreground text-sm">
-					Gate pass is available once all three clearances are confirmed.
+					Gate pass is available once all clinical checklist items and all three
+					clearances are complete.
 				</p>
 			)}
 		</div>

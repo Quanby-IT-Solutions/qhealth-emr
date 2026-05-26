@@ -51,6 +51,7 @@ import {
 	PrescriptionListSchema,
 	PrescriptionSchema,
 	SaveCounselingLogInputSchema,
+	SendPrescriptionSchema,
 	SignPrescriptionSchema,
 	TranchedOrdersResponseSchema,
 	TranchePreviewInputSchema,
@@ -309,6 +310,16 @@ export const ordersContract = {
 			tags: ["Orders — Prescriptions"],
 		})
 		.input(SignPrescriptionSchema)
+		.output(PrescriptionSchema),
+
+	sendPrescription: oc
+		.route({
+			method: "POST",
+			path: "/prescriptions/{id}/send",
+			summary: "Record e-prescription delivery to the patient",
+			tags: ["Orders — Prescriptions"],
+		})
+		.input(SendPrescriptionSchema)
 		.output(PrescriptionSchema),
 
 	// ========================================================================

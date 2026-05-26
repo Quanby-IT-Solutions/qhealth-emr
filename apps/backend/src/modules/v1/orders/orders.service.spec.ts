@@ -1722,4 +1722,149 @@ describe("OrdersService", () => {
 		).rejects.toBeInstanceOf(ForbiddenException)
 		expect(mockDb.update).not.toHaveBeenCalled()
 	})
+
+	it("records signed prescription delivery with audit metadata", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const prescription = {
+			id: "88888888-8888-4888-9888-888888888888",
+			facilityId,
+			encounterId: "99999999-9999-4999-9999-999999999999",
+			medicationOrderId: "77777777-7777-4777-9777-777777777777",
+			patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+			prescriberStaffId: "staff-prescriber",
+			prescriberStaffName: "Dr. Test",
+			prcLicenseNumber: "PRC-100001",
+			ptrNumber: "PTR-100001",
+			pdeaS2License: null,
+			prescriptionContent: { genericName: "Paracetamol" },
+			status: "signed",
+			signedAt: new Date("2026-05-17T02:00:00.000Z"),
+			createdAt: new Date("2026-05-17T01:55:00.000Z"),
+		}
+		const auditInsertBuilder = createInsertBuilder([])
+
+		mockDb.select
+			.mockImplementationOnce(() => createSelectBuilder([prescription]))
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "staff-prescriber",
+							userId: "user-1",
+							facilityId,
+							isActive: true,
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+		mockDb.insert.mockImplementationOnce(() => auditInsertBuilder)
+
+		const result = await service.sendPrescription(
+			{
+				id: prescription.id,
+				channel: "email",
+				email: "patient@example.com",
+			},
+			"user-1"
+		)
+
+		expect(result).toEqual(prescription)
+		expect(auditInsertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				facilityId,
+				userId: "user-1",
+				staffProfileId: "staff-prescriber",
+				action: "update",
+				entityType: "prescription",
+				entityId: prescription.id,
+				metadata: expect.objectContaining({
+					operation: "sendPrescription",
+					status: "signed",
+					channel: "email",
+					email: "patient@example.com",
+					patientId: prescription.patientId,
+					encounterId: prescription.encounterId,
+				}),
+			})
+		)
+	})
+
+	it("rejects sending unsigned prescriptions", async () => {
+		mockDb.select.mockImplementationOnce(() =>
+			createSelectBuilder([
+				{
+					id: "88888888-8888-4888-9888-888888888888",
+					facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+					encounterId: "99999999-9999-4999-9999-999999999999",
+					medicationOrderId: "77777777-7777-4777-9777-777777777777",
+					patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+					prescriberStaffId: "staff-prescriber",
+					prescriberStaffName: "Dr. Test",
+					prcLicenseNumber: "PRC-100001",
+					ptrNumber: "PTR-100001",
+					pdeaS2License: null,
+					prescriptionContent: { genericName: "Paracetamol" },
+					status: "draft",
+					signedAt: null,
+					createdAt: new Date("2026-05-17T01:55:00.000Z"),
+				},
+			])
+		)
+
+		await expect(
+			service.sendPrescription(
+				{ id: "88888888-8888-4888-9888-888888888888", channel: "patient_portal" },
+				"user-1"
+			)
+		).rejects.toBeInstanceOf(BadRequestException)
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
+	it("rejects sending by a clinician who did not prescribe it", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder([
+					{
+						id: "88888888-8888-4888-9888-888888888888",
+						facilityId,
+						encounterId: "99999999-9999-4999-9999-999999999999",
+						medicationOrderId: "77777777-7777-4777-9777-777777777777",
+						patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+						prescriberStaffId: "staff-prescriber",
+						prescriberStaffName: "Dr. Test",
+						prcLicenseNumber: "PRC-100001",
+						ptrNumber: "PTR-100001",
+						pdeaS2License: null,
+						prescriptionContent: { genericName: "Paracetamol" },
+						status: "issued",
+						signedAt: new Date("2026-05-17T02:00:00.000Z"),
+						createdAt: new Date("2026-05-17T01:55:00.000Z"),
+					},
+				])
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "staff-other",
+							userId: "user-2",
+							facilityId,
+							isActive: true,
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+
+		await expect(
+			service.sendPrescription(
+				{ id: "88888888-8888-4888-9888-888888888888", channel: "patient_portal" },
+				"user-2"
+			)
+		).rejects.toBeInstanceOf(ForbiddenException)
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
 })

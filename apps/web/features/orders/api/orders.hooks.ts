@@ -648,6 +648,22 @@ export function useSignPrescriptionMutation() {
 	})
 }
 
+type SendPrescriptionInput = V1Inputs["orders"]["sendPrescription"]
+
+export function useSendPrescriptionMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation({
+		mutationFn: async (input: SendPrescriptionInput) => {
+			const result = await orpc.orders.sendPrescription.call(input)
+			return mapPrescription(result)
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
+		},
+	})
+}
+
 export function useActiveOrdersQuery(encounterId: string) {
 	return useQuery(
 		orpc.orders.getActiveOrders.queryOptions({

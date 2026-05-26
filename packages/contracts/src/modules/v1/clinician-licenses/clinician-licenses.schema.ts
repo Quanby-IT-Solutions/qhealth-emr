@@ -37,8 +37,8 @@ export const ListCliniciansQuerySchema = z.object({
 	facilityId: z.string().uuid().optional(),
 	search: z.string().optional(),
 	status: LicenseStatusEnum.optional(),
-	page: z.number().int().positive().optional().default(1),
-	limit: z.number().int().min(1).max(100).optional().default(20),
+	page: z.coerce.number().int().positive().optional().default(1),
+	limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 })
 
 export const AddLicenseSchema = z.object({

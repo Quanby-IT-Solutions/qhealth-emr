@@ -33,6 +33,29 @@ interface VerifyInput {
 export class ClinicianLicensesService {
 	constructor(private readonly auditService: AuditService) {}
 
+	private daysUntilDateOnly(date: string | Date | null): number | null {
+		if (!date) return null
+		const dateText =
+			date instanceof Date
+				? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+				: date.slice(0, 10)
+		const [year, month, day] = dateText.split("-").map(Number)
+		if (!year || !month || !day) return null
+
+		const target = Date.UTC(year, month - 1, day)
+		const now = new Date()
+		const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+		return Math.ceil((target - today) / (1000 * 60 * 60 * 24))
+	}
+
+	private nextExpiryStatus(licenses: Array<{ expiryDate: string | Date | null }>) {
+		const days = licenses
+			.map(license => this.daysUntilDateOnly(license.expiryDate))
+			.filter((value): value is number => value !== null)
+
+		return days.length ? Math.min(...days) : null
+	}
+
 	@Cron("0 6 * * *")
 	async sweepExpiredLicenses(): Promise<void> {
 		const today = new Date().toISOString().split("T")[0]!
@@ -108,13 +131,7 @@ export class ClinicianLicensesService {
 			.filter(p => matchingProfileIds.includes(p.id))
 			.map(p => {
 				const licenses = licensesByProfileId.get(p.id) ?? []
-				const expiryDates = licenses
-					.map(l => (l.expiryDate ? new Date(l.expiryDate).getTime() : null))
-					.filter(Boolean) as number[]
-				const nextExpiry = expiryDates.length ? Math.min(...expiryDates) : null
-				const daysUntilNextExpiry = nextExpiry
-					? Math.ceil((nextExpiry - Date.now()) / (1000 * 60 * 60 * 24))
-					: null
+				const daysUntilNextExpiry = this.nextExpiryStatus(licenses)
 
 				return {
 					staffProfileId: p.id,
@@ -152,13 +169,7 @@ export class ClinicianLicensesService {
 			.where(eq(clinicianLicenses.staffProfileId, staffProfileId))
 			.orderBy(desc(clinicianLicenses.updatedAt))
 
-		const expiryDates = licenses
-			.map(l => (l.expiryDate ? new Date(l.expiryDate).getTime() : null))
-			.filter(Boolean) as number[]
-		const nextExpiry = expiryDates.length ? Math.min(...expiryDates) : null
-		const daysUntilNextExpiry = nextExpiry
-			? Math.ceil((nextExpiry - Date.now()) / (1000 * 60 * 60 * 24))
-			: null
+		const daysUntilNextExpiry = this.nextExpiryStatus(licenses)
 
 		return {
 			staffProfileId,
@@ -212,15 +223,47 @@ export class ClinicianLicensesService {
 			.where(eq(clinicianLicenses.id, input.id))
 			.returning()
 
-		// ADM-BE-05: propagate S2 verification to staff profile
-		if (license.licenseType === "S2" && license.expiryDate) {
-			await db
-				.update(staffProfiles)
-				.set({ s2VerifiedUntil: new Date(license.expiryDate), updatedAt: new Date() })
-				.where(eq(staffProfiles.id, license.staffProfileId))
-		}
+		await this.propagateVerifiedLicenseToStaffProfile(license)
 
 		return updated!
+	}
+
+	private async propagateVerifiedLicenseToStaffProfile(license: typeof clinicianLicenses.$inferSelect) {
+		const updatedAt = new Date()
+
+		switch (license.licenseType) {
+			case "PRC":
+				await db
+					.update(staffProfiles)
+					.set({
+						prcLicenseNumber: license.licenseNumber,
+						prcExpiry: license.expiryDate,
+						updatedAt,
+					})
+					.where(eq(staffProfiles.id, license.staffProfileId))
+				break
+			case "PTR":
+				await db
+					.update(staffProfiles)
+					.set({
+						ptrNumber: license.licenseNumber,
+						ptrExpiry: license.expiryDate,
+						updatedAt,
+					})
+					.where(eq(staffProfiles.id, license.staffProfileId))
+				break
+			case "S2":
+				await db
+					.update(staffProfiles)
+					.set({
+						pdeaS2License: license.licenseNumber,
+						pdeaS2Expiry: license.expiryDate,
+						s2VerifiedUntil: license.expiryDate ? new Date(license.expiryDate) : null,
+						updatedAt,
+					})
+					.where(eq(staffProfiles.id, license.staffProfileId))
+				break
+		}
 	}
 
 	async markPending(id: string) {

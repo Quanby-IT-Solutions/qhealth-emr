@@ -672,15 +672,14 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Physician": [
-		// Physicians view patients and create encounters, but don't manage scheduling/beds (Registrar's job)
-		["adt", ["view", "create"]],
+		// Physicians view encounters and document care; Registrar owns encounter creation/scheduling/beds.
+		["adt", ["view"]],
 		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
 		["orders", ["view", "create", "edit", "sign"]],
 		["nursing", ["view"]],
-		["billing", ["view"]],
 		["formulary", ["view"]],
-		["reporting", ["view", "create"]],
+		["reporting", ["view"]],
 		["opd", ["view"]], // OPD dashboard access
 		["telemedicine", ["view", "create", "edit"]], // Virtual consultation access
 		["ed", ["view", "edit"]], // Emergency department patient viewing + disposition (C2)
@@ -1587,6 +1586,91 @@ async function ensureReferenceData(facilityId: string) {
 				isActive: true,
 			})
 			.returning()
+	}
+
+	const highAlertFormularySeeds = [
+		{
+			genericName: "Regular Insulin",
+			rxnormCode: "253182",
+			atcCode: "A10AB01",
+			doseForm: "vial",
+			strength: "100 units/mL",
+			route: "subcutaneous",
+			highAlertNotes:
+				"High-alert medication: independent double-check required before ordering or administration.",
+		},
+		{
+			genericName: "Heparin Sodium",
+			rxnormCode: "5224",
+			atcCode: "B01AB01",
+			doseForm: "vial",
+			strength: "5000 units/mL",
+			route: "intravenous",
+			highAlertNotes:
+				"High-alert anticoagulant: verify indication, dose, concentration, and patient identifiers.",
+		},
+		{
+			genericName: "Potassium Chloride",
+			rxnormCode: "8591",
+			atcCode: "A12BA01",
+			doseForm: "vial",
+			strength: "2 mEq/mL concentrate",
+			route: "intravenous",
+			highAlertNotes:
+				"High-alert concentrated electrolyte: dilution and independent double-check required.",
+		},
+	]
+
+	for (const seed of highAlertFormularySeeds) {
+		let [highAlertGeneric] = await db
+			.select()
+			.from(drugGenerics)
+			.where(eq(drugGenerics.genericName, seed.genericName))
+		if (!highAlertGeneric) {
+			;[highAlertGeneric] = await db
+				.insert(drugGenerics)
+				.values({
+					genericName: seed.genericName,
+					rxnormCode: seed.rxnormCode,
+					atcCode: seed.atcCode,
+				})
+				.returning()
+		}
+
+		const [highAlertItem] = await db
+			.select()
+			.from(formularyItems)
+			.where(
+				and(
+					eq(formularyItems.facilityId, facilityId),
+					eq(formularyItems.drugGenericId, highAlertGeneric!.id),
+					eq(formularyItems.strength, seed.strength),
+					eq(formularyItems.route, seed.route)
+				)
+			)
+
+		if (!highAlertItem) {
+			await db.insert(formularyItems).values({
+				facilityId,
+				drugGenericId: highAlertGeneric!.id,
+				doseForm: seed.doseForm,
+				strength: seed.strength,
+				route: seed.route,
+				isActive: true,
+				isHighAlert: true,
+				highAlertNotes: seed.highAlertNotes,
+				formularyNotes: "Baseline high-alert seed for CPOE double-verification testing.",
+			})
+		} else if (!highAlertItem.isHighAlert) {
+			await db
+				.update(formularyItems)
+				.set({
+					isHighAlert: true,
+					highAlertNotes: highAlertItem.highAlertNotes ?? seed.highAlertNotes,
+					updatedAt: new Date(),
+				})
+				.where(eq(formularyItems.id, highAlertItem.id))
+		}
 	}
 
 	let [chargeItem] = await db

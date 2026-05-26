@@ -237,6 +237,14 @@ export class OrdersController {
 		})
 	}
 
+	@RequirePermission("orders", "sign")
+	@Implement(v1.orders.sendPrescription)
+	async sendPrescription(@Session() session: UserSession) {
+		return implement(v1.orders.sendPrescription).handler(async ({ input }) => {
+			return this.ordersService.sendPrescription(input, session.user.id)
+		})
+	}
+
 	// ========================================================================
 	// Active Orders
 	// ========================================================================

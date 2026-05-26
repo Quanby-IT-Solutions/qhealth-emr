@@ -53,6 +53,7 @@ type VerifyOrderInput = V1Inputs["orders"]["verifyOrder"]
 type CreateHighAlertVerificationInput = V1Inputs["orders"]["createHighAlertVerification"]
 type PrescriptionListInput = V1Inputs["orders"]["listPrescriptions"]
 type CreatePrescriptionInput = V1Inputs["orders"]["createPrescription"]
+type SendPrescriptionInput = V1Inputs["orders"]["sendPrescription"]
 type ActiveOrdersInput = V1Inputs["orders"]["getActiveOrders"]
 type PdeaLicenseCheckInput = V1Inputs["orders"]["checkPdeaLicense"]
 type TranchePreviewInput = V1Inputs["orders"]["previewTranches"]
@@ -2288,6 +2289,48 @@ export class OrdersService {
 		this.logger.log(`Signed prescription ${id}`)
 
 		return this.findPrescription(id)
+	}
+
+	async sendPrescription(input: SendPrescriptionInput, userId: string) {
+		const prescription = await this.findPrescription(input.id)
+		if (prescription.status !== "signed" && prescription.status !== "issued") {
+			throw new BadRequestException("Prescription must be signed before sending.")
+		}
+
+		if (input.channel === "email" && !input.email) {
+			throw new BadRequestException("Email address is required to send an e-prescription by email.")
+		}
+
+		const staff = await this.getOrderingStaffProfile(userId, prescription.facilityId)
+		if (staff.id !== prescription.prescriberStaffId) {
+			throw new ForbiddenException("Only the prescribing clinician can send this prescription.")
+		}
+
+		await this.writeAuditLog({
+			facilityId: prescription.facilityId,
+			userId,
+			staffProfileId: staff.id,
+			action: "update",
+			entityType: "prescription",
+			entityId: prescription.id,
+			metadata: {
+				operation: "sendPrescription",
+				status: prescription.status,
+				channel: input.channel,
+				email: input.email ?? null,
+				sentAt: new Date().toISOString(),
+				patientId: prescription.patientId,
+				encounterId: prescription.encounterId,
+			},
+		})
+
+		this.logger.log(
+			`Recorded ${input.channel} delivery for prescription ${input.id}${
+				input.email ? ` to ${input.email}` : ""
+			}`
+		)
+
+		return prescription
 	}
 
 	// ========================================================================
