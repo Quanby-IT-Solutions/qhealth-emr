@@ -539,6 +539,12 @@ export const SignPrescriptionSchema = z.object({
 	id: z.string().uuid(),
 })
 
+export const SendPrescriptionSchema = z.object({
+	id: z.string().uuid(),
+	channel: z.enum(["patient_portal", "email"]),
+	email: z.string().email().optional(),
+})
+
 export const PrescriptionListSchema = PaginationInputSchema.extend({
 	encounterId: z.string().uuid().optional(),
 	patientId: z.string().uuid().optional(),

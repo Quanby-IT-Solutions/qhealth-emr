@@ -27,6 +27,7 @@ import {
 	opdTriageIntakes,
 	patients,
 	payments,
+	prescriptions,
 	rolePermissions,
 	roles,
 	staffProfiles,
@@ -1502,33 +1503,101 @@ export class EncountersService {
 						.from(dischargeClearances)
 						.where(eq(dischargeClearances.encounterId, encounter.id))
 
+					const [signedDischargeSummaryRow] = await db
+						.select({ n: count() })
+						.from(clinicalNotes)
+						.where(
+							and(
+								eq(clinicalNotes.encounterId, encounter.id),
+								eq(clinicalNotes.noteType, "discharge_summary"),
+								eq(clinicalNotes.status, "signed")
+							)
+						)
+					const dischargeSummarySigned = (signedDischargeSummaryRow?.n ?? 0) > 0
+
+					const [finalDiagnosisRow] = await db
+						.select({ n: count() })
+						.from(clinicalNotes)
+						.where(
+							and(
+								eq(clinicalNotes.encounterId, encounter.id),
+								eq(clinicalNotes.noteType, "discharge_summary"),
+								eq(clinicalNotes.status, "signed"),
+								sql`COALESCE((${clinicalNotes.structuredData}->'icd10_diagnosis'->>'icd10Code'), '') <> ''`
+							)
+						)
+					const finalDiagnosisCoded = (finalDiagnosisRow?.n ?? 0) > 0
+
+					const [followupRow] = await db
+						.select({ n: count() })
+						.from(clinicalNotes)
+						.where(
+							and(
+								eq(clinicalNotes.encounterId, encounter.id),
+								eq(clinicalNotes.noteType, "discharge_summary"),
+								eq(clinicalNotes.status, "signed"),
+								sql`length(trim(COALESCE(${clinicalNotes.structuredData}->>'plan', ''))) > 0`
+							)
+						)
+					const followupInstructionsEntered = (followupRow?.n ?? 0) > 0
+
+					const [activeMedRow] = await db
+						.select({ n: count() })
+						.from(medicationOrders)
+						.where(
+							and(
+								eq(medicationOrders.encounterId, encounter.id),
+								inArray(medicationOrders.status, ["verified", "active"])
+							)
+						)
+					const activeMedicationOrderCount = activeMedRow?.n ?? 0
+
+					const [signedPrescriptionRow] = await db
+						.select({ n: count() })
+						.from(prescriptions)
+						.where(
+							and(
+								eq(prescriptions.encounterId, encounter.id),
+								inArray(prescriptions.status, ["signed", "issued"])
+							)
+						)
+					const signedPrescriptionCount = signedPrescriptionRow?.n ?? 0
+					const dischargeMedicationsStatus: ChecklistStatus =
+						signedPrescriptionCount > 0
+							? "complete"
+							: activeMedicationOrderCount === 0
+								? "not_applicable"
+								: "incomplete"
+
 					return [
 						{
 							key: "discharge_summary_signed",
 							label: "Discharge summary signed",
 							category: "clinical" as ChecklistCategory,
-							status: "incomplete" as ChecklistStatus,
+							status: (dischargeSummarySigned ? "complete" : "incomplete") as ChecklistStatus,
 							responsibleRole: "Clinician",
 						},
 						{
 							key: "final_diagnosis_coded",
 							label: "Final diagnosis coded (ICD-10)",
 							category: "clinical" as ChecklistCategory,
-							status: "incomplete" as ChecklistStatus,
+							status: (finalDiagnosisCoded ? "complete" : "incomplete") as ChecklistStatus,
 							responsibleRole: "Clinician",
 						},
 						{
 							key: "discharge_medications",
 							label: "Discharge medications documented",
 							category: "clinical" as ChecklistCategory,
-							status: "incomplete" as ChecklistStatus,
+							status: dischargeMedicationsStatus,
 							responsibleRole: "Clinician",
 						},
 						{
 							key: "followup_instructions",
 							label: "Follow-up instructions entered",
 							category: "clinical" as ChecklistCategory,
-							status: "incomplete" as ChecklistStatus,
+							status: (followupInstructionsEntered
+								? "complete"
+								: "incomplete") as ChecklistStatus,
 							responsibleRole: "Clinician",
 						},
 						{

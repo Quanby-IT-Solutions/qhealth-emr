@@ -1,7 +1,16 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
-import { and, eq } from "drizzle-orm"
+import { and, count, eq, inArray, sql } from "drizzle-orm"
 
-import { beds, encounters, gatePasses, patients, staffProfiles, wards } from "@repo/db/schema"
+import {
+	beds,
+	clinicalNotes,
+	encounters,
+	gatePasses,
+	medicationOrders,
+	patients,
+	prescriptions,
+	wards,
+} from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 
@@ -36,6 +45,7 @@ export class GatePassService {
 				patientId: encounters.patientId,
 				bedId: encounters.bedId,
 				status: encounters.status,
+				encounterType: encounters.encounterType,
 				admissionDatetime: encounters.admissionDatetime,
 				dischargeDatetime: encounters.dischargeDatetime,
 				disposition: encounters.disposition,
@@ -51,6 +61,15 @@ export class GatePassService {
 			throw new BadRequestException(
 				"Gate pass can only be issued for discharged or pending-discharge encounters"
 			)
+		}
+
+		if (enc.encounterType === "inpatient") {
+			const clinicalComplete = await this.inpatientClinicalChecklistComplete(encounterId)
+			if (!clinicalComplete) {
+				throw new BadRequestException(
+					"Clinical discharge checklist must be completed before issuing a gate pass"
+				)
+			}
 		}
 
 		// Fetch patient name
@@ -141,5 +160,72 @@ export class GatePassService {
 			.where(eq(gatePasses.encounterId, encounterId))
 
 		return gatePass ?? null
+	}
+
+	private async inpatientClinicalChecklistComplete(encounterId: string) {
+		const [signedDischargeSummaryRow] = await db
+			.select({ n: count() })
+			.from(clinicalNotes)
+			.where(
+				and(
+					eq(clinicalNotes.encounterId, encounterId),
+					eq(clinicalNotes.noteType, "discharge_summary"),
+					eq(clinicalNotes.status, "signed")
+				)
+			)
+
+		const [finalDiagnosisRow] = await db
+			.select({ n: count() })
+			.from(clinicalNotes)
+			.where(
+				and(
+					eq(clinicalNotes.encounterId, encounterId),
+					eq(clinicalNotes.noteType, "discharge_summary"),
+					eq(clinicalNotes.status, "signed"),
+					sql`COALESCE((${clinicalNotes.structuredData}->'icd10_diagnosis'->>'icd10Code'), '') <> ''`
+				)
+			)
+
+		const [followupRow] = await db
+			.select({ n: count() })
+			.from(clinicalNotes)
+			.where(
+				and(
+					eq(clinicalNotes.encounterId, encounterId),
+					eq(clinicalNotes.noteType, "discharge_summary"),
+					eq(clinicalNotes.status, "signed"),
+					sql`length(trim(COALESCE(${clinicalNotes.structuredData}->>'plan', ''))) > 0`
+				)
+			)
+
+		const [activeMedRow] = await db
+			.select({ n: count() })
+			.from(medicationOrders)
+			.where(
+				and(
+					eq(medicationOrders.encounterId, encounterId),
+					inArray(medicationOrders.status, ["verified", "active"])
+				)
+			)
+
+		const [signedPrescriptionRow] = await db
+			.select({ n: count() })
+			.from(prescriptions)
+			.where(
+				and(
+					eq(prescriptions.encounterId, encounterId),
+					inArray(prescriptions.status, ["signed", "issued"])
+				)
+			)
+
+		const dischargeMedicationComplete =
+			(signedPrescriptionRow?.n ?? 0) > 0 || (activeMedRow?.n ?? 0) === 0
+
+		return (
+			(signedDischargeSummaryRow?.n ?? 0) > 0 &&
+			(finalDiagnosisRow?.n ?? 0) > 0 &&
+			(followupRow?.n ?? 0) > 0 &&
+			dischargeMedicationComplete
+		)
 	}
 }

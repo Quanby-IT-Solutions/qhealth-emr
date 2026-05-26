@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Printer } from "lucide-react"
+import { FileText, Pill, Printer } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Badge } from "@/core/components/ui/badge"
@@ -129,6 +129,43 @@ export function DischargePanel({
 										{prescriptionCount}
 									</span>
 								)}
+							</Button>
+						</div>
+					</CardContent>
+				</Card>
+			)}
+
+			{/* Inpatient clinical completion shortcuts */}
+			{!isOutpatient && (
+				<Card>
+					<CardHeader>
+						<CardTitle>Clinical Discharge Documents</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-3">
+						<p className="text-muted-foreground text-sm">
+							Complete the signed discharge summary, final ICD-10 diagnosis, discharge
+							medications, and follow-up plan before downstream clearances finish.
+						</p>
+						<div className="flex flex-col gap-2 sm:flex-row">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() =>
+									router.push(`/patients/${patientId}/encounters/${encounterId}/documentation`)
+								}
+							>
+								<FileText className="mr-1.5 size-4" />
+								Open Documentation
+							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() =>
+									router.push(`/patients/${patientId}/encounters/${encounterId}/orders`)
+								}
+							>
+								<Pill className="mr-1.5 size-4" />
+								Open Orders
 							</Button>
 						</div>
 					</CardContent>

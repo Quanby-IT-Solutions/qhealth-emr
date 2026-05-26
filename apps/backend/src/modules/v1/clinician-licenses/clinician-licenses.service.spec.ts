@@ -3,7 +3,7 @@
  *
  * Covers:
  * 1. add — inserts a new license record
- * 2. verify — sets status to "verified"; propagates S2 to staffProfile.s2VerifiedUntil
+ * 2. verify — sets status to "verified"; propagates PRC/PTR/S2 to staffProfile credentials
  * 3. sweepExpiredLicenses — bulk-sets expired verified licenses to "expired"
  */
 
@@ -39,6 +39,12 @@ jest.mock("@repo/db/schema", () => ({
 		id: "id",
 		userId: "userId",
 		facilityId: "facilityId",
+		prcLicenseNumber: "prcLicenseNumber",
+		prcExpiry: "prcExpiry",
+		ptrNumber: "ptrNumber",
+		ptrExpiry: "ptrExpiry",
+		pdeaS2License: "pdeaS2License",
+		pdeaS2Expiry: "pdeaS2Expiry",
 		s2VerifiedUntil: "s2VerifiedUntil",
 		updatedAt: "updatedAt",
 	},
@@ -168,27 +174,66 @@ describe("ClinicianLicensesService", () => {
 			await expect(service.verify({ id: LICENSE_ID })).rejects.toThrow(NotFoundException)
 		})
 
-		it("sets status to 'verified' and returns updated license", async () => {
+		it("sets status to 'verified' and propagates a PRC license to the staff profile", async () => {
 			const license = makeLicense({ status: "pending" })
 			const updated = makeLicense({ status: "verified", verifiedAt: new Date() })
 
 			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([license]))
-			;(db.update as jest.Mock).mockReturnValueOnce(mockUpdateWhereChain([updated]))
-			// S2 propagation update (not S2 type, so update not called again)
+			;(db.update as jest.Mock)
+				.mockReturnValueOnce(mockUpdateWhereChain([updated]))
+				.mockReturnValueOnce(mockUpdateSetWhereChain())
 
 			const result = await service.verify({ id: LICENSE_ID })
 
 			expect(result.status).toBe("verified")
+			expect(db.update).toHaveBeenCalledTimes(2)
+			expect((db.update as jest.Mock).mock.results[1]?.value.set).toHaveBeenCalledWith(
+				expect.objectContaining({
+					prcLicenseNumber: "PRC-123456",
+					prcExpiry: "2025-12-31",
+				})
+			)
 		})
 
-		it("propagates S2 verification to staff profile s2VerifiedUntil", async () => {
+		it("propagates PTR verification to the staff profile", async () => {
+			const ptrLicense = makeLicense({
+				licenseType: "PTR",
+				licenseNumber: "PTR-987654",
+				status: "pending",
+				expiryDate: "2026-01-31",
+			})
+			const updatedLicense = makeLicense({
+				licenseType: "PTR",
+				licenseNumber: "PTR-987654",
+				status: "verified",
+			})
+
+			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([ptrLicense]))
+			;(db.update as jest.Mock)
+				.mockReturnValueOnce(mockUpdateWhereChain([updatedLicense]))
+				.mockReturnValueOnce(mockUpdateSetWhereChain())
+
+			const result = await service.verify({ id: LICENSE_ID })
+
+			expect(result.status).toBe("verified")
+			expect((db.update as jest.Mock).mock.results[1]?.value.set).toHaveBeenCalledWith(
+				expect.objectContaining({
+					ptrNumber: "PTR-987654",
+					ptrExpiry: "2026-01-31",
+				})
+			)
+		})
+
+		it("propagates S2 verification to staff profile PDEA credentials", async () => {
 			const s2License = makeLicense({
 				licenseType: "S2",
+				licenseNumber: "S2-222222",
 				status: "pending",
 				expiryDate: "2026-06-30",
 			})
 			const updatedLicense = makeLicense({
 				licenseType: "S2",
+				licenseNumber: "S2-222222",
 				status: "verified",
 				verifiedAt: new Date(),
 			})
@@ -205,19 +250,13 @@ describe("ClinicianLicensesService", () => {
 			expect(result.status).toBe("verified")
 			// db.update should have been called twice: once for license, once for staff profile
 			expect(db.update).toHaveBeenCalledTimes(2)
-		})
-
-		it("does not update staff profile when licenseType is PRC", async () => {
-			const prcLicense = makeLicense({ licenseType: "PRC", status: "pending" })
-			const updatedLicense = makeLicense({ licenseType: "PRC", status: "verified" })
-
-			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([prcLicense]))
-			;(db.update as jest.Mock).mockReturnValueOnce(mockUpdateWhereChain([updatedLicense]))
-
-			await service.verify({ id: LICENSE_ID })
-
-			// Only one update call: for the license itself
-			expect(db.update).toHaveBeenCalledTimes(1)
+			expect((db.update as jest.Mock).mock.results[1]?.value.set).toHaveBeenCalledWith(
+				expect.objectContaining({
+					pdeaS2License: "S2-222222",
+					pdeaS2Expiry: "2026-06-30",
+					s2VerifiedUntil: new Date("2026-06-30"),
+				})
+			)
 		})
 	})
 

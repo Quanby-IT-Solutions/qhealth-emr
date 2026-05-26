@@ -18,6 +18,7 @@ import { cn, getInitials } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { filterNavItems, PRIMARY_NAV_ITEMS, SECONDARY_NAV_ITEMS } from "@/features/app-shell/lib/navigation"
 import { useSignOutMutation } from "@/features/auth/api/session.hooks"
+import { useNursingSync } from "@/features/nursing/lib/use-nursing-sync"
 import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 
 // --- Custom SVGs ---
@@ -1006,6 +1007,7 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 		pathname === "/patients/search" || pathname === "/opd" || isVideoRoomRoute
 	const { theme, setTheme } = useTheme()
 	const { isOnline } = useOfflineSync()
+	useNursingSync()
 	const { data: profile } = useMyProfile()
 	const signOut = useSignOutMutation()
 

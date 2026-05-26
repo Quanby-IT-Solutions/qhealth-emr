@@ -18,7 +18,10 @@ import {
 } from "@/core/components/ui/dialog"
 import { Separator } from "@/core/components/ui/separator"
 import { useEncounterDetailQuery } from "@/features/encounters/api/encounters.hooks"
-import { usePrescriptionListQuery } from "@/features/orders/api/orders.hooks"
+import {
+	usePrescriptionListQuery,
+	useSendPrescriptionMutation,
+} from "@/features/orders/api/orders.hooks"
 
 interface PrescriptionContent {
 	genericName?: string
@@ -304,6 +307,7 @@ export function PrescriptionPrintDialog({
 		page: 1,
 		limit: 50,
 	})
+	const sendPrescription = useSendPrescriptionMutation()
 
 	const isLoading = encounterLoading || rxLoading
 	const signedPrescriptions = (prescriptionsData?.data ?? []).filter(rx => rx.status === "signed")
@@ -442,43 +446,45 @@ export function PrescriptionPrintDialog({
 		onPrinted?.()
 	}
 
-	function handleSendToPortal() {
+	async function handleSendToPortal() {
 		if (!printData || !canSendPrescription) return
-		// Patient portal push — queues the signed prescriptions for patient portal access.
-		// The patient will see the e-Rx in their portal dashboard on next login.
-		toast.success(
-			`${printData.prescriptions.length} prescription(s) sent to patient portal.`,
-			{
+		try {
+			// Patient portal push — queues the signed prescriptions for patient portal access.
+			// The patient will see the e-Rx in their portal dashboard on next login.
+			await Promise.all(
+				printData.prescriptions.map(rx =>
+					sendPrescription.mutateAsync({ id: rx.id, channel: "patient_portal" })
+				)
+			)
+			toast.success(`${printData.prescriptions.length} prescription(s) sent to patient portal.`, {
 				description: `${printData.patientName} will see the e-Rx on their next portal login.`,
 				duration: 5000,
-			}
-		)
+			})
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to send e-prescription.")
+		}
 	}
 
-	function handleSendEmail() {
+	async function handleSendEmail() {
 		if (!printData || !canSendPrescription) return
 
-		const bodyLines = [
-			`Patient: ${printData.patientName}`,
-			`MRN: ${printData.patientMrn}`,
-			`Date: ${printData.encounterDate}`,
-			"",
-			"Prescriptions:",
-			...printData.prescriptions.map(
-				(rx, index) =>
-					`${index + 1}. ${rx.genericName} - ${rx.dose} ${rx.doseUnit} ${rx.doseForm}, ${rx.route}, ${rx.frequency}`
-			),
-			"",
-			`Prescriber PRC/PTR: ${printData.prescriptions[0]?.prcNumber ?? "--"} / ${printData.prescriptions[0]?.ptrNumber ?? "--"}`,
-			`Signed: ${printData.prescriptions[0]?.signedAt ?? "--"}`,
-		]
+		const email = window.prompt("Enter the patient email address for this e-prescription:")
+		const trimmedEmail = email?.trim()
+		if (!trimmedEmail) return
 
-		const subject = `e-Prescription - ${printData.patientName}`
-		const body = bodyLines.join("\n")
-		window.open(
-			`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
-			"_self"
-		)
+		try {
+			await Promise.all(
+				printData.prescriptions.map(rx =>
+					sendPrescription.mutateAsync({ id: rx.id, channel: "email", email: trimmedEmail })
+				)
+			)
+			toast.success(`${printData.prescriptions.length} prescription(s) sent by email.`, {
+				description: `${printData.patientName} e-Rx delivery recorded for ${trimmedEmail}.`,
+				duration: 5000,
+			})
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to send e-prescription email.")
+		}
 	}
 
 	function handleGoToMedicationOrders() {
@@ -657,16 +663,16 @@ export function PrescriptionPrintDialog({
 							</Button>
 							<Button
 								variant="outline"
-								onClick={handleSendToPortal}
-								disabled={!canSendPrescription}
+								onClick={() => void handleSendToPortal()}
+								disabled={!canSendPrescription || sendPrescription.isPending}
 							>
 								<MonitorSmartphone className="mr-1.5 size-4" />
 								Patient Portal
 							</Button>
 							<Button
 								variant="outline"
-								onClick={handleSendEmail}
-								disabled={!canSendPrescription}
+								onClick={() => void handleSendEmail()}
+								disabled={!canSendPrescription || sendPrescription.isPending}
 							>
 								<Mail className="mr-1.5 size-4" />
 								Send via Email
