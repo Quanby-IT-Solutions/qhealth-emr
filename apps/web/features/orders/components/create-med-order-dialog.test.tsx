@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -395,21 +395,28 @@ describe("CreateMedOrderDialog", () => {
 
 		render(<CreateMedOrderDialog {...defaultProps} />)
 
-		await user.type(screen.getByTestId("generic-name-input"), "Amoxicillin")
+		fireEvent.change(screen.getByTestId("generic-name-input"), {
+			target: { value: "Amoxicillin" },
+		})
 		await user.click(screen.getByRole("button", { name: /run drug safety check/i }))
 
-		await user.type(screen.getByLabelText(/^Dose\s+\*$/i), "500")
-		await user.type(screen.getByLabelText(/^Dose Unit\s+\*$/i), "mg")
-		await user.type(screen.getByLabelText(/^Dose Form\s+\*$/i), "tablet")
-		await user.type(screen.getByLabelText(/^Route\s+\*$/i), "oral")
-
-		await user.selectOptions(screen.getByLabelText(/^Frequency\s+\*$/i), "once")
+		fireEvent.change(screen.getByLabelText(/^Dose\s+\*$/i), { target: { value: "500" } })
+		fireEvent.change(screen.getByLabelText(/^Dose Unit\s+\*$/i), { target: { value: "mg" } })
+		fireEvent.change(screen.getByLabelText(/^Dose Form\s+\*$/i), {
+			target: { value: "tablet" },
+		})
+		fireEvent.change(screen.getByLabelText(/^Route\s+\*$/i), { target: { value: "oral" } })
+		fireEvent.change(screen.getByLabelText(/^Frequency\s+\*$/i), {
+			target: { value: "once" },
+		})
 
 		const submitBtn = screen.getByRole("button", { name: /create order/i })
 		expect(submitBtn).toBeDisabled()
 
 		await user.click(screen.getByRole("button", { name: /override allergy-0/i }))
-		await user.type(screen.getByPlaceholderText(/document the clinical justification/i), "Clinically necessary")
+		fireEvent.change(screen.getByPlaceholderText(/document the clinical justification/i), {
+			target: { value: "Clinically necessary" },
+		})
 		await user.click(screen.getByRole("button", { name: /confirm override/i }))
 
 		expect(screen.getByRole("button", { name: /create order/i })).not.toBeDisabled()
@@ -499,17 +506,25 @@ describe("CreateMedOrderDialog", () => {
 
 		render(<CreateMedOrderDialog {...defaultProps} />)
 
-		await user.type(screen.getByTestId("generic-name-input"), "Morphine")
+		fireEvent.change(screen.getByTestId("generic-name-input"), {
+			target: { value: "Morphine" },
+		})
 		await user.click(screen.getByRole("checkbox", { name: /controlled substance/i }))
 		await user.click(screen.getByTestId("s2-proceed"))
 		await user.click(screen.getByRole("button", { name: /run drug safety check/i }))
-		await user.type(screen.getByLabelText(/^Dose\s+\*$/i), "10")
-		await user.type(screen.getByLabelText(/^Dose Unit\s+\*$/i), "mg")
-		await user.type(screen.getByLabelText(/^Dose Form\s+\*$/i), "tablet")
-		await user.type(screen.getByLabelText(/^Route\s+\*$/i), "oral")
-		await user.selectOptions(screen.getByLabelText(/^Frequency\s+\*$/i), "bid")
-		await user.type(screen.getByLabelText(/duration/i), "91")
-		await user.selectOptions(screen.getByLabelText(/pdea schedule/i), "S-2")
+		fireEvent.change(screen.getByLabelText(/^Dose\s+\*$/i), { target: { value: "10" } })
+		fireEvent.change(screen.getByLabelText(/^Dose Unit\s+\*$/i), { target: { value: "mg" } })
+		fireEvent.change(screen.getByLabelText(/^Dose Form\s+\*$/i), {
+			target: { value: "tablet" },
+		})
+		fireEvent.change(screen.getByLabelText(/^Route\s+\*$/i), { target: { value: "oral" } })
+		fireEvent.change(screen.getByLabelText(/^Frequency\s+\*$/i), {
+			target: { value: "bid" },
+		})
+		fireEvent.change(screen.getByLabelText(/duration/i), { target: { value: "91" } })
+		fireEvent.change(screen.getByLabelText(/pdea schedule/i), {
+			target: { value: "S-2" },
+		})
 
 		expect(screen.getByText(/cannot exceed 90 days/i)).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: /create order/i })).toBeDisabled()
@@ -560,17 +575,25 @@ describe("CreateMedOrderDialog", () => {
 
 		render(<CreateMedOrderDialog {...defaultProps} />)
 
-		await user.type(screen.getByTestId("generic-name-input"), "Morphine")
+		fireEvent.change(screen.getByTestId("generic-name-input"), {
+			target: { value: "Morphine" },
+		})
 		await user.click(screen.getByRole("checkbox", { name: /controlled substance/i }))
 		await user.click(screen.getByTestId("s2-proceed"))
 		await user.click(screen.getByRole("button", { name: /run drug safety check/i }))
-		await user.type(screen.getByLabelText(/^Dose\s+\*$/i), "10")
-		await user.type(screen.getByLabelText(/^Dose Unit\s+\*$/i), "mg")
-		await user.type(screen.getByLabelText(/^Dose Form\s+\*$/i), "tablet")
-		await user.type(screen.getByLabelText(/^Route\s+\*$/i), "oral")
-		await user.selectOptions(screen.getByLabelText(/^Frequency\s+\*$/i), "bid")
-		await user.type(screen.getByLabelText(/duration/i), "45")
-		await user.selectOptions(screen.getByLabelText(/pdea schedule/i), "S-2")
+		fireEvent.change(screen.getByLabelText(/^Dose\s+\*$/i), { target: { value: "10" } })
+		fireEvent.change(screen.getByLabelText(/^Dose Unit\s+\*$/i), { target: { value: "mg" } })
+		fireEvent.change(screen.getByLabelText(/^Dose Form\s+\*$/i), {
+			target: { value: "tablet" },
+		})
+		fireEvent.change(screen.getByLabelText(/^Route\s+\*$/i), { target: { value: "oral" } })
+		fireEvent.change(screen.getByLabelText(/^Frequency\s+\*$/i), {
+			target: { value: "bid" },
+		})
+		fireEvent.change(screen.getByLabelText(/duration/i), { target: { value: "45" } })
+		fireEvent.change(screen.getByLabelText(/pdea schedule/i), {
+			target: { value: "S-2" },
+		})
 
 		await user.click(screen.getByRole("button", { name: /preview tranches/i }))
 		await user.click(screen.getByTestId("confirm-tranches"))
