@@ -66,6 +66,7 @@ export const TelemedicineAppointmentSchema = z.object({
 	patientInviteToken: z.string().optional(),
 	notes: z.string().nullable(),
 	encounterId: z.string().uuid().nullable(),
+	linkedCoreEncounterId: z.string().uuid().nullable(),
 	createdAt: z.string(),
 	createdByName: z.string(),
 })
@@ -259,6 +260,7 @@ export const TelemedicineEncounterSchema = z.object({
 	encounterType: TeleEncounterTypeEnum,
 	linkedEncounterId: z.string().uuid().nullable(),
 	linkedEncounterNumber: z.string().nullable(),
+	linkedEncounterStatus: z.string().nullable(),
 	patientId: z.string().uuid(),
 	patientName: z.string(),
 	clinicianId: z.string().uuid(),
@@ -303,6 +305,22 @@ export const CreateEncounterInputSchema = z.object({
 	diagnosis: z.string().default(""),
 	icdCode: z.string().optional(),
 	vitalSigns: VitalSignsSchema.optional(),
+}).superRefine((data, ctx) => {
+	if (data.encounterType === "linked" && !data.linkedEncounterId) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: "linkedEncounterId is required when encounterType is linked.",
+			path: ["linkedEncounterId"],
+		})
+	}
+
+	if (data.encounterType === "standalone" && data.linkedEncounterId) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: "linkedEncounterId is only allowed when encounterType is linked.",
+			path: ["linkedEncounterId"],
+		})
+	}
 })
 
 export type CreateEncounterInput = z.infer<typeof CreateEncounterInputSchema>

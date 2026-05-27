@@ -5,6 +5,7 @@ import dynamic from "next/dynamic"
 import { motion } from "framer-motion"
 import {
 	AlertTriangle,
+	CalendarClock,
 	Loader2,
 	Mic,
 	MicOff,
@@ -85,6 +86,57 @@ function getAvatarGradient(seed: string): string {
 	let hash = 0
 	for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0
 	return palettes[Math.abs(hash) % palettes.length] ?? palettes[0]!
+}
+
+interface JoinWindowMessage {
+	start: string
+	end: string
+}
+
+interface FriendlyJoinWindow {
+	date?: string
+	startTime: string
+	endTime: string
+	timezoneLabel: string
+}
+
+function parseErrorMessage(message: string): string {
+	try {
+		const parsed = JSON.parse(message) as { message?: unknown; error?: unknown }
+		if (typeof parsed.message === "string" && parsed.message.trim()) return parsed.message
+		if (typeof parsed.error === "string" && parsed.error.trim()) return parsed.error
+	} catch {
+		return message
+	}
+	return message
+}
+
+function parseJoinWindowMessage(message: string): JoinWindowMessage | null {
+	const displayMessage = parseErrorMessage(message)
+	const match = /^Video room can be joined from (.+) until (.+)\.$/.exec(displayMessage)
+	if (!match) return null
+	return { start: match[1] ?? "", end: match[2] ?? "" }
+}
+
+function toFriendlyJoinWindow(window: JoinWindowMessage): FriendlyJoinWindow {
+	const startMatch = /^(.+), (\d{1,2}:\d{2} [AP]M) GMT\+8$/.exec(window.start)
+	const endMatch = /^(.+), (\d{1,2}:\d{2} [AP]M) GMT\+8$/.exec(window.end)
+	if (startMatch && endMatch) {
+		const startDate = startMatch[1]
+		const endDate = endMatch[1]
+		return {
+			date: startDate === endDate ? startDate : undefined,
+			startTime: startDate === endDate ? (startMatch[2] ?? window.start) : window.start,
+			endTime: startDate === endDate ? (endMatch[2] ?? window.end) : window.end,
+			timezoneLabel: "Philippine time",
+		}
+	}
+
+	return {
+		startTime: window.start.replace("GMT+8", "Philippine time"),
+		endTime: window.end.replace("GMT+8", "Philippine time"),
+		timezoneLabel: "Philippine time",
+	}
 }
 
 interface CameraPreviewProps {
@@ -547,16 +599,34 @@ export function LiveKitErrorCard({
 	title?: string
 	onRetry?: () => void
 }) {
-	let displayMessage = message
-	try {
-		const parsed = JSON.parse(message) as { message?: unknown; error?: unknown }
-		if (typeof parsed.message === "string" && parsed.message.trim()) {
-			displayMessage = parsed.message
-		} else if (typeof parsed.error === "string" && parsed.error.trim()) {
-			displayMessage = parsed.error
-		}
-	} catch {
-		displayMessage = message
+	const displayMessage = parseErrorMessage(message)
+	const joinWindow = parseJoinWindowMessage(message)
+	const friendlyJoinWindow = joinWindow ? toFriendlyJoinWindow(joinWindow) : null
+
+	if (friendlyJoinWindow) {
+		return (
+			<Alert className="border-amber-500/40 bg-amber-500/10 px-4 py-4 text-amber-900 dark:text-amber-100">
+				<CalendarClock className="size-4" />
+				<AlertTitle>Video room opens later</AlertTitle>
+				<AlertDescription className="space-y-3 text-amber-900/90 dark:text-amber-100/90">
+					<p>
+						You can join this appointment&apos;s video room
+						{friendlyJoinWindow.date ? ` on ${friendlyJoinWindow.date}` : ""} from{" "}
+						<strong>{friendlyJoinWindow.startTime}</strong> to{" "}
+						<strong>{friendlyJoinWindow.endTime}</strong>, {friendlyJoinWindow.timezoneLabel}.
+					</p>
+					<p className="text-xs">
+						Please come back during that time window, then check again.
+					</p>
+					{onRetry && (
+						<Button type="button" variant="outline" size="sm" onClick={onRetry}>
+							<RefreshCw className="size-3.5" />
+							Check again
+						</Button>
+					)}
+				</AlertDescription>
+			</Alert>
+		)
 	}
 
 	return (

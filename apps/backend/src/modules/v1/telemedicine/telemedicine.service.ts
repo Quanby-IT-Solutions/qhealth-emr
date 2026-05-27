@@ -128,6 +128,7 @@ export class TelemedicineService {
 			patientJoinedAt: this.serializeDate(appt.patientJoinedAt),
 			notes: appt.notes ?? null,
 			encounterId: appt.linkedCoreEncounterId ?? null,
+			linkedCoreEncounterId: appt.linkedCoreEncounterId ?? null,
 			createdAt: appt.createdAt.toISOString(),
 			createdByName,
 		}
@@ -559,6 +560,7 @@ export class TelemedicineService {
 					patientInviteLastUsedAt: telemedicineAppointments.patientInviteLastUsedAt,
 					patientJoinedAt: telemedicineAppointments.patientJoinedAt,
 					notes: telemedicineAppointments.notes,
+					linkedCoreEncounterId: telemedicineAppointments.linkedCoreEncounterId,
 					teleEncounterId: telemedicineEncounters.id,
 					createdAt: telemedicineAppointments.createdAt,
 					patientFirstName: patients.firstName,
@@ -618,6 +620,7 @@ export class TelemedicineService {
 			patientJoinedAt: this.serializeDate(r.patientJoinedAt),
 			notes: r.notes ?? null,
 			encounterId: r.teleEncounterId ?? null,
+			linkedCoreEncounterId: r.linkedCoreEncounterId ?? null,
 			createdAt: r.createdAt.toISOString(),
 			createdByName: r.createdByName ?? "",
 		}))
@@ -664,6 +667,7 @@ export class TelemedicineService {
 				patientInviteLastUsedAt: telemedicineAppointments.patientInviteLastUsedAt,
 				patientJoinedAt: telemedicineAppointments.patientJoinedAt,
 				notes: telemedicineAppointments.notes,
+				linkedCoreEncounterId: telemedicineAppointments.linkedCoreEncounterId,
 				teleEncounterId: telemedicineEncounters.id,
 				createdAt: telemedicineAppointments.createdAt,
 				patientFirstName: patients.firstName,
@@ -717,6 +721,7 @@ export class TelemedicineService {
 			patientJoinedAt: this.serializeDate(row.patientJoinedAt),
 			notes: row.notes ?? null,
 			encounterId: row.teleEncounterId ?? null,
+			linkedCoreEncounterId: row.linkedCoreEncounterId ?? null,
 			createdAt: row.createdAt.toISOString(),
 			createdByName: row.createdByName ?? "",
 		}
@@ -1549,12 +1554,14 @@ export class TelemedicineService {
 
 		// Resolve linked encounter number if applicable
 		let linkedEncounterNumber: string | null = null
+		let linkedEncounterStatus: string | null = null
 		if (row.linkedEncounterId) {
 			const [linkedEnc] = await db
-				.select({ id: encounters.id })
+				.select({ id: encounters.id, status: encounters.status })
 				.from(encounters)
 				.where(eq(encounters.id, row.linkedEncounterId))
 			linkedEncounterNumber = linkedEnc ? `ENC-${linkedEnc.id.slice(0, 8).toUpperCase()}` : null
+			linkedEncounterStatus = linkedEnc?.status ?? null
 		}
 
 		return {
@@ -1563,6 +1570,7 @@ export class TelemedicineService {
 			encounterType: row.encounterType,
 			linkedEncounterId: row.linkedEncounterId ?? null,
 			linkedEncounterNumber,
+			linkedEncounterStatus,
 			patientId: row.patientId,
 			patientName: `${row.patientLastName}, ${row.patientFirstName}`,
 			clinicianId: row.clinicianStaffId,
@@ -1611,6 +1619,16 @@ export class TelemedicineService {
 
 		if (existingEncounter) {
 			throw new BadRequestException("A telemedicine encounter already exists for this appointment.")
+		}
+
+		if (input.encounterType === "linked" && !input.linkedEncounterId) {
+			throw new BadRequestException("linkedEncounterId is required for linked telemedicine encounters.")
+		}
+
+		if (input.encounterType === "standalone" && input.linkedEncounterId) {
+			throw new BadRequestException(
+				"linkedEncounterId is only allowed for linked telemedicine encounters."
+			)
 		}
 
 		if (input.linkedEncounterId) {

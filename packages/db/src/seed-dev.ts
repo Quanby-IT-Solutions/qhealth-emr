@@ -679,7 +679,6 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["orders", ["view", "create", "edit", "sign"]],
 		["nursing", ["view"]],
 		["formulary", ["view"]],
-		["reporting", ["view"]],
 		["opd", ["view"]], // OPD dashboard access
 		["telemedicine", ["view", "create", "edit"]], // Virtual consultation access
 		["ed", ["view", "edit"]], // Emergency department patient viewing + disposition (C2)

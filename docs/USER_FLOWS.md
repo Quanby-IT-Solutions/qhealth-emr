@@ -1444,11 +1444,14 @@ FMDRF and FNDRF remain separate physician-owned death review forms under Death R
 2. Open scheduled telemedicine appointment
 3. Click **"Start Virtual Encounter"**
 4. **Telemedicine Encounter Page** opens with patient details + chart
-5. Click **"Launch Video"** → **Video Link Launch Page** opens Zoom/Teams in new window
-6. Conduct consultation
-7. Document SOAP note in EMR (D1)
-8. End video call
-9. Close encounter
+5. Confirm encounter context detected from the appointment source:
+   - **Standalone** for a virtual-only consultation
+   - **Follow-up to In-Person Visit** for a follow-up to an existing OPD, ER, or inpatient encounter
+6. Click **"Launch Video"** → **Video Link Launch Page** opens Zoom/Teams in new window
+7. Conduct consultation
+8. Document SOAP note in EMR (D1)
+9. End video call
+10. Close encounter
 
 **Wireframe Pages**
 

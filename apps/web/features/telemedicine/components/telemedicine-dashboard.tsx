@@ -30,6 +30,10 @@ import { TelemedicineEncounterForm } from "@/features/telemedicine/components/te
 import { TelemedicineEncounterSummary } from "@/features/telemedicine/components/telemedicine-encounter-summary"
 import { VideoCallPanel } from "@/features/telemedicine/components/video-call-panel"
 import { VirtualVisitScheduler } from "@/features/telemedicine/components/virtual-visit-scheduler"
+import {
+	formatJoinWindowRange,
+	getJoinWindowState,
+} from "@/features/telemedicine/lib/join-window"
 
 // ============================================================================
 // Types
@@ -210,8 +214,31 @@ function AppointmentContextBanner({
 	onClear?: () => void
 	onChange?: () => void
 }) {
+	const joinWindowState = getJoinWindowState(appointment)
+	const joinWindowText =
+		joinWindowState.startsAt && joinWindowState.endsAt
+			? `${formatJoinWindowRange(joinWindowState.startsAt, joinWindowState.endsAt)} Philippine time`
+			: null
+	const statusText =
+		joinWindowState.kind === "open"
+			? "Video room is open now"
+			: joinWindowState.kind === "upcoming"
+				? "Video room opens later"
+				: joinWindowState.kind === "closed"
+					? "Video room window has passed"
+					: "Video room unavailable"
+
 	return (
-		<div className="border-primary/20 bg-primary/5 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+		<div
+			className={[
+				"flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3",
+				joinWindowState.kind === "closed"
+					? "border-destructive/30 bg-destructive/10"
+					: joinWindowState.kind === "upcoming"
+						? "border-amber-500/30 bg-amber-500/10"
+						: "border-primary/20 bg-primary/5",
+			].join(" ")}
+		>
 			<div className="flex flex-wrap items-center gap-3 text-sm">
 				<span className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-full">
 					<User className="size-4" />
@@ -236,6 +263,11 @@ function AppointmentContextBanner({
 							{formatAppointmentStatusLabel(appointment.status)}
 						</span>
 					</div>
+					{joinWindowText && (
+						<p className="text-muted-foreground text-xs">
+							<span className="font-medium">{statusText}:</span> {joinWindowText}
+						</p>
+					)}
 				</div>
 			</div>
 			<div className="flex gap-2">
@@ -335,10 +367,14 @@ function StandardTelemedicineDashboard({ profile }: { profile?: MyProfile }) {
 		setActiveTab("encounter")
 	}
 
-	function handleAppointmentSelected(appointmentId: string, encounterId?: string | null) {
+	function handleAppointmentSelected(
+		appointmentId: string,
+		encounterId?: string | null,
+		targetTab: "encounter" | "video" = "encounter"
+	) {
 		setSelectedAppointmentId(appointmentId)
 		setActiveEncounterId(encounterId ?? null)
-		setActiveTab("encounter")
+		setActiveTab(targetTab)
 	}
 
 	function handleEncounterCreated(encounterId: string) {
@@ -395,9 +431,11 @@ function StandardTelemedicineDashboard({ profile }: { profile?: MyProfile }) {
 						) : (
 							<TelemedicineEncounterForm
 								appointmentId={selectedAppointmentId}
+								facilityId={appointment?.facilityId ?? facilityId}
 								patientId={appointment?.patientId ?? ""}
 								patientName={patientName}
 								clinicianName={clinicianName}
+								initialLinkedEncounterId={appointment?.linkedCoreEncounterId ?? null}
 								onEncounterCreated={handleEncounterCreated}
 							/>
 						)
@@ -499,11 +537,18 @@ function PhysicianTelemedicineDashboard({ profile }: { profile?: MyProfile }) {
 	const currentEncounterId = activeEncounterId ?? appointment?.encounterId ?? null
 	const hasAppointment = Boolean(selectedAppointmentId)
 	const hasEncounter = Boolean(currentEncounterId)
+	const selectedJoinWindowState = appointment ? getJoinWindowState(appointment) : null
+	const blocksNewEncounter =
+		Boolean(appointment) && !hasEncounter && selectedJoinWindowState?.kind === "closed"
 
-	function handleAppointmentSelected(appointmentId: string, encounterId?: string | null) {
+	function handleAppointmentSelected(
+		appointmentId: string,
+		encounterId?: string | null,
+		targetTab: "encounter" | "video" = "encounter"
+	) {
 		setSelectedAppointmentId(appointmentId)
 		setActiveEncounterId(encounterId ?? null)
-		setActiveTab("encounter")
+		setActiveTab(targetTab)
 	}
 
 	function handleEncounterCreated(encounterId: string) {
@@ -544,8 +589,10 @@ function PhysicianTelemedicineDashboard({ profile }: { profile?: MyProfile }) {
 				? "Document the SOAP note"
 				: "Select an appointment to begin",
 			completed: hasEncounter,
-			disabled: !hasAppointment,
-			disabledReason: "Select an appointment first",
+			disabled: !hasAppointment || blocksNewEncounter,
+			disabledReason: blocksNewEncounter
+				? "Video window passed"
+				: "Select an appointment first",
 		},
 		{
 			id: "video",
@@ -606,12 +653,22 @@ function PhysicianTelemedicineDashboard({ profile }: { profile?: MyProfile }) {
 								onLaunchVideo={() => setActiveTab("video")}
 								onGenerateAbstract={() => setActiveTab("documents")}
 							/>
+						) : blocksNewEncounter ? (
+							<GuidedEmpty
+								icon={ClipboardList}
+								title="Video window has passed"
+								message="A new encounter cannot be started after the video access window has passed. Mark the appointment as no-show or reschedule if the consultation did not happen."
+								ctaLabel="Go to My Appointments"
+								onCta={() => setActiveTab("appointments")}
+							/>
 						) : (
 							<TelemedicineEncounterForm
 								appointmentId={selectedAppointmentId!}
+								facilityId={appointment?.facilityId ?? facilityId}
 								patientId={appointment?.patientId ?? ""}
 								patientName={patientName}
 								clinicianName={clinicianName}
+								initialLinkedEncounterId={appointment?.linkedCoreEncounterId ?? null}
 								onEncounterCreated={handleEncounterCreated}
 							/>
 						)

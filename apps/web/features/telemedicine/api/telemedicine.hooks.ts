@@ -67,6 +67,7 @@ export interface TelemedicineAppointment {
 	patientInviteToken?: string
 	notes: string | null
 	encounterId: string | null
+	linkedCoreEncounterId: string | null
 	createdAt: string
 	createdByName: string
 }
@@ -125,6 +126,7 @@ export interface TelemedicineEncounter {
 	encounterType: EncounterType
 	linkedEncounterId: string | null
 	linkedEncounterNumber: string | null
+	linkedEncounterStatus: string | null
 	patientId: string
 	patientName: string
 	clinicianId: string

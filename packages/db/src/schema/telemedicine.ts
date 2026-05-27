@@ -114,6 +114,7 @@ export const telemedicineEncounters = createTable(
 	}),
 	t => [
 		index("telemedicine_encounters_appointment_id_idx").on(t.appointmentId),
+		index("telemedicine_encounters_linked_encounter_id_idx").on(t.linkedEncounterId),
 		index("telemedicine_encounters_patient_id_idx").on(t.patientId),
 		index("telemedicine_encounters_clinician_staff_id_idx").on(t.clinicianStaffId),
 		index("telemedicine_encounters_status_idx").on(t.status),

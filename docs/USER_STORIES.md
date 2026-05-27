@@ -500,6 +500,7 @@ DONE - KARL
   - **As a** Physician
   - **I want to** initiate a virtual encounter via an integrated commercial video platform link (Zoom/Teams)
   - **So that** telemedicine consultations are documented natively in the EMR
+  - **Clarification**: The system defaults the encounter context from the appointment source: standalone when booked as a virtual-only consult, or linked when booked as a follow-up to an existing OPD, ER, or inpatient visit. The physician confirms or changes the context when documenting.
   - **Pages**: Telemedicine Encounter Page, Video Link Launch Page
 
 - **Story 14.2 – Tele-Encounter Clinical Abstract & e-Rx**

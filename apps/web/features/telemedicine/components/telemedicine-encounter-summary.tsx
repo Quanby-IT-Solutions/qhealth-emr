@@ -132,6 +132,22 @@ export function TelemedicineEncounterSummary({
 							<Field label="Diagnosis" value={encounter.diagnosis} />
 						</div>
 
+						{encounter.encounterType === "linked" && (
+							<div className="border-primary/30 bg-primary/5 rounded-md border p-3">
+								<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+									Linked In-Person Visit
+								</p>
+								<p className="text-sm font-medium">
+									{encounter.linkedEncounterNumber ?? encounter.linkedEncounterId ?? "Linked visit"}
+								</p>
+								{encounter.linkedEncounterStatus && (
+									<p className="text-muted-foreground text-xs">
+										Status: {encounter.linkedEncounterStatus.replace(/_/g, " ")}
+									</p>
+								)}
+							</div>
+						)}
+
 						<ChartSnapshot patientId={encounter.patientId} />
 
 						<Separator />
