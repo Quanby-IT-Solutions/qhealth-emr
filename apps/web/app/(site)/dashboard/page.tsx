@@ -8,6 +8,7 @@ import { NurseRoleDashboard } from "@/features/nursing/components/nurse-role-das
 import { DietitianDashboard } from "@/features/nutrition/components/dietitian-dashboard"
 import { PharmacyDashboard } from "@/features/pharmacy/components/pharmacy-dashboard"
 import { PhysicianDashboard } from "@/features/physician-dashboard/components/physician-dashboard"
+import { SurgeonDashboard } from "@/features/surgical/components/surgeon-dashboard"
 
 export default function DashboardPage() {
 	const { data: profile, isLoading } = useMyProfile()
@@ -21,6 +22,8 @@ export default function DashboardPage() {
 		permSet.has("nursing:view") && !permSet.has("clinical_docs:sign")
 	const canViewPharmacyDashboard = permSet.has("orders:verify")
 	const canViewNutritionDashboard = permSet.has("nutrition:view")
+	const canViewSurgeonDashboard =
+		profile?.activeRole?.name?.toLowerCase() === "surgeon" && permSet.has("surgical:view")
 	const canViewPhysicianDashboard = permSet.has("clinical_docs:sign")
 
 	if (isLoading) {
@@ -52,6 +55,10 @@ export default function DashboardPage() {
 
 	if (canViewNutritionDashboard) {
 		return <DietitianDashboard />
+	}
+
+	if (canViewSurgeonDashboard) {
+		return <SurgeonDashboard profile={profile} />
 	}
 
 	if (canViewPhysicianDashboard) {

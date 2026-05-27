@@ -12,8 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables
-  await dotenv.load(fileName: '.env');
+  // Load committed defaults so tests and clean checkouts do not require a local .env asset.
+  await dotenv.load(fileName: 'config/env.defaults');
 
   // Initialize awesome_notifications before runApp so channels are registered.
   await NotificationService.instance.initialize();
