@@ -903,17 +903,13 @@ export function AnesthesiaRecordForm({
 					</div>
 					<div className="flex items-center gap-2">
 						<Tooltip>
-							<TooltipTrigger>
-								<Button
-									variant="outline"
-									size="sm"
-									disabled
-									className="pointer-events-none"
-									tabIndex={-1}
-								>
+							<TooltipTrigger
+								render={
+									<span className="border-border bg-background text-muted-foreground inline-flex h-7 cursor-not-allowed items-center justify-center gap-1 rounded-[min(var(--radius-md),12px)] border px-2.5 text-[0.8rem] font-medium opacity-50" />
+								}
+							>
 									<Monitor className="mr-1.5 size-3.5" />
 									Connect Monitor
-								</Button>
 							</TooltipTrigger>
 							<TooltipContent side="bottom">
 								Bedside monitor integration is not yet available in this environment
