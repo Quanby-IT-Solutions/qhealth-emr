@@ -141,7 +141,7 @@ class OnboardingScreen extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 64),
+            const SizedBox(height: 48),
             Container(
               width: 180,
               height: 180,
