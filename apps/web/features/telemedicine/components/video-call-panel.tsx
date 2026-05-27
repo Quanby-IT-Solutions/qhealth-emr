@@ -51,6 +51,10 @@ import {
 	useRegeneratePatientInviteMutation,
 	useRevokePatientInviteMutation,
 } from "@/features/telemedicine/api/telemedicine.hooks"
+import {
+	formatJoinWindowRange,
+	getJoinWindowState,
+} from "@/features/telemedicine/lib/join-window"
 import { getVideoLaunchPath } from "@/features/telemedicine/lib/video-links"
 
 // ============================================================================
@@ -225,6 +229,11 @@ function VideoCallContent({
 	const expiryState = getExpiryState(currentAppt.patientInviteExpiresAt)
 	const patientJoined = Boolean(currentAppt.patientJoinedAt)
 	const patientEmail = currentAppt.patientEmail
+	const joinWindowState = getJoinWindowState(currentAppt)
+	const joinWindowText =
+		joinWindowState.startsAt && joinWindowState.endsAt
+			? `${formatJoinWindowRange(joinWindowState.startsAt, joinWindowState.endsAt)} Philippine time`
+			: null
 
 	async function handleRegenerateInvite() {
 		setError(null)
@@ -282,25 +291,55 @@ function VideoCallContent({
 
 	return (
 		<div className="space-y-4">
-			<div className="rounded-2xl border border-success/30 bg-success/10 px-4 py-3">
-				<p className="flex items-center gap-2 text-sm font-medium text-success">
+			<div
+				className={[
+					"rounded-2xl border px-4 py-3",
+					joinWindowState.kind === "open"
+						? "border-success/30 bg-success/10"
+						: joinWindowState.kind === "closed"
+							? "border-destructive/30 bg-destructive/10"
+							: "border-amber-500/30 bg-amber-500/10",
+				].join(" ")}
+			>
+				<p
+					className={[
+						"flex items-center gap-2 text-sm font-medium",
+						joinWindowState.kind === "open"
+							? "text-success"
+							: joinWindowState.kind === "closed"
+								? "text-destructive"
+								: "text-amber-700 dark:text-amber-300",
+					].join(" ")}
+				>
 					<Video className="size-4" />
-					Video room is ready for this appointment
+					{joinWindowState.kind === "open"
+						? "Video room is open now"
+						: joinWindowState.kind === "closed"
+							? "Video room window has passed"
+							: "Video room opens later"}
 				</p>
-				<p className="text-success/90 mt-1 text-xs">
-					Clinician access is authenticated. Patient access uses the invite link plus DOB or MRN
-					verification.
+				<p className="text-muted-foreground mt-1 text-xs">
+					{joinWindowText
+						? `Video access: ${joinWindowText}.`
+						: "Video access window is unavailable for this appointment."}
 				</p>
 			</div>
 
 			<div className="flex flex-wrap gap-2">
-				<Button asChild className="rounded-full">
-					<Link href={getVideoLaunchPath(currentAppt.id)} target="_blank" rel="noopener noreferrer">
+				{joinWindowState.kind === "open" ? (
+					<Button asChild className="rounded-full">
+						<Link href={getVideoLaunchPath(currentAppt.id)} target="_blank" rel="noopener noreferrer">
+							<Video className="size-4" />
+							Open Clinician Room
+							<ExternalLink className="size-3.5" />
+						</Link>
+					</Button>
+				) : (
+					<Button type="button" className="rounded-full" disabled>
 						<Video className="size-4" />
-						Open Clinician Room
-						<ExternalLink className="size-3.5" />
-					</Link>
-				</Button>
+						{joinWindowState.kind === "closed" ? "Room Closed" : "Room Opens Later"}
+					</Button>
+				)}
 				{patientInviteUrl && (
 					<>
 						<CopyButton

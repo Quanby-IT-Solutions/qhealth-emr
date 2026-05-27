@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { AlertCircle, CheckCircle2, ClipboardList, Link2, Unlink } from "lucide-react"
+import { AlertCircle, CheckCircle2, ClipboardList, Link2, Loader2, Unlink } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -17,6 +17,7 @@ import {
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Separator } from "@/core/components/ui/separator"
+import { useEncounterListQuery } from "@/features/encounters/api/encounters.hooks"
 import { usePatientSummaryQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
 import {
 	type CreateEncounterInput,
@@ -30,9 +31,11 @@ import {
 
 interface TelemedicineEncounterFormProps {
 	appointmentId: string
+	facilityId: string
 	patientId: string
 	patientName: string
 	clinicianName: string
+	initialLinkedEncounterId?: string | null
 	onEncounterCreated?: (encounterId: string) => void
 }
 
@@ -73,11 +76,18 @@ const EMPTY_FORM: EncounterFormState = {
 	weight: "",
 }
 
+function buildInitialForm(initialLinkedEncounterId?: string | null): EncounterFormState {
+	return {
+		...EMPTY_FORM,
+		encounterType: initialLinkedEncounterId ? "linked" : "standalone",
+		linkedEncounterId: initialLinkedEncounterId ?? "",
+	}
+}
+
 // ============================================================================
 // Validation helpers
 // ============================================================================
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const BP_RE = /^\d{2,3}\/\d{2,3}$/
 const ICD10_RE = /^[A-Z]\d{2}(\.\d{1,3})?$/i
 
@@ -96,7 +106,6 @@ function validateForm(form: EncounterFormState): FieldErrors {
 
 	if (form.encounterType === "linked") {
 		if (!form.linkedEncounterId.trim()) errors.linkedEncounterId = "Linked encounter ID is required"
-		else if (!UUID_RE.test(form.linkedEncounterId.trim())) errors.linkedEncounterId = "Must be a valid UUID"
 	}
 
 	if (!form.diagnosis.trim()) errors.diagnosis = "Required"
@@ -138,40 +147,86 @@ function FieldError({ message }: { message?: string }) {
 function EncounterTypeToggle({
 	value,
 	onChange,
+	linkedDisabled,
+	linkedDisabledReason,
+	isLoadingLinkedVisits,
 }: {
 	value: EncounterType
 	onChange: (v: EncounterType) => void
+	linkedDisabled: boolean
+	linkedDisabledReason?: string
+	isLoadingLinkedVisits: boolean
 }) {
 	return (
-		<div className="flex gap-3">
+		<div className="grid gap-3 sm:grid-cols-2">
 			<button
 				type="button"
 				onClick={() => onChange("standalone")}
 				className={[
-					"flex flex-1 items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors",
+					"flex min-h-24 items-start gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors",
 					value === "standalone"
 						? "border-primary bg-primary/10 text-primary"
 						: "border-muted bg-background text-muted-foreground hover:border-primary/40",
 				].join(" ")}
+				aria-pressed={value === "standalone"}
 			>
-				<Unlink className="size-4" />
-				Standalone
+				<Unlink className="mt-0.5 size-4 shrink-0" />
+				<span className="space-y-1">
+					<span className="block text-sm font-medium">Standalone Telemedicine Visit</span>
+					<span className="text-muted-foreground block text-xs">
+						Use when this online consult is the whole visit.
+					</span>
+				</span>
 			</button>
 			<button
 				type="button"
-				onClick={() => onChange("linked")}
+				onClick={() => {
+					if (!linkedDisabled) onChange("linked")
+				}}
+				disabled={linkedDisabled}
 				className={[
-					"flex flex-1 items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors",
+					"flex min-h-24 items-start gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60",
 					value === "linked"
 						? "border-primary bg-primary/10 text-primary"
 						: "border-muted bg-background text-muted-foreground hover:border-primary/40",
 				].join(" ")}
+				aria-pressed={value === "linked"}
 			>
-				<Link2 className="size-4" />
-				Linked to In-Person Visit
+				<Link2 className="mt-0.5 size-4 shrink-0" />
+				<span className="space-y-1">
+					<span className="block text-sm font-medium">Follow-up to In-Person Visit</span>
+					<span className="text-muted-foreground block text-xs">
+						Use when this teleconsult continues a previous OPD, ER, or inpatient encounter.
+					</span>
+					{isLoadingLinkedVisits && (
+						<span className="text-muted-foreground flex items-center gap-1 text-xs">
+							<Loader2 className="size-3 animate-spin" />
+							Checking prior visits
+						</span>
+					)}
+					{linkedDisabledReason && !isLoadingLinkedVisits && (
+						<span className="text-muted-foreground block text-xs">{linkedDisabledReason}</span>
+					)}
+				</span>
 			</button>
 		</div>
 	)
+}
+
+function formatEncounterDate(value: Date | string): string {
+	const d = typeof value === "string" ? new Date(value) : value
+	if (Number.isNaN(d.getTime())) return String(value)
+	return d.toLocaleString("en-PH", {
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+		hour: "numeric",
+		minute: "2-digit",
+	})
+}
+
+function formatEncounterType(value: string): string {
+	return value.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
 }
 
 const SOAP_SECTIONS = [
@@ -262,12 +317,14 @@ function ChartSnapshot({ patientId }: { patientId: string }) {
 
 export function TelemedicineEncounterForm({
 	appointmentId,
+	facilityId,
 	patientId,
 	patientName,
 	clinicianName,
+	initialLinkedEncounterId,
 	onEncounterCreated,
 }: TelemedicineEncounterFormProps) {
-	const [form, setForm] = useState<EncounterFormState>(EMPTY_FORM)
+	const [form, setForm] = useState<EncounterFormState>(() => buildInitialForm(initialLinkedEncounterId))
 	const [submitted, setSubmitted] = useState(false)
 	const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 	const [submitError, setSubmitError] = useState<string | null>(null)
@@ -275,6 +332,19 @@ export function TelemedicineEncounterForm({
 	const formRef = useRef<HTMLFormElement>(null)
 
 	const createMutation = useCreateEncounterMutation()
+	const linkedEncounterQuery = useEncounterListQuery(
+		{ facilityId, patientId, page: 1, limit: 25 },
+		{ enabled: Boolean(facilityId && patientId) }
+	)
+	const linkableEncounters =
+		linkedEncounterQuery.data?.data.filter(encounter => encounter.encounterType !== "telemedicine") ??
+		[]
+	const detectedFollowUp = Boolean(initialLinkedEncounterId)
+	const followUpDisabled =
+		!detectedFollowUp && (linkedEncounterQuery.isLoading || linkableEncounters.length === 0)
+	const followUpDisabledReason = followUpDisabled
+		? "No prior OPD, ER, or inpatient visit found for this patient at this facility."
+		: undefined
 
 	const hasFieldErrors = Object.keys(fieldErrors).length > 0
 
@@ -357,7 +427,7 @@ export function TelemedicineEncounterForm({
 	}
 
 	function handleConfirmClear() {
-		setForm(EMPTY_FORM)
+		setForm(buildInitialForm(initialLinkedEncounterId))
 		setFieldErrors({})
 		setSubmitError(null)
 		setClearDialogOpen(false)
@@ -400,29 +470,84 @@ export function TelemedicineEncounterForm({
 						<ChartSnapshot patientId={patientId} />
 						<Separator />
 
-						{/* Encounter Type */}
+						{/* Encounter Context */}
 						<div className="space-y-2">
-							<label className="text-sm font-medium">Encounter Type</label>
+							<div>
+								<label className="text-sm font-medium">
+									Encounter Context <span className="text-destructive">*</span>
+								</label>
+								<p className="text-muted-foreground text-xs">
+									{detectedFollowUp
+										? "Detected from the appointment source. Confirm or change if needed."
+										: "Detected as standalone unless this teleconsult continues a prior visit."}
+								</p>
+							</div>
 							<EncounterTypeToggle
 								value={form.encounterType}
-								onChange={v => patch("encounterType", v)}
+								onChange={v => {
+									patch("encounterType", v)
+									if (v === "standalone") patch("linkedEncounterId", "")
+								}}
+								linkedDisabled={followUpDisabled}
+								linkedDisabledReason={followUpDisabledReason}
+								isLoadingLinkedVisits={linkedEncounterQuery.isLoading}
 							/>
 							{form.encounterType === "linked" && (
 								<div data-field="linkedEncounterId" className="space-y-1.5 pt-1">
-									<label htmlFor="linkedEncounterId" className="text-sm font-medium">
-										Linked Encounter UUID <span className="text-destructive">*</span>
-									</label>
-									<input
-										id="linkedEncounterId"
-										className={inputClass("linkedEncounterId")}
-										value={form.linkedEncounterId}
-										onChange={e => patch("linkedEncounterId", e.target.value)}
-										placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-										aria-invalid={Boolean(fieldErrors.linkedEncounterId)}
-									/>
+									<div className="flex items-baseline justify-between gap-2">
+										<label className="text-sm font-medium">
+											Linked In-Person Visit <span className="text-destructive">*</span>
+										</label>
+										{linkedEncounterQuery.isLoading && (
+											<span className="text-muted-foreground flex items-center gap-1 text-xs">
+												<Loader2 className="size-3 animate-spin" />
+												Loading visits
+											</span>
+										)}
+									</div>
+									<div className="space-y-2">
+										{linkableEncounters.map(encounter => {
+											const selected = form.linkedEncounterId === encounter.id
+											return (
+												<button
+													key={encounter.id}
+													type="button"
+													onClick={() => patch("linkedEncounterId", encounter.id)}
+													className={[
+														"w-full rounded-md border p-3 text-left transition-colors",
+														selected
+															? "border-primary bg-primary/10"
+															: "border-border bg-background hover:border-primary/40",
+													].join(" ")}
+													aria-pressed={selected}
+												>
+													<div className="flex flex-wrap items-center justify-between gap-2">
+														<span className="text-sm font-medium">
+															{formatEncounterType(encounter.encounterType)}
+														</span>
+														<span className="text-muted-foreground text-xs">
+															{formatEncounterDate(encounter.admissionDatetime)}
+														</span>
+													</div>
+													<div className="text-muted-foreground mt-1 grid gap-1 text-xs sm:grid-cols-3">
+														<span>Status: {formatEncounterType(encounter.status)}</span>
+														<span>
+															Attending: {encounter.attendingStaffName || "Unassigned"}
+														</span>
+														<span>{encounter.chiefComplaint || "No chief complaint"}</span>
+													</div>
+												</button>
+											)
+										})}
+										{!linkedEncounterQuery.isLoading && !linkableEncounters.length && (
+											<div className="border-muted bg-muted/30 text-muted-foreground rounded-md border p-3 text-sm">
+												{followUpDisabledReason}
+											</div>
+										)}
+									</div>
 									<FieldError message={fieldErrors.linkedEncounterId} />
 									<p className="text-muted-foreground text-xs">
-										Paste the encounter ID from the linked in-person visit.
+										Select the OPD, ER, or inpatient visit this telemedicine follow-up belongs to.
 									</p>
 								</div>
 							)}
@@ -591,7 +716,7 @@ export function TelemedicineEncounterForm({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Clear this clinical note?</AlertDialogTitle>
 						<AlertDialogDescription>
-							All notes, vitals, and diagnosis information you've typed will be discarded. This
+							All notes, vitals, and diagnosis information you&apos;ve typed will be discarded. This
 							cannot be undone.
 						</AlertDialogDescription>
 					</AlertDialogHeader>

@@ -86,6 +86,8 @@ export default function EncounterChartLayout({
 	const breakGlassRequired =
 		error?.message?.includes(BREAK_GLASS_REQUIRED_MESSAGE) ||
 		String(error).includes(BREAK_GLASS_REQUIRED_MESSAGE)
+	const base = `/patients/${patientId}/encounters/${encounterId}`
+	const isDeathReportRoute = pathname.startsWith(`${base}/death-report`)
 
 	// Break-Glass state
 	const [breakGlassOpen, setBreakGlassOpen] = useState(false)
@@ -96,8 +98,6 @@ export default function EncounterChartLayout({
 		patientId: encounter?.patientId ?? patientId,
 		enabled: canInvokeBreakGlass,
 	})
-
-	const base = `/patients/${patientId}/encounters/${encounterId}`
 
 	useEffect(() => {
 		if (breakGlassRequired && activeBreakGlass) {
@@ -173,8 +173,12 @@ export default function EncounterChartLayout({
 		{
 			label: "Nursing",
 			href: `${base}/nursing`,
-			// Nursing tab is for Nurses and Physicians; Surgeons view vitals in Summary
-			show: can(permSet, "nursing", "view") && !can(permSet, "surgical", "view"),
+			// Nursing workflows are nurse-owned. Clinicians get vitals/clinical
+			// context from Summary, Orders, and Documentation instead.
+			show:
+				can(permSet, "nursing", "view") &&
+				!can(permSet, "surgical", "view") &&
+				!can(permSet, "clinical_docs", "sign"),
 		},
 		{
 			label: "Nutrition",
@@ -184,7 +188,10 @@ export default function EncounterChartLayout({
 		{
 			label: "Billing",
 			href: `${base}/billing`,
-			show: can(permSet, "billing", "view"),
+			// Billing workspace belongs to Billing/MSW/Auditor-style review roles, not
+			// clinicians documenting care. Physicians trigger clinical completion and
+			// May Go Home from the Discharge tab.
+			show: can(permSet, "billing", "view") && !can(permSet, "clinical_docs", "sign"),
 		},
 		{
 			label: "MSW",
@@ -206,9 +213,11 @@ export default function EncounterChartLayout({
 		{
 			label: "Death Report",
 			href: `${base}/death-report`,
-			// Death Report (FMDRF/FNDRF) is visible to anyone with explicit death_reporting:view
-			// This includes Physicians/Surgeons (authors) and Registrars (certificate issuance)
-			show: can(permSet, "death_reporting", "view"),
+			// Death reporting is triggered by a deceased/expired disposition.
+			// Keep the tab visible while completing the required modal-launched route.
+			show:
+				can(permSet, "death_reporting", "view") &&
+				(encounter?.disposition === "deceased" || isDeathReportRoute),
 		},
 		{
 			label: "Transfers",

@@ -307,11 +307,16 @@ export type DischargeChecklist = z.infer<typeof DischargeChecklistSchema>
 
 export const LinkedEncounterItemSchema = z.object({
 	id: z.string().uuid(),
+	source: z.enum(["core", "telemedicine"]).default("core"),
+	appointmentId: z.string().uuid().nullable().default(null),
 	encounterType: EncounterTypeEnum,
 	status: EncounterStatusEnum,
 	admissionDatetime: dateOrString,
 	dischargeDatetime: dateOrString.nullable(),
 	attendingStaffName: z.string().nullable(),
+	chiefComplaint: z.string().nullable().default(null),
+	diagnosis: z.string().nullable().default(null),
+	clinicianName: z.string().nullable().default(null),
 })
 
 export const LinkedEncounterListSchema = z.object({

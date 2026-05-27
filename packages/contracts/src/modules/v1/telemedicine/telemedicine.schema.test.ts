@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
 	CreateAppointmentInputSchema,
+	CreateEncounterInputSchema,
 	EndLiveKitSessionInputSchema,
 	EPrescriptionSchema,
 	JoinLiveKitRoomInputSchema,
@@ -128,6 +129,52 @@ describe("telemedicine appointment schema", () => {
 		expect(JoinPatientLiveKitRoomInputSchema.safeParse({ token: "a".repeat(43) }).success).toBe(
 			false
 		)
+	})
+})
+
+describe("telemedicine encounter schema", () => {
+	it("accepts standalone encounters without a linked encounter", () => {
+		expect(
+			CreateEncounterInputSchema.safeParse({
+				appointmentId: ID,
+				encounterType: "standalone",
+				chiefComplaint: "Cough",
+				diagnosis: "Upper respiratory tract infection",
+			}).success
+		).toBe(true)
+	})
+
+	it("accepts linked encounters only when linkedEncounterId is present", () => {
+		expect(
+			CreateEncounterInputSchema.safeParse({
+				appointmentId: ID,
+				encounterType: "linked",
+				linkedEncounterId: "550e8400-e29b-41d4-a716-446655440001",
+				chiefComplaint: "Follow-up",
+				diagnosis: "Improving",
+			}).success
+		).toBe(true)
+
+		expect(
+			CreateEncounterInputSchema.safeParse({
+				appointmentId: ID,
+				encounterType: "linked",
+				chiefComplaint: "Follow-up",
+				diagnosis: "Improving",
+			}).success
+		).toBe(false)
+	})
+
+	it("rejects standalone encounters with linkedEncounterId", () => {
+		expect(
+			CreateEncounterInputSchema.safeParse({
+				appointmentId: ID,
+				encounterType: "standalone",
+				linkedEncounterId: "550e8400-e29b-41d4-a716-446655440001",
+				chiefComplaint: "Cough",
+				diagnosis: "Upper respiratory tract infection",
+			}).success
+		).toBe(false)
 	})
 })
 

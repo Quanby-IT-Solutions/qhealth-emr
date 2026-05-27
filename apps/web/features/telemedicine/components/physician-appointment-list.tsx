@@ -34,12 +34,21 @@ import {
 	type AppointmentStatus,
 	type TelemedicineAppointment,
 } from "@/features/telemedicine/api/telemedicine.hooks"
+import {
+	formatJoinTime,
+	formatJoinWindowRange,
+	getJoinWindowState,
+} from "@/features/telemedicine/lib/join-window"
 
 interface PhysicianAppointmentListProps {
 	facilityId: string
 	staffProfileId: string
 	selectedAppointmentId?: string | null
-	onAppointmentSelected?: (appointmentId: string, encounterId?: string | null) => void
+	onAppointmentSelected?: (
+		appointmentId: string,
+		encounterId?: string | null,
+		targetTab?: "encounter" | "video"
+	) => void
 }
 
 type StatusFilter = AppointmentStatus | "all"
@@ -146,6 +155,12 @@ function AppointmentRow({
 	const hasEncounter = Boolean(appt.encounterId)
 	const isCompleted = appt.status === "completed"
 	const isCancelled = appt.status === "cancelled" || appt.status === "no-show"
+	const joinWindowState = getJoinWindowState(appt)
+	const blocksNewEncounter = joinWindowState.kind === "closed" && !hasEncounter
+	const joinWindowText =
+		joinWindowState.startsAt && joinWindowState.endsAt
+			? `${formatJoinWindowRange(joinWindowState.startsAt, joinWindowState.endsAt)} Philippine time`
+			: null
 
 	let ctaLabel: string
 	let ctaVariant: "default" | "secondary" | "outline" = "default"
@@ -155,6 +170,9 @@ function AppointmentRow({
 	} else if (isCompleted) {
 		ctaLabel = "Review"
 		ctaVariant = "secondary"
+	} else if (blocksNewEncounter) {
+		ctaLabel = "View Details"
+		ctaVariant = "outline"
 	} else if (hasEncounter) {
 		ctaLabel = "Continue Encounter"
 		ctaVariant = "secondary"
@@ -202,6 +220,16 @@ function AppointmentRow({
 								: `Starts in ${startsInMin}m`}
 						</Badge>
 					)}
+					{joinWindowState.kind === "open" && !isCompleted && !isCancelled && (
+						<Badge className="bg-success/15 text-success border-success/30 text-xs">
+							Video open now
+						</Badge>
+					)}
+					{joinWindowState.kind === "upcoming" && joinWindowState.startsAt && !isCompleted && (
+						<Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-xs">
+							Opens {formatJoinTime(joinWindowState.startsAt)}
+						</Badge>
+					)}
 					{isSelected && <Badge className="bg-primary text-primary-foreground text-xs">Selected</Badge>}
 				</div>
 				<div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
@@ -222,6 +250,16 @@ function AppointmentRow({
 				</div>
 				{appt.notes && (
 					<p className="text-muted-foreground line-clamp-2 text-xs italic">{appt.notes}</p>
+				)}
+				{joinWindowText && (
+					<p className="text-muted-foreground text-xs">
+						Video access: {joinWindowText}
+					</p>
+				)}
+				{blocksNewEncounter && (
+					<p className="text-destructive text-xs">
+						Video window has passed. Mark as no-show or reschedule if the consultation did not happen.
+					</p>
 				)}
 			</div>
 			<Button
@@ -436,7 +474,13 @@ export function PhysicianAppointmentList({
 													appt={appt}
 													isSelected={selectedAppointmentId === appt.id}
 													onSelect={() =>
-														onAppointmentSelected?.(appt.id, appt.encounterId)
+														onAppointmentSelected?.(
+															appt.id,
+															appt.encounterId,
+															getJoinWindowState(appt).kind === "closed" && !appt.encounterId
+																? "video"
+																: "encounter"
+														)
 													}
 												/>
 											))}

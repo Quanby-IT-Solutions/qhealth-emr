@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { useQueryClient } from "@tanstack/react-query"
 
@@ -26,7 +25,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useEdQueueQuery } from "@/features/ed/api/ed.hooks"
-import { acuityColor, acuityLabel } from "@/features/ed/lib/acuity-utils"
+import { acuityColor } from "@/features/ed/lib/acuity-utils"
 import { orpc } from "@/services/orpc/client"
 import { useNotifications } from "@/services/notifications/notification-provider"
 import { toast } from "sonner"
@@ -87,6 +86,7 @@ export function EdDashboard() {
 		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
 	)
 	const canCreate = permSet.has("ed:create")
+	const canMergePreEncounters = permSet.has("adt:edit") && permSet.has("patients:edit")
 
 	const { data: queue, isLoading } = useEdQueueQuery(facilityId)
 
@@ -326,7 +326,7 @@ export function EdDashboard() {
 												</TableCell>
 												<TableCell>
 													<div className="flex gap-1">
-														{item.type === "pre_encounter" && (
+														{item.type === "pre_encounter" && canMergePreEncounters && (
 															<Button
 																size="sm"
 																variant="outline"

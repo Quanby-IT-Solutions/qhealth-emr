@@ -146,6 +146,8 @@
 
 **Key Workflows:** Employs lightweight API links to approved secure video platforms (LiveKit-hosted rooms, with optional HTTPS Zoom/Teams links where configured) to preserve bandwidth. Focuses natively on generating the electronic clinical abstract and digitally signed e-prescription.
 
+**Clarification – Continuity of Care:** Telemedicine encounters may be recorded as standalone virtual visits or linked to an existing in-person OPD, ER, or inpatient encounter when the teleconsultation is a follow-up to that care episode. The appointment source determines the default encounter context, and the physician confirms or changes it during documentation.
+
 ---
 
 ## Section 3: Statutory and Regulatory Reporting Engine

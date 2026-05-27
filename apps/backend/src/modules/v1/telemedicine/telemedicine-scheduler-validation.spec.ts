@@ -206,6 +206,7 @@ describe("TelemedicineService - Scheduler Validation", () => {
 			patientJoinedAt: null,
 			notes: null,
 			encounterId: null,
+			linkedCoreEncounterId: null,
 			createdAt: "2026-05-22T00:00:00.000Z",
 			createdByName: "Scheduler User",
 		})

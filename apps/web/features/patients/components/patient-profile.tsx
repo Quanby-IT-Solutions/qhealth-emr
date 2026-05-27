@@ -415,35 +415,35 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 	return (
 		<div className="bg-background">
-			<div className="mx-auto w-full max-w-screen-2xl px-4 py-4 sm:px-6 lg:px-8">
-				<div className="mb-6 flex flex-wrap items-center gap-3 sm:mb-8">
+			<div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+				<div className="mb-4 flex flex-wrap items-center gap-3">
 					<Button variant="ghost" size="sm" className="h-8 px-2" onClick={handleBackToPrevious}>
 						<ArrowLeft className="size-4" />
 						Back to Search
 					</Button>
 				</div>
 
-				<section className="mb-6 sm:mb-8">
-					<div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-						<div className="bg-secondary text-muted-foreground flex size-12 shrink-0 items-center justify-center rounded-full sm:size-14">
-							<UserRound className="size-6" />
-						</div>
-						<div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-							<div className="min-w-0 space-y-3">
+				<section className="mb-5 rounded-lg border border-border/60 bg-card px-4 py-4 shadow-sm sm:px-5">
+					<div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+						<div className="flex min-w-0 items-start gap-4">
+							<div className="bg-secondary text-muted-foreground flex size-12 shrink-0 items-center justify-center rounded-lg border border-border/60">
+								<UserRound className="size-5" />
+							</div>
+							<div className="min-w-0 space-y-2">
 								<p className="text-muted-foreground text-[0.68rem] font-medium tracking-[0.24em] uppercase">
 									Patient
 								</p>
 								<div className="space-y-2">
-									<h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+									<h1 className="break-words text-2xl font-semibold tracking-tight">
 										{patientName}
 									</h1>
-									<div className="flex flex-wrap items-center gap-3">
+									<div className="flex flex-wrap items-center gap-2">
 										<Badge variant="secondary" className="font-mono">
 											{patient.mrn}
 										</Badge>
-										<span className="text-muted-foreground text-sm">
+										<Badge variant={patient.isActive ? "outline" : "secondary"}>
 											{patient.isActive ? "Active record" : "Inactive record"}
-										</span>
+										</Badge>
 										{summary?.hasSevereAllergies && (
 											<Badge variant="destructive">Severe Allergy</Badge>
 										)}
@@ -457,44 +457,45 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 									</div>
 								</div>
 							</div>
-
-							{activeBreakGlass ? (
-								<Button
-									variant="outline"
-									className="w-full border-orange-300 text-orange-700 hover:bg-orange-50 sm:w-fit"
-									onClick={() => setBreakGlassOpen(true)}
-								>
-									<ShieldAlert className="size-4" />
-									Break-Glass Active
-								</Button>
-							) : null}
 						</div>
+
+						{activeBreakGlass ? (
+							<Button
+								variant="outline"
+								className="w-full border-orange-500/50 bg-orange-500/10 text-orange-300 hover:bg-orange-500/15 hover:text-orange-200 sm:w-fit"
+								onClick={() => setBreakGlassOpen(true)}
+							>
+								<ShieldAlert className="size-4" />
+								Break-Glass Active
+							</Button>
+						) : null}
 					</div>
 				</section>
 
 				{activeBreakGlass ? (
-					<Card className="mb-6 border-orange-300 bg-orange-50/60 shadow-sm sm:mb-8">
-						<CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-							<div className="min-w-0 space-y-1">
-								<div className="flex items-center gap-2">
-									<ShieldAlert className="size-4 shrink-0 text-orange-700" />
-									<p className="text-sm font-medium text-orange-900">
+					<Card className="mb-5 overflow-hidden border-orange-500/30 bg-card shadow-sm">
+						<CardContent className="flex flex-col gap-4 border-l-4 border-orange-500 p-4 sm:flex-row sm:items-center sm:justify-between">
+							<div className="flex min-w-0 items-start gap-3">
+								<div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-orange-500/10 text-orange-300">
+									<ShieldAlert className="size-4" />
+								</div>
+								<div className="min-w-0 space-y-1">
+									<p className="text-sm font-medium text-foreground">
 										Temporary Break-Glass Access Active
 									</p>
+									<p className="text-sm text-muted-foreground">
+										Access is temporary and expires automatically.
+									</p>
+									<p className="text-xs text-muted-foreground">
+										Expires at {formatDateTime(activeBreakGlass.accessExpiresAt)}
+									</p>
 								</div>
-								<p className="text-sm text-orange-800">
-									Access to this patient record is temporary and will expire automatically. This
-									does not grant permanent access.
-								</p>
-								<p className="text-xs text-orange-700">
-									Expires at {formatDateTime(activeBreakGlass.accessExpiresAt)}
-								</p>
 							</div>
-							<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+							<div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
 								<BreakGlassCountdown accessExpiresAt={activeBreakGlass.accessExpiresAt} />
 								<Button
 									variant="outline"
-									className="w-full border-orange-300 text-orange-700 hover:bg-orange-100 sm:w-fit"
+									className="w-full border-orange-500/50 bg-orange-500/10 text-orange-300 hover:bg-orange-500/15 hover:text-orange-200 sm:w-fit"
 									onClick={() => setBreakGlassOpen(true)}
 								>
 									View Access Session

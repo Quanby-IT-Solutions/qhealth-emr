@@ -31,6 +31,8 @@ import {
 	rolePermissions,
 	roles,
 	staffProfiles,
+	telemedicineAppointments,
+	telemedicineEncounters,
 	userRoles,
 	users,
 	vitalSigns,
@@ -447,16 +449,67 @@ export class EncountersService {
 			.where(eq(encounters.linkedEncounterId, input.id))
 			.orderBy(desc(encounters.admissionDatetime))
 
+		const telemedicineClinicianSq = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("telemedicine_clinician")
+
+		const telemedicineRows = await db
+			.select({
+				id: telemedicineEncounters.id,
+				appointmentId: telemedicineEncounters.appointmentId,
+				status: telemedicineEncounters.status,
+				createdAt: telemedicineEncounters.createdAt,
+				chiefComplaint: telemedicineEncounters.chiefComplaint,
+				diagnosis: telemedicineEncounters.diagnosis,
+				clinicianName: telemedicineClinicianSq.name,
+			})
+			.from(telemedicineEncounters)
+			.innerJoin(
+				telemedicineAppointments,
+				eq(telemedicineEncounters.appointmentId, telemedicineAppointments.id)
+			)
+			.leftJoin(
+				telemedicineClinicianSq,
+				eq(telemedicineEncounters.clinicianStaffId, telemedicineClinicianSq.id)
+			)
+			.where(eq(telemedicineEncounters.linkedEncounterId, input.id))
+			.orderBy(desc(telemedicineEncounters.createdAt))
+
 		return {
 			sourceEncounterId: input.id,
-			linkedEncounters: linkedRows.map(row => ({
-				id: row.id,
-				encounterType: row.encounterType,
-				status: row.status,
-				admissionDatetime: row.admissionDatetime,
-				dischargeDatetime: row.dischargeDatetime,
-				attendingStaffName: row.attendingStaffName ?? null,
-			})),
+			linkedEncounters: [
+				...linkedRows.map(row => ({
+					id: row.id,
+					source: "core" as const,
+					appointmentId: null,
+					encounterType: row.encounterType,
+					status: row.status,
+					admissionDatetime: row.admissionDatetime,
+					dischargeDatetime: row.dischargeDatetime,
+					attendingStaffName: row.attendingStaffName ?? null,
+					chiefComplaint: null,
+					diagnosis: null,
+					clinicianName: row.attendingStaffName ?? null,
+				})),
+				...telemedicineRows.map(row => ({
+					id: row.id,
+					source: "telemedicine" as const,
+					appointmentId: row.appointmentId,
+					encounterType: "telemedicine" as const,
+					status: row.status === "finalized" ? ("closed" as const) : ("active" as const),
+					admissionDatetime: row.createdAt,
+					dischargeDatetime: row.status === "finalized" ? row.createdAt : null,
+					attendingStaffName: row.clinicianName ?? null,
+					chiefComplaint: row.chiefComplaint || null,
+					diagnosis: row.diagnosis || null,
+					clinicianName: row.clinicianName ?? null,
+				})),
+			].sort(
+				(a, b) =>
+					new Date(b.admissionDatetime).getTime() - new Date(a.admissionDatetime).getTime()
+			),
 		}
 	}
 
