@@ -37,7 +37,25 @@ describe("OperationRecordForm", () => {
 			error: null,
 		})
 		mockUseListCliniciansQuery.mockReturnValue({
-			data: { data: [] },
+			data: {
+				data: [
+					{
+						staffProfileId: "surgeon-1",
+						name: "Dr. Eduardo Lim",
+						department: "Surgery",
+					},
+					{
+						staffProfileId: "scrub-1",
+						name: "Nurse Ana Reyes",
+						department: "Ward Nursing",
+					},
+					{
+						staffProfileId: "anes-1",
+						name: "Dr. Rosario Tan",
+						department: "Anesthesiology",
+					},
+				],
+			},
 			isLoading: false,
 		})
 	})
@@ -117,5 +135,40 @@ describe("OperationRecordForm", () => {
 		})
 
 		expect(callOrder).toEqual(["save", "sign"])
+	})
+
+	it("searches and stores selected OR personnel by staff profile id", async () => {
+		const user = userEvent.setup()
+		saveMutateAsync.mockResolvedValue({})
+
+		render(
+			<OperationRecordForm
+				caseId="case-1"
+				facilityId="facility-1"
+				surgeonStaffId="surgeon-1"
+				defaultAnesthesiologistStaffId="anes-1"
+				canEdit
+				existing={null}
+			/>
+		)
+
+		await user.type(screen.getByPlaceholderText("Pre-op diagnosis"), "Symptomatic cholelithiasis")
+		await user.type(
+			screen.getByPlaceholderText("List each performed procedure on its own line for RVS mapping."),
+			"Laparoscopic cholecystectomy"
+		)
+		await user.type(screen.getByTestId("scrub-nurse"), "ana")
+		await user.click(screen.getByRole("button", { name: /nurse ana reyes/i }))
+
+		await user.click(screen.getByRole("button", { name: /save operation record/i }))
+
+		await waitFor(() => {
+			expect(saveMutateAsync).toHaveBeenCalledWith(
+				expect.objectContaining({
+					scrubNurseStaffId: "scrub-1",
+					anesthesiologistStaffId: "anes-1",
+				})
+			)
+		})
 	})
 })

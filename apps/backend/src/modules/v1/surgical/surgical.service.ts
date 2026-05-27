@@ -1724,6 +1724,8 @@ export class SurgicalService {
 				actualEndDatetime: surgicalCases.actualEndDatetime,
 				procedureName: surgicalCases.procedureName,
 				surgeonName: surgeonSq.name,
+				status: surgicalCases.status,
+				estimatedDurationMinutes: surgicalCases.estimatedDurationMinutes,
 			})
 			.from(surgicalCases)
 			.leftJoin(surgeonSq, eq(surgicalCases.surgeonStaffId, surgeonSq.id))
@@ -1744,18 +1746,36 @@ export class SurgicalService {
 			.filter(r => r.scheduledDatetime !== null && r.orSuite !== null)
 			.map(r => {
 				const start = r.scheduledDatetime!
-				const end = r.actualEndDatetime ?? new Date(start.getTime() + 2 * 60 * 60 * 1000)
+				const estimatedDurationMinutes = r.estimatedDurationMinutes ?? 120
+				const shouldUseActualEnd = r.status === "completed" && r.actualEndDatetime
+				const end = shouldUseActualEnd
+					? r.actualEndDatetime!
+					: new Date(start.getTime() + estimatedDurationMinutes * 60 * 1000)
 				return {
 					id: r.id,
 					facilityId: r.facilityId,
 					orSuite: r.orSuite!,
-					date: start.toISOString().slice(0, 10),
-					startTime: start.toISOString().slice(11, 19),
-					endTime: end.toISOString().slice(11, 19),
+					date: this.formatLocalDate(start),
+					startTime: this.formatLocalTime(start),
+					endTime: this.formatLocalTime(end),
 					surgicalCaseId: r.id,
 					procedureName: r.procedureName ?? null,
 					surgeonName: r.surgeonName ?? null,
 				}
 			})
+	}
+
+	private formatLocalDate(date: Date) {
+		const year = date.getFullYear()
+		const month = String(date.getMonth() + 1).padStart(2, "0")
+		const day = String(date.getDate()).padStart(2, "0")
+		return `${year}-${month}-${day}`
+	}
+
+	private formatLocalTime(date: Date) {
+		const hours = String(date.getHours()).padStart(2, "0")
+		const minutes = String(date.getMinutes()).padStart(2, "0")
+		const seconds = String(date.getSeconds()).padStart(2, "0")
+		return `${hours}:${minutes}:${seconds}`
 	}
 }

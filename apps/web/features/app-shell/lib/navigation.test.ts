@@ -68,6 +68,28 @@ const physicianPermissions = [
 	{ module: "audit", action: "create" },
 ]
 
+const surgeonPermissions = [
+	{ module: "adt", action: "view" },
+	{ module: "patients", action: "view" },
+	{ module: "clinical_docs", action: "view" },
+	{ module: "clinical_docs", action: "create" },
+	{ module: "clinical_docs", action: "edit" },
+	{ module: "clinical_docs", action: "sign" },
+	{ module: "orders", action: "view" },
+	{ module: "orders", action: "create" },
+	{ module: "orders", action: "sign" },
+	{ module: "surgical", action: "view" },
+	{ module: "surgical", action: "create" },
+	{ module: "surgical", action: "edit" },
+	{ module: "surgical", action: "sign" },
+	{ module: "formulary", action: "view" },
+	{ module: "opd", action: "view" },
+	{ module: "death_reporting", action: "view" },
+	{ module: "death_reporting", action: "create" },
+	{ module: "death_reporting", action: "edit" },
+	{ module: "audit", action: "create" },
+]
+
 describe("filterNavItems", () => {
 	it("keeps the Triage Officer sidebar scoped to triage-owned workflows", () => {
 		const primaryTitles = filterNavItems(PRIMARY_NAV_ITEMS, triagePermissions).map(
@@ -143,6 +165,24 @@ describe("filterNavItems", () => {
 			"Emergency",
 			"OPD",
 			"Telemedicine",
+		])
+		expect(secondaryTitles).toEqual([])
+	})
+
+	it("keeps the Surgeon sidebar scoped to surgical workflows", () => {
+		const primaryTitles = filterNavItems(PRIMARY_NAV_ITEMS, surgeonPermissions).map(
+			item => item.title
+		)
+		const secondaryTitles = filterNavItems(SECONDARY_NAV_ITEMS, surgeonPermissions).map(
+			item => item.title
+		)
+
+		expect(primaryTitles).toEqual([
+			"Dashboard",
+			"Patients",
+			"OR Schedule",
+			"Surgical Services",
+			"OPD",
 		])
 		expect(secondaryTitles).toEqual([])
 	})

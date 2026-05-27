@@ -45,6 +45,7 @@ import {
 	shiftHandoffs,
 	snomedCtCodes,
 	staffProfiles,
+	surgicalCases,
 	surveillanceFlags,
 	systemSettings,
 	tarEntries,
@@ -1217,6 +1218,75 @@ async function ensureEncounter(
 			attendingStaffId,
 			bedId,
 			admissionDatetime: new Date(),
+		})
+		.returning()
+	return created!
+}
+
+async function ensureSurgicalCase(seed: {
+	facilityId: string
+	encounterId: string
+	patientId: string
+	procedureName: string
+	orSuite: string
+	surgicalType: "elective" | "emergency" | "urgent"
+	surgeonStaffId: string
+	anesthesiologistStaffId: string
+	scheduledDatetime: Date
+	estimatedDurationMinutes: number
+	requiredEquipment: string[]
+	notes: string
+}) {
+	const [existing] = await db
+		.select()
+		.from(surgicalCases)
+		.where(
+			and(
+				eq(surgicalCases.facilityId, seed.facilityId),
+				eq(surgicalCases.encounterId, seed.encounterId),
+				eq(surgicalCases.procedureName, seed.procedureName)
+			)
+		)
+
+	if (existing) {
+		const [updated] = await db
+			.update(surgicalCases)
+			.set({
+				orSuite: seed.orSuite,
+				surgicalType: seed.surgicalType,
+				surgeonStaffId: seed.surgeonStaffId,
+				anesthesiologistStaffId: seed.anesthesiologistStaffId,
+				scheduledDatetime: seed.scheduledDatetime,
+				actualStartDatetime: null,
+				actualEndDatetime: null,
+				status: "scheduled",
+				estimatedDurationMinutes: seed.estimatedDurationMinutes,
+				requiredEquipment: seed.requiredEquipment,
+				notes: seed.notes,
+				updatedAt: new Date(),
+			})
+			.where(eq(surgicalCases.id, existing.id))
+			.returning()
+		return updated!
+	}
+
+	const [created] = await db
+		.insert(surgicalCases)
+		.values({
+			facilityId: seed.facilityId,
+			encounterId: seed.encounterId,
+			patientId: seed.patientId,
+			procedureName: seed.procedureName,
+			orSuite: seed.orSuite,
+			surgicalType: seed.surgicalType,
+			surgeonStaffId: seed.surgeonStaffId,
+			anesthesiologistStaffId: seed.anesthesiologistStaffId,
+			scheduledDatetime: seed.scheduledDatetime,
+			status: "scheduled",
+			asaClass: "ASA II",
+			estimatedDurationMinutes: seed.estimatedDurationMinutes,
+			requiredEquipment: seed.requiredEquipment,
+			notes: seed.notes,
 		})
 		.returning()
 	return created!
@@ -3365,6 +3435,32 @@ async function main() {
 		"inpatient",
 		"Uncontrolled hypertension"
 	)
+	const surgicalEncounter = await ensureEncounter(
+		mainFacility.id,
+		patient4.id,
+		staffMap.get("surgeon@qhealth.local")!,
+		null,
+		"inpatient",
+		"Scheduled laparoscopic cholecystectomy"
+	)
+	const scheduledOrTime = new Date()
+	scheduledOrTime.setDate(scheduledOrTime.getDate() + 1)
+	scheduledOrTime.setHours(8, 0, 0, 0)
+	await ensureSurgicalCase({
+		facilityId: mainFacility.id,
+		encounterId: surgicalEncounter.id,
+		patientId: patient4.id,
+		procedureName: "Laparoscopic cholecystectomy",
+		orSuite: "OR-1",
+		surgicalType: "elective",
+		surgeonStaffId: staffMap.get("surgeon@qhealth.local")!,
+		anesthesiologistStaffId: staffMap.get("anesthesiologist@qhealth.local")!,
+		scheduledDatetime: scheduledOrTime,
+		estimatedDurationMinutes: 120,
+		requiredEquipment: ["laparoscope", "electrocautery"],
+		notes:
+			"Dev smoke case for Surgeon workflow: operation record signing and RVS mapping.",
+	})
 
 	const refs = await ensureReferenceData(mainFacility.id)
 	await ensureClinicalData({
