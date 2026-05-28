@@ -144,6 +144,25 @@ export class GatePassService {
 			})
 			.returning()
 
+		if (enc.status === "pending_discharge") {
+			await db
+				.update(encounters)
+				.set({
+					status: "discharged",
+					disposition: enc.disposition ?? "home",
+					dischargeDatetime,
+					updatedAt: new Date(),
+				})
+				.where(eq(encounters.id, encounterId))
+
+			if (enc.bedId) {
+				await db
+					.update(beds)
+					.set({ status: "dirty", currentEncounterId: null, updatedAt: new Date() })
+					.where(eq(beds.id, enc.bedId))
+			}
+		}
+
 		return gatePass!
 	}
 

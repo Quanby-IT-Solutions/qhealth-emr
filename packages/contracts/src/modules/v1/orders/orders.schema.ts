@@ -423,8 +423,8 @@ export const CreateImagingOrderSchema = z.object({
 	preEncounterId: z.string().uuid().optional(),
 	modality: ImagingModalityEnum,
 	bodyPart: z.string().min(1),
-	clinicalIndication: z.string().trim().min(1).optional(),
-	indicationIcd10Code: z.string().trim().min(1).optional(),
+	clinicalIndication: z.string().trim().min(1),
+	indicationIcd10Code: z.string().trim().min(1),
 	indicationIcd10Display: z.string().trim().min(1).optional(),
 	priority: OrderPriorityEnum.optional(),
 }).superRefine((value, ctx) => {

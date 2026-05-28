@@ -1,8 +1,14 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import type { InferContractRouterOutputs } from "@orpc/contract"
+
+import type { v1Contract } from "@repo/contracts"
 
 import { orpc } from "@/services/orpc/client"
+
+type V1Outputs = InferContractRouterOutputs<typeof v1Contract>
+export type LoincCode = V1Outputs["formulary"]["loinc"]["search"]["data"][number]
 
 // ============================================================================
 // Drug Generics

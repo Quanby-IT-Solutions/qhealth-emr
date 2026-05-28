@@ -23,6 +23,7 @@ import {
 import { Textarea } from "@/core/components/ui/textarea"
 import {
 	useCreateProblemMutation,
+	useProblemsQuery,
 	type ProblemStatus,
 } from "@/features/problems-allergies/api/problems-allergies.hooks"
 
@@ -57,6 +58,10 @@ export function AddProblemDialog({
 	const [snomedSearch, setSnomedSearch] = useState("")
 
 	const createProblem = useCreateProblemMutation()
+	const activeProblemsQuery = useProblemsQuery({ patientId, status: "active" })
+	const activeProblems = activeProblemsQuery.data?.data ?? []
+	const activeIcd10Codes = new Set(activeProblems.flatMap(problem => problem.icd10Code ?? []))
+	const activeSnomedCodes = new Set(activeProblems.flatMap(problem => problem.snomedCode ?? []))
 	const hasCode = Boolean(codes.icd10Code || codes.snomedCode)
 	const canSubmit = Boolean(hasCode && description.trim() && facilityId && !createProblem.isPending)
 
@@ -121,6 +126,8 @@ export function AddProblemDialog({
 						onIcd10SearchChange={setIcd10Search}
 						snomedSearch={snomedSearch}
 						onSnomedSearchChange={setSnomedSearch}
+						disabledIcd10Codes={status === "active" ? activeIcd10Codes : undefined}
+						disabledSnomedCodes={status === "active" ? activeSnomedCodes : undefined}
 						onDescriptionSuggestion={suggestion => {
 							if (!description.trim()) setDescription(suggestion)
 						}}

@@ -263,6 +263,7 @@ export default function EncounterChartLayout({
 				]
 			: []),
 	].filter(tab => tab.show)
+	const canRenderEncounterContent = Boolean(visibleEncounter && !chartAccessBlocked && !isError)
 
 	return (
 		<ChartContext.Provider
@@ -466,7 +467,7 @@ export default function EncounterChartLayout({
 					) : null}
 				</div>
 
-				{visibleEncounter ? (
+				{canRenderEncounterContent ? (
 					<>
 						{/* Tab Bar */}
 						<div className="bg-background border-b">

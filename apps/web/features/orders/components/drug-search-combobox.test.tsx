@@ -138,4 +138,35 @@ describe("DrugSearchCombobox", () => {
 			})
 		)
 	})
+
+	it("opens active drug options on focus before typing", async () => {
+		const user = userEvent.setup()
+		const onSelect = vi.fn()
+		const onRawInput = vi.fn()
+
+		mockUseFormularyItemsQuery.mockReturnValue({
+			data: { data: [paracetamolFormularyItem] },
+			isLoading: false,
+		})
+		mockUseDrugGenericsQuery.mockReturnValue({
+			data: { data: [] },
+			isLoading: false,
+		})
+
+		render(
+			<DrugSearchCombobox
+				id="genericName"
+				facilityId="facility-1"
+				value=""
+				onSelect={onSelect}
+				onRawInput={onRawInput}
+				placeholder="Search generic"
+			/>
+		)
+
+		await user.click(screen.getByPlaceholderText("Search generic"))
+
+		expect(await screen.findByText("Paracetamol")).toBeInTheDocument()
+		expect(screen.getByText("Biogesic")).toBeInTheDocument()
+	})
 })

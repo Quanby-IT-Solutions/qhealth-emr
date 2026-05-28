@@ -31,6 +31,7 @@ jest.mock("@repo/db/schema", () => ({
 	clinicalNotes: {},
 	consentRecords: {},
 	encounters: {},
+	icd10Codes: { code: "icd10.code", isActive: "icd10.isActive" },
 	konsultaActivities: {},
 	labOrders: {},
 	noteAddenda: {},
@@ -63,6 +64,11 @@ type Privates = {
 		facilityId: string
 		encounterId?: string | null
 		preEncounterId?: string | null
+	}) => Promise<void>
+	assertIcd10DiagnosisPresentForSigning: (input: {
+		noteType: string
+		structuredData?: unknown
+		template: unknown
 	}) => Promise<void>
 }
 
@@ -106,6 +112,14 @@ const validKonsultaData = {
 beforeEach(() => {
 	jest.clearAllMocks()
 })
+
+function mockActiveIcd10Codes(codes: string[]) {
+	;(db.select as jest.Mock).mockReturnValueOnce({
+		from: () => ({
+			where: () => Promise.resolve(codes.map(code => ({ code }))),
+		}),
+	})
+}
 
 describe("ClinicalDocsService.assertAssessmentAndPlanPresent", () => {
 	it("throws BadRequestException when Assessment is empty but Plan is present", () => {
@@ -164,8 +178,7 @@ describe("ClinicalDocsService.assertAssessmentAndPlanPresent", () => {
 describe("ClinicalDocsService.validateKonsultaCompleteness", () => {
 	it("returns valid:false with 'Primary Diagnosis Code' missing when primaryDiagnosis.code is absent", () => {
 		const { service } = makeService()
-		const { primaryDiagnosis: _omitted, ...rest } = validKonsultaData
-		const data = { ...rest, primaryDiagnosis: { description: "Pneumonia" } }
+		const data = { ...validKonsultaData, primaryDiagnosis: { description: "Pneumonia" } }
 		const result = asPrivates(service).validateKonsultaCompleteness(data)
 		expect(result.valid).toBe(false)
 		expect(result.missingFields).toContain("Primary Diagnosis Code")
@@ -211,6 +224,9 @@ describe("ClinicalDocsService.signNote immutability", () => {
 						{
 							id: "note-1",
 							facilityId: "fac-1",
+							templateId: null,
+							noteType: "consultation",
+							structuredData: null,
 							status: "signed",
 							authorStaffId: "staff-1",
 						},
@@ -221,6 +237,83 @@ describe("ClinicalDocsService.signNote immutability", () => {
 		await expect(
 			service.signNote({ id: "note-1" } as never, "127.0.0.1", "user-1")
 		).rejects.toThrow(BadRequestException)
+	})
+})
+
+describe("ClinicalDocsService.assertIcd10DiagnosisPresentForSigning", () => {
+	it("throws when a consultation note has no ICD-10 diagnosis", async () => {
+		const { service } = makeService()
+		await expect(
+			asPrivates(service).assertIcd10DiagnosisPresentForSigning({
+				noteType: "consultation",
+				structuredData: { assessment: "URI", plan: "Supportive care" },
+				template: null,
+			})
+		).rejects.toThrow(BadRequestException)
+	})
+
+	it("accepts the structured ICD-10 diagnosis selected in the note editor", async () => {
+		const { service } = makeService()
+		mockActiveIcd10Codes(["J18.9"])
+		await expect(
+			asPrivates(service).assertIcd10DiagnosisPresentForSigning({
+				noteType: "consultation",
+				structuredData: {
+					assessment: "Pneumonia",
+					plan: "Antibiotics",
+					icd10_diagnosis: {
+						icd10Code: "J18.9",
+						icd10Display: "Pneumonia, unspecified organism",
+					},
+				},
+				template: null,
+			})
+		).resolves.toBeUndefined()
+	})
+
+	it("accepts legacy diagnosis arrays from the create-note dialog", async () => {
+		const { service } = makeService()
+		mockActiveIcd10Codes(["J18.9"])
+		await expect(
+			asPrivates(service).assertIcd10DiagnosisPresentForSigning({
+				noteType: "consultation",
+				structuredData: {
+					diagnoses: [{ code: "J18.9", description: "Pneumonia, unspecified organism" }],
+				},
+				template: null,
+			})
+		).resolves.toBeUndefined()
+	})
+
+	it("accepts multiple ICD-10 diagnoses without a primary marker", async () => {
+		const { service } = makeService()
+		mockActiveIcd10Codes(["J18.9", "I10"])
+		await expect(
+			asPrivates(service).assertIcd10DiagnosisPresentForSigning({
+				noteType: "consultation",
+				structuredData: {
+					diagnoses: [
+						{ code: "J18.9", description: "Pneumonia, unspecified organism" },
+						{ code: "I10", description: "Essential hypertension" },
+					],
+				},
+				template: null,
+			})
+		).resolves.toBeUndefined()
+	})
+
+	it("throws when selected ICD-10 diagnosis is not active in the master table", async () => {
+		const { service } = makeService()
+		mockActiveIcd10Codes([])
+		await expect(
+			asPrivates(service).assertIcd10DiagnosisPresentForSigning({
+				noteType: "consultation",
+				structuredData: {
+					diagnoses: [{ code: "BAD.1", description: "Invalid diagnosis" }],
+				},
+				template: null,
+			})
+		).rejects.toThrow("Select valid active ICD-10 code")
 	})
 })
 

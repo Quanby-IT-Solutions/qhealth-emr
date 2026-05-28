@@ -27,6 +27,8 @@ interface ProblemCodeFieldsProps {
 	snomedSearch: string
 	onSnomedSearchChange: (value: string) => void
 	onDescriptionSuggestion?: (description: string) => void
+	disabledIcd10Codes?: Set<string>
+	disabledSnomedCodes?: Set<string>
 }
 
 export function ProblemCodeFields({
@@ -37,6 +39,8 @@ export function ProblemCodeFields({
 	snomedSearch,
 	onSnomedSearchChange,
 	onDescriptionSuggestion,
+	disabledIcd10Codes = new Set(),
+	disabledSnomedCodes = new Set(),
 }: ProblemCodeFieldsProps) {
 	const [icd10Open, setIcd10Open] = useState(false)
 	const [snomedOpen, setSnomedOpen] = useState(false)
@@ -84,6 +88,7 @@ export function ProblemCodeFields({
 	}
 
 	function selectIcd10(result: Icd10SearchResult) {
+		if (disabledIcd10Codes.has(result.code)) return
 		onChange({
 			...value,
 			icd10Code: result.code,
@@ -95,6 +100,7 @@ export function ProblemCodeFields({
 	}
 
 	function selectSnomed(result: SnomedCtSearchResult) {
+		if (disabledSnomedCodes.has(result.conceptId)) return
 		onChange({
 			...value,
 			snomedCode: result.conceptId,
@@ -128,9 +134,12 @@ export function ProblemCodeFields({
 						onBlur={closeIcd10SearchAfterSelectionChance}
 						onKeyDown={event => {
 							if (event.key === "Escape") closeIcd10Search()
-							if (event.key === "Enter" && icd10Results[0]) {
+							const firstSelectable = icd10Results.find(
+								result => !disabledIcd10Codes.has(result.code)
+							)
+							if (event.key === "Enter" && firstSelectable) {
 								event.preventDefault()
-								selectIcd10(icd10Results[0])
+								selectIcd10(firstSelectable)
 							}
 						}}
 						placeholder={
@@ -147,21 +156,28 @@ export function ProblemCodeFields({
 							{icd10Query.isFetching ? (
 								<div className="text-muted-foreground px-3 py-3">Searching ICD-10...</div>
 							) : icd10Results.length ? (
-								icd10Results.map(result => (
-									<button
-										key={result.id}
-										type="button"
-										className="hover:bg-muted focus:bg-muted block w-full rounded-sm px-3 py-2 text-left outline-hidden"
-										onMouseDown={event => event.preventDefault()}
-										onClick={() => selectIcd10(result)}
-									>
-										<span className="block font-mono text-xs font-semibold">{result.code}</span>
-										<span className="block">{result.description}</span>
-										{result.category && (
-											<span className="text-muted-foreground block text-xs">{result.category}</span>
-										)}
-									</button>
-								))
+								icd10Results.map(result => {
+									const disabled = disabledIcd10Codes.has(result.code)
+									return (
+										<button
+											key={result.id}
+											type="button"
+											disabled={disabled}
+											className="hover:bg-muted focus:bg-muted disabled:text-muted-foreground disabled:hover:bg-transparent block w-full rounded-sm px-3 py-2 text-left outline-hidden disabled:cursor-not-allowed disabled:opacity-70"
+											onMouseDown={event => event.preventDefault()}
+											onClick={() => selectIcd10(result)}
+										>
+											<span className="flex items-center justify-between gap-2">
+												<span className="font-mono text-xs font-semibold">{result.code}</span>
+												{disabled && <span className="text-xs">Already active</span>}
+											</span>
+											<span className="block">{result.description}</span>
+											{result.category && (
+												<span className="text-muted-foreground block text-xs">{result.category}</span>
+											)}
+										</button>
+									)
+								})
 							) : (
 								<div className="text-muted-foreground px-3 py-3">No ICD-10 matches</div>
 							)}
@@ -208,9 +224,12 @@ export function ProblemCodeFields({
 						onBlur={closeSnomedSearchAfterSelectionChance}
 						onKeyDown={event => {
 							if (event.key === "Escape") closeSnomedSearch()
-							if (event.key === "Enter" && snomedResults[0]) {
+							const firstSelectable = snomedResults.find(
+								result => !disabledSnomedCodes.has(result.conceptId)
+							)
+							if (event.key === "Enter" && firstSelectable) {
 								event.preventDefault()
-								selectSnomed(snomedResults[0])
+								selectSnomed(firstSelectable)
 							}
 						}}
 						placeholder={
@@ -227,25 +246,30 @@ export function ProblemCodeFields({
 							{snomedQuery.isFetching ? (
 								<div className="text-muted-foreground px-3 py-3">Searching SNOMED CT...</div>
 							) : snomedResults.length ? (
-								snomedResults.map(result => (
-									<button
-										key={result.id}
-										type="button"
-										className="hover:bg-muted focus:bg-muted block w-full rounded-sm px-3 py-2 text-left outline-hidden"
-										onMouseDown={event => event.preventDefault()}
-										onClick={() => selectSnomed(result)}
-									>
-										<span className="block font-mono text-xs font-semibold">
-											{result.conceptId}
-										</span>
-										<span className="block">{result.preferredTerm}</span>
-										{result.semanticTag && (
-											<span className="text-muted-foreground block text-xs">
-												{result.semanticTag}
+								snomedResults.map(result => {
+									const disabled = disabledSnomedCodes.has(result.conceptId)
+									return (
+										<button
+											key={result.id}
+											type="button"
+											disabled={disabled}
+											className="hover:bg-muted focus:bg-muted disabled:text-muted-foreground disabled:hover:bg-transparent block w-full rounded-sm px-3 py-2 text-left outline-hidden disabled:cursor-not-allowed disabled:opacity-70"
+											onMouseDown={event => event.preventDefault()}
+											onClick={() => selectSnomed(result)}
+										>
+											<span className="flex items-center justify-between gap-2">
+												<span className="font-mono text-xs font-semibold">{result.conceptId}</span>
+												{disabled && <span className="text-xs">Already active</span>}
 											</span>
-										)}
-									</button>
-								))
+											<span className="block">{result.preferredTerm}</span>
+											{result.semanticTag && (
+												<span className="text-muted-foreground block text-xs">
+													{result.semanticTag}
+												</span>
+											)}
+										</button>
+									)
+								})
 							) : (
 								<div className="text-muted-foreground px-3 py-3">No SNOMED CT matches</div>
 							)}

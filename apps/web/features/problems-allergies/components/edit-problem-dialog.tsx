@@ -22,6 +22,7 @@ import {
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 import {
+	useProblemsQuery,
 	useUpdateProblemMutation,
 	type Problem,
 	type ProblemStatus,
@@ -50,6 +51,21 @@ export function EditProblemDialog({ open, onOpenChange, problem }: EditProblemDi
 	const [snomedSearch, setSnomedSearch] = useState("")
 
 	const updateProblem = useUpdateProblemMutation()
+	const activeProblemsQuery = useProblemsQuery({
+		patientId: problem?.patientId ?? "",
+		status: "active",
+	})
+	const activeProblems = activeProblemsQuery.data?.data ?? []
+	const activeIcd10Codes = new Set(
+		activeProblems
+			.filter(activeProblem => activeProblem.id !== problem?.id)
+			.flatMap(activeProblem => (activeProblem.icd10Code ? [activeProblem.icd10Code] : []))
+	)
+	const activeSnomedCodes = new Set(
+		activeProblems
+			.filter(activeProblem => activeProblem.id !== problem?.id)
+			.flatMap(activeProblem => (activeProblem.snomedCode ? [activeProblem.snomedCode] : []))
+	)
 	const hasCode = Boolean(codes.icd10Code || codes.snomedCode)
 	const canSubmit = Boolean(problem && hasCode && description.trim() && !updateProblem.isPending)
 
@@ -106,6 +122,8 @@ export function EditProblemDialog({ open, onOpenChange, problem }: EditProblemDi
 						onIcd10SearchChange={setIcd10Search}
 						snomedSearch={snomedSearch}
 						onSnomedSearchChange={setSnomedSearch}
+						disabledIcd10Codes={status === "active" ? activeIcd10Codes : undefined}
+						disabledSnomedCodes={status === "active" ? activeSnomedCodes : undefined}
 						onDescriptionSuggestion={suggestion => {
 							if (!description.trim()) setDescription(suggestion)
 						}}

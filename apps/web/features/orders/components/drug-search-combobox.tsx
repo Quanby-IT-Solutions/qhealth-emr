@@ -77,16 +77,16 @@ export function DrugSearchCombobox({
 
 	const trimmedValue = inputValue.trim()
 	const debouncedValue = useDebounce(trimmedValue, 300)
-	const searchEnabled = !!facilityId && debouncedValue.length >= 2
+	const searchEnabled = !!facilityId && (open || debouncedValue.length >= 2)
 
 	const { data, isLoading } = useFormularyItemsQuery({
 		facilityId: searchEnabled ? facilityId : "",
-		search: searchEnabled ? debouncedValue : undefined,
+		search: debouncedValue || undefined,
 		isActive: true,
 		limit: 20,
 	})
 	const { data: genericData, isLoading: genericsLoading } = useDrugGenericsQuery({
-		search: searchEnabled ? debouncedValue : undefined,
+		search: debouncedValue || undefined,
 		isActive: true,
 		limit: 20,
 	})
@@ -110,11 +110,11 @@ export function DrugSearchCombobox({
 		setInputValue(nextValue)
 		onSelect(null)
 		onRawInput(nextValue)
-		setOpen(!!facilityId && nextValue.trim().length >= 2)
+		setOpen(!!facilityId)
 	}
 
 	function handleOpenChange(nextOpen: boolean) {
-		setOpen(nextOpen && !disabled && !!facilityId && inputValue.trim().length >= 2)
+		setOpen(nextOpen && !disabled && !!facilityId)
 	}
 
 	function handleSelect(item: DrugSearchSelection) {
@@ -124,7 +124,7 @@ export function DrugSearchCombobox({
 	}
 
 	function openIfSearchable() {
-		if (!disabled && facilityId && inputValue.trim().length >= 2) {
+		if (!disabled && facilityId) {
 			setOpen(true)
 		}
 	}
@@ -159,7 +159,16 @@ export function DrugSearchCombobox({
 							<div className="text-muted-foreground px-3 py-4 text-sm">Searching...</div>
 						) : (
 							<>
-								<CommandEmpty>No drug matches</CommandEmpty>
+								<CommandEmpty>
+									<div className="px-3 py-4 text-left text-sm">
+										<p>No orderable generic found.</p>
+										<p className="text-muted-foreground mt-1 text-xs">
+											Search a specific generic drug name, such as amoxicillin, or check the
+											drug catalog. Allergy classes like penicillin are not orderable unless
+											they exist as active generics.
+										</p>
+									</div>
+								</CommandEmpty>
 								<CommandGroup>
 									{items.map(item => (
 										<CommandItem

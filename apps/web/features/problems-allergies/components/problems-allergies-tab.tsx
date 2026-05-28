@@ -163,6 +163,20 @@ export function ProblemsAllergiesTab({
 	function renderProblemActions(problem: Problem, compact = false) {
 		if (!canWrite) return null
 
+		if (problem.status === "entered_in_error") {
+			return (
+				<div
+					className={
+						compact
+							? "text-muted-foreground text-sm"
+							: "text-muted-foreground text-right text-sm"
+					}
+				>
+					Audit only
+				</div>
+			)
+		}
+
 		return (
 			<div className={compact ? "grid grid-cols-2 gap-2" : "flex flex-wrap justify-end gap-2"}>
 				<Button
@@ -201,7 +215,6 @@ export function ProblemsAllergiesTab({
 					variant="outline"
 					className={compact ? "col-span-2 justify-center" : ""}
 					onClick={() => setProblemToMarkEnteredInError(problem)}
-					disabled={problem.status === "entered_in_error"}
 				>
 					<ArchiveX className="size-4" />
 					Entered in Error

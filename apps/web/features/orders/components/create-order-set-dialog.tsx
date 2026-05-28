@@ -67,6 +67,7 @@ export function CreateOrderSetDialog({
 }: CreateOrderSetDialogProps) {
 	const [selectedSetId, setSelectedSetId] = useState(ORDER_SETS[0]?.id ?? "")
 	const [isSubmitting, setIsSubmitting] = useState(false)
+	const [submitError, setSubmitError] = useState<string | null>(null)
 
 	const createLabOrder = useCreateLabOrderMutation()
 	const createImagingOrder = useCreateImagingOrderMutation()
@@ -77,6 +78,7 @@ export function CreateOrderSetDialog({
 	function resetDialog() {
 		setSelectedSetId(ORDER_SETS[0]?.id ?? "")
 		setIsSubmitting(false)
+		setSubmitError(null)
 	}
 
 	function handleOpenChange(next: boolean) {
@@ -88,10 +90,17 @@ export function CreateOrderSetDialog({
 		if (!selectedSet) return
 
 		setIsSubmitting(true)
+		setSubmitError(null)
 
 		try {
 			for (const order of selectedSet.orders) {
 				if (order.type === "lab") {
+					if (!order.payload.loincCode || !order.payload.indicationIcd10Code) {
+						throw new Error(
+							`${order.payload.testName} is missing required LOINC or ICD-10 metadata.`
+						)
+					}
+
 					await createLabOrder.mutateAsync({
 						facilityId,
 						encounterId,
@@ -108,6 +117,10 @@ export function CreateOrderSetDialog({
 			}
 
 			handleOpenChange(false)
+		} catch (error) {
+			setSubmitError(
+				error instanceof Error ? error.message : "Failed to sign the selected order set."
+			)
 		} finally {
 			setIsSubmitting(false)
 		}
@@ -204,6 +217,12 @@ export function CreateOrderSetDialog({
 						</CardContent>
 					</Card>
 				</div>
+
+				{submitError ? (
+					<div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+						{submitError}
+					</div>
+				) : null}
 
 				<DialogFooter>
 					<Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isPending}>

@@ -48,8 +48,10 @@ export function useIssueGatePassMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.discharge.issueGatePass.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.discharge.key() }),
+			onSuccess: () => {
+				void queryClient.invalidateQueries({ queryKey: orpc.discharge.key() })
+				void queryClient.invalidateQueries({ queryKey: orpc.encounter.key() })
+			},
 		})
 	)
 }

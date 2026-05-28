@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { CheckCircle2, RefreshCw } from "lucide-react"
+import { CheckCircle2, RefreshCw, X } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -24,6 +24,10 @@ import {
 	useUpdateFmdrfMutation,
 	type CreateFmdrfInput,
 } from "@/features/death-reporting/api/death-reporting.hooks"
+import {
+	useIcd10ProblemSearchQuery,
+	type Icd10SearchResult,
+} from "@/features/problems-allergies/api/problems-allergies.hooks"
 
 // ============================================================================
 // Signature canvas
@@ -144,6 +148,118 @@ function CheckRow({ id, label, checked, onChange, disabled }: CheckRowProps) {
 			/>
 			{label}
 		</label>
+	)
+}
+
+function formatIcd10Cause(result: Icd10SearchResult) {
+	return `${result.code} - ${result.description}`
+}
+
+function Icd10CausePicker({
+	label,
+	value,
+	onChange,
+	disabled,
+	required,
+	placeholder = "Search diagnosis or ICD-10 code",
+}: {
+	label: string
+	value: string
+	onChange: (value: string) => void
+	disabled?: boolean
+	required?: boolean
+	placeholder?: string
+}) {
+	const [open, setOpen] = useState(false)
+	const [search, setSearch] = useState("")
+	const query = useIcd10ProblemSearchQuery({
+		search: search.trim(),
+		limit: 10,
+		includeEmptySearch: open && !disabled,
+	})
+	const results = query.data?.data ?? []
+
+	function selectResult(result: Icd10SearchResult) {
+		onChange(formatIcd10Cause(result))
+		setSearch("")
+		setOpen(false)
+	}
+
+	function closeSearchAfterSelectionChance() {
+		window.setTimeout(() => setOpen(false), 100)
+	}
+
+	return (
+		<div className="space-y-2 sm:col-span-2">
+			<div className="flex flex-wrap items-center gap-2">
+				<Label>{label}</Label>
+				<Badge variant="secondary" className="text-xs">
+					ICD-10
+				</Badge>
+			</div>
+			<div className="relative z-20">
+				<Input
+					value={search}
+					onChange={event => {
+						setSearch(event.target.value)
+						setOpen(true)
+					}}
+					onFocus={() => setOpen(true)}
+					onBlur={closeSearchAfterSelectionChance}
+					onKeyDown={event => {
+						if (event.key === "Escape") setOpen(false)
+						if (event.key === "Enter" && results[0]) {
+							event.preventDefault()
+							selectResult(results[0])
+						}
+					}}
+					placeholder={placeholder}
+					autoComplete="off"
+					disabled={disabled}
+				/>
+				{open && !disabled && (
+					<div className="bg-popover text-popover-foreground ring-foreground/10 absolute z-[100] mt-1 max-h-64 w-full overflow-y-auto rounded-md border p-1 text-sm shadow-md ring-1">
+						{query.isFetching ? (
+							<div className="text-muted-foreground px-3 py-3">Searching ICD-10...</div>
+						) : results.length > 0 ? (
+							results.map(result => (
+								<button
+									key={result.id}
+									type="button"
+									className="hover:bg-muted focus:bg-muted block w-full rounded-sm px-3 py-2 text-left outline-hidden"
+									onMouseDown={event => event.preventDefault()}
+									onClick={() => selectResult(result)}
+								>
+									<span className="block font-mono text-xs font-semibold">{result.code}</span>
+									<span className="block">{result.description}</span>
+								</button>
+							))
+						) : (
+							<div className="text-muted-foreground px-3 py-3">No ICD-10 matches</div>
+						)}
+					</div>
+				)}
+			</div>
+			{value ? (
+				<div className="bg-primary/5 border-primary/20 flex items-start justify-between gap-3 rounded-md border px-3 py-2 text-sm">
+					<p className="min-w-0 break-words">{value}</p>
+					{!disabled && (
+						<Button
+							type="button"
+							size="icon"
+							variant="ghost"
+							className="size-7 shrink-0"
+							aria-label={`Remove ${label}`}
+							onClick={() => onChange("")}
+						>
+							<X className="size-3" />
+						</Button>
+					)}
+				</div>
+			) : required ? (
+				<p className="text-muted-foreground text-xs">Select an ICD-10 cause before submitting.</p>
+			) : null}
+		</div>
 	)
 }
 
@@ -499,44 +615,36 @@ export function FmdrfForm({
 							required
 						/>
 					</div>
-					<div className="space-y-1.5 sm:col-span-2">
-						<Label>Immediate Cause of Death (ICD-10) *</Label>
-						<Input
-							placeholder="e.g., J18.9 — Pneumonia"
-							value={form.causeOfDeathImmediate}
-							onChange={e => set("causeOfDeathImmediate", e.target.value)}
-							disabled={isReadOnly}
-							required
-						/>
-					</div>
-					<div className="space-y-1.5 sm:col-span-2">
-						<Label>Antecedent Cause</Label>
-						<Input
-							placeholder="Condition giving rise to immediate cause"
-							value={form.causeOfDeathAntecedent}
-							onChange={e => set("causeOfDeathAntecedent", e.target.value)}
-							disabled={isReadOnly}
-						/>
-					</div>
-					<div className="space-y-1.5 sm:col-span-2">
-						<Label>Underlying Cause *</Label>
-						<Input
-							placeholder="Disease/injury initiating chain of events"
-							value={form.causeOfDeathUnderlying}
-							onChange={e => set("causeOfDeathUnderlying", e.target.value)}
-							disabled={isReadOnly}
-							required
-						/>
-					</div>
-					<div className="space-y-1.5 sm:col-span-2">
-						<Label>Contributing Conditions</Label>
-						<Input
-							placeholder="Other significant conditions not directly causing death"
-							value={form.causeOfDeathContributing ?? ""}
-							onChange={e => set("causeOfDeathContributing", e.target.value)}
-							disabled={isReadOnly}
-						/>
-					</div>
+					<Icd10CausePicker
+						label="Immediate Cause of Death *"
+						value={form.causeOfDeathImmediate}
+						onChange={value => set("causeOfDeathImmediate", value)}
+						disabled={isReadOnly}
+						required
+						placeholder="Search immediate cause or ICD-10 code"
+					/>
+					<Icd10CausePicker
+						label="Antecedent Cause"
+						value={form.causeOfDeathAntecedent}
+						onChange={value => set("causeOfDeathAntecedent", value)}
+						disabled={isReadOnly}
+						placeholder="Search antecedent cause or ICD-10 code"
+					/>
+					<Icd10CausePicker
+						label="Underlying Cause *"
+						value={form.causeOfDeathUnderlying}
+						onChange={value => set("causeOfDeathUnderlying", value)}
+						disabled={isReadOnly}
+						required
+						placeholder="Search underlying cause or ICD-10 code"
+					/>
+					<Icd10CausePicker
+						label="Contributing Conditions"
+						value={form.causeOfDeathContributing ?? ""}
+						onChange={value => set("causeOfDeathContributing", value)}
+						disabled={isReadOnly}
+						placeholder="Search contributing condition or ICD-10 code"
+					/>
 				</CardContent>
 			</Card>
 
