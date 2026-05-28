@@ -19,8 +19,10 @@ import {
 	encounterStatusEvents,
 	formularyItems,
 	highAlertVerifications,
+	icd10Codes,
 	imagingOrders,
 	labOrders,
+	loincCodes,
 	marEntries,
 	medicationOrders,
 	orderVerifications,
@@ -1437,6 +1439,7 @@ export class OrdersService {
 	async createLabOrder(input: CreateLabOrderInput, userId: string) {
 		const staff = await this.getOrderingStaffProfile(userId, input.facilityId)
 		await this.assertAncillaryOrderContextInFacility(input)
+		await this.assertLabOrderTerminologyIsReady(input)
 
 		const [created] = await db
 			.insert(labOrders)
@@ -1494,6 +1497,43 @@ export class OrdersService {
 		}
 
 		return this.findLabOrder(created!.id)
+	}
+
+	private async assertLabOrderTerminologyIsReady(input: CreateLabOrderInput) {
+		const clinicalIndication = input.clinicalIndication?.trim()
+		if (!clinicalIndication) {
+			throw new BadRequestException("Clinical indication is required before signing a lab order.")
+		}
+
+		const loincCode = input.loincCode?.trim()
+		if (!loincCode) {
+			throw new BadRequestException("Select an active LOINC lab test before signing a lab order.")
+		}
+
+		const [loincMatch] = await db
+			.select({ loincNum: loincCodes.loincNum })
+			.from(loincCodes)
+			.where(and(eq(loincCodes.loincNum, loincCode), eq(loincCodes.isActive, true)))
+			.limit(1)
+
+		if (!loincMatch) {
+			throw new BadRequestException("Select an active LOINC lab test before signing a lab order.")
+		}
+
+		const icd10Code = input.indicationIcd10Code?.trim()
+		if (!icd10Code) {
+			throw new BadRequestException("ICD-10 indication is required before signing a lab order.")
+		}
+
+		const [icd10Match] = await db
+			.select({ code: icd10Codes.code })
+			.from(icd10Codes)
+			.where(and(eq(icd10Codes.code, icd10Code), eq(icd10Codes.isActive, true)))
+			.limit(1)
+
+		if (!icd10Match) {
+			throw new BadRequestException("Select a valid active ICD-10 indication before signing a lab order.")
+		}
 	}
 
 	/**
@@ -1658,6 +1698,7 @@ export class OrdersService {
 	async createImagingOrder(input: CreateImagingOrderInput, userId: string) {
 		const staff = await this.getOrderingStaffProfile(userId, input.facilityId)
 		await this.assertAncillaryOrderContextInFacility(input)
+		await this.assertImagingOrderIndicationIsReady(input)
 
 		const [created] = await db
 			.insert(imagingOrders)
@@ -1712,6 +1753,28 @@ export class OrdersService {
 		}
 
 		return this.findImagingOrder(created!.id)
+	}
+
+	private async assertImagingOrderIndicationIsReady(input: CreateImagingOrderInput) {
+		const clinicalIndication = input.clinicalIndication?.trim()
+		if (!clinicalIndication) {
+			throw new BadRequestException("Clinical indication is required before signing an imaging order.")
+		}
+
+		const icd10Code = input.indicationIcd10Code?.trim()
+		if (!icd10Code) {
+			throw new BadRequestException("ICD-10 indication is required before signing an imaging order.")
+		}
+
+		const [icd10Match] = await db
+			.select({ code: icd10Codes.code })
+			.from(icd10Codes)
+			.where(and(eq(icd10Codes.code, icd10Code), eq(icd10Codes.isActive, true)))
+			.limit(1)
+
+		if (!icd10Match) {
+			throw new BadRequestException("Select a valid active ICD-10 indication before signing an imaging order.")
+		}
 	}
 
 	/**

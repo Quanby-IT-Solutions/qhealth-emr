@@ -265,4 +265,20 @@ describe("ProblemsAllergiesTab", () => {
 		)
 		expect(calledWithEnteredInError).toBe(true)
 	})
+
+	it("shows entered-in-error problems as audit-only records without edit actions", () => {
+		mockProblemsWith([
+			buildProblem({
+				description: "Incorrect diagnosis",
+				status: "entered_in_error",
+				resolutionDate: "2026-05-28",
+			}),
+		])
+
+		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
+
+		expect(screen.getAllByText(/audit only/i).length).toBeGreaterThan(0)
+		expect(screen.queryByRole("button", { name: /^edit$/i })).toBeNull()
+		expect(screen.queryByRole("button", { name: /^resolve$/i })).toBeNull()
+	})
 })

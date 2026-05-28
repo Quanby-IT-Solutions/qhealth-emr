@@ -9,6 +9,7 @@ jest.mock("@/common/database/database.client", () => ({
 	db: {
 		select: jest.fn(),
 		insert: jest.fn(),
+		update: jest.fn(),
 	},
 }))
 
@@ -36,6 +37,7 @@ jest.mock("@repo/db/schema", () => {
 type MockDb = {
 	select: jest.Mock
 	insert: jest.Mock
+	update: jest.Mock
 }
 
 function createSelectBuilder(result: unknown) {
@@ -43,6 +45,13 @@ function createSelectBuilder(result: unknown) {
 		from: jest.fn().mockReturnThis(),
 		leftJoin: jest.fn().mockReturnThis(),
 		where: jest.fn().mockResolvedValue(result),
+	}
+}
+
+function createUpdateBuilder() {
+	return {
+		set: jest.fn().mockReturnThis(),
+		where: jest.fn().mockResolvedValue([]),
 	}
 }
 
@@ -124,10 +133,59 @@ describe("GatePassService", () => {
 				returning: jest.fn().mockResolvedValue([{ id: "gate-pass-1" }]),
 			}),
 		}))
+		mockDb.update.mockImplementation(() => createUpdateBuilder())
 
 		await expect(service.generateGatePass("encounter-1", "staff-1")).resolves.toEqual({
 			id: "gate-pass-1",
 		})
 		expect(clinicalChecklistSpy).not.toHaveBeenCalled()
+		expect(mockDb.update).not.toHaveBeenCalled()
+	})
+
+	it("finalizes a pending-discharge encounter and releases the bed after issuing a gate pass", async () => {
+		jest
+			.spyOn(
+				service as unknown as { inpatientClinicalChecklistComplete: (encounterId: string) => Promise<boolean> },
+				"inpatientClinicalChecklistComplete"
+			)
+			.mockResolvedValue(true)
+
+		mockDb.select
+			.mockImplementationOnce(() => createSelectBuilder([]))
+			.mockImplementationOnce(() =>
+				createSelectBuilder([
+					{
+						id: "encounter-1",
+						facilityId: "facility-1",
+						patientId: "patient-1",
+						bedId: "bed-1",
+						status: "pending_discharge",
+						encounterType: "inpatient",
+						admissionDatetime: new Date("2026-05-25T00:00:00.000Z"),
+						dischargeDatetime: null,
+						disposition: null,
+					},
+				])
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ firstName: "Juan", lastName: "Dela Cruz" }])
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ bedNumber: "101", wardId: "ward-1" }])
+			)
+			.mockImplementationOnce(() => createSelectBuilder([{ name: "Medical Ward" }]))
+
+		mockDb.insert.mockImplementationOnce(() => ({
+			values: jest.fn().mockReturnValue({
+				returning: jest.fn().mockResolvedValue([{ id: "gate-pass-1" }]),
+			}),
+		}))
+		mockDb.update.mockImplementation(() => createUpdateBuilder())
+
+		await expect(service.generateGatePass("encounter-1", "staff-1")).resolves.toEqual({
+			id: "gate-pass-1",
+		})
+
+		expect(mockDb.update).toHaveBeenCalledTimes(2)
 	})
 })

@@ -22,22 +22,14 @@ import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
-} from "@/core/components/ui/command"
-import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
 	DialogHeader,
 	DialogTitle,
 } from "@/core/components/ui/dialog"
+import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Popover, PopoverContent, PopoverTrigger } from "@/core/components/ui/popover"
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
@@ -67,12 +59,12 @@ interface NoteEditorProps {
 	onDone: () => void
 }
 
-interface Icd10Diagnosis {
-	icd10Code: string
-	icd10Display: string
+interface DiagnosisEntry {
+	code: string
+	description: string
 }
 
-type StructuredDataValue = string | Icd10Diagnosis | undefined
+type StructuredDataValue = string | DiagnosisEntry[] | Record<string, unknown> | undefined
 type StructuredData = Record<string, StructuredDataValue>
 type InsertSource = "vitals" | "allergies" | "labs"
 
@@ -229,13 +221,40 @@ function hasSourceBlock(existing: string, source: InsertSource, text: string) {
 	return match[0].trim() === next
 }
 
-function isIcd10Diagnosis(value: StructuredDataValue): value is Icd10Diagnosis {
-	return (
-		!!value &&
-		typeof value === "object" &&
-		"icd10Code" in value &&
-		"icd10Display" in value
+function readDiagnoses(data: StructuredData): DiagnosisEntry[] {
+	if (Array.isArray(data.diagnoses)) {
+		const entries = data.diagnoses.flatMap(item => {
+			if (!item || typeof item !== "object" || Array.isArray(item)) return []
+			const diagnosis = item as unknown as Record<string, unknown>
+			const code = typeof diagnosis.code === "string" ? diagnosis.code.trim() : ""
+			const description =
+				typeof diagnosis.description === "string" ? diagnosis.description.trim() : ""
+			if (!code) return []
+			return [{ code, description }]
+		})
+		if (entries.length > 0) return entries
+	}
+
+	const legacy = data.icd10_diagnosis
+	if (legacy && typeof legacy === "object" && !Array.isArray(legacy)) {
+		const diagnosis = legacy as Record<string, unknown>
+		const code = typeof diagnosis.icd10Code === "string" ? diagnosis.icd10Code.trim() : ""
+		const description =
+			typeof diagnosis.icd10Display === "string" ? diagnosis.icd10Display.trim() : ""
+		if (code) return [{ code, description }]
+	}
+
+	return []
+}
+
+function normalizeDiagnoses(diagnoses: DiagnosisEntry[]) {
+	const unique = diagnoses.filter(
+		diagnosis =>
+			diagnosis.code.trim() &&
+			diagnoses.findIndex(item => item.code === diagnosis.code) === diagnoses.indexOf(diagnosis)
 	)
+	if (unique.length === 0) return []
+	return unique
 }
 
 function shouldRenderIcd10Field(template: AuthoringTemplate, sections: TemplateSection[]) {
@@ -253,96 +272,134 @@ function Icd10DiagnosisField({
 	value,
 	onChange,
 }: {
-	value: Icd10Diagnosis | null
-	onChange: (value: Icd10Diagnosis | null) => void
+	value: DiagnosisEntry[]
+	onChange: (value: DiagnosisEntry[]) => void
 }) {
 	const [open, setOpen] = useState(false)
-	const [inputValue, setInputValue] = useState(
-		value ? `${value.icd10Code} - ${value.icd10Display}` : ""
-	)
+	const [inputValue, setInputValue] = useState("")
 	const searchTerm = inputValue.trim()
-	const query = useIcd10ProblemSearchQuery({ search: searchTerm, limit: 10 })
+	const query = useIcd10ProblemSearchQuery({
+		search: searchTerm,
+		limit: 10,
+		includeEmptySearch: open,
+	})
 	const results = query.data?.data ?? []
 
 	function selectResult(result: Icd10SearchResult) {
-		onChange({ icd10Code: result.code, icd10Display: result.description })
-		setInputValue(`${result.code} - ${result.description}`)
+		if (value.some(diagnosis => diagnosis.code === result.code)) {
+			setInputValue("")
+			setOpen(false)
+			return
+		}
+		onChange(
+			normalizeDiagnoses([
+				...value,
+				{
+					code: result.code,
+					description: result.description,
+				},
+			])
+		)
+		setInputValue("")
 		setOpen(false)
 	}
 
+	function removeDiagnosis(code: string) {
+		onChange(normalizeDiagnoses(value.filter(diagnosis => diagnosis.code !== code)))
+	}
+
+	function closeSearchAfterSelectionChance() {
+		window.setTimeout(() => setOpen(false), 100)
+	}
+
 	return (
-		<Card className="rounded-lg">
+		<Card className="relative z-20 overflow-visible rounded-lg">
 			<CardHeader className="pb-2">
-				<CardTitle className="text-sm">
-					ICD-10 Diagnosis <span className="text-destructive">*</span>
+				<CardTitle className="flex items-center gap-2 text-sm">
+					<span>ICD-10 Diagnoses</span>
+					<Badge variant="secondary" className="text-xs">
+						Required before signing
+					</Badge>
 				</CardTitle>
 			</CardHeader>
-			<CardContent className="space-y-2">
+			<CardContent className="space-y-2 overflow-visible">
 				<p className="text-muted-foreground text-xs">
-					Search by keyword or ICD-10 code, for example pneumonia or J18.
+					Search by diagnosis words or ICD-10 code, for example pneumonia, hypertension,
+					diabetes, or J18.
 				</p>
-				<Popover open={open} onOpenChange={setOpen}>
-					<Command shouldFilter={false} className="h-auto w-full overflow-visible bg-transparent p-0">
-						<PopoverTrigger render={<div className="w-full" />} nativeButton={false}>
-							<CommandInput
-								data-element-id="icd10-search"
-								value={inputValue}
-								onValueChange={nextValue => {
-									setInputValue(nextValue)
-									if (value) onChange(null)
-									setOpen(nextValue.trim().length >= 2)
-								}}
-								onFocus={() => setOpen(searchTerm.length >= 2)}
-								placeholder="Search ICD-10 codes..."
-							/>
-						</PopoverTrigger>
-						<PopoverContent align="start" className="w-(--anchor-width) p-0">
-							<CommandList>
-								{query.isFetching ? (
-									<div className="text-muted-foreground px-3 py-4 text-sm">Searching ICD-10...</div>
-								) : (
-									<>
-										<CommandEmpty>No ICD-10 matches</CommandEmpty>
-										<CommandGroup>
-											{results.map(result => (
-												<CommandItem
-													key={result.id}
-													value={result.id}
-													onSelect={() => selectResult(result)}
-													className="items-start py-2"
-												>
-													<div className="flex min-w-0 flex-col">
-														<span className="font-mono text-xs font-semibold">{result.code}</span>
-														<span className="text-sm">{result.description}</span>
-														{result.category && (
-															<span className="text-muted-foreground text-xs">{result.category}</span>
-														)}
-													</div>
-												</CommandItem>
-											))}
-										</CommandGroup>
-									</>
-								)}
-							</CommandList>
-						</PopoverContent>
-					</Command>
-				</Popover>
-				{value && (
-					<Badge variant="secondary" className="gap-1.5">
-						<span className="font-mono">{value.icd10Code}</span>
-						<span>- {value.icd10Display}</span>
-						<button
-							type="button"
-							aria-label="Clear ICD-10 diagnosis"
-							onClick={() => {
-								onChange(null)
-								setInputValue("")
-							}}
-							className="text-muted-foreground hover:text-foreground"
-						>
-							<X className="size-3" />
-						</button>
-					</Badge>
+				<div className="relative z-30">
+					<Input
+						data-element-id="icd10-search"
+						value={inputValue}
+						onChange={event => {
+							const nextValue = event.target.value
+							setInputValue(nextValue)
+							setOpen(true)
+						}}
+						onFocus={() => setOpen(true)}
+						onBlur={closeSearchAfterSelectionChance}
+						onKeyDown={event => {
+							if (event.key === "Escape") setOpen(false)
+							if (event.key === "Enter" && results[0]) {
+								event.preventDefault()
+								selectResult(results[0])
+							}
+						}}
+						placeholder="Search disease, diagnosis, or ICD-10 code..."
+						autoComplete="off"
+					/>
+					{open && (
+						<div className="bg-popover text-popover-foreground ring-foreground/10 absolute z-[100] mt-1 max-h-64 w-full overflow-y-auto rounded-md border p-1 text-sm shadow-md ring-1">
+							{query.isFetching ? (
+								<div className="text-muted-foreground px-3 py-3">Searching ICD-10...</div>
+							) : results.length > 0 ? (
+								results.map(result => (
+									<button
+										key={result.id}
+										type="button"
+										className="hover:bg-muted focus:bg-muted block w-full rounded-sm px-3 py-2 text-left outline-hidden"
+										onMouseDown={event => event.preventDefault()}
+										onClick={() => selectResult(result)}
+									>
+										<span className="block font-mono text-xs font-semibold">{result.code}</span>
+										<span className="block">{result.description}</span>
+										{result.category && (
+											<span className="text-muted-foreground block text-xs">{result.category}</span>
+										)}
+									</button>
+								))
+							) : (
+								<div className="text-muted-foreground px-3 py-3">No ICD-10 matches</div>
+							)}
+						</div>
+					)}
+				</div>
+				{value.length > 0 && (
+					<div className="space-y-2">
+						{value.map(diagnosis => (
+							<div
+								key={diagnosis.code}
+								className="bg-primary/5 border-primary/20 flex items-start justify-between gap-3 rounded-md border px-3 py-2 text-sm"
+							>
+								<div className="min-w-0">
+									<span className="font-mono text-xs font-semibold">{diagnosis.code}</span>
+									<p className="text-muted-foreground mt-1">{diagnosis.description}</p>
+								</div>
+								<div className="flex shrink-0 items-center gap-1">
+									<Button
+										type="button"
+										size="icon"
+										variant="ghost"
+										className="size-7"
+										aria-label={`Remove ${diagnosis.code}`}
+										onClick={() => removeDiagnosis(diagnosis.code)}
+									>
+										<X className="size-3" />
+									</Button>
+								</div>
+							</div>
+						))}
+					</div>
 				)}
 			</CardContent>
 		</Card>
@@ -477,9 +534,7 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 		!assessmentText ? "Assessment" : null,
 		!planText ? "Plan" : null,
 	].filter(Boolean)
-	const selectedIcd10 = isIcd10Diagnosis(structuredData.icd10_diagnosis)
-		? structuredData.icd10_diagnosis
-		: null
+	const selectedDiagnoses = readDiagnoses(structuredData)
 	const showIcd10Field = shouldRenderIcd10Field(template, sections)
 	const isSaving = createNote.isPending || updateNote.isPending
 	const isSaveBlocked = isSaving || isDraftCreateLocked
@@ -491,12 +546,19 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 		setHasLocalChanges(true)
 	}
 
-	function updateIcd10Diagnosis(value: Icd10Diagnosis | null) {
+	function updateDiagnoses(value: DiagnosisEntry[]) {
+		const diagnoses = normalizeDiagnoses(value)
 		setStructuredData(prev => {
 			const next = { ...prev }
-			if (value) {
-				next.icd10_diagnosis = value
+			if (diagnoses.length > 0) {
+				next.diagnoses = diagnoses
+				const firstDiagnosis = diagnoses[0]!
+				next.icd10_diagnosis = {
+					icd10Code: firstDiagnosis.code,
+					icd10Display: firstDiagnosis.description,
+				}
 			} else {
+				delete next.diagnoses
 				delete next.icd10_diagnosis
 			}
 			return next
@@ -680,7 +742,7 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 					{sections.map(section => (
 						<div key={section.key} className="space-y-3">
 							{showIcd10Field && section.key === assessmentKey && (
-								<Icd10DiagnosisField value={selectedIcd10} onChange={updateIcd10Diagnosis} />
+								<Icd10DiagnosisField value={selectedDiagnoses} onChange={updateDiagnoses} />
 							)}
 							<Card
 								className={
@@ -851,15 +913,23 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 										<div className="space-y-2">
 											<div className="flex items-center gap-2 text-sm font-medium">
 												<Stethoscope className="size-4 text-blue-600" />
-												ICD-10 Diagnosis
+												ICD-10 Diagnoses
 											</div>
-											{selectedIcd10 ? (
-												<Badge variant="secondary" className="max-w-full justify-start gap-1.5 whitespace-normal text-left">
-													<span className="font-mono">{selectedIcd10.icd10Code}</span>
-													<span>- {selectedIcd10.icd10Display}</span>
-												</Badge>
+											{selectedDiagnoses.length > 0 ? (
+												<div className="space-y-1.5">
+													{selectedDiagnoses.map(diagnosis => (
+														<Badge
+															key={diagnosis.code}
+															variant="secondary"
+															className="max-w-full justify-start gap-1.5 whitespace-normal text-left"
+														>
+															<span className="font-mono">{diagnosis.code}</span>
+															<span>- {diagnosis.description}</span>
+														</Badge>
+													))}
+												</div>
 											) : (
-												<p className="text-muted-foreground text-sm">No ICD-10 diagnosis selected.</p>
+												<p className="text-muted-foreground text-sm">No ICD-10 diagnoses selected.</p>
 											)}
 										</div>
 

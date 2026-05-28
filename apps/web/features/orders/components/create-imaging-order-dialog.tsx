@@ -22,6 +22,10 @@ import {
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useCreateImagingOrderMutation } from "@/features/orders/api/orders.hooks"
+import {
+	Icd10IndicationPicker,
+	type DiagnosisEntry,
+} from "@/features/orders/components/create-lab-order-dialog"
 
 type ImagingModality = "xray" | "ct" | "mri" | "ultrasound" | "other"
 type OrderPriority = "routine" | "urgent" | "stat"
@@ -42,8 +46,7 @@ export function CreateImagingOrderDialog({
 	const [modality, setModality] = useState<ImagingModality | "">("")
 	const [bodyPart, setBodyPart] = useState("")
 	const [clinicalIndication, setClinicalIndication] = useState("")
-	const [indicationIcd10Code, setIndicationIcd10Code] = useState("")
-	const [indicationIcd10Display, setIndicationIcd10Display] = useState("")
+	const [indicationDiagnosis, setIndicationDiagnosis] = useState<DiagnosisEntry | null>(null)
 	const [priority, setPriority] = useState<OrderPriority>("routine")
 
 	const createImagingOrder = useCreateImagingOrderMutation()
@@ -52,8 +55,7 @@ export function CreateImagingOrderDialog({
 		setModality("")
 		setBodyPart("")
 		setClinicalIndication("")
-		setIndicationIcd10Code("")
-		setIndicationIcd10Display("")
+		setIndicationDiagnosis(null)
 		setPriority("routine")
 	}
 
@@ -63,7 +65,7 @@ export function CreateImagingOrderDialog({
 	}
 
 	function handleSubmit() {
-		if (!modality || !bodyPart.trim()) return
+		if (!modality || !bodyPart.trim() || !clinicalIndication.trim() || !indicationDiagnosis) return
 
 		createImagingOrder.mutate(
 			{
@@ -71,9 +73,9 @@ export function CreateImagingOrderDialog({
 				encounterId,
 				modality,
 				bodyPart: bodyPart.trim(),
-				clinicalIndication: clinicalIndication.trim() || undefined,
-				indicationIcd10Code: indicationIcd10Code.trim() || undefined,
-				indicationIcd10Display: indicationIcd10Display.trim() || undefined,
+				clinicalIndication: clinicalIndication.trim(),
+				indicationIcd10Code: indicationDiagnosis.code,
+				indicationIcd10Display: indicationDiagnosis.description,
 				priority,
 			},
 			{
@@ -126,30 +128,11 @@ export function CreateImagingOrderDialog({
 							value={clinicalIndication}
 							onChange={(e) => setClinicalIndication(e.target.value)}
 							rows={2}
-							placeholder="Optional"
+							placeholder="Medical necessity for the requested imaging study"
 						/>
 					</div>
 
-					<div className="grid grid-cols-2 gap-4">
-						<div className="space-y-2">
-							<Label htmlFor="imgIndicationIcd10Code">ICD-10 Code</Label>
-							<Input
-								id="imgIndicationIcd10Code"
-								value={indicationIcd10Code}
-								onChange={(e) => setIndicationIcd10Code(e.target.value)}
-								placeholder="e.g., R05.9"
-							/>
-						</div>
-						<div className="space-y-2">
-							<Label htmlFor="imgIndicationIcd10Display">ICD-10 Diagnosis</Label>
-							<Input
-								id="imgIndicationIcd10Display"
-								value={indicationIcd10Display}
-								onChange={(e) => setIndicationIcd10Display(e.target.value)}
-								placeholder="e.g., Cough, unspecified"
-							/>
-						</div>
-					</div>
+					<Icd10IndicationPicker value={indicationDiagnosis} onChange={setIndicationDiagnosis} />
 
 					<div className="space-y-2">
 						<Label htmlFor="imgPriority">Priority</Label>
@@ -171,7 +154,13 @@ export function CreateImagingOrderDialog({
 						Cancel
 					</Button>
 					<Button
-						disabled={!modality || !bodyPart.trim() || createImagingOrder.isPending}
+						disabled={
+							!modality ||
+							!bodyPart.trim() ||
+							!clinicalIndication.trim() ||
+							!indicationDiagnosis ||
+							createImagingOrder.isPending
+						}
 						onClick={handleSubmit}
 					>
 						{createImagingOrder.isPending ? "Signing..." : "Sign Imaging Order"}

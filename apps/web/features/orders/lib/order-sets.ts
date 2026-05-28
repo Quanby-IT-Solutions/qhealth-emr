@@ -50,6 +50,7 @@ export const ORDER_SETS = [
 				payload: {
 					testName: "Complete Blood Count",
 					panelName: "Sepsis Bundle",
+					loincCode: "57021-8",
 					specimenType: "Blood",
 					clinicalIndication: "Suspected sepsis",
 					indicationIcd10Code: "A41.9",
@@ -62,6 +63,7 @@ export const ORDER_SETS = [
 				payload: {
 					testName: "Blood Culture",
 					panelName: "Sepsis Bundle",
+					loincCode: "600-7",
 					specimenType: "Blood",
 					clinicalIndication: "Suspected sepsis",
 					indicationIcd10Code: "A41.9",
@@ -74,6 +76,7 @@ export const ORDER_SETS = [
 				payload: {
 					testName: "Lactate",
 					panelName: "Sepsis Bundle",
+					loincCode: "2524-7",
 					specimenType: "Blood",
 					clinicalIndication: "Suspected sepsis",
 					indicationIcd10Code: "A41.9",
@@ -86,6 +89,7 @@ export const ORDER_SETS = [
 				payload: {
 					testName: "Procalcitonin",
 					panelName: "Sepsis Bundle",
+					loincCode: "33959-8",
 					specimenType: "Blood",
 					clinicalIndication: "Suspected sepsis",
 					indicationIcd10Code: "A41.9",
@@ -116,6 +120,7 @@ export const ORDER_SETS = [
 				payload: {
 					testName: "Troponin I",
 					panelName: "Cardiac Workup",
+					loincCode: "10839-9",
 					specimenType: "Blood",
 					clinicalIndication: "Chest pain evaluation",
 					indicationIcd10Code: "R07.9",
@@ -128,6 +133,7 @@ export const ORDER_SETS = [
 				payload: {
 					testName: "CK-MB",
 					panelName: "Cardiac Workup",
+					loincCode: "13969-1",
 					specimenType: "Blood",
 					clinicalIndication: "Chest pain evaluation",
 					indicationIcd10Code: "R07.9",
@@ -158,6 +164,7 @@ export const ORDER_SETS = [
 				payload: {
 					testName: "Complete Blood Count",
 					panelName: "Pre-op Panel",
+					loincCode: "57021-8",
 					specimenType: "Blood",
 					clinicalIndication: "Pre-operative clearance",
 					indicationIcd10Code: "Z01.818",
@@ -170,6 +177,7 @@ export const ORDER_SETS = [
 				payload: {
 					testName: "Basic Metabolic Panel",
 					panelName: "Pre-op Panel",
+					loincCode: "51990-0",
 					specimenType: "Blood",
 					clinicalIndication: "Pre-operative clearance",
 					indicationIcd10Code: "Z01.818",
@@ -182,6 +190,7 @@ export const ORDER_SETS = [
 				payload: {
 					testName: "PT/INR",
 					panelName: "Pre-op Panel",
+					loincCode: "5902-2",
 					specimenType: "Blood",
 					clinicalIndication: "Pre-operative clearance",
 					indicationIcd10Code: "Z01.818",

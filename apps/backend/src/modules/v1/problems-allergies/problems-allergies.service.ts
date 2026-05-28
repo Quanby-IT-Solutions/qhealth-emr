@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, count, desc, eq, ilike, or } from "drizzle-orm"
+import { and, count, desc, eq, ilike, ne, or, sql, type SQL } from "drizzle-orm"
 
 import {
 	allergies,
@@ -92,6 +92,76 @@ export class ProblemsAllergiesService {
 			if (!match) {
 				throw new BadRequestException("Select a valid active SNOMED CT code from the suggestions.")
 			}
+		}
+	}
+
+	private async assertNoDuplicateActiveProblem(input: {
+		patientId: string
+		icd10Code?: string | null
+		snomedCode?: string | null
+		status?: "active" | "resolved" | "entered_in_error" | null
+		excludeProblemId?: string
+	}) {
+		if ((input.status ?? "active") !== "active") return
+
+		const icd10Code = this.normalizeOptionalText(input.icd10Code)
+		const snomedCode = this.normalizeOptionalText(input.snomedCode)
+		const codeConditions: SQL[] = []
+		if (icd10Code) codeConditions.push(eq(problems.icd10Code, icd10Code))
+		if (snomedCode) codeConditions.push(eq(problems.snomedCode, snomedCode))
+
+		if (codeConditions.length === 0) return
+
+		const conditions = [
+			eq(problems.patientId, input.patientId),
+			eq(problems.status, "active"),
+			or(...codeConditions)!,
+		]
+
+		if (input.excludeProblemId) {
+			conditions.push(ne(problems.id, input.excludeProblemId))
+		}
+
+		const [duplicate] = await db
+			.select({ id: problems.id })
+			.from(problems)
+			.where(and(...conditions))
+			.limit(1)
+
+		if (duplicate) {
+			throw new BadRequestException(
+				"This problem is already active for this patient. Edit the existing problem or mark the duplicate as Entered in Error."
+			)
+		}
+	}
+
+	private async assertNoDuplicateActiveAllergy(input: {
+		patientId: string
+		allergenName: string
+		allergenType: "medication" | "food" | "environmental"
+		excludeAllergyId?: string
+	}) {
+		const conditions = [
+			eq(allergies.patientId, input.patientId),
+			eq(allergies.isActive, true),
+			eq(allergies.allergenType, input.allergenType),
+			sql`lower(${allergies.allergenName}) = ${input.allergenName.trim().toLowerCase()}`,
+		]
+
+		if (input.excludeAllergyId) {
+			conditions.push(ne(allergies.id, input.excludeAllergyId))
+		}
+
+		const [duplicate] = await db
+			.select({ id: allergies.id })
+			.from(allergies)
+			.where(and(...conditions))
+			.limit(1)
+
+		if (duplicate) {
+			throw new BadRequestException(
+				"This allergy is already active for this patient. Edit the existing allergy or deactivate the duplicate."
+			)
 		}
 	}
 
@@ -273,6 +343,12 @@ export class ProblemsAllergiesService {
 		})
 		this.assertProblemHasClinicalCode(input)
 		await this.assertSubmittedProblemCodesAreActive(input)
+		await this.assertNoDuplicateActiveProblem({
+			patientId: input.patientId,
+			icd10Code: input.icd10Code,
+			snomedCode: input.snomedCode,
+			status: input.status ?? "active",
+		})
 
 		const [created] = await db
 			.insert(problems)
@@ -312,6 +388,11 @@ export class ProblemsAllergiesService {
 
 	async updateProblem(input: UpdateProblemInput, userId: string, actor?: ChartAccessActor) {
 		const existing = await this.getProblem(input.id, actor)
+		if (existing.status === "entered_in_error") {
+			throw new BadRequestException(
+				"Entered-in-error problems are audit records and cannot be edited."
+			)
+		}
 		const staffProfileId = await this.getStaffProfileId(userId, existing.facilityId)
 
 		const updateValues: Record<string, unknown> = { updatedAt: new Date() }
@@ -327,6 +408,13 @@ export class ProblemsAllergiesService {
 		await this.assertSubmittedProblemCodesAreActive({
 			icd10Code: input.icd10Code,
 			snomedCode: input.snomedCode,
+		})
+		await this.assertNoDuplicateActiveProblem({
+			patientId: existing.patientId,
+			icd10Code: nextIcd10Code,
+			snomedCode: nextSnomedCode,
+			status: input.status ?? existing.status,
+			excludeProblemId: existing.id,
 		})
 
 		if (input.description !== undefined) updateValues.description = input.description
@@ -367,6 +455,12 @@ export class ProblemsAllergiesService {
 
 	async resolveProblem(input: ResolveProblemInput, userId: string, actor?: ChartAccessActor) {
 		const existing = await this.getProblem(input.id, actor)
+
+		if (existing.status === "entered_in_error") {
+			throw new BadRequestException(
+				"Entered-in-error problems are audit records and cannot be resolved."
+			)
+		}
 
 		if (existing.status === "resolved") {
 			return existing
@@ -449,21 +543,43 @@ export class ProblemsAllergiesService {
 		const limit = Number(input.limit ?? 50)
 		const offset = (page - 1) * limit
 		const conditions = [eq(icd10Codes.isActive, true)]
+		const search = input.search?.trim() ?? ""
+		const escapedSearch = this.escapeLikePattern(search)
+		const terms = search
+			.split(/\s+/)
+			.map(term => term.trim())
+			.filter(Boolean)
+			.slice(0, 6)
 
-		if (input.search?.trim()) {
-			const escaped = this.escapeLikePattern(input.search.trim())
-			conditions.push(
-				or(ilike(icd10Codes.code, `%${escaped}%`), ilike(icd10Codes.description, `%${escaped}%`))!
-			)
+		if (terms.length > 0) {
+			for (const term of terms) {
+				const escaped = this.escapeLikePattern(term)
+				conditions.push(
+					or(
+						ilike(icd10Codes.code, `%${escaped}%`),
+						ilike(icd10Codes.description, `%${escaped}%`),
+						ilike(icd10Codes.category, `%${escaped}%`)
+					)!
+				)
+			}
 		}
 
 		const whereClause = and(...conditions)
+		const relevanceOrder = search
+			? sql`CASE
+					WHEN lower(${icd10Codes.code}) = lower(${search}) THEN 0
+					WHEN lower(${icd10Codes.code}) LIKE lower(${`${escapedSearch}%`}) THEN 1
+					WHEN lower(${icd10Codes.description}) LIKE lower(${`${escapedSearch}%`}) THEN 2
+					WHEN lower(${icd10Codes.category}) LIKE lower(${`${escapedSearch}%`}) THEN 3
+					ELSE 4
+				END`
+			: icd10Codes.code
 		const [data, totalResult] = await Promise.all([
 			db
 				.select()
 				.from(icd10Codes)
 				.where(whereClause)
-				.orderBy(icd10Codes.code)
+				.orderBy(relevanceOrder, icd10Codes.code)
 				.limit(limit)
 				.offset(offset),
 			db.select({ count: count() }).from(icd10Codes).where(whereClause),
@@ -732,6 +848,11 @@ export class ProblemsAllergiesService {
 			entityType: "allergy",
 			entityId: input.patientId,
 		})
+		await this.assertNoDuplicateActiveAllergy({
+			patientId: input.patientId,
+			allergenName: input.allergenName,
+			allergenType: input.allergenType,
+		})
 
 		const [created] = await db
 			.insert(allergies)
@@ -776,6 +897,12 @@ export class ProblemsAllergiesService {
 	async updateAllergy(input: UpdateAllergyInput, userId: string, actor?: ChartAccessActor) {
 		const existing = await this.getAllergy(input.id, actor)
 		const staffProfileId = await this.getStaffProfileId(userId, existing.facilityId)
+		await this.assertNoDuplicateActiveAllergy({
+			patientId: existing.patientId,
+			allergenName: input.allergenName ?? existing.allergenName,
+			allergenType: input.allergenType ?? existing.allergenType,
+			excludeAllergyId: existing.id,
+		})
 
 		const updateValues: Record<string, unknown> = { updatedAt: new Date() }
 		const materiallyChanged =

@@ -12,6 +12,7 @@ import {
 	clinicalNotes,
 	consentRecords,
 	encounters,
+	icd10Codes,
 	konsultaActivities,
 	labOrders,
 	noteAddenda,
@@ -261,6 +262,103 @@ export class ClinicalDocsService {
 				"Assessment and Plan sections are required before saving a clinical note."
 			)
 		}
+	}
+
+	private isSoapTemplate(template: TemplateForValidation | null) {
+		if (!template) return false
+		const sectionKeys = new Set(template.sections.map(section => section.key.toLowerCase()))
+		return (
+			sectionKeys.has("subjective") &&
+			sectionKeys.has("objective") &&
+			sectionKeys.has("assessment") &&
+			sectionKeys.has("plan")
+		)
+	}
+
+	private extractIcd10DiagnosisCodes(data: unknown) {
+		if (!data || typeof data !== "object" || Array.isArray(data)) return []
+		const record = data as Record<string, unknown>
+		const codes = new Set<string>()
+
+		const selectedDiagnosis = record.icd10_diagnosis
+		if (
+			selectedDiagnosis &&
+			typeof selectedDiagnosis === "object" &&
+			!Array.isArray(selectedDiagnosis)
+		) {
+			const diagnosis = selectedDiagnosis as Record<string, unknown>
+			if (typeof diagnosis.icd10Code === "string" && diagnosis.icd10Code.trim()) {
+				codes.add(diagnosis.icd10Code.trim())
+			}
+		}
+
+		const primaryDiagnosis = record.primaryDiagnosis
+		if (
+			primaryDiagnosis &&
+			typeof primaryDiagnosis === "object" &&
+			!Array.isArray(primaryDiagnosis)
+		) {
+			const diagnosis = primaryDiagnosis as Record<string, unknown>
+			if (typeof diagnosis.code === "string" && diagnosis.code.trim()) {
+				codes.add(diagnosis.code.trim())
+			}
+		}
+
+		const diagnoses = record.diagnoses
+		if (Array.isArray(diagnoses)) {
+			for (const item of diagnoses) {
+				if (!item || typeof item !== "object" || Array.isArray(item)) continue
+				const diagnosis = item as Record<string, unknown>
+				if (typeof diagnosis.code === "string" && diagnosis.code.trim()) {
+					codes.add(diagnosis.code.trim())
+				}
+				if (typeof diagnosis.icdCode === "string" && diagnosis.icdCode.trim()) {
+					codes.add(diagnosis.icdCode.trim())
+				}
+			}
+		}
+
+		return [...codes]
+	}
+
+	private async assertIcd10DiagnosisCodesAreActive(codes: string[]) {
+		if (codes.length === 0) return
+
+		const rows = await db
+			.select({ code: icd10Codes.code })
+			.from(icd10Codes)
+			.where(and(inArray(icd10Codes.code, codes), eq(icd10Codes.isActive, true)))
+
+		const activeCodes = new Set(rows.map(row => row.code))
+		const invalidCodes = codes.filter(code => !activeCodes.has(code))
+		if (invalidCodes.length > 0) {
+			throw new BadRequestException(
+				`Select valid active ICD-10 code(s) before signing: ${invalidCodes.join(", ")}.`
+			)
+		}
+	}
+
+	private async assertIcd10DiagnosisPresentForSigning(input: {
+		noteType: NoteType
+		structuredData?: unknown
+		template: TemplateForValidation | null
+	}) {
+		const requiresIcd10 =
+			input.noteType === "consultation" ||
+			input.noteType === "fpe" ||
+			this.isSoapTemplate(input.template)
+
+		if (!requiresIcd10) return
+
+		const codes = this.extractIcd10DiagnosisCodes(input.structuredData)
+		if (codes.length > 0) {
+			await this.assertIcd10DiagnosisCodesAreActive(codes)
+			return
+		}
+
+		throw new BadRequestException(
+			"ICD-10 diagnosis is required before signing this clinical note."
+		)
 	}
 
 	private async assertNoteCanBeSaved(input: {
@@ -909,6 +1007,9 @@ export class ClinicalDocsService {
 			.select({
 				id: clinicalNotes.id,
 				facilityId: clinicalNotes.facilityId,
+				templateId: clinicalNotes.templateId,
+				noteType: clinicalNotes.noteType,
+				structuredData: clinicalNotes.structuredData,
 				status: clinicalNotes.status,
 				authorStaffId: clinicalNotes.authorStaffId,
 			})
@@ -919,6 +1020,15 @@ export class ClinicalDocsService {
 		if (existing.status === "signed") {
 			throw new BadRequestException("Note is already signed.")
 		}
+
+		const template = existing.templateId
+			? await this.getTemplateForValidation(existing.templateId)
+			: null
+		await this.assertIcd10DiagnosisPresentForSigning({
+			noteType: existing.noteType,
+			structuredData: existing.structuredData,
+			template,
+		})
 
 		const signerStaffId = await this.getStaffProfileId(userId, existing.facilityId)
 		if (signerStaffId !== existing.authorStaffId) {

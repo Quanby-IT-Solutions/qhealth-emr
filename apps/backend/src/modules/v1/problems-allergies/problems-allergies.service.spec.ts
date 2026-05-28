@@ -183,6 +183,41 @@ describe("ProblemsAllergiesService", () => {
 		expect(auditService.log).not.toHaveBeenCalled()
 	})
 
+	it("rejects duplicate active allergies with the same allergen and type for the same patient", async () => {
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "550e8400-e29b-41d4-a716-446655440002" }])
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([
+					{
+						id: "550e8400-e29b-41d4-a716-446655440001",
+						facilityId: "550e8400-e29b-41d4-a716-446655440000",
+					},
+				])
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "550e8400-e29b-41d4-a716-446655440099" }])
+			)
+
+		await expect(
+			service.createAllergy(
+				{
+					facilityId: "550e8400-e29b-41d4-a716-446655440000",
+					patientId: "550e8400-e29b-41d4-a716-446655440001",
+					allergenName: "penicillin",
+					allergenType: "medication",
+					reactionType: "Rash",
+					severity: "moderate",
+				},
+				"user-1"
+			)
+		).rejects.toThrow("This allergy is already active for this patient.")
+
+		expect(mockDb.insert).not.toHaveBeenCalled()
+		expect(auditService.log).not.toHaveBeenCalled()
+	})
+
 	it("marks problems as entered in error instead of deleting clinical history", async () => {
 		const problem = buildProblem()
 		const updatedProblem = buildProblem({
@@ -241,6 +276,84 @@ describe("ProblemsAllergiesService", () => {
 		expect(result).toEqual(problem)
 		expect(mockDb.update).not.toHaveBeenCalled()
 		expect(mockDb.delete).not.toHaveBeenCalled()
+		expect(auditService.log).not.toHaveBeenCalled()
+	})
+
+	it("rejects edits to entered-in-error problems", async () => {
+		const problem = buildProblem({ status: "entered_in_error" })
+
+		mockDb.select.mockImplementationOnce(() =>
+			createSelectBuilder([problem], { resolveOnWhere: true })
+		)
+
+		await expect(
+			service.updateProblem(
+				{
+					id: problem.id,
+					status: "active",
+				},
+				"user-1"
+			)
+		).rejects.toThrow("Entered-in-error problems are audit records and cannot be edited.")
+
+		expect(mockDb.update).not.toHaveBeenCalled()
+		expect(auditService.log).not.toHaveBeenCalled()
+	})
+
+	it("rejects resolving entered-in-error problems", async () => {
+		const problem = buildProblem({ status: "entered_in_error" })
+
+		mockDb.select.mockImplementationOnce(() =>
+			createSelectBuilder([problem], { resolveOnWhere: true })
+		)
+
+		await expect(service.resolveProblem({ id: problem.id }, "user-1")).rejects.toThrow(
+			"Entered-in-error problems are audit records and cannot be resolved."
+		)
+
+		expect(mockDb.update).not.toHaveBeenCalled()
+		expect(auditService.log).not.toHaveBeenCalled()
+	})
+
+	it("rejects duplicate active problems with the same ICD-10 code for the same patient", async () => {
+		const actor = {
+			userId: "user-1",
+			facilityId: "550e8400-e29b-41d4-a716-446655440000",
+		}
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "550e8400-e29b-41d4-a716-446655440002" }])
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([
+					{
+						id: "550e8400-e29b-41d4-a716-446655440001",
+						facilityId: "550e8400-e29b-41d4-a716-446655440000",
+					},
+				])
+			)
+			.mockImplementationOnce(() => createSelectBuilder([{ code: "E78.5" }]))
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "550e8400-e29b-41d4-a716-446655440099" }])
+			)
+
+		await expect(
+			service.createProblem(
+				{
+					facilityId: "550e8400-e29b-41d4-a716-446655440000",
+					patientId: "550e8400-e29b-41d4-a716-446655440001",
+					icd10Code: "E78.5",
+					icd10Display: "Dyslipidemia, unspecified",
+					description: "Dyslipidemia, unspecified",
+					status: "active",
+				},
+				"user-1",
+				actor as never
+			)
+		).rejects.toThrow("This problem is already active for this patient.")
+
+		expect(mockDb.insert).not.toHaveBeenCalled()
 		expect(auditService.log).not.toHaveBeenCalled()
 	})
 })

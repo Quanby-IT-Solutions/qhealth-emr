@@ -400,6 +400,7 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 	const controlledMedicationOrderIds = new Set(
 		(medOrders.data?.data ?? []).filter(order => order.isControlledSubstance).map(order => order.id)
 	)
+	const medicationOrdersById = new Map((medOrders.data?.data ?? []).map(order => [order.id, order]))
 	const allOrders = [
 		...(medOrders.data?.data ?? []).map(order => ({
 			id: order.id,
@@ -605,67 +606,75 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 									No lab orders yet.
 								</div>
 							) : (
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>Test Name</TableHead>
-											<TableHead>Panel</TableHead>
-											<TableHead>LOINC Code</TableHead>
-											<TableHead>Indication</TableHead>
-											<TableHead>Priority</TableHead>
-											<TableHead>Status</TableHead>
-											<TableHead>Ordered By</TableHead>
-											<TableHead>Date</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{labOrders.data.data.map(lab => {
-											const indication = formatIndication(
-												lab.clinicalIndication,
-												lab.indicationIcd10Code,
-												lab.indicationIcd10Display
-											)
+								<div className="overflow-x-auto">
+									<Table className="min-w-[1280px]">
+										<TableHeader>
+											<TableRow>
+												<TableHead className="w-[420px]">Test Name</TableHead>
+												<TableHead className="w-[160px]">Panel</TableHead>
+												<TableHead className="w-[120px]">LOINC Code</TableHead>
+												<TableHead className="w-[320px]">Indication</TableHead>
+												<TableHead className="w-[100px]">Priority</TableHead>
+												<TableHead className="w-[120px]">Status</TableHead>
+												<TableHead className="w-[180px]">Ordered By</TableHead>
+												<TableHead className="w-[160px]">Date</TableHead>
+											</TableRow>
+										</TableHeader>
+										<TableBody>
+											{labOrders.data.data.map(lab => {
+												const indication = formatIndication(
+													lab.clinicalIndication,
+													lab.indicationIcd10Code,
+													lab.indicationIcd10Display
+												)
 
-											return (
-												<TableRow
-													key={lab.id}
-													className={cn(
-														lab.priority === "stat" &&
-															"border-destructive bg-destructive/10 border-l-2"
-													)}
-												>
-													<TableCell className="font-medium">{lab.testName}</TableCell>
-													<TableCell>{lab.panelName ?? "--"}</TableCell>
-													<TableCell>{lab.loincCode ?? "--"}</TableCell>
-													<TableCell>
-														<div className="max-w-[220px]">
-															<p className="truncate text-sm">
-																{indication.clinical ?? "--"}
-															</p>
-															{indication.diagnosis && (
-																<p className="truncate text-xs text-muted-foreground">
-																	{indication.diagnosis}
-																</p>
+												return (
+													<TableRow
+														key={lab.id}
+														className={cn(
+															lab.priority === "stat" &&
+																"border-destructive bg-destructive/10 border-l-2"
+														)}
+													>
+														<TableCell className="font-medium">{lab.testName}</TableCell>
+														<TableCell>
+															{lab.panelName ? (
+																lab.panelName
+															) : (
+																<span className="text-muted-foreground">Single test</span>
 															)}
-														</div>
-													</TableCell>
-													<TableCell>
-														<Badge variant={priorityVariant(lab.priority)}>
-															{lab.priority}
-														</Badge>
-													</TableCell>
-													<TableCell>
-														<Badge variant={medStatusVariant(lab.status)}>
-															{lab.status.replace(/_/g, " ")}
-														</Badge>
-													</TableCell>
-													<TableCell>{lab.orderingStaffName ?? "--"}</TableCell>
-													<TableCell>{formatDateTime(lab.createdAt)}</TableCell>
-												</TableRow>
-											)
-										})}
-									</TableBody>
-								</Table>
+														</TableCell>
+														<TableCell>{lab.loincCode ?? "--"}</TableCell>
+														<TableCell>
+															<div className="max-w-[320px]">
+																<p className="truncate text-sm">
+																	{indication.clinical ?? "--"}
+																</p>
+																{indication.diagnosis && (
+																	<p className="truncate text-xs text-muted-foreground">
+																		{indication.diagnosis}
+																	</p>
+																)}
+															</div>
+														</TableCell>
+														<TableCell>
+															<Badge variant={priorityVariant(lab.priority)}>
+																{lab.priority}
+															</Badge>
+														</TableCell>
+														<TableCell>
+															<Badge variant={medStatusVariant(lab.status)}>
+																{lab.status.replace(/_/g, " ")}
+															</Badge>
+														</TableCell>
+														<TableCell>{lab.orderingStaffName ?? "--"}</TableCell>
+														<TableCell>{formatDateTime(lab.createdAt)}</TableCell>
+													</TableRow>
+												)
+											})}
+										</TableBody>
+									</Table>
+								</div>
 							)}
 						</CardContent>
 					</Card>
@@ -708,7 +717,14 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 									<TableBody>
 										{prescriptionsData.data.data.map(rx => {
 											const content = rx.prescriptionContent as Record<string, unknown> | null
-											const drugName = (content?.genericName as string) ?? "--"
+											const contentGenericName =
+												typeof content?.genericName === "string"
+													? content.genericName.trim()
+													: ""
+											const drugName =
+												contentGenericName ||
+												medicationOrdersById.get(rx.medicationOrderId)?.genericName ||
+												"--"
 											const isControlledPrescription =
 												controlledMedicationOrderIds.has(rx.medicationOrderId) ||
 												Boolean(content?.isControlledSubstance)

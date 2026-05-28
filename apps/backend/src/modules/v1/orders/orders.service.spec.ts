@@ -50,8 +50,10 @@ jest.mock("@repo/db/schema", () => {
 		encounterStatusEvents: createTable(),
 		formularyItems: createTable(),
 		highAlertVerifications: createTable(),
+		icd10Codes: createTable(),
 		imagingOrders: createTable(),
 		labOrders: createTable(),
+		loincCodes: createTable(),
 		marEntries: createTable(),
 		medicationOrders: createTable(),
 		orderVerifications: createTable(),
@@ -1006,6 +1008,12 @@ describe("OrdersService", () => {
 			.mockImplementationOnce(() =>
 				createSelectBuilder([{ id: encounterId, facilityId }], { withLimit: true })
 			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ loincNum: "57021-8" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ code: "J18.9" }], { withLimit: true })
+			)
 
 		mockDb.insert
 			.mockImplementationOnce(() => orderInsertBuilder)
@@ -1017,6 +1025,7 @@ describe("OrdersService", () => {
 				facilityId,
 				encounterId,
 				testName: "Complete Blood Count",
+				loincCode: "57021-8",
 				clinicalIndication: "Fever and productive cough",
 				indicationIcd10Code: "J18.9",
 				indicationIcd10Display: "Pneumonia, unspecified organism",
@@ -1031,6 +1040,7 @@ describe("OrdersService", () => {
 				facilityId,
 				encounterId,
 				testName: "Complete Blood Count",
+				loincCode: "57021-8",
 				clinicalIndication: "Fever and productive cough",
 				indicationIcd10Code: "J18.9",
 				indicationIcd10Display: "Pneumonia, unspecified organism",
@@ -1064,6 +1074,75 @@ describe("OrdersService", () => {
 		expect(result).toEqual({ id: labOrderId })
 	})
 
+	it("rejects lab order signing without an active LOINC test", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const encounterId = "99999999-9999-4999-9999-999999999999"
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[{ id: "staff-physician", userId: "user-1", facilityId, isActive: true }],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: encounterId, facilityId }], { withLimit: true })
+			)
+
+		await expect(
+			service.createLabOrder(
+				{
+					facilityId,
+					encounterId,
+					testName: "Complete Blood Count",
+					clinicalIndication: "Fever and productive cough",
+					indicationIcd10Code: "J18.9",
+					indicationIcd10Display: "Pneumonia, unspecified organism",
+				},
+				"user-1"
+			)
+		).rejects.toThrow("Select an active LOINC lab test")
+
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
+	it("rejects lab order signing without an active ICD-10 indication", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const encounterId = "99999999-9999-4999-9999-999999999999"
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[{ id: "staff-physician", userId: "user-1", facilityId, isActive: true }],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: encounterId, facilityId }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ loincNum: "57021-8" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withLimit: true }))
+
+		await expect(
+			service.createLabOrder(
+				{
+					facilityId,
+					encounterId,
+					testName: "Complete Blood Count",
+					loincCode: "57021-8",
+					clinicalIndication: "Fever and productive cough",
+					indicationIcd10Code: "BAD.1",
+					indicationIcd10Display: "Bad diagnosis",
+				},
+				"user-1"
+			)
+		).rejects.toThrow("Select a valid active ICD-10 indication")
+
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
 	it("creates a signed imaging order with persisted indication metadata", async () => {
 		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
 		const encounterId = "99999999-9999-4999-9999-999999999999"
@@ -1083,6 +1162,9 @@ describe("OrdersService", () => {
 			)
 			.mockImplementationOnce(() =>
 				createSelectBuilder([{ id: encounterId, facilityId }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ code: "J18.9" }], { withLimit: true })
 			)
 
 		mockDb.insert
