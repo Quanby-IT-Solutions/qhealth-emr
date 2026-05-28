@@ -117,6 +117,11 @@ async function openAllergiesTab(user: ReturnType<typeof userEvent.setup>) {
 	await user.click(screen.getByRole("tab", { name: /allergies/i }))
 }
 
+async function selectProblemStatus(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
+	await user.click(screen.getByRole("combobox", { name: /filter problem status/i }))
+	await user.click(await screen.findByRole("option", { name }))
+}
+
 describe("ProblemsAllergiesTab", () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
@@ -163,6 +168,28 @@ describe("ProblemsAllergiesTab", () => {
 		expect(screen.getAllByText("I10").length).toBeGreaterThan(0)
 	})
 
+	it("filters problems by documenting doctor's name from search", async () => {
+		const user = userEvent.setup()
+		mockProblemsWith([
+			buildProblem({
+				id: "problem-match",
+				description: "Hypertension",
+				documentingStaffName: "Dr. Miguel Santos",
+			}),
+			buildProblem({
+				id: "problem-other",
+				description: "Dyslipidemia",
+				documentingStaffName: "Dr. Ana Reyes",
+			}),
+		])
+
+		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
+		await user.type(screen.getByRole("textbox", { name: /search problems/i }), "Miguel")
+
+		expect(screen.getAllByText("Hypertension").length).toBeGreaterThan(0)
+		expect(screen.queryByText("Dyslipidemia")).toBeNull()
+	})
+
 	it("renders allergy name and severity badge", async () => {
 		const user = userEvent.setup()
 		mockAllergiesWith([
@@ -173,6 +200,28 @@ describe("ProblemsAllergiesTab", () => {
 
 		expect(screen.getAllByText("Penicillin").length).toBeGreaterThan(0)
 		expect(screen.getAllByText("severe").length).toBeGreaterThan(0)
+	})
+
+	it("does not filter allergies by documenting doctor's name from search", async () => {
+		const user = userEvent.setup()
+		mockAllergiesWith([
+			buildAllergy({
+				id: "allergy-match",
+				allergenName: "Penicillin",
+				documentingStaffName: "Dr. Miguel Santos",
+			}),
+			buildAllergy({
+				id: "allergy-other",
+				allergenName: "Shellfish",
+				documentingStaffName: "Dr. Ana Reyes",
+			}),
+		])
+
+		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
+		await openAllergiesTab(user)
+		await user.type(screen.getByRole("textbox", { name: /search allergies/i }), "Miguel")
+
+		expect(screen.getByText(/no allergies match the selected filters/i)).toBeInTheDocument()
 	})
 
 	it("opens the deactivate allergy confirmation with the allergen name", async () => {
@@ -240,12 +289,12 @@ describe("ProblemsAllergiesTab", () => {
 		expect(screen.queryByRole("button", { name: /^verify$/i })).toBeNull()
 	})
 
-	it("queries resolved problems when the Resolved tab is selected", async () => {
+	it("queries resolved problems when the Resolved status is selected", async () => {
 		const user = userEvent.setup()
 		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
 
 		mockUseProblemsQuery.mockClear()
-		await user.click(screen.getByRole("tab", { name: /resolved/i }))
+		await selectProblemStatus(user, /resolved/i)
 
 		const calledWithResolved = mockUseProblemsQuery.mock.calls.some(call =>
 			call[0]?.status === "resolved"
@@ -253,12 +302,12 @@ describe("ProblemsAllergiesTab", () => {
 		expect(calledWithResolved).toBe(true)
 	})
 
-	it("queries entered-in-error problems when the Entered in Error tab is selected", async () => {
+	it("queries entered-in-error problems when the Entered in Error status is selected", async () => {
 		const user = userEvent.setup()
 		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
 
 		mockUseProblemsQuery.mockClear()
-		await user.click(screen.getByRole("tab", { name: /entered in error/i }))
+		await selectProblemStatus(user, /entered in error/i)
 
 		const calledWithEnteredInError = mockUseProblemsQuery.mock.calls.some(
 			call => call[0]?.status === "entered_in_error"

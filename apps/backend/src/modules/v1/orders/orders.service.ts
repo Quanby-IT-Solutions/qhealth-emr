@@ -90,13 +90,7 @@ export class OrdersService {
 	private allergyClassRules = [
 		{
 			className: "Penicillin / beta-lactam",
-			allergens: [
-				"penicillin",
-				"penicillins",
-				"penicillin class",
-				"beta lactam",
-				"beta-lactam",
-			],
+			allergens: ["penicillin", "penicillins", "penicillin class", "beta lactam", "beta-lactam"],
 			generics: [
 				"amoxicillin",
 				"ampicillin",
@@ -505,12 +499,7 @@ export class OrdersService {
 				facilityId: staffProfiles.facilityId,
 			})
 			.from(staffProfiles)
-			.where(
-				and(
-					eq(staffProfiles.id, input.verifyingStaffId),
-					eq(staffProfiles.isActive, true)
-				)
-			)
+			.where(and(eq(staffProfiles.id, input.verifyingStaffId), eq(staffProfiles.isActive, true)))
 			.limit(1)
 
 		if (!profile) {
@@ -571,9 +560,7 @@ export class OrdersService {
 			}
 
 			if (encounter.facilityId !== input.facilityId) {
-				throw new BadRequestException(
-					"Encounter does not belong to the medication order facility."
-				)
+				throw new BadRequestException("Encounter does not belong to the medication order facility.")
 			}
 
 			if (input.patientId && input.patientId !== encounter.patientId) {
@@ -608,7 +595,9 @@ export class OrdersService {
 		preEncounterId?: string | null
 	}) {
 		if (!input.encounterId && !input.preEncounterId) {
-			throw new BadRequestException("encounterId or preEncounterId is required for ancillary orders.")
+			throw new BadRequestException(
+				"encounterId or preEncounterId is required for ancillary orders."
+			)
 		}
 
 		if (input.encounterId) {
@@ -683,6 +672,43 @@ export class OrdersService {
 		}
 
 		return cdsResult.alerts
+	}
+
+	private async assertNoOpenDuplicateMedOrder(input: {
+		facilityId: string
+		encounterId?: string | null
+		preEncounterId?: string | null
+		genericName: string
+	}) {
+		const contextCondition = input.encounterId
+			? eq(medicationOrders.encounterId, input.encounterId)
+			: input.preEncounterId
+				? eq(medicationOrders.preEncounterId, input.preEncounterId)
+				: null
+
+		if (!contextCondition) return
+
+		const [duplicate] = await db
+			.select({
+				id: medicationOrders.id,
+				status: medicationOrders.status,
+			})
+			.from(medicationOrders)
+			.where(
+				and(
+					eq(medicationOrders.facilityId, input.facilityId),
+					contextCondition,
+					eq(medicationOrders.genericName, input.genericName),
+					inArray(medicationOrders.status, ["pending_verification", "verified", "active"])
+				)
+			)
+			.limit(1)
+
+		if (duplicate) {
+			throw new BadRequestException(
+				`${input.genericName} already has an open medication order for this encounter. Discontinue or update the existing order before creating another one.`
+			)
+		}
 	}
 
 	private hasHighAlertAlert(cdsAlerts: unknown) {
@@ -1122,9 +1148,7 @@ export class OrdersService {
 		if (isControlledOrder) {
 			this.assertActivePdeaS2Credential(staff)
 			if (!input.durationDays) {
-				throw new BadRequestException(
-					"durationDays is required for controlled substance orders."
-				)
+				throw new BadRequestException("durationDays is required for controlled substance orders.")
 			}
 			if (input.durationDays > PDEA_MAX_CONTROLLED_DAYS) {
 				throw new BadRequestException(
@@ -1179,6 +1203,13 @@ export class OrdersService {
 			isControlledSubstance: isControlledOrder,
 			orderingStaffId: staff.id,
 			cdsOverrides: input.cdsOverrides,
+		})
+
+		await this.assertNoOpenDuplicateMedOrder({
+			facilityId: input.facilityId,
+			encounterId: input.encounterId ?? null,
+			preEncounterId: input.preEncounterId ?? null,
+			genericName: canonicalGenericName,
 		})
 
 		const [created] = await db
@@ -1532,7 +1563,9 @@ export class OrdersService {
 			.limit(1)
 
 		if (!icd10Match) {
-			throw new BadRequestException("Select a valid active ICD-10 indication before signing a lab order.")
+			throw new BadRequestException(
+				"Select a valid active ICD-10 indication before signing a lab order."
+			)
 		}
 	}
 
@@ -1758,12 +1791,16 @@ export class OrdersService {
 	private async assertImagingOrderIndicationIsReady(input: CreateImagingOrderInput) {
 		const clinicalIndication = input.clinicalIndication?.trim()
 		if (!clinicalIndication) {
-			throw new BadRequestException("Clinical indication is required before signing an imaging order.")
+			throw new BadRequestException(
+				"Clinical indication is required before signing an imaging order."
+			)
 		}
 
 		const icd10Code = input.indicationIcd10Code?.trim()
 		if (!icd10Code) {
-			throw new BadRequestException("ICD-10 indication is required before signing an imaging order.")
+			throw new BadRequestException(
+				"ICD-10 indication is required before signing an imaging order."
+			)
 		}
 
 		const [icd10Match] = await db
@@ -1773,7 +1810,9 @@ export class OrdersService {
 			.limit(1)
 
 		if (!icd10Match) {
-			throw new BadRequestException("Select a valid active ICD-10 indication before signing an imaging order.")
+			throw new BadRequestException(
+				"Select a valid active ICD-10 indication before signing an imaging order."
+			)
 		}
 	}
 
@@ -2237,7 +2276,9 @@ export class OrdersService {
 		if (!medOrder)
 			throw new NotFoundException(`Medication order ${input.medicationOrderId} not found`)
 		if (medOrder.facilityId !== input.facilityId) {
-			throw new BadRequestException("Medication order does not belong to the prescription facility.")
+			throw new BadRequestException(
+				"Medication order does not belong to the prescription facility."
+			)
 		}
 		if (medOrder.encounterId !== input.encounterId) {
 			throw new BadRequestException("Medication order does not belong to the selected encounter.")
@@ -2705,6 +2746,13 @@ export class OrdersService {
 			isControlledSubstance: true,
 			orderingStaffId: staff.id,
 			cdsOverrides: input.cdsOverrides,
+		})
+
+		await this.assertNoOpenDuplicateMedOrder({
+			facilityId: input.facilityId,
+			encounterId: input.encounterId ?? null,
+			preEncounterId: input.preEncounterId ?? null,
+			genericName: canonicalGenericName,
 		})
 
 		const preview = await this.previewTranches({
