@@ -21,7 +21,9 @@ export const env = createEnv({
 	 * These are only available on the server and will NOT be exposed to the client
 	 */
 	server: {
+		DATABASE_URL: z.string().optional(),
 		INTERNAL_API_BASE_URL: z.url().optional(),
+		PATIENT_PORTAL_SESSION_SECRET: z.string().optional(),
 	},
 
 	/**
@@ -42,7 +44,9 @@ export const env = createEnv({
 	runtimeEnv: {
 		// Server Configuration
 		NODE_ENV: process.env.NODE_ENV,
+		DATABASE_URL: process.env.DATABASE_URL,
 		INTERNAL_API_BASE_URL: process.env.INTERNAL_API_BASE_URL,
+		PATIENT_PORTAL_SESSION_SECRET: process.env.PATIENT_PORTAL_SESSION_SECRET,
 
 		// Client-side variables
 		NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,

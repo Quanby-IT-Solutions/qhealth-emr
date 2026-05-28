@@ -1,0 +1,746 @@
+import "server-only"
+
+import { createHmac, timingSafeEqual } from "node:crypto"
+import { Pool } from "pg"
+
+import type { PatientPortalDocument } from "@/features/patient-portal/lib/static-summary"
+import { env } from "@/env"
+
+export const PATIENT_PORTAL_COOKIE = "qhealth_patient_portal"
+
+const DEFAULT_DATABASE_URL = "postgres://postgres:password@localhost:5432/qhealth-emr"
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 2
+
+type PortalPoolGlobal = typeof globalThis & {
+	__qhealthPatientPortalPool?: Pool
+}
+
+export type PortalSession = {
+	patientId: string
+	mrn: string
+	dateOfBirth: string
+	issuedAt: number
+}
+
+export type PortalStatus = "normal" | "attention" | "released"
+
+export type PortalSummaryItem = {
+	label: string
+	value: string
+	detail?: string
+	status?: PortalStatus
+}
+
+export type PatientPortalRecord = {
+	patient: {
+		id: string
+		mrn: string
+		name: string
+		firstName: string
+		lastName: string
+		dateOfBirth: string
+		sex: string
+		facilityName: string
+	}
+	snapshot: {
+		generatedAt: string
+		releasedThrough: string
+		source: string
+	}
+	overview: PortalSummaryItem[]
+	problems: PortalSummaryItem[]
+	allergies: PortalSummaryItem[]
+	medications: PortalSummaryItem[]
+	labs: PortalSummaryItem[]
+	imaging: PortalSummaryItem[]
+	encounters: PortalSummaryItem[]
+	notes: PortalSummaryItem[]
+}
+
+type PatientRow = {
+	id: string
+	mrn: string
+	first_name: string
+	last_name: string
+	date_of_birth: string
+	sex: string
+	facility_name: string | null
+}
+
+type EncounterRow = {
+	id: string
+	encounter_type: string
+	status: string
+	chief_complaint: string | null
+	admission_datetime: string
+	discharge_datetime: string | null
+	disposition: string | null
+}
+
+type ProblemRow = {
+	description: string
+	status: string
+	onset_date: string | null
+	resolution_date: string | null
+	icd10_code: string | null
+	icd10_display: string | null
+}
+
+type AllergyRow = {
+	allergen_name: string
+	allergen_type: string
+	reaction_type: string | null
+	severity: string
+	onset_date: string | null
+	is_active: boolean
+}
+
+type MedicationRow = {
+	generic_name: string
+	brand_name: string | null
+	dose: string
+	dose_unit: string
+	dose_form: string
+	route: string
+	frequency: string
+	duration_days: number | null
+	status: string
+	special_instructions: string | null
+	created_at: string
+}
+
+type LabRow = {
+	test_name: string
+	panel_name: string | null
+	priority: string
+	status: string
+	specimen_type: string | null
+	collection_datetime: string | null
+	resulted_datetime: string | null
+	results: unknown
+	created_at: string
+}
+
+type ImagingRow = {
+	modality: string
+	body_part: string
+	clinical_indication: string | null
+	priority: string
+	status: string
+	scheduled_datetime: string | null
+	completed_datetime: string | null
+	report: string | null
+	created_at: string
+}
+
+type NoteRow = {
+	note_type: string
+	content: string
+	status: string
+	signed_at: string | null
+	created_at: string
+}
+
+function getPool() {
+	const globalForPool = globalThis as PortalPoolGlobal
+
+	if (!globalForPool.__qhealthPatientPortalPool) {
+		globalForPool.__qhealthPatientPortalPool = new Pool({
+			connectionString: env.DATABASE_URL ?? DEFAULT_DATABASE_URL,
+			max: 4,
+		})
+	}
+
+	return globalForPool.__qhealthPatientPortalPool
+}
+
+function getSessionSecret() {
+	return env.PATIENT_PORTAL_SESSION_SECRET ?? "qhealth-dev-patient-portal-secret"
+}
+
+export function normalizePortalMrn(value: string) {
+	return value
+		.trim()
+		.toUpperCase()
+		.replace(/[^A-Z0-9]/g, "")
+}
+
+function signValue(value: string) {
+	return createHmac("sha256", getSessionSecret()).update(value).digest("base64url")
+}
+
+export function createPortalSessionCookie(session: PortalSession) {
+	const payload = Buffer.from(JSON.stringify(session)).toString("base64url")
+	return `${payload}.${signValue(payload)}`
+}
+
+export function parsePortalSessionCookie(value: string | undefined): PortalSession | null {
+	if (!value) {
+		return null
+	}
+
+	const [payload, signature] = value.split(".")
+
+	if (!payload || !signature) {
+		return null
+	}
+
+	const expectedSignature = signValue(payload)
+	const signatureBuffer = Buffer.from(signature)
+	const expectedBuffer = Buffer.from(expectedSignature)
+
+	if (
+		signatureBuffer.length !== expectedBuffer.length ||
+		!timingSafeEqual(signatureBuffer, expectedBuffer)
+	) {
+		return null
+	}
+
+	try {
+		const session = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as PortalSession
+		const ageSeconds = Math.floor(Date.now() / 1000) - session.issuedAt
+
+		if (ageSeconds > SESSION_MAX_AGE_SECONDS) {
+			return null
+		}
+
+		return session
+	} catch {
+		return null
+	}
+}
+
+export function getPatientPortalCookieOptions() {
+	return {
+		httpOnly: true,
+		maxAge: SESSION_MAX_AGE_SECONDS,
+		path: "/patient-portal",
+		sameSite: "lax" as const,
+		secure: env.NODE_ENV === "production",
+	}
+}
+
+export async function verifyPatientPortalIdentity(mrn: string, dateOfBirth: string) {
+	const normalizedMrn = normalizePortalMrn(mrn)
+	const { rows } = await getPool().query<PatientRow>(
+		`
+			select
+				p.id,
+				p.mrn,
+				p.first_name,
+				p.last_name,
+				p.date_of_birth::text as date_of_birth,
+				p.sex,
+				f.name as facility_name
+			from patients p
+			left join facilities f on f.id = p.facility_id
+			where regexp_replace(upper(p.mrn), '[^A-Z0-9]', '', 'g') = $1
+				and p.date_of_birth = $2::date
+				and p.is_active = true
+			limit 1
+		`,
+		[normalizedMrn, dateOfBirth]
+	)
+
+	return rows[0] ?? null
+}
+
+export async function getPatientPortalRecord(
+	patientId: string
+): Promise<PatientPortalRecord | null> {
+	const patient = await getPatientById(patientId)
+
+	if (!patient) {
+		return null
+	}
+
+	const [encounters, problems, allergies, medications, labs, imaging, notes] = await Promise.all([
+		getEncounters(patient.id),
+		getProblems(patient.id),
+		getAllergies(patient.id),
+		getMedications(patient.id),
+		getLabs(patient.id),
+		getImaging(patient.id),
+		getNotes(patient.id),
+	])
+
+	return {
+		patient: {
+			id: patient.id,
+			mrn: patient.mrn,
+			name: `${patient.first_name} ${patient.last_name}`,
+			firstName: patient.first_name,
+			lastName: patient.last_name,
+			dateOfBirth: patient.date_of_birth,
+			sex: patient.sex,
+			facilityName: patient.facility_name ?? "QHealth Medical Center",
+		},
+		snapshot: {
+			generatedAt: formatDateTime(new Date().toISOString()),
+			releasedThrough: "Released records available through the current portal snapshot.",
+			source: "Read-only patient portal database snapshot",
+		},
+		overview: buildOverview(patient, encounters, problems, allergies),
+		problems: problems.map(problem => ({
+			label: problem.description,
+			value: problem.status,
+			detail: [
+				problem.icd10_code ? `ICD-10 ${problem.icd10_code}` : null,
+				problem.icd10_display,
+				problem.onset_date ? `Onset ${formatDate(problem.onset_date)}` : null,
+				problem.resolution_date ? `Resolved ${formatDate(problem.resolution_date)}` : null,
+			]
+				.filter(Boolean)
+				.join(" · "),
+			status: problem.status === "active" ? "attention" : "released",
+		})),
+		allergies: allergies.map(allergy => ({
+			label: allergy.allergen_name,
+			value: `${allergy.severity} ${allergy.allergen_type}`,
+			detail: [
+				allergy.reaction_type ? `Reaction: ${allergy.reaction_type}` : null,
+				allergy.onset_date ? `Onset ${formatDate(allergy.onset_date)}` : null,
+				allergy.is_active ? "Active" : "Inactive",
+			]
+				.filter(Boolean)
+				.join(" · "),
+			status: allergy.is_active ? "attention" : "released",
+		})),
+		medications: medications.map(medication => ({
+			label: medication.generic_name,
+			value: [
+				medication.dose,
+				medication.dose_unit,
+				medication.dose_form,
+				medication.route,
+				medication.frequency,
+			].join(" "),
+			detail: [
+				medication.brand_name ? `Brand: ${medication.brand_name}` : null,
+				medication.duration_days ? `${medication.duration_days} days` : null,
+				medication.special_instructions,
+				`Status: ${medication.status}`,
+			]
+				.filter(Boolean)
+				.join(" · "),
+			status:
+				medication.status === "active" || medication.status === "verified" ? "normal" : "released",
+		})),
+		labs: labs.map(lab => ({
+			label: lab.panel_name ? `${lab.panel_name} · ${lab.test_name}` : lab.test_name,
+			value: formatResults(lab.results) || lab.status,
+			detail: [
+				lab.specimen_type ? `Specimen: ${lab.specimen_type}` : null,
+				`Priority: ${lab.priority}`,
+				lab.resulted_datetime
+					? `Resulted ${formatDateTime(lab.resulted_datetime)}`
+					: `Ordered ${formatDateTime(lab.created_at)}`,
+			]
+				.filter(Boolean)
+				.join(" · "),
+			status: lab.status === "resulted" || lab.status === "completed" ? "released" : "attention",
+		})),
+		imaging: imaging.map(order => ({
+			label: `${order.modality.toUpperCase()} · ${order.body_part}`,
+			value: order.report || order.status,
+			detail: [
+				order.clinical_indication ? `Indication: ${order.clinical_indication}` : null,
+				`Priority: ${order.priority}`,
+				order.completed_datetime
+					? `Completed ${formatDateTime(order.completed_datetime)}`
+					: `Ordered ${formatDateTime(order.created_at)}`,
+			]
+				.filter(Boolean)
+				.join(" · "),
+			status: order.status === "completed" ? "released" : "attention",
+		})),
+		encounters: encounters.map(encounter => ({
+			label: `${encounter.encounter_type} encounter`,
+			value: encounter.status,
+			detail: [
+				encounter.chief_complaint ? `Chief complaint: ${encounter.chief_complaint}` : null,
+				`Admitted ${formatDateTime(encounter.admission_datetime)}`,
+				encounter.discharge_datetime
+					? `Discharged ${formatDateTime(encounter.discharge_datetime)}`
+					: null,
+				encounter.disposition ? `Disposition: ${encounter.disposition}` : null,
+			]
+				.filter(Boolean)
+				.join(" · "),
+			status: encounter.status === "active" ? "normal" : "released",
+		})),
+		notes: notes.map(note => ({
+			label: `${note.note_type} note`,
+			value: note.status,
+			detail: `${note.signed_at ? `Signed ${formatDateTime(note.signed_at)}` : `Created ${formatDateTime(note.created_at)}`} · ${truncateText(note.content, 140)}`,
+			status: note.status === "signed" ? "released" : "attention",
+		})),
+	}
+}
+
+export function buildPatientPortalDocuments(record: PatientPortalRecord): PatientPortalDocument[] {
+	const releasedAt = record.snapshot.generatedAt
+	const safeMrn = record.patient.mrn.replace(/[^A-Z0-9-]/gi, "-").toLowerCase()
+
+	return [
+		{
+			id: "daily-summary",
+			title: "Daily Released Medical Summary",
+			category: "Patient Summary",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-daily-summary.txt`,
+			description:
+				"Read-only snapshot of demographics, encounters, allergies, problems, orders, and notes.",
+			body: buildDocumentBody(record),
+		},
+		{
+			id: "lab-results",
+			title: "Released Laboratory Results",
+			category: "Diagnostics",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-laboratory-results.txt`,
+			description: "Released laboratory order and result summary for this patient.",
+			body: buildSectionDocument(record, "Released Laboratory Results", record.labs),
+		},
+		{
+			id: "imaging-report",
+			title: "Released Imaging Reports",
+			category: "Radiology",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-imaging-reports.txt`,
+			description: "Released imaging order and report summary for this patient.",
+			body: buildSectionDocument(record, "Released Imaging Reports", record.imaging),
+		},
+	]
+}
+
+async function getPatientById(patientId: string) {
+	const { rows } = await getPool().query<PatientRow>(
+		`
+			select
+				p.id,
+				p.mrn,
+				p.first_name,
+				p.last_name,
+				p.date_of_birth::text as date_of_birth,
+				p.sex,
+				f.name as facility_name
+			from patients p
+			left join facilities f on f.id = p.facility_id
+			where p.id = $1
+				and p.is_active = true
+			limit 1
+		`,
+		[patientId]
+	)
+
+	return rows[0] ?? null
+}
+
+async function getEncounters(patientId: string) {
+	const { rows } = await getPool().query<EncounterRow>(
+		`
+			select
+				id,
+				encounter_type,
+				status,
+				chief_complaint,
+				admission_datetime::text as admission_datetime,
+				discharge_datetime::text as discharge_datetime,
+				disposition
+			from encounters
+			where patient_id = $1
+			order by admission_datetime desc
+			limit 10
+		`,
+		[patientId]
+	)
+
+	return rows
+}
+
+async function getProblems(patientId: string) {
+	const { rows } = await getPool().query<ProblemRow>(
+		`
+			select description, status, onset_date::text as onset_date, resolution_date::text as resolution_date, icd10_code, icd10_display
+			from problems
+			where patient_id = $1
+			order by created_at desc
+			limit 20
+		`,
+		[patientId]
+	)
+
+	return rows
+}
+
+async function getAllergies(patientId: string) {
+	const { rows } = await getPool().query<AllergyRow>(
+		`
+			select allergen_name, allergen_type, reaction_type, severity, onset_date::text as onset_date, is_active
+			from allergies
+			where patient_id = $1
+			order by is_active desc, created_at desc
+			limit 20
+		`,
+		[patientId]
+	)
+
+	return rows
+}
+
+async function getMedications(patientId: string) {
+	const { rows } = await getPool().query<MedicationRow>(
+		`
+			select
+				mo.generic_name,
+				mo.brand_name,
+				mo.dose,
+				mo.dose_unit,
+				mo.dose_form,
+				mo.route,
+				mo.frequency,
+				mo.duration_days,
+				mo.status,
+				mo.special_instructions,
+				mo.created_at::text as created_at
+			from medication_orders mo
+			inner join encounters e on e.id = mo.encounter_id
+			where e.patient_id = $1
+			order by mo.created_at desc
+			limit 30
+		`,
+		[patientId]
+	)
+
+	return rows
+}
+
+async function getLabs(patientId: string) {
+	const { rows } = await getPool().query<LabRow>(
+		`
+			select
+				lo.test_name,
+				lo.panel_name,
+				lo.priority,
+				lo.status,
+				lo.specimen_type,
+				lo.collection_datetime::text as collection_datetime,
+				lo.resulted_datetime::text as resulted_datetime,
+				lo.results,
+				lo.created_at::text as created_at
+			from lab_orders lo
+			inner join encounters e on e.id = lo.encounter_id
+			where e.patient_id = $1
+			order by coalesce(lo.resulted_datetime, lo.created_at) desc
+			limit 30
+		`,
+		[patientId]
+	)
+
+	return rows
+}
+
+async function getImaging(patientId: string) {
+	const { rows } = await getPool().query<ImagingRow>(
+		`
+			select
+				io.modality,
+				io.body_part,
+				io.clinical_indication,
+				io.priority,
+				io.status,
+				io.scheduled_datetime::text as scheduled_datetime,
+				io.completed_datetime::text as completed_datetime,
+				io.report,
+				io.created_at::text as created_at
+			from imaging_orders io
+			inner join encounters e on e.id = io.encounter_id
+			where e.patient_id = $1
+			order by coalesce(io.completed_datetime, io.created_at) desc
+			limit 30
+		`,
+		[patientId]
+	)
+
+	return rows
+}
+
+async function getNotes(patientId: string) {
+	const { rows } = await getPool().query<NoteRow>(
+		`
+			select cn.note_type, cn.content, cn.status, cn.signed_at::text as signed_at, cn.created_at::text as created_at
+			from clinical_notes cn
+			inner join encounters e on e.id = cn.encounter_id
+			where e.patient_id = $1
+				and cn.status = 'signed'
+			order by coalesce(cn.signed_at, cn.created_at) desc
+			limit 20
+		`,
+		[patientId]
+	)
+
+	return rows
+}
+
+function buildOverview(
+	patient: PatientRow,
+	encounters: EncounterRow[],
+	problems: ProblemRow[],
+	allergies: AllergyRow[]
+): PortalSummaryItem[] {
+	const latestEncounter = encounters[0]
+	const activeAllergies = allergies.filter(allergy => allergy.is_active)
+	const activeProblems = problems.filter(problem => problem.status === "active")
+
+	return [
+		{
+			label: "Patient",
+			value: `${patient.first_name} ${patient.last_name}`,
+			detail: `MRN ${patient.mrn} · DOB ${formatDate(patient.date_of_birth)} · ${patient.sex}`,
+			status: "released",
+		},
+		{
+			label: "Latest encounter",
+			value: latestEncounter
+				? `${latestEncounter.encounter_type} · ${latestEncounter.status}`
+				: "No encounter found",
+			detail: latestEncounter
+				? `${latestEncounter.chief_complaint ?? "No chief complaint recorded"} · ${formatDateTime(latestEncounter.admission_datetime)}`
+				: "No released encounter is linked to this patient.",
+			status: latestEncounter?.status === "active" ? "normal" : "released",
+		},
+		{
+			label: "Active allergies",
+			value: activeAllergies.length.toString(),
+			detail:
+				activeAllergies.map(allergy => allergy.allergen_name).join(", ") ||
+				"No active allergy record found.",
+			status: activeAllergies.length > 0 ? "attention" : "normal",
+		},
+		{
+			label: "Active problems",
+			value: activeProblems.length.toString(),
+			detail:
+				activeProblems.map(problem => problem.description).join(", ") ||
+				"No active problem record found.",
+			status: activeProblems.length > 0 ? "attention" : "normal",
+		},
+	]
+}
+
+function formatResults(results: unknown) {
+	if (!results) {
+		return ""
+	}
+
+	if (Array.isArray(results)) {
+		return results
+			.map(item => {
+				if (typeof item === "object" && item !== null) {
+					const result = item as Record<string, unknown>
+					return [result.test, result.name, result.result, result.value, result.unit]
+						.filter(Boolean)
+						.join(" ")
+				}
+
+				return String(item)
+			})
+			.filter(Boolean)
+			.join("; ")
+	}
+
+	if (typeof results === "object") {
+		return Object.entries(results as Record<string, unknown>)
+			.map(([key, value]) => `${key}: ${String(value)}`)
+			.join("; ")
+	}
+
+	return String(results)
+}
+
+function buildDocumentBody(record: PatientPortalRecord) {
+	return [
+		"QHealth Patient Portal - Daily Released Medical Summary",
+		"",
+		`Patient: ${record.patient.name}`,
+		`MRN: ${record.patient.mrn}`,
+		`Date of birth: ${formatDate(record.patient.dateOfBirth)}`,
+		`Facility: ${record.patient.facilityName}`,
+		`Generated: ${record.snapshot.generatedAt}`,
+		"",
+		buildSectionText("Overview", record.overview),
+		buildSectionText("Encounters", record.encounters),
+		buildSectionText("Problems", record.problems),
+		buildSectionText("Allergies", record.allergies),
+		buildSectionText("Medications", record.medications),
+		buildSectionText("Laboratory Results", record.labs),
+		buildSectionText("Imaging Reports", record.imaging),
+		buildSectionText("Signed Notes", record.notes),
+	].join("\n")
+}
+
+function buildSectionDocument(
+	record: PatientPortalRecord,
+	title: string,
+	items: PortalSummaryItem[]
+) {
+	return [
+		`QHealth Patient Portal - ${title}`,
+		"",
+		`Patient: ${record.patient.name}`,
+		`MRN: ${record.patient.mrn}`,
+		`Generated: ${record.snapshot.generatedAt}`,
+		"",
+		buildSectionText(title, items),
+	].join("\n")
+}
+
+function buildSectionText(title: string, items: PortalSummaryItem[]) {
+	if (items.length === 0) {
+		return `${title}\n- No released records found.`
+	}
+
+	return [
+		title,
+		...items.map(item => {
+			const detail = item.detail ? ` (${item.detail})` : ""
+			return `- ${item.label}: ${item.value}${detail}`
+		}),
+	].join("\n")
+}
+
+function formatDate(value: string | null | undefined) {
+	if (!value) {
+		return "Not recorded"
+	}
+
+	return new Intl.DateTimeFormat("en-PH", {
+		day: "2-digit",
+		month: "short",
+		year: "numeric",
+	}).format(new Date(value))
+}
+
+function formatDateTime(value: string | null | undefined) {
+	if (!value) {
+		return "Not recorded"
+	}
+
+	return new Intl.DateTimeFormat("en-PH", {
+		dateStyle: "medium",
+		timeStyle: "short",
+		timeZone: "Asia/Manila",
+	}).format(new Date(value))
+}
+
+function truncateText(value: string, maxLength: number) {
+	if (value.length <= maxLength) {
+		return value
+	}
+
+	return `${value.slice(0, maxLength - 1)}...`
+}
