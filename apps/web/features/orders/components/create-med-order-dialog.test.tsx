@@ -9,14 +9,17 @@ const mockUseCreateMedOrderMutation = vi.fn()
 const mockUseCreateTranchedOrdersMutation = vi.fn()
 const mockUseCheckPdeaLicenseQuery = vi.fn()
 const mockUseCreateHighAlertVerificationMutation = vi.fn()
+const mockUseMedOrderListQuery = vi.fn()
 const mockUseMyProfile = vi.fn()
 const mockUseFormularyItemsQuery = vi.fn()
 
 vi.mock("@/features/orders/api/orders.hooks", () => ({
 	useEvaluateCdsMutation: (...args: unknown[]) => mockUseEvaluateCdsMutation(...args),
 	useCreateMedOrderMutation: (...args: unknown[]) => mockUseCreateMedOrderMutation(...args),
-	useCreateTranchedOrdersMutation: (...args: unknown[]) => mockUseCreateTranchedOrdersMutation(...args),
+	useCreateTranchedOrdersMutation: (...args: unknown[]) =>
+		mockUseCreateTranchedOrdersMutation(...args),
 	useCheckPdeaLicenseQuery: (...args: unknown[]) => mockUseCheckPdeaLicenseQuery(...args),
+	useMedOrderListQuery: (...args: unknown[]) => mockUseMedOrderListQuery(...args),
 	useCreateHighAlertVerificationMutation: (...args: unknown[]) =>
 		mockUseCreateHighAlertVerificationMutation(...args),
 }))
@@ -75,11 +78,7 @@ vi.mock("@/core/components/ui/select", async () => {
 		})
 
 		return (
-			<select
-				id={triggerId}
-				value={value ?? ""}
-				onChange={e => onValueChange?.(e.target.value)}
-			>
+			<select id={triggerId} value={value ?? ""} onChange={e => onValueChange?.(e.target.value)}>
 				<option value="" disabled>
 					Select…
 				</option>
@@ -187,10 +186,7 @@ vi.mock("./allergy-alert-banner", () => ({
 						{alert.allergenName} {alert.blockType}
 					</span>
 					{alert.blockType === "soft_block" && (
-						<button
-							type="button"
-							onClick={() => onOverride?.(alert.id, "Clinically necessary")}
-						>
+						<button type="button" onClick={() => onOverride?.(alert.id, "Clinically necessary")}>
 							Override {alert.id}
 						</button>
 					)}
@@ -235,10 +231,7 @@ interface EvaluateCdsResult {
 
 function setCdsEvaluateResult(result: EvaluateCdsResult) {
 	mockUseEvaluateCdsMutation.mockReturnValue({
-		mutate: (
-			_input: unknown,
-			opts?: { onSuccess?: (data: EvaluateCdsResult) => void }
-		) => {
+		mutate: (_input: unknown, opts?: { onSuccess?: (data: EvaluateCdsResult) => void }) => {
 			opts?.onSuccess?.(result)
 		},
 		isPending: false,
@@ -291,6 +284,7 @@ describe("CreateMedOrderDialog", () => {
 			isSuccess: true,
 			isError: false,
 		})
+		mockUseMedOrderListQuery.mockReturnValue({ data: { data: [] }, isLoading: false })
 		mockUseCreateMedOrderMutation.mockReturnValue({ mutate: vi.fn(), isPending: false })
 		mockUseCreateTranchedOrdersMutation.mockReturnValue({ mutate: vi.fn(), isPending: false })
 		mockUseCreateHighAlertVerificationMutation.mockReturnValue({
@@ -330,9 +324,7 @@ describe("CreateMedOrderDialog", () => {
 		await user.type(screen.getByTestId("generic-name-input"), "Paracetamol")
 		await user.click(screen.getByRole("button", { name: /run drug safety check/i }))
 
-		expect(
-			screen.getByText(/no medication-safety alerts for this order/i)
-		).toBeInTheDocument()
+		expect(screen.getByText(/no medication-safety alerts for this order/i)).toBeInTheDocument()
 	})
 
 	it("keeps submit disabled when CDS returns a hard-block allergy", async () => {
@@ -420,6 +412,39 @@ describe("CreateMedOrderDialog", () => {
 		await user.click(screen.getByRole("button", { name: /confirm override/i }))
 
 		expect(screen.getByRole("button", { name: /create order/i })).not.toBeDisabled()
+	})
+
+	it("blocks creating a duplicate open medication order for the encounter", async () => {
+		const user = userEvent.setup()
+		mockUseMedOrderListQuery.mockReturnValue({
+			data: {
+				data: [
+					{
+						id: "med-1",
+						genericName: "Amlodipine",
+						status: "active",
+					},
+				],
+			},
+			isLoading: false,
+		})
+
+		render(<CreateMedOrderDialog {...defaultProps} />)
+
+		await user.type(screen.getByTestId("generic-name-input"), "Amlodipine")
+		await user.click(screen.getByRole("button", { name: /run drug safety check/i }))
+		fireEvent.change(screen.getByLabelText(/^Dose\s+\*$/i), { target: { value: "5" } })
+		fireEvent.change(screen.getByLabelText(/^Dose Unit\s+\*$/i), { target: { value: "mg" } })
+		fireEvent.change(screen.getByLabelText(/^Dose Form\s+\*$/i), {
+			target: { value: "tablet" },
+		})
+		fireEvent.change(screen.getByLabelText(/^Route\s+\*$/i), { target: { value: "oral" } })
+		fireEvent.change(screen.getByLabelText(/^Frequency\s+\*$/i), {
+			target: { value: "once" },
+		})
+
+		expect(screen.getByText(/already has an open Amlodipine order/i)).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: /create order/i })).toBeDisabled()
 	})
 
 	it("renders a high-alert severity item when CDS requires double verification", async () => {

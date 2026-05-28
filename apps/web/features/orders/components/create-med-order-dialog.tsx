@@ -31,6 +31,7 @@ import {
 	useCreateMedOrderMutation,
 	useCreateTranchedOrdersMutation,
 	useEvaluateCdsMutation,
+	useMedOrderListQuery,
 	type CdsEvaluateResponse,
 } from "@/features/orders/api/orders.hooks"
 import { DrugSearchCombobox } from "@/features/orders/components/drug-search-combobox"
@@ -89,7 +90,17 @@ const FREQUENCY_OPTIONS = [
 
 type FrequencyValue = (typeof FREQUENCY_OPTIONS)[number]["value"]
 
-const REPEATING_FREQUENCIES: FrequencyValue[] = ["q4h", "q6h", "q8h", "q12h", "daily", "bid", "tid", "qid"]
+const REPEATING_FREQUENCIES: FrequencyValue[] = [
+	"q4h",
+	"q6h",
+	"q8h",
+	"q12h",
+	"daily",
+	"bid",
+	"tid",
+	"qid",
+]
+const OPEN_MED_ORDER_STATUSES = new Set(["pending_verification", "verified", "active"])
 
 function getNextHour(): string {
 	const d = new Date()
@@ -167,7 +178,8 @@ function buildSafetyRows(cdsAlerts: CdsAlertItem[], allergyAlerts: AllergyAlertI
 				id: alert.id,
 				source: "allergy" as const,
 				severity: alert.blockType,
-				title: alert.blockType === "hard_block" ? "Allergy hard block" : "Allergy override required",
+				title:
+					alert.blockType === "hard_block" ? "Allergy hard block" : "Allergy override required",
 				message: `${alert.allergenName}${details ? ` (${details})` : ""}`,
 				canOverride: alert.blockType === "soft_block",
 			}
@@ -212,8 +224,8 @@ function SafetyReviewPanel({
 	if (rows.length === 0) return null
 
 	return (
-		<section className="overflow-hidden rounded-lg border bg-background">
-			<div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-3 py-2.5">
+		<section className="bg-background overflow-hidden rounded-lg border">
+			<div className="bg-muted/30 flex items-center justify-between gap-3 border-b px-3 py-2.5">
 				<div>
 					<h3 className="text-sm font-semibold">Safety Review</h3>
 					<p className="text-muted-foreground text-xs">
@@ -232,7 +244,13 @@ function SafetyReviewPanel({
 					const isOverridden = isAllergy
 						? allergyOverriddenAlerts.has(row.id)
 						: overriddenAlerts.has(row.id)
-					const Icon = isHardBlock ? Ban : isHighAlert ? ShieldAlert : isSoftBlock ? AlertTriangle : Bell
+					const Icon = isHardBlock
+						? Ban
+						: isHighAlert
+							? ShieldAlert
+							: isSoftBlock
+								? AlertTriangle
+								: Bell
 
 					return (
 						<div
@@ -260,7 +278,9 @@ function SafetyReviewPanel({
 									<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
 										<span className="text-sm font-semibold">{row.title}</span>
 										<span
-											data-testid={row.source === "cds" ? `cds-alert-${row.id}-severity` : undefined}
+											data-testid={
+												row.source === "cds" ? `cds-alert-${row.id}-severity` : undefined
+											}
 											className="sr-only"
 										>
 											{row.severity}
@@ -275,7 +295,9 @@ function SafetyReviewPanel({
 									<p className="text-muted-foreground mt-0.5 text-sm">{row.message}</p>
 								</div>
 								{isHardBlock ? (
-									<span className="text-muted-foreground shrink-0 text-xs font-medium">Cannot proceed</span>
+									<span className="text-muted-foreground shrink-0 text-xs font-medium">
+										Cannot proceed
+									</span>
 								) : row.canOverride ? (
 									<Button
 										type="button"
@@ -391,6 +413,7 @@ export function CreateMedOrderDialog({
 	const createHighAlertVerification = useCreateHighAlertVerificationMutation()
 	const createMedOrder = useCreateMedOrderMutation()
 	const createTranchedOrders = useCreateTranchedOrdersMutation()
+	const existingMedOrders = useMedOrderListQuery({ encounterId, limit: 100 })
 
 	// ── PDEA validation ──────────────────────────────────────────────────────
 	const staffProfile =
@@ -410,6 +433,11 @@ export function CreateMedOrderDialog({
 	const livePdeaCanPrescribe = !isControlledSubstance
 		? true
 		: Boolean(livePdeaStatus?.canPrescribeControlled)
+	const duplicateOpenMedOrder = (existingMedOrders.data?.data ?? []).find(
+		order =>
+			OPEN_MED_ORDER_STATUSES.has(order.status) &&
+			order.genericName.trim().toLowerCase() === genericName.trim().toLowerCase()
+	)
 
 	function handleControlledSubstanceChange(checked: boolean) {
 		if (!checked) {
@@ -434,14 +462,7 @@ export function CreateMedOrderDialog({
 				genericName: genericName.trim().toLowerCase(),
 				isControlledSubstance,
 			}),
-		[
-			patientId,
-			facilityId,
-			orderingStaffId,
-			formularyItemId,
-			genericName,
-			isControlledSubstance,
-		]
+		[patientId, facilityId, orderingStaffId, formularyItemId, genericName, isControlledSubstance]
 	)
 	const hasFreshCdsCheck = cdsResult !== null && lastCdsCheckSignature === cdsCheckSignature
 	const freshCdsAlerts = hasFreshCdsCheck ? (cdsResult?.alerts ?? []) : []
@@ -501,9 +522,9 @@ export function CreateMedOrderDialog({
 		durationNum <= MAX_CONTROLLED_DAYS
 
 	// ── Schedule anchor helpers ──────────────────────────────────────────────
-	const isRepeatingFrequency = frequency !== "" && REPEATING_FREQUENCIES.includes(frequency as FrequencyValue)
-	const needsInpatientFields =
-		encounterType === "inpatient" || encounterType === "emergency"
+	const isRepeatingFrequency =
+		frequency !== "" && REPEATING_FREQUENCIES.includes(frequency as FrequencyValue)
+	const needsInpatientFields = encounterType === "inpatient" || encounterType === "emergency"
 	const durationRequired = isRepeatingFrequency || isControlledSubstance
 	const firstDoseRequired = needsInpatientFields
 
@@ -529,6 +550,7 @@ export function CreateMedOrderDialog({
 		allSoftBlocksOverridden &&
 		!hasAllergyHardBlock &&
 		allergyAllSoftBlocksOverridden &&
+		!duplicateOpenMedOrder &&
 		hasLivePdeaValidation &&
 		livePdeaCanPrescribe
 	const canSubmit = canProceedToSubmit && (!requiresDoubleVerification || highAlertVerified)
@@ -622,9 +644,7 @@ export function CreateMedOrderDialog({
 					setHighAlertVerificationError(null)
 				},
 				onError: err => {
-					setSubmitError(
-						err instanceof Error ? err.message : "Failed to run drug safety check"
-					)
+					setSubmitError(err instanceof Error ? err.message : "Failed to run drug safety check")
 				},
 			}
 		)
@@ -733,7 +753,8 @@ export function CreateMedOrderDialog({
 			},
 			{
 				onSuccess: order => handleOrderCreated(order.id, highAlertVerificationDraft),
-				onError: err => setSubmitError(err instanceof Error ? err.message : "Failed to create order"),
+				onError: err =>
+					setSubmitError(err instanceof Error ? err.message : "Failed to create order"),
 			}
 		)
 	}
@@ -768,9 +789,9 @@ export function CreateMedOrderDialog({
 				cdsOverrides,
 			},
 			{
-				onSuccess: result =>
-					handleOrderCreated(result.parentOrder.id, highAlertVerificationDraft),
-				onError: err => setSubmitError(err instanceof Error ? err.message : "Failed to create order"),
+				onSuccess: result => handleOrderCreated(result.parentOrder.id, highAlertVerificationDraft),
+				onError: err =>
+					setSubmitError(err instanceof Error ? err.message : "Failed to create order"),
 			}
 		)
 	}
@@ -871,11 +892,17 @@ export function CreateMedOrderDialog({
 								<Label htmlFor="genericName">
 									Generic Name <span className="text-destructive">*</span>
 								</Label>
-								<Badge variant="outline" className="border-emerald-400 text-[10px] text-emerald-700 dark:text-emerald-400">
+								<Badge
+									variant="outline"
+									className="border-emerald-400 text-[10px] text-emerald-700 dark:text-emerald-400"
+								>
 									RA 6675
 								</Badge>
 								{selectedGenericIsNonFormulary ? (
-									<Badge variant="outline" className="border-amber-400 text-[10px] text-amber-700 dark:text-amber-300">
+									<Badge
+										variant="outline"
+										className="border-amber-400 text-[10px] text-amber-700 dark:text-amber-300"
+									>
 										Non-formulary
 									</Badge>
 								) : null}
@@ -910,17 +937,24 @@ export function CreateMedOrderDialog({
 								autoFocus
 							/>
 							<p className="text-muted-foreground text-xs">
-								Generic-first ordering is required. Brand and formulary status stay subordinate to the generic name.
+								Generic-first ordering is required. Brand and formulary status stay subordinate to
+								the generic name.
 							</p>
+							{duplicateOpenMedOrder ? (
+								<div className="border-destructive/30 bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+									<AlertCircle className="size-4 shrink-0" />
+									<span>
+										This encounter already has an open {duplicateOpenMedOrder.genericName} order.
+										Discontinue or update the existing order before creating another one.
+									</span>
+								</div>
+							) : null}
 						</div>
 
 						{/* ── Brand Name (secondary — only after generic entered) */}
 						{genericName.trim() && (
 							<div className="border-muted-foreground/25 space-y-1 border-l-2 pl-3">
-								<Label
-									htmlFor="brandName"
-									className="text-muted-foreground text-xs font-normal"
-								>
+								<Label htmlFor="brandName" className="text-muted-foreground text-xs font-normal">
 									Brand Name (optional)
 								</Label>
 								<Input
@@ -938,7 +972,7 @@ export function CreateMedOrderDialog({
 						)}
 
 						{/* ── CDS Check ────────────────────────────────── */}
-						<div className="rounded-lg border bg-background p-3">
+						<div className="bg-background rounded-lg border p-3">
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 								<div className="min-w-0">
 									<p className="text-sm font-semibold">Drug Safety Check</p>
@@ -1010,7 +1044,6 @@ export function CreateMedOrderDialog({
 								<span>{submitError}</span>
 							</div>
 						)}
-
 
 						{/* ── Dosing ───────────────────────────────────── */}
 						<div className="grid grid-cols-3 gap-4">
@@ -1085,8 +1118,7 @@ export function CreateMedOrderDialog({
 							</div>
 							<div className="space-y-2">
 								<Label htmlFor="durationDays">
-									Duration (days){" "}
-									{durationRequired && <span className="text-destructive">*</span>}
+									Duration (days) {durationRequired && <span className="text-destructive">*</span>}
 								</Label>
 								<Input
 									id="durationDays"
@@ -1200,8 +1232,8 @@ export function CreateMedOrderDialog({
 							{pdeaLicense !== null && !pdeaExpiry && (
 								<div className="border-destructive bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
 									<AlertCircle className="size-4 shrink-0" />
-									PDEA S-2 license expiry is not recorded. Contact administration before
-									ordering controlled substances.
+									PDEA S-2 license expiry is not recorded. Contact administration before ordering
+									controlled substances.
 								</div>
 							)}
 							{pdeaValid && (
@@ -1269,7 +1301,10 @@ export function CreateMedOrderDialog({
 							{isControlledSubstance && (
 								<div className="space-y-2 pl-6">
 									<Label htmlFor="pdeaSchedule">PDEA Schedule</Label>
-									<Select value={pdeaSchedule} onValueChange={value => setPdeaSchedule(value ?? "")}>
+									<Select
+										value={pdeaSchedule}
+										onValueChange={value => setPdeaSchedule(value ?? "")}
+									>
 										<SelectTrigger id="pdeaSchedule" className="w-full">
 											<SelectValue>
 												{PDEA_SCHEDULE_OPTIONS.find(o => o.value === pdeaSchedule)?.label ??

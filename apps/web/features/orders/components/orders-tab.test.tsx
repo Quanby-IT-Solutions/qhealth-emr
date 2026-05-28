@@ -24,8 +24,7 @@ vi.mock("@/features/orders/api/orders.hooks", () => ({
 	usePrescriptionListQuery: (...args: unknown[]) => mockUsePrescriptionListQuery(...args),
 	useDiscontinueMedOrderMutation: (...args: unknown[]) =>
 		mockUseDiscontinueMedOrderMutation(...args),
-	useCreatePrescriptionMutation: (...args: unknown[]) =>
-		mockUseCreatePrescriptionMutation(...args),
+	useCreatePrescriptionMutation: (...args: unknown[]) => mockUseCreatePrescriptionMutation(...args),
 	useSignPrescriptionMutation: (...args: unknown[]) => mockUseSignPrescriptionMutation(...args),
 }))
 
@@ -145,9 +144,7 @@ describe("OrdersTab", () => {
 		const user = userEvent.setup()
 		mockRoleContext([{ module: "orders", action: "view" }])
 
-		render(
-			<OrdersTab encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />
-		)
+		render(<OrdersTab encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />)
 
 		expect(screen.queryByText(/prescription license warning/i)).toBeNull()
 		expect(screen.queryByRole("button", { name: /order set/i })).toBeNull()
@@ -170,9 +167,7 @@ describe("OrdersTab", () => {
 			{ module: "orders", action: "sign" },
 		])
 
-		render(
-			<OrdersTab encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />
-		)
+		render(<OrdersTab encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />)
 
 		expect(screen.getByRole("button", { name: /order set/i })).toBeInTheDocument()
 
@@ -183,5 +178,59 @@ describe("OrdersTab", () => {
 
 		await user.click(screen.getByRole("tab", { name: /prescriptions/i }))
 		expect(screen.getByRole("button", { name: /^sign$/i })).toBeInTheDocument()
+	})
+
+	it("confirms before discontinuing an active medication order", async () => {
+		const user = userEvent.setup()
+		const discontinueMutate = vi.fn()
+		mockRoleContext([
+			{ module: "orders", action: "view" },
+			{ module: "orders", action: "edit" },
+		])
+		mockUseDiscontinueMedOrderMutation.mockReturnValue({
+			mutate: discontinueMutate,
+			isPending: false,
+		})
+
+		render(<OrdersTab encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />)
+
+		await user.click(screen.getByRole("tab", { name: /medications/i }))
+		await user.click(screen.getByRole("button", { name: /discontinue/i }))
+
+		expect(discontinueMutate).not.toHaveBeenCalled()
+		expect(screen.getByText(/discontinue medication/i)).toBeInTheDocument()
+
+		await user.click(screen.getByRole("button", { name: /^discontinue$/i }))
+
+		expect(discontinueMutate).toHaveBeenCalledWith("med-1")
+	})
+
+	it("confirms before generating an e-prescription from an active medication order", async () => {
+		const user = userEvent.setup()
+		const createPrescriptionMutate = vi.fn()
+		mockRoleContext([
+			{ module: "orders", action: "view" },
+			{ module: "orders", action: "create" },
+			{ module: "orders", action: "sign" },
+		])
+		mockUseCreatePrescriptionMutation.mockReturnValue({
+			mutate: createPrescriptionMutate,
+			isPending: false,
+		})
+
+		render(<OrdersTab encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />)
+
+		await user.click(screen.getByRole("tab", { name: /medications/i }))
+		await user.click(screen.getByRole("button", { name: /generate rx/i }))
+
+		expect(createPrescriptionMutate).not.toHaveBeenCalled()
+		expect(screen.getByText(/generate prescription/i)).toBeInTheDocument()
+
+		await user.click(screen.getByRole("button", { name: /^generate rx$/i }))
+
+		expect(createPrescriptionMutate).toHaveBeenCalledWith(
+			expect.objectContaining({ medicationOrderId: "med-1" }),
+			expect.any(Object)
+		)
 	})
 })

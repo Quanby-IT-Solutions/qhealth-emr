@@ -442,15 +442,11 @@ describe("OrdersService", () => {
 					{ withLimit: true }
 				)
 			)
-			.mockImplementationOnce(() =>
-				createSelectBuilder([], { withLimit: true })
-			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withLimit: true }))
 			.mockImplementationOnce(() =>
 				createSelectBuilder([{ genericName: "Amoxicillin" }], { withLimit: true })
 			)
-			.mockImplementationOnce(() =>
-				createSelectBuilder([], { withOrderBy: true, withLimit: true })
-			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withOrderBy: true, withLimit: true }))
 
 		const result = await service.evaluateCds({
 			patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
@@ -500,9 +496,7 @@ describe("OrdersService", () => {
 					{ withLimit: true }
 				)
 			)
-			.mockImplementationOnce(() =>
-				createSelectBuilder([], { withLimit: true })
-			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withLimit: true }))
 			.mockImplementationOnce(() =>
 				createSelectBuilder([{ genericName: "Amoxicillin" }], { withLimit: true })
 			)
@@ -551,9 +545,7 @@ describe("OrdersService", () => {
 			.mockImplementationOnce(() =>
 				createSelectBuilder([{ genericName: "Amoxicillin" }], { withLimit: true })
 			)
-			.mockImplementationOnce(() =>
-				createSelectBuilder([], { withOrderBy: true, withLimit: true })
-			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withOrderBy: true, withLimit: true }))
 
 		const result = await service.evaluateCds({
 			patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
@@ -754,6 +746,88 @@ describe("OrdersService", () => {
 		expect(mockDb.insert).not.toHaveBeenCalled()
 	})
 
+	it("rejects duplicate open medication orders for the same encounter", async () => {
+		problemsAllergiesMock.getActiveAllergies.mockResolvedValue({ allergies: [] })
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "staff-1", userId: "user-1" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ encounterType: "outpatient" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "3f6a0f4f-761d-4fd1-b76f-95e6692eb001",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+							isActive: true,
+							genericName: "Amlodipine",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "3f6a0f4f-761d-4fd1-b76f-95e6692eb001",
+							isActive: true,
+							isRestricted: false,
+							isHighAlert: false,
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "existing-order",
+							status: "active",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+
+		await expect(
+			service.createMedOrder(
+				{
+					facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+					encounterId: "99999999-9999-4999-9999-999999999999",
+					patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+					formularyItemId: "3f6a0f4f-761d-4fd1-b76f-95e6692eb001",
+					genericName: "Amlodipine",
+					dose: "5",
+					doseUnit: "mg",
+					doseForm: "tablet",
+					route: "PO",
+					frequency: "once",
+					cdsAlerts: [],
+				},
+				"user-1"
+			)
+		).rejects.toThrow(
+			"Amlodipine already has an open medication order for this encounter. Discontinue or update the existing order before creating another one."
+		)
+		expect(mockDb.insert).not.toHaveBeenCalled()
+	})
+
 	it("requires override reasons for CDS soft blocks before creating a medication order", async () => {
 		problemsAllergiesMock.getActiveAllergies.mockResolvedValue({
 			allergies: [
@@ -853,9 +927,7 @@ describe("OrdersService", () => {
 					{ withLimit: true }
 				)
 			)
-			.mockImplementationOnce(() =>
-				createSelectBuilder([], { withOrderBy: true, withLimit: true })
-			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withOrderBy: true, withLimit: true }))
 
 		await expect(
 			service.createMedOrder(
@@ -1011,9 +1083,7 @@ describe("OrdersService", () => {
 			.mockImplementationOnce(() =>
 				createSelectBuilder([{ loincNum: "57021-8" }], { withLimit: true })
 			)
-			.mockImplementationOnce(() =>
-				createSelectBuilder([{ code: "J18.9" }], { withLimit: true })
-			)
+			.mockImplementationOnce(() => createSelectBuilder([{ code: "J18.9" }], { withLimit: true }))
 
 		mockDb.insert
 			.mockImplementationOnce(() => orderInsertBuilder)
@@ -1163,9 +1233,7 @@ describe("OrdersService", () => {
 			.mockImplementationOnce(() =>
 				createSelectBuilder([{ id: encounterId, facilityId }], { withLimit: true })
 			)
-			.mockImplementationOnce(() =>
-				createSelectBuilder([{ code: "J18.9" }], { withLimit: true })
-			)
+			.mockImplementationOnce(() => createSelectBuilder([{ code: "J18.9" }], { withLimit: true }))
 
 		mockDb.insert
 			.mockImplementationOnce(() => orderInsertBuilder)
