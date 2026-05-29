@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { Download, FileText, LockKeyhole, ShieldCheck } from "lucide-react"
+import { LockKeyhole, ShieldCheck } from "lucide-react"
 
 import { PatientPortalLinkButton } from "@/features/patient-portal/components/patient-portal-link-button"
 
@@ -39,15 +39,6 @@ export default function PatientPortalLayout({
 						>
 							<LockKeyhole className="size-4" />
 							Login
-						</PatientPortalLinkButton>
-						<PatientPortalLinkButton
-							href="/patient-portal/summary"
-							variant="ghost"
-							size="sm"
-							className="gap-1.5"
-						>
-							<FileText className="size-4" />
-							Summary
 						</PatientPortalLinkButton>
 					</nav>
 				</div>

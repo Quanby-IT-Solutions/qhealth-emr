@@ -509,8 +509,11 @@ export default function ProcedureLoggingPage() {
 										placeholder={clearanceIdentifierPlaceholder}
 										readOnly
 										aria-readonly="true"
+										tabIndex={-1}
+										onFocus={event => event.currentTarget.blur()}
+										onMouseDown={event => event.preventDefault()}
 										title={selectedClearanceId || clearanceIdentifierPlaceholder}
-										className="bg-muted/40 font-mono"
+										className="bg-muted/40 focus-visible:border-input cursor-default font-mono focus-visible:ring-0"
 									/>
 									{showManualClearanceMatch && (
 										<p

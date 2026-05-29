@@ -20,6 +20,13 @@ import {
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Progress } from "@/core/components/ui/progress"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
@@ -45,6 +52,31 @@ function requestStatusBadge(status: CrossMatchRequest["status"]) {
 
 function canResolveCrossMatch(status: CrossMatchRequest["status"]) {
 	return status === "pending" || status === "cross_matched"
+}
+
+const crossMatchStatusFilterOptions = [
+	{ value: "all", label: "All requests" },
+	{ value: "pending", label: "Pending" },
+	{ value: "approved", label: "Approved" },
+	{ value: "rejected", label: "Rejected" },
+] as const
+
+type CrossMatchStatusFilter = (typeof crossMatchStatusFilterOptions)[number]["value"]
+
+function matchesCrossMatchStatusFilter(request: CrossMatchRequest, filter: CrossMatchStatusFilter) {
+	if (filter === "pending") {
+		return request.status === "pending" || request.status === "cross_matched"
+	}
+
+	if (filter === "approved") {
+		return request.status === "approved"
+	}
+
+	if (filter === "rejected") {
+		return request.status === "cancelled"
+	}
+
+	return true
 }
 
 type BloodBankActionModalProps = {
@@ -330,6 +362,8 @@ const bloodTypes = ["O-", "O+", "A+", "A-", "B+", "AB+"] as const
 export function BloodBankDashboard() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+	const [crossMatchStatusFilter, setCrossMatchStatusFilter] =
+		useState<CrossMatchStatusFilter>("all")
 
 	const pendingQuery = useCrossMatchListQuery({ facilityId, status: "pending", limit: 50 })
 	const crossMatchedQuery = useCrossMatchListQuery({
@@ -360,6 +394,11 @@ export function BloodBankDashboard() {
 		queryRequests.length === 0 && env.NODE_ENV === "development"
 			? MOCK_CROSSMATCH_REQUESTS
 			: queryRequests
+	const filteredRequests = useMemo(
+		() =>
+			requests.filter(request => matchesCrossMatchStatusFilter(request, crossMatchStatusFilter)),
+		[requests, crossMatchStatusFilter]
+	)
 
 	const pendingApprovals = (pendingQuery.data?.total ?? 0) + (crossMatchedQuery.data?.total ?? 0)
 	const issuedToday = approvedQuery.data?.data.filter(req => {
@@ -453,11 +492,37 @@ export function BloodBankDashboard() {
 
 			<div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
 				<Card>
-					<CardHeader className="pb-2">
+					<CardHeader className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-center sm:justify-between">
 						<CardTitle className="text-base">Cross-match requests</CardTitle>
+						<div className="flex items-center gap-2">
+							<Label htmlFor="cross-match-status-filter" className="text-muted-foreground text-xs">
+								Status
+							</Label>
+							<Select
+								value={crossMatchStatusFilter}
+								onValueChange={value => setCrossMatchStatusFilter(value as CrossMatchStatusFilter)}
+							>
+								<SelectTrigger id="cross-match-status-filter" size="sm" className="w-40">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{crossMatchStatusFilterOptions.map(option => (
+										<SelectItem key={option.value} value={option.value}>
+											{option.label}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
 					</CardHeader>
 					<CardContent className="space-y-3">
-						{requests.slice(0, 6).map(req => {
+						{filteredRequests.length === 0 ? (
+							<div className="text-muted-foreground rounded-md border border-dashed p-4 text-sm">
+								No cross-match requests match this status.
+							</div>
+						) : null}
+
+						{filteredRequests.slice(0, 6).map(req => {
 							const actionsDisabled = !canResolveCrossMatch(req.status)
 
 							return (
