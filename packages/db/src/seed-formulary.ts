@@ -43,13 +43,24 @@ async function seedDrugGenerics() {
 		{ genericName: "Prednisone", rxnormCode: "8640", atcCode: "H02AB07" },
 	]
 
-	await db.insert(drugGenerics).values(data).onConflictDoNothing()
-	console.log(`Seeded ${data.length} drug generics`)
+	const normalizeGenericName = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase()
+	const existing = await db.select().from(drugGenerics)
+	const existingNames = new Set(existing.map(row => normalizeGenericName(row.genericName)))
+	const missing = data
+		.map(row => ({ ...row, genericName: row.genericName.trim().replace(/\s+/g, " ") }))
+		.filter(row => !existingNames.has(normalizeGenericName(row.genericName)))
+
+	if (missing.length > 0) {
+		await db.insert(drugGenerics).values(missing)
+	}
+
+	console.log(`Seeded ${missing.length} drug generics (${data.length - missing.length} already present)`)
 	return db.select().from(drugGenerics)
 }
 
 async function seedDrugBrands(generics: { id: string; genericName: string }[]) {
 	const getGenericId = (name: string) => generics.find(g => g.genericName === name)?.id
+	const normalizeName = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase()
 
 	const data = [
 		{ drugGenericId: getGenericId("Paracetamol")!, brandName: "Biogesic", manufacturer: "Unilab" },
@@ -72,10 +83,23 @@ async function seedDrugBrands(generics: { id: string; genericName: string }[]) {
 			manufacturer: "Sanofi",
 		},
 		{ drugGenericId: getGenericId("Furosemide")!, brandName: "Lasix", manufacturer: "Sanofi" },
-	].filter(d => d.drugGenericId)
+	]
+		.filter(d => d.drugGenericId)
+		.map(row => ({ ...row, brandName: row.brandName.trim().replace(/\s+/g, " ") }))
 
-	await db.insert(drugBrands).values(data).onConflictDoNothing()
-	console.log(`Seeded ${data.length} drug brands`)
+	const existing = await db.select().from(drugBrands)
+	const existingKeys = new Set(
+		existing.map(row => `${row.drugGenericId}:${normalizeName(row.brandName)}`)
+	)
+	const missing = data.filter(
+		row => !existingKeys.has(`${row.drugGenericId}:${normalizeName(row.brandName)}`)
+	)
+
+	if (missing.length > 0) {
+		await db.insert(drugBrands).values(missing)
+	}
+
+	console.log(`Seeded ${missing.length} drug brands (${data.length - missing.length} already present)`)
 }
 
 async function seedIcd10Codes() {

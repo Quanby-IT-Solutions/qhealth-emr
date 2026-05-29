@@ -139,6 +139,40 @@ describe("DrugSearchCombobox", () => {
 		)
 	})
 
+	it("deduplicates non-formulary generic matches by normalized generic name", async () => {
+		const user = userEvent.setup()
+
+		mockUseFormularyItemsQuery.mockReturnValue({
+			data: { data: [] },
+			isLoading: false,
+		})
+		mockUseDrugGenericsQuery.mockReturnValue({
+			data: {
+				data: [
+					amoxicillinGeneric,
+					{ ...amoxicillinGeneric, id: "generic-duplicate", genericName: " amoxicillin " },
+				],
+			},
+			isLoading: false,
+		})
+
+		render(
+			<DrugSearchCombobox
+				id="genericName"
+				facilityId="facility-1"
+				value=""
+				onSelect={vi.fn()}
+				onRawInput={vi.fn()}
+				placeholder="Search generic"
+			/>
+		)
+
+		await user.type(screen.getByPlaceholderText("Search generic"), "Amox")
+
+		expect(await screen.findByText("Amoxicillin")).toBeInTheDocument()
+		expect(screen.getAllByText(/non-formulary at this facility/i)).toHaveLength(1)
+	})
+
 	it("opens active drug options on focus before typing", async () => {
 		const user = userEvent.setup()
 		const onSelect = vi.fn()

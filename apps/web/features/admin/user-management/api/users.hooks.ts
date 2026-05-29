@@ -32,8 +32,10 @@ export function useSearchCliniciansQuery(input: {
 	excludeStaffProfileId?: string
 }) {
 	return useQuery({
-		...orpc.rbac.searchClinicians.queryOptions({ input }),
-		enabled: !!input.facilityId && (input.search?.trim().length ?? 0) >= 2,
+		...orpc.rbac.searchClinicians.queryOptions({
+			input: { ...input, search: input.search?.trim() || undefined },
+		}),
+		enabled: !!input.facilityId,
 	})
 }
 

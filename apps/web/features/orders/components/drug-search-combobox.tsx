@@ -208,8 +208,15 @@ function buildSearchSelections(
 	genericItems: DrugGeneric[]
 ): DrugSearchSelection[] {
 	const genericNamesWithFormulary = new Set(
-		formularyItems.map(item => item.genericName.trim().toLowerCase())
+		formularyItems.map(item => normalizeDrugName(item.genericName))
 	)
+	const seenGenericNames = new Set(genericNamesWithFormulary)
+	const uniqueGenericItems = genericItems.filter(generic => {
+		const normalizedName = normalizeDrugName(generic.genericName)
+		if (!normalizedName || seenGenericNames.has(normalizedName)) return false
+		seenGenericNames.add(normalizedName)
+		return true
+	})
 
 	return [
 		...formularyItems.map(item => ({
@@ -223,14 +230,16 @@ function buildSearchSelections(
 			route: item.route,
 			isFormulary: true,
 		})),
-		...genericItems
-			.filter(generic => !genericNamesWithFormulary.has(generic.genericName.trim().toLowerCase()))
-			.map(generic => ({
-				id: generic.id,
-				drugGenericId: generic.id,
-				genericName: generic.genericName,
-				brandName: null,
-				isFormulary: false,
-			})),
+		...uniqueGenericItems.map(generic => ({
+			id: generic.id,
+			drugGenericId: generic.id,
+			genericName: generic.genericName,
+			brandName: null,
+			isFormulary: false,
+		})),
 	]
+}
+
+function normalizeDrugName(name: string) {
+	return name.trim().replace(/\s+/g, " ").toLowerCase()
 }
