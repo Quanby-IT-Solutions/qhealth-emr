@@ -1613,7 +1613,7 @@ async function ensureReferenceData(facilityId: string) {
 	let [generic] = await db
 		.select()
 		.from(drugGenerics)
-		.where(eq(drugGenerics.genericName, "Paracetamol"))
+		.where(sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g')) = ${"paracetamol"}`)
 	if (!generic) {
 		;[generic] = await db
 			.insert(drugGenerics)
@@ -1691,15 +1691,18 @@ async function ensureReferenceData(facilityId: string) {
 	]
 
 	for (const seed of highAlertFormularySeeds) {
+		const normalizedGenericName = seed.genericName.trim().replace(/\s+/g, " ").toLowerCase()
 		let [highAlertGeneric] = await db
 			.select()
 			.from(drugGenerics)
-			.where(eq(drugGenerics.genericName, seed.genericName))
+			.where(
+				sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g')) = ${normalizedGenericName}`
+			)
 		if (!highAlertGeneric) {
 			;[highAlertGeneric] = await db
 				.insert(drugGenerics)
 				.values({
-					genericName: seed.genericName,
+					genericName: seed.genericName.trim().replace(/\s+/g, " "),
 					rxnormCode: seed.rxnormCode,
 					atcCode: seed.atcCode,
 				})
@@ -2502,7 +2505,7 @@ async function ensureNursingScenarios(params: {
 	let [amlodipineGeneric] = await db
 		.select()
 		.from(drugGenerics)
-		.where(eq(drugGenerics.genericName, "Amlodipine"))
+		.where(sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g')) = ${"amlodipine"}`)
 	if (!amlodipineGeneric) {
 		;[amlodipineGeneric] = await db
 			.insert(drugGenerics)
@@ -2540,12 +2543,18 @@ async function ensureNursingScenarios(params: {
 	]
 
 	for (const g of moreGenerics) {
+		const normalizedGenericName = g.genericName.trim().replace(/\s+/g, " ").toLowerCase()
 		const [exists] = await db
 			.select()
 			.from(drugGenerics)
-			.where(eq(drugGenerics.genericName, g.genericName))
+			.where(
+				sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g')) = ${normalizedGenericName}`
+			)
 		if (!exists) {
-			await db.insert(drugGenerics).values(g)
+			await db.insert(drugGenerics).values({
+				...g,
+				genericName: g.genericName.trim().replace(/\s+/g, " "),
+			})
 		}
 	}
 

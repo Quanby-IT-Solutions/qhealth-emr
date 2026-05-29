@@ -45,6 +45,7 @@ export function ClinicianCoSignCombobox({
 	const [open, setOpen] = useState(false)
 	const [inputValue, setInputValue] = useState(value?.name ?? "")
 	const debouncedSearch = useDebounce(inputValue.trim(), 300)
+	const canSearch = !disabled && !!facilityId
 
 	const { data, isLoading } = useSearchCliniciansQuery({
 		facilityId,
@@ -55,7 +56,7 @@ export function ClinicianCoSignCombobox({
 	function handleInputChange(next: string) {
 		setInputValue(next)
 		onChange(null)
-		setOpen(!disabled && next.trim().length >= 2)
+		setOpen(canSearch)
 	}
 
 	function handleSelect(item: NonNullable<typeof data>[number]) {
@@ -64,27 +65,45 @@ export function ClinicianCoSignCombobox({
 		setOpen(false)
 	}
 
+	function openIfSearchable() {
+		if (canSearch) {
+			setOpen(true)
+		}
+	}
+
 	return (
-		<Popover open={open} onOpenChange={o => !disabled && setOpen(o)}>
+		<Popover open={open} onOpenChange={o => canSearch && setOpen(o)}>
 			<Command shouldFilter={false} className="h-auto w-full overflow-visible bg-transparent p-0">
-				<PopoverTrigger render={<div className="w-full" />}>
+				<PopoverTrigger nativeButton={false} render={<div className="w-full" />}>
 					<CommandInput
 						value={inputValue}
 						onValueChange={handleInputChange}
-						onFocus={() => {
-							if (!disabled && inputValue.trim().length >= 2) setOpen(true)
+						onPointerDown={event => event.stopPropagation()}
+						onClick={event => {
+							event.stopPropagation()
+							openIfSearchable()
 						}}
+						onFocus={openIfSearchable}
 						placeholder="Search by clinician name..."
 						disabled={disabled}
 					/>
 				</PopoverTrigger>
-				<PopoverContent align="start" className="w-(--anchor-width) p-0">
+				<PopoverContent
+					align="start"
+					className="w-(--anchor-width) p-0"
+					initialFocus={false}
+					finalFocus={false}
+				>
 					<CommandList>
 						{isLoading ? (
 							<div className="text-muted-foreground px-3 py-4 text-sm">Searching...</div>
 						) : (
 							<>
-								<CommandEmpty>No matching clinicians</CommandEmpty>
+								<CommandEmpty>
+									{inputValue.trim()
+										? "No matching clinicians"
+										: "No active co-signers available"}
+								</CommandEmpty>
 								<CommandGroup>
 									{(data ?? []).map(item => (
 										<CommandItem

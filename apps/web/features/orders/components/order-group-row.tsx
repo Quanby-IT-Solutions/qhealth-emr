@@ -65,6 +65,10 @@ export function OrderGroupRow({
 	const [confirmDiscontinueOpen, setConfirmDiscontinueOpen] = useState(false)
 	const [confirmGenerateRxOpen, setConfirmGenerateRxOpen] = useState(false)
 	const hasChildren = tranches.length > 0
+	const parentTrancheLabel =
+		(parent.pdeaTrancheTotal ?? 0) > 1 && parent.pdeaTrancheNumber
+			? `Tranche #${parent.pdeaTrancheNumber} of ${parent.pdeaTrancheTotal}`
+			: null
 
 	function handleConfirmDiscontinue() {
 		onDiscontinue?.(parent.id)
@@ -100,6 +104,11 @@ export function OrderGroupRow({
 							<div className="truncate font-bold" title={parent.genericName}>
 								{parent.genericName}
 							</div>
+							{parentTrancheLabel && (
+								<div className="text-muted-foreground truncate text-xs">
+									{parentTrancheLabel}
+								</div>
+							)}
 							{parent.brandName && (
 								<div className="text-muted-foreground truncate text-xs" title={parent.brandName}>
 									{parent.brandName}

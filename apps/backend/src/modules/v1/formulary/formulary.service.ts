@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, count, desc, eq, getTableColumns, ilike, or } from "drizzle-orm"
+import { and, count, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm"
 
 import {
 	catalogVersions,
@@ -81,6 +81,31 @@ export class FormularyService {
 		return input.replace(/[\\%_]/g, "\\$&")
 	}
 
+	private normalizeDrugGenericName(input: string): string {
+		return input.trim().replace(/\s+/g, " ").toLowerCase()
+	}
+
+	private async findDrugGenericByNormalizedName(genericName: string, excludeId?: string) {
+		const normalizedName = this.normalizeDrugGenericName(genericName)
+		if (!normalizedName) return null
+
+		const conditions = [
+			sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g')) = ${normalizedName}`,
+		]
+
+		if (excludeId) {
+			conditions.push(sql`${drugGenerics.id} <> ${excludeId}`)
+		}
+
+		const [existing] = await db
+			.select({ id: drugGenerics.id, genericName: drugGenerics.genericName })
+			.from(drugGenerics)
+			.where(and(...conditions))
+			.limit(1)
+
+		return existing ?? null
+	}
+
 	// ========================================================================
 	// Drug Generics
 	// ========================================================================
@@ -126,6 +151,14 @@ export class FormularyService {
 	}
 
 	async createDrugGeneric(input: CreateDrugGenericInput, actor: FormularyActor) {
+		const genericName = input.genericName.trim().replace(/\s+/g, " ")
+		const duplicate = await this.findDrugGenericByNormalizedName(genericName)
+		if (duplicate) {
+			throw new BadRequestException(
+				`Drug generic "${duplicate.genericName}" already exists in the catalog.`
+			)
+		}
+
 		// FORM-003: Validate rxnormCode against catalog if provided
 		if (input.rxnormCode) {
 			const [rxRow] = await db
@@ -143,7 +176,7 @@ export class FormularyService {
 		const [created] = await db
 			.insert(drugGenerics)
 			.values({
-				genericName: input.genericName,
+				genericName,
 				rxnormCode: input.rxnormCode ?? null,
 				atcCode: input.atcCode ?? null,
 			})
@@ -170,17 +203,28 @@ export class FormularyService {
 
 	async updateDrugGeneric(input: UpdateDrugGenericInput, actor: FormularyActor) {
 		const { id, ...updates } = input
+		const sanitizedUpdates = { ...updates }
+
+		if (sanitizedUpdates.genericName !== undefined) {
+			sanitizedUpdates.genericName = sanitizedUpdates.genericName.trim().replace(/\s+/g, " ")
+			const duplicate = await this.findDrugGenericByNormalizedName(sanitizedUpdates.genericName, id)
+			if (duplicate) {
+				throw new BadRequestException(
+					`Drug generic "${duplicate.genericName}" already exists in the catalog.`
+				)
+			}
+		}
 
 		// FORM-003: Validate new rxnormCode against catalog if being changed
-		if (updates.rxnormCode !== null && updates.rxnormCode !== undefined) {
+		if (sanitizedUpdates.rxnormCode !== null && sanitizedUpdates.rxnormCode !== undefined) {
 			const [rxRow] = await db
 				.select({ id: rxnormCodes.id })
 				.from(rxnormCodes)
-				.where(eq(rxnormCodes.rxcui, updates.rxnormCode))
+				.where(eq(rxnormCodes.rxcui, sanitizedUpdates.rxnormCode))
 				.limit(1)
 			if (!rxRow) {
 				throw new BadRequestException(
-					`RxNorm code "${updates.rxnormCode}" is not present in the active RxNorm catalog. Select a valid RXCUI from the code-set browser.`
+					`RxNorm code "${sanitizedUpdates.rxnormCode}" is not present in the active RxNorm catalog. Select a valid RXCUI from the code-set browser.`
 				)
 			}
 		}
@@ -189,7 +233,7 @@ export class FormularyService {
 
 		const [updated] = await db
 			.update(drugGenerics)
-			.set(updates)
+			.set(sanitizedUpdates)
 			.where(eq(drugGenerics.id, id))
 			.returning()
 
