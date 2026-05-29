@@ -84,6 +84,10 @@ function formatTimeOnly(value: string): string {
 	})
 }
 
+function getTodayInputDate(): string {
+	return new Date().toISOString().slice(0, 10)
+}
+
 type JoinWindowState =
 	| { kind: "open" }
 	| { kind: "pending"; opensAt: string }
@@ -414,6 +418,7 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 	const canSubmit = Boolean(
 		preview && joinWindowState?.kind === "open" && !joinRoom.data
 	)
+	const todayInputDate = getTodayInputDate()
 
 	async function handleJoin(e: React.FormEvent) {
 		e.preventDefault()
@@ -421,6 +426,10 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 
 		if (!dateOfBirth && !mrn.trim()) {
 			setFormError("Enter your date of birth or MRN to verify this appointment.")
+			return
+		}
+		if (dateOfBirth && new Date(dateOfBirth).getTime() > Date.now()) {
+			setFormError("Date of birth cannot be in the future.")
 			return
 		}
 
@@ -686,6 +695,7 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 									type="date"
 									className={inputBaseClass}
 									value={dateOfBirth}
+									max={todayInputDate}
 									onChange={e => setDateOfBirth(e.target.value)}
 									disabled={!canSubmit || joinRoom.isPending}
 									aria-describedby="verify-help"

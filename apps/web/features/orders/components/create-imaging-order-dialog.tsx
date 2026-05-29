@@ -97,9 +97,14 @@ export function CreateImagingOrderDialog({
 				<div className="grid gap-4 py-4">
 					<div className="space-y-2">
 						<Label htmlFor="imgModality">Modality *</Label>
-						<Select value={modality || undefined} onValueChange={v => setModality((v ?? "") as ImagingModality | "")}>
-							<SelectTrigger id="imgModality">
-								<SelectValue />
+						<Select
+							value={modality || undefined}
+							onValueChange={v => setModality((v ?? "") as ImagingModality | "")}
+						>
+							<SelectTrigger id="imgModality" className="w-full">
+								<SelectValue placeholder="Select imaging modality">
+									{modality ? undefined : "Select imaging modality"}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="xray">X-Ray</SelectItem>
@@ -136,8 +141,11 @@ export function CreateImagingOrderDialog({
 
 					<div className="space-y-2">
 						<Label htmlFor="imgPriority">Priority</Label>
-						<Select value={priority} onValueChange={v => setPriority((v ?? "routine") as OrderPriority)}>
-							<SelectTrigger id="imgPriority">
+						<Select
+							value={priority}
+							onValueChange={v => setPriority((v ?? "routine") as OrderPriority)}
+						>
+							<SelectTrigger id="imgPriority" className="w-full">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>

@@ -258,7 +258,13 @@ function normalizeDiagnoses(diagnoses: DiagnosisEntry[]) {
 }
 
 function shouldRenderIcd10Field(template: AuthoringTemplate, sections: TemplateSection[]) {
-	if (template.category === "fpe" || template.category === "consultation") return true
+	if (
+		template.category === "fpe" ||
+		template.category === "consultation" ||
+		template.category === "discharge_summary"
+	) {
+		return true
+	}
 	const sectionKeys = new Set(sections.map(section => section.key.toLowerCase()))
 	return (
 		sectionKeys.has("subjective") &&

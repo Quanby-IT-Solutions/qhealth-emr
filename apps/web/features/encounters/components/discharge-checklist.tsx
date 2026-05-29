@@ -81,6 +81,12 @@ const OUTPATIENT_STEPS: Step[] = [
 		role: "Biller",
 	},
 	{
+		id: "orders",
+		label: "Orders / eRx",
+		keys: ["orders_finalized"],
+		role: "Clinician",
+	},
+	{
 		id: "gate_pass",
 		label: "Gate Pass",
 		keys: [],

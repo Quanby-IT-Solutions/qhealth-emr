@@ -131,7 +131,7 @@ function setDiagnoses(value: unknown, diagnoses: DiagnosisEntry[]) {
 }
 
 function requiresIcd10BeforeSigning(noteType: string) {
-	return noteType === "consultation" || noteType === "fpe"
+	return noteType === "consultation" || noteType === "fpe" || noteType === "discharge_summary"
 }
 
 function Icd10DiagnosisEditField({

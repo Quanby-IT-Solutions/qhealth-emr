@@ -53,7 +53,10 @@ export function DischargePanel({
 	)
 
 	const signedNoteCount = (notesData?.data ?? []).filter(n => n.status === "signed").length
-	const prescriptionCount = prescriptionsData?.data.length ?? 0
+	const printablePrescriptionCount =
+		(prescriptionsData?.data ?? []).filter(
+			rx => rx.status === "signed" || rx.status === "issued"
+		).length
 
 	const [abstractOpen, setAbstractOpen] = useState(false)
 	const [rxPrintOpen, setRxPrintOpen] = useState(false)
@@ -105,6 +108,7 @@ export function DischargePanel({
 							<Button
 								variant="outline"
 								onClick={() => {
+									setAbstractOpened(true)
 									setAbstractOpen(true)
 								}}
 							>
@@ -119,14 +123,15 @@ export function DischargePanel({
 							<Button
 								variant="outline"
 								onClick={() => {
+									setRxOpened(true)
 									setRxPrintOpen(true)
 								}}
 							>
 								<Printer className="mr-1.5 size-4" />
 								Print e-Prescription
-								{prescriptionCount > 0 && (
+								{printablePrescriptionCount > 0 && (
 									<span className="bg-secondary text-secondary-foreground ml-2 rounded-full px-2 py-0.5 text-xs">
-										{prescriptionCount}
+										{printablePrescriptionCount}
 									</span>
 								)}
 							</Button>
@@ -223,7 +228,7 @@ export function DischargePanel({
 								!checklist?.allComplete ||
 								// PS-017: require release documents to be opened before OPD close
 								(signedNoteCount > 0 && !abstractOpened) ||
-								(prescriptionCount > 0 && !rxOpened) ||
+								(printablePrescriptionCount > 0 && !rxOpened) ||
 								close.isPending
 							}
 						>
