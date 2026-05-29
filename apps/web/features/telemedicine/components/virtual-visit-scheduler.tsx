@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { AlertCircle, ArrowRight, Calendar, Clock, User, Video } from "lucide-react"
+import { toast } from "sonner"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -46,6 +47,8 @@ interface BookingFormState {
 	notes: string
 }
 
+type BookingFormErrors = Partial<Record<keyof BookingFormState | "schedule", string>>
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -87,6 +90,28 @@ function isFutureAppointment(date: string, time: string): boolean {
 	return Number.isFinite(scheduled.getTime()) && scheduled.getTime() > Date.now()
 }
 
+function getLocalDateTimeInputMinimum(): string {
+	const now = new Date()
+	now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+	return now.toISOString().slice(0, 16)
+}
+
+function appointmentsOverlap(
+	leftDate: string,
+	leftTime: string,
+	leftDuration: number,
+	rightDate: string,
+	rightTime: string,
+	rightDuration: number
+) {
+	const leftStart = new Date(`${leftDate}T${leftTime}`).getTime()
+	const rightStart = new Date(`${rightDate}T${rightTime}`).getTime()
+	if (!Number.isFinite(leftStart) || !Number.isFinite(rightStart)) return false
+	const leftEnd = leftStart + leftDuration * 60_000
+	const rightEnd = rightStart + rightDuration * 60_000
+	return leftStart < rightEnd && rightStart < leftEnd
+}
+
 function AppointmentStatusBadge({ status }: { status: AppointmentStatus }) {
 	const colorClass = getAppointmentStatusColor(status)
 	return (
@@ -111,6 +136,7 @@ export function VirtualVisitScheduler({
 	const [patientSearch, setPatientSearch] = useState("")
 	const [debouncedPatientSearch, setDebouncedPatientSearch] = useState("")
 	const [error, setError] = useState<string | null>(null)
+	const [fieldErrors, setFieldErrors] = useState<BookingFormErrors>({})
 
 	const { data: appointments, isLoading } = useAppointmentsQuery(facilityId)
 	const { data: clinicians, isLoading: cliniciansLoading } = useStaffClinicianListQuery({
@@ -129,9 +155,24 @@ export function VirtualVisitScheduler({
 
 	function patch(key: keyof BookingFormState, value: string | number) {
 		setForm(prev => ({ ...prev, [key]: value }))
+		setFieldErrors(prev => {
+			if (!prev[key]) return prev
+			const next = { ...prev }
+			delete next[key]
+			return next
+		})
 	}
 
 	function handleClinicianSelect(clinicianId: string) {
+		if (!clinicianId) {
+			setForm(prev => ({
+				...prev,
+				clinicianId: "",
+				clinicianName: "",
+				clinicianSpecialty: "",
+			}))
+			return
+		}
 		const clinician = clinicians.find(c => c.id === clinicianId)
 		if (clinician) {
 			setForm(prev => ({
@@ -140,6 +181,11 @@ export function VirtualVisitScheduler({
 				clinicianName: clinician.name,
 				clinicianSpecialty: clinician.department ?? "",
 			}))
+			setFieldErrors(prev => {
+				const next = { ...prev }
+				delete next.clinicianId
+				return next
+			})
 		}
 	}
 
@@ -158,28 +204,74 @@ export function VirtualVisitScheduler({
 			patientContactNumber: patientWithContact.phone ?? "",
 			patientEmail: patientWithContact.email ?? "",
 		}))
+		setFieldErrors(prev => {
+			const next = { ...prev }
+			delete next.patientId
+			return next
+		})
+	}
+
+	function validateBookingForm(): BookingFormErrors {
+		const nextErrors: BookingFormErrors = {}
+		const activeAppointments =
+			appointments?.data.filter(appt => !["cancelled", "no-show", "completed"].includes(appt.status)) ??
+			[]
+
+		if (!facilityId) nextErrors.schedule = "Select an active facility before booking."
+		if (!form.patientId || !form.patientName || !form.patientMrn) {
+			nextErrors.patientId = "Select a patient from the search results before booking."
+		}
+		if (!form.clinicianId) {
+			nextErrors.clinicianId = "Select an available clinician."
+		} else if (!clinicians.some(c => c.id === form.clinicianId)) {
+			nextErrors.clinicianId = "This clinician is no longer available. Select another clinician."
+		}
+		if (!form.scheduledDate) nextErrors.scheduledDate = "Select an appointment date."
+		if (!form.scheduledTime) nextErrors.scheduledTime = "Select an appointment time."
+		if (form.scheduledDate && form.scheduledTime) {
+			if (!isFutureAppointment(form.scheduledDate, form.scheduledTime)) {
+				nextErrors.schedule = "Appointment date and time must be in the future."
+			} else {
+				const hasConflict = activeAppointments.some(appt =>
+					appt.clinicianId === form.clinicianId &&
+					appointmentsOverlap(
+						form.scheduledDate,
+						form.scheduledTime,
+						form.durationMinutes,
+						appt.scheduledDate,
+						appt.scheduledTime,
+						appt.durationMinutes
+					)
+				)
+				if (hasConflict) {
+					nextErrors.schedule =
+						"The selected clinician already has a telemedicine appointment at that time."
+				}
+			}
+		}
+
+		return nextErrors
 	}
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault()
 		setError(null)
 
-		if (!form.patientId || !form.patientName || !form.patientMrn) {
-			setError("Select a patient from the search results before booking.")
+		const nextErrors = validateBookingForm()
+		if (Object.keys(nextErrors).length > 0) {
+			setFieldErrors(nextErrors)
+			const message = nextErrors.schedule ?? "Please fix the highlighted fields before booking."
+			setError(message)
+			toast.error("Appointment cannot be booked yet", { description: message })
 			return
 		}
-		if (!form.clinicianId) {
-			setError("Please select a clinician.")
-			return
-		}
-		if (!form.scheduledDate || !form.scheduledTime) {
-			setError("Please select a date and time.")
-			return
-		}
-		if (!isFutureAppointment(form.scheduledDate, form.scheduledTime)) {
-			setError("Appointment date and time must be in the future.")
-			return
-		}
+		setFieldErrors({})
+
+		const confirmed = window.confirm(
+			`Book a ${form.durationMinutes}-minute virtual appointment for ${form.patientName} with ${form.clinicianName} on ${formatDate(form.scheduledDate)} at ${form.scheduledTime}?`
+		)
+		if (!confirmed) return
+
 		const input: CreateAppointmentInput = {
 			facilityId,
 			patientId: form.patientId,
@@ -196,14 +288,21 @@ export function VirtualVisitScheduler({
 			setForm(EMPTY_FORM)
 			setPatientSearch("")
 			setShowForm(false)
+			toast.success("Virtual appointment booked", {
+				description: `${appt.patientName} is scheduled with ${appt.clinicianName}.`,
+			})
 			onAppointmentCreated?.(appt)
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to create appointment.")
+			const message = err instanceof Error ? err.message : "Failed to create appointment."
+			setError(message)
+			toast.error("Could not book appointment", { description: message })
 		}
 	}
 
 	// Minimum date: today
 	const today = new Date().toISOString().split("T")[0]
+	const minDateTime = getLocalDateTimeInputMinimum()
+	const canSubmit = Boolean(facilityId) && !createMutation.isPending
 
 	return (
 		<div className="space-y-4">
@@ -265,6 +364,7 @@ export function VirtualVisitScheduler({
 											}))
 										}}
 										placeholder="Search by patient name or MRN"
+										aria-invalid={Boolean(fieldErrors.patientId)}
 										required
 									/>
 									{debouncedPatientSearch.length >= 2 && !form.patientId && (
@@ -293,6 +393,9 @@ export function VirtualVisitScheduler({
 												</p>
 											)}
 										</div>
+									)}
+									{fieldErrors.patientId && (
+										<p className="text-destructive text-xs">{fieldErrors.patientId}</p>
 									)}
 								</div>
 								{form.patientId && (
@@ -325,9 +428,14 @@ export function VirtualVisitScheduler({
 									onChange={e => handleClinicianSelect(e.target.value)}
 									required
 									disabled={cliniciansLoading}
+									aria-invalid={Boolean(fieldErrors.clinicianId)}
 								>
 									<option value="">
-										{cliniciansLoading ? "Loading clinicians..." : "Select clinician"}
+										{cliniciansLoading
+											? "Loading clinicians..."
+											: clinicians.length
+												? "Select clinician"
+												: "No clinicians available"}
 									</option>
 									{clinicians.map(c => (
 										<option key={c.id} value={c.id}>
@@ -335,6 +443,9 @@ export function VirtualVisitScheduler({
 										</option>
 									))}
 								</select>
+								{fieldErrors.clinicianId && (
+									<p className="text-destructive text-xs">{fieldErrors.clinicianId}</p>
+								)}
 							</div>
 
 							{/* Date, Time, Duration */}
@@ -350,8 +461,12 @@ export function VirtualVisitScheduler({
 										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
 										value={form.scheduledDate}
 										onChange={e => patch("scheduledDate", e.target.value)}
+										aria-invalid={Boolean(fieldErrors.scheduledDate)}
 										required
 									/>
+									{fieldErrors.scheduledDate && (
+										<p className="text-destructive text-xs">{fieldErrors.scheduledDate}</p>
+									)}
 								</div>
 								<div className="space-y-1.5">
 									<label htmlFor="scheduledTime" className="text-sm font-medium">
@@ -363,8 +478,13 @@ export function VirtualVisitScheduler({
 										className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
 										value={form.scheduledTime}
 										onChange={e => patch("scheduledTime", e.target.value)}
+										min={form.scheduledDate === today ? minDateTime.slice(11) : undefined}
+										aria-invalid={Boolean(fieldErrors.scheduledTime)}
 										required
 									/>
+									{fieldErrors.scheduledTime && (
+										<p className="text-destructive text-xs">{fieldErrors.scheduledTime}</p>
+									)}
 								</div>
 								<div className="space-y-1.5">
 									<label htmlFor="duration" className="text-sm font-medium">
@@ -405,10 +525,19 @@ export function VirtualVisitScheduler({
 							)}
 
 							<div className="flex justify-end gap-3">
-								<Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+								<Button
+									type="button"
+									variant="outline"
+									onClick={() => {
+										setShowForm(false)
+										setError(null)
+										setFieldErrors({})
+									}}
+									disabled={createMutation.isPending}
+								>
 									Cancel
 								</Button>
-								<Button type="submit" disabled={createMutation.isPending}>
+								<Button type="submit" disabled={!canSubmit}>
 									{createMutation.isPending ? "Booking..." : "Book Appointment"}
 								</Button>
 							</div>

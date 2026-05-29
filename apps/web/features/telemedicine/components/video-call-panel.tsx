@@ -153,6 +153,8 @@ function CopyButton({
 	successMessage = "Copied to clipboard",
 	size = "sm",
 	variant = "outline",
+	disabled = false,
+	disabledMessage,
 }: {
 	text: string
 	copyKey: string
@@ -162,6 +164,8 @@ function CopyButton({
 	successMessage?: string
 	size?: "sm" | "default" | "lg"
 	variant?: "outline" | "default" | "ghost"
+	disabled?: boolean
+	disabledMessage?: string
 }) {
 	const isCopied = copied === copyKey
 	return (
@@ -170,7 +174,14 @@ function CopyButton({
 			variant={variant}
 			size={size}
 			className="rounded-full"
-			onClick={() => onCopy(text, copyKey, successMessage)}
+			disabled={disabled}
+			onClick={() => {
+				if (disabled) {
+					if (disabledMessage) toast.error(disabledMessage)
+					return
+				}
+				onCopy(text, copyKey, successMessage)
+			}}
 		>
 			{isCopied ? (
 				<>
@@ -227,6 +238,8 @@ function VideoCallContent({
 	const inviteHidden = hasStoredInvite && !patientInviteUrl
 	const isInviteActionPending = regenerateInvite.isPending || revokeInvite.isPending
 	const expiryState = getExpiryState(currentAppt.patientInviteExpiresAt)
+	const inviteExpired = expiryState.tone === "danger"
+	const canSharePatientInvite = Boolean(patientInviteUrl) && !inviteExpired && !inviteRevoked
 	const patientJoined = Boolean(currentAppt.patientJoinedAt)
 	const patientEmail = currentAppt.patientEmail
 	const joinWindowState = getJoinWindowState(currentAppt)
@@ -237,6 +250,12 @@ function VideoCallContent({
 
 	async function handleRegenerateInvite() {
 		setError(null)
+		if (hasStoredInvite) {
+			const confirmed = window.confirm(
+				"Regenerate the patient invite? The existing patient link will stop working and you will need to share the new one."
+			)
+			if (!confirmed) return
+		}
 		try {
 			const invite = await regenerateInvite.mutateAsync(currentAppt.id)
 			setPatientInviteToken(invite.patientInviteToken)
@@ -281,7 +300,7 @@ function VideoCallContent({
 		}
 	}
 
-	const mailtoHref = patientEmail && patientInviteUrl
+	const mailtoHref = patientEmail && canSharePatientInvite && patientInviteUrl
 		? `mailto:${encodeURIComponent(patientEmail)}?subject=${encodeURIComponent(
 				"Your telemedicine consultation link"
 			)}&body=${encodeURIComponent(
@@ -349,6 +368,8 @@ function VideoCallContent({
 							onCopy={copyText}
 							label="Copy Patient Link"
 							successMessage="Patient link copied"
+							disabled={!canSharePatientInvite}
+							disabledMessage="Regenerate the expired invite before sharing."
 						/>
 						{mailtoHref && (
 							<Button asChild variant="outline" className="rounded-full">
@@ -429,6 +450,8 @@ function VideoCallContent({
 								copied={copied}
 								onCopy={copyText}
 								successMessage="Patient link copied"
+								disabled={!canSharePatientInvite}
+								disabledMessage="Regenerate the expired invite before sharing."
 							/>
 						</div>
 						<p className="text-primary break-all text-sm underline underline-offset-2">
@@ -590,6 +613,7 @@ function VideoCallContent({
 						<AlertDialogCancel disabled={isInviteActionPending}>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={handleConfirmRevoke}
+							disabled={isInviteActionPending}
 							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
 						>
 							Revoke invite

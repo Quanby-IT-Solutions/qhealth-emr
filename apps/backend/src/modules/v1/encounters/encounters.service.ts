@@ -1576,7 +1576,10 @@ export class EncountersService {
 								eq(clinicalNotes.encounterId, encounter.id),
 								eq(clinicalNotes.noteType, "discharge_summary"),
 								eq(clinicalNotes.status, "signed"),
-								sql`COALESCE((${clinicalNotes.structuredData}->'icd10_diagnosis'->>'icd10Code'), '') <> ''`
+								sql`(
+									COALESCE((${clinicalNotes.structuredData}->'icd10_diagnosis'->>'icd10Code'), '') <> ''
+									OR jsonb_array_length(COALESCE(${clinicalNotes.structuredData}->'diagnoses', '[]'::jsonb)) > 0
+								)`
 							)
 						)
 					const finalDiagnosisCoded = (finalDiagnosisRow?.n ?? 0) > 0
@@ -1754,23 +1757,42 @@ export class EncountersService {
 						key: "orders_finalized",
 						label: "Orders/prescriptions finalized",
 						category: "clinical" as ChecklistCategory,
-						// PS-018: check real medication orders — blocks close if pending orders exist
+						// PS-018: block unresolved medication orders. Verified/active OPD meds are
+						// resolved once a signed/issued eRx exists for that medication order.
 						status: await (async (): Promise<ChecklistStatus> => {
-							const [totalRow] = await db
-								.select({ n: count() })
+							const medRows = await db
+								.select({
+									id: medicationOrders.id,
+									status: medicationOrders.status,
+								})
 								.from(medicationOrders)
 								.where(eq(medicationOrders.encounterId, encounter.id))
-							if ((totalRow?.n ?? 0) === 0) return "not_applicable" // no orders
-							const [pendingRow] = await db
-								.select({ n: count() })
-								.from(medicationOrders)
+							if (medRows.length === 0) return "not_applicable" // no orders
+
+							const rxRows = await db
+								.select({ medicationOrderId: prescriptions.medicationOrderId })
+								.from(prescriptions)
 								.where(
 									and(
-										eq(medicationOrders.encounterId, encounter.id),
-										inArray(medicationOrders.status, ["pending_verification", "verified", "active"])
+										eq(prescriptions.encounterId, encounter.id),
+										inArray(prescriptions.status, ["signed", "issued"])
 									)
 								)
-							return (pendingRow?.n ?? 0) === 0 ? "complete" : "incomplete"
+							const signedPrescriptionMedOrderIds = new Set(
+								rxRows
+									.map(row => row.medicationOrderId)
+									.filter((id): id is string => Boolean(id))
+							)
+
+							const hasUnresolvedMedicationOrder = medRows.some(order => {
+								if (order.status === "pending_verification") return true
+								if (order.status === "verified" || order.status === "active") {
+									return !signedPrescriptionMedOrderIds.has(order.id)
+								}
+								return false
+							})
+
+							return hasUnresolvedMedicationOrder ? "incomplete" : "complete"
 						})(),
 						responsibleRole: "Clinician",
 					},

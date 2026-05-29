@@ -121,6 +121,28 @@ function isNumberInRange(value: string, min: number, max: number) {
 	return Number.isFinite(parsed) && parsed >= min && parsed <= max
 }
 
+function isFutureLocalDateTime(value: string) {
+	if (!value.trim()) return true
+	const parsed = new Date(value)
+	return Number.isFinite(parsed.getTime()) && parsed.getTime() > Date.now()
+}
+
+function isValidUrl(value: string) {
+	if (!value.trim()) return true
+	try {
+		const url = new URL(value)
+		return url.protocol === "https:" || url.protocol === "http:"
+	} catch {
+		return false
+	}
+}
+
+function getLocalDateTimeInputMinimum(): string {
+	const now = new Date()
+	now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+	return now.toISOString().slice(0, 16)
+}
+
 function acuityBadgeClass(acuity: ProvisionalAcuity) {
 	switch (acuity) {
 		case "urgent":
@@ -217,6 +239,7 @@ export function OpdTeleTriagePage() {
 		const minutes = Math.floor((new Date(patient.etaAt).getTime() - now) / 60_000)
 		return minutes >= 0 && minutes <= 15
 	}).length
+	const minScheduledArrivalTime = getLocalDateTimeInputMinimum()
 
 	const [form, setForm] = useState(INITIAL_FORM)
 	const [redFlags, setRedFlags] = useState<string[]>([])
@@ -233,8 +256,16 @@ export function OpdTeleTriagePage() {
 		return () => clearInterval(id)
 	}, [])
 
-	const update = (field: keyof typeof form, value: string) =>
+	const update = (field: keyof typeof form, value: string) => {
 		setForm(prev => ({ ...prev, [field]: value }))
+		setErrors(prev => {
+			if (!prev[field]) return prev
+			const next = { ...prev }
+			delete next[field]
+			if (field === "etaMinutes" || field === "scheduledArrivalTime") delete next.arrival
+			return next
+		})
+	}
 
 	function validateForm() {
 		const nextErrors: FormErrors = {}
@@ -246,6 +277,12 @@ export function OpdTeleTriagePage() {
 		}
 		if (!isPositiveIntegerInRange(form.etaMinutes, 0, 480)) {
 			nextErrors.etaMinutes = "ETA must be 0 to 480 minutes."
+		}
+		if (form.scheduledArrivalTime && !isFutureLocalDateTime(form.scheduledArrivalTime)) {
+			nextErrors.scheduledArrivalTime = "Scheduled arrival must be in the future."
+		}
+		if (form.channelType === "video" && !isValidUrl(form.videoLink)) {
+			nextErrors.videoLink = "Enter a valid http or https video link."
 		}
 		if (!isPositiveIntegerInRange(form.systolicBp, 40, 300)) {
 			nextErrors.systolicBp = "Systolic BP must be 40 to 300."
@@ -267,6 +304,11 @@ export function OpdTeleTriagePage() {
 		}
 
 		setErrors(nextErrors)
+		if (Object.keys(nextErrors).length > 0) {
+			toast.error("Remote intake cannot be queued yet", {
+				description: Object.values(nextErrors)[0],
+			})
+		}
 		return Object.keys(nextErrors).length === 0
 	}
 
@@ -281,6 +323,7 @@ export function OpdTeleTriagePage() {
 		e.preventDefault()
 		if (!facilityId || !staffProfileId) return
 		if (!validateForm()) return
+		if (!window.confirm("Queue this OPD remote intake for triage follow-up?")) return
 
 		const assessmentNotes = buildAssessmentNotes(form.assessmentNotes, redFlags, preparationNeeds)
 
@@ -318,6 +361,7 @@ export function OpdTeleTriagePage() {
 	}
 
 	function handleArrived(id: string) {
+		if (!window.confirm("Mark this remote intake as arrived and create the OPD triage intake?")) return
 		markArrived.mutate(
 			{ id },
 			{
@@ -331,6 +375,12 @@ export function OpdTeleTriagePage() {
 	}
 
 	function handleCancel(id: string, status: "cancelled" | "no_show") {
+		const confirmed = window.confirm(
+			status === "no_show"
+				? "Mark this remote intake as no-show?"
+				: "Cancel this remote intake?"
+		)
+		if (!confirmed) return
 		cancelRemote.mutate(
 			{ id, status },
 			{
@@ -533,10 +583,13 @@ export function OpdTeleTriagePage() {
 								<Input
 									id="scheduledArrivalTime"
 									type="datetime-local"
+									min={minScheduledArrivalTime}
 									value={form.scheduledArrivalTime}
 									onChange={e => update("scheduledArrivalTime", e.target.value)}
 								/>
-								<FieldError message={!errors.etaMinutes ? errors.arrival : undefined} />
+								<FieldError
+									message={errors.scheduledArrivalTime ?? (!errors.etaMinutes ? errors.arrival : undefined)}
+								/>
 							</div>
 							{form.channelType === "video" && (
 								<div className="space-y-2 md:col-span-2">
@@ -548,6 +601,7 @@ export function OpdTeleTriagePage() {
 										onChange={e => update("videoLink", e.target.value)}
 										placeholder="https://..."
 									/>
+									<FieldError message={errors.videoLink} />
 								</div>
 							)}
 							<div className="space-y-2 md:col-span-2">

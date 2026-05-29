@@ -97,7 +97,7 @@ export class EncountersController {
 		})
 	}
 
-	@RequirePermission("adt", "edit")
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.encounter.close)
 	async close(@Session() session: UserSession) {
 		return implement(v1.encounter.close).handler(async ({ input }) => {
