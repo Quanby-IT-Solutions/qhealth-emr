@@ -9,7 +9,6 @@ import {
 	CardTitle,
 } from "@/core/components/ui/card"
 import { PatientPortalLoginForm } from "@/features/patient-portal/components/patient-portal-login-form"
-import { patientPortalSnapshot } from "@/features/patient-portal/lib/static-summary"
 
 const portalAssurances = [
 	{
@@ -24,8 +23,9 @@ const portalAssurances = [
 	},
 	{
 		icon: Database,
-		title: "Static daily cache",
-		description: "The summary is generated from released records once per daily portal cycle.",
+		title: "Database-backed summary",
+		description:
+			"The summary is generated from the matched patient record and connected released data.",
 	},
 ]
 
@@ -36,7 +36,7 @@ export default function PatientPortalLoginPage() {
 				<div className="max-w-2xl space-y-4">
 					<Badge variant="outline" className="gap-1.5">
 						<CalendarClock className="size-3.5" />
-						{patientPortalSnapshot.snapshotDate} portal snapshot
+						Current patient portal snapshot
 					</Badge>
 					<div className="space-y-3">
 						<h1 className="text-3xl font-semibold tracking-normal text-balance md:text-5xl">
@@ -68,14 +68,14 @@ export default function PatientPortalLoginPage() {
 				<CardHeader>
 					<CardTitle>Patient Portal Login</CardTitle>
 					<CardDescription>
-						Open the latest released static summary for the patient or authorized proxy.
+						Open the current read-only summary for the patient or authorized proxy.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<PatientPortalLoginForm />
 					<p className="text-muted-foreground mt-4 text-xs leading-5">
-						Snapshot source: {patientPortalSnapshot.source}. Generated{" "}
-						{patientPortalSnapshot.generatedAt}.
+						After identity matching, the portal loads patient-facing details from the connected
+						database record.
 					</p>
 				</CardContent>
 			</Card>

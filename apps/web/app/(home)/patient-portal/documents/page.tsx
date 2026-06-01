@@ -61,11 +61,11 @@ export default async function PatientPortalDocumentsPage() {
 					</Badge>
 					<div>
 						<h1 className="text-2xl font-semibold tracking-normal md:text-3xl">
-							Released portal documents
+							Patient portal documents
 						</h1>
 						<p className="text-muted-foreground mt-2 max-w-2xl text-sm leading-6">
 							Documents are generated from the matched patient record for {record.patient.name} (
-							{record.patient.mrn}). Each download is read-only and reflects released portal
+							{record.patient.mrn}). Each download is read-only and reflects patient-facing database
 							information.
 						</p>
 					</div>
@@ -83,7 +83,7 @@ export default async function PatientPortalDocumentsPage() {
 
 			<Alert>
 				<LockKeyhole className="size-4" />
-				<AlertTitle>Read-only release snapshot</AlertTitle>
+				<AlertTitle>Read-only database snapshot</AlertTitle>
 				<AlertDescription>
 					Generated {record.snapshot.generatedAt} from {record.snapshot.source}.
 				</AlertDescription>
@@ -109,7 +109,7 @@ export default async function PatientPortalDocumentsPage() {
 									<span className="font-medium">{document.category}</span>
 								</div>
 								<div className="flex items-center justify-between gap-3 border-b pb-2">
-									<span className="text-muted-foreground">Released</span>
+									<span className="text-muted-foreground">Generated</span>
 									<span className="text-right font-medium">{document.releasedAt}</span>
 								</div>
 								<div className="flex items-center justify-between gap-3">

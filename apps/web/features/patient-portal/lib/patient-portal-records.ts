@@ -31,15 +31,36 @@ export type PortalSummaryItem = {
 	status?: PortalStatus
 }
 
+export type PortalDetailItem = {
+	label: string
+	value: string
+}
+
 export type PatientPortalRecord = {
 	patient: {
 		id: string
 		mrn: string
 		name: string
 		firstName: string
+		middleName: string | null
 		lastName: string
 		dateOfBirth: string
 		sex: string
+		addressLine1: string | null
+		addressLine2: string | null
+		city: string | null
+		province: string | null
+		zipCode: string | null
+		phone: string | null
+		email: string | null
+		philhealthMemberId: string | null
+		emergencyContactName: string | null
+		emergencyContactPhone: string | null
+		nextOfKinName: string | null
+		nextOfKinRelationship: string | null
+		isActive: boolean
+		createdAt: string
+		updatedAt: string
 		facilityName: string
 	}
 	snapshot: {
@@ -47,6 +68,7 @@ export type PatientPortalRecord = {
 		releasedThrough: string
 		source: string
 	}
+	patientDetails: PortalDetailItem[]
 	overview: PortalSummaryItem[]
 	problems: PortalSummaryItem[]
 	allergies: PortalSummaryItem[]
@@ -55,15 +77,36 @@ export type PatientPortalRecord = {
 	imaging: PortalSummaryItem[]
 	encounters: PortalSummaryItem[]
 	notes: PortalSummaryItem[]
+	appointments: PortalSummaryItem[]
+	consents: PortalSummaryItem[]
+	prescriptions: PortalSummaryItem[]
+	billing: PortalSummaryItem[]
+	recordsRequests: PortalSummaryItem[]
 }
 
 type PatientRow = {
 	id: string
 	mrn: string
 	first_name: string
+	middle_name: string | null
 	last_name: string
 	date_of_birth: string
 	sex: string
+	address_line1: string | null
+	address_line2: string | null
+	city: string | null
+	province: string | null
+	zip_code: string | null
+	phone: string | null
+	email: string | null
+	philhealth_member_id: string | null
+	emergency_contact_name: string | null
+	emergency_contact_phone: string | null
+	next_of_kin_name: string | null
+	next_of_kin_relationship: string | null
+	is_active: boolean
+	created_at: string
+	updated_at: string
 	facility_name: string | null
 }
 
@@ -138,6 +181,64 @@ type NoteRow = {
 	content: string
 	status: string
 	signed_at: string | null
+	created_at: string
+}
+
+type AppointmentRow = {
+	clinic_name: string | null
+	appointment_date: string
+	appointment_time: string
+	queue_number: number | null
+	status: string
+	encounter_type: string
+	chief_complaint: string | null
+	notes: string | null
+}
+
+type ConsentRow = {
+	consent_type: string
+	signed_by_name: string
+	relationship: string
+	signed_at: string | null
+	is_active: boolean
+	revoked_at: string | null
+	revocation_reason: string | null
+}
+
+type PrescriptionRow = {
+	generic_name: string
+	brand_name: string | null
+	dose: string
+	dose_unit: string
+	dose_form: string
+	route: string
+	frequency: string
+	status: string
+	signed_at: string | null
+	created_at: string
+}
+
+type InvoiceRow = {
+	invoice_number: string
+	subtotal: string
+	discount: string
+	total_amount: string
+	philhealth_coverage: string
+	patient_responsibility: string
+	status: string
+	finalized_at: string | null
+	created_at: string
+}
+
+type RecordsRequestRow = {
+	request_type: string
+	requested_by_name: string
+	requested_by_relationship: string | null
+	purpose: string | null
+	status: string
+	completed_at: string | null
+	released_at: string | null
+	rejection_reason: string | null
 	created_at: string
 }
 
@@ -228,9 +329,25 @@ export async function verifyPatientPortalIdentity(mrn: string, dateOfBirth: stri
 				p.id,
 				p.mrn,
 				p.first_name,
+				p.middle_name,
 				p.last_name,
 				p.date_of_birth::text as date_of_birth,
 				p.sex,
+				p.address_line1,
+				p.address_line2,
+				p.city,
+				p.province,
+				p.zip_code,
+				p.phone,
+				p.email,
+				p.philhealth_member_id,
+				p.emergency_contact_name,
+				p.emergency_contact_phone,
+				p.next_of_kin_name,
+				p.next_of_kin_relationship,
+				p.is_active,
+				p.created_at::text as created_at,
+				p.updated_at::text as updated_at,
 				f.name as facility_name
 			from patients p
 			left join facilities f on f.id = p.facility_id
@@ -254,7 +371,20 @@ export async function getPatientPortalRecord(
 		return null
 	}
 
-	const [encounters, problems, allergies, medications, labs, imaging, notes] = await Promise.all([
+	const [
+		encounters,
+		problems,
+		allergies,
+		medications,
+		labs,
+		imaging,
+		notes,
+		appointments,
+		consents,
+		prescriptions,
+		billing,
+		recordsRequests,
+	] = await Promise.all([
 		getEncounters(patient.id),
 		getProblems(patient.id),
 		getAllergies(patient.id),
@@ -262,24 +392,48 @@ export async function getPatientPortalRecord(
 		getLabs(patient.id),
 		getImaging(patient.id),
 		getNotes(patient.id),
+		getAppointments(patient.id),
+		getConsents(patient.id),
+		getPrescriptions(patient.id),
+		getBilling(patient.id),
+		getRecordsRequests(patient.id),
 	])
+
+	const patientName = formatPatientName(patient)
 
 	return {
 		patient: {
 			id: patient.id,
 			mrn: patient.mrn,
-			name: `${patient.first_name} ${patient.last_name}`,
+			name: patientName,
 			firstName: patient.first_name,
+			middleName: patient.middle_name,
 			lastName: patient.last_name,
 			dateOfBirth: patient.date_of_birth,
 			sex: patient.sex,
+			addressLine1: patient.address_line1,
+			addressLine2: patient.address_line2,
+			city: patient.city,
+			province: patient.province,
+			zipCode: patient.zip_code,
+			phone: patient.phone,
+			email: patient.email,
+			philhealthMemberId: patient.philhealth_member_id,
+			emergencyContactName: patient.emergency_contact_name,
+			emergencyContactPhone: patient.emergency_contact_phone,
+			nextOfKinName: patient.next_of_kin_name,
+			nextOfKinRelationship: patient.next_of_kin_relationship,
+			isActive: patient.is_active,
+			createdAt: patient.created_at,
+			updatedAt: patient.updated_at,
 			facilityName: patient.facility_name ?? "QHealth Medical Center",
 		},
 		snapshot: {
 			generatedAt: formatDateTime(new Date().toISOString()),
-			releasedThrough: "Released records available through the current portal snapshot.",
+			releasedThrough: "Patient-facing records available through the current portal snapshot.",
 			source: "Read-only patient portal database snapshot",
 		},
+		patientDetails: buildPatientDetails(patient),
 		overview: buildOverview(patient, encounters, problems, allergies),
 		problems: problems.map(problem => ({
 			label: problem.description,
@@ -375,6 +529,85 @@ export async function getPatientPortalRecord(
 			detail: `${note.signed_at ? `Signed ${formatDateTime(note.signed_at)}` : `Created ${formatDateTime(note.created_at)}`} · ${truncateText(note.content, 140)}`,
 			status: note.status === "signed" ? "released" : "attention",
 		})),
+		appointments: appointments.map(appointment => ({
+			label: appointment.clinic_name ?? `${formatStatus(appointment.encounter_type)} appointment`,
+			value: `${formatDate(appointment.appointment_date)} at ${formatTime(appointment.appointment_time)}`,
+			detail: [
+				`Status: ${formatStatus(appointment.status)}`,
+				appointment.queue_number ? `Queue ${appointment.queue_number}` : null,
+				appointment.chief_complaint ? `Reason: ${appointment.chief_complaint}` : appointment.notes,
+			]
+				.filter(Boolean)
+				.join(" | "),
+			status:
+				appointment.status === "cancelled" || appointment.status === "no_show"
+					? "attention"
+					: "released",
+		})),
+		consents: consents.map(consent => ({
+			label: `${formatStatus(consent.consent_type)} consent`,
+			value: consent.is_active ? "Active" : "Inactive",
+			detail: [
+				`Signed by ${consent.signed_by_name} (${formatStatus(consent.relationship)})`,
+				consent.signed_at ? `Signed ${formatDateTime(consent.signed_at)}` : null,
+				consent.revoked_at ? `Revoked ${formatDateTime(consent.revoked_at)}` : null,
+				consent.revocation_reason ? `Reason: ${consent.revocation_reason}` : null,
+			]
+				.filter(Boolean)
+				.join(" | "),
+			status: consent.is_active ? "released" : "attention",
+		})),
+		prescriptions: prescriptions.map(prescription => ({
+			label: prescription.generic_name,
+			value: [
+				prescription.dose,
+				prescription.dose_unit,
+				prescription.dose_form,
+				prescription.route,
+				prescription.frequency,
+			].join(" "),
+			detail: [
+				prescription.brand_name ? `Brand: ${prescription.brand_name}` : null,
+				`Status: ${formatStatus(prescription.status)}`,
+				prescription.signed_at
+					? `Signed ${formatDateTime(prescription.signed_at)}`
+					: `Created ${formatDateTime(prescription.created_at)}`,
+			]
+				.filter(Boolean)
+				.join(" | "),
+			status: "released",
+		})),
+		billing: billing.map(invoice => ({
+			label: `Invoice ${invoice.invoice_number}`,
+			value: `${formatCurrency(invoice.patient_responsibility)} patient responsibility`,
+			detail: [
+				`Total ${formatCurrency(invoice.total_amount)}`,
+				`PhilHealth ${formatCurrency(invoice.philhealth_coverage)}`,
+				`Discount ${formatCurrency(invoice.discount)}`,
+				`Status: ${formatStatus(invoice.status)}`,
+				invoice.finalized_at
+					? `Finalized ${formatDateTime(invoice.finalized_at)}`
+					: `Created ${formatDateTime(invoice.created_at)}`,
+			].join(" | "),
+			status: "released",
+		})),
+		recordsRequests: recordsRequests.map(request => ({
+			label: formatStatus(request.request_type),
+			value: formatStatus(request.status),
+			detail: [
+				`Requested by ${request.requested_by_name}${request.requested_by_relationship ? ` (${formatStatus(request.requested_by_relationship)})` : ""}`,
+				request.purpose ? `Purpose: ${request.purpose}` : null,
+				request.released_at
+					? `Released ${formatDateTime(request.released_at)}`
+					: request.completed_at
+						? `Completed ${formatDateTime(request.completed_at)}`
+						: `Requested ${formatDateTime(request.created_at)}`,
+				request.rejection_reason ? `Reason: ${request.rejection_reason}` : null,
+			]
+				.filter(Boolean)
+				.join(" | "),
+			status: request.status === "rejected" ? "attention" : "released",
+		})),
 	}
 }
 
@@ -384,6 +617,16 @@ export function buildPatientPortalDocuments(record: PatientPortalRecord): Patien
 
 	return [
 		{
+			id: "patient-details",
+			title: "Patient Database Record",
+			category: "Patient Profile",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-patient-details.txt`,
+			description: "Patient-facing profile details loaded from the matched patients table record.",
+			body: buildDetailSectionDocument(record, "Patient Database Record", record.patientDetails),
+		},
+		{
 			id: "daily-summary",
 			title: "Daily Released Medical Summary",
 			category: "Patient Summary",
@@ -391,7 +634,7 @@ export function buildPatientPortalDocuments(record: PatientPortalRecord): Patien
 			format: "TXT",
 			fileName: `${safeMrn}-daily-summary.txt`,
 			description:
-				"Read-only snapshot of demographics, encounters, allergies, problems, orders, and notes.",
+				"Read-only snapshot of patient details and connected patient-facing medical records.",
 			body: buildDocumentBody(record),
 		},
 		{
@@ -414,6 +657,106 @@ export function buildPatientPortalDocuments(record: PatientPortalRecord): Patien
 			description: "Released imaging order and report summary for this patient.",
 			body: buildSectionDocument(record, "Released Imaging Reports", record.imaging),
 		},
+		{
+			id: "appointments",
+			title: "Appointment History",
+			category: "Scheduling",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-appointments.txt`,
+			description: "Appointments connected directly to this patient record.",
+			body: buildSectionDocument(record, "Appointment History", record.appointments),
+		},
+		{
+			id: "encounters",
+			title: "Encounter History",
+			category: "Clinical",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-encounters.txt`,
+			description: "Recent encounters connected to this patient record.",
+			body: buildSectionDocument(record, "Encounter History", record.encounters),
+		},
+		{
+			id: "problems",
+			title: "Problem Records",
+			category: "Clinical",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-problems.txt`,
+			description: "Problem-list records connected to this patient.",
+			body: buildSectionDocument(record, "Problem Records", record.problems),
+		},
+		{
+			id: "allergies",
+			title: "Allergy Records",
+			category: "Safety",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-allergies.txt`,
+			description: "Allergy and reaction records connected to this patient.",
+			body: buildSectionDocument(record, "Allergy Records", record.allergies),
+		},
+		{
+			id: "medications",
+			title: "Medication Records",
+			category: "Pharmacy",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-medications.txt`,
+			description: "Patient-facing medication orders connected through this patient's encounters.",
+			body: buildSectionDocument(record, "Medication Records", record.medications),
+		},
+		{
+			id: "prescriptions",
+			title: "Released Prescriptions",
+			category: "Pharmacy",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-prescriptions.txt`,
+			description: "Signed and issued prescriptions for this patient.",
+			body: buildSectionDocument(record, "Released Prescriptions", record.prescriptions),
+		},
+		{
+			id: "signed-notes",
+			title: "Signed Clinical Notes",
+			category: "Clinical",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-signed-notes.txt`,
+			description: "Signed clinical notes connected through this patient's encounters.",
+			body: buildSectionDocument(record, "Signed Clinical Notes", record.notes),
+		},
+		{
+			id: "consents",
+			title: "Consent Records",
+			category: "Consent",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-consents.txt`,
+			description: "Signed consent records connected directly to this patient.",
+			body: buildSectionDocument(record, "Consent Records", record.consents),
+		},
+		{
+			id: "billing",
+			title: "Billing Records",
+			category: "Billing",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-billing.txt`,
+			description: "Finalized invoices connected directly to this patient.",
+			body: buildSectionDocument(record, "Billing Records", record.billing),
+		},
+		{
+			id: "records-requests",
+			title: "Medical Records Requests",
+			category: "Medical Records",
+			releasedAt,
+			format: "TXT",
+			fileName: `${safeMrn}-records-requests.txt`,
+			description: "Chart and document requests connected directly to this patient.",
+			body: buildSectionDocument(record, "Medical Records Requests", record.recordsRequests),
+		},
 	]
 }
 
@@ -424,9 +767,25 @@ async function getPatientById(patientId: string) {
 				p.id,
 				p.mrn,
 				p.first_name,
+				p.middle_name,
 				p.last_name,
 				p.date_of_birth::text as date_of_birth,
 				p.sex,
+				p.address_line1,
+				p.address_line2,
+				p.city,
+				p.province,
+				p.zip_code,
+				p.phone,
+				p.email,
+				p.philhealth_member_id,
+				p.emergency_contact_name,
+				p.emergency_contact_phone,
+				p.next_of_kin_name,
+				p.next_of_kin_relationship,
+				p.is_active,
+				p.created_at::text as created_at,
+				p.updated_at::text as updated_at,
 				f.name as facility_name
 			from patients p
 			left join facilities f on f.id = p.facility_id
@@ -510,6 +869,7 @@ async function getMedications(patientId: string) {
 			from medication_orders mo
 			inner join encounters e on e.id = mo.encounter_id
 			where e.patient_id = $1
+				and mo.status in ('verified', 'active', 'completed', 'discontinued')
 			order by mo.created_at desc
 			limit 30
 		`,
@@ -535,6 +895,7 @@ async function getLabs(patientId: string) {
 			from lab_orders lo
 			inner join encounters e on e.id = lo.encounter_id
 			where e.patient_id = $1
+				and lo.status in ('resulted', 'completed')
 			order by coalesce(lo.resulted_datetime, lo.created_at) desc
 			limit 30
 		`,
@@ -560,6 +921,8 @@ async function getImaging(patientId: string) {
 			from imaging_orders io
 			inner join encounters e on e.id = io.encounter_id
 			where e.patient_id = $1
+				and io.status = 'completed'
+				and io.report is not null
 			order by coalesce(io.completed_datetime, io.created_at) desc
 			limit 30
 		`,
@@ -586,6 +949,159 @@ async function getNotes(patientId: string) {
 	return rows
 }
 
+async function getAppointments(patientId: string) {
+	const { rows } = await getPool().query<AppointmentRow>(
+		`
+			select
+				ct.clinic_name,
+				a.appointment_date::text as appointment_date,
+				a.appointment_time::text as appointment_time,
+				a.queue_number,
+				a.status,
+				a.encounter_type,
+				a.chief_complaint,
+				a.notes
+			from appointments a
+			left join clinic_templates ct on ct.id = a.clinic_template_id
+			where a.patient_id = $1
+			order by a.appointment_date desc, a.appointment_time desc
+			limit 30
+		`,
+		[patientId]
+	)
+
+	return rows
+}
+
+async function getConsents(patientId: string) {
+	const { rows } = await getPool().query<ConsentRow>(
+		`
+			select
+				consent_type,
+				signed_by_name,
+				relationship,
+				signed_at::text as signed_at,
+				is_active,
+				revoked_at::text as revoked_at,
+				revocation_reason
+			from consent_records
+			where patient_id = $1
+				and signed_at is not null
+			order by signed_at desc
+			limit 30
+		`,
+		[patientId]
+	)
+
+	return rows
+}
+
+async function getPrescriptions(patientId: string) {
+	const { rows } = await getPool().query<PrescriptionRow>(
+		`
+			select
+				mo.generic_name,
+				mo.brand_name,
+				mo.dose,
+				mo.dose_unit,
+				mo.dose_form,
+				mo.route,
+				mo.frequency,
+				p.status,
+				p.signed_at::text as signed_at,
+				p.created_at::text as created_at
+			from prescriptions p
+			inner join medication_orders mo on mo.id = p.medication_order_id
+			where p.patient_id = $1
+				and p.status in ('signed', 'issued')
+			order by coalesce(p.signed_at, p.created_at) desc
+			limit 30
+		`,
+		[patientId]
+	)
+
+	return rows
+}
+
+async function getBilling(patientId: string) {
+	const { rows } = await getPool().query<InvoiceRow>(
+		`
+			select
+				invoice_number,
+				subtotal::text as subtotal,
+				discount::text as discount,
+				total_amount::text as total_amount,
+				philhealth_coverage::text as philhealth_coverage,
+				patient_responsibility::text as patient_responsibility,
+				status,
+				finalized_at::text as finalized_at,
+				created_at::text as created_at
+			from invoices
+			where patient_id = $1
+				and status in ('finalized', 'partially_paid', 'paid')
+			order by coalesce(finalized_at, created_at) desc
+			limit 30
+		`,
+		[patientId]
+	)
+
+	return rows
+}
+
+async function getRecordsRequests(patientId: string) {
+	const { rows } = await getPool().query<RecordsRequestRow>(
+		`
+			select
+				request_type,
+				requested_by_name,
+				requested_by_relationship,
+				purpose,
+				status,
+				completed_at::text as completed_at,
+				released_at::text as released_at,
+				rejection_reason,
+				created_at::text as created_at
+			from medical_records_requests
+			where patient_id = $1
+			order by created_at desc
+			limit 30
+		`,
+		[patientId]
+	)
+
+	return rows
+}
+
+function buildPatientDetails(patient: PatientRow): PortalDetailItem[] {
+	return [
+		{ label: "Medical record number", value: patient.mrn },
+		{ label: "First name", value: patient.first_name },
+		{ label: "Middle name", value: formatValue(patient.middle_name) },
+		{ label: "Last name", value: patient.last_name },
+		{ label: "Date of birth", value: formatDate(patient.date_of_birth) },
+		{ label: "Sex", value: formatStatus(patient.sex) },
+		{ label: "Address line 1", value: formatValue(patient.address_line1) },
+		{ label: "Address line 2", value: formatValue(patient.address_line2) },
+		{ label: "City", value: formatValue(patient.city) },
+		{ label: "Province", value: formatValue(patient.province) },
+		{ label: "ZIP code", value: formatValue(patient.zip_code) },
+		{ label: "Phone", value: formatValue(patient.phone) },
+		{ label: "Email", value: formatValue(patient.email) },
+		{ label: "PhilHealth member ID", value: formatValue(patient.philhealth_member_id) },
+		{ label: "Emergency contact", value: formatValue(patient.emergency_contact_name) },
+		{ label: "Emergency contact phone", value: formatValue(patient.emergency_contact_phone) },
+		{ label: "Next of kin", value: formatValue(patient.next_of_kin_name) },
+		{
+			label: "Next-of-kin relationship",
+			value: formatValue(patient.next_of_kin_relationship),
+		},
+		{ label: "Registered facility", value: patient.facility_name ?? "QHealth Medical Center" },
+		{ label: "Patient record status", value: patient.is_active ? "Active" : "Inactive" },
+		{ label: "Patient record created", value: formatDateTime(patient.created_at) },
+		{ label: "Last profile update", value: formatDateTime(patient.updated_at) },
+	]
+}
+
 function buildOverview(
 	patient: PatientRow,
 	encounters: EncounterRow[],
@@ -599,7 +1115,7 @@ function buildOverview(
 	return [
 		{
 			label: "Patient",
-			value: `${patient.first_name} ${patient.last_name}`,
+			value: formatPatientName(patient),
 			detail: `MRN ${patient.mrn} · DOB ${formatDate(patient.date_of_birth)} · ${patient.sex}`,
 			status: "released",
 		},
@@ -672,14 +1188,20 @@ function buildDocumentBody(record: PatientPortalRecord) {
 		`Facility: ${record.patient.facilityName}`,
 		`Generated: ${record.snapshot.generatedAt}`,
 		"",
+		buildDetailSectionText("Patient Details", record.patientDetails),
 		buildSectionText("Overview", record.overview),
+		buildSectionText("Appointments", record.appointments),
 		buildSectionText("Encounters", record.encounters),
 		buildSectionText("Problems", record.problems),
 		buildSectionText("Allergies", record.allergies),
 		buildSectionText("Medications", record.medications),
+		buildSectionText("Prescriptions", record.prescriptions),
 		buildSectionText("Laboratory Results", record.labs),
 		buildSectionText("Imaging Reports", record.imaging),
 		buildSectionText("Signed Notes", record.notes),
+		buildSectionText("Consents", record.consents),
+		buildSectionText("Billing", record.billing),
+		buildSectionText("Medical Records Requests", record.recordsRequests),
 	].join("\n")
 }
 
@@ -699,6 +1221,22 @@ function buildSectionDocument(
 	].join("\n")
 }
 
+function buildDetailSectionDocument(
+	record: PatientPortalRecord,
+	title: string,
+	items: PortalDetailItem[]
+) {
+	return [
+		`QHealth Patient Portal - ${title}`,
+		"",
+		`Patient: ${record.patient.name}`,
+		`MRN: ${record.patient.mrn}`,
+		`Generated: ${record.snapshot.generatedAt}`,
+		"",
+		buildDetailSectionText(title, items),
+	].join("\n")
+}
+
 function buildSectionText(title: string, items: PortalSummaryItem[]) {
 	if (items.length === 0) {
 		return `${title}\n- No released records found.`
@@ -711,6 +1249,50 @@ function buildSectionText(title: string, items: PortalSummaryItem[]) {
 			return `- ${item.label}: ${item.value}${detail}`
 		}),
 	].join("\n")
+}
+
+function buildDetailSectionText(title: string, items: PortalDetailItem[]) {
+	return [title, ...items.map(item => `- ${item.label}: ${item.value}`)].join("\n")
+}
+
+function formatPatientName(patient: PatientRow) {
+	return [patient.first_name, patient.middle_name, patient.last_name].filter(Boolean).join(" ")
+}
+
+function formatValue(value: string | null | undefined) {
+	return value?.trim() || "Not recorded"
+}
+
+function formatStatus(value: string) {
+	return value.replace(/_/g, " ").replace(/\b\w/g, character => character.toUpperCase())
+}
+
+function formatCurrency(value: string) {
+	const amount = Number(value)
+
+	if (Number.isNaN(amount)) {
+		return value
+	}
+
+	return new Intl.NumberFormat("en-PH", {
+		style: "currency",
+		currency: "PHP",
+	}).format(amount)
+}
+
+function formatTime(value: string) {
+	const [hours, minutes] = value.split(":")
+	const date = new Date()
+	date.setHours(Number(hours), Number(minutes), 0, 0)
+
+	if (Number.isNaN(date.getTime())) {
+		return value
+	}
+
+	return new Intl.DateTimeFormat("en-PH", {
+		hour: "numeric",
+		minute: "2-digit",
+	}).format(date)
 }
 
 function formatDate(value: string | null | undefined) {

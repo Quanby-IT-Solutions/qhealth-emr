@@ -35,6 +35,7 @@ import {
 	getPatientPortalRecord,
 	parsePortalSessionCookie,
 	PATIENT_PORTAL_COOKIE,
+	type PortalDetailItem,
 	type PortalSummaryItem,
 } from "@/features/patient-portal/lib/patient-portal-records"
 
@@ -103,7 +104,7 @@ function RecordTable({ items, emptyText }: { items: PortalSummaryItem[]; emptyTe
 			<TableHeader>
 				<TableRow>
 					<TableHead>Record</TableHead>
-					<TableHead>Released detail</TableHead>
+					<TableHead>Details</TableHead>
 					<TableHead>Status</TableHead>
 				</TableRow>
 			</TableHeader>
@@ -124,6 +125,21 @@ function RecordTable({ items, emptyText }: { items: PortalSummaryItem[]; emptyTe
 				))}
 			</TableBody>
 		</Table>
+	)
+}
+
+function DetailGrid({ items }: { items: PortalDetailItem[] }) {
+	return (
+		<div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+			{items.map(item => (
+				<div key={item.label} className="border-b pb-3">
+					<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+						{item.label}
+					</p>
+					<p className="mt-1.5 text-sm font-medium break-words">{item.value}</p>
+				</div>
+			))}
+		</div>
 	)
 }
 
@@ -207,6 +223,21 @@ export default async function PatientSummaryDashboardPage() {
 				</div>
 			</div>
 
+			<Card className="rounded-lg">
+				<CardHeader>
+					<CardTitle className="flex items-center gap-2">
+						<FileText className="text-primary size-4" />
+						Patient Database Record
+					</CardTitle>
+					<CardDescription>
+						Patient-facing details loaded from the matched patients table record.
+					</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<DetailGrid items={record.patientDetails} />
+				</CardContent>
+			</Card>
+
 			<div className="grid gap-4 lg:grid-cols-2">
 				<Card className="rounded-lg">
 					<CardHeader>
@@ -244,7 +275,7 @@ export default async function PatientSummaryDashboardPage() {
 							Medication Records
 						</CardTitle>
 						<CardDescription>
-							Medication orders linked to this patient’s encounters.
+							Medication orders linked to this patient&apos;s encounters.
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
@@ -288,6 +319,93 @@ export default async function PatientSummaryDashboardPage() {
 					</CardHeader>
 					<CardContent>
 						<SummaryList items={record.encounters} emptyText="No encounter records found." />
+					</CardContent>
+				</Card>
+
+				<Card className="rounded-lg">
+					<CardHeader>
+						<CardTitle className="flex items-center gap-2">
+							<CalendarDays className="text-primary size-4" />
+							Appointment History
+						</CardTitle>
+						<CardDescription>
+							Appointments connected directly to this patient record.
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<RecordTable items={record.appointments} emptyText="No appointments found." />
+					</CardContent>
+				</Card>
+
+				<Card className="rounded-lg">
+					<CardHeader>
+						<CardTitle className="flex items-center gap-2">
+							<Pill className="text-primary size-4" />
+							Released Prescriptions
+						</CardTitle>
+						<CardDescription>Signed and issued prescriptions for this patient.</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<RecordTable
+							items={record.prescriptions}
+							emptyText="No released prescriptions found."
+						/>
+					</CardContent>
+				</Card>
+
+				<Card className="rounded-lg">
+					<CardHeader>
+						<CardTitle className="flex items-center gap-2">
+							<FileText className="text-primary size-4" />
+							Signed Clinical Notes
+						</CardTitle>
+						<CardDescription>
+							Signed notes connected through this patient&apos;s encounters.
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<RecordTable items={record.notes} emptyText="No signed clinical notes found." />
+					</CardContent>
+				</Card>
+
+				<Card className="rounded-lg">
+					<CardHeader>
+						<CardTitle className="flex items-center gap-2">
+							<ShieldCheck className="text-primary size-4" />
+							Consent Records
+						</CardTitle>
+						<CardDescription>Signed consent records connected to this patient.</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<RecordTable items={record.consents} emptyText="No signed consent records found." />
+					</CardContent>
+				</Card>
+
+				<Card className="rounded-lg">
+					<CardHeader>
+						<CardTitle className="flex items-center gap-2">
+							<FileText className="text-primary size-4" />
+							Billing Records
+						</CardTitle>
+						<CardDescription>Finalized invoices connected to this patient record.</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<RecordTable items={record.billing} emptyText="No finalized invoices found." />
+					</CardContent>
+				</Card>
+
+				<Card className="rounded-lg">
+					<CardHeader>
+						<CardTitle className="flex items-center gap-2">
+							<FileText className="text-primary size-4" />
+							Medical Records Requests
+						</CardTitle>
+						<CardDescription>
+							Chart and document requests connected to this patient.
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<RecordTable items={record.recordsRequests} emptyText="No records requests found." />
 					</CardContent>
 				</Card>
 			</div>
