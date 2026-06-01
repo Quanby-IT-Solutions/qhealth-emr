@@ -70,6 +70,14 @@ function formatAssignmentType(type: RvsAssignmentType) {
 	return type === "primary" ? "Primary" : "Adjunct"
 }
 
+function modifierInput(value: string) {
+	return value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 2)
+}
+
+function positiveWholeNumberInput(value: string) {
+	return value.replace(/\D/g, "").replace(/^0+(?=\d)/, "")
+}
+
 interface SearchResultRowProps {
 	code: RvsCode
 	isExpanded: boolean
@@ -90,16 +98,16 @@ function SearchResultRow({
 	canSuggest,
 }: SearchResultRowProps) {
 	const [modifier, setModifier] = useState("")
-	const [units, setUnits] = useState(1)
+	const [units, setUnits] = useState("1")
 
 	function handleExpand() {
 		setModifier("")
-		setUnits(1)
+		setUnits("1")
 		onExpand(code.id)
 	}
 
 	function handleConfirm() {
-		onConfirm(code.id, modifier, units)
+		onConfirm(code.id, modifier, Number(units || "1"))
 	}
 
 	return (
@@ -140,18 +148,21 @@ function SearchResultRow({
 									placeholder="e.g. 50"
 									maxLength={2}
 									value={modifier}
-									onChange={(e) => setModifier(e.target.value.toUpperCase())}
+									onChange={e => setModifier(modifierInput(e.target.value))}
 									disabled={isSuggesting}
 								/>
 							</div>
 							<div className="space-y-1">
 								<Label className="text-xs">Units</Label>
 								<Input
-									type="number"
 									className="h-8 w-20 text-sm"
-									min={1}
+									inputMode="numeric"
+									pattern="[0-9]*"
 									value={units}
-									onChange={(e) => setUnits(Math.max(1, Number(e.target.value)))}
+									onChange={e => setUnits(positiveWholeNumberInput(e.target.value))}
+									onBlur={() => {
+										if (!units) setUnits("1")
+									}}
 									disabled={isSuggesting}
 								/>
 							</div>
@@ -346,7 +357,7 @@ function SearchPanel({
 				)}
 			</div>
 
-			<div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+			<div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(180px,220px)]">
 				<div>
 					<Label htmlFor="rvsSearch" className="mb-1 block text-sm">
 						Search RVS/CPT Codes
@@ -356,7 +367,7 @@ function SearchPanel({
 						placeholder="Type at least 2 characters (e.g. cholecyst, 47562)..."
 						value={query}
 						onChange={event => setQuery(event.target.value)}
-						className="max-w-md"
+						className="w-full"
 					/>
 				</div>
 
@@ -366,7 +377,7 @@ function SearchPanel({
 						value={assignmentType}
 						onValueChange={value => onAssignmentTypeChange(value as RvsAssignmentType)}
 					>
-						<SelectTrigger>
+						<SelectTrigger className="w-full justify-between">
 							<SelectValue>{assignmentType || "Select type"}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
