@@ -264,6 +264,15 @@ function toDatetimeLocalValue(value: string | null | undefined) {
 	return localDate.toISOString().slice(0, 16)
 }
 
+function wholeNumberInput(value: string) {
+	return value.replace(/\D/g, "")
+}
+
+function toOptionalWholeNumber(value: string) {
+	const normalized = wholeNumberInput(value)
+	return normalized ? Number(normalized) : undefined
+}
+
 function buildInitialState(
 	existing: OperationRecord | null | undefined,
 	defaultAnesthesiologistStaffId: string | null | undefined
@@ -366,9 +375,9 @@ export function OperationRecordForm({
 			operativeTechnique: form.operativeTechnique || undefined,
 			findings: form.findings || undefined,
 			specimens: form.specimens || undefined,
-			estimatedBloodLoss: form.estimatedBloodLoss ? Number(form.estimatedBloodLoss) : undefined,
-			fluidIn: form.fluidIn ? Number(form.fluidIn) : undefined,
-			fluidOut: form.fluidOut ? Number(form.fluidOut) : undefined,
+			estimatedBloodLoss: toOptionalWholeNumber(form.estimatedBloodLoss),
+			fluidIn: toOptionalWholeNumber(form.fluidIn),
+			fluidOut: toOptionalWholeNumber(form.fluidOut),
 			incisionDatetime: form.incisionDatetime || undefined,
 			closureDatetime: form.closureDatetime || undefined,
 			firstAssistantStaffId: form.firstAssistantStaffId || undefined,
@@ -552,11 +561,12 @@ export function OperationRecordForm({
 					<div className="space-y-1.5">
 						<Label>EBL (mL)</Label>
 						<Input
-							type="number"
-							min={0}
-							step={1}
+							inputMode="numeric"
+							pattern="[0-9]*"
 							value={form.estimatedBloodLoss}
-							onChange={event => setField("estimatedBloodLoss", event.target.value)}
+							onChange={event =>
+								setField("estimatedBloodLoss", wholeNumberInput(event.target.value))
+							}
 							placeholder="0"
 							disabled={fieldsDisabled}
 						/>
@@ -564,11 +574,10 @@ export function OperationRecordForm({
 					<div className="space-y-1.5">
 						<Label>Fluid In (mL)</Label>
 						<Input
-							type="number"
-							min={0}
-							step={1}
+							inputMode="numeric"
+							pattern="[0-9]*"
 							value={form.fluidIn}
-							onChange={event => setField("fluidIn", event.target.value)}
+							onChange={event => setField("fluidIn", wholeNumberInput(event.target.value))}
 							placeholder="0"
 							disabled={fieldsDisabled}
 						/>
@@ -576,11 +585,10 @@ export function OperationRecordForm({
 					<div className="space-y-1.5">
 						<Label>Fluid Out (mL)</Label>
 						<Input
-							type="number"
-							min={0}
-							step={1}
+							inputMode="numeric"
+							pattern="[0-9]*"
 							value={form.fluidOut}
-							onChange={event => setField("fluidOut", event.target.value)}
+							onChange={event => setField("fluidOut", wholeNumberInput(event.target.value))}
 							placeholder="0"
 							disabled={fieldsDisabled}
 						/>
