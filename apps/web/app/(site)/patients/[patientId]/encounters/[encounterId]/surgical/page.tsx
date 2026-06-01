@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/t
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useChartContext } from "@/features/encounters/context/chart-context"
 import { AnesthesiaRecordForm } from "@/features/surgical/components/anesthesia-record-form"
+import { CreateSurgicalCasePanel } from "@/features/surgical/components/create-surgical-case-panel"
 import { OperationRecordForm } from "@/features/surgical/components/operation-record-form"
 import { PreOpChecklist } from "@/features/surgical/components/pre-op-checklist"
 import { RvsCodeSelector } from "@/features/surgical/components/rvs-code-selector"
@@ -18,7 +19,7 @@ import {
 } from "@/features/surgical/api/surgical.hooks"
 
 export default function SurgicalPage() {
-	const { encounterId, facilityId } = useChartContext()
+	const { encounterId, patientId, facilityId } = useChartContext()
 	const { data: profile } = useMyProfile()
 	const activeStaffProfile =
 		profile?.staffProfiles?.find((staffProfile) =>
@@ -61,8 +62,12 @@ export default function SurgicalPage() {
 	const canEditPreOp = isAnesthesiologist ? false : canEditSurgical
 	const canEditOperation = isAnesthesiologist ? false : canEditSurgical
 	const canSignOperation = isAnesthesiologist ? false : canSignSurgical
-	const canEditAnesthesia = isSurgeon ? false : canEditSurgical
-	const canSignAnesthesia = isSurgeon ? false : canSignSurgical
+	const isAssignedAnesthesiologist =
+		isAnesthesiologist &&
+		!!surgicalCase?.anesthesiologistStaffId &&
+		surgicalCase.anesthesiologistStaffId === staffId
+	const canEditAnesthesia = isAssignedAnesthesiologist && canEditSurgical
+	const canSignAnesthesia = isAssignedAnesthesiologist && canSignSurgical
 
 	if (casesLoading) {
 		return (
@@ -74,6 +79,18 @@ export default function SurgicalPage() {
 	}
 
 	if (!surgicalCase) {
+		if (canEditSurgical) {
+			return (
+				<CreateSurgicalCasePanel
+					encounterId={encounterId}
+					patientId={patientId}
+					facilityId={activeFacilityId}
+					onSuccess={() => {
+						// query auto-invalidates via useCreateSurgicalCaseMutation onSuccess
+					}}
+				/>
+			)
+		}
 		return (
 			<div className="p-8 text-center">
 				<p className="text-muted-foreground text-sm">

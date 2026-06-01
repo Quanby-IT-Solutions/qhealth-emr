@@ -22,6 +22,13 @@ import {
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useCreateImagingOrderMutation } from "@/features/orders/api/orders.hooks"
+import {
+	Icd10IndicationPicker,
+	type DiagnosisEntry,
+} from "@/features/orders/components/create-lab-order-dialog"
+
+type ImagingModality = "xray" | "ct" | "mri" | "ultrasound" | "other"
+type OrderPriority = "routine" | "urgent" | "stat"
 
 interface CreateImagingOrderDialogProps {
 	open: boolean
@@ -36,10 +43,11 @@ export function CreateImagingOrderDialog({
 	encounterId,
 	facilityId,
 }: CreateImagingOrderDialogProps) {
-	const [modality, setModality] = useState("")
+	const [modality, setModality] = useState<ImagingModality | "">("")
 	const [bodyPart, setBodyPart] = useState("")
 	const [clinicalIndication, setClinicalIndication] = useState("")
-	const [priority, setPriority] = useState("routine")
+	const [indicationDiagnosis, setIndicationDiagnosis] = useState<DiagnosisEntry | null>(null)
+	const [priority, setPriority] = useState<OrderPriority>("routine")
 
 	const createImagingOrder = useCreateImagingOrderMutation()
 
@@ -47,6 +55,7 @@ export function CreateImagingOrderDialog({
 		setModality("")
 		setBodyPart("")
 		setClinicalIndication("")
+		setIndicationDiagnosis(null)
 		setPriority("routine")
 	}
 
@@ -56,7 +65,7 @@ export function CreateImagingOrderDialog({
 	}
 
 	function handleSubmit() {
-		if (!modality || !bodyPart.trim()) return
+		if (!modality || !bodyPart.trim() || !clinicalIndication.trim() || !indicationDiagnosis) return
 
 		createImagingOrder.mutate(
 			{
@@ -64,7 +73,9 @@ export function CreateImagingOrderDialog({
 				encounterId,
 				modality,
 				bodyPart: bodyPart.trim(),
-				clinicalIndication: clinicalIndication.trim() || undefined,
+				clinicalIndication: clinicalIndication.trim(),
+				indicationIcd10Code: indicationDiagnosis.code,
+				indicationIcd10Display: indicationDiagnosis.description,
 				priority,
 			},
 			{
@@ -86,9 +97,14 @@ export function CreateImagingOrderDialog({
 				<div className="grid gap-4 py-4">
 					<div className="space-y-2">
 						<Label htmlFor="imgModality">Modality *</Label>
-						<Select value={modality || undefined} onValueChange={v => setModality(v ?? "")}>
-							<SelectTrigger id="imgModality">
-								<SelectValue />
+						<Select
+							value={modality || undefined}
+							onValueChange={v => setModality((v ?? "") as ImagingModality | "")}
+						>
+							<SelectTrigger id="imgModality" className="w-full">
+								<SelectValue placeholder="Select imaging modality">
+									{modality ? undefined : "Select imaging modality"}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="xray">X-Ray</SelectItem>
@@ -117,14 +133,19 @@ export function CreateImagingOrderDialog({
 							value={clinicalIndication}
 							onChange={(e) => setClinicalIndication(e.target.value)}
 							rows={2}
-							placeholder="Optional"
+							placeholder="Medical necessity for the requested imaging study"
 						/>
 					</div>
 
+					<Icd10IndicationPicker value={indicationDiagnosis} onChange={setIndicationDiagnosis} />
+
 					<div className="space-y-2">
 						<Label htmlFor="imgPriority">Priority</Label>
-						<Select value={priority} onValueChange={v => setPriority(v ?? "routine")}>
-							<SelectTrigger id="imgPriority">
+						<Select
+							value={priority}
+							onValueChange={v => setPriority((v ?? "routine") as OrderPriority)}
+						>
+							<SelectTrigger id="imgPriority" className="w-full">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
@@ -141,10 +162,16 @@ export function CreateImagingOrderDialog({
 						Cancel
 					</Button>
 					<Button
-						disabled={!modality || !bodyPart.trim() || createImagingOrder.isPending}
+						disabled={
+							!modality ||
+							!bodyPart.trim() ||
+							!clinicalIndication.trim() ||
+							!indicationDiagnosis ||
+							createImagingOrder.isPending
+						}
 						onClick={handleSubmit}
 					>
-						{createImagingOrder.isPending ? "Creating…" : "Create Imaging Order"}
+						{createImagingOrder.isPending ? "Signing..." : "Sign Imaging Order"}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

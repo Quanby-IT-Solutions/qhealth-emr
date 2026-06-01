@@ -26,6 +26,23 @@ export function useListStaffQuery(params: {
 	)
 }
 
+export function useSearchCliniciansQuery(input: {
+	facilityId: string
+	search?: string
+	excludeStaffProfileId?: string
+}) {
+	return useQuery({
+		...orpc.rbac.searchClinicians.queryOptions({
+			input: { ...input, search: input.search?.trim() || undefined },
+		}),
+		enabled: !!input.facilityId,
+	})
+}
+
+export function useVerifyCoSignCredentialsMutation() {
+	return useMutation(orpc.rbac.verifyCoSignCredentials.mutationOptions({}))
+}
+
 export function useListRolesQuery(facilityId: string) {
 	return useQuery(
 		orpc.rbac.listRoles.queryOptions({

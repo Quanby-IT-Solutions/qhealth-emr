@@ -5,16 +5,20 @@ import {
 	Logger,
 	NotFoundException,
 } from "@nestjs/common"
-import { and, count, desc, eq, inArray } from "drizzle-orm"
+import { and, count, desc, eq, inArray, isNull } from "drizzle-orm"
 
 import {
 	allergies,
 	clinicalNotes,
 	consentRecords,
 	encounters,
+	icd10Codes,
+	konsultaActivities,
 	labOrders,
 	noteAddenda,
 	noteTemplates,
+	patients,
+	preEncounters,
 	staffProfiles,
 	users,
 	vitalSigns,
@@ -260,6 +264,103 @@ export class ClinicalDocsService {
 		}
 	}
 
+	private isSoapTemplate(template: TemplateForValidation | null) {
+		if (!template) return false
+		const sectionKeys = new Set(template.sections.map(section => section.key.toLowerCase()))
+		return (
+			sectionKeys.has("subjective") &&
+			sectionKeys.has("objective") &&
+			sectionKeys.has("assessment") &&
+			sectionKeys.has("plan")
+		)
+	}
+
+	private extractIcd10DiagnosisCodes(data: unknown) {
+		if (!data || typeof data !== "object" || Array.isArray(data)) return []
+		const record = data as Record<string, unknown>
+		const codes = new Set<string>()
+
+		const selectedDiagnosis = record.icd10_diagnosis
+		if (
+			selectedDiagnosis &&
+			typeof selectedDiagnosis === "object" &&
+			!Array.isArray(selectedDiagnosis)
+		) {
+			const diagnosis = selectedDiagnosis as Record<string, unknown>
+			if (typeof diagnosis.icd10Code === "string" && diagnosis.icd10Code.trim()) {
+				codes.add(diagnosis.icd10Code.trim())
+			}
+		}
+
+		const primaryDiagnosis = record.primaryDiagnosis
+		if (
+			primaryDiagnosis &&
+			typeof primaryDiagnosis === "object" &&
+			!Array.isArray(primaryDiagnosis)
+		) {
+			const diagnosis = primaryDiagnosis as Record<string, unknown>
+			if (typeof diagnosis.code === "string" && diagnosis.code.trim()) {
+				codes.add(diagnosis.code.trim())
+			}
+		}
+
+		const diagnoses = record.diagnoses
+		if (Array.isArray(diagnoses)) {
+			for (const item of diagnoses) {
+				if (!item || typeof item !== "object" || Array.isArray(item)) continue
+				const diagnosis = item as Record<string, unknown>
+				if (typeof diagnosis.code === "string" && diagnosis.code.trim()) {
+					codes.add(diagnosis.code.trim())
+				}
+				if (typeof diagnosis.icdCode === "string" && diagnosis.icdCode.trim()) {
+					codes.add(diagnosis.icdCode.trim())
+				}
+			}
+		}
+
+		return [...codes]
+	}
+
+	private async assertIcd10DiagnosisCodesAreActive(codes: string[]) {
+		if (codes.length === 0) return
+
+		const rows = await db
+			.select({ code: icd10Codes.code })
+			.from(icd10Codes)
+			.where(and(inArray(icd10Codes.code, codes), eq(icd10Codes.isActive, true)))
+
+		const activeCodes = new Set(rows.map(row => row.code))
+		const invalidCodes = codes.filter(code => !activeCodes.has(code))
+		if (invalidCodes.length > 0) {
+			throw new BadRequestException(
+				`Select valid active ICD-10 code(s) before signing: ${invalidCodes.join(", ")}.`
+			)
+		}
+	}
+
+	private async assertIcd10DiagnosisPresentForSigning(input: {
+		noteType: NoteType
+		structuredData?: unknown
+		template: TemplateForValidation | null
+	}) {
+		const requiresIcd10 =
+			input.noteType === "consultation" ||
+			input.noteType === "fpe" ||
+			this.isSoapTemplate(input.template)
+
+		if (!requiresIcd10) return
+
+		const codes = this.extractIcd10DiagnosisCodes(input.structuredData)
+		if (codes.length > 0) {
+			await this.assertIcd10DiagnosisCodesAreActive(codes)
+			return
+		}
+
+		throw new BadRequestException(
+			"ICD-10 diagnosis is required before signing this clinical note."
+		)
+	}
+
 	private async assertNoteCanBeSaved(input: {
 		facilityId: string
 		noteType: NoteType
@@ -279,6 +380,47 @@ export class ClinicalDocsService {
 			structuredData: input.structuredData,
 			template,
 		})
+	}
+
+	private async assertNoteTargetCanBeSaved(input: {
+		facilityId: string
+		encounterId?: string | null
+		preEncounterId?: string | null
+	}) {
+		if (!!input.encounterId === !!input.preEncounterId) {
+			throw new BadRequestException(
+				"Clinical note drafts must be attached to exactly one encounter or pre-encounter."
+			)
+		}
+
+		if (input.encounterId) {
+			const [encounter] = await db
+				.select({ id: encounters.id, facilityId: encounters.facilityId })
+				.from(encounters)
+				.where(eq(encounters.id, input.encounterId))
+				.limit(1)
+
+			if (!encounter) throw new NotFoundException(`Encounter ${input.encounterId} not found`)
+			if (encounter.facilityId !== input.facilityId) {
+				throw new BadRequestException("Encounter does not belong to the selected facility.")
+			}
+			return
+		}
+
+		if (input.preEncounterId) {
+			const [preEncounter] = await db
+				.select({ id: preEncounters.id, facilityId: preEncounters.facilityId })
+				.from(preEncounters)
+				.where(eq(preEncounters.id, input.preEncounterId))
+				.limit(1)
+
+			if (!preEncounter) {
+				throw new NotFoundException(`Pre-encounter ${input.preEncounterId} not found`)
+			}
+			if (preEncounter.facilityId !== input.facilityId) {
+				throw new BadRequestException("Pre-encounter does not belong to the selected facility.")
+			}
+		}
 	}
 
 	// ========================================================================
@@ -415,7 +557,56 @@ export class ClinicalDocsService {
 		const limit = Number(input.limit ?? 50)
 		const offset = (page - 1) * limit
 
+		// Derive the target facility from the requested encounter / pre-encounter so that
+		// a clinician who knows another facility's encounter UUID cannot list its notes.
+		let resolvedFacilityId: string | null = null
+		if (input.encounterId) {
+			const [encounter] = await db
+				.select({ facilityId: encounters.facilityId })
+				.from(encounters)
+				.where(eq(encounters.id, input.encounterId))
+				.limit(1)
+			resolvedFacilityId = encounter?.facilityId ?? null
+		} else if (input.preEncounterId) {
+			const [preEncounter] = await db
+				.select({ facilityId: preEncounters.facilityId })
+				.from(preEncounters)
+				.where(eq(preEncounters.id, input.preEncounterId))
+				.limit(1)
+			resolvedFacilityId = preEncounter?.facilityId ?? null
+		}
+
+		if ((input.encounterId || input.preEncounterId) && !resolvedFacilityId) {
+			return {
+				data: [],
+				total: 0,
+				page,
+				limit,
+				totalPages: 0,
+			}
+		}
+
+		// If the caller's RBAC profile is known, require an active staff profile at the
+		// resolved facility. Without one, treat the encounter as out-of-scope and return empty.
+		if (resolvedFacilityId && actor?.rbacProfile) {
+			const hasFacilityProfile = actor.rbacProfile.staffProfiles.some(
+				profile => profile.facilityId === resolvedFacilityId
+			)
+			if (!hasFacilityProfile) {
+				return {
+					data: [],
+					total: 0,
+					page,
+					limit,
+					totalPages: 0,
+				}
+			}
+		}
+
 		const conditions = []
+		if (resolvedFacilityId) {
+			conditions.push(eq(clinicalNotes.facilityId, resolvedFacilityId))
+		}
 		if (input.encounterId) {
 			conditions.push(eq(clinicalNotes.encounterId, input.encounterId))
 		}
@@ -439,6 +630,8 @@ export class ClinicalDocsService {
 				facilityId: clinicalNotes.facilityId,
 				encounterId: clinicalNotes.encounterId,
 				preEncounterId: clinicalNotes.preEncounterId,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
 				templateId: clinicalNotes.templateId,
 				templateName: noteTemplates.name,
 				noteType: clinicalNotes.noteType,
@@ -455,6 +648,8 @@ export class ClinicalDocsService {
 			.from(clinicalNotes)
 			.leftJoin(staffProfiles, eq(clinicalNotes.authorStaffId, staffProfiles.id))
 			.leftJoin(users, eq(staffProfiles.userId, users.id))
+			.leftJoin(encounters, eq(clinicalNotes.encounterId, encounters.id))
+			.leftJoin(patients, eq(encounters.patientId, patients.id))
 			.leftJoin(noteTemplates, eq(clinicalNotes.templateId, noteTemplates.id))
 			.where(whereClause)
 			.orderBy(desc(clinicalNotes.createdAt))
@@ -462,9 +657,16 @@ export class ClinicalDocsService {
 			.offset(offset)
 
 		const total = totalResult?.count ?? 0
+		const data = rows.map(({ patientFirstName, patientLastName, ...note }) => ({
+			...note,
+			patientName:
+				patientFirstName && patientLastName
+					? `${patientLastName}, ${patientFirstName}`
+					: null,
+		}))
 
 		return {
-			data: rows,
+			data,
 			total,
 			page,
 			limit,
@@ -515,6 +717,7 @@ export class ClinicalDocsService {
 				authorStaffId: noteAddenda.authorStaffId,
 				authorStaffName: users.name,
 				signedAt: noteAddenda.signedAt,
+				signedIp: noteAddenda.signedIp,
 				createdAt: noteAddenda.createdAt,
 			})
 			.from(noteAddenda)
@@ -527,6 +730,11 @@ export class ClinicalDocsService {
 	}
 
 	async createNote(input: CreateNoteInput, userId: string) {
+		await this.assertNoteTargetCanBeSaved({
+			facilityId: input.facilityId,
+			encounterId: input.encounterId,
+			preEncounterId: input.preEncounterId,
+		})
 		await this.assertNoteCanBeSaved({
 			facilityId: input.facilityId,
 			noteType: input.noteType,
@@ -536,25 +744,28 @@ export class ClinicalDocsService {
 		})
 
 		const resolvedAuthorStaffId = await this.getStaffProfileId(userId, input.facilityId)
-		const [row] = await db
-			.insert(clinicalNotes)
-			.values({
-				facilityId: input.facilityId,
-				encounterId: input.encounterId ?? null,
-				preEncounterId: input.preEncounterId ?? null,
-				templateId: input.templateId ?? null,
-				noteType: input.noteType,
-				content: input.content ?? "",
-				structuredData: input.structuredData ?? null,
-				authorStaffId: resolvedAuthorStaffId,
-			})
-			.returning()
+		const [row] = await db.transaction(async tx => {
+			return tx
+				.insert(clinicalNotes)
+				.values({
+					facilityId: input.facilityId,
+					encounterId: input.encounterId ?? null,
+					preEncounterId: input.preEncounterId ?? null,
+					templateId: input.templateId ?? null,
+					noteType: input.noteType,
+					content: input.content ?? "",
+					structuredData: input.structuredData ?? null,
+					status: "draft",
+					authorStaffId: resolvedAuthorStaffId,
+				})
+				.returning()
+		})
 
 		this.logger.log(`Created clinical note ${row!.id}`)
 		return this.getNote(row!.id)
 	}
 
-	async updateNote(input: UpdateNoteInput) {
+	async updateNote(input: UpdateNoteInput, userId: string) {
 		// Verify note is still draft
 		const [existing] = await db
 			.select({
@@ -565,6 +776,7 @@ export class ClinicalDocsService {
 				content: clinicalNotes.content,
 				structuredData: clinicalNotes.structuredData,
 				status: clinicalNotes.status,
+				authorStaffId: clinicalNotes.authorStaffId,
 			})
 			.from(clinicalNotes)
 			.where(eq(clinicalNotes.id, input.id))
@@ -572,6 +784,11 @@ export class ClinicalDocsService {
 		if (!existing) throw new NotFoundException(`Clinical note ${input.id} not found`)
 		if (existing.status === "signed") {
 			throw new BadRequestException("Cannot edit a signed note. Add an addendum instead.")
+		}
+
+		const editorStaffId = await this.getStaffProfileId(userId, existing.facilityId)
+		if (editorStaffId !== existing.authorStaffId) {
+			throw new ForbiddenException("Only the original author can edit this note.")
 		}
 
 		await this.assertNoteCanBeSaved({
@@ -597,6 +814,10 @@ export class ClinicalDocsService {
 		if (!data || typeof data !== "object" || Array.isArray(data)) {
 			return { valid: false, missingFields: ["All required FPE fields"] }
 		}
+		const icd10Pattern = /^[A-Z][0-9][0-9A-Z](\.[0-9A-Z]{1,4})?$/
+		const bloodPressurePattern = /^\d{2,3}\/\d{2,3}$/
+		const wholeNumberPattern = /^\d{1,3}$/
+		const decimalPattern = /^\d{1,3}(\.\d{1,2})?$/
 		const d = data as Record<string, unknown>
 		const vs =
 			d.vitalSigns && typeof d.vitalSigns === "object" && !Array.isArray(d.vitalSigns)
@@ -608,16 +829,45 @@ export class ClinicalDocsService {
 			!Array.isArray(d.primaryDiagnosis)
 				? (d.primaryDiagnosis as Record<string, unknown>)
 				: {}
+		const hasText = (value: unknown) => typeof value === "string" && value.trim().length > 0
+		const textValue = (value: unknown) => (typeof value === "string" ? value.trim() : "")
 
 		const missing: string[] = []
-		if (!d.chiefComplaint) missing.push("Chief Complaint")
-		if (!vs.bloodPressure) missing.push("Blood Pressure")
-		if (!vs.weight) missing.push("Weight")
-		if (!vs.height) missing.push("Height")
-		if (!pd.code) missing.push("Primary Diagnosis Code")
-		if (!pd.description) missing.push("Primary Diagnosis Description")
-		if (!d.historyOfPresentIllness) missing.push("History of Present Illness")
-		if (!d.physicalExamGeneral) missing.push("Physical Exam (General)")
+		if (!hasText(d.chiefComplaint)) missing.push("Chief Complaint")
+		if (!hasText(vs.bloodPressure)) missing.push("Blood Pressure")
+		if (!hasText(vs.weight)) missing.push("Weight")
+		if (!hasText(vs.height)) missing.push("Height")
+		if (!hasText(pd.code)) missing.push("Primary Diagnosis Code")
+		if (!hasText(pd.description)) missing.push("Primary Diagnosis Description")
+		if (!hasText(d.socialHistory)) missing.push("Lifestyle / Social History")
+		if (!hasText(d.mentalHealthScreening)) missing.push("Mental Health Screening")
+		if (!hasText(d.historyOfPresentIllness)) missing.push("History of Present Illness")
+		if (!hasText(d.physicalExamGeneral)) missing.push("Physical Exam (General)")
+
+		if (hasText(pd.code) && !icd10Pattern.test(textValue(pd.code))) {
+			missing.push("Primary Diagnosis Code must use ICD-10 format")
+		}
+		if (hasText(vs.bloodPressure) && !bloodPressurePattern.test(textValue(vs.bloodPressure))) {
+			missing.push("Blood Pressure must use systolic/diastolic format")
+		}
+		for (const [field, label] of [
+			["heartRate", "Heart Rate"],
+			["respiratoryRate", "Respiratory Rate"],
+			["oxygenSaturation", "O2 Saturation"],
+		] as const) {
+			if (hasText(vs[field]) && !wholeNumberPattern.test(textValue(vs[field]))) {
+				missing.push(`${label} must be a whole number`)
+			}
+		}
+		for (const [field, label] of [
+			["temperature", "Temperature"],
+			["weight", "Weight"],
+			["height", "Height"],
+		] as const) {
+			if (hasText(vs[field]) && !decimalPattern.test(textValue(vs[field]))) {
+				missing.push(`${label} must be a number with up to 2 decimals`)
+			}
+		}
 
 		return { valid: missing.length === 0, missingFields: missing }
 	}
@@ -627,9 +877,11 @@ export class ClinicalDocsService {
 			.select({
 				id: clinicalNotes.id,
 				facilityId: clinicalNotes.facilityId,
+				encounterId: clinicalNotes.encounterId,
 				noteType: clinicalNotes.noteType,
 				status: clinicalNotes.status,
 				structuredData: clinicalNotes.structuredData,
+				authorStaffId: clinicalNotes.authorStaffId,
 			})
 			.from(clinicalNotes)
 			.where(eq(clinicalNotes.id, input.noteId))
@@ -644,10 +896,110 @@ export class ClinicalDocsService {
 
 		const { valid, missingFields } = this.validateKonsultaCompleteness(existing.structuredData)
 		if (!valid) {
-			throw new BadRequestException(`Missing required FPE fields: ${missingFields.join(", ")}`)
+			throw new BadRequestException(`FPE data is incomplete or invalid: ${missingFields.join(", ")}`)
 		}
 
-		return this.signNote({ id: input.noteId }, signedIp, userId)
+		if (!existing.encounterId) {
+			throw new BadRequestException("FPE notes must be attached to an encounter.")
+		}
+
+		const signerStaffId = await this.getStaffProfileId(userId, existing.facilityId)
+		if (signerStaffId !== existing.authorStaffId) {
+			throw new ForbiddenException("Only the original author can submit this FPE note.")
+		}
+
+		const [encounter] = await db
+			.select({
+				id: encounters.id,
+				patientId: encounters.patientId,
+				facilityId: encounters.facilityId,
+			})
+			.from(encounters)
+			.where(eq(encounters.id, existing.encounterId))
+			.limit(1)
+
+		if (!encounter) throw new NotFoundException(`Encounter ${existing.encounterId} not found`)
+		if (encounter.facilityId !== existing.facilityId || encounter.facilityId !== input.facilityId) {
+			throw new BadRequestException("FPE note does not belong to the selected facility.")
+		}
+
+		const [patient] = await db
+			.select({ philhealthMemberId: patients.philhealthMemberId })
+			.from(patients)
+			.where(eq(patients.id, encounter.patientId))
+			.limit(1)
+
+		if (!patient?.philhealthMemberId) {
+			throw new BadRequestException("Patient does not have an active PhilHealth PIN for Konsulta FPE.")
+		}
+
+		const [dpaConsent] = await db
+			.select({ id: consentRecords.id })
+			.from(consentRecords)
+			.where(
+				and(
+					eq(consentRecords.facilityId, existing.facilityId),
+					eq(consentRecords.patientId, encounter.patientId),
+					eq(consentRecords.consentType, "dpa"),
+					eq(consentRecords.isActive, true),
+					isNull(consentRecords.revokedAt)
+				)
+			)
+			.orderBy(desc(consentRecords.signedAt), desc(consentRecords.createdAt))
+			.limit(1)
+
+		if (!dpaConsent) {
+			throw new BadRequestException(
+				"Active Data Privacy Act consent is required before submitting an FPE for Konsulta capitation."
+			)
+		}
+
+		const signedAt = new Date()
+		const activityDate = signedAt.toISOString().slice(0, 10)
+
+		await db.transaction(async tx => {
+			await tx
+				.update(clinicalNotes)
+				.set({
+					status: "signed",
+					signedAt,
+					signedIp,
+					updatedAt: signedAt,
+				})
+				.where(eq(clinicalNotes.id, input.noteId))
+
+			await tx
+				.insert(konsultaActivities)
+				.values({
+					patientId: encounter.patientId,
+					facilityId: existing.facilityId,
+					activityType: "FPE",
+					activityDate,
+					sourceRef: input.noteId,
+				})
+				.onConflictDoNothing()
+		})
+
+		await this.auditService.log({
+			facilityId: existing.facilityId,
+			userId,
+			staffProfileId: signerStaffId,
+			action: "sign",
+			entityType: "clinical_note",
+			entityId: existing.id,
+			beforeState: { status: existing.status },
+			afterState: { status: "signed", signedAt: signedAt.toISOString(), signedIp },
+			ipAddress: signedIp,
+			userAgent: null,
+			metadata: {
+				operation: "submitFpe",
+				konsultaActivityType: "FPE",
+				konsultaActivityDate: activityDate,
+			},
+		})
+
+		this.logger.log(`Submitted FPE note ${input.noteId} and recorded Konsulta activity`)
+		return this.getNote(input.noteId)
 	}
 
 	async signNote(input: SignNoteInput, signedIp: string, userId: string) {
@@ -655,6 +1007,9 @@ export class ClinicalDocsService {
 			.select({
 				id: clinicalNotes.id,
 				facilityId: clinicalNotes.facilityId,
+				templateId: clinicalNotes.templateId,
+				noteType: clinicalNotes.noteType,
+				structuredData: clinicalNotes.structuredData,
 				status: clinicalNotes.status,
 				authorStaffId: clinicalNotes.authorStaffId,
 			})
@@ -665,6 +1020,15 @@ export class ClinicalDocsService {
 		if (existing.status === "signed") {
 			throw new BadRequestException("Note is already signed.")
 		}
+
+		const template = existing.templateId
+			? await this.getTemplateForValidation(existing.templateId)
+			: null
+		await this.assertIcd10DiagnosisPresentForSigning({
+			noteType: existing.noteType,
+			structuredData: existing.structuredData,
+			template,
+		})
 
 		const signerStaffId = await this.getStaffProfileId(userId, existing.facilityId)
 		if (signerStaffId !== existing.authorStaffId) {
@@ -829,7 +1193,7 @@ export class ClinicalDocsService {
 		return this.getAddendum(row!.id)
 	}
 
-	async signAddendum(input: SignAddendumInput, userId: string) {
+	async signAddendum(input: SignAddendumInput, userId: string, signedIp: string) {
 		const [existing] = await db
 			.select({
 				id: noteAddenda.id,
@@ -860,7 +1224,7 @@ export class ClinicalDocsService {
 		const signedAt = new Date()
 		await db
 			.update(noteAddenda)
-			.set({ status: "signed", signedAt })
+			.set({ status: "signed", signedAt, signedIp })
 			.where(eq(noteAddenda.id, input.id))
 
 		await this.auditService.log({
@@ -871,8 +1235,8 @@ export class ClinicalDocsService {
 			entityType: "note_addendum",
 			entityId: existing.id,
 			beforeState: { status: existing.status },
-			afterState: { status: "signed", signedAt: signedAt.toISOString() },
-			ipAddress: null,
+			afterState: { status: "signed", signedAt: signedAt.toISOString(), signedIp },
+			ipAddress: signedIp,
 			userAgent: null,
 			metadata: { noteId: existing.noteId },
 		})
@@ -892,6 +1256,7 @@ export class ClinicalDocsService {
 				authorStaffId: noteAddenda.authorStaffId,
 				authorStaffName: users.name,
 				signedAt: noteAddenda.signedAt,
+				signedIp: noteAddenda.signedIp,
 				createdAt: noteAddenda.createdAt,
 			})
 			.from(noteAddenda)
@@ -954,6 +1319,7 @@ export class ClinicalDocsService {
 				witnessStaffId: consentRecords.witnessStaffId,
 				witnessStaffName: users.name,
 				revokedAt: consentRecords.revokedAt,
+				revocationReason: consentRecords.revocationReason,
 				createdAt: consentRecords.createdAt,
 				updatedAt: consentRecords.updatedAt,
 			})
@@ -992,6 +1358,7 @@ export class ClinicalDocsService {
 				witnessStaffId: consentRecords.witnessStaffId,
 				witnessStaffName: users.name,
 				revokedAt: consentRecords.revokedAt,
+				revocationReason: consentRecords.revocationReason,
 				createdAt: consentRecords.createdAt,
 				updatedAt: consentRecords.updatedAt,
 			})
@@ -1050,7 +1417,11 @@ export class ClinicalDocsService {
 
 		await db
 			.update(consentRecords)
-			.set({ revokedAt: new Date(), updatedAt: new Date() })
+			.set({
+				revokedAt: new Date(),
+				revocationReason: input.reason ?? null,
+				updatedAt: new Date(),
+			})
 			.where(eq(consentRecords.id, input.id))
 
 		this.logger.log(`Revoked consent record ${input.id}`)

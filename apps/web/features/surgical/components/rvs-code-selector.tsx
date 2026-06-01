@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Loader2, Plus, Trash2 } from "lucide-react"
+import { CheckCircle2, ChevronUp, Loader2, Lock, Plus, ShieldAlert, Trash2 } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -43,12 +43,18 @@ interface ProcedureCoverage {
 	label: string
 	primaryCount: number
 	adjunctCount: number
+	finalizedPrimaryCount: number
 	isReady: boolean
 }
 
 function statusBadge(status: RvsCodeStatus) {
 	if (status === "finalized") {
-		return <Badge variant="default">{formatStatus(status)}</Badge>
+		return (
+			<Badge variant="default" className="gap-1">
+				<Lock className="size-3" />
+				{formatStatus(status)}
+			</Badge>
+		)
 	}
 	if (status === "validated") {
 		return <Badge variant="secondary">{formatStatus(status)}</Badge>
@@ -64,34 +70,118 @@ function formatAssignmentType(type: RvsAssignmentType) {
 	return type === "primary" ? "Primary" : "Adjunct"
 }
 
+function modifierInput(value: string) {
+	return value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 2)
+}
+
+function positiveWholeNumberInput(value: string) {
+	return value.replace(/\D/g, "").replace(/^0+(?=\d)/, "")
+}
+
 interface SearchResultRowProps {
 	code: RvsCode
-	onSuggest: (rvsCodeId: string) => void
+	isExpanded: boolean
+	onExpand: (id: string) => void
+	onCollapse: () => void
+	onConfirm: (rvsCodeId: string, modifier: string, units: number) => void
 	isSuggesting: boolean
 	canSuggest: boolean
 }
 
-function SearchResultRow({ code, onSuggest, isSuggesting, canSuggest }: SearchResultRowProps) {
+function SearchResultRow({
+	code,
+	isExpanded,
+	onExpand,
+	onCollapse,
+	onConfirm,
+	isSuggesting,
+	canSuggest,
+}: SearchResultRowProps) {
+	const [modifier, setModifier] = useState("")
+	const [units, setUnits] = useState("1")
+
+	function handleExpand() {
+		setModifier("")
+		setUnits("1")
+		onExpand(code.id)
+	}
+
+	function handleConfirm() {
+		onConfirm(code.id, modifier, Number(units || "1"))
+	}
+
 	return (
-		<TableRow>
-			<TableCell className="font-mono text-sm">{code.code}</TableCell>
-			<TableCell className="text-sm">{code.description}</TableCell>
-			<TableCell className="text-right">
-				<Button
-					size="sm"
-					variant="outline"
-					disabled={!canSuggest || isSuggesting}
-					onClick={() => onSuggest(code.id)}
-				>
-					{isSuggesting ? (
-						<Loader2 className="size-3.5 animate-spin" />
+		<>
+			<TableRow>
+				<TableCell className="font-mono text-sm">{code.code}</TableCell>
+				<TableCell className="text-sm">{code.description}</TableCell>
+				<TableCell className="text-right">
+					{isExpanded ? (
+						<Button size="sm" variant="ghost" onClick={onCollapse} aria-label="Cancel">
+							<ChevronUp className="size-3.5" />
+						</Button>
 					) : (
-						<Plus className="size-3.5" />
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={!canSuggest || isSuggesting}
+							onClick={handleExpand}
+						>
+							{isSuggesting ? (
+								<Loader2 className="size-3.5 animate-spin" />
+							) : (
+								<Plus className="size-3.5" />
+							)}
+							Suggest
+						</Button>
 					)}
-					Suggest
-				</Button>
-			</TableCell>
-		</TableRow>
+				</TableCell>
+			</TableRow>
+			{isExpanded ? (
+				<TableRow>
+					<TableCell colSpan={3} className="bg-muted/40 py-3">
+						<div className="flex flex-wrap items-end gap-3 px-1">
+							<div className="space-y-1">
+								<Label className="text-xs">Modifier (optional)</Label>
+								<Input
+									className="h-8 w-24 text-sm"
+									placeholder="e.g. 50"
+									maxLength={2}
+									value={modifier}
+									onChange={e => setModifier(modifierInput(e.target.value))}
+									disabled={isSuggesting}
+								/>
+							</div>
+							<div className="space-y-1">
+								<Label className="text-xs">Units</Label>
+								<Input
+									className="h-8 w-20 text-sm"
+									inputMode="numeric"
+									pattern="[0-9]*"
+									value={units}
+									onChange={e => setUnits(positiveWholeNumberInput(e.target.value))}
+									onBlur={() => {
+										if (!units) setUnits("1")
+									}}
+									disabled={isSuggesting}
+								/>
+							</div>
+							<Button
+								size="sm"
+								disabled={isSuggesting}
+								onClick={handleConfirm}
+							>
+								{isSuggesting ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : null}
+								Add
+							</Button>
+							<Button size="sm" variant="ghost" onClick={onCollapse} disabled={isSuggesting}>
+								Cancel
+							</Button>
+						</div>
+					</TableCell>
+				</TableRow>
+			) : null}
+		</>
 	)
 }
 
@@ -120,7 +210,7 @@ function AssignmentRow({
 	isUpdating,
 	isRemoving,
 }: AssignmentRowProps) {
-	const disableMutations = !isOperationRecordSigned
+	const disableStatusUpdate = !isOperationRecordSigned
 	const procedureLabel = assignment.procedureLabel ?? defaultProcedureLabel ?? "Legacy assignment"
 
 	return (
@@ -138,7 +228,7 @@ function AssignmentRow({
 						<Button
 							size="sm"
 							variant="outline"
-							disabled={disableMutations || isUpdating}
+							disabled={disableStatusUpdate || isUpdating}
 							onClick={() => onUpdateStatus(assignment.id, "validated")}
 						>
 							{isUpdating ? <Loader2 className="size-3.5 animate-spin" /> : null}
@@ -148,19 +238,19 @@ function AssignmentRow({
 					{assignment.status === "validated" && canFinalize ? (
 						<Button
 							size="sm"
-							disabled={disableMutations || isUpdating}
+							disabled={disableStatusUpdate || isUpdating}
 							onClick={() => onUpdateStatus(assignment.id, "finalized")}
 						>
 							{isUpdating ? <Loader2 className="size-3.5 animate-spin" /> : null}
 							Finalize
 						</Button>
 					) : null}
-					{assignment.status !== "finalized" && canEdit ? (
+					{assignment.status === "suggested" && canEdit && isOperationRecordSigned ? (
 						<Button
 							size="sm"
 							variant="ghost"
 							aria-label={`Remove ${assignment.code}`}
-							disabled={disableMutations || isRemoving}
+							disabled={isRemoving}
 							onClick={() => onRemove(assignment.id)}
 						>
 							<Trash2 className="size-3.5 text-red-500" />
@@ -198,6 +288,9 @@ function SearchPanel({
 	const search = useRvsCodeSearchQuery(debouncedQuery.length >= 2 ? debouncedQuery : "")
 	const suggest = useSuggestRvsCodeMutation()
 	const results = search.data?.data ?? []
+
+	const [expandedCodeId, setExpandedCodeId] = useState<string | null>(null)
+
 	const selectedProcedure = procedureCoverage.find(
 		procedure =>
 			normalizeProcedureLabel(procedure.label) === normalizeProcedureLabel(selectedProcedureLabel)
@@ -209,17 +302,22 @@ function SearchPanel({
 		!!selectedProcedureLabel &&
 		!(assignmentType === "primary" && hasPrimaryForSelectedProcedure)
 
-	function handleSuggest(rvsCodeId: string) {
-		if (!selectedProcedureLabel) {
-			return
-		}
+	function handleConfirm(rvsCodeId: string, modifier: string, units: number) {
+		if (!selectedProcedureLabel) return
 
-		suggest.mutate({
-			caseId,
-			rvsCodeId,
-			procedureLabel: selectedProcedureLabel,
-			assignmentType,
-		})
+		suggest.mutate(
+			{
+				caseId,
+				rvsCodeId,
+				procedureLabel: selectedProcedureLabel,
+				assignmentType,
+				modifier: modifier || undefined,
+				units,
+			},
+			{
+				onSuccess: () => setExpandedCodeId(null),
+			}
+		)
 	}
 
 	return (
@@ -259,7 +357,7 @@ function SearchPanel({
 				)}
 			</div>
 
-			<div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+			<div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(180px,220px)]">
 				<div>
 					<Label htmlFor="rvsSearch" className="mb-1 block text-sm">
 						Search RVS/CPT Codes
@@ -269,7 +367,7 @@ function SearchPanel({
 						placeholder="Type at least 2 characters (e.g. cholecyst, 47562)..."
 						value={query}
 						onChange={event => setQuery(event.target.value)}
-						className="max-w-md"
+						className="w-full"
 					/>
 				</div>
 
@@ -279,7 +377,7 @@ function SearchPanel({
 						value={assignmentType}
 						onValueChange={value => onAssignmentTypeChange(value as RvsAssignmentType)}
 					>
-						<SelectTrigger>
+						<SelectTrigger className="w-full justify-between">
 							<SelectValue>{assignmentType || "Select type"}</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
@@ -330,7 +428,10 @@ function SearchPanel({
 									<SearchResultRow
 										key={code.id}
 										code={code}
-										onSuggest={handleSuggest}
+										isExpanded={expandedCodeId === code.id}
+										onExpand={id => setExpandedCodeId(id)}
+										onCollapse={() => setExpandedCodeId(null)}
+										onConfirm={handleConfirm}
 										canSuggest={canSuggest}
 										isSuggesting={suggest.isPending && suggest.variables?.rvsCodeId === code.id}
 									/>
@@ -339,7 +440,7 @@ function SearchPanel({
 						</Table>
 					) : (
 						<p className="text-muted-foreground p-4 text-sm">
-							No codes matched "{debouncedQuery}".
+							No codes matched &quot;{debouncedQuery}&quot;.
 						</p>
 					)}
 				</div>
@@ -406,11 +507,16 @@ export function RvsCodeSelector({
 			const adjunctCount = relatedAssignments.filter(
 				assignment => assignment.assignmentType === "adjunct"
 			).length
+			const finalizedPrimaryCount = relatedAssignments.filter(
+				assignment =>
+					assignment.assignmentType === "primary" && assignment.status === "finalized"
+			).length
 
 			return {
 				label: procedure.label,
 				primaryCount,
 				adjunctCount,
+				finalizedPrimaryCount,
 				isReady: primaryCount > 0,
 			}
 		})
@@ -425,23 +531,27 @@ export function RvsCodeSelector({
 			.reduce((sum, assignment) => sum + (assignment.units ?? 1), 0)
 	}, [assignments.data])
 
+	const hasAnyAssignment = (assignments.data?.length ?? 0) > 0
 	const missingPrimaryCount = procedureCoverage.filter(procedure => !procedure.isReady).length
+	const missingFinalizedPrimaryCount = procedureCoverage.filter(
+		procedure => procedure.finalizedPrimaryCount === 0
+	).length
+	const claimReady =
+		procedureCoverage.length > 0 &&
+		missingPrimaryCount === 0 &&
+		missingFinalizedPrimaryCount === 0
+	const pendingBillingReview =
+		missingPrimaryCount === 0 &&
+		hasAnyAssignment &&
+		missingFinalizedPrimaryCount > 0
 
-	useEffect(() => {
-		if (procedureCoverage.length === 0) {
-			setSelectedProcedureLabel("")
-			return
-		}
-
-		const selectedStillExists = procedureCoverage.some(
-			procedure =>
-				normalizeProcedureLabel(procedure.label) === normalizeProcedureLabel(selectedProcedureLabel)
-		)
-
-		if (!selectedStillExists) {
-			setSelectedProcedureLabel(procedureCoverage[0]!.label)
-		}
-	}, [procedureCoverage, selectedProcedureLabel])
+	const selectedStillExists = procedureCoverage.some(
+		procedure =>
+			normalizeProcedureLabel(procedure.label) === normalizeProcedureLabel(selectedProcedureLabel)
+	)
+	const effectiveSelectedProcedureLabel = selectedStillExists
+		? selectedProcedureLabel
+		: (procedureCoverage[0]?.label ?? "")
 
 	function handleUpdateStatus(id: string, status: RvsCodeStatus) {
 		updateStatus.mutate({ caseId, assignmentId: id, status })
@@ -466,24 +576,46 @@ export function RvsCodeSelector({
 				</CardHeader>
 				<CardContent className="space-y-4">
 					{!isOperationRecordSigned ? (
-						<div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-							Sign the operative record first. RVS search remains available, but suggesting,
-							validating, finalizing, and removing codes stays locked until the record is signed.
+						<div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+							<Lock className="mt-0.5 size-4 shrink-0 text-amber-600" />
+							<p>
+								Sign the operative record before mapping, validating, or finalizing RVS codes.
+							</p>
 						</div>
 					) : null}
-					{procedureCoverage.length > 0 ? (
-						<div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-							{missingPrimaryCount === 0
-								? "All listed procedures already have a primary RVS code."
-								: `${missingPrimaryCount} procedure${missingPrimaryCount === 1 ? "" : "s"} still need a primary RVS code before surgical billing is ready.`}
+
+					{claimReady ? (
+						<div className="flex items-start gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+							<CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-600" />
+							<p>
+								All procedures mapped with finalized primary RVS codes. Claim is ready for
+								submission.
+							</p>
+						</div>
+					) : pendingBillingReview ? (
+						<div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+							<ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+							<p>
+								All procedures mapped. Awaiting billing team validation and finalization before
+								PhilHealth claim can be submitted.
+							</p>
+						</div>
+					) : procedureCoverage.length > 0 ? (
+						<div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+							<ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+							<p>
+								{missingPrimaryCount} procedure{missingPrimaryCount === 1 ? "" : "s"} still need
+								a primary RVS code before surgical billing is ready.
+							</p>
 						</div>
 					) : null}
+
 					<SearchPanel
 						caseId={caseId}
 						canEdit={canEdit}
 						isOperationRecordSigned={isOperationRecordSigned}
 						procedureCoverage={procedureCoverage}
-						selectedProcedureLabel={selectedProcedureLabel}
+						selectedProcedureLabel={effectiveSelectedProcedureLabel}
 						onSelectProcedure={setSelectedProcedureLabel}
 						assignmentType={assignmentType}
 						onAssignmentTypeChange={setAssignmentType}

@@ -31,6 +31,8 @@ export const BedStatusEnum = z.enum([
 	"reserved",
 	"cleaning",
 	"out_of_service",
+	"pending_transfer",
+	"dirty",
 ])
 
 // ============================================================================
@@ -122,7 +124,7 @@ export type CreateWardInput = z.infer<typeof CreateWardSchema>
 export const CreateBedSchema = z.object({
 	wardId: z.string().uuid(),
 	facilityId: z.string().uuid(),
-	bedNumber: z.string().min(1).max(50),
+	bedNumber: z.string().trim().min(1).max(50),
 })
 
 export type CreateBedInput = z.infer<typeof CreateBedSchema>

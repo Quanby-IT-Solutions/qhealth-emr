@@ -1,6 +1,11 @@
 import { createEnv } from "@t3-oss/env-core"
 import { z } from "zod"
 
+const emptyStringToUndefined = (value: unknown) => (value === "" ? undefined : value)
+
+const optionalString = z.preprocess(emptyStringToUndefined, z.string().optional())
+const optionalUrl = z.preprocess(emptyStringToUndefined, z.string().url().optional())
+
 /**
  * Type-safe environment variable validation for Backend API
  *
@@ -54,6 +59,36 @@ export const env = createEnv({
 		PHILHEALTH_MOCK_REMAINING_BENEFIT: z.coerce.number().default(45000),
 		PHILHEALTH_MOCK_ERROR_MESSAGE: z.string().default("Mock PhilHealth error response."),
 
+		// LiveKit video conferencing
+		LIVEKIT_MODE: z.enum(["mock", "real"]).default("mock"),
+		LIVEKIT_API_KEY: optionalString,
+		LIVEKIT_API_SECRET: optionalString,
+		LIVEKIT_WS_URL: optionalUrl,
+
+		// ElevenLabs speech-to-text
+		ELEVENLABS_API_KEY: optionalString,
+
+		// File storage for generated artifacts
+		FILE_STORAGE_TYPE: z.enum(["local", "s3"]).default("local"),
+		FILE_STORAGE_PATH: z.string().default("./storage"),
+		FILE_STORAGE_BASE_URL: z.string().default("/storage"),
+		AWS_S3_BUCKET: optionalString,
+		AWS_REGION: z.string().default("ap-southeast-1"),
+		AWS_ACCESS_KEY_ID: optionalString,
+		AWS_SECRET_ACCESS_KEY: optionalString,
+
+		// Outbound SMTP for clinical document delivery (abstract, e-Rx).
+		// When MAILER_MODE=smtp and host/user/pass/from are set, NodemailerMailer
+		// is used. Otherwise LogOnlyMailer logs the send and the document is still
+		// marked sent with a warning audit entry (mailerConfigured: false).
+		MAILER_MODE: z.enum(["log", "smtp"]).default("log"),
+		SMTP_HOST: optionalString,
+		SMTP_PORT: z.coerce.number().int().positive().optional(),
+		SMTP_USER: optionalString,
+		SMTP_PASS: optionalString,
+		SMTP_FROM: optionalString,
+		SMTP_SECURE: z.coerce.boolean().default(false),
+
 		// NHDR (National Health Data Repository) integration
 		NHDR_MODE: z.enum(["mock", "real"]).default("mock"),
 		NHDR_BASE_URL: z.string().url().optional(),
@@ -62,6 +97,10 @@ export const env = createEnv({
 		// Additional integration credential env-vars
 		FHIR_API_KEY: z.string().optional(),
 		CIVIL_REGISTRY_API_KEY: z.string().optional(),
+		LCR_API_ENABLED: z.coerce.boolean().default(false),
+		LCR_API_BASE_URL: optionalUrl,
+		LCR_API_KEY: optionalString,
+		LCR_API_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
 		HAI_API_KEY: z.string().optional(),
 		ERP_API_KEY: z.string().optional(),
 		LIS_API_KEY: z.string().optional(),

@@ -5,42 +5,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { type v1Contract } from "@repo/contracts"
 
-import { env } from "@/env"
 import { orpc } from "@/services/orpc/client"
-
-// Pharmacy endpoints are under /orders/pharmacy in the backend
-const ORDERS_BASE = `${env.NEXT_PUBLIC_API_BASE_URL}/v1/orders`
-const PHARMACY_BASE = `${ORDERS_BASE}/pharmacy`
 
 type V1Outputs = InferContractRouterOutputs<typeof v1Contract>
 type RawMedOrder = V1Outputs["orders"]["getMedOrder"]
 type RawVerificationQueueResponse = V1Outputs["orders"]["getVerificationQueue"]
-
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-	const res = await fetch(url, {
-		credentials: "include",
-		...init,
-		headers: {
-			"Content-Type": "application/json",
-			...init?.headers,
-		},
-	})
-	if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-	return res.json() as Promise<T>
-}
-
-function buildQueryString(
-	params: Record<string, string | number | boolean | undefined>
-): string {
-	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
-	if (entries.length === 0) return ""
-	return (
-		"?" +
-		entries
-			.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-			.join("&")
-	)
-}
 
 // ============================================================================
 // Types
@@ -74,6 +43,8 @@ export interface PharmacyQueueItem {
 	prnReason: string | null
 	isControlledSubstance: boolean
 	pdeaSchedule: string | null
+	pdeaTrancheNumber: number | null
+	pdeaTrancheTotal: number | null
 	priority: OrderPriority
 	status: QueueStatus
 	orderingStaffId: string
@@ -139,10 +110,10 @@ export interface OpdPrescription {
 	patientName: string
 	patientMrn: string
 	patientDateOfBirth: string | null
-	prescriberName: string
+	prescriberName: string | null
 	prescriberPrc: string
-	prescribedAt: string
-	status: "active" | "partially_dispensed" | "dispensed" | "expired" | "cancelled"
+	prescribedAt: string | Date
+	status: "draft" | "signed" | "issued"
 	items: OpdPrescriptionItem[]
 	philhealthPin: string | null
 	philhealthCoverage: number
@@ -236,6 +207,8 @@ function mapPharmacyQueueItem(order: RawMedOrder): PharmacyQueueItem {
 		prnReason: order.prnReason,
 		isControlledSubstance: order.isControlledSubstance,
 		pdeaSchedule: order.pdeaSchedule,
+		pdeaTrancheNumber: order.pdeaTrancheNumber,
+		pdeaTrancheTotal: order.pdeaTrancheTotal,
 		priority: (order.priority ?? "routine") as OrderPriority,
 		status: normalizeQueueStatus(order.status),
 		orderingStaffId: order.orderingStaffId,
@@ -377,7 +350,7 @@ export function usePharmacyQueueQuery(params: PharmacyQueueParams) {
 export function usePharmacyOrderDetailQuery(id: string | null) {
 	return useQuery({
 		...orpc.orders.getMedOrder.queryOptions({
-			input: id ? { id } : undefined,
+			input: { id: id ?? "" },
 			enabled: !!id,
 			select: mapPharmacyOrderDetail,
 		}),
@@ -455,6 +428,40 @@ export function useDispenseOrderMutation() {
 // OPD Dispensing
 // ============================================================================
 
+export interface OpdPrescriptionQueueItem {
+	id: string
+	prescriptionNumber: string
+	patientName: string
+	patientMrn: string
+	patientDateOfBirth: string | null
+	prescriberName: string | null
+	prescribedAt: string
+	status: "draft" | "signed" | "issued"
+	medicationSummary: string
+}
+
+export interface OpdPrescriptionListParams {
+	facilityId?: string
+	status?: "signed" | "issued" | "all"
+	page?: number
+	limit?: number
+}
+
+export function useOpdPrescriptionQueueQuery(params: OpdPrescriptionListParams) {
+	return useQuery({
+		...orpc.orders.listOpdPrescriptions.queryOptions({
+			input: {
+				facilityId: params.facilityId,
+				status: params.status ?? "signed",
+				page: params.page ?? 1,
+				limit: params.limit ?? 20,
+			},
+		}),
+		queryKey: [...pharmacyKeys.all, "opd-queue", params] as const,
+		refetchInterval: 30 * 1000,
+	})
+}
+
 export function useOpdPrescriptionSearchQuery(search: string) {
 	return useQuery({
 		...orpc.orders.searchOpdPrescription.queryOptions({
@@ -530,7 +537,7 @@ export interface SaveCounselingLogInput {
 	encounterId?: string
 	patientId?: string
 	medicationOrderId?: string
-	checklistItems: Array<{ label: string; checked: boolean }>
+	checklistItems: Array<{ item: string; checked: boolean }>
 	patientSignature?: string
 }
 

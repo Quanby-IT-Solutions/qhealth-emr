@@ -9,6 +9,8 @@ export const DeathReportStatusSchema = z.object({
 	hasFndrf: z.boolean(),
 	fmdrfId: z.string().uuid().nullable(),
 	fndrfId: z.string().uuid().nullable(),
+	fmdrfStatus: z.enum(["draft", "completed", "submitted"]).nullable(),
+	fndrfStatus: z.enum(["draft", "completed", "submitted"]).nullable(),
 })
 
 export const GetDeathReportStatusInputSchema = z.object({
@@ -33,6 +35,7 @@ export const FmdrfReportSchema = z.object({
 
 	// Section 2 – Death Details
 	dateOfDeath: z.string(), // ISO datetime
+	placeOfDeath: z.string(),
 	causeOfDeathImmediate: z.string(),
 	causeOfDeathAntecedent: z.string(),
 	causeOfDeathUnderlying: z.string(),
@@ -65,12 +68,14 @@ export const FmdrfReportSchema = z.object({
 	physicianSignatureDataUrl: z.string(),
 	certificationDate: z.string(),
 
+	status: z.enum(["draft", "completed", "submitted"]),
 	createdAt: z.string(),
 	updatedAt: z.string(),
 })
 
 export const CreateFmdrfInputSchema = FmdrfReportSchema.omit({
 	id: true,
+	status: true,
 	createdAt: true,
 	updatedAt: true,
 })
@@ -82,6 +87,7 @@ export const UpdateFmdrfInputSchema = z
 	.extend(
 		FmdrfReportSchema.omit({
 			id: true,
+			status: true,
 			createdAt: true,
 			updatedAt: true,
 		}).partial().shape
@@ -116,6 +122,7 @@ export const FndrfReportSchema = z.object({
 	deliveryType: z.enum(["svd", "cs", "forceps", "vacuum", "other"]),
 	apgarScore1Min: z.number().int().min(0).max(10).nullable(),
 	apgarScore5Min: z.number().int().min(0).max(10).nullable(),
+	resuscitationRequired: z.boolean(),
 
 	// Section 3 – Maternal Info
 	motherName: z.string(),
@@ -147,12 +154,14 @@ export const FndrfReportSchema = z.object({
 	physicianSignatureDataUrl: z.string(),
 	certificationDate: z.string(),
 
+	status: z.enum(["draft", "completed", "submitted"]),
 	createdAt: z.string(),
 	updatedAt: z.string(),
 })
 
 export const CreateFndrfInputSchema = FndrfReportSchema.omit({
 	id: true,
+	status: true,
 	createdAt: true,
 	updatedAt: true,
 })
@@ -164,6 +173,7 @@ export const UpdateFndrfInputSchema = z
 	.extend(
 		FndrfReportSchema.omit({
 			id: true,
+			status: true,
 			createdAt: true,
 			updatedAt: true,
 		}).partial().shape
@@ -180,8 +190,6 @@ export const FndrfIdInputSchema = z.object({
 // SLA-021: mark a death report as released (Flow 7 Step 3 authoritative evidence)
 export const MarkDeathReportReleasedInputSchema = z.object({
 	id: z.string().uuid(),
-	/** UUID of the staff member who physically released the certificate */
-	releasedByStaffId: z.string().uuid(),
 	/** ISO datetime of release; defaults to now if omitted */
 	releasedAt: z.string().datetime().optional(),
 })

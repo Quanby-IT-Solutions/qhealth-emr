@@ -15,17 +15,31 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 			...init?.headers,
 		},
 	})
-	if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+	if (!res.ok) {
+		let detail = res.statusText
+		try {
+			const body = (await res.clone().json()) as unknown
+			if (body && typeof body === "object" && "message" in body) {
+				const message = (body as { message?: unknown }).message
+				detail = Array.isArray(message) ? message.join(", ") : String(message ?? detail)
+			}
+		} catch {
+			try {
+				const text = await res.text()
+				if (text) detail = text
+			} catch {
+				// Keep the status text fallback.
+			}
+		}
+		throw new Error(`HTTP ${res.status}: ${detail}`)
+	}
 	return res.json() as Promise<T>
 }
 
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
 	if (entries.length === 0) return ""
-	return (
-		"?" +
-		entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
-	)
+	return `?${entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")}`
 }
 
 // ============================================================================
@@ -78,6 +92,7 @@ export interface Addendum {
 	authorStaffId: string
 	authorStaffName: string | null
 	signedAt: string | null
+	signedIp: string | null
 	createdAt: string
 }
 
@@ -86,6 +101,7 @@ export interface ClinicalNote {
 	facilityId: string
 	encounterId: string | null
 	preEncounterId: string | null
+	patientName?: string | null
 	templateId: string | null
 	templateName: string | null
 	noteType: ClinicalNoteType
@@ -123,7 +139,7 @@ interface ConsentRecord {
 	witnessStaffId: string | null
 	witnessStaffName: string | null
 	revokedAt: string | null
-	revokeReason: string | null
+	revocationReason: string | null
 	createdAt: string
 	updatedAt: string
 }
@@ -193,14 +209,15 @@ export const clinicalDocsKeys = {
 	all: ["clinical-docs"] as const,
 	templates: (facilityId: string) => [...clinicalDocsKeys.all, "templates", facilityId] as const,
 	template: (id: string) => [...clinicalDocsKeys.all, "template", id] as const,
-	notes: (encounterId?: string, preEncounterId?: string) =>
-		[...clinicalDocsKeys.all, "notes", encounterId, preEncounterId] as const,
+	notes: (encounterId?: string, preEncounterId?: string, noteType?: string, status?: string) =>
+		[...clinicalDocsKeys.all, "notes", encounterId, preEncounterId, noteType, status] as const,
 	note: (id: string) => [...clinicalDocsKeys.all, "note", id] as const,
 	context: (encounterId: string) => [...clinicalDocsKeys.all, "context", encounterId] as const,
-	consents: (encounterId: string) => [...clinicalDocsKeys.all, "consents", encounterId] as const,
+	consents: (encounterId: string, consentType?: string) =>
+		[...clinicalDocsKeys.all, "consents", encounterId, consentType] as const,
 	consent: (id: string) => [...clinicalDocsKeys.all, "consent", id] as const,
-	patientConsents: (patientId: string) =>
-		[...clinicalDocsKeys.all, "patient-consents", patientId] as const,
+	patientConsents: (patientId: string, consentType?: string) =>
+		[...clinicalDocsKeys.all, "patient-consents", patientId, consentType] as const,
 	signedNotes: (encounterId: string) =>
 		[...clinicalDocsKeys.all, "signed-notes", encounterId] as const,
 }
@@ -296,8 +313,17 @@ export function useNotesQuery(params: {
 	noteType?: string
 	status?: string
 }) {
+	const hasAnyFilter = Boolean(
+		params.encounterId || params.preEncounterId || params.noteType || params.status
+	)
+
 	return useQuery({
-		queryKey: clinicalDocsKeys.notes(params.encounterId, params.preEncounterId),
+		queryKey: clinicalDocsKeys.notes(
+			params.encounterId,
+			params.preEncounterId,
+			params.noteType,
+			params.status
+		),
 		queryFn: () =>
 			fetchJson<ClinicalNoteListResponse>(
 				`${API_BASE}/notes${buildQueryString({
@@ -308,7 +334,7 @@ export function useNotesQuery(params: {
 					limit: 100,
 				})}`
 			),
-		enabled: !!(params.encounterId || params.preEncounterId),
+		enabled: hasAnyFilter,
 	})
 }
 
@@ -447,15 +473,17 @@ export function useSignAddendumMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
-		mutationFn: (data: { id: string; noteId: string }) =>
+		mutationFn: (data: { id: string }) =>
 			fetchJson<Addendum>(`${API_BASE}/addenda/${data.id}/sign`, {
 				method: "PUT",
-				body: JSON.stringify(data),
+				body: JSON.stringify({ id: data.id }),
 			}),
-		onSuccess: (_data, variables) => {
-			void queryClient.invalidateQueries({
-				queryKey: clinicalDocsKeys.note(variables.noteId),
-			})
+		onSuccess: data => {
+			if (data?.noteId) {
+				void queryClient.invalidateQueries({
+					queryKey: clinicalDocsKeys.note(data.noteId),
+				})
+			}
 		},
 	})
 }
@@ -466,7 +494,7 @@ export function useSignAddendumMutation() {
 
 export function useConsentsQuery(params: { encounterId: string; consentType?: string }) {
 	return useQuery({
-		queryKey: clinicalDocsKeys.consents(params.encounterId),
+		queryKey: clinicalDocsKeys.consents(params.encounterId, params.consentType),
 		queryFn: () =>
 			fetchJson<ConsentRecordListResponse>(
 				`${API_BASE}/consents${buildQueryString({
@@ -522,7 +550,7 @@ export function useRevokeConsentMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
-		mutationFn: (data: { id: string; encounterId: string }) =>
+		mutationFn: (data: { id: string; encounterId: string; reason?: string }) =>
 			fetchJson<ConsentRecord>(`${API_BASE}/consents/${data.id}/revoke`, {
 				method: "PUT",
 				body: JSON.stringify(data),
@@ -559,7 +587,7 @@ export function useRevokeConsentWithReasonMutation() {
 
 export function usePatientConsentsQuery(params: { patientId: string; consentType?: string }) {
 	return useQuery({
-		queryKey: clinicalDocsKeys.patientConsents(params.patientId),
+		queryKey: clinicalDocsKeys.patientConsents(params.patientId, params.consentType),
 		queryFn: () =>
 			fetchJson<ConsentRecordListResponse>(
 				`${API_BASE}/consents${buildQueryString({

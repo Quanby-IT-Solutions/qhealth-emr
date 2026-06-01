@@ -19,6 +19,7 @@ export const authEnv = createEnv({
 		BETTER_AUTH_SECRET: z.string(),
 		BETTER_AUTH_TRUSTED_ORIGINS: z.string(),
 		BETTER_AUTH_COOKIE_DOMAIN: z.string().optional(),
+		BETTER_AUTH_RATE_LIMIT_ENABLED: z.enum(["true", "false"]).optional(),
 
 		// OAuth Providers (Google)
 		GOOGLE_CLIENT_ID: z.string().optional(),
@@ -76,7 +77,7 @@ export function createAuth(): ReturnType<typeof betterAuth> {
 		},
 		trustedOrigins: authEnv.BETTER_AUTH_TRUSTED_ORIGINS?.split(",") ?? [],
 		rateLimit: {
-			enabled: true,
+			enabled: authEnv.BETTER_AUTH_RATE_LIMIT_ENABLED !== "false",
 			window: 3600,
 			max: 200,
 			customRules: {

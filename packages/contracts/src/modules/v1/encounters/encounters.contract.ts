@@ -11,6 +11,9 @@ import {
 	EncounterListSchema,
 	EncounterSchema,
 	LinkedEncounterListSchema,
+	ListPendingTransfersSchema,
+	PendingTransferListResponseSchema,
+	ReceiveTransferSchema,
 	SignMayGoHomeOrderSchema,
 	TransferEncounterSchema,
 } from "./encounters.schema.js"
@@ -20,7 +23,7 @@ export const encounterContract = {
 		.route({
 			method: "GET",
 			path: "/encounters",
-			summary: "List encounters for a patient",
+			summary: "List encounters for a patient or facility",
 			tags: ["Encounters"],
 		})
 		.input(EncounterListSchema)
@@ -56,15 +59,35 @@ export const encounterContract = {
 		.input(CreateEncounterSchema)
 		.output(EncounterSchema),
 
-	transfer: oc
+	initiateTransfer: oc
 		.route({
 			method: "POST",
 			path: "/encounters/{encounterId}/transfer",
-			summary: "Transfer inpatient to a different ward/bed",
+			summary: "Initiate transfer — source bed → pending_transfer, dest bed → reserved",
 			tags: ["Encounters"],
 		})
 		.input(TransferEncounterSchema)
 		.output(EncounterSchema),
+
+	receiveTransfer: oc
+		.route({
+			method: "POST",
+			path: "/encounters/transfers/{transferId}/receive",
+			summary: "Ward nurse confirms patient arrival — source bed → dirty, dest bed → occupied",
+			tags: ["Encounters"],
+		})
+		.input(ReceiveTransferSchema)
+		.output(EncounterSchema),
+
+	listPendingTransfers: oc
+		.route({
+			method: "GET",
+			path: "/encounters/transfers/pending",
+			summary: "List pending transfers destined for a facility (optionally filtered by ward)",
+			tags: ["Encounters"],
+		})
+		.input(ListPendingTransfersSchema)
+		.output(PendingTransferListResponseSchema),
 
 	discharge: oc
 		.route({

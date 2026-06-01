@@ -13,6 +13,7 @@ import {
 	loincCodes,
 	rvsCodes,
 	rxnormCodes,
+	snomedCtCodes,
 } from "./schema/formulary.js"
 
 const DATABASE_URL = process.env.DATABASE_URL
@@ -42,13 +43,24 @@ async function seedDrugGenerics() {
 		{ genericName: "Prednisone", rxnormCode: "8640", atcCode: "H02AB07" },
 	]
 
-	await db.insert(drugGenerics).values(data).onConflictDoNothing()
-	console.log(`Seeded ${data.length} drug generics`)
+	const normalizeGenericName = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase()
+	const existing = await db.select().from(drugGenerics)
+	const existingNames = new Set(existing.map(row => normalizeGenericName(row.genericName)))
+	const missing = data
+		.map(row => ({ ...row, genericName: row.genericName.trim().replace(/\s+/g, " ") }))
+		.filter(row => !existingNames.has(normalizeGenericName(row.genericName)))
+
+	if (missing.length > 0) {
+		await db.insert(drugGenerics).values(missing)
+	}
+
+	console.log(`Seeded ${missing.length} drug generics (${data.length - missing.length} already present)`)
 	return db.select().from(drugGenerics)
 }
 
 async function seedDrugBrands(generics: { id: string; genericName: string }[]) {
 	const getGenericId = (name: string) => generics.find(g => g.genericName === name)?.id
+	const normalizeName = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase()
 
 	const data = [
 		{ drugGenericId: getGenericId("Paracetamol")!, brandName: "Biogesic", manufacturer: "Unilab" },
@@ -71,10 +83,23 @@ async function seedDrugBrands(generics: { id: string; genericName: string }[]) {
 			manufacturer: "Sanofi",
 		},
 		{ drugGenericId: getGenericId("Furosemide")!, brandName: "Lasix", manufacturer: "Sanofi" },
-	].filter(d => d.drugGenericId)
+	]
+		.filter(d => d.drugGenericId)
+		.map(row => ({ ...row, brandName: row.brandName.trim().replace(/\s+/g, " ") }))
 
-	await db.insert(drugBrands).values(data).onConflictDoNothing()
-	console.log(`Seeded ${data.length} drug brands`)
+	const existing = await db.select().from(drugBrands)
+	const existingKeys = new Set(
+		existing.map(row => `${row.drugGenericId}:${normalizeName(row.brandName)}`)
+	)
+	const missing = data.filter(
+		row => !existingKeys.has(`${row.drugGenericId}:${normalizeName(row.brandName)}`)
+	)
+
+	if (missing.length > 0) {
+		await db.insert(drugBrands).values(missing)
+	}
+
+	console.log(`Seeded ${missing.length} drug brands (${data.length - missing.length} already present)`)
 }
 
 async function seedIcd10Codes() {
@@ -125,6 +150,11 @@ async function seedIcd10Codes() {
 			category: "Diseases of the circulatory system",
 		},
 		{
+			code: "A41.9",
+			description: "Sepsis, unspecified organism",
+			category: "Certain infectious and parasitic diseases",
+		},
+		{
 			code: "J06.9",
 			description: "Acute upper respiratory infection, unspecified",
 			category: "Diseases of the respiratory system",
@@ -160,14 +190,122 @@ async function seedIcd10Codes() {
 			category: "Symptoms, signs and abnormal clinical findings",
 		},
 		{
+			code: "R07.9",
+			description: "Chest pain, unspecified",
+			category: "Symptoms, signs and abnormal clinical findings",
+		},
+		{
 			code: "Z00.00",
 			description: "Encounter for general adult medical examination without abnormal findings",
+			category: "Factors influencing health status",
+		},
+		{
+			code: "Z01.818",
+			description: "Encounter for other preprocedural examination",
 			category: "Factors influencing health status",
 		},
 	]
 
 	await db.insert(icd10Codes).values(data).onConflictDoNothing()
 	console.log(`Seeded ${data.length} ICD-10 codes`)
+}
+
+async function seedSnomedCtCodes() {
+	const data = [
+		{
+			conceptId: "38341003",
+			fsn: "Hypertensive disorder, systemic arterial (disorder)",
+			preferredTerm: "Hypertension",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "44054006",
+			fsn: "Diabetes mellitus type 2 (disorder)",
+			preferredTerm: "Type 2 diabetes mellitus",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "233604007",
+			fsn: "Pneumonia (disorder)",
+			preferredTerm: "Pneumonia",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "195967001",
+			fsn: "Asthma (disorder)",
+			preferredTerm: "Asthma",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "13645005",
+			fsn: "Chronic obstructive lung disease (disorder)",
+			preferredTerm: "Chronic obstructive pulmonary disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "84114007",
+			fsn: "Heart failure (disorder)",
+			preferredTerm: "Heart failure",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "53741008",
+			fsn: "Coronary arteriosclerosis (disorder)",
+			preferredTerm: "Coronary artery disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "235595009",
+			fsn: "Gastroesophageal reflux disease (disorder)",
+			preferredTerm: "Gastroesophageal reflux disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "279039007",
+			fsn: "Low back pain (finding)",
+			preferredTerm: "Low back pain",
+			semanticTag: "finding",
+		},
+		{
+			conceptId: "709044004",
+			fsn: "Chronic kidney disease (disorder)",
+			preferredTerm: "Chronic kidney disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "386661006",
+			fsn: "Fever (finding)",
+			preferredTerm: "Fever",
+			semanticTag: "finding",
+		},
+		{
+			conceptId: "68566005",
+			fsn: "Urinary tract infectious disease (disorder)",
+			preferredTerm: "Urinary tract infection",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "40930008",
+			fsn: "Hypothyroidism (disorder)",
+			preferredTerm: "Hypothyroidism",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "55822004",
+			fsn: "Hyperlipidemia (disorder)",
+			preferredTerm: "Hyperlipidemia",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "69896004",
+			fsn: "Rheumatoid arthritis (disorder)",
+			preferredTerm: "Rheumatoid arthritis",
+			semanticTag: "disorder",
+		},
+	]
+
+	await db.insert(snomedCtCodes).values(data).onConflictDoNothing()
+	console.log(`Seeded ${data.length} SNOMED CT codes`)
 }
 
 async function seedLoincCodes() {
@@ -251,6 +389,70 @@ async function seedLoincCodes() {
 			system: "Ser/Plas",
 			scale: "Qn",
 			longCommonName: "Alanine aminotransferase [Enzymatic activity/volume] in Serum or Plasma",
+		},
+		{
+			loincNum: "57021-8",
+			component: "CBC W Auto Differential panel",
+			property: "-",
+			system: "Bld",
+			scale: "-",
+			longCommonName: "CBC W Auto Differential panel - Blood",
+		},
+		{
+			loincNum: "600-7",
+			component: "Bacteria identified",
+			property: "Prid",
+			system: "Bld",
+			scale: "Nom",
+			longCommonName: "Bacteria identified in Blood by Culture",
+		},
+		{
+			loincNum: "2524-7",
+			component: "Lactate",
+			property: "SCnc",
+			system: "Ser/Plas",
+			scale: "Qn",
+			longCommonName: "Lactate [Moles/volume] in Serum or Plasma",
+		},
+		{
+			loincNum: "33959-8",
+			component: "Procalcitonin",
+			property: "MCnc",
+			system: "Ser/Plas",
+			scale: "Qn",
+			longCommonName: "Procalcitonin [Mass/volume] in Serum or Plasma",
+		},
+		{
+			loincNum: "10839-9",
+			component: "Troponin I.cardiac",
+			property: "MCnc",
+			system: "Ser/Plas",
+			scale: "Qn",
+			longCommonName: "Troponin I.cardiac [Mass/volume] in Serum or Plasma",
+		},
+		{
+			loincNum: "13969-1",
+			component: "Creatine kinase.MB",
+			property: "MCnc",
+			system: "Ser/Plas",
+			scale: "Qn",
+			longCommonName: "Creatine kinase.MB [Mass/volume] in Serum or Plasma",
+		},
+		{
+			loincNum: "51990-0",
+			component: "Basic metabolic panel",
+			property: "-",
+			system: "Bld",
+			scale: "-",
+			longCommonName: "Basic metabolic panel - Blood",
+		},
+		{
+			loincNum: "5902-2",
+			component: "Prothrombin time (PT)",
+			property: "Time",
+			system: "PPP",
+			scale: "Qn",
+			longCommonName: "Prothrombin time (PT)",
 		},
 	]
 
@@ -365,6 +567,7 @@ async function main() {
 	const generics = await seedDrugGenerics()
 	await seedDrugBrands(generics)
 	await seedIcd10Codes()
+	await seedSnomedCtCodes()
 	await seedLoincCodes()
 	await seedRxnormCodes()
 	await seedRvsCodes()

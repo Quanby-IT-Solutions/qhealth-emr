@@ -21,6 +21,7 @@ import {
 } from "@/core/components/ui/table"
 
 const TRANCHE_DAYS = 30
+const MAX_TOTAL_DAYS = 90
 
 export interface TrancheRow {
 	trancheNumber: number
@@ -122,13 +123,14 @@ export function TranchingPreviewModal({
 	startDate = new Date(),
 }: TranchingPreviewModalProps) {
 	const tranches = buildTranches(durationDays, frequency, startDate)
+	const exceedsMaxDays = durationDays > MAX_TOTAL_DAYS
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+			<DialogContent className="max-h-[92vh] w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-4xl lg:max-w-5xl">
 				<DialogHeader>
 					<DialogTitle>Controlled Substance Tranche Preview</DialogTitle>
-					<DialogDescription>
+					<DialogDescription className="max-w-3xl">
 						The prescription for{" "}
 						<span className="font-medium">
 							{drugName} {dose} {doseUnit}
@@ -139,29 +141,29 @@ export function TranchingPreviewModal({
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="rounded-md border">
-					<Table>
+				<div className="overflow-hidden rounded-md border">
+					<Table className="table-fixed">
 						<TableHeader>
 							<TableRow>
-								<TableHead className="w-20">Tranche</TableHead>
-								<TableHead>Start Date</TableHead>
-								<TableHead>End Date</TableHead>
-								<TableHead>Quantity</TableHead>
-								<TableHead className="w-24 text-center">No Refill</TableHead>
-								<TableHead>Dispensing Instructions</TableHead>
+								<TableHead className="w-[12%] px-3">Tranche</TableHead>
+								<TableHead className="w-[15%] px-3">Start Date</TableHead>
+								<TableHead className="w-[15%] px-3">End Date</TableHead>
+								<TableHead className="w-[14%] px-3">Quantity</TableHead>
+								<TableHead className="w-[12%] px-3 text-center">No Refill</TableHead>
+								<TableHead className="w-[32%] px-3">Dispensing Instructions</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{tranches.map(row => (
 								<TableRow key={row.trancheNumber}>
-									<TableCell className="font-medium">#{row.trancheNumber}</TableCell>
-									<TableCell>{format(row.startDate, "MMM d, yyyy")}</TableCell>
-									<TableCell>{format(row.endDate, "MMM d, yyyy")}</TableCell>
-									<TableCell>{row.quantity}</TableCell>
-									<TableCell className="text-center">
+									<TableCell className="px-3 font-medium">#{row.trancheNumber}</TableCell>
+									<TableCell className="px-3">{format(row.startDate, "MMM d, yyyy")}</TableCell>
+									<TableCell className="px-3">{format(row.endDate, "MMM d, yyyy")}</TableCell>
+									<TableCell className="px-3">{row.quantity}</TableCell>
+									<TableCell className="px-3 text-center">
 										<span className="text-destructive font-semibold">YES</span>
 									</TableCell>
-									<TableCell className="text-muted-foreground text-xs">
+									<TableCell className="text-muted-foreground whitespace-normal px-3 text-xs leading-relaxed">
 										{row.dispensingInstructions}
 									</TableCell>
 								</TableRow>
@@ -175,12 +177,19 @@ export function TranchingPreviewModal({
 					prescription must carry a No Refill inscription, and the pharmacist may not dispense the
 					next tranche before the earliest dispensing date shown above.
 				</p>
+				{exceedsMaxDays && (
+					<p className="text-destructive text-xs font-medium">
+						PDEA controlled substance courses cannot exceed {MAX_TOTAL_DAYS} days.
+					</p>
+				)}
 
-				<DialogFooter>
+				<DialogFooter className="gap-2 sm:justify-end">
 					<Button variant="outline" onClick={() => onOpenChange(false)}>
 						Back to Form
 					</Button>
-					<Button onClick={() => onConfirm(tranches)}>Confirm &amp; Submit Order</Button>
+					<Button disabled={exceedsMaxDays} onClick={() => onConfirm(tranches)}>
+						Confirm &amp; Submit Order
+					</Button>
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>

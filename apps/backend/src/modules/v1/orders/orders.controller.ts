@@ -4,7 +4,11 @@ import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import {
+	RequireAnyPermissions,
+	RequirePermission,
+	RequirePermissions,
+} from "@/modules/v1/rbac/rbac.guard"
 
 import { OrdersService } from "./orders.service"
 
@@ -44,7 +48,10 @@ export class OrdersController {
 		})
 	}
 
-	@RequirePermission("orders", "create")
+	@RequirePermissions([
+		{ module: "orders", action: "create" },
+		{ module: "orders", action: "sign" },
+	])
 	@Implement(v1.orders.createMedOrder)
 	async createMedOrder(@Session() session: UserSession) {
 		return implement(v1.orders.createMedOrder).handler(async ({ input }) => {
@@ -72,7 +79,10 @@ export class OrdersController {
 	// Lab Orders
 	// ========================================================================
 
-	@RequirePermission("orders", "view")
+	@RequireAnyPermissions([
+		{ module: "orders", action: "view" },
+		{ module: "laboratory", action: "view" },
+	])
 	@Implement(v1.orders.listLabOrders)
 	async listLabOrders() {
 		return implement(v1.orders.listLabOrders).handler(async ({ input }) => {
@@ -80,7 +90,10 @@ export class OrdersController {
 		})
 	}
 
-	@RequirePermission("orders", "view")
+	@RequireAnyPermissions([
+		{ module: "orders", action: "view" },
+		{ module: "laboratory", action: "view" },
+	])
 	@Implement(v1.orders.getLabOrder)
 	async getLabOrder() {
 		return implement(v1.orders.getLabOrder).handler(async ({ input }) => {
@@ -96,7 +109,10 @@ export class OrdersController {
 		})
 	}
 
-	@RequirePermission("orders", "edit")
+	@RequireAnyPermissions([
+		{ module: "orders", action: "edit" },
+		{ module: "laboratory", action: "edit" },
+	])
 	@Implement(v1.orders.updateLabOrder)
 	async updateLabOrder() {
 		return implement(v1.orders.updateLabOrder).handler(async ({ input }) => {
@@ -169,7 +185,7 @@ export class OrdersController {
 		})
 	}
 
-	@RequirePermission("orders", "edit")
+	@RequirePermission("orders", "verify")
 	@Implement(v1.orders.verifyOrder)
 	async verifyOrder(@Session() session: UserSession) {
 		return implement(v1.orders.verifyOrder).handler(async ({ input }) => {
@@ -223,9 +239,17 @@ export class OrdersController {
 
 	@RequirePermission("orders", "sign")
 	@Implement(v1.orders.signPrescription)
-	async signPrescription() {
+	async signPrescription(@Session() session: UserSession) {
 		return implement(v1.orders.signPrescription).handler(async ({ input }) => {
-			return this.ordersService.signPrescription(input.id)
+			return this.ordersService.signPrescription(input.id, session.user.id)
+		})
+	}
+
+	@RequirePermission("orders", "sign")
+	@Implement(v1.orders.sendPrescription)
+	async sendPrescription(@Session() session: UserSession) {
+		return implement(v1.orders.sendPrescription).handler(async ({ input }) => {
+			return this.ordersService.sendPrescription(input, session.user.id)
 		})
 	}
 
@@ -265,7 +289,10 @@ export class OrdersController {
 		})
 	}
 
-	@RequirePermission("orders", "create")
+	@RequirePermissions([
+		{ module: "orders", action: "create" },
+		{ module: "orders", action: "sign" },
+	])
 	@Implement(v1.orders.createTranchedOrders)
 	async createTranchedOrders(@Session() session: UserSession) {
 		return implement(v1.orders.createTranchedOrders).handler(async ({ input }) => {
@@ -312,6 +339,14 @@ export class OrdersController {
 	// ========================================================================
 	// OPD Dispensing
 	// ========================================================================
+
+	@RequirePermission("orders", "verify")
+	@Implement(v1.orders.listOpdPrescriptions)
+	async listOpdPrescriptions() {
+		return implement(v1.orders.listOpdPrescriptions).handler(async ({ input }) => {
+			return this.ordersService.listOpdPrescriptions(input)
+		})
+	}
 
 	@RequirePermission("orders", "verify")
 	@Implement(v1.orders.searchOpdPrescription)

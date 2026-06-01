@@ -37,7 +37,7 @@ function can(permSet: Set<string>, module: string, action: string) {
 // Types
 // ============================================================================
 
-type OpdStepId = "triage" | "registration" | "vitals" | "consultation" | "disposition"
+export type OpdStepId = "triage" | "registration" | "vitals" | "consultation" | "disposition"
 type OpdStepStatus = "pending" | "in_progress" | "completed"
 
 interface RequiredPermission {
@@ -45,7 +45,7 @@ interface RequiredPermission {
 	action: string
 }
 
-interface OpdStep {
+export interface OpdStep {
 	id: OpdStepId
 	label: string
 	description: string
@@ -56,7 +56,7 @@ interface OpdStep {
 	requiredPermission: RequiredPermission
 }
 
-const OPD_STEPS: OpdStep[] = [
+export const OPD_STEPS: OpdStep[] = [
 	{
 		id: "triage",
 		label: "Triage",
@@ -99,6 +99,21 @@ const OPD_STEPS: OpdStep[] = [
 		requiredPermission: { module: "clinical_docs", action: "sign" },
 	},
 ]
+
+export function canRoleActOnOpdStep(
+	permSet: Set<string>,
+	activeRoleName: string | null | undefined,
+	step: OpdStep,
+) {
+	const roleCanOwnStep =
+		activeRoleName === step.responsibleRole ||
+		(step.responsibleRole === "Physician" && activeRoleName === "Surgeon")
+
+	return (
+		roleCanOwnStep &&
+		can(permSet, step.requiredPermission.module, step.requiredPermission.action)
+	)
+}
 
 interface StepData {
 	completedAt: string | null
@@ -184,7 +199,7 @@ function TriageForm({
 					<Select
 						value={data.notes.split("|")[1] ?? ""}
 						onValueChange={val =>
-							onChange({ notes: [data.notes.split("|")[0] ?? "", val].join("|") })
+							onChange({ notes: [data.notes.split("|")[0] ?? "", val ?? ""].join("|") })
 						}
 					>
 						<SelectTrigger>
@@ -206,11 +221,17 @@ function TriageForm({
 function RegistrationForm({
 	data,
 	onChange,
+	patientMrn,
+	patientPhilhealthMemberId,
 }: {
 	data: StepData
 	onChange: (d: Partial<StepData>) => void
+	patientMrn?: string
+	patientPhilhealthMemberId?: string | null
 }) {
 	const fields = data.notes.split("|")
+	const displayMrn = fields[0] || patientMrn || ""
+	const displayPhilhealthMemberId = fields[1] || patientPhilhealthMemberId || ""
 	const set = (i: number, val: string) => {
 		const updated = [...fields]
 		updated[i] = val
@@ -220,15 +241,19 @@ function RegistrationForm({
 		<div className="grid grid-cols-2 gap-4">
 			<div className="space-y-2">
 				<Label>Patient MRN</Label>
-				<Input placeholder="MRN" value={fields[0] ?? ""} onChange={e => set(0, e.target.value)} />
+				<Input placeholder="MRN" value={displayMrn} onChange={e => set(0, e.target.value)} />
 			</div>
 			<div className="space-y-2">
 				<Label>PhilHealth Member ID</Label>
-				<Input placeholder="PhilHealth ID" value={fields[1] ?? ""} onChange={e => set(1, e.target.value)} />
+				<Input
+					placeholder="PhilHealth ID"
+					value={displayPhilhealthMemberId}
+					onChange={e => set(1, e.target.value)}
+				/>
 			</div>
 			<div className="space-y-2">
 				<Label>Classification</Label>
-				<Select value={fields[2] ?? ""} onValueChange={val => set(2, val)}>
+				<Select value={fields[2] ?? ""} onValueChange={val => set(2, val ?? "")}>
 					<SelectTrigger>
 						<SelectValue placeholder="Select classification" />
 					</SelectTrigger>
@@ -242,7 +267,7 @@ function RegistrationForm({
 			</div>
 			<div className="space-y-2">
 				<Label>Consent Signed</Label>
-				<Select value={fields[3] ?? ""} onValueChange={val => set(3, val)}>
+				<Select value={fields[3] ?? ""} onValueChange={val => set(3, val ?? "")}>
 					<SelectTrigger>
 						<SelectValue placeholder="Select" />
 					</SelectTrigger>
@@ -358,7 +383,7 @@ function DispositionForm({
 		<div className="space-y-4">
 			<div className="space-y-2">
 				<Label>Disposition</Label>
-				<Select value={fields[0] ?? ""} onValueChange={val => set(0, val)}>
+				<Select value={fields[0] ?? ""} onValueChange={val => set(0, val ?? "")}>
 					<SelectTrigger>
 						<SelectValue placeholder="Select disposition" />
 					</SelectTrigger>
@@ -432,6 +457,8 @@ interface OpdFlowProps {
 	encounterId?: string
 	patientName?: string
 	patientId?: string
+	patientMrn?: string
+	patientPhilhealthMemberId?: string | null
 }
 
 const storageKey = (patientId?: string) =>
@@ -474,8 +501,27 @@ function loadOpdState(patientId?: string): PersistedOpdState {
 	return defaultOpdState()
 }
 
-export function OpdFlow({ encounterId, patientName, patientId }: OpdFlowProps) {
+export function getPatientActiveOpdStep(patientId?: string): OpdStep | null {
+	const state = loadOpdState(patientId)
+	const hasOpenStep = OPD_STEPS.some(step => state.stepStatuses[step.id] !== "completed")
+
+	if (!hasOpenStep) {
+		return null
+	}
+
+	return OPD_STEPS.find(step => step.id === state.currentStep) ?? OPD_STEPS[0] ?? null
+}
+
+export function OpdFlow({
+	encounterId,
+	patientName,
+	patientId,
+	patientMrn,
+	patientPhilhealthMemberId,
+}: OpdFlowProps) {
 	const permSet = usePermissionSet()
+	const { data: profile } = useMyProfile()
+	const activeRoleName = profile?.activeRole?.name
 
 	const [currentStep, setCurrentStep] = useState<OpdStepId>(() => loadOpdState(patientId).currentStep)
 	const [stepStatuses, setStepStatuses] = useState<Record<OpdStepId, OpdStepStatus>>(
@@ -483,6 +529,7 @@ export function OpdFlow({ encounterId, patientName, patientId }: OpdFlowProps) {
 	)
 	const [stepData, setStepData] = useState<OpdFlowState>(() => loadOpdState(patientId).stepData)
 	const [startedAt] = useState<string>(() => loadOpdState(patientId).startedAt)
+	const [elapsedMin, setElapsedMin] = useState(0)
 
 	// Persist to localStorage whenever state changes
 	useEffect(() => {
@@ -490,17 +537,24 @@ export function OpdFlow({ encounterId, patientName, patientId }: OpdFlowProps) {
 		localStorage.setItem(storageKey(patientId), JSON.stringify(state))
 	}, [currentStep, stepStatuses, stepData, startedAt, patientId])
 
+	useEffect(() => {
+		function updateElapsed() {
+			setElapsedMin(Math.round((Date.now() - Date.parse(startedAt)) / 60_000))
+		}
+
+		updateElapsed()
+		const intervalId = window.setInterval(updateElapsed, 60_000)
+
+		return () => window.clearInterval(intervalId)
+	}, [startedAt])
+
 	const currentIdx = OPD_STEPS.findIndex(s => s.id === currentStep)
 	const currentStepDef = OPD_STEPS[currentIdx]!
 
 	// Check if user can act on the current step
 	const canActOnCurrentStep = currentStepDef
-		? can(permSet, currentStepDef.requiredPermission.module, currentStepDef.requiredPermission.action)
+		? canRoleActOnOpdStep(permSet, activeRoleName, currentStepDef)
 		: false
-
-	// Check which steps the user can act on
-	const getCanActOnStep = (step: OpdStep) =>
-		can(permSet, step.requiredPermission.module, step.requiredPermission.action)
 
 	function handleDataChange(updates: Partial<StepData>) {
 		setStepData(prev => ({
@@ -536,7 +590,6 @@ export function OpdFlow({ encounterId, patientName, patientId }: OpdFlowProps) {
 	}
 
 	const isAllComplete = OPD_STEPS.every(s => stepStatuses[s.id] === "completed")
-	const elapsedMin = Math.round((Date.now() - Date.parse(startedAt)) / 60_000)
 
 	return (
 		<div className="space-y-6">
@@ -615,7 +668,12 @@ export function OpdFlow({ encounterId, patientName, patientId }: OpdFlowProps) {
 									<TriageForm data={stepData.triage} onChange={handleDataChange} />
 								)}
 								{currentStep === "registration" && (
-									<RegistrationForm data={stepData.registration} onChange={handleDataChange} />
+									<RegistrationForm
+										data={stepData.registration}
+										onChange={handleDataChange}
+										patientMrn={patientMrn}
+										patientPhilhealthMemberId={patientPhilhealthMemberId}
+									/>
 								)}
 								{currentStep === "vitals" && (
 									<VitalsForm data={stepData.vitals} onChange={handleDataChange} />

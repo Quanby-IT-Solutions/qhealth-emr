@@ -39,6 +39,8 @@ import {
 	OpdDispenseHistorySchema,
 	OpdDispenseInputSchema,
 	OpdDispenseRecordSchema,
+	OpdPrescriptionListInputSchema,
+	OpdPrescriptionListResponseSchema,
 	OpdPrescriptionSchema,
 	OpdPrescriptionSearchSchema,
 	ParentOrderIdSchema,
@@ -49,6 +51,7 @@ import {
 	PrescriptionListSchema,
 	PrescriptionSchema,
 	SaveCounselingLogInputSchema,
+	SendPrescriptionSchema,
 	SignImagingReportSchema,
 	SignPrescriptionSchema,
 	TranchedOrdersResponseSchema,
@@ -320,6 +323,16 @@ export const ordersContract = {
 		.input(SignPrescriptionSchema)
 		.output(PrescriptionSchema),
 
+	sendPrescription: oc
+		.route({
+			method: "POST",
+			path: "/prescriptions/{id}/send",
+			summary: "Record e-prescription delivery to the patient",
+			tags: ["Orders — Prescriptions"],
+		})
+		.input(SendPrescriptionSchema)
+		.output(PrescriptionSchema),
+
 	// ========================================================================
 	// Active Orders (cross-module)
 	// ========================================================================
@@ -349,14 +362,14 @@ export const ordersContract = {
 		.output(PdeaLicenseStatusSchema),
 
 	// ========================================================================
-	// PDEA Tranching (for controlled substances > 90 days)
+	// PDEA Tranching (for controlled substances > 30 days, max 90 days)
 	// ========================================================================
 
 	previewTranches: oc
 		.route({
 			method: "POST",
 			path: "/pdea/preview-tranches",
-			summary: "Preview how an order will be split into tranches (controlled substances > 90 days)",
+			summary: "Preview how an order will be split into 30-day tranches (max 90 days)",
 			tags: ["Orders — PDEA"],
 		})
 		.input(TranchePreviewInputSchema)
@@ -419,6 +432,16 @@ export const ordersContract = {
 	// ========================================================================
 	// OPD Dispensing
 	// ========================================================================
+
+	listOpdPrescriptions: oc
+		.route({
+			method: "GET",
+			path: "/pharmacy/opd/prescriptions",
+			summary: "List signed/issued OPD prescriptions awaiting dispensing",
+			tags: ["Orders — OPD Dispensing"],
+		})
+		.input(OpdPrescriptionListInputSchema)
+		.output(OpdPrescriptionListResponseSchema),
 
 	searchOpdPrescription: oc
 		.route({

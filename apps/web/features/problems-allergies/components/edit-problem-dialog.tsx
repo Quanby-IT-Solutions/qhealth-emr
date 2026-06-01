@@ -22,6 +22,7 @@ import {
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 import {
+	useProblemsQuery,
 	useUpdateProblemMutation,
 	type Problem,
 	type ProblemStatus,
@@ -50,11 +51,27 @@ export function EditProblemDialog({ open, onOpenChange, problem }: EditProblemDi
 	const [snomedSearch, setSnomedSearch] = useState("")
 
 	const updateProblem = useUpdateProblemMutation()
+	const activeProblemsQuery = useProblemsQuery({
+		patientId: problem?.patientId ?? "",
+		status: "active",
+	})
+	const activeProblems = activeProblemsQuery.data?.data ?? []
+	const activeIcd10Codes = new Set(
+		activeProblems
+			.filter(activeProblem => activeProblem.id !== problem?.id)
+			.flatMap(activeProblem => (activeProblem.icd10Code ? [activeProblem.icd10Code] : []))
+	)
+	const activeSnomedCodes = new Set(
+		activeProblems
+			.filter(activeProblem => activeProblem.id !== problem?.id)
+			.flatMap(activeProblem => (activeProblem.snomedCode ? [activeProblem.snomedCode] : []))
+	)
 	const hasCode = Boolean(codes.icd10Code || codes.snomedCode)
 	const canSubmit = Boolean(problem && hasCode && description.trim() && !updateProblem.isPending)
 
 	useEffect(() => {
 		if (!problem || !open) return
+		// eslint-disable-next-line react-hooks/set-state-in-effect -- syncing the selected problem into local editable form state is intentional
 		setDescription(problem.description)
 		setOnsetDate(problem.onsetDate ?? "")
 		setResolutionDate(problem.resolutionDate ?? "")
@@ -105,14 +122,16 @@ export function EditProblemDialog({ open, onOpenChange, problem }: EditProblemDi
 						onIcd10SearchChange={setIcd10Search}
 						snomedSearch={snomedSearch}
 						onSnomedSearchChange={setSnomedSearch}
+						disabledIcd10Codes={status === "active" ? activeIcd10Codes : undefined}
+						disabledSnomedCodes={status === "active" ? activeSnomedCodes : undefined}
 						onDescriptionSuggestion={suggestion => {
 							if (!description.trim()) setDescription(suggestion)
 						}}
 					/>
 
 					{!hasCode && (
-						<Alert>
-							<AlertDescription>
+						<Alert className="border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
+							<AlertDescription className="text-amber-900 dark:text-amber-100">
 								Select at least one ICD-10 or SNOMED CT code before saving.
 							</AlertDescription>
 						</Alert>

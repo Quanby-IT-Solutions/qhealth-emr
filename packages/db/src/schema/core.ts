@@ -78,7 +78,15 @@ export const beds = createTable(
 			.text("status")
 			.notNull()
 			.default("available")
-			.$type<"available" | "occupied" | "reserved" | "cleaning" | "out_of_service">(),
+			.$type<
+				| "available"
+				| "occupied"
+				| "reserved"
+				| "cleaning"
+				| "out_of_service"
+				| "pending_transfer"
+				| "dirty"
+			>(),
 		currentEncounterId: t
 			.uuid("current_encounter_id")
 			.references((): AnyPgColumn => encounters.id, { onDelete: "set null" }),
@@ -252,6 +260,11 @@ export const encounterTransfers = createTable(
 			.uuid("ordering_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
 		transferredAt: t.timestamp("transferred_at").notNull().defaultNow(),
+		status: t.text("status").notNull().default("completed").$type<"pending" | "completed">(),
+		receivedAt: t.timestamp("received_at"),
+		receivingStaffId: t
+			.uuid("receiving_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [

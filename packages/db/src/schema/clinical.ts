@@ -1,8 +1,119 @@
 import { index } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
-import { encounters, patients, preEncounters } from "./core.js"
+import { encounters, opdTriageIntakes, patients, preEncounters } from "./core.js"
 import { facilities, staffProfiles } from "./rbac.js"
+
+// ============================================================================
+// TELE-TRIAGE — Inbound patient records from phone/video triage
+// ============================================================================
+
+export const inboundTriageRecords = createTable(
+	"inbound_triage_records",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		callerName: t.text("caller_name").notNull(),
+		patientLocation: t.text("patient_location").notNull(),
+		transportMode: t
+			.text("transport_mode")
+			.notNull()
+			.$type<"ambulance" | "private_vehicle" | "walk_in" | "motorcycle_ambulance">(),
+		channelType: t.text("channel_type").notNull().$type<"phone" | "video">(),
+		etaMinutes: t.integer("eta_minutes").notNull(),
+		etaAt: t.timestamp("eta_at", { withTimezone: true }).notNull(),
+		provisionalAcuityLevel: t.integer("provisional_acuity_level").notNull(),
+		acuityScale: t.text("acuity_scale").notNull().$type<"esi" | "ats" | "ctas">(),
+		assessmentNotes: t.text("assessment_notes").notNull().default(""),
+		resourceNeeds: t.jsonb("resource_needs").notNull().default({}),
+		status: t
+			.text("status")
+			.notNull()
+			.default("queued")
+			.$type<"queued" | "arrived" | "cancelled">(),
+		arrivedAt: t.timestamp("arrived_at", { withTimezone: true }),
+		preEncounterId: t
+			.uuid("pre_encounter_id")
+			.references(() => preEncounters.id, { onDelete: "set null" }),
+		triageStaffId: t
+			.uuid("triage_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("inbound_triage_records_facility_id_idx").on(t.facilityId),
+		index("inbound_triage_records_status_idx").on(t.status),
+		index("inbound_triage_records_eta_at_idx").on(t.etaAt),
+	]
+)
+
+// ============================================================================
+// OPD TELE-TRIAGE — Pre-arrival outpatient phone/video triage records
+// ============================================================================
+
+export const opdTeleTriageIntakes = createTable(
+	"opd_tele_triage_intakes",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		callerName: t.text("caller_name").notNull(),
+		callerRelationship: t
+			.text("caller_relationship")
+			.$type<"self" | "family" | "caregiver" | "other">(),
+		patientId: t.uuid("patient_id").references(() => patients.id, { onDelete: "restrict" }),
+		patientLocation: t.text("patient_location").notNull(),
+		channelType: t.text("channel_type").notNull().$type<"phone" | "video">(),
+		videoLink: t.text("video_link"),
+		videoSessionId: t.text("video_session_id"),
+		livekitSessionStartedAt: t.timestamp("livekit_session_started_at", { withTimezone: true }),
+		livekitSessionEndedAt: t.timestamp("livekit_session_ended_at", { withTimezone: true }),
+		scheduledArrivalTime: t.timestamp("scheduled_arrival_time", { withTimezone: true }),
+		etaMinutes: t.integer("eta_minutes"),
+		etaAt: t.timestamp("eta_at", { withTimezone: true }),
+		chiefComplaint: t.text("chief_complaint").notNull(),
+		assessmentNotes: t.text("assessment_notes").notNull().default(""),
+		provisionalAcuity: t
+			.text("provisional_acuity")
+			.notNull()
+			.$type<"urgent" | "routine" | "scheduled">(),
+		systolicBp: t.integer("systolic_bp"),
+		diastolicBp: t.integer("diastolic_bp"),
+		temperatureCelsius: t.real("temperature_celsius"),
+		heartRateBpm: t.integer("heart_rate_bpm"),
+		respiratoryRate: t.integer("respiratory_rate"),
+		oxygenSatPct: t.real("oxygen_sat_pct"),
+		status: t
+			.text("status")
+			.notNull()
+			.default("pending_arrival")
+			.$type<"pending_arrival" | "arrived" | "cancelled" | "no_show">(),
+		arrivedAt: t.timestamp("arrived_at", { withTimezone: true }),
+		linkedTriageIntakeId: t
+			.uuid("linked_triage_intake_id")
+			.references(() => opdTriageIntakes.id, { onDelete: "set null" }),
+		triageStaffId: t
+			.uuid("triage_staff_id")
+			.notNull()
+			.references(() => staffProfiles.id, { onDelete: "restrict" }),
+		cancelReason: t.text("cancel_reason"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
+	}),
+	t => [
+		index("opd_tele_triage_intakes_facility_id_idx").on(t.facilityId),
+		index("opd_tele_triage_intakes_patient_id_idx").on(t.patientId),
+		index("opd_tele_triage_intakes_status_idx").on(t.status),
+		index("opd_tele_triage_intakes_eta_at_idx").on(t.etaAt),
+		index("opd_tele_triage_intakes_scheduled_arrival_idx").on(t.scheduledArrivalTime),
+	]
+)
 
 // ============================================================================
 // CLINICAL — Notes, Templates, Consent, Problems, Allergies
@@ -104,6 +215,7 @@ export const noteAddenda = createTable(
 			.notNull()
 			.references(() => staffProfiles.id, { onDelete: "restrict" }),
 		signedAt: t.timestamp("signed_at"),
+		signedIp: t.text("signed_ip"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
 	t => [index("note_addenda_note_id_idx").on(t.noteId)]
@@ -184,7 +296,11 @@ export const problems = createTable(
 		description: t.text("description").notNull(),
 		onsetDate: t.date("onset_date"),
 		resolutionDate: t.date("resolution_date"),
-		status: t.text("status").notNull().default("active").$type<"active" | "resolved">(),
+		status: t
+			.text("status")
+			.notNull()
+			.default("active")
+			.$type<"active" | "resolved" | "entered_in_error">(),
 		documentingStaffId: t
 			.uuid("documenting_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
@@ -220,6 +336,13 @@ export const allergies = createTable(
 		severity: t.text("severity").notNull().$type<"mild" | "moderate" | "severe">(),
 		onsetDate: t.date("onset_date"),
 		isActive: t.boolean("is_active").notNull().default(true),
+		// Flow D5: allergies must be physician-verified before they participate in
+		// CDS / CPOE hard-blocking. Newly captured allergies are unverified.
+		isVerified: t.boolean("is_verified").notNull().default(false),
+		verifiedAt: t.timestamp("verified_at", { withTimezone: true }),
+		verifiedByStaffId: t
+			.uuid("verified_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
 		documentingStaffId: t
 			.uuid("documenting_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
@@ -230,6 +353,8 @@ export const allergies = createTable(
 		index("allergies_patient_id_idx").on(t.patientId),
 		index("allergies_facility_id_idx").on(t.facilityId),
 		index("allergies_allergen_type_idx").on(t.allergenType),
+		index("allergies_is_active_idx").on(t.isActive),
+		index("allergies_is_verified_idx").on(t.isVerified),
 	]
 )
 

@@ -40,10 +40,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
 	if (entries.length === 0) return ""
-	return (
-		"?" +
-		entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")
-	)
+	return `?${entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")}`
 }
 
 // ============================================================================
@@ -232,7 +229,7 @@ export interface RvsCode {
 export interface RvsAssignment {
 	id: string
 	surgicalCaseId: string
-	rvsCodeId: string
+	rvsCodeId: string | null
 	procedureLabel: string | null
 	code: string
 	description: string
@@ -631,6 +628,7 @@ export function useOrSlotsQuery(params: OrSlotsParams) {
 				`${API_BASE}/or-slots${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
 			),
 		enabled: !!params.facilityId,
+		staleTime: 0,
 	})
 }
 

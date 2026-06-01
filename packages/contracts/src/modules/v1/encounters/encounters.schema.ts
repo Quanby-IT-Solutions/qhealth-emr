@@ -103,6 +103,8 @@ export const EncounterTransferSchema = z.object({
 	transferReason: z.string().nullable(),
 	orderingStaffId: z.string().uuid().nullable(),
 	transferredAt: dateOrString,
+	status: z.enum(["pending", "completed"]),
+	receivedAt: dateOrString.nullable(),
 	fromWardName: z.string().nullable(),
 	fromBedNumber: z.string().nullable(),
 	toWardName: z.string().nullable(),
@@ -113,10 +115,12 @@ export const EncounterTransferSchema = z.object({
 export const EncounterDetailSchema = EncounterSchema.extend({
 	patientName: z.string(),
 	patientMrn: z.string(),
+	patientAddress: z.string().nullable(),
 	patientDateOfBirth: z.string(),
 	patientSex: z.enum(["male", "female", "other"]),
 	admittingStaffName: z.string().nullable(),
 	attendingStaffName: z.string().nullable(),
+	attendingStaffLicenseNo: z.string().nullable().optional(),
 	wardName: z.string().nullable(),
 	bedNumber: z.string().nullable(),
 	transfers: z.array(EncounterTransferSchema),
@@ -199,9 +203,10 @@ export type CreateEncounterInput = z.infer<typeof CreateEncounterSchema>
 // ============================================================================
 
 export const EncounterListSchema = PaginationInputSchema.extend({
-	patientId: z.string().uuid(),
+	patientId: z.string().uuid().optional(),
 	facilityId: z.string().uuid(),
 	status: EncounterStatusEnum.optional(),
+	encounterType: EncounterTypeEnum.optional(),
 })
 
 export const EncounterListItemSchema = z.object({
@@ -211,10 +216,12 @@ export const EncounterListItemSchema = z.object({
 	chiefComplaint: z.string().nullable(),
 	admissionDatetime: dateOrString,
 	dischargeDatetime: dateOrString.nullable(),
+	patientName: z.string().nullable(),
 	attendingStaffName: z.string().nullable(),
 	wardName: z.string().nullable(),
 	bedNumber: z.string().nullable(),
 	queueNumber: z.number().int().positive().nullable(),
+	transferStatus: z.enum(["pending", "completed"]).nullable(),
 })
 
 export const EncounterListResponseSchema = PaginatedResponseSchema.extend({
@@ -300,14 +307,55 @@ export type DischargeChecklist = z.infer<typeof DischargeChecklistSchema>
 
 export const LinkedEncounterItemSchema = z.object({
 	id: z.string().uuid(),
+	source: z.enum(["core", "telemedicine"]).default("core"),
+	appointmentId: z.string().uuid().nullable().default(null),
 	encounterType: EncounterTypeEnum,
 	status: EncounterStatusEnum,
 	admissionDatetime: dateOrString,
 	dischargeDatetime: dateOrString.nullable(),
 	attendingStaffName: z.string().nullable(),
+	chiefComplaint: z.string().nullable().default(null),
+	diagnosis: z.string().nullable().default(null),
+	clinicianName: z.string().nullable().default(null),
 })
 
 export const LinkedEncounterListSchema = z.object({
 	sourceEncounterId: z.string().uuid(),
 	linkedEncounters: z.array(LinkedEncounterItemSchema),
 })
+
+// ============================================================================
+// Receive Transfer (Ward Nurse confirms patient arrival)
+// ============================================================================
+
+export const ReceiveTransferSchema = z.object({
+	transferId: z.string().uuid(),
+	receivingStaffId: z.string().uuid(),
+})
+
+export type ReceiveTransferInput = z.infer<typeof ReceiveTransferSchema>
+
+// ============================================================================
+// List Pending Transfers (Ward Nurse view)
+// ============================================================================
+
+export const ListPendingTransfersSchema = z.object({
+	facilityId: z.string().uuid(),
+	toWardId: z.string().uuid().optional(),
+})
+
+export const PendingTransferItemSchema = z.object({
+	transferId: z.string().uuid(),
+	encounterId: z.string().uuid(),
+	patientName: z.string(),
+	patientMrn: z.string(),
+	fromWardName: z.string().nullable(),
+	fromBedNumber: z.string().nullable(),
+	toWardName: z.string().nullable(),
+	toBedNumber: z.string().nullable(),
+	transferReason: z.string().nullable(),
+	orderingStaffName: z.string().nullable(),
+	transferredAt: dateOrString,
+})
+
+export const PendingTransferListResponseSchema = z.array(PendingTransferItemSchema)

@@ -2,11 +2,17 @@ import { oc } from "@orpc/contract"
 import { z } from "zod"
 
 import {
+	CreateInboundTriageSchema,
 	CreatePreEncounterSchema,
 	EdDispositionResultSchema,
 	EdDispositionSchema,
 	EdQueueListSchema,
 	EdQueueResponseSchema,
+	InboundTriageIdSchema,
+	InboundTriageListResponseSchema,
+	InboundTriageListSchema,
+	InboundTriageRecordSchema,
+	MarkArrivedResultSchema,
 	MergePreEncounterSchema,
 	MergePreviewSchema,
 	MergeResultSchema,
@@ -54,6 +60,16 @@ export const edContract = {
 			tags: ["Emergency Department"],
 		})
 		.input(UpdatePreEncounterSchema)
+		.output(PreEncounterSchema),
+
+	cancelPreEncounter: oc
+		.route({
+			method: "POST",
+			path: "/pre-encounters/{id}/cancel",
+			summary: "Cancel an active trauma alias pre-encounter",
+			tags: ["Emergency Department"],
+		})
+		.input(PreEncounterIdSchema)
 		.output(PreEncounterSchema),
 
 	listPreEncounters: oc
@@ -118,4 +134,45 @@ export const edContract = {
 		})
 		.input(EdDispositionSchema)
 		.output(EdDispositionResultSchema),
+
+	// Tele-Triage — Inbound patient management
+	createInboundTriage: oc
+		.route({
+			method: "POST",
+			path: "/inbound-triage",
+			summary: "Queue an inbound patient from a phone or video triage call",
+			tags: ["Emergency Department"],
+		})
+		.input(CreateInboundTriageSchema)
+		.output(InboundTriageRecordSchema),
+
+	listInboundTriage: oc
+		.route({
+			method: "GET",
+			path: "/inbound-triage",
+			summary: "List inbound triage records for a facility",
+			tags: ["Emergency Department"],
+		})
+		.input(InboundTriageListSchema)
+		.output(InboundTriageListResponseSchema),
+
+	markInboundArrived: oc
+		.route({
+			method: "POST",
+			path: "/inbound-triage/{id}/arrived",
+			summary: "Mark an inbound patient as arrived and create a pre-encounter",
+			tags: ["Emergency Department"],
+		})
+		.input(InboundTriageIdSchema)
+		.output(MarkArrivedResultSchema),
+
+	cancelInboundTriage: oc
+		.route({
+			method: "POST",
+			path: "/inbound-triage/{id}/cancel",
+			summary: "Cancel an inbound triage record",
+			tags: ["Emergency Department"],
+		})
+		.input(InboundTriageIdSchema)
+		.output(InboundTriageRecordSchema),
 }

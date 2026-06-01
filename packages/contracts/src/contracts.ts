@@ -378,6 +378,8 @@ export {
 export type {
 	SystemSettings,
 	TriggerOfflineCacheJobResult,
+	OfflinePreparedPatientSummary,
+	OfflineSummarySnapshot,
 } from "./modules/v1/system-settings/system-settings.schema.js"
 
 // FHIR Endpoints schemas (ADM-BE-07)

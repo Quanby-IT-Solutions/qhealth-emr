@@ -214,7 +214,9 @@ export function useVitalsQuery(params: VitalSignListParams, options?: { enabled?
 			fetchJson<PaginatedResponse<VitalSign>>(
 				`${API_BASE}/vitals${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
 			),
-		enabled: (options?.enabled ?? true) && !!(params.encounterId || params.preEncounterId),
+		enabled:
+			(options?.enabled ?? true) &&
+			!!(params.facilityId || params.encounterId || params.preEncounterId),
 		retry: shouldRetryRead,
 	})
 }
@@ -577,7 +579,7 @@ export function useHaiTagsQuery(params: HaiTagListParams) {
 			fetchJson<PaginatedResponse<HaiTag>>(
 				`${API_BASE}/hai-tags${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
 			),
-		enabled: !!params.encounterId,
+		enabled: !!(params.facilityId || params.encounterId),
 	})
 }
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { MapPin, Video } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -20,12 +21,18 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
+import { usePermissions } from "@/core/hooks/use-permissions"
 import {
-	type AppointmentStatus,
 	useAppointmentsQuery,
 	useCheckInMutation,
 	useUpdateAppointmentStatusMutation,
+	type AppointmentStatus,
 } from "@/features/scheduling/api/scheduling.hooks"
+import {
+	useAppointmentsQuery as useTelemedicineAppointmentsQuery,
+	type TelemedicineAppointment,
+	type AppointmentStatus as TelemedicineAppointmentStatus,
+} from "@/features/telemedicine/api/telemedicine.hooks"
 
 function todayIso() {
 	return new Date().toISOString().slice(0, 10)
@@ -45,17 +52,31 @@ function statusBadge(status: AppointmentStatus) {
 		case "checked_in":
 			return <Badge variant="default">Checked In</Badge>
 		case "in_progress":
-			return (
-				<Badge className="bg-blue-500 text-white hover:bg-blue-500/80">In Progress</Badge>
-			)
+			return <Badge className="bg-blue-500 text-white hover:bg-blue-500/80">In Progress</Badge>
 		case "completed":
-			return (
-				<Badge className="bg-green-600 text-white hover:bg-green-600/80">Completed</Badge>
-			)
+			return <Badge className="bg-green-600 text-white hover:bg-green-600/80">Completed</Badge>
 		case "no_show":
 			return <Badge variant="destructive">No Show</Badge>
 		case "cancelled":
 			return <Badge variant="secondary">Cancelled</Badge>
+		default:
+			return <Badge variant="secondary">{status}</Badge>
+	}
+}
+
+function telemedicineStatusBadge(status: TelemedicineAppointmentStatus) {
+	switch (status) {
+		case "scheduled":
+		case "confirmed":
+			return <Badge variant="outline">{status}</Badge>
+		case "in-progress":
+			return <Badge className="bg-blue-500 text-white hover:bg-blue-500/80">In Progress</Badge>
+		case "completed":
+			return <Badge className="bg-green-600 text-white hover:bg-green-600/80">Completed</Badge>
+		case "cancelled":
+			return <Badge variant="secondary">Cancelled</Badge>
+		case "no-show":
+			return <Badge variant="destructive">No Show</Badge>
 		default:
 			return <Badge variant="secondary">{status}</Badge>
 	}
@@ -68,19 +89,33 @@ interface CheckInListProps {
 export function CheckInList({ facilityId }: CheckInListProps) {
 	const [statusFilter, setStatusFilter] = useState<string>("all")
 	const [page, setPage] = useState(1)
+	const { canViewTelemedicine } = usePermissions()
+	const today = todayIso()
 
 	const { data, isLoading, refetch } = useAppointmentsQuery({
 		facilityId,
-		date: todayIso(),
+		date: today,
 		status: statusFilter === "all" ? undefined : (statusFilter as AppointmentStatus),
 		page,
 		limit: 25,
 	})
+	const telemedicineQuery = useTelemedicineAppointmentsQuery(
+		facilityId,
+		1,
+		100,
+		undefined,
+		canViewTelemedicine
+	)
 
 	const checkInMut = useCheckInMutation()
 	const statusMut = useUpdateAppointmentStatusMutation()
 
 	const appointments = data?.items ?? []
+	const telemedicineAppointments =
+		canViewTelemedicine && statusFilter === "all"
+			? (telemedicineQuery.data?.data ?? []).filter(appt => appt.scheduledDate === today)
+			: []
+	const isListLoading = isLoading || (canViewTelemedicine && telemedicineQuery.isLoading)
 
 	function handleCheckIn(appointmentId: string) {
 		checkInMut.mutate({ id: appointmentId }, { onSuccess: () => void refetch() })
@@ -102,7 +137,7 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<div>
 					<h2 className="text-lg font-semibold">Today's Appointments</h2>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						{new Date().toLocaleDateString("en-PH", {
 							weekday: "long",
 							year: "numeric",
@@ -135,7 +170,16 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 							<SelectItem value="cancelled">Cancelled</SelectItem>
 						</SelectContent>
 					</Select>
-					<Button size="sm" variant="outline" onClick={() => void refetch()}>
+					<Button
+						size="sm"
+						variant="outline"
+						onClick={() => {
+							void refetch()
+							if (canViewTelemedicine) {
+								void telemedicineQuery.refetch()
+							}
+						}}
+					>
 						Refresh
 					</Button>
 				</div>
@@ -143,10 +187,10 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 
 			<Card>
 				<CardContent className="p-0">
-					{isLoading ? (
-						<p className="py-8 text-center text-muted-foreground">Loading appointments…</p>
-					) : appointments.length === 0 ? (
-						<p className="py-8 text-center text-muted-foreground">
+					{isListLoading ? (
+						<p className="text-muted-foreground py-8 text-center">Loading appointments…</p>
+					) : appointments.length === 0 && telemedicineAppointments.length === 0 ? (
+						<p className="text-muted-foreground py-8 text-center">
 							No appointments found for today.
 						</p>
 					) : (
@@ -155,6 +199,8 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 								<TableRow>
 									<TableHead>Time</TableHead>
 									<TableHead>Patient</TableHead>
+									<TableHead>Type</TableHead>
+									<TableHead>Physician/Provider</TableHead>
 									<TableHead>Queue #</TableHead>
 									<TableHead>Status</TableHead>
 									<TableHead>Actions</TableHead>
@@ -168,9 +214,16 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 										</TableCell>
 										<TableCell>
 											<div className="font-medium">{appt.patientName ?? "—"}</div>
-											<div className="text-xs text-muted-foreground">
-												{appt.patientMrn ?? ""}
-											</div>
+											<div className="text-muted-foreground text-xs">{appt.patientMrn ?? ""}</div>
+										</TableCell>
+										<TableCell>
+											<Badge variant="outline" className="gap-1">
+												<MapPin className="size-3" />
+												In-person
+											</Badge>
+										</TableCell>
+										<TableCell className="text-muted-foreground text-sm">
+											{appt.clinicianStaffId.slice(0, 8)}
 										</TableCell>
 										<TableCell>
 											{appt.queueNumber ? (
@@ -211,13 +264,36 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 													</>
 												)}
 												{appt.status === "checked_in" && (
-													<span className="text-xs text-muted-foreground">
+													<span className="text-muted-foreground text-xs">
 														{appt.checkedInAt
 															? `Checked in at ${new Date(appt.checkedInAt).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}`
 															: "In queue"}
 													</span>
 												)}
 											</div>
+										</TableCell>
+									</TableRow>
+								))}
+								{telemedicineAppointments.map((appt: TelemedicineAppointment) => (
+									<TableRow key={appt.id}>
+										<TableCell className="font-medium">
+											{formatSlotTime(appt.scheduledTime)}
+										</TableCell>
+										<TableCell>
+											<div className="font-medium">{appt.patientName}</div>
+											<div className="text-muted-foreground text-xs">{appt.patientMrn}</div>
+										</TableCell>
+										<TableCell>
+											<Badge variant="secondary" className="gap-1">
+												<Video className="size-3" />
+												Telemedicine
+											</Badge>
+										</TableCell>
+										<TableCell>{appt.clinicianName || "—"}</TableCell>
+										<TableCell>—</TableCell>
+										<TableCell>{telemedicineStatusBadge(appt.status)}</TableCell>
+										<TableCell>
+											<span className="text-muted-foreground text-xs">Managed in Telemedicine</span>
 										</TableCell>
 									</TableRow>
 								))}
@@ -237,7 +313,7 @@ export function CheckInList({ facilityId }: CheckInListProps) {
 					>
 						Previous
 					</Button>
-					<span className="self-center text-sm text-muted-foreground">
+					<span className="text-muted-foreground self-center text-sm">
 						Page {page} of {data?.totalPages}
 					</span>
 					<Button

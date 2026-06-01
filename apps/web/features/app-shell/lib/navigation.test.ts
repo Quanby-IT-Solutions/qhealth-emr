@@ -43,6 +43,53 @@ const schedulerPermissions = [
 	{ module: "scheduling", action: "edit" },
 ]
 
+const physicianPermissions = [
+	{ module: "adt", action: "view" },
+	{ module: "patients", action: "view" },
+	{ module: "clinical_docs", action: "view" },
+	{ module: "clinical_docs", action: "create" },
+	{ module: "clinical_docs", action: "edit" },
+	{ module: "clinical_docs", action: "sign" },
+	{ module: "orders", action: "view" },
+	{ module: "orders", action: "create" },
+	{ module: "orders", action: "edit" },
+	{ module: "orders", action: "sign" },
+	{ module: "nursing", action: "view" },
+	{ module: "formulary", action: "view" },
+	{ module: "opd", action: "view" },
+	{ module: "telemedicine", action: "view" },
+	{ module: "telemedicine", action: "create" },
+	{ module: "telemedicine", action: "edit" },
+	{ module: "ed", action: "view" },
+	{ module: "ed", action: "edit" },
+	{ module: "death_reporting", action: "view" },
+	{ module: "death_reporting", action: "create" },
+	{ module: "death_reporting", action: "edit" },
+	{ module: "audit", action: "create" },
+]
+
+const surgeonPermissions = [
+	{ module: "adt", action: "view" },
+	{ module: "patients", action: "view" },
+	{ module: "clinical_docs", action: "view" },
+	{ module: "clinical_docs", action: "create" },
+	{ module: "clinical_docs", action: "edit" },
+	{ module: "clinical_docs", action: "sign" },
+	{ module: "orders", action: "view" },
+	{ module: "orders", action: "create" },
+	{ module: "orders", action: "sign" },
+	{ module: "surgical", action: "view" },
+	{ module: "surgical", action: "create" },
+	{ module: "surgical", action: "edit" },
+	{ module: "surgical", action: "sign" },
+	{ module: "formulary", action: "view" },
+	{ module: "opd", action: "view" },
+	{ module: "death_reporting", action: "view" },
+	{ module: "death_reporting", action: "create" },
+	{ module: "death_reporting", action: "edit" },
+	{ module: "audit", action: "create" },
+]
+
 describe("filterNavItems", () => {
 	it("keeps the Triage Officer sidebar scoped to triage-owned workflows", () => {
 		const primaryTitles = filterNavItems(PRIMARY_NAV_ITEMS, triagePermissions).map(
@@ -52,7 +99,13 @@ describe("filterNavItems", () => {
 			item => item.title
 		)
 
-		expect(primaryTitles).toEqual(["Dashboard", "Triage"])
+		expect(primaryTitles).toEqual([
+			"Dashboard",
+			"Triage Queue",
+			"Trauma Alias",
+			"Tele-Triage",
+			"OPD Tele-Triage",
+		])
 		expect(secondaryTitles).toEqual([])
 	})
 
@@ -66,12 +119,14 @@ describe("filterNavItems", () => {
 
 		expect(primaryTitles).toEqual([
 			"Dashboard",
-			"Register Patient",
-			"Patients & Encounters",
+			"Patient Management",
 			"Bed Management",
+			"Housekeeping",
 			"OPD",
 			"Chart Merge",
 			"Civil Registry",
+			"Patient Transfers",
+			"Discharge Processing",
 		])
 		expect(secondaryTitles).toEqual([])
 	})
@@ -92,6 +147,42 @@ describe("filterNavItems", () => {
 			"Check-In",
 			"OPD Queue",
 			"OR Schedule",
+		])
+		expect(secondaryTitles).toEqual([])
+	})
+
+	it("keeps the Physician sidebar scoped to physician-owned workflows", () => {
+		const primaryTitles = filterNavItems(PRIMARY_NAV_ITEMS, physicianPermissions).map(
+			item => item.title
+		)
+		const secondaryTitles = filterNavItems(SECONDARY_NAV_ITEMS, physicianPermissions).map(
+			item => item.title
+		)
+
+		expect(primaryTitles).toEqual([
+			"Dashboard",
+			"Patients",
+			"Emergency",
+			"OPD",
+			"Telemedicine",
+		])
+		expect(secondaryTitles).toEqual([])
+	})
+
+	it("keeps the Surgeon sidebar scoped to surgical workflows", () => {
+		const primaryTitles = filterNavItems(PRIMARY_NAV_ITEMS, surgeonPermissions).map(
+			item => item.title
+		)
+		const secondaryTitles = filterNavItems(SECONDARY_NAV_ITEMS, surgeonPermissions).map(
+			item => item.title
+		)
+
+		expect(primaryTitles).toEqual([
+			"Dashboard",
+			"Patients",
+			"OR Schedule",
+			"Surgical Services",
+			"OPD",
 		])
 		expect(secondaryTitles).toEqual([])
 	})

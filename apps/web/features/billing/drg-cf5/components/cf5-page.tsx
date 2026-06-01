@@ -18,10 +18,12 @@ import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Skeleton } from "@/core/components/ui/skeleton"
 
-import { ClaimStatusTimeline } from "@/features/billing/components/claim-status-timeline"
+import {
+	ClaimStatusTimeline,
+	type ClaimStatus,
+} from "@/features/billing/components/claim-status-timeline"
 import { EncounterContextBar } from "@/features/billing/components/encounter-context-bar"
 import { XmlPreviewPane } from "@/features/billing/components/xml-preview-pane"
-import type { ClaimStatus } from "@/features/billing/components/claim-status-timeline"
 import {
 	useCf5WithBillingQuery,
 	useGenerateCf5Mutation,
@@ -143,15 +145,15 @@ export function Cf5Page({ encounterId }: Cf5PageProps) {
 					{!surgicalReadiness.isReady ? (
 						<Alert variant="destructive">
 							<AlertDescription>
-								CF5 is blocked until every signed operative procedure has a primary RVS code.
-								Missing: {surgicalReadiness.missingProcedureLabels.join(", ")}.
+								CF5 is blocked until every signed operative procedure has a finalized primary
+								RVS code. Missing: {surgicalReadiness.missingProcedureLabels.join(", ")}.
 							</AlertDescription>
 						</Alert>
 					) : (
 						<Alert>
 							<AlertDescription>
 								Surgical prerequisite check passed. Each listed operative procedure has a
-								primary RVS code.
+								finalized primary RVS code.
 							</AlertDescription>
 						</Alert>
 					)}
@@ -174,7 +176,7 @@ export function Cf5Page({ encounterId }: Cf5PageProps) {
 											</p>
 										</div>
 										<Badge variant={procedure.isReady ? "default" : "destructive"}>
-											{procedure.isReady ? "Ready" : "Missing Primary"}
+											{procedure.isReady ? "Ready" : "Missing Finalized Primary"}
 										</Badge>
 									</div>
 								))}

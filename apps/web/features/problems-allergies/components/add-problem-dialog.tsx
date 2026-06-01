@@ -23,6 +23,7 @@ import {
 import { Textarea } from "@/core/components/ui/textarea"
 import {
 	useCreateProblemMutation,
+	useProblemsQuery,
 	type ProblemStatus,
 } from "@/features/problems-allergies/api/problems-allergies.hooks"
 
@@ -57,6 +58,10 @@ export function AddProblemDialog({
 	const [snomedSearch, setSnomedSearch] = useState("")
 
 	const createProblem = useCreateProblemMutation()
+	const activeProblemsQuery = useProblemsQuery({ patientId, status: "active" })
+	const activeProblems = activeProblemsQuery.data?.data ?? []
+	const activeIcd10Codes = new Set(activeProblems.flatMap(problem => problem.icd10Code ?? []))
+	const activeSnomedCodes = new Set(activeProblems.flatMap(problem => problem.snomedCode ?? []))
 	const hasCode = Boolean(codes.icd10Code || codes.snomedCode)
 	const canSubmit = Boolean(hasCode && description.trim() && facilityId && !createProblem.isPending)
 
@@ -85,6 +90,11 @@ export function AddProblemDialog({
 		)
 	}
 
+	function handleCancel() {
+		resetForm()
+		onOpenChange(false)
+	}
+
 	function resetForm() {
 		setDescription("")
 		setOnsetDate("")
@@ -105,7 +115,7 @@ export function AddProblemDialog({
 		>
 			<DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
 				<DialogHeader>
-					<DialogTitle>Add Problem</DialogTitle>
+					<DialogTitle className="text-xl">Add Problem</DialogTitle>
 				</DialogHeader>
 
 				<div className="grid gap-4">
@@ -116,14 +126,16 @@ export function AddProblemDialog({
 						onIcd10SearchChange={setIcd10Search}
 						snomedSearch={snomedSearch}
 						onSnomedSearchChange={setSnomedSearch}
+						disabledIcd10Codes={status === "active" ? activeIcd10Codes : undefined}
+						disabledSnomedCodes={status === "active" ? activeSnomedCodes : undefined}
 						onDescriptionSuggestion={suggestion => {
 							if (!description.trim()) setDescription(suggestion)
 						}}
 					/>
 
 					{!hasCode && (
-						<Alert>
-							<AlertDescription>
+						<Alert className="border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
+							<AlertDescription className="text-amber-900 dark:text-amber-100">
 								Select at least one ICD-10 or SNOMED CT code before saving.
 							</AlertDescription>
 						</Alert>
@@ -139,7 +151,7 @@ export function AddProblemDialog({
 						/>
 					</div>
 
-					<div className="grid gap-4 sm:grid-cols-3">
+					<div className={`grid gap-4 ${status === "resolved" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
 						<div className="space-y-2">
 							<Label>Status</Label>
 							<Select value={status} onValueChange={value => setStatus(value as ProblemStatus)}>
@@ -176,6 +188,9 @@ export function AddProblemDialog({
 				</div>
 
 				<DialogFooter>
+					<Button type="button" variant="outline" onClick={handleCancel} disabled={createProblem.isPending}>
+						Cancel
+					</Button>
 					<Button onClick={handleSubmit} disabled={!canSubmit}>
 						{createProblem.isPending ? "Adding..." : "Add Problem"}
 					</Button>

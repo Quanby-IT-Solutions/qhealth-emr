@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-
 import { CheckCircle2, RefreshCw } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -9,13 +8,21 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
-import type { CreateFndrfInput } from "@/features/death-reporting/api/death-reporting.hooks"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
 	useCreateFndrfMutation,
 	useFndrfQuery,
+	useMarkDeathReportReleasedMutation,
 	useUpdateFndrfMutation,
+	type CreateFndrfInput,
 } from "@/features/death-reporting/api/death-reporting.hooks"
 
 // ============================================================================
@@ -128,7 +135,7 @@ function CheckRow({ id, label, checked, onChange, disabled }: CheckRowProps) {
 			<input
 				id={id}
 				type="checkbox"
-				className="size-4 accent-primary"
+				className="accent-primary size-4"
 				checked={checked}
 				onChange={e => onChange(e.target.checked)}
 				disabled={disabled}
@@ -144,6 +151,13 @@ function CheckRow({ id, label, checked, onChange, disabled }: CheckRowProps) {
 
 type FormState = Omit<CreateFndrfInput, "encounterId" | "patientId" | "facilityId">
 
+function toDatetimeLocalValue(value: string) {
+	const date = new Date(value)
+	if (Number.isNaN(date.getTime())) return value
+	const pad = (n: number) => String(n).padStart(2, "0")
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 function emptyForm(): FormState {
 	return {
 		newbornName: "",
@@ -154,6 +168,7 @@ function emptyForm(): FormState {
 		deliveryType: "svd",
 		apgarScore1Min: null,
 		apgarScore5Min: null,
+		resuscitationRequired: false,
 		motherName: "",
 		motherAge: 0,
 		motherGravidity: 0,
@@ -185,9 +200,11 @@ interface FndrfFormProps {
 	encounterId: string
 	patientId: string
 	facilityId: string
+	/** Prefill values from encounter context */
 	initialNewbornName?: string
 	initialNewbornMrn?: string
 	initialNewbornDateOfBirth?: string
+	initialPlaceOfDeath?: string | null
 }
 
 export function FndrfForm({
@@ -197,10 +214,25 @@ export function FndrfForm({
 	initialNewbornName,
 	initialNewbornMrn,
 	initialNewbornDateOfBirth,
+	initialPlaceOfDeath,
 }: FndrfFormProps) {
 	const { data: existing } = useFndrfQuery(encounterId)
 	const createMutation = useCreateFndrfMutation()
 	const updateMutation = useUpdateFndrfMutation()
+	const markReleasedMutation = useMarkDeathReportReleasedMutation()
+
+	const { data: profile } = useMyProfile()
+	const activeStaffProfile =
+		profile?.staffProfiles?.find(p =>
+			p.roles.some((r: { id: string }) => r.id === profile?.activeRole?.id)
+		) ?? profile?.staffProfiles?.[0]
+	const defaultPhysicianName = profile?.user?.name ?? ""
+	const defaultPhysicianLicenseNo = activeStaffProfile?.prcLicenseNumber ?? ""
+	const staffProfileId = activeStaffProfile?.id ?? null
+	const permissions = profile?.activeRole?.permissions ?? []
+	const canEdit = (permissions as Array<{ module: string; action: string }>).some(
+		p => p.module === "death_reporting" && p.action === "edit"
+	)
 
 	const [editing, setEditing] = useState(false)
 	const [form, setForm] = useState<FormState>(emptyForm)
@@ -208,21 +240,23 @@ export function FndrfForm({
 
 	useEffect(() => {
 		if (existing) {
+			// eslint-disable-next-line react-hooks/set-state-in-effect
 			setForm({
 				newbornName: existing.newbornName,
 				newbornMrn: existing.newbornMrn,
-				newbornDateOfBirth: existing.newbornDateOfBirth,
+				newbornDateOfBirth: toDatetimeLocalValue(existing.newbornDateOfBirth),
 				gestationalAgeWeeks: existing.gestationalAgeWeeks,
 				birthWeightGrams: existing.birthWeightGrams,
 				deliveryType: existing.deliveryType,
 				apgarScore1Min: existing.apgarScore1Min,
 				apgarScore5Min: existing.apgarScore5Min,
+				resuscitationRequired: existing.resuscitationRequired,
 				motherName: existing.motherName,
 				motherAge: existing.motherAge,
 				motherGravidity: existing.motherGravidity,
 				motherParity: existing.motherParity,
 				motherAncVisits: existing.motherAncVisits,
-				dateOfDeath: existing.dateOfDeath,
+				dateOfDeath: toDatetimeLocalValue(existing.dateOfDeath),
 				ageAtDeathHours: existing.ageAtDeathHours,
 				ageAtDeathDays: existing.ageAtDeathDays,
 				placeOfDeath: existing.placeOfDeath,
@@ -241,12 +275,25 @@ export function FndrfForm({
 		} else {
 			setForm(prev => ({
 				...prev,
-				newbornName: initialNewbornName ?? "",
-				newbornMrn: initialNewbornMrn ?? "",
-				newbornDateOfBirth: initialNewbornDateOfBirth ?? "",
+				newbornName: prev.newbornName || initialNewbornName || "",
+				newbornMrn: prev.newbornMrn || initialNewbornMrn || "",
+				newbornDateOfBirth:
+					prev.newbornDateOfBirth ||
+					(initialNewbornDateOfBirth ? toDatetimeLocalValue(initialNewbornDateOfBirth) : ""),
+				placeOfDeath: prev.placeOfDeath || initialPlaceOfDeath || "",
+				physicianName: prev.physicianName || defaultPhysicianName,
+				physicianLicenseNo: prev.physicianLicenseNo || defaultPhysicianLicenseNo,
 			}))
 		}
-	}, [existing, initialNewbornName, initialNewbornMrn, initialNewbornDateOfBirth])
+	}, [
+		existing,
+		initialNewbornName,
+		initialNewbornMrn,
+		initialNewbornDateOfBirth,
+		initialPlaceOfDeath,
+		defaultPhysicianName,
+		defaultPhysicianLicenseNo,
+	])
 
 	const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
 		setForm(prev => ({ ...prev, [key]: value }))
@@ -258,6 +305,10 @@ export function FndrfForm({
 		"newbornName",
 		"newbornMrn",
 		"newbornDateOfBirth",
+		"gestationalAgeWeeks",
+		"birthWeightGrams",
+		"motherName",
+		"motherAge",
 		"dateOfDeath",
 		"placeOfDeath",
 		"physicianName",
@@ -266,7 +317,20 @@ export function FndrfForm({
 		"certificationDate",
 	]
 
-	const isValid = requiredFields.every(f => !!form[f])
+	const hasCause =
+		form.causePrematurity ||
+		form.causeBirthAsphyxia ||
+		form.causeSepsis ||
+		form.causeCongenitalAnomaly ||
+		form.causeRds ||
+		!!form.causeOther?.trim()
+
+	const isValid =
+		hasCause &&
+		requiredFields.every(f => {
+			const value = form[f]
+			return typeof value === "number" ? value > 0 : !!value
+		})
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
@@ -298,8 +362,8 @@ export function FndrfForm({
 					<CheckCircle2 className="size-6 text-green-600" />
 					<div>
 						<p className="font-medium text-green-700">FNDRF Submitted</p>
-						<p className="text-sm text-muted-foreground">
-							Facility Neonatal Death Review Form has been saved.
+						<p className="text-muted-foreground text-sm">
+							Facility Neonatal Death Review Form has been submitted for MNDRS review.
 						</p>
 					</div>
 					<Button
@@ -307,7 +371,10 @@ export function FndrfForm({
 						variant="outline"
 						size="sm"
 						className="ml-auto"
-						onClick={() => { setEditing(true); setSubmitted(false) }}
+						onClick={() => {
+							setEditing(true)
+							setSubmitted(false)
+						}}
 					>
 						Edit
 					</Button>
@@ -322,13 +389,38 @@ export function FndrfForm({
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="text-lg font-semibold">Facility Neonatal Death Review Form (FNDRF)</h2>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						DOH-mandated neonatal death review documentation
 					</p>
 				</div>
 				{existing && !editing && (
 					<div className="flex items-center gap-2">
-						<Badge className="bg-green-100 text-green-800">Submitted</Badge>
+						{existing.status === "draft" && (
+							<Badge className="bg-amber-100 text-amber-800">Draft</Badge>
+						)}
+						{existing.status === "completed" && (
+							<Badge className="bg-green-100 text-green-800">Completed</Badge>
+						)}
+						{existing.status === "submitted" && (
+							<Badge className="bg-blue-100 text-blue-800">Submitted</Badge>
+						)}
+						{existing.status === "draft" && canEdit && (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={markReleasedMutation.isPending || !staffProfileId}
+								onClick={() => {
+									if (!staffProfileId) return
+									void markReleasedMutation.mutateAsync({
+										id: existing.id,
+										encounterId,
+									})
+								}}
+							>
+								{markReleasedMutation.isPending ? "Marking…" : "Mark as Completed"}
+							</Button>
+						)}
 						<Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
 							Edit
 						</Button>
@@ -380,7 +472,7 @@ export function FndrfForm({
 				</CardHeader>
 				<CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 					<div className="space-y-1.5">
-						<Label>Gestational Age (weeks)</Label>
+						<Label>Gestational Age (weeks) *</Label>
 						<Input
 							type="number"
 							min={20}
@@ -391,7 +483,7 @@ export function FndrfForm({
 						/>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Birth Weight (grams)</Label>
+						<Label>Birth Weight (grams) *</Label>
 						<Input
 							type="number"
 							min={0}
@@ -404,9 +496,7 @@ export function FndrfForm({
 						<Label>Type of Delivery</Label>
 						<Select
 							value={form.deliveryType}
-							onValueChange={v =>
-								set("deliveryType", v as FormState["deliveryType"])
-							}
+							onValueChange={v => set("deliveryType", v as FormState["deliveryType"])}
 						>
 							<SelectTrigger disabled={isReadOnly}>
 								<SelectValue />
@@ -427,9 +517,7 @@ export function FndrfForm({
 							min={0}
 							max={10}
 							value={form.apgarScore1Min ?? ""}
-							onChange={e =>
-								set("apgarScore1Min", e.target.value ? Number(e.target.value) : null)
-							}
+							onChange={e => set("apgarScore1Min", e.target.value ? Number(e.target.value) : null)}
 							disabled={isReadOnly}
 						/>
 					</div>
@@ -440,9 +528,16 @@ export function FndrfForm({
 							min={0}
 							max={10}
 							value={form.apgarScore5Min ?? ""}
-							onChange={e =>
-								set("apgarScore5Min", e.target.value ? Number(e.target.value) : null)
-							}
+							onChange={e => set("apgarScore5Min", e.target.value ? Number(e.target.value) : null)}
+							disabled={isReadOnly}
+						/>
+					</div>
+					<div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
+						<CheckRow
+							id="resuscitation-required"
+							label="Resuscitation efforts performed"
+							checked={form.resuscitationRequired}
+							onChange={v => set("resuscitationRequired", v)}
 							disabled={isReadOnly}
 						/>
 					</div>
@@ -456,7 +551,7 @@ export function FndrfForm({
 				</CardHeader>
 				<CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 					<div className="space-y-1.5 sm:col-span-2">
-						<Label>Mother&apos;s Full Name</Label>
+						<Label>Mother&apos;s Full Name *</Label>
 						<Input
 							value={form.motherName}
 							onChange={e => set("motherName", e.target.value)}
@@ -464,7 +559,7 @@ export function FndrfForm({
 						/>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Mother&apos;s Age</Label>
+						<Label>Mother&apos;s Age *</Label>
 						<Input
 							type="number"
 							min={10}
@@ -500,9 +595,7 @@ export function FndrfForm({
 							type="number"
 							min={0}
 							value={form.motherAncVisits ?? ""}
-							onChange={e =>
-								set("motherAncVisits", e.target.value ? Number(e.target.value) : null)
-							}
+							onChange={e => set("motherAncVisits", e.target.value ? Number(e.target.value) : null)}
 							disabled={isReadOnly}
 						/>
 					</div>
@@ -531,9 +624,7 @@ export function FndrfForm({
 							type="number"
 							min={0}
 							value={form.ageAtDeathHours ?? ""}
-							onChange={e =>
-								set("ageAtDeathHours", e.target.value ? Number(e.target.value) : null)
-							}
+							onChange={e => set("ageAtDeathHours", e.target.value ? Number(e.target.value) : null)}
 							disabled={isReadOnly}
 						/>
 					</div>
@@ -543,9 +634,7 @@ export function FndrfForm({
 							type="number"
 							min={0}
 							value={form.ageAtDeathDays ?? ""}
-							onChange={e =>
-								set("ageAtDeathDays", e.target.value ? Number(e.target.value) : null)
-							}
+							onChange={e => set("ageAtDeathDays", e.target.value ? Number(e.target.value) : null)}
 							disabled={isReadOnly}
 						/>
 					</div>
@@ -565,7 +654,7 @@ export function FndrfForm({
 			{/* Section 5 – Cause of Death */}
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-sm">Section 5 — Cause of Death</CardTitle>
+					<CardTitle className="text-sm">Section 5 — Cause of Death *</CardTitle>
 				</CardHeader>
 				<CardContent className="grid gap-3 sm:grid-cols-2">
 					<CheckRow
@@ -670,6 +759,7 @@ export function FndrfForm({
 					<div className="space-y-1.5">
 						<Label>Physician Signature *</Label>
 						{isReadOnly && form.physicianSignatureDataUrl ? (
+							// eslint-disable-next-line @next/next/no-img-element
 							<img
 								src={form.physicianSignatureDataUrl}
 								alt="Physician signature"
@@ -683,9 +773,7 @@ export function FndrfForm({
 									disabled={isReadOnly}
 								/>
 								{!isReadOnly && !form.physicianSignatureDataUrl && (
-									<p className="text-xs text-muted-foreground">
-										Draw your signature above *
-									</p>
+									<p className="text-muted-foreground text-xs">Draw your signature above *</p>
 								)}
 							</>
 						)}

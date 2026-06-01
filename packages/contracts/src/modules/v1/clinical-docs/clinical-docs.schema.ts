@@ -130,6 +130,7 @@ export const AddendumSchema = z.object({
 	authorStaffId: z.string().uuid(),
 	authorStaffName: z.string().nullable(),
 	signedAt: dateOrString.nullable(),
+	signedIp: z.string().nullable(),
 	createdAt: dateOrString,
 })
 
@@ -140,6 +141,7 @@ export const ClinicalNoteSchema = z.object({
 	facilityId: z.string().uuid(),
 	encounterId: z.string().uuid().nullable(),
 	preEncounterId: z.string().uuid().nullable(),
+	patientName: z.string().nullable().optional(),
 	templateId: z.string().uuid().nullable(),
 	templateName: z.string().nullable(),
 	noteType: NoteTypeEnum,
@@ -181,6 +183,15 @@ export const ClinicalNoteIdSchema = z.object({
 	id: z.string().uuid(),
 })
 
+/**
+ * Filters accepted by `clinicalDocs.listNotes`.
+ *
+ * Facility isolation is enforced server-side: the backend derives the target
+ * `facilityId` from the supplied `encounterId` / `preEncounterId` via an
+ * encounter join, and additionally requires the caller to hold an active staff
+ * profile at that facility. Clients neither pass nor need to pass a
+ * `facilityId` here — adding one would have no effect.
+ */
 export const ClinicalNoteListSchema = PaginationInputSchema.extend({
 	encounterId: z.string().uuid().optional(),
 	preEncounterId: z.string().uuid().optional(),
@@ -288,6 +299,7 @@ export const ConsentRecordSchema = z.object({
 	witnessStaffId: z.string().uuid().nullable(),
 	witnessStaffName: z.string().nullable(),
 	revokedAt: dateOrString.nullable(),
+	revocationReason: z.string().nullable(),
 	createdAt: dateOrString,
 	updatedAt: dateOrString,
 })
@@ -307,6 +319,7 @@ export const CreateConsentRecordSchema = z.object({
 
 export const RevokeConsentSchema = z.object({
 	id: z.string().uuid(),
+	reason: z.string().min(1).max(500).optional(),
 })
 
 export const ConsentRecordIdSchema = z.object({

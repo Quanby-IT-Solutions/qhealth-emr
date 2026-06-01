@@ -1,23 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { Info, Loader2, Lock, Save, Signature } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
+import { Info, Loader2, Lock, Save, Search, Signature, X } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Checkbox } from "@/core/components/ui/checkbox"
-import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
-} from "@/core/components/ui/command"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Popover, PopoverContent, PopoverTrigger } from "@/core/components/ui/popover"
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useListCliniciansQuery } from "@/features/patients/api/patients.hooks"
@@ -85,7 +77,10 @@ function StaffSearchCombobox({
 	disabled = false,
 }: StaffSearchComboboxProps) {
 	const [open, setOpen] = useState(false)
-	const [inputValue, setInputValue] = useState("")
+	const [query, setQuery] = useState("")
+	const [menuRect, setMenuRect] = useState<DOMRect | null>(null)
+	const triggerRef = useRef<HTMLDivElement>(null)
+	const menuRef = useRef<HTMLDivElement>(null)
 
 	const selectedOption = useMemo(
 		() => options.find(option => option.staffProfileId === value) ?? null,
@@ -93,85 +88,189 @@ function StaffSearchCombobox({
 	)
 
 	const filteredOptions = useMemo(() => {
-		const query = inputValue.trim().toLowerCase()
+		const normalizedQuery = query.trim().toLowerCase()
 		const source =
-			query.length === 0
+			normalizedQuery.length === 0
 				? options
 				: options.filter(option => {
 						const department = option.department?.toLowerCase() ?? ""
-						return option.name.toLowerCase().includes(query) || department.includes(query)
+						return (
+							option.name.toLowerCase().includes(normalizedQuery) ||
+							department.includes(normalizedQuery)
+						)
 					})
 
 		return source.slice(0, 20)
-	}, [inputValue, options])
+	}, [options, query])
 
-	useEffect(() => {
-		setInputValue(selectedOption?.name ?? "")
-	}, [selectedOption])
-
-	function handleInputChange(nextValue: string) {
-		setInputValue(nextValue)
-		if (!nextValue.trim()) {
-			onChange("")
-		}
-		setOpen(!disabled)
+	function updateMenuRect() {
+		setMenuRect(triggerRef.current?.getBoundingClientRect() ?? null)
 	}
 
-	function handleOpenChange(nextOpen: boolean) {
-		setOpen(nextOpen && !disabled)
-		if (!nextOpen && !value) {
-			setInputValue("")
+	function handleQueryChange(nextQuery: string) {
+		setQuery(nextQuery)
+		updateMenuRect()
+		setOpen(!disabled)
+
+		if (selectedOption && nextQuery !== selectedOption.name) {
+			onChange("")
+		}
+	}
+
+	function handleBlur() {
+		window.setTimeout(() => {
+			const exactMatch = options.find(
+				option => option.name.toLowerCase() === query.trim().toLowerCase()
+			)
+
+			if (exactMatch) {
+				onChange(exactMatch.staffProfileId)
+				setQuery("")
+			} else {
+				setQuery("")
+			}
+		}, 120)
+	}
+
+	function handleClear() {
+		onChange("")
+		setQuery("")
+		setOpen(false)
+		setMenuRect(null)
+	}
+
+	function handleFocus() {
+		if (!disabled) {
+			setQuery(selectedOption?.name ?? "")
+			updateMenuRect()
+			setOpen(true)
 		}
 	}
 
 	function handleSelect(option: StaffOption) {
 		onChange(option.staffProfileId)
-		setInputValue(option.name)
+		setQuery("")
 		setOpen(false)
+		setMenuRect(null)
 	}
 
-	return (
-		<Popover open={open} onOpenChange={handleOpenChange}>
-			<Command shouldFilter={false} className="h-auto w-full overflow-visible bg-transparent p-0">
-				<PopoverTrigger render={<div className="w-full" />}>
-					<CommandInput
-						id={id}
-						value={inputValue}
-						onValueChange={handleInputChange}
-						onFocus={() => {
-							if (!disabled) {
-								setOpen(true)
-							}
+	useEffect(() => {
+		if (!open) return
+
+		function handlePointerDown(event: PointerEvent) {
+			const target = event.target as Node
+			if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) {
+				return
+			}
+			setOpen(false)
+			setQuery("")
+			setMenuRect(null)
+		}
+
+		document.addEventListener("pointerdown", handlePointerDown)
+		return () => document.removeEventListener("pointerdown", handlePointerDown)
+	}, [open])
+
+	const inputValue = open || query ? query : (selectedOption?.name ?? "")
+	const menu =
+		open && !disabled && menuRect
+			? createPortal(
+					<div
+						ref={menuRef}
+						className="bg-popover text-popover-foreground fixed z-[100] max-h-60 overflow-y-auto rounded-md border p-1 shadow-md"
+						style={{
+							top: menuRect.bottom + 4,
+							left: menuRect.left,
+							width: menuRect.width,
 						}}
-						placeholder={placeholder}
-						disabled={disabled}
-					/>
-				</PopoverTrigger>
-				<PopoverContent align="start" className="w-(--anchor-width) p-0">
-					<CommandList>
-						<CommandEmpty>No matching staff found.</CommandEmpty>
-						<CommandGroup>
-							{filteredOptions.map(option => (
-								<CommandItem
+					>
+						{filteredOptions.length > 0 ? (
+							filteredOptions.map(option => (
+								<button
 									key={option.staffProfileId}
-									value={option.staffProfileId}
-									onSelect={() => handleSelect(option)}
-									className="items-start py-2"
+									type="button"
+									className="hover:bg-muted flex w-full min-w-0 flex-col items-start rounded-sm px-2 py-2 text-left text-sm"
+									onMouseDown={event => event.preventDefault()}
+									onClick={() => handleSelect(option)}
 								>
-									<div className="flex min-w-0 flex-1 flex-col">
-										<span className="truncate font-medium">{option.name}</span>
-										{option.department ? (
-											<span className="text-muted-foreground text-xs">{option.department}</span>
-										) : null}
-									</div>
-								</CommandItem>
-							))}
-						</CommandGroup>
-					</CommandList>
-				</PopoverContent>
-			</Command>
-		</Popover>
+									<span className="w-full truncate font-medium">{option.name}</span>
+									{option.department ? (
+										<span className="text-muted-foreground w-full truncate text-xs">
+											{option.department}
+										</span>
+									) : null}
+								</button>
+							))
+						) : (
+							<p className="text-muted-foreground px-2 py-3 text-sm">No matching staff found.</p>
+						)}
+					</div>,
+					document.body
+				)
+			: null
+
+	return (
+		<>
+			<div ref={triggerRef} className="relative w-full">
+				<Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+				<Input
+					id={id}
+					data-testid={id}
+					value={inputValue}
+					onChange={event => handleQueryChange(event.target.value)}
+					onFocus={handleFocus}
+					onBlur={handleBlur}
+					placeholder={placeholder}
+					disabled={disabled}
+					autoComplete="off"
+					className="pr-9 pl-9"
+					onKeyDown={event => {
+						if (event.key === "Escape") {
+							setOpen(false)
+							setQuery("")
+							setMenuRect(null)
+						}
+						if (event.key === "Tab") {
+							setOpen(false)
+							setQuery("")
+							setMenuRect(null)
+						}
+					}}
+				/>
+				{value && !disabled ? (
+					<button
+						type="button"
+						aria-label={`Clear ${id ?? "staff selection"}`}
+						className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 flex size-6 -translate-y-1/2 items-center justify-center rounded"
+						onMouseDown={event => event.preventDefault()}
+						onClick={handleClear}
+					>
+						<X className="size-4" />
+					</button>
+				) : null}
+			</div>
+			{menu}
+		</>
 	)
+}
+
+function toDatetimeLocalValue(value: string | null | undefined) {
+	if (!value) return ""
+
+	const date = new Date(value)
+	if (Number.isNaN(date.getTime())) return ""
+
+	const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+	return localDate.toISOString().slice(0, 16)
+}
+
+function wholeNumberInput(value: string) {
+	return value.replace(/\D/g, "")
+}
+
+function toOptionalWholeNumber(value: string) {
+	const normalized = wholeNumberInput(value)
+	return normalized ? Number(normalized) : undefined
 }
 
 function buildInitialState(
@@ -189,8 +288,8 @@ function buildInitialState(
 		estimatedBloodLoss: existing?.estimatedBloodLoss?.toString() ?? "",
 		fluidIn: existing?.fluidIn?.toString() ?? "",
 		fluidOut: existing?.fluidOut?.toString() ?? "",
-		incisionDatetime: existing?.incisionDatetime?.slice(0, 16) ?? "",
-		closureDatetime: existing?.closureDatetime?.slice(0, 16) ?? "",
+		incisionDatetime: toDatetimeLocalValue(existing?.incisionDatetime),
+		closureDatetime: toDatetimeLocalValue(existing?.closureDatetime),
 		firstAssistantStaffId: existing?.firstAssistantStaffId ?? "",
 		secondAssistantStaffId: existing?.secondAssistantStaffId ?? "",
 		scrubNurseStaffId: existing?.scrubNurseStaffId ?? "",
@@ -224,9 +323,15 @@ export function OperationRecordForm({
 		staffOptions.find(option => option.staffProfileId === surgeonStaffId)?.name ?? surgeonStaffId
 	const isSigned = existing?.status === "signed"
 	const fieldsDisabled = isSigned || !canEdit || save.isPending || sign.isPending
+	const timeOrderInvalid = Boolean(
+		form.incisionDatetime &&
+			form.closureDatetime &&
+			new Date(form.closureDatetime) < new Date(form.incisionDatetime)
+	)
 	const canSubmit = Boolean(
 		form.preOpDiagnosis.trim() &&
 		form.procedurePerformed.trim() &&
+		!timeOrderInvalid &&
 		!save.isPending &&
 		!sign.isPending
 	)
@@ -239,11 +344,7 @@ export function OperationRecordForm({
 		if (!form.operativeTechnique.trim()) missingFields.push("operative technique")
 		if (!form.incisionDatetime) missingFields.push("incision time")
 		if (!form.closureDatetime) missingFields.push("closure time")
-		if (
-			form.incisionDatetime &&
-			form.closureDatetime &&
-			new Date(form.closureDatetime) < new Date(form.incisionDatetime)
-		) {
+		if (timeOrderInvalid) {
 			missingFields.push("closure time after incision time")
 		}
 		if (!form.scrubNurseStaffId) missingFields.push("scrub nurse")
@@ -251,7 +352,7 @@ export function OperationRecordForm({
 		if (!form.anesthesiologistStaffId) missingFields.push("anesthesiologist")
 
 		return missingFields
-	}, [form])
+	}, [form, timeOrderInvalid])
 	const canSignDraft = canSign && !isSigned && (Boolean(existing) || canEdit)
 	const canSignRecord = canSignDraft && signChecklistMissing.length === 0
 
@@ -274,9 +375,9 @@ export function OperationRecordForm({
 			operativeTechnique: form.operativeTechnique || undefined,
 			findings: form.findings || undefined,
 			specimens: form.specimens || undefined,
-			estimatedBloodLoss: form.estimatedBloodLoss ? Number(form.estimatedBloodLoss) : undefined,
-			fluidIn: form.fluidIn ? Number(form.fluidIn) : undefined,
-			fluidOut: form.fluidOut ? Number(form.fluidOut) : undefined,
+			estimatedBloodLoss: toOptionalWholeNumber(form.estimatedBloodLoss),
+			fluidIn: toOptionalWholeNumber(form.fluidIn),
+			fluidOut: toOptionalWholeNumber(form.fluidOut),
 			incisionDatetime: form.incisionDatetime || undefined,
 			closureDatetime: form.closureDatetime || undefined,
 			firstAssistantStaffId: form.firstAssistantStaffId || undefined,
@@ -396,7 +497,9 @@ export function OperationRecordForm({
 						</p>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Procedure Narrative</Label>
+						<Label>
+							Procedure Narrative <span className="text-destructive">*</span>
+						</Label>
 						<Textarea
 							rows={3}
 							value={form.procedureDescription}
@@ -406,7 +509,9 @@ export function OperationRecordForm({
 						/>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Operative Technique</Label>
+						<Label>
+							Operative Technique <span className="text-destructive">*</span>
+						</Label>
 						<Textarea
 							rows={4}
 							value={form.operativeTechnique}
@@ -456,10 +561,12 @@ export function OperationRecordForm({
 					<div className="space-y-1.5">
 						<Label>EBL (mL)</Label>
 						<Input
-							type="number"
-							min={0}
+							inputMode="numeric"
+							pattern="[0-9]*"
 							value={form.estimatedBloodLoss}
-							onChange={event => setField("estimatedBloodLoss", event.target.value)}
+							onChange={event =>
+								setField("estimatedBloodLoss", wholeNumberInput(event.target.value))
+							}
 							placeholder="0"
 							disabled={fieldsDisabled}
 						/>
@@ -467,10 +574,10 @@ export function OperationRecordForm({
 					<div className="space-y-1.5">
 						<Label>Fluid In (mL)</Label>
 						<Input
-							type="number"
-							min={0}
+							inputMode="numeric"
+							pattern="[0-9]*"
 							value={form.fluidIn}
-							onChange={event => setField("fluidIn", event.target.value)}
+							onChange={event => setField("fluidIn", wholeNumberInput(event.target.value))}
 							placeholder="0"
 							disabled={fieldsDisabled}
 						/>
@@ -478,17 +585,19 @@ export function OperationRecordForm({
 					<div className="space-y-1.5">
 						<Label>Fluid Out (mL)</Label>
 						<Input
-							type="number"
-							min={0}
+							inputMode="numeric"
+							pattern="[0-9]*"
 							value={form.fluidOut}
-							onChange={event => setField("fluidOut", event.target.value)}
+							onChange={event => setField("fluidOut", wholeNumberInput(event.target.value))}
 							placeholder="0"
 							disabled={fieldsDisabled}
 						/>
 					</div>
 					<div className="col-span-full grid gap-4 sm:grid-cols-2">
 						<div className="space-y-1.5">
-							<Label>Incision Time</Label>
+							<Label>
+								Incision Time <span className="text-destructive">*</span>
+							</Label>
 							<Input
 								type="datetime-local"
 								value={form.incisionDatetime}
@@ -497,7 +606,9 @@ export function OperationRecordForm({
 							/>
 						</div>
 						<div className="space-y-1.5">
-							<Label>Closure Time</Label>
+							<Label>
+								Closure Time <span className="text-destructive">*</span>
+							</Label>
 							<Input
 								type="datetime-local"
 								value={form.closureDatetime}
@@ -506,12 +617,17 @@ export function OperationRecordForm({
 							/>
 						</div>
 					</div>
+					{timeOrderInvalid ? (
+						<p className="text-destructive col-span-full text-sm">
+							Closure time must be after incision time.
+						</p>
+					) : null}
 				</CardContent>
 			</Card>
 
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base">Surgical Team</CardTitle>
+					<CardTitle className="text-base">OR Personnel</CardTitle>
 				</CardHeader>
 				<CardContent className="grid gap-4 sm:grid-cols-2">
 					<div className="space-y-1.5">
@@ -541,7 +657,9 @@ export function OperationRecordForm({
 						/>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Scrub Nurse</Label>
+						<Label>
+							Scrub Nurse <span className="text-destructive">*</span>
+						</Label>
 						<StaffSearchCombobox
 							id="scrub-nurse"
 							value={form.scrubNurseStaffId}
@@ -552,7 +670,9 @@ export function OperationRecordForm({
 						/>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Circulating Nurse</Label>
+						<Label>
+							Circulating Nurse <span className="text-destructive">*</span>
+						</Label>
 						<StaffSearchCombobox
 							id="circulating-nurse"
 							value={form.circulatingNurseStaffId}
@@ -563,7 +683,9 @@ export function OperationRecordForm({
 						/>
 					</div>
 					<div className="space-y-1.5">
-						<Label>Anesthesiologist</Label>
+						<Label>
+							Anesthesiologist <span className="text-destructive">*</span>
+						</Label>
 						<StaffSearchCombobox
 							id="anesthesiologist"
 							value={form.anesthesiologistStaffId}

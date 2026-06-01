@@ -14,10 +14,11 @@ import {
 	TableRow,
 } from "@/core/components/ui/table"
 import {
+	type ConsentRecord,
 	useConsentsQuery,
-	useRevokeConsentMutation,
 } from "@/features/clinical-docs/api/clinical-docs.hooks"
 
+import { ConsentRevocation } from "./consent-revocation"
 import { CreateConsentDialog } from "./create-consent-dialog"
 
 function formatDateTime(dateStr: string | null | undefined) {
@@ -68,18 +69,9 @@ export function ConsentRecordsTab({
 }: ConsentRecordsTabProps) {
 	const { data, isLoading } = useConsentsQuery({ encounterId })
 	const [createOpen, setCreateOpen] = useState(false)
-	const [revokeId, setRevokeId] = useState<string | null>(null)
-
-	const revokeConsent = useRevokeConsentMutation()
+	const [revokeTarget, setRevokeTarget] = useState<ConsentRecord | null>(null)
 
 	const consents = data?.data ?? []
-
-	function handleRevoke(id: string) {
-		revokeConsent.mutate(
-			{ id, encounterId },
-			{ onSuccess: () => setRevokeId(null) }
-		)
-	}
 
 	return (
 		<div className="space-y-4">
@@ -140,8 +132,7 @@ export function ConsentRecordsTab({
 													<Button
 														size="sm"
 														variant="outline"
-														onClick={() => handleRevoke(consent.id)}
-														disabled={revokeConsent.isPending}
+														onClick={() => setRevokeTarget(consent)}
 													>
 														Revoke
 													</Button>
@@ -168,6 +159,17 @@ export function ConsentRecordsTab({
 				facilityId={facilityId}
 				patientId={patientId}
 			/>
+
+			{revokeTarget && (
+				<ConsentRevocation
+					open={!!revokeTarget}
+					onOpenChange={open => {
+						if (!open) setRevokeTarget(null)
+					}}
+					consent={revokeTarget}
+					patientId={patientId}
+				/>
+			)}
 		</div>
 	)
 }

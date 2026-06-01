@@ -421,6 +421,33 @@ export const PaginatedUsersSchema = z.object({
 })
 
 // ============================================================================
+// Co-Sign Workflows
+// ============================================================================
+
+export const SearchCliniciansQuerySchema = z.object({
+	facilityId: z.string().uuid(),
+	search: z.string().optional(),
+	excludeStaffProfileId: z.string().uuid().optional(),
+})
+
+export const ClinicianSummarySchema = z.object({
+	staffProfileId: z.string().uuid(),
+	name: z.string(),
+	department: z.string().nullable(),
+	primaryRole: z.string().nullable(),
+})
+
+export const CoSignVerifyInputSchema = z.object({
+	staffProfileId: z.string().uuid(),
+	password: z.string().min(1),
+})
+
+export const CoSignVerifyResponseSchema = z.object({
+	verified: z.boolean(),
+	staffName: z.string(),
+})
+
+// ============================================================================
 // Inferred Types
 // ============================================================================
 

@@ -1,49 +1,144 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import {
+	AlertTriangle,
+	Ban,
+	Calendar,
 	Check,
+	CheckCircle2,
+	Clock,
 	Copy,
 	ExternalLink,
-	KeyRound,
+	Info,
 	Loader2,
-	MessageSquare,
-	PhoneCall,
+	Mail,
+	RefreshCw,
+	ShieldCheck,
+	User,
 	Video,
 } from "lucide-react"
+import { toast } from "sonner"
 
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/core/components/ui/alert-dialog"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/core/components/ui/dialog"
 import { Separator } from "@/core/components/ui/separator"
 import {
-	getPlatformLabel,
+	formatAppointmentStatusLabel,
+	getPatientInviteUrl,
 	type TelemedicineAppointment,
 	useAppointmentQuery,
+	useRegeneratePatientInviteMutation,
+	useRevokePatientInviteMutation,
 } from "@/features/telemedicine/api/telemedicine.hooks"
+import {
+	formatJoinWindowRange,
+	getJoinWindowState,
+} from "@/features/telemedicine/lib/join-window"
+import { getVideoLaunchPath } from "@/features/telemedicine/lib/video-links"
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface VideoCallPanelProps {
-	/** Pass either a full appointment object or just the appointmentId */
 	appointment?: TelemedicineAppointment
 	appointmentId?: string
+	initialPatientInviteToken?: string | null
+	onPatientInviteTokenChange?: (appointmentId: string, token: string | null) => void
 }
 
 // ============================================================================
 // Helpers
 // ============================================================================
 
+function formatDate(val: string): string {
+	if (!val) return "-"
+	const date = new Date(val)
+	if (Number.isNaN(date.getTime())) return val
+	return date.toLocaleDateString("en-PH", {
+		weekday: "short",
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+	})
+}
+
+function formatTime(val: string): string {
+	if (!val) return "-"
+	const [h, m] = val.split(":")
+	const hour = Number(h)
+	const minute = Number(m)
+	if (!Number.isFinite(hour) || !Number.isFinite(minute)) return val
+	const period = hour >= 12 ? "PM" : "AM"
+	const display = hour % 12 === 0 ? 12 : hour % 12
+	return `${display}:${String(minute).padStart(2, "0")} ${period}`
+}
+
+function formatDateTime(val: string | null | undefined): string {
+	if (!val) return "Never"
+	const date = new Date(val)
+	if (Number.isNaN(date.getTime())) return "-"
+	return date.toLocaleString("en-PH", {
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	})
+}
+
+function getExpiryState(expiresAt: string | null | undefined): {
+	label: string
+	tone: "neutral" | "warning" | "danger"
+} {
+	if (!expiresAt) return { label: "No expiry set", tone: "neutral" }
+	const expires = new Date(expiresAt)
+	if (Number.isNaN(expires.getTime())) return { label: "-", tone: "neutral" }
+	const diffMs = expires.getTime() - Date.now()
+	const diffMin = Math.round(diffMs / 60000)
+	if (diffMin <= 0) return { label: "Expired", tone: "danger" }
+	if (diffMin < 60) return { label: `Expires in ${diffMin}m`, tone: "warning" }
+	const diffHours = Math.round(diffMin / 60)
+	if (diffHours < 24) return { label: `Expires in ${diffHours}h`, tone: "warning" }
+	const diffDays = Math.round(diffHours / 24)
+	return { label: `Expires in ${diffDays}d`, tone: "neutral" }
+}
+
 function useCopyToClipboard() {
 	const [copied, setCopied] = useState<string | null>(null)
 
-	function copyText(text: string, key: string) {
-		void navigator.clipboard.writeText(text).then(() => {
-			setCopied(key)
-			setTimeout(() => setCopied(null), 2000)
-		})
+	function copyText(text: string, key: string, successMessage?: string) {
+		void navigator.clipboard
+			.writeText(text)
+			.then(() => {
+				setCopied(key)
+				if (successMessage) toast.success(successMessage)
+				setTimeout(() => setCopied(null), 2000)
+			})
+			.catch(() => {
+				toast.error("Could not copy. Select the link manually and copy.")
+			})
 	}
 
 	return { copied, copyText }
@@ -54,207 +149,478 @@ function CopyButton({
 	copyKey,
 	copied,
 	onCopy,
+	label = "Copy",
+	successMessage = "Copied to clipboard",
+	size = "sm",
+	variant = "outline",
+	disabled = false,
+	disabledMessage,
 }: {
 	text: string
 	copyKey: string
 	copied: string | null
-	onCopy: (text: string, key: string) => void
+	onCopy: (text: string, key: string, successMessage?: string) => void
+	label?: string
+	successMessage?: string
+	size?: "sm" | "default" | "lg"
+	variant?: "outline" | "default" | "ghost"
+	disabled?: boolean
+	disabledMessage?: string
 }) {
 	const isCopied = copied === copyKey
 	return (
-		<button
+		<Button
 			type="button"
-			onClick={() => onCopy(text, copyKey)}
-			className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors"
-			aria-label="Copy to clipboard"
+			variant={variant}
+			size={size}
+			className="rounded-full"
+			disabled={disabled}
+			onClick={() => {
+				if (disabled) {
+					if (disabledMessage) toast.error(disabledMessage)
+					return
+				}
+				onCopy(text, copyKey, successMessage)
+			}}
 		>
 			{isCopied ? (
 				<>
-					<Check className="size-3 text-green-500" />
-					<span className="text-green-500">Copied!</span>
+					<Check className="size-3.5 text-success" />
+					Copied
 				</>
 			) : (
 				<>
-					<Copy className="size-3" />
-					<span>Copy</span>
+					<Copy className="size-3.5" />
+					{label}
 				</>
 			)}
-		</button>
+		</Button>
 	)
 }
 
 // ============================================================================
-// Inner panel (renders when data is available)
+// Inner panel
 // ============================================================================
 
-function VideoCallContent({ appt }: { appt: TelemedicineAppointment }) {
+function VideoCallContent({
+	appt,
+	initialPatientInviteToken,
+	onPatientInviteTokenChange,
+}: {
+	appt: TelemedicineAppointment
+	initialPatientInviteToken?: string | null
+	onPatientInviteTokenChange?: (appointmentId: string, token: string | null) => void
+}) {
 	const { copied, copyText } = useCopyToClipboard()
+	const [currentAppt, setCurrentAppt] = useState(appt)
+	const [patientInviteToken, setPatientInviteToken] = useState<string | null>(
+		initialPatientInviteToken ?? appt.patientInviteToken ?? null
+	)
+	const [error, setError] = useState<string | null>(null)
+	const [revokeDialogOpen, setRevokeDialogOpen] = useState(false)
+	const regenerateInvite = useRegeneratePatientInviteMutation()
+	const revokeInvite = useRevokePatientInviteMutation()
 
-	const platformLabel = getPlatformLabel(appt.platform)
-	const hasLink = Boolean(appt.videoLink)
+	useEffect(() => {
+		setCurrentAppt(appt)
+	}, [appt])
+
+	useEffect(() => {
+		setPatientInviteToken(initialPatientInviteToken ?? appt.patientInviteToken ?? null)
+	}, [appt.id, appt.patientInviteToken, initialPatientInviteToken])
+
+	const patientInviteUrl = useMemo(
+		() => (patientInviteToken ? getPatientInviteUrl(patientInviteToken) : null),
+		[patientInviteToken]
+	)
+	const inviteRevoked = Boolean(currentAppt.patientInviteRevokedAt)
+	const hasStoredInvite = Boolean(currentAppt.patientInviteExpiresAt) && !inviteRevoked
+	const inviteHidden = hasStoredInvite && !patientInviteUrl
+	const isInviteActionPending = regenerateInvite.isPending || revokeInvite.isPending
+	const expiryState = getExpiryState(currentAppt.patientInviteExpiresAt)
+	const inviteExpired = expiryState.tone === "danger"
+	const canSharePatientInvite = Boolean(patientInviteUrl) && !inviteExpired && !inviteRevoked
+	const patientJoined = Boolean(currentAppt.patientJoinedAt)
+	const patientEmail = currentAppt.patientEmail
+	const joinWindowState = getJoinWindowState(currentAppt)
+	const joinWindowText =
+		joinWindowState.startsAt && joinWindowState.endsAt
+			? `${formatJoinWindowRange(joinWindowState.startsAt, joinWindowState.endsAt)} Philippine time`
+			: null
+
+	async function handleRegenerateInvite() {
+		setError(null)
+		if (hasStoredInvite) {
+			const confirmed = window.confirm(
+				"Regenerate the patient invite? The existing patient link will stop working and you will need to share the new one."
+			)
+			if (!confirmed) return
+		}
+		try {
+			const invite = await regenerateInvite.mutateAsync(currentAppt.id)
+			setPatientInviteToken(invite.patientInviteToken)
+			onPatientInviteTokenChange?.(currentAppt.id, invite.patientInviteToken)
+			setCurrentAppt(prev => ({
+				...prev,
+				patientInviteToken: invite.patientInviteToken,
+				patientInviteExpiresAt: invite.patientInviteExpiresAt,
+				patientInviteRevokedAt: invite.patientInviteRevokedAt,
+				patientInviteLastUsedAt: null,
+			}))
+			toast.success(hasStoredInvite ? "Patient invite regenerated" : "Patient invite generated", {
+				description: "A fresh secure link is ready to share with the patient.",
+			})
+		} catch (err) {
+			const message = err instanceof Error ? err.message : "Failed to regenerate patient invite."
+			setError(message)
+			toast.error("Could not generate invite", { description: message })
+		}
+	}
+
+	async function handleConfirmRevoke() {
+		setRevokeDialogOpen(false)
+		setError(null)
+		try {
+			const invite = await revokeInvite.mutateAsync(currentAppt.id)
+			setPatientInviteToken(null)
+			onPatientInviteTokenChange?.(currentAppt.id, null)
+			setCurrentAppt(prev => ({
+				...prev,
+				patientInviteToken: undefined,
+				patientInviteExpiresAt: invite.patientInviteExpiresAt,
+				patientInviteRevokedAt: invite.patientInviteRevokedAt,
+			}))
+			toast.success("Patient invite revoked", {
+				description: "The patient can no longer join with the old link.",
+			})
+		} catch (err) {
+			const message = err instanceof Error ? err.message : "Failed to revoke patient invite."
+			setError(message)
+			toast.error("Could not revoke invite", { description: message })
+		}
+	}
+
+	const mailtoHref = patientEmail && canSharePatientInvite && patientInviteUrl
+		? `mailto:${encodeURIComponent(patientEmail)}?subject=${encodeURIComponent(
+				"Your telemedicine consultation link"
+			)}&body=${encodeURIComponent(
+				`Hello ${currentAppt.patientName},\n\nPlease use this secure link to join your scheduled video consultation:\n\n${patientInviteUrl}\n\nYou will need your date of birth or MRN to verify your identity.\n\nThank you.`
+			)}`
+		: null
 
 	return (
 		<div className="space-y-4">
-			{/* Status banner */}
-			{!hasLink ? (
-				<div className="rounded-lg bg-yellow-50 px-4 py-3">
-					<p className="flex items-center gap-2 text-sm text-yellow-700">
-						<Loader2 className="size-4 animate-spin" />
-						Generating {platformLabel} link... This may take a moment after booking.
-					</p>
-				</div>
-			) : (
-				<div className="rounded-lg bg-green-50 px-4 py-3">
-					<p className="flex items-center gap-2 text-sm text-green-700">
-						<Video className="size-4" />
-						{platformLabel} meeting is ready to join.
-					</p>
-				</div>
-			)}
+			<div
+				className={[
+					"rounded-2xl border px-4 py-3",
+					joinWindowState.kind === "open"
+						? "border-success/30 bg-success/10"
+						: joinWindowState.kind === "closed"
+							? "border-destructive/30 bg-destructive/10"
+							: "border-amber-500/30 bg-amber-500/10",
+				].join(" ")}
+			>
+				<p
+					className={[
+						"flex items-center gap-2 text-sm font-medium",
+						joinWindowState.kind === "open"
+							? "text-success"
+							: joinWindowState.kind === "closed"
+								? "text-destructive"
+								: "text-amber-700 dark:text-amber-300",
+					].join(" ")}
+				>
+					<Video className="size-4" />
+					{joinWindowState.kind === "open"
+						? "Video room is open now"
+						: joinWindowState.kind === "closed"
+							? "Video room window has passed"
+							: "Video room opens later"}
+				</p>
+				<p className="text-muted-foreground mt-1 text-xs">
+					{joinWindowText
+						? `Video access: ${joinWindowText}.`
+						: "Video access window is unavailable for this appointment."}
+				</p>
+			</div>
 
-			{/* Video link */}
-			{hasLink && (
-				<div className="space-y-3">
-					<div className="rounded-lg border p-3">
-						<div className="mb-1.5 flex items-center justify-between">
+			<div className="flex flex-wrap gap-2">
+				{joinWindowState.kind === "open" ? (
+					<Button asChild className="rounded-full">
+						<Link href={getVideoLaunchPath(currentAppt.id)} target="_blank" rel="noopener noreferrer">
+							<Video className="size-4" />
+							Open Clinician Room
+							<ExternalLink className="size-3.5" />
+						</Link>
+					</Button>
+				) : (
+					<Button type="button" className="rounded-full" disabled>
+						<Video className="size-4" />
+						{joinWindowState.kind === "closed" ? "Room Closed" : "Room Opens Later"}
+					</Button>
+				)}
+				{patientInviteUrl && (
+					<>
+						<CopyButton
+							text={patientInviteUrl}
+							copyKey="patientInviteTop"
+							copied={copied}
+							onCopy={copyText}
+							label="Copy Patient Link"
+							successMessage="Patient link copied"
+							disabled={!canSharePatientInvite}
+							disabledMessage="Regenerate the expired invite before sharing."
+						/>
+						{mailtoHref && (
+							<Button asChild variant="outline" className="rounded-full">
+								<a href={mailtoHref}>
+									<Mail className="size-3.5" />
+									Email to Patient
+								</a>
+							</Button>
+						)}
+					</>
+				)}
+			</div>
+
+			<Separator />
+
+			<div className="space-y-3">
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<div>
+						<h4 className="flex items-center gap-2 text-sm font-medium">
+							<ShieldCheck className="text-primary size-4" />
+							Secure Patient Invite
+						</h4>
+						<p className="text-muted-foreground mt-1 text-xs">
+							The raw token is only shown when an invite is created or regenerated. Regenerating
+							replaces any existing link.
+						</p>
+					</div>
+					<div className="flex flex-wrap gap-2">
+						<Button
+							type="button"
+							size="sm"
+							variant="outline"
+							className="rounded-full"
+							onClick={handleRegenerateInvite}
+							disabled={isInviteActionPending}
+						>
+							{regenerateInvite.isPending ? (
+								<Loader2 className="size-3.5 animate-spin" />
+							) : (
+								<RefreshCw className="size-3.5" />
+							)}
+							{hasStoredInvite ? "Regenerate" : "Generate"}
+						</Button>
+						<Button
+							type="button"
+							size="sm"
+							variant="destructive"
+							className="rounded-full"
+							onClick={() => setRevokeDialogOpen(true)}
+							disabled={!hasStoredInvite || isInviteActionPending}
+						>
+							{revokeInvite.isPending ? (
+								<Loader2 className="size-3.5 animate-spin" />
+							) : (
+								<Ban className="size-3.5" />
+							)}
+							Revoke
+						</Button>
+					</div>
+				</div>
+
+				{error && (
+					<div className="border-destructive/30 text-destructive bg-destructive/10 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm">
+						<AlertTriangle className="mt-0.5 size-4 shrink-0" />
+						<p>{error}</p>
+					</div>
+				)}
+
+				{patientInviteUrl ? (
+					<div className="rounded-2xl border border-border/60 bg-white p-3">
+						<div className="mb-2 flex flex-wrap items-center justify-between gap-2">
 							<span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-								Meeting Link
+								Patient Join Link
 							</span>
 							<CopyButton
-								text={appt.videoLink!}
-								copyKey="link"
+								text={patientInviteUrl}
+								copyKey="patientInvite"
 								copied={copied}
 								onCopy={copyText}
+								successMessage="Patient link copied"
+								disabled={!canSharePatientInvite}
+								disabledMessage="Regenerate the expired invite before sharing."
 							/>
 						</div>
 						<p className="text-primary break-all text-sm underline underline-offset-2">
-							{appt.videoLink}
+							{patientInviteUrl}
 						</p>
+						{expiryState.tone === "danger" && (
+							<p className="text-destructive mt-2 flex items-center gap-1 text-xs">
+								<AlertTriangle className="size-3" />
+								This link has expired. Regenerate before sharing.
+							</p>
+						)}
+						{expiryState.tone === "warning" && (
+							<p className="mt-2 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300">
+								<Clock className="size-3" />
+								{expiryState.label}. Regenerate if the patient hasn&apos;t joined yet.
+							</p>
+						)}
 					</div>
-
-					{appt.meetingId && (
-						<div className="grid grid-cols-2 gap-3">
-							<div className="rounded-lg border p-3">
-								<div className="mb-1 flex items-center justify-between">
-									<span className="text-muted-foreground flex items-center gap-1 text-xs">
-										<Video className="size-3" />
-										Meeting ID
-									</span>
-									<CopyButton
-										text={appt.meetingId}
-										copyKey="meetingId"
-										copied={copied}
-										onCopy={copyText}
-									/>
-								</div>
-								<p className="font-mono text-sm font-medium">{appt.meetingId}</p>
-							</div>
-							{appt.meetingPassword && (
-								<div className="rounded-lg border p-3">
-									<div className="mb-1 flex items-center justify-between">
-										<span className="text-muted-foreground flex items-center gap-1 text-xs">
-											<KeyRound className="size-3" />
-											Passcode
-										</span>
-										<CopyButton
-											text={appt.meetingPassword}
-											copyKey="password"
-											copied={copied}
-											onCopy={copyText}
-										/>
-									</div>
-									<p className="font-mono text-sm font-medium">{appt.meetingPassword}</p>
-								</div>
-							)}
+				) : inviteHidden ? (
+					<div className="border-primary/30 bg-primary/10 text-primary flex items-start gap-2 rounded-2xl border p-3 text-sm">
+						<ShieldCheck className="mt-0.5 size-4 shrink-0" />
+						<div>
+							<p className="font-medium">An active invite exists, but the link is hidden</p>
+							<p className="text-primary/80 text-xs">
+								Tokens are only shown once at creation. Regenerate to copy a fresh secure link.
+							</p>
 						</div>
-					)}
-
-					<Separator />
-
-					{/* Action Buttons */}
-					<div className="flex flex-wrap gap-3">
-						<a
-							href={appt.videoLink!}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium"
-						>
-							<Video className="size-4" />
-							Join {platformLabel} Call
-							<ExternalLink className="size-3" />
-						</a>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => copyText(appt.videoLink!, "joinBtn")}
-						>
-							{copied === "joinBtn" ? (
-								<>
-									<Check className="mr-1.5 size-3 text-green-500" />
-									Copied!
-								</>
-							) : (
-								<>
-									<Copy className="mr-1.5 size-3" />
-									Copy Link
-								</>
-							)}
-						</Button>
 					</div>
-				</div>
-			)}
-
-			{/* Patient sharing section */}
-			{hasLink && (
-				<div className="rounded-lg bg-blue-50 p-4">
-					<h4 className="mb-2 text-sm font-medium text-blue-800">Share with Patient</h4>
-					<p className="mb-3 text-xs text-blue-700">
-						The video link has been automatically sent to the patient via SMS/email. You can also
-						manually share it.
-					</p>
-					<div className="flex flex-wrap gap-2">
-						<Button variant="outline" size="sm" className="bg-white text-xs">
-							<MessageSquare className="mr-1.5 size-3" />
-							Send via SMS
-						</Button>
-						<Button variant="outline" size="sm" className="bg-white text-xs">
-							<PhoneCall className="mr-1.5 size-3" />
-							Send via Email
-						</Button>
+				) : inviteRevoked ? (
+					<div className="border-destructive/30 bg-destructive/10 text-destructive flex items-start gap-2 rounded-2xl border p-3 text-sm">
+						<Ban className="mt-0.5 size-4 shrink-0" />
+						<div>
+							<p className="font-medium">Invite revoked</p>
+							<p className="text-xs">Generate a new invite if the patient still needs access.</p>
+						</div>
 					</div>
-				</div>
-			)}
+				) : (
+					<div className="text-muted-foreground rounded-2xl border border-border/60 p-3 text-sm">
+						<p>No invite has been generated yet.</p>
+						<p className="text-xs">Click <strong>Generate</strong> when you are ready to share access with the patient.</p>
+					</div>
+				)}
 
-			{/* Appointment details */}
-			<Separator />
-			<div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-				<div>
-					<span className="text-muted-foreground">Patient:</span>{" "}
-					<span className="font-medium">{appt.patientName}</span>
-				</div>
-				<div>
-					<span className="text-muted-foreground">Clinician:</span>{" "}
-					<span className="font-medium">{appt.clinicianName}</span>
-				</div>
-				<div>
-					<span className="text-muted-foreground">Date:</span>{" "}
-					<span className="font-medium">{appt.scheduledDate}</span>
-				</div>
-				<div>
-					<span className="text-muted-foreground">Time:</span>{" "}
-					<span className="font-medium">{appt.scheduledTime} ({appt.durationMinutes} min)</span>
-				</div>
-				<div>
-					<span className="text-muted-foreground">Platform:</span>{" "}
-					<Badge variant="outline" className="text-xs">
-						{platformLabel}
-					</Badge>
-				</div>
-				<div>
-					<span className="text-muted-foreground">Status:</span>{" "}
-					<span className="font-medium capitalize">{appt.status}</span>
+				<div className="grid gap-3 text-sm md:grid-cols-3">
+					<div className="rounded-2xl border border-border/60 p-3">
+						<p className="text-muted-foreground mb-1 text-xs">Expires</p>
+						<p className="font-medium">{formatDateTime(currentAppt.patientInviteExpiresAt)}</p>
+						{expiryState.tone !== "neutral" && (
+							<Badge
+								variant="outline"
+								className={`mt-1 text-xs ${
+									expiryState.tone === "danger"
+										? "border-destructive/40 text-destructive"
+										: "border-amber-500/40 text-amber-700 dark:text-amber-300"
+								}`}
+							>
+								{expiryState.label}
+							</Badge>
+						)}
+					</div>
+					<div className="rounded-2xl border border-border/60 p-3">
+						<p className="text-muted-foreground mb-1 text-xs">Last Used</p>
+						<p className="font-medium">{formatDateTime(currentAppt.patientInviteLastUsedAt)}</p>
+					</div>
+					<div className="rounded-2xl border border-border/60 p-3">
+						<p className="text-muted-foreground mb-1 text-xs">Patient Joined</p>
+						<p className="font-medium">{formatDateTime(currentAppt.patientJoinedAt)}</p>
+						{patientJoined && (
+							<Badge className="bg-success/15 text-success border-success/30 mt-1 text-xs">
+								<CheckCircle2 className="mr-1 size-3" />
+								Verified
+							</Badge>
+						)}
+					</div>
 				</div>
 			</div>
+
+			<Separator />
+
+			<div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+				<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+					<span className="font-medium">{currentAppt.patientName}</span>
+					<span className="text-muted-foreground text-xs">
+						{formatDate(currentAppt.scheduledDate)} · {formatTime(currentAppt.scheduledTime)}
+					</span>
+				</div>
+				<Dialog>
+					<DialogTrigger className="border-border bg-muted text-foreground hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2">
+						<Info className="size-3.5" />
+						Details
+					</DialogTrigger>
+					<DialogContent className="sm:max-w-lg">
+						<DialogHeader>
+							<DialogTitle className="flex items-center gap-2">
+								<Info className="text-primary size-4" />
+								Appointment Details
+							</DialogTitle>
+							<DialogDescription>
+								{currentAppt.patientName} video consultation
+							</DialogDescription>
+						</DialogHeader>
+						<div className="grid gap-3 sm:grid-cols-2">
+							<div>
+								<p className="text-muted-foreground flex items-center gap-1 text-xs">
+									<User className="size-3" />
+									Patient
+								</p>
+								<p className="text-foreground text-sm font-medium">{currentAppt.patientName}</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground flex items-center gap-1 text-xs">
+									<User className="size-3" />
+									Clinician
+								</p>
+								<p className="text-foreground text-sm font-medium">{currentAppt.clinicianName}</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground flex items-center gap-1 text-xs">
+									<Calendar className="size-3" />
+									Date
+								</p>
+								<p className="text-foreground text-sm font-medium">
+									{formatDate(currentAppt.scheduledDate)}
+								</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground flex items-center gap-1 text-xs">
+									<Clock className="size-3" />
+									Time
+								</p>
+								<p className="text-foreground text-sm font-medium">
+									{formatTime(currentAppt.scheduledTime)} ({currentAppt.durationMinutes} min)
+								</p>
+							</div>
+							<div>
+								<p className="text-muted-foreground text-xs">Status</p>
+								<p className="text-foreground text-sm font-medium">
+									{formatAppointmentStatusLabel(currentAppt.status)}
+								</p>
+							</div>
+						</div>
+					</DialogContent>
+				</Dialog>
+			</div>
+
+			<AlertDialog
+				open={revokeDialogOpen}
+				onOpenChange={open => !isInviteActionPending && setRevokeDialogOpen(open)}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Revoke patient invite?</AlertDialogTitle>
+						<AlertDialogDescription>
+							The patient will no longer be able to join with the current secure link. If they
+							still need access, you&apos;ll need to generate a fresh invite and share it again.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={isInviteActionPending}>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={handleConfirmRevoke}
+							disabled={isInviteActionPending}
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+						>
+							Revoke invite
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	)
 }
@@ -263,10 +629,16 @@ function VideoCallContent({ appt }: { appt: TelemedicineAppointment }) {
 // Main Component
 // ============================================================================
 
-export function VideoCallPanel({ appointment, appointmentId }: VideoCallPanelProps) {
-	// If full appointment is passed, use it directly (no query needed)
+export function VideoCallPanel({
+	appointment,
+	appointmentId,
+	initialPatientInviteToken,
+	onPatientInviteTokenChange,
+}: VideoCallPanelProps) {
 	const shouldFetch = !appointment && Boolean(appointmentId)
-	const { data: fetched, isLoading } = useAppointmentQuery(shouldFetch ? (appointmentId ?? "") : "")
+	const { data: fetched, isLoading, error, refetch } = useAppointmentQuery(
+		shouldFetch ? (appointmentId ?? "") : ""
+	)
 	const appt = appointment ?? fetched
 
 	return (
@@ -279,16 +651,34 @@ export function VideoCallPanel({ appointment, appointmentId }: VideoCallPanelPro
 			</CardHeader>
 			<CardContent>
 				{isLoading ? (
-					<div className="flex items-center gap-2 py-6 text-sm text-gray-500">
+					<div className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
 						<Loader2 className="size-4 animate-spin" />
 						Loading appointment details...
 					</div>
+				) : error ? (
+					<div className="flex flex-col items-center gap-3 py-8 text-center">
+						<AlertTriangle className="text-destructive size-8" />
+						<p className="text-destructive text-sm">
+							{error.message || "Unable to load appointment details."}
+						</p>
+						<Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
+							Try again
+						</Button>
+					</div>
 				) : !appt ? (
-					<p className="text-muted-foreground py-6 text-center text-sm">
-						Select an appointment to view video call details.
-					</p>
+					<div className="flex flex-col items-center gap-2 py-8 text-center">
+						<Video className="text-muted-foreground size-8" />
+						<p className="text-sm font-medium">No appointment selected</p>
+						<p className="text-muted-foreground text-xs">
+							Pick an appointment to view video call details and manage patient invites.
+						</p>
+					</div>
 				) : (
-					<VideoCallContent appt={appt} />
+					<VideoCallContent
+						appt={appt}
+						initialPatientInviteToken={initialPatientInviteToken}
+						onPatientInviteTokenChange={onPatientInviteTokenChange}
+					/>
 				)}
 			</CardContent>
 		</Card>

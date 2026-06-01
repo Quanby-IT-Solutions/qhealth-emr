@@ -63,7 +63,7 @@ export function AmendmentForm({
 
 		try {
 			const addendum = await addAddendum.mutateAsync(getPayload())
-			await signAddendum.mutateAsync({ id: addendum.id, noteId })
+			await signAddendum.mutateAsync({ id: addendum.id })
 			onSuccess()
 		} catch (error) {
 			setSignFlowError(error instanceof Error ? error.message : "Unable to sign addendum.")

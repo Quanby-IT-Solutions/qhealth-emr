@@ -1,22 +1,33 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-
-import { CheckCircle2, RefreshCw } from "lucide-react"
+import { CheckCircle2, RefreshCw, X } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
-import type { CreateFmdrfInput } from "@/features/death-reporting/api/death-reporting.hooks"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
 	useCreateFmdrfMutation,
 	useFmdrfQuery,
+	useMarkDeathReportReleasedMutation,
 	useUpdateFmdrfMutation,
+	type CreateFmdrfInput,
 } from "@/features/death-reporting/api/death-reporting.hooks"
+import {
+	useIcd10ProblemSearchQuery,
+	type Icd10SearchResult,
+} from "@/features/problems-allergies/api/problems-allergies.hooks"
 
 // ============================================================================
 // Signature canvas
@@ -130,7 +141,7 @@ function CheckRow({ id, label, checked, onChange, disabled }: CheckRowProps) {
 			<input
 				id={id}
 				type="checkbox"
-				className="size-4 accent-primary"
+				className="accent-primary size-4"
 				checked={checked}
 				onChange={e => onChange(e.target.checked)}
 				disabled={disabled}
@@ -140,11 +151,130 @@ function CheckRow({ id, label, checked, onChange, disabled }: CheckRowProps) {
 	)
 }
 
+function formatIcd10Cause(result: Icd10SearchResult) {
+	return `${result.code} - ${result.description}`
+}
+
+function Icd10CausePicker({
+	label,
+	value,
+	onChange,
+	disabled,
+	required,
+	placeholder = "Search diagnosis or ICD-10 code",
+}: {
+	label: string
+	value: string
+	onChange: (value: string) => void
+	disabled?: boolean
+	required?: boolean
+	placeholder?: string
+}) {
+	const [open, setOpen] = useState(false)
+	const [search, setSearch] = useState("")
+	const query = useIcd10ProblemSearchQuery({
+		search: search.trim(),
+		limit: 10,
+		includeEmptySearch: open && !disabled,
+	})
+	const results = query.data?.data ?? []
+
+	function selectResult(result: Icd10SearchResult) {
+		onChange(formatIcd10Cause(result))
+		setSearch("")
+		setOpen(false)
+	}
+
+	function closeSearchAfterSelectionChance() {
+		window.setTimeout(() => setOpen(false), 100)
+	}
+
+	return (
+		<div className="space-y-2 sm:col-span-2">
+			<div className="flex flex-wrap items-center gap-2">
+				<Label>{label}</Label>
+				<Badge variant="secondary" className="text-xs">
+					ICD-10
+				</Badge>
+			</div>
+			<div className="relative z-20">
+				<Input
+					value={search}
+					onChange={event => {
+						setSearch(event.target.value)
+						setOpen(true)
+					}}
+					onFocus={() => setOpen(true)}
+					onBlur={closeSearchAfterSelectionChance}
+					onKeyDown={event => {
+						if (event.key === "Escape") setOpen(false)
+						if (event.key === "Enter" && results[0]) {
+							event.preventDefault()
+							selectResult(results[0])
+						}
+					}}
+					placeholder={placeholder}
+					autoComplete="off"
+					disabled={disabled}
+				/>
+				{open && !disabled && (
+					<div className="bg-popover text-popover-foreground ring-foreground/10 absolute z-[100] mt-1 max-h-64 w-full overflow-y-auto rounded-md border p-1 text-sm shadow-md ring-1">
+						{query.isFetching ? (
+							<div className="text-muted-foreground px-3 py-3">Searching ICD-10...</div>
+						) : results.length > 0 ? (
+							results.map(result => (
+								<button
+									key={result.id}
+									type="button"
+									className="hover:bg-muted focus:bg-muted block w-full rounded-sm px-3 py-2 text-left outline-hidden"
+									onMouseDown={event => event.preventDefault()}
+									onClick={() => selectResult(result)}
+								>
+									<span className="block font-mono text-xs font-semibold">{result.code}</span>
+									<span className="block">{result.description}</span>
+								</button>
+							))
+						) : (
+							<div className="text-muted-foreground px-3 py-3">No ICD-10 matches</div>
+						)}
+					</div>
+				)}
+			</div>
+			{value ? (
+				<div className="bg-primary/5 border-primary/20 flex items-start justify-between gap-3 rounded-md border px-3 py-2 text-sm">
+					<p className="min-w-0 break-words">{value}</p>
+					{!disabled && (
+						<Button
+							type="button"
+							size="icon"
+							variant="ghost"
+							className="size-7 shrink-0"
+							aria-label={`Remove ${label}`}
+							onClick={() => onChange("")}
+						>
+							<X className="size-3" />
+						</Button>
+					)}
+				</div>
+			) : required ? (
+				<p className="text-muted-foreground text-xs">Select an ICD-10 cause before submitting.</p>
+			) : null}
+		</div>
+	)
+}
+
 // ============================================================================
 // Default form state
 // ============================================================================
 
 type FormState = Omit<CreateFmdrfInput, "encounterId" | "patientId" | "facilityId">
+
+function toDatetimeLocalValue(value: string) {
+	const date = new Date(value)
+	if (Number.isNaN(date.getTime())) return value
+	const pad = (n: number) => String(n).padStart(2, "0")
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
 
 function emptyForm(): FormState {
 	return {
@@ -153,6 +283,7 @@ function emptyForm(): FormState {
 		patientAge: 0,
 		patientAddress: "",
 		dateOfDeath: "",
+		placeOfDeath: "",
 		causeOfDeathImmediate: "",
 		causeOfDeathAntecedent: "",
 		causeOfDeathUnderlying: "",
@@ -191,6 +322,8 @@ interface FmdrfFormProps {
 	initialPatientName?: string
 	initialPatientMrn?: string
 	initialPatientAge?: number
+	initialPatientAddress?: string | null
+	initialPlaceOfDeath?: string | null
 }
 
 export function FmdrfForm({
@@ -200,10 +333,26 @@ export function FmdrfForm({
 	initialPatientName,
 	initialPatientMrn,
 	initialPatientAge,
+	initialPatientAddress,
+	initialPlaceOfDeath,
 }: FmdrfFormProps) {
 	const { data: existing } = useFmdrfQuery(encounterId)
 	const createMutation = useCreateFmdrfMutation()
 	const updateMutation = useUpdateFmdrfMutation()
+	const markReleasedMutation = useMarkDeathReportReleasedMutation()
+
+	const { data: profile } = useMyProfile()
+	const activeStaffProfile =
+		profile?.staffProfiles?.find(p =>
+			p.roles.some((r: { id: string }) => r.id === profile?.activeRole?.id)
+		) ?? profile?.staffProfiles?.[0]
+	const defaultPhysicianName = profile?.user?.name ?? ""
+	const defaultPhysicianLicenseNo = activeStaffProfile?.prcLicenseNumber ?? ""
+	const staffProfileId = activeStaffProfile?.id ?? null
+	const permissions = profile?.activeRole?.permissions ?? []
+	const canEdit = (permissions as Array<{ module: string; action: string }>).some(
+		p => p.module === "death_reporting" && p.action === "edit"
+	)
 
 	const [editing, setEditing] = useState(false)
 	const [form, setForm] = useState<FormState>(emptyForm)
@@ -212,12 +361,14 @@ export function FmdrfForm({
 	// Populate form from existing report or prefill values
 	useEffect(() => {
 		if (existing) {
+			// eslint-disable-next-line react-hooks/set-state-in-effect
 			setForm({
 				patientName: existing.patientName,
 				patientMrn: existing.patientMrn,
 				patientAge: existing.patientAge,
 				patientAddress: existing.patientAddress,
-				dateOfDeath: existing.dateOfDeath,
+				dateOfDeath: toDatetimeLocalValue(existing.dateOfDeath),
+				placeOfDeath: existing.placeOfDeath,
 				causeOfDeathImmediate: existing.causeOfDeathImmediate,
 				causeOfDeathAntecedent: existing.causeOfDeathAntecedent,
 				causeOfDeathUnderlying: existing.causeOfDeathUnderlying,
@@ -245,12 +396,25 @@ export function FmdrfForm({
 		} else {
 			setForm(prev => ({
 				...prev,
-				patientName: initialPatientName ?? "",
-				patientMrn: initialPatientMrn ?? "",
-				patientAge: initialPatientAge ?? 0,
+				patientName: prev.patientName || initialPatientName || "",
+				patientMrn: prev.patientMrn || initialPatientMrn || "",
+				patientAge: prev.patientAge || initialPatientAge || 0,
+				patientAddress: prev.patientAddress || initialPatientAddress || "",
+				placeOfDeath: prev.placeOfDeath || initialPlaceOfDeath || "",
+				physicianName: prev.physicianName || defaultPhysicianName,
+				physicianLicenseNo: prev.physicianLicenseNo || defaultPhysicianLicenseNo,
 			}))
 		}
-	}, [existing, initialPatientName, initialPatientMrn, initialPatientAge])
+	}, [
+		existing,
+		initialPatientName,
+		initialPatientMrn,
+		initialPatientAge,
+		initialPatientAddress,
+		initialPlaceOfDeath,
+		defaultPhysicianName,
+		defaultPhysicianLicenseNo,
+	])
 
 	const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
 		setForm(prev => ({ ...prev, [key]: value }))
@@ -261,7 +425,10 @@ export function FmdrfForm({
 	const requiredFields: (keyof FormState)[] = [
 		"patientName",
 		"patientMrn",
+		"patientAge",
+		"patientAddress",
 		"dateOfDeath",
+		"placeOfDeath",
 		"causeOfDeathImmediate",
 		"causeOfDeathUnderlying",
 		"physicianName",
@@ -270,7 +437,10 @@ export function FmdrfForm({
 		"certificationDate",
 	]
 
-	const isValid = requiredFields.every(f => !!form[f])
+	const isValid = requiredFields.every(f => {
+		const value = form[f]
+		return typeof value === "number" ? value > 0 : !!value
+	})
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
@@ -305,8 +475,8 @@ export function FmdrfForm({
 					<CheckCircle2 className="size-6 text-green-600" />
 					<div>
 						<p className="font-medium text-green-700">FMDRF Submitted</p>
-						<p className="text-sm text-muted-foreground">
-							Facility Maternal Death Review Form has been saved.
+						<p className="text-muted-foreground text-sm">
+							Facility Maternal Death Review Form has been submitted for MNDRS review.
 						</p>
 					</div>
 					<Button
@@ -314,7 +484,10 @@ export function FmdrfForm({
 						variant="outline"
 						size="sm"
 						className="ml-auto"
-						onClick={() => { setEditing(true); setSubmitted(false) }}
+						onClick={() => {
+							setEditing(true)
+							setSubmitted(false)
+						}}
 					>
 						Edit
 					</Button>
@@ -329,13 +502,38 @@ export function FmdrfForm({
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="text-lg font-semibold">Facility Maternal Death Review Form (FMDRF)</h2>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						DOH-mandated maternal death review documentation
 					</p>
 				</div>
 				{existing && !editing && (
 					<div className="flex items-center gap-2">
-						<Badge className="bg-green-100 text-green-800">Submitted</Badge>
+						{existing.status === "draft" && (
+							<Badge className="bg-amber-100 text-amber-800">Draft</Badge>
+						)}
+						{existing.status === "completed" && (
+							<Badge className="bg-green-100 text-green-800">Completed</Badge>
+						)}
+						{existing.status === "submitted" && (
+							<Badge className="bg-blue-100 text-blue-800">Submitted</Badge>
+						)}
+						{existing.status === "draft" && canEdit && (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={markReleasedMutation.isPending || !staffProfileId}
+								onClick={() => {
+									if (!staffProfileId) return
+									void markReleasedMutation.mutateAsync({
+										id: existing.id,
+										encounterId,
+									})
+								}}
+							>
+								{markReleasedMutation.isPending ? "Marking…" : "Mark as Completed"}
+							</Button>
+						)}
 						<Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
 							Edit
 						</Button>
@@ -407,44 +605,46 @@ export function FmdrfForm({
 							required
 						/>
 					</div>
-					<div className="space-y-1.5 sm:col-span-2">
-						<Label>Immediate Cause of Death (ICD-10) *</Label>
+					<div className="space-y-1.5">
+						<Label>Place of Death *</Label>
 						<Input
-							placeholder="e.g., J18.9 — Pneumonia"
-							value={form.causeOfDeathImmediate}
-							onChange={e => set("causeOfDeathImmediate", e.target.value)}
+							placeholder="e.g., Emergency Department, Ward 3"
+							value={form.placeOfDeath}
+							onChange={e => set("placeOfDeath", e.target.value)}
 							disabled={isReadOnly}
 							required
 						/>
 					</div>
-					<div className="space-y-1.5 sm:col-span-2">
-						<Label>Antecedent Cause</Label>
-						<Input
-							placeholder="Condition giving rise to immediate cause"
-							value={form.causeOfDeathAntecedent}
-							onChange={e => set("causeOfDeathAntecedent", e.target.value)}
-							disabled={isReadOnly}
-						/>
-					</div>
-					<div className="space-y-1.5 sm:col-span-2">
-						<Label>Underlying Cause *</Label>
-						<Input
-							placeholder="Disease/injury initiating chain of events"
-							value={form.causeOfDeathUnderlying}
-							onChange={e => set("causeOfDeathUnderlying", e.target.value)}
-							disabled={isReadOnly}
-							required
-						/>
-					</div>
-					<div className="space-y-1.5 sm:col-span-2">
-						<Label>Contributing Conditions</Label>
-						<Input
-							placeholder="Other significant conditions not directly causing death"
-							value={form.causeOfDeathContributing ?? ""}
-							onChange={e => set("causeOfDeathContributing", e.target.value)}
-							disabled={isReadOnly}
-						/>
-					</div>
+					<Icd10CausePicker
+						label="Immediate Cause of Death *"
+						value={form.causeOfDeathImmediate}
+						onChange={value => set("causeOfDeathImmediate", value)}
+						disabled={isReadOnly}
+						required
+						placeholder="Search immediate cause or ICD-10 code"
+					/>
+					<Icd10CausePicker
+						label="Antecedent Cause"
+						value={form.causeOfDeathAntecedent}
+						onChange={value => set("causeOfDeathAntecedent", value)}
+						disabled={isReadOnly}
+						placeholder="Search antecedent cause or ICD-10 code"
+					/>
+					<Icd10CausePicker
+						label="Underlying Cause *"
+						value={form.causeOfDeathUnderlying}
+						onChange={value => set("causeOfDeathUnderlying", value)}
+						disabled={isReadOnly}
+						required
+						placeholder="Search underlying cause or ICD-10 code"
+					/>
+					<Icd10CausePicker
+						label="Contributing Conditions"
+						value={form.causeOfDeathContributing ?? ""}
+						onChange={value => set("causeOfDeathContributing", value)}
+						disabled={isReadOnly}
+						placeholder="Search contributing condition or ICD-10 code"
+					/>
 				</CardContent>
 			</Card>
 
@@ -656,6 +856,7 @@ export function FmdrfForm({
 					<div className="space-y-1.5">
 						<Label>Physician Signature *</Label>
 						{isReadOnly && form.physicianSignatureDataUrl ? (
+							// eslint-disable-next-line @next/next/no-img-element
 							<img
 								src={form.physicianSignatureDataUrl}
 								alt="Physician signature"
@@ -669,9 +870,7 @@ export function FmdrfForm({
 									disabled={isReadOnly}
 								/>
 								{!isReadOnly && !form.physicianSignatureDataUrl && (
-									<p className="text-xs text-muted-foreground">
-										Draw your signature above *
-									</p>
+									<p className="text-muted-foreground text-xs">Draw your signature above *</p>
 								)}
 							</>
 						)}

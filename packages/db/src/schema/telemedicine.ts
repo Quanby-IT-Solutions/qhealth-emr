@@ -1,11 +1,11 @@
-import { index } from "drizzle-orm/pg-core"
+import { index, uniqueIndex } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
 import { encounters, patients } from "./core.js"
 import { facilities, staffProfiles } from "./rbac.js"
 
 // ============================================================================
-// TELEMEDICINE — Appointments, Encounters, Prescriptions
+// TELEMEDICINE - Appointments, Encounters, Prescriptions
 // ============================================================================
 
 export const telemedicineAppointments = createTable(
@@ -27,7 +27,7 @@ export const telemedicineAppointments = createTable(
 		scheduledDate: t.date("scheduled_date").notNull(),
 		scheduledTime: t.time("scheduled_time").notNull(),
 		durationMinutes: t.integer("duration_minutes").notNull().default(30),
-		platform: t.text("platform").notNull().default("zoom").$type<"zoom" | "teams">(),
+		platform: t.text("platform").notNull().default("livekit").$type<"zoom" | "teams" | "livekit">(),
 		status: t
 			.text("status")
 			.notNull()
@@ -36,12 +36,22 @@ export const telemedicineAppointments = createTable(
 		videoLink: t.text("video_link"),
 		meetingId: t.text("meeting_id"),
 		meetingPassword: t.text("meeting_password"),
+		livekitRoomName: t.text("livekit_room_name"),
+		livekitSessionStartedAt: t.timestamp("livekit_session_started_at", { withTimezone: true }),
+		livekitSessionEndedAt: t.timestamp("livekit_session_ended_at", { withTimezone: true }),
+		patientInviteTokenHash: t.text("patient_invite_token_hash"),
+		patientInviteExpiresAt: t.timestamp("patient_invite_expires_at", { withTimezone: true }),
+		patientInviteRevokedAt: t.timestamp("patient_invite_revoked_at", { withTimezone: true }),
+		patientInviteLastUsedAt: t.timestamp("patient_invite_last_used_at", { withTimezone: true }),
+		patientJoinedAt: t.timestamp("patient_joined_at", { withTimezone: true }),
 		notes: t.text("notes"),
-		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
+		linkedCoreEncounterId: t
+			.uuid("linked_core_encounter_id")
+			.references(() => encounters.id, { onDelete: "set null" }),
 		createdByStaffId: t
 			.uuid("created_by_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
-		cancelledAt: t.timestamp("cancelled_at"),
+		cancelledAt: t.timestamp("cancelled_at", { withTimezone: true }),
 		cancellationReason: t.text("cancellation_reason"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
@@ -52,6 +62,7 @@ export const telemedicineAppointments = createTable(
 		index("telemedicine_appts_clinician_staff_id_idx").on(t.clinicianStaffId),
 		index("telemedicine_appts_scheduled_date_idx").on(t.scheduledDate),
 		index("telemedicine_appts_status_idx").on(t.status),
+		uniqueIndex("telemedicine_appts_patient_invite_hash_uniq").on(t.patientInviteTokenHash),
 	]
 )
 
@@ -103,6 +114,7 @@ export const telemedicineEncounters = createTable(
 	}),
 	t => [
 		index("telemedicine_encounters_appointment_id_idx").on(t.appointmentId),
+		index("telemedicine_encounters_linked_encounter_id_idx").on(t.linkedEncounterId),
 		index("telemedicine_encounters_patient_id_idx").on(t.patientId),
 		index("telemedicine_encounters_clinician_staff_id_idx").on(t.clinicianStaffId),
 		index("telemedicine_encounters_status_idx").on(t.status),
@@ -127,11 +139,19 @@ export const telemedicinePrescriptions = createTable(
 			.text("status")
 			.notNull()
 			.default("draft")
-			.$type<"draft" | "active" | "dispensed" | "cancelled">(),
+			.$type<"draft" | "active" | "signed" | "sent" | "dispensed" | "cancelled">(),
+		prcLicenseNumber: t.text("prc_license_number"),
+		ptrNumber: t.text("ptr_number"),
 		dispensingInstructions: t.text("dispensing_instructions"),
 		createdByStaffId: t
 			.uuid("created_by_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		signedAt: t.timestamp("signed_at"),
+		signedByStaffId: t
+			.uuid("signed_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		sentAt: t.timestamp("sent_at"),
+		sentToEmail: t.text("sent_to_email"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 	}),

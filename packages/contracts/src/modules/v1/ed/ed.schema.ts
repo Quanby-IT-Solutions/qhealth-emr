@@ -29,6 +29,21 @@ export const PreEncounterStatusEnum = z.enum(["active", "merged", "cancelled"])
 export const EdQueueStatusEnum = z.enum(["waiting", "triage", "being_seen", "disposition"])
 export const EdDispositionEnum = z.enum(["admit", "discharge", "transfer", "deceased"])
 
+export const InboundTriageChannelEnum = z.enum(["phone", "video"])
+export const InboundTriageTransportEnum = z.enum([
+	"ambulance",
+	"private_vehicle",
+	"walk_in",
+	"motorcycle_ambulance",
+])
+export const InboundTriageStatusEnum = z.enum(["queued", "arrived", "cancelled"])
+
+export const ResourceNeedsSchema = z.object({
+	bed: z.boolean().default(false),
+	codeTeam: z.boolean().default(false),
+	equipment: z.array(z.string()).default([]),
+})
+
 // ============================================================================
 // Pre-Encounter Schema — full resource
 // ============================================================================
@@ -114,6 +129,7 @@ export const MergePreEncounterSchema = z.object({
 	patientId: z.string().uuid(),
 	encounterType: z.enum(["inpatient", "outpatient", "emergency"]).default("emergency"),
 	admittingStaffId: z.string().uuid(),
+	attendingStaffId: z.string().uuid().optional(),
 	bedId: z.string().uuid().optional(),
 })
 
@@ -159,6 +175,19 @@ export type MergeResult = z.infer<typeof MergeResultSchema>
 // ED Queue Item
 // ============================================================================
 
+export const EdInboundHandoffSchema = z.object({
+	id: z.string().uuid(),
+	callerName: z.string(),
+	patientLocation: z.string(),
+	transportMode: InboundTriageTransportEnum,
+	channelType: InboundTriageChannelEnum,
+	etaMinutes: z.number().int(),
+	etaAt: dateOrString,
+	arrivedAt: dateOrString.nullable(),
+	assessmentNotes: z.string(),
+	resourceNeeds: ResourceNeedsSchema,
+})
+
 export const EdQueueItemSchema = z.object({
 	id: z.string().uuid(),
 	type: z.enum(["pre_encounter", "encounter"]),
@@ -175,6 +204,7 @@ export const EdQueueItemSchema = z.object({
 	bedNumber: z.string().nullable(),
 	wardName: z.string().nullable(),
 	oecbEligible: z.boolean().default(false),
+	inboundHandoff: EdInboundHandoffSchema.nullable(),
 })
 
 export type EdQueueItem = z.infer<typeof EdQueueItemSchema>
@@ -244,4 +274,75 @@ export const UpdateQueueStatusSchema = z.object({
 	id: z.string().uuid(),
 	type: z.enum(["pre_encounter", "encounter"]),
 	queueStatus: EdQueueStatusEnum,
+})
+
+// ============================================================================
+// Inbound Triage Record — full resource
+// ============================================================================
+
+export const InboundTriageRecordSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	callerName: z.string(),
+	patientLocation: z.string(),
+	transportMode: InboundTriageTransportEnum,
+	channelType: InboundTriageChannelEnum,
+	etaMinutes: z.number().int(),
+	etaAt: dateOrString,
+	provisionalAcuityLevel: z.number().int().min(1).max(5),
+	acuityScale: TriageAcuityScaleEnum,
+	assessmentNotes: z.string(),
+	resourceNeeds: ResourceNeedsSchema,
+	status: InboundTriageStatusEnum,
+	arrivedAt: dateOrString.nullable(),
+	preEncounterId: z.string().uuid().nullable(),
+	triageStaffId: z.string().uuid().nullable(),
+	createdAt: dateOrString,
+	updatedAt: dateOrString,
+})
+
+export type InboundTriageRecord = z.infer<typeof InboundTriageRecordSchema>
+
+// ============================================================================
+// Create Inbound Triage
+// ============================================================================
+
+export const CreateInboundTriageSchema = z.object({
+	facilityId: z.string().uuid(),
+	callerName: z.string().min(1).max(500),
+	patientLocation: z.string().min(1).max(1000),
+	transportMode: InboundTriageTransportEnum,
+	channelType: InboundTriageChannelEnum,
+	etaMinutes: z.number().int().min(0).max(480),
+	provisionalAcuityLevel: z.number().int().min(1).max(5),
+	acuityScale: TriageAcuityScaleEnum,
+	assessmentNotes: z.string().max(5000).optional(),
+	resourceNeeds: ResourceNeedsSchema.optional(),
+	triageStaffId: z.string().uuid(),
+})
+
+export type CreateInboundTriageInput = z.infer<typeof CreateInboundTriageSchema>
+
+// ============================================================================
+// List Inbound Triage
+// ============================================================================
+
+export const InboundTriageListSchema = z.object({
+	facilityId: z.string().uuid(),
+	status: InboundTriageStatusEnum.optional(),
+})
+
+export const InboundTriageListResponseSchema = z.array(InboundTriageRecordSchema)
+
+// ============================================================================
+// Mark Arrived / Cancel
+// ============================================================================
+
+export const InboundTriageIdSchema = z.object({
+	id: z.string().uuid(),
+})
+
+export const MarkArrivedResultSchema = z.object({
+	id: z.string().uuid(),
+	preEncounterId: z.string().uuid(),
 })

@@ -23,6 +23,7 @@ import {
 	flowsheetEntries,
 	formularyItems,
 	haiTags,
+	icd10Codes,
 	imagingOrders,
 	integrations,
 	invoiceLineItems,
@@ -37,14 +38,19 @@ import {
 	payments,
 	pidsrCases,
 	preEncounters,
+	prescriptions,
 	problems,
 	rolePermissions,
 	roles,
 	shiftHandoffs,
+	snomedCtCodes,
 	staffProfiles,
+	surgicalCases,
 	surveillanceFlags,
 	systemSettings,
 	tarEntries,
+	telemedicineAppointments,
+	telemedicineEncounters,
 	userRoles,
 	users,
 	vitalSigns,
@@ -87,6 +93,228 @@ async function assertSeedSchemaReady() {
 async function ensureProblemsTerminologyColumns() {
 	await db.execute(sql`ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "snomed_code" text`)
 	await db.execute(sql`ALTER TABLE "problems" ADD COLUMN IF NOT EXISTS "snomed_display" text`)
+}
+
+async function ensureTelemedicineLiveKitColumns() {
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "livekit_room_name" text`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "livekit_session_started_at" timestamptz`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "livekit_session_ended_at" timestamptz`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "patient_invite_token_hash" text`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "patient_invite_expires_at" timestamptz`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "patient_invite_revoked_at" timestamptz`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "patient_invite_last_used_at" timestamptz`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ADD COLUMN IF NOT EXISTS "patient_joined_at" timestamptz`
+	)
+	await db.execute(
+		sql`ALTER TABLE IF EXISTS "telemedicine_appointments" ALTER COLUMN "platform" SET DEFAULT 'livekit'`
+	)
+	await db.execute(
+		sql`CREATE UNIQUE INDEX IF NOT EXISTS "telemedicine_appts_patient_invite_hash_uniq" ON "telemedicine_appointments" ("patient_invite_token_hash")`
+	)
+}
+
+async function seedProblemTerminology() {
+	const icd10Data = [
+		{
+			code: "A09",
+			description: "Infectious gastroenteritis and colitis, unspecified",
+			category: "Certain infectious and parasitic diseases",
+		},
+		{
+			code: "A15.0",
+			description: "Tuberculosis of lung",
+			category: "Certain infectious and parasitic diseases",
+		},
+		{
+			code: "B20",
+			description: "Human immunodeficiency virus [HIV] disease",
+			category: "Certain infectious and parasitic diseases",
+		},
+		{
+			code: "E11",
+			description: "Type 2 diabetes mellitus",
+			category: "Endocrine, nutritional and metabolic diseases",
+		},
+		{
+			code: "E11.65",
+			description: "Type 2 diabetes mellitus with hyperglycemia",
+			category: "Endocrine, nutritional and metabolic diseases",
+		},
+		{
+			code: "E78.5",
+			description: "Dyslipidemia, unspecified",
+			category: "Endocrine, nutritional and metabolic diseases",
+		},
+		{
+			code: "I10",
+			description: "Essential (primary) hypertension",
+			category: "Diseases of the circulatory system",
+		},
+		{
+			code: "I25.10",
+			description: "Atherosclerotic heart disease of native coronary artery",
+			category: "Diseases of the circulatory system",
+		},
+		{
+			code: "I50.9",
+			description: "Heart failure, unspecified",
+			category: "Diseases of the circulatory system",
+		},
+		{
+			code: "J06.9",
+			description: "Acute upper respiratory infection, unspecified",
+			category: "Diseases of the respiratory system",
+		},
+		{
+			code: "J18.9",
+			description: "Pneumonia, unspecified organism",
+			category: "Diseases of the respiratory system",
+		},
+		{
+			code: "J45.909",
+			description: "Unspecified asthma, uncomplicated",
+			category: "Diseases of the respiratory system",
+		},
+		{
+			code: "K21.0",
+			description: "Gastro-esophageal reflux disease with esophagitis",
+			category: "Diseases of the digestive system",
+		},
+		{
+			code: "M54.5",
+			description: "Low back pain",
+			category: "Diseases of the musculoskeletal system",
+		},
+		{
+			code: "N18.3",
+			description: "Chronic kidney disease, stage 3",
+			category: "Diseases of the genitourinary system",
+		},
+		{
+			code: "R50.9",
+			description: "Fever, unspecified",
+			category: "Symptoms, signs and abnormal clinical findings",
+		},
+		{
+			code: "Z00.00",
+			description: "Encounter for general adult medical examination without abnormal findings",
+			category: "Factors influencing health status",
+		},
+	]
+
+	const snomedData = [
+		{
+			conceptId: "38341003",
+			fsn: "Hypertensive disorder, systemic arterial (disorder)",
+			preferredTerm: "Hypertension",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "44054006",
+			fsn: "Diabetes mellitus type 2 (disorder)",
+			preferredTerm: "Type 2 diabetes mellitus",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "233604007",
+			fsn: "Pneumonia (disorder)",
+			preferredTerm: "Pneumonia",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "195967001",
+			fsn: "Asthma (disorder)",
+			preferredTerm: "Asthma",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "13645005",
+			fsn: "Chronic obstructive lung disease (disorder)",
+			preferredTerm: "Chronic obstructive pulmonary disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "84114007",
+			fsn: "Heart failure (disorder)",
+			preferredTerm: "Heart failure",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "53741008",
+			fsn: "Coronary arteriosclerosis (disorder)",
+			preferredTerm: "Coronary artery disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "235595009",
+			fsn: "Gastroesophageal reflux disease (disorder)",
+			preferredTerm: "Gastroesophageal reflux disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "279039007",
+			fsn: "Low back pain (finding)",
+			preferredTerm: "Low back pain",
+			semanticTag: "finding",
+		},
+		{
+			conceptId: "709044004",
+			fsn: "Chronic kidney disease (disorder)",
+			preferredTerm: "Chronic kidney disease",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "386661006",
+			fsn: "Fever (finding)",
+			preferredTerm: "Fever",
+			semanticTag: "finding",
+		},
+		{
+			conceptId: "68566005",
+			fsn: "Urinary tract infectious disease (disorder)",
+			preferredTerm: "Urinary tract infection",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "40930008",
+			fsn: "Hypothyroidism (disorder)",
+			preferredTerm: "Hypothyroidism",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "55822004",
+			fsn: "Hyperlipidemia (disorder)",
+			preferredTerm: "Hyperlipidemia",
+			semanticTag: "disorder",
+		},
+		{
+			conceptId: "69896004",
+			fsn: "Rheumatoid arthritis (disorder)",
+			preferredTerm: "Rheumatoid arthritis",
+			semanticTag: "disorder",
+		},
+	]
+
+	await db.insert(icd10Codes).values(icd10Data).onConflictDoNothing()
+	await db.insert(snomedCtCodes).values(snomedData).onConflictDoNothing()
+	console.log(
+		`  - Seeded ${icd10Data.length} ICD-10 and ${snomedData.length} SNOMED CT problem codes`
+	)
 }
 
 type ModuleName =
@@ -445,15 +673,13 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Physician": [
-		// Physicians view patients and create encounters, but don't manage scheduling/beds (Registrar's job)
-		["adt", ["view", "create"]],
+		// Physicians view encounters and document care; Registrar owns encounter creation/scheduling/beds.
+		["adt", ["view"]],
 		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
 		["orders", ["view", "create", "edit", "sign"]],
 		["nursing", ["view"]],
-		["billing", ["view"]],
 		["formulary", ["view"]],
-		["reporting", ["view", "create"]],
 		["opd", ["view"]], // OPD dashboard access
 		["telemedicine", ["view", "create", "edit"]], // Virtual consultation access
 		["ed", ["view", "edit"]], // Emergency department patient viewing + disposition (C2)
@@ -483,7 +709,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 	"Billing Officer": [
 		["adt", ["view"]],
 		["patients", ["view"]], // Patient record access for billing reconciliation
-		["billing", ["view", "create", "edit", "export"]], // Legacy fallback for shell-level access
+		["billing", ["view", "create", "edit", "sign", "export"]], // Legacy fallback for shell-level access and RVS finalization
 		["billing.charges", ["read", "write"]],
 		["billing.invoices", ["read", "write"]],
 		["billing.payments", ["read", "write"]],
@@ -997,11 +1223,397 @@ async function ensureEncounter(
 	return created!
 }
 
+async function ensureSurgicalCase(seed: {
+	facilityId: string
+	encounterId: string
+	patientId: string
+	procedureName: string
+	orSuite: string
+	surgicalType: "elective" | "emergency" | "urgent"
+	surgeonStaffId: string
+	anesthesiologistStaffId: string
+	scheduledDatetime: Date
+	estimatedDurationMinutes: number
+	requiredEquipment: string[]
+	notes: string
+}) {
+	const [existing] = await db
+		.select()
+		.from(surgicalCases)
+		.where(
+			and(
+				eq(surgicalCases.facilityId, seed.facilityId),
+				eq(surgicalCases.encounterId, seed.encounterId),
+				eq(surgicalCases.procedureName, seed.procedureName)
+			)
+		)
+
+	if (existing) {
+		const [updated] = await db
+			.update(surgicalCases)
+			.set({
+				orSuite: seed.orSuite,
+				surgicalType: seed.surgicalType,
+				surgeonStaffId: seed.surgeonStaffId,
+				anesthesiologistStaffId: seed.anesthesiologistStaffId,
+				scheduledDatetime: seed.scheduledDatetime,
+				actualStartDatetime: null,
+				actualEndDatetime: null,
+				status: "scheduled",
+				estimatedDurationMinutes: seed.estimatedDurationMinutes,
+				requiredEquipment: seed.requiredEquipment,
+				notes: seed.notes,
+				updatedAt: new Date(),
+			})
+			.where(eq(surgicalCases.id, existing.id))
+			.returning()
+		return updated!
+	}
+
+	const [created] = await db
+		.insert(surgicalCases)
+		.values({
+			facilityId: seed.facilityId,
+			encounterId: seed.encounterId,
+			patientId: seed.patientId,
+			procedureName: seed.procedureName,
+			orSuite: seed.orSuite,
+			surgicalType: seed.surgicalType,
+			surgeonStaffId: seed.surgeonStaffId,
+			anesthesiologistStaffId: seed.anesthesiologistStaffId,
+			scheduledDatetime: seed.scheduledDatetime,
+			status: "scheduled",
+			asaClass: "ASA II",
+			estimatedDurationMinutes: seed.estimatedDurationMinutes,
+			requiredEquipment: seed.requiredEquipment,
+			notes: seed.notes,
+		})
+		.returning()
+	return created!
+}
+
+function toSeedDate(daysFromToday: number) {
+	const date = new Date()
+	date.setDate(date.getDate() + daysFromToday)
+	return formatSeedDate(date)
+}
+
+function formatSeedDate(date: Date) {
+	const year = date.getFullYear()
+	const month = `${date.getMonth() + 1}`.padStart(2, "0")
+	const day = `${date.getDate()}`.padStart(2, "0")
+	return `${year}-${month}-${day}`
+}
+
+function formatSeedTime(date: Date) {
+	const hour = `${date.getHours()}`.padStart(2, "0")
+	const minute = `${date.getMinutes()}`.padStart(2, "0")
+	const second = `${date.getSeconds()}`.padStart(2, "0")
+	return `${hour}:${minute}:${second}`
+}
+
+function toSeedDateTime(minutesFromNow: number) {
+	const date = new Date()
+	date.setMinutes(date.getMinutes() + minutesFromNow, 0, 0)
+	return {
+		scheduledDate: formatSeedDate(date),
+		scheduledTime: formatSeedTime(date),
+	}
+}
+
+async function ensureTelemedicineAppointment(seed: {
+	facilityId: string
+	patientId: string
+	clinicianStaffId: string
+	scheduledDate: string
+	scheduledTime: string
+	durationMinutes: number
+	status: "scheduled" | "confirmed" | "in-progress" | "completed" | "cancelled" | "no-show"
+	videoLink: string
+	meetingId: string
+	meetingPassword: string
+	notes: string
+	createdByStaffId: string
+}) {
+	const [existing] = await db
+		.select({
+			id: telemedicineAppointments.id,
+			meetingId: telemedicineAppointments.meetingId,
+		})
+		.from(telemedicineAppointments)
+		.where(
+			and(
+				eq(telemedicineAppointments.facilityId, seed.facilityId),
+				eq(telemedicineAppointments.meetingId, seed.meetingId)
+			)
+		)
+		.limit(1)
+
+	const values = {
+		facilityId: seed.facilityId,
+		patientId: seed.patientId,
+		clinicianStaffId: seed.clinicianStaffId,
+		scheduledDate: seed.scheduledDate,
+		scheduledTime: seed.scheduledTime,
+		durationMinutes: seed.durationMinutes,
+		platform: "livekit" as const,
+		status: seed.status,
+		videoLink: seed.videoLink,
+		meetingId: seed.meetingId,
+		meetingPassword: seed.meetingPassword,
+		notes: seed.notes,
+		createdByStaffId: seed.createdByStaffId,
+	}
+
+	if (existing) {
+		const [updated] = await db
+			.update(telemedicineAppointments)
+			.set({ ...values, updatedAt: new Date() })
+			.where(eq(telemedicineAppointments.id, existing.id))
+			.returning({
+				id: telemedicineAppointments.id,
+				meetingId: telemedicineAppointments.meetingId,
+			})
+		return updated ?? existing
+	}
+
+	const [created] = await db.insert(telemedicineAppointments).values(values).returning({
+		id: telemedicineAppointments.id,
+		meetingId: telemedicineAppointments.meetingId,
+	})
+	return created!
+}
+
+async function ensureTelemedicineEncounter(seed: {
+	appointmentId: string
+	patientId: string
+	clinicianStaffId: string
+	chiefComplaint: string
+	subjectiveNotes: string
+	objectiveNotes: string
+	assessmentNotes: string
+	planNotes: string
+	diagnosis: string
+	icdCode?: string
+	vitalSigns?: {
+		bloodPressure?: string
+		heartRate?: string
+		temperature?: string
+		oxygenSaturation?: string
+		weight?: string
+	}
+	status: "open" | "signed" | "finalized"
+	signedAt?: Date
+}) {
+	const [existing] = await db
+		.select()
+		.from(telemedicineEncounters)
+		.where(eq(telemedicineEncounters.appointmentId, seed.appointmentId))
+		.limit(1)
+
+	const values = {
+		appointmentId: seed.appointmentId,
+		encounterType: "standalone" as const,
+		linkedEncounterId: null,
+		patientId: seed.patientId,
+		clinicianStaffId: seed.clinicianStaffId,
+		chiefComplaint: seed.chiefComplaint,
+		subjectiveNotes: seed.subjectiveNotes,
+		objectiveNotes: seed.objectiveNotes,
+		assessmentNotes: seed.assessmentNotes,
+		planNotes: seed.planNotes,
+		diagnosis: seed.diagnosis,
+		icdCode: seed.icdCode ?? null,
+		vitalSigns: seed.vitalSigns ?? null,
+		status: seed.status,
+		signedAt: seed.status === "open" ? null : (seed.signedAt ?? new Date()),
+		signedByStaffId: seed.status === "open" ? null : seed.clinicianStaffId,
+	}
+
+	if (existing) {
+		const [updated] = await db
+			.update(telemedicineEncounters)
+			.set({ ...values, updatedAt: new Date() })
+			.where(eq(telemedicineEncounters.id, existing.id))
+			.returning()
+		return updated ?? existing
+	}
+
+	const [created] = await db.insert(telemedicineEncounters).values(values).returning()
+	return created!
+}
+
+async function ensureTelemedicineAppointments(params: {
+	mainFacilityId: string
+	northFacilityId: string
+	doctorStaffId: string
+	familyMedicineNorthStaffId: string
+	schedulerMainStaffId: string
+	schedulerNorthStaffId: string
+	mainPatientIds: {
+		scheduled: string
+		inProgress: string
+		confirmed: string
+		completed: string
+	}
+	northPatientIds: {
+		scheduled: string
+		confirmed: string
+	}
+}) {
+	const now = new Date()
+	const completedSignedAt = new Date(now.getTime() - 2 * 24 * 3_600_000)
+	const inProgressSchedule = toSeedDateTime(-15)
+
+	const mainScheduled = await ensureTelemedicineAppointment({
+		facilityId: params.mainFacilityId,
+		patientId: params.mainPatientIds.scheduled,
+		clinicianStaffId: params.doctorStaffId,
+		scheduledDate: toSeedDate(1),
+		scheduledTime: "09:00:00",
+		durationMinutes: 30,
+		status: "scheduled",
+		videoLink: "https://zoom.us/j/910000001",
+		meetingId: "QH-TM-MAIN-001",
+		meetingPassword: "telemed1",
+		notes: "Initial virtual consult for hypertension medication review.",
+		createdByStaffId: params.schedulerMainStaffId,
+	})
+
+	const mainInProgress = await ensureTelemedicineAppointment({
+		facilityId: params.mainFacilityId,
+		patientId: params.mainPatientIds.inProgress,
+		clinicianStaffId: params.doctorStaffId,
+		scheduledDate: inProgressSchedule.scheduledDate,
+		scheduledTime: inProgressSchedule.scheduledTime,
+		durationMinutes: 45,
+		status: "in-progress",
+		videoLink: "https://zoom.us/j/910000002",
+		meetingId: "QH-TM-MAIN-002",
+		meetingPassword: "telemed2",
+		notes: "Active virtual follow-up with partial SOAP documentation.",
+		createdByStaffId: params.schedulerMainStaffId,
+	})
+	await ensureTelemedicineEncounter({
+		appointmentId: mainInProgress.id,
+		patientId: params.mainPatientIds.inProgress,
+		clinicianStaffId: params.doctorStaffId,
+		chiefComplaint: "Persistent cough and low-grade fever",
+		subjectiveNotes:
+			"Patient reports five days of productive cough, intermittent fever, and mild fatigue. No chest pain or dyspnea at rest.",
+		objectiveNotes:
+			"Video assessment: speaking in full sentences, no visible respiratory distress. Home temperature 37.8 C.",
+		assessmentNotes:
+			"Likely acute upper respiratory infection. Pneumonia risk remains low but requires monitoring.",
+		planNotes:
+			"Complete respiratory review, counsel on warning signs, and decide if chest imaging is needed.",
+		diagnosis: "Acute upper respiratory infection",
+		icdCode: "J06.9",
+		vitalSigns: {
+			bloodPressure: "124/78",
+			heartRate: "88",
+			temperature: "37.8",
+			oxygenSaturation: "97",
+			weight: "68",
+		},
+		status: "open",
+	})
+
+	const mainConfirmed = await ensureTelemedicineAppointment({
+		facilityId: params.mainFacilityId,
+		patientId: params.mainPatientIds.confirmed,
+		clinicianStaffId: params.doctorStaffId,
+		scheduledDate: toSeedDate(3),
+		scheduledTime: "14:00:00",
+		durationMinutes: 30,
+		status: "confirmed",
+		videoLink: "https://zoom.us/j/910000003",
+		meetingId: "QH-TM-MAIN-003",
+		meetingPassword: "telemed3",
+		notes: "Confirmed diabetes follow-up and home glucose review.",
+		createdByStaffId: params.schedulerMainStaffId,
+	})
+
+	const mainCompleted = await ensureTelemedicineAppointment({
+		facilityId: params.mainFacilityId,
+		patientId: params.mainPatientIds.completed,
+		clinicianStaffId: params.doctorStaffId,
+		scheduledDate: toSeedDate(-4),
+		scheduledTime: "15:30:00",
+		durationMinutes: 30,
+		status: "completed",
+		videoLink: "https://zoom.us/j/910000004",
+		meetingId: "QH-TM-MAIN-004",
+		meetingPassword: "telemed4",
+		notes: "Completed virtual consult with finalized SOAP note.",
+		createdByStaffId: params.schedulerMainStaffId,
+	})
+	await ensureTelemedicineEncounter({
+		appointmentId: mainCompleted.id,
+		patientId: params.mainPatientIds.completed,
+		clinicianStaffId: params.doctorStaffId,
+		chiefComplaint: "Blood pressure follow-up",
+		subjectiveNotes:
+			"Patient reports improved adherence to losartan, no dizziness, chest pain, or shortness of breath.",
+		objectiveNotes:
+			"Home blood pressure log averages 128/82 mmHg. Patient appears well on video consultation.",
+		assessmentNotes: "Essential hypertension, controlled on current regimen.",
+		planNotes:
+			"Continue current medications, reinforce low-sodium diet, and repeat follow-up in four weeks.",
+		diagnosis: "Essential hypertension",
+		icdCode: "I10",
+		vitalSigns: {
+			bloodPressure: "128/82",
+			heartRate: "76",
+			temperature: "36.7",
+			oxygenSaturation: "98",
+			weight: "72",
+		},
+		status: "finalized",
+		signedAt: completedSignedAt,
+	})
+
+	await ensureTelemedicineAppointment({
+		facilityId: params.northFacilityId,
+		patientId: params.northPatientIds.scheduled,
+		clinicianStaffId: params.familyMedicineNorthStaffId,
+		scheduledDate: toSeedDate(2),
+		scheduledTime: "08:30:00",
+		durationMinutes: 30,
+		status: "scheduled",
+		videoLink: "https://zoom.us/j/920000001",
+		meetingId: "QH-TM-NORTH-001",
+		meetingPassword: "north1",
+		notes: "Family medicine virtual consult for headache and sleep hygiene review.",
+		createdByStaffId: params.schedulerNorthStaffId,
+	})
+
+	await ensureTelemedicineAppointment({
+		facilityId: params.northFacilityId,
+		patientId: params.northPatientIds.confirmed,
+		clinicianStaffId: params.familyMedicineNorthStaffId,
+		scheduledDate: toSeedDate(5),
+		scheduledTime: "11:00:00",
+		durationMinutes: 30,
+		status: "confirmed",
+		videoLink: "https://zoom.us/j/920000002",
+		meetingId: "QH-TM-NORTH-002",
+		meetingPassword: "north2",
+		notes: "Confirmed family medicine follow-up for allergic rhinitis.",
+		createdByStaffId: params.schedulerNorthStaffId,
+	})
+
+	console.log("  - Seeded telemedicine appointments for physician workflows")
+	console.log(
+		`    - Main facility examples: ${mainScheduled.meetingId}, ${mainConfirmed.meetingId}`
+	)
+}
+
 async function ensureReferenceData(facilityId: string) {
 	let [generic] = await db
 		.select()
 		.from(drugGenerics)
-		.where(eq(drugGenerics.genericName, "Paracetamol"))
+		.where(sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g')) = ${"paracetamol"}`)
 	if (!generic) {
 		;[generic] = await db
 			.insert(drugGenerics)
@@ -1043,6 +1655,94 @@ async function ensureReferenceData(facilityId: string) {
 				isActive: true,
 			})
 			.returning()
+	}
+
+	const highAlertFormularySeeds = [
+		{
+			genericName: "Regular Insulin",
+			rxnormCode: "253182",
+			atcCode: "A10AB01",
+			doseForm: "vial",
+			strength: "100 units/mL",
+			route: "subcutaneous",
+			highAlertNotes:
+				"High-alert medication: independent double-check required before ordering or administration.",
+		},
+		{
+			genericName: "Heparin Sodium",
+			rxnormCode: "5224",
+			atcCode: "B01AB01",
+			doseForm: "vial",
+			strength: "5000 units/mL",
+			route: "intravenous",
+			highAlertNotes:
+				"High-alert anticoagulant: verify indication, dose, concentration, and patient identifiers.",
+		},
+		{
+			genericName: "Potassium Chloride",
+			rxnormCode: "8591",
+			atcCode: "A12BA01",
+			doseForm: "vial",
+			strength: "2 mEq/mL concentrate",
+			route: "intravenous",
+			highAlertNotes:
+				"High-alert concentrated electrolyte: dilution and independent double-check required.",
+		},
+	]
+
+	for (const seed of highAlertFormularySeeds) {
+		const normalizedGenericName = seed.genericName.trim().replace(/\s+/g, " ").toLowerCase()
+		let [highAlertGeneric] = await db
+			.select()
+			.from(drugGenerics)
+			.where(
+				sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g')) = ${normalizedGenericName}`
+			)
+		if (!highAlertGeneric) {
+			;[highAlertGeneric] = await db
+				.insert(drugGenerics)
+				.values({
+					genericName: seed.genericName.trim().replace(/\s+/g, " "),
+					rxnormCode: seed.rxnormCode,
+					atcCode: seed.atcCode,
+				})
+				.returning()
+		}
+
+		const [highAlertItem] = await db
+			.select()
+			.from(formularyItems)
+			.where(
+				and(
+					eq(formularyItems.facilityId, facilityId),
+					eq(formularyItems.drugGenericId, highAlertGeneric!.id),
+					eq(formularyItems.strength, seed.strength),
+					eq(formularyItems.route, seed.route)
+				)
+			)
+
+		if (!highAlertItem) {
+			await db.insert(formularyItems).values({
+				facilityId,
+				drugGenericId: highAlertGeneric!.id,
+				doseForm: seed.doseForm,
+				strength: seed.strength,
+				route: seed.route,
+				isActive: true,
+				isHighAlert: true,
+				highAlertNotes: seed.highAlertNotes,
+				formularyNotes: "Baseline high-alert seed for CPOE double-verification testing.",
+			})
+		} else if (!highAlertItem.isHighAlert) {
+			await db
+				.update(formularyItems)
+				.set({
+					isHighAlert: true,
+					highAlertNotes: highAlertItem.highAlertNotes ?? seed.highAlertNotes,
+					updatedAt: new Date(),
+				})
+				.where(eq(formularyItems.id, highAlertItem.id))
+		}
 	}
 
 	let [chargeItem] = await db
@@ -1265,6 +1965,40 @@ async function ensureNursingAndOrders(params: {
 			.returning()
 	}
 
+	// OPD Dispensing seed — signed prescription tied to the Paracetamol order
+	const [existingPrescription] = await db
+		.select()
+		.from(prescriptions)
+		.where(eq(prescriptions.medicationOrderId, medOrder!.id))
+	if (!existingPrescription) {
+		await db.insert(prescriptions).values({
+			facilityId: params.facilityId,
+			encounterId: params.encounterId,
+			medicationOrderId: medOrder!.id,
+			patientId: params.patientId,
+			prescriberStaffId: params.doctorStaffId,
+			prcLicenseNumber: "PRC-100001",
+			ptrNumber: "PTR-100001",
+			prescriptionContent: {
+				medications: [
+					{
+						genericName: "Paracetamol",
+						brandName: "Biogesic",
+						dose: "500 mg",
+						doseUnit: "mg",
+						doseForm: "tablet",
+						route: "oral",
+						frequency: "q6h",
+						durationDays: 3,
+						quantity: 12,
+					},
+				],
+			},
+			status: "signed",
+			signedAt: new Date(),
+		})
+	}
+
 	// Pending-verification order — feeds the Pharmacy Verification Queue (Story 10.1)
 	const [pendingMedOrder] = await db
 		.select()
@@ -1309,6 +2043,9 @@ async function ensureNursingAndOrders(params: {
 			encounterId: params.encounterId,
 			loincCode: "6690-2",
 			testName: "Complete Blood Count",
+			clinicalIndication: "Fever and productive cough",
+			indicationIcd10Code: "J18.9",
+			indicationIcd10Display: "Pneumonia, unspecified organism",
 			priority: "routine",
 			status: "ordered",
 			specimenType: "Blood",
@@ -1329,6 +2066,8 @@ async function ensureNursingAndOrders(params: {
 			modality: "xray",
 			bodyPart: "Chest",
 			clinicalIndication: "Persistent cough and fever",
+			indicationIcd10Code: "J18.9",
+			indicationIcd10Display: "Pneumonia, unspecified organism",
 			priority: "routine",
 			status: "ordered",
 			orderingStaffId: params.doctorStaffId,
@@ -1766,7 +2505,7 @@ async function ensureNursingScenarios(params: {
 	let [amlodipineGeneric] = await db
 		.select()
 		.from(drugGenerics)
-		.where(eq(drugGenerics.genericName, "Amlodipine"))
+		.where(sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g')) = ${"amlodipine"}`)
 	if (!amlodipineGeneric) {
 		;[amlodipineGeneric] = await db
 			.insert(drugGenerics)
@@ -1804,12 +2543,18 @@ async function ensureNursingScenarios(params: {
 	]
 
 	for (const g of moreGenerics) {
+		const normalizedGenericName = g.genericName.trim().replace(/\s+/g, " ").toLowerCase()
 		const [exists] = await db
 			.select()
 			.from(drugGenerics)
-			.where(eq(drugGenerics.genericName, g.genericName))
+			.where(
+				sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g')) = ${normalizedGenericName}`
+			)
 		if (!exists) {
-			await db.insert(drugGenerics).values(g)
+			await db.insert(drugGenerics).values({
+				...g,
+				genericName: g.genericName.trim().replace(/\s+/g, " "),
+			})
 		}
 	}
 
@@ -2389,6 +3134,8 @@ async function main() {
 	console.log("Seeding qhealth-emr development data...")
 	await assertSeedSchemaReady()
 	await ensureProblemsTerminologyColumns()
+	await ensureTelemedicineLiveKitColumns()
+	await seedProblemTerminology()
 
 	const facilityMap = new Map<string, Awaited<ReturnType<typeof ensureFacility>>>()
 	for (const facilitySeed of demoFacilities) {
@@ -2398,6 +3145,7 @@ async function main() {
 	}
 
 	const mainFacility = facilityMap.get("main")!
+	const northFacility = facilityMap.get("north-clinic")!
 
 	const roleMap = new Map<string, string>()
 	for (const facilitySeed of demoFacilities) {
@@ -2417,6 +3165,7 @@ async function main() {
 	}
 
 	const staffMap = new Map<string, string>()
+	const staffFacilityMap = new Map<string, string>()
 	for (const user of demoUsers) {
 		const assignedFacilityKeys = staffFacilityAssignments[user.email] ?? ["main"]
 
@@ -2424,6 +3173,7 @@ async function main() {
 			const facility = facilityMap.get(facilityKey)!
 			const staff = await ensureStaffProfile(authUsers.get(user.email)!, facility.id, user)
 			await ensureUserRole(staff.id, roleMap.get(`${facilityKey}:${user.roleName}`)!)
+			staffFacilityMap.set(`${facilityKey}:${user.email}`, staff.id)
 
 			if (facilityKey === "main") {
 				staffMap.set(user.email, staff.id)
@@ -2457,7 +3207,57 @@ async function main() {
 		"1992-07-03",
 		"female"
 	)
-	await ensurePatient(mainFacility.id, "QH-000003", "Pedro", "Reyes", "1978-11-21", "male")
+	const patient3 = await ensurePatient(
+		mainFacility.id,
+		"QH-000003",
+		"Pedro",
+		"Reyes",
+		"1978-11-21",
+		"male"
+	)
+	const patient4 = await ensurePatient(
+		mainFacility.id,
+		"QH-000004",
+		"Lourdes",
+		"Garcia",
+		"1969-04-09",
+		"female"
+	)
+	const northPatient1 = await ensurePatient(
+		northFacility.id,
+		"QHN-000001",
+		"Elena",
+		"Flores",
+		"1988-03-17",
+		"female"
+	)
+	const northPatient2 = await ensurePatient(
+		northFacility.id,
+		"QHN-000002",
+		"Roberto",
+		"Lim",
+		"1975-09-12",
+		"male"
+	)
+
+	await ensureTelemedicineAppointments({
+		mainFacilityId: mainFacility.id,
+		northFacilityId: northFacility.id,
+		doctorStaffId: staffMap.get("doctor@qhealth.local")!,
+		familyMedicineNorthStaffId: staffFacilityMap.get("north-clinic:familymed@qhealth.local")!,
+		schedulerMainStaffId: staffMap.get("scheduler@qhealth.local")!,
+		schedulerNorthStaffId: staffFacilityMap.get("north-clinic:scheduler@qhealth.local")!,
+		mainPatientIds: {
+			scheduled: patient1.id,
+			inProgress: patient2.id,
+			confirmed: patient3.id,
+			completed: patient4.id,
+		},
+		northPatientIds: {
+			scheduled: northPatient1.id,
+			confirmed: northPatient2.id,
+		},
+	})
 
 	// Newborn patient — DOB set to ~36 hours ago so the NBS tab (< 30 days rule) is always visible.
 	// Re-run the seed if this patient's age exceeds 28 days.
@@ -2644,6 +3444,32 @@ async function main() {
 		"inpatient",
 		"Uncontrolled hypertension"
 	)
+	const surgicalEncounter = await ensureEncounter(
+		mainFacility.id,
+		patient4.id,
+		staffMap.get("surgeon@qhealth.local")!,
+		null,
+		"inpatient",
+		"Scheduled laparoscopic cholecystectomy"
+	)
+	const scheduledOrTime = new Date()
+	scheduledOrTime.setDate(scheduledOrTime.getDate() + 1)
+	scheduledOrTime.setHours(8, 0, 0, 0)
+	await ensureSurgicalCase({
+		facilityId: mainFacility.id,
+		encounterId: surgicalEncounter.id,
+		patientId: patient4.id,
+		procedureName: "Laparoscopic cholecystectomy",
+		orSuite: "OR-1",
+		surgicalType: "elective",
+		surgeonStaffId: staffMap.get("surgeon@qhealth.local")!,
+		anesthesiologistStaffId: staffMap.get("anesthesiologist@qhealth.local")!,
+		scheduledDatetime: scheduledOrTime,
+		estimatedDurationMinutes: 120,
+		requiredEquipment: ["laparoscope", "electrocautery"],
+		notes:
+			"Dev smoke case for Surgeon workflow: operation record signing and RVS mapping.",
+	})
 
 	const refs = await ensureReferenceData(mainFacility.id)
 	await ensureClinicalData({

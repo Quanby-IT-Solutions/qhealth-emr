@@ -1,6 +1,6 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import type {
 	Appointment,
@@ -193,6 +193,22 @@ export function useTemplateSlotsQuery(params: TemplateSlotsQueryParams) {
 	})
 }
 
+export function useTemplateSlotsQueries(params: TemplateSlotsQueryParams[]) {
+	return useQueries({
+		queries: params.map(queryParams => ({
+			...orpc.scheduling.listTemplateSlots.queryOptions({
+				input: {
+					id: queryParams.templateId,
+					fromDate: queryParams.fromDate,
+					toDate: queryParams.toDate,
+					status: queryParams.status,
+				} satisfies ListTemplateSlotsQuery,
+			}),
+			enabled: !!queryParams.templateId && !!queryParams.fromDate && !!queryParams.toDate,
+		})),
+	})
+}
+
 export function useUpdateSlotMutation() {
 	const queryClient = useQueryClient()
 
@@ -250,10 +266,7 @@ export function useUpdateSlotMutation() {
 	)
 }
 
-export function useAvailableSlotsQuery(
-	params: AvailableSlotQueryParams,
-	enabled = true
-) {
+export function useAvailableSlotsQuery(params: AvailableSlotQueryParams, enabled = true) {
 	return useQuery({
 		...orpc.scheduling.getAvailableSlots.queryOptions({
 			input: {

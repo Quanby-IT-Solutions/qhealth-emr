@@ -2,10 +2,11 @@
 
 import { Fragment, useCallback, useState } from "react"
 
+import Link from "next/link"
 import { BellRing, ChevronDown, ChevronRight } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
-import { Button } from "@/core/components/ui/button"
+import { Button, buttonVariants } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
@@ -13,9 +14,10 @@ import { Label } from "@/core/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
 import { Textarea } from "@/core/components/ui/textarea"
+import { cn } from "@/core/lib/utils"
 
-import type { BreakGlassEvent } from "@/features/auditor/break-glass-review/api/break-glass.hooks"
 import {
+	type BreakGlassEvent,
 	useApproveMutation,
 	useBreakGlassInboxQuery,
 } from "@/features/auditor/break-glass-review/api/break-glass.hooks"
@@ -54,7 +56,7 @@ function AccessLogDetail({ event }: { event: BreakGlassEvent }) {
 					<p className="mt-0.5">{event.reviewNotes}</p>
 				</div>
 			)}
-			{event.recordsAccessed != null && (
+			{event.recordsAccessed !== null && event.recordsAccessed !== undefined && (
 				<div className="col-span-2">
 					<span className="font-semibold uppercase tracking-wide text-muted-foreground">Records Accessed</span>
 					<pre className="mt-0.5 max-h-32 overflow-y-auto rounded bg-muted p-2 text-[11px]">
@@ -276,6 +278,13 @@ export function BreakGlassInbox({ facilityId }: BreakGlassInboxProps) {
 																Approve
 															</Button>
 														)}
+														<Link
+															href={`/auditor/break-glass/${event.id}`}
+															className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+															onClick={e => e.stopPropagation()}
+														>
+															View Report
+														</Link>
 														<Button
 															variant="outline"
 															size="sm"

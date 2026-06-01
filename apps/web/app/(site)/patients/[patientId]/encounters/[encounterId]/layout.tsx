@@ -77,15 +77,15 @@ export default function EncounterChartLayout({
 	const isAnesthesiologist = activeRoleName === "anesthesiologist"
 	const canViewClinicalSummary = can(permSet, "clinical_docs", "view")
 	const canViewVitals = can(permSet, "nursing", "view") || can(permSet, "surgical", "view")
-	const { data: summary } = usePatientSummaryQuery(encounter?.patientId ?? "", {
-		enabled: !!encounter?.patientId && canViewClinicalSummary,
-	})
 	const { isOnline } = useOfflineSync()
 	const activeStaffProfile = getActiveStaffProfile(profile)
 	const activeFacilityId = activeStaffProfile?.facilityId
+	const [breakGlassExpired, setBreakGlassExpired] = useState(false)
 	const breakGlassRequired =
 		error?.message?.includes(BREAK_GLASS_REQUIRED_MESSAGE) ||
 		String(error).includes(BREAK_GLASS_REQUIRED_MESSAGE)
+	const base = `/patients/${patientId}/encounters/${encounterId}`
+	const isDeathReportRoute = pathname.startsWith(`${base}/death-report`)
 
 	// Break-Glass state
 	const [breakGlassOpen, setBreakGlassOpen] = useState(false)
@@ -96,8 +96,11 @@ export default function EncounterChartLayout({
 		patientId: encounter?.patientId ?? patientId,
 		enabled: canInvokeBreakGlass,
 	})
-
-	const base = `/patients/${patientId}/encounters/${encounterId}`
+	const chartAccessBlocked = breakGlassRequired || (breakGlassExpired && !activeBreakGlass)
+	const visibleEncounter = chartAccessBlocked ? undefined : encounter
+	const { data: summary } = usePatientSummaryQuery(visibleEncounter?.patientId ?? "", {
+		enabled: !!visibleEncounter?.patientId && canViewClinicalSummary,
+	})
 
 	useEffect(() => {
 		if (breakGlassRequired && activeBreakGlass) {
@@ -106,20 +109,34 @@ export default function EncounterChartLayout({
 	}, [activeBreakGlass, breakGlassRequired, refetchEncounter])
 
 	useEffect(() => {
-		if (!activeBreakGlass?.accessExpiresAt) return
+		if (!activeBreakGlass?.accessExpiresAt) {
+			return
+		}
 
 		const expiresAtMs = new Date(activeBreakGlass.accessExpiresAt).getTime()
 		const refreshDelayMs = expiresAtMs - Date.now() + 1000
 
 		if (refreshDelayMs <= 0) {
-			void refetchActiveBreakGlass()
-			void refetchEncounter()
-			return
+			const timeoutId = window.setTimeout(() => {
+				setBreakGlassExpired(true)
+				void refetchActiveBreakGlass()
+				void refetchEncounter().then(result => {
+					if (result.status === "success") {
+						setBreakGlassExpired(false)
+					}
+				})
+			}, 0)
+			return () => window.clearTimeout(timeoutId)
 		}
 
 		const timeoutId = window.setTimeout(() => {
+			setBreakGlassExpired(true)
 			void refetchActiveBreakGlass()
-			void refetchEncounter()
+			void refetchEncounter().then(result => {
+				if (result.status === "success") {
+					setBreakGlassExpired(false)
+				}
+			})
 		}, refreshDelayMs)
 
 		return () => window.clearTimeout(timeoutId)
@@ -173,8 +190,12 @@ export default function EncounterChartLayout({
 		{
 			label: "Nursing",
 			href: `${base}/nursing`,
-			// Nursing tab is for Nurses and Physicians; Surgeons view vitals in Summary
-			show: can(permSet, "nursing", "view") && !can(permSet, "surgical", "view"),
+			// Nursing workflows are nurse-owned. Clinicians get vitals/clinical
+			// context from Summary, Orders, and Documentation instead.
+			show:
+				can(permSet, "nursing", "view") &&
+				!can(permSet, "surgical", "view") &&
+				!can(permSet, "clinical_docs", "sign"),
 		},
 		{
 			label: "Nutrition",
@@ -184,7 +205,10 @@ export default function EncounterChartLayout({
 		{
 			label: "Billing",
 			href: `${base}/billing`,
-			show: can(permSet, "billing", "view"),
+			// Billing workspace belongs to Billing/MSW/Auditor-style review roles, not
+			// clinicians documenting care. Physicians trigger clinical completion and
+			// May Go Home from the Discharge tab.
+			show: can(permSet, "billing", "view") && !can(permSet, "clinical_docs", "sign"),
 		},
 		{
 			label: "MSW",
@@ -206,9 +230,11 @@ export default function EncounterChartLayout({
 		{
 			label: "Death Report",
 			href: `${base}/death-report`,
-			// Death Report (FMDRF/FNDRF) is visible to anyone with explicit death_reporting:view
-			// This includes Physicians/Surgeons (authors) and Registrars (certificate issuance)
-			show: can(permSet, "death_reporting", "view"),
+			// Death reporting is triggered by a deceased/expired disposition.
+			// Keep the tab visible while completing the required modal-launched route.
+			show:
+				can(permSet, "death_reporting", "view") &&
+				(visibleEncounter?.disposition === "deceased" || isDeathReportRoute),
 		},
 		{
 			label: "Transfers",
@@ -221,31 +247,32 @@ export default function EncounterChartLayout({
 			href: `${base}/audit-trail`,
 			show: can(permSet, "audit", "view"),
 		},
-		...(encounter?.status === "active" &&
-		encounter.encounterType !== "outpatient" &&
+		...(visibleEncounter?.status === "active" &&
+		visibleEncounter?.encounterType !== "outpatient" &&
 		can(permSet, "adt", "edit")
 			? [{ label: "Transfer Patient", href: `${base}/transfer`, show: true }]
 			: []),
-		...((encounter?.status === "active" || encounter?.status === "pending_discharge") &&
+		...((visibleEncounter?.status === "active" || visibleEncounter?.status === "pending_discharge") &&
 		(can(permSet, "adt", "edit") || can(permSet, "clinical_docs", "sign"))
 			? [
 					{
-						label: encounter?.encounterType === "outpatient" ? "Close" : "Discharge",
+						label: visibleEncounter?.encounterType === "outpatient" ? "Close" : "Discharge",
 						href: `${base}/discharge`,
 						show: true,
 					},
 				]
 			: []),
 	].filter(tab => tab.show)
+	const canRenderEncounterContent = Boolean(visibleEncounter && !chartAccessBlocked && !isError)
 
 	return (
 		<ChartContext.Provider
 			value={{
 				encounterId,
 				patientId,
-				encounter,
+				encounter: visibleEncounter,
 				isLoading,
-				facilityId: encounter?.facilityId,
+				facilityId: visibleEncounter?.facilityId,
 				activeAllergyCount: summary?.activeAllergyCount ?? 0,
 				hasSevereAllergies: summary?.hasSevereAllergies ?? false,
 				canViewClinicalSummary,
@@ -269,8 +296,8 @@ export default function EncounterChartLayout({
 				<div className="bg-background border-b px-3 py-4 sm:px-6">
 					{isLoading ? (
 						<div className="bg-muted h-12 animate-pulse rounded" />
-					) : isError ? (
-						breakGlassRequired && canInvokeBreakGlass && activeFacilityId ? (
+					) : chartAccessBlocked || isError ? (
+						chartAccessBlocked && canInvokeBreakGlass && activeFacilityId ? (
 							<div className="w-full max-w-lg space-y-4">
 								<div>
 									<p className="text-foreground text-sm font-medium">Break-Glass Required</p>
@@ -322,39 +349,39 @@ export default function EncounterChartLayout({
 								You do not have permission to view this encounter.
 							</p>
 						)
-					) : encounter ? (
+					) : visibleEncounter ? (
 						<div className="flex flex-wrap items-center gap-x-6 gap-y-2">
 							<div>
-								<p className="text-lg font-semibold">{encounter.patientName}</p>
-								<p className="text-muted-foreground text-sm">MRN: {encounter.patientMrn}</p>
+								<p className="text-lg font-semibold">{visibleEncounter.patientName}</p>
+								<p className="text-muted-foreground text-sm">MRN: {visibleEncounter.patientMrn}</p>
 							</div>
 							<Separator orientation="vertical" className="hidden h-10 sm:block" />
 							<div className="flex flex-wrap gap-4 text-sm">
-								{encounter.patientDateOfBirth && (
+								{visibleEncounter.patientDateOfBirth && (
 									<span>
 										<span className="text-muted-foreground">Age: </span>
-										{calculateAge(encounter.patientDateOfBirth)}
+										{calculateAge(visibleEncounter.patientDateOfBirth)}
 									</span>
 								)}
 								<span>
 									<span className="text-muted-foreground">Sex: </span>
-									<span className="capitalize">{encounter.patientSex}</span>
+									<span className="capitalize">{visibleEncounter.patientSex}</span>
 								</span>
 								<span>
 									<span className="text-muted-foreground">Type: </span>
-									<span className="capitalize">{encounter.encounterType}</span>
+									<span className="capitalize">{visibleEncounter.encounterType}</span>
 								</span>
-								{encounter.attendingStaffName && (
+								{visibleEncounter.attendingStaffName && (
 									<span>
 										<span className="text-muted-foreground">Attending: </span>
-										{encounter.attendingStaffName}
+										{visibleEncounter.attendingStaffName}
 									</span>
 								)}
-								{encounter.wardName && (
+								{visibleEncounter.wardName && (
 									<span>
 										<span className="text-muted-foreground">Ward: </span>
-										{encounter.wardName}
-										{encounter.bedNumber ? ` / Bed ${encounter.bedNumber}` : ""}
+										{visibleEncounter.wardName}
+										{visibleEncounter.bedNumber ? ` / Bed ${visibleEncounter.bedNumber}` : ""}
 									</span>
 								)}
 							</div>
@@ -380,8 +407,8 @@ export default function EncounterChartLayout({
 
 							{/* Break-Glass Button - for clinicians */}
 							{canInvokeBreakGlass &&
-								encounter?.facilityId &&
-								encounter?.patientId &&
+								visibleEncounter?.facilityId &&
+								visibleEncounter?.patientId &&
 								(breakGlassRequired || !!activeBreakGlass) && (
 									<div className="ml-auto flex flex-wrap items-center justify-end gap-2">
 										{activeBreakGlass?.accessExpiresAt ? (
@@ -420,12 +447,13 @@ export default function EncounterChartLayout({
 													</DialogDescription>
 												</DialogHeader>
 												<BreakGlassForm
-													patientId={encounter.patientId}
-													facilityId={encounter.facilityId}
+													patientId={visibleEncounter.patientId}
+													facilityId={visibleEncounter.facilityId}
 													entityType="encounter"
 													entityId={encounterId}
 													activeEvent={activeBreakGlass}
 													onSuccess={() => {
+														setBreakGlassExpired(false)
 														setBreakGlassOpen(false)
 														void refetchEncounter()
 													}}
@@ -439,7 +467,7 @@ export default function EncounterChartLayout({
 					) : null}
 				</div>
 
-				{encounter ? (
+				{canRenderEncounterContent ? (
 					<>
 						{/* Tab Bar */}
 						<div className="bg-background border-b">

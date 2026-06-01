@@ -1,12 +1,14 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, count, desc, eq, isNull, like } from "drizzle-orm"
+import { and, asc, count, desc, eq, inArray, isNull, like, or } from "drizzle-orm"
 
 import {
 	beds,
 	clinicalNotes,
+	deathReports,
 	encounters,
 	encounterStatusEvents,
 	imagingOrders,
+	inboundTriageRecords,
 	ioEntries,
 	labOrders,
 	marEntries,
@@ -22,6 +24,11 @@ import {
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
+import {
+	formatDeathReportLabels,
+	getRequiredDeathReportTypes,
+	isSubmittedDeathReportStatus,
+} from "@/modules/v1/death-reporting/death-reporting-eligibility"
 import { closeOpenSlaStep } from "@/utils/sla-events"
 import { resolveStepTarget } from "@/utils/sla-step-target"
 
@@ -35,6 +42,16 @@ type MergeInput = V1Inputs["ed"]["merge"]
 type EdQueueInput = V1Inputs["ed"]["getQueue"]
 type UpdateQueueStatusInput = V1Inputs["ed"]["updateQueueStatus"]
 type EdDispositionInput = V1Inputs["ed"]["dispose"]
+type CreateInboundTriageInput = V1Inputs["ed"]["createInboundTriage"]
+type InboundTriageListInput = V1Inputs["ed"]["listInboundTriage"]
+type InboundTriageIdInput = V1Inputs["ed"]["markInboundArrived"]
+type DBTransaction = Parameters<Parameters<(typeof db)["transaction"]>[0]>[0]
+type InboundArrivalRecord = typeof inboundTriageRecords.$inferSelect
+type ResourceNeeds = {
+	bed: boolean
+	codeTeam: boolean
+	equipment: string[]
+}
 
 @Injectable()
 export class EdService {
@@ -194,6 +211,32 @@ export class EdService {
 			.set(updateData)
 			.where(eq(preEncounters.id, input.id))
 			.returning()
+
+		return updated!
+	}
+
+	async cancelPreEncounter(id: string) {
+		const [existing] = await db.select().from(preEncounters).where(eq(preEncounters.id, id))
+
+		if (!existing) {
+			throw new NotFoundException(`Pre-encounter ${id} not found`)
+		}
+
+		if (existing.status !== "active") {
+			throw new BadRequestException("Can only cancel active pre-encounters")
+		}
+
+		const [updated] = await db
+			.update(preEncounters)
+			.set({ status: "cancelled", updatedAt: new Date() })
+			.where(eq(preEncounters.id, id))
+			.returning()
+
+		this.notificationService.broadcast(
+			"ed_queue",
+			"ED Queue Updated",
+			"Trauma alias pre-encounter removed from queue"
+		)
 
 		return updated!
 	}
@@ -418,7 +461,7 @@ export class EdService {
 					encounterType: input.encounterType ?? "emergency",
 					chiefComplaint: preEnc.chiefComplaint,
 					admittingStaffId: input.admittingStaffId,
-					attendingStaffId: input.admittingStaffId,
+					attendingStaffId: input.attendingStaffId ?? input.admittingStaffId,
 					bedId: input.bedId ?? null,
 					admissionDatetime: preEnc.triageDatetime ?? new Date(),
 					mergedFromPreEncounterId: preEnc.id,
@@ -570,6 +613,20 @@ export class EdService {
 	// ED Queue
 	// ========================================================================
 
+	private mapResourceNeeds(resourceNeeds: unknown): ResourceNeeds {
+		const rn = (resourceNeeds ?? {}) as {
+			bed?: boolean
+			codeTeam?: boolean
+			equipment?: string[]
+		}
+
+		return {
+			bed: rn.bed ?? false,
+			codeTeam: rn.codeTeam ?? false,
+			equipment: rn.equipment ?? [],
+		}
+	}
+
 	async getQueue(input: EdQueueInput) {
 		// Get active pre-encounters (not yet merged)
 		const preEncRows = await db
@@ -580,8 +637,19 @@ export class EdService {
 				acuityLevel: preEncounters.triageAcuityLevel,
 				acuityScale: preEncounters.triageAcuityScale,
 				arrivalTime: preEncounters.createdAt,
+				inboundId: inboundTriageRecords.id,
+				inboundCallerName: inboundTriageRecords.callerName,
+				inboundPatientLocation: inboundTriageRecords.patientLocation,
+				inboundTransportMode: inboundTriageRecords.transportMode,
+				inboundChannelType: inboundTriageRecords.channelType,
+				inboundEtaMinutes: inboundTriageRecords.etaMinutes,
+				inboundEtaAt: inboundTriageRecords.etaAt,
+				inboundArrivedAt: inboundTriageRecords.arrivedAt,
+				inboundAssessmentNotes: inboundTriageRecords.assessmentNotes,
+				inboundResourceNeeds: inboundTriageRecords.resourceNeeds,
 			})
 			.from(preEncounters)
+			.leftJoin(inboundTriageRecords, eq(inboundTriageRecords.preEncounterId, preEncounters.id))
 			.where(
 				and(eq(preEncounters.facilityId, input.facilityId), eq(preEncounters.status, "active"))
 			)
@@ -615,7 +683,10 @@ export class EdService {
 			.where(
 				and(
 					eq(encounters.facilityId, input.facilityId),
-					eq(encounters.encounterType, "emergency"),
+					or(
+						eq(encounters.encounterType, "emergency"),
+						eq(wards.wardType, "er")
+					),
 					eq(encounters.status, "active")
 				)
 			)
@@ -640,6 +711,20 @@ export class EdService {
 			bedNumber: null,
 			wardName: null,
 			oecbEligible: false,
+			inboundHandoff: pe.inboundId
+				? {
+						id: pe.inboundId,
+						callerName: pe.inboundCallerName!,
+						patientLocation: pe.inboundPatientLocation!,
+						transportMode: pe.inboundTransportMode!,
+						channelType: pe.inboundChannelType!,
+						etaMinutes: pe.inboundEtaMinutes!,
+						etaAt: pe.inboundEtaAt!,
+						arrivedAt: pe.inboundArrivedAt,
+						assessmentNotes: pe.inboundAssessmentNotes ?? "",
+						resourceNeeds: this.mapResourceNeeds(pe.inboundResourceNeeds),
+					}
+				: null,
 		}))
 
 		// Build queue items from encounters — all data is already joined
@@ -669,6 +754,7 @@ export class EdService {
 				bedNumber: enc.bedNumber ?? null,
 				wardName: enc.wardName ?? null,
 				oecbEligible: enc.oecbEligible ?? false,
+				inboundHandoff: null,
 			}
 		})
 
@@ -688,6 +774,18 @@ export class EdService {
 			bedNumber: string | null
 			wardName: string | null
 			oecbEligible: boolean
+			inboundHandoff: {
+				id: string
+				callerName: string
+				patientLocation: string
+				transportMode: "ambulance" | "private_vehicle" | "walk_in" | "motorcycle_ambulance"
+				channelType: "phone" | "video"
+				etaMinutes: number
+				etaAt: Date
+				arrivedAt: Date | null
+				assessmentNotes: string
+				resourceNeeds: ResourceNeeds
+			} | null
 		}> = [...preEncItems, ...encItems]
 
 		// Sort by acuity level (1 = most urgent first), then by arrival time
@@ -779,6 +877,31 @@ export class EdService {
 
 		if (encounter.status !== "active") {
 			throw new BadRequestException("Can only set disposition on active encounters")
+		}
+
+		if (encounter.encounterType !== "emergency") {
+			throw new BadRequestException(
+				"Disposition is only allowed on emergency department encounters"
+			)
+		}
+
+		// Require at least one signed clinical note before allowing disposition
+		const [signedNote] = await db
+			.select({ id: clinicalNotes.id })
+			.from(clinicalNotes)
+			.where(
+				and(eq(clinicalNotes.encounterId, input.encounterId), eq(clinicalNotes.status, "signed"))
+			)
+			.limit(1)
+
+		if (!signedNote) {
+			throw new BadRequestException(
+				"At least one signed clinical note is required before disposition"
+			)
+		}
+
+		if (input.disposition === "deceased") {
+			await this.assertRequiredDeathReportsSubmitted(encounter)
 		}
 
 		// SLA-004: Resolve step targets before the transaction (read-only operations)
@@ -902,6 +1025,20 @@ export class EdService {
 				})
 			}
 
+			// Emit billing routing event for OECB-tagged ED discharges
+			if (input.disposition === "discharge" && (input.oecbEligible ?? false)) {
+				await tx.insert(encounterStatusEvents).values({
+					facilityId: encounter.facilityId,
+					encounterId: input.encounterId,
+					fromStatus: null,
+					toStatus: "ready_for_billing",
+					workflowType: "billing" as const,
+					staffId: null,
+					notes: "OECB-tagged ED discharge — routed to PhilHealth outpatient billing",
+					occurredAt: dispositionNow,
+				})
+			}
+
 			return {
 				encounterId: input.encounterId,
 				disposition: input.disposition,
@@ -911,7 +1048,7 @@ export class EdService {
 		})
 
 		this.logger.log(
-			`ED Disposition: encounter ${input.encounterId} → ${input.disposition}${input.oecbEligible ? " (OECB tagged)" : ""}`
+			`ED Disposition: encounter ${input.encounterId} → ${input.disposition}${result.oecbEligible ? " (OECB → billing routed)" : ""}`
 		)
 		this.notificationService.broadcast(
 			"ed_queue",
@@ -920,5 +1057,285 @@ export class EdService {
 		)
 
 		return result
+	}
+
+	private async assertRequiredDeathReportsSubmitted(encounter: typeof encounters.$inferSelect) {
+		const [patient] = await db
+			.select({
+				sex: patients.sex,
+				dateOfBirth: patients.dateOfBirth,
+			})
+			.from(patients)
+			.where(eq(patients.id, encounter.patientId))
+			.limit(1)
+
+		if (!patient) {
+			throw new NotFoundException(`Patient ${encounter.patientId} not found`)
+		}
+
+		const requiredReportTypes = getRequiredDeathReportTypes(patient.sex, patient.dateOfBirth)
+		if (requiredReportTypes.length === 0) return
+
+		const reports = await db
+			.select({
+				reportType: deathReports.reportType,
+				status: deathReports.status,
+			})
+			.from(deathReports)
+			.where(
+				and(
+					eq(deathReports.encounterId, encounter.id),
+					inArray(deathReports.reportType, requiredReportTypes)
+				)
+			)
+
+		const submittedTypes = new Set(
+			reports
+				.filter(report => isSubmittedDeathReportStatus(report.status))
+				.map(report => report.reportType)
+		)
+		const missingTypes = requiredReportTypes.filter(type => !submittedTypes.has(type))
+
+		if (missingTypes.length > 0) {
+			throw new BadRequestException(
+				`${formatDeathReportLabels(missingTypes)} must be submitted before dispositioning a deceased patient.`
+			)
+		}
+	}
+
+	// ========================================================================
+	// Tele-Triage — Inbound Patient Management
+	// ========================================================================
+
+	private mapInboundRecord(row: {
+		id: string
+		facilityId: string
+		callerName: string
+		patientLocation: string
+		transportMode: "ambulance" | "private_vehicle" | "walk_in" | "motorcycle_ambulance"
+		channelType: "phone" | "video"
+		etaMinutes: number
+		etaAt: Date
+		provisionalAcuityLevel: number
+		acuityScale: "esi" | "ats" | "ctas"
+		assessmentNotes: string
+		resourceNeeds: unknown
+		status: "queued" | "arrived" | "cancelled"
+		arrivedAt: Date | null
+		preEncounterId: string | null
+		triageStaffId: string | null
+		createdAt: Date
+		updatedAt: Date
+	}) {
+		return {
+			...row,
+			resourceNeeds: this.mapResourceNeeds(row.resourceNeeds),
+		}
+	}
+
+	async createInboundTriage(input: CreateInboundTriageInput) {
+		const now = new Date()
+		const etaAt = new Date(now.getTime() + input.etaMinutes * 60_000)
+
+		const [record] = await db
+			.insert(inboundTriageRecords)
+			.values({
+				facilityId: input.facilityId,
+				callerName: input.callerName,
+				patientLocation: input.patientLocation,
+				transportMode: input.transportMode,
+				channelType: input.channelType,
+				etaMinutes: input.etaMinutes,
+				etaAt,
+				provisionalAcuityLevel: input.provisionalAcuityLevel,
+				acuityScale: input.acuityScale,
+				assessmentNotes: input.assessmentNotes ?? "",
+				resourceNeeds: input.resourceNeeds ?? { bed: false, codeTeam: false, equipment: [] },
+				status: "queued",
+				triageStaffId: input.triageStaffId,
+			})
+			.returning()
+
+		this.logger.log(`Created inbound triage record ${record!.id} — ETA ${input.etaMinutes}m`)
+		this.notificationService.broadcast(
+			"tele_triage",
+			`Inbound L${input.provisionalAcuityLevel} patient — ETA ${input.etaMinutes}m`,
+			`${input.callerName} · ${input.patientLocation} via ${input.transportMode}`
+		)
+
+		return this.mapInboundRecord(record!)
+	}
+
+	async listInboundTriage(input: InboundTriageListInput) {
+		const conditions = [eq(inboundTriageRecords.facilityId, input.facilityId)]
+		if (input.status) {
+			conditions.push(eq(inboundTriageRecords.status, input.status))
+		}
+
+		const rows = await db
+			.select()
+			.from(inboundTriageRecords)
+			.where(and(...conditions))
+			.orderBy(asc(inboundTriageRecords.etaAt))
+
+		return rows.map(r => this.mapInboundRecord(r))
+	}
+
+	async markInboundArrived(input: InboundTriageIdInput) {
+		let result: {
+			record: InboundArrivalRecord
+			preEncounterId: string
+		} | null = null
+
+		for (let attempt = 0; attempt < 3; attempt++) {
+			try {
+				result = await db.transaction(async tx => {
+					const now = new Date()
+					const record = await this.claimInboundArrival(tx, input.id, now)
+
+					const preEncounter = await this.createInboundPreEncounter(tx, record)
+
+					const [linked] = await tx
+						.update(inboundTriageRecords)
+						.set({
+							preEncounterId: preEncounter.id,
+							updatedAt: now,
+						})
+						.where(
+							and(
+								eq(inboundTriageRecords.id, input.id),
+								eq(inboundTriageRecords.status, "arrived"),
+								isNull(inboundTriageRecords.preEncounterId)
+							)
+						)
+						.returning({ id: inboundTriageRecords.id })
+
+					if (!linked) {
+						throw new BadRequestException("Inbound record is already linked to a pre-encounter")
+					}
+
+					return { record, preEncounterId: preEncounter.id }
+				})
+				break
+			} catch (err: unknown) {
+				if (this.isUniqueViolation(err) && attempt < 2) {
+					continue
+				}
+				throw err
+			}
+		}
+
+		if (!result) {
+			throw new Error("Failed to create a unique pre-encounter after 3 attempts")
+		}
+
+		this.logger.log(`Inbound triage ${input.id} arrived → pre-encounter ${result.preEncounterId}`)
+		this.notificationService.broadcast(
+			"ed_queue",
+			"Inbound patient arrived",
+			`${result.record.callerName} checked in — pre-encounter created`
+		)
+
+		return { id: input.id, preEncounterId: result.preEncounterId }
+	}
+
+	private async claimInboundArrival(tx: DBTransaction, id: string, now: Date) {
+		const [claimed] = await tx
+			.update(inboundTriageRecords)
+			.set({
+				status: "arrived",
+				arrivedAt: now,
+				updatedAt: now,
+			})
+			.where(
+				and(
+					eq(inboundTriageRecords.id, id),
+					eq(inboundTriageRecords.status, "queued"),
+					isNull(inboundTriageRecords.preEncounterId)
+				)
+			)
+			.returning()
+
+		if (claimed) {
+			if (!claimed.triageStaffId) {
+				throw new BadRequestException("Inbound record has no triage staff assigned")
+			}
+			return claimed
+		}
+
+		const [existing] = await tx
+			.select()
+			.from(inboundTriageRecords)
+			.where(eq(inboundTriageRecords.id, id))
+
+		if (!existing) {
+			throw new NotFoundException(`Inbound triage record ${id} not found`)
+		}
+
+		if (existing.preEncounterId) {
+			throw new BadRequestException("Inbound record is already linked to a pre-encounter")
+		}
+
+		throw new BadRequestException("Record is not in queued status")
+	}
+
+	private async createInboundPreEncounter(tx: DBTransaction, record: InboundArrivalRecord) {
+		const year = new Date().getFullYear()
+		const [countResult] = await tx
+			.select({ count: count() })
+			.from(preEncounters)
+			.where(
+				and(
+					eq(preEncounters.facilityId, record.facilityId),
+					like(preEncounters.traumaAlias, `TRAUMA-${year}-%`)
+				)
+			)
+
+		const seq = (countResult?.count ?? 0) + 1
+		const traumaAlias = `TRAUMA-${year}-${String(seq).padStart(4, "0")}`
+
+		const [created] = await tx
+			.insert(preEncounters)
+			.values({
+				facilityId: record.facilityId,
+				traumaAlias,
+				chiefComplaint: record.assessmentNotes || null,
+				triageAcuityScale: record.acuityScale,
+				triageAcuityLevel: record.provisionalAcuityLevel,
+				triageDatetime: new Date(),
+				triageStaffId: record.triageStaffId,
+				status: "active",
+			})
+			.returning()
+
+		return created!
+	}
+
+	private isUniqueViolation(err: unknown) {
+		return (err as { code?: string }).code === "23505"
+	}
+
+	async cancelInboundTriage(input: InboundTriageIdInput) {
+		const [record] = await db
+			.select()
+			.from(inboundTriageRecords)
+			.where(eq(inboundTriageRecords.id, input.id))
+
+		if (!record) {
+			throw new NotFoundException(`Inbound triage record ${input.id} not found`)
+		}
+
+		if (record.status !== "queued") {
+			throw new BadRequestException("Only queued records can be cancelled")
+		}
+
+		const [updated] = await db
+			.update(inboundTriageRecords)
+			.set({ status: "cancelled", updatedAt: new Date() })
+			.where(eq(inboundTriageRecords.id, input.id))
+			.returning()
+
+		this.logger.log(`Inbound triage record ${input.id} cancelled`)
+		return this.mapInboundRecord(updated!)
 	}
 }

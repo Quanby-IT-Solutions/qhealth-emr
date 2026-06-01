@@ -29,9 +29,20 @@ export function DocumentationTab({
 	const [mode, setMode] = useState<"timeline" | "template" | "editor">("timeline")
 	const [selectedTemplate, setSelectedTemplate] = useState<AuthoringTemplate | null>(null)
 	const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
+	const [editorBackMode, setEditorBackMode] = useState<"timeline" | "template">("template")
 
 	const notes = data?.data ?? []
 	const canCreateNote = !!facilityId && !!canWrite
+	const startFpe = () => {
+		setSelectedTemplate({
+			name: "FPE / Konsulta",
+			category: "fpe",
+			sections: [],
+			isFacilityTemplate: false,
+		})
+		setEditorBackMode("timeline")
+		setMode("editor")
+	}
 
 	if (mode === "template") {
 		return (
@@ -40,6 +51,7 @@ export function DocumentationTab({
 				onBack={() => setMode("timeline")}
 				onSelectTemplate={template => {
 					setSelectedTemplate(template)
+					setEditorBackMode("template")
 					setMode("editor")
 				}}
 			/>
@@ -53,10 +65,9 @@ export function DocumentationTab({
 					key={`fpe-${selectedTemplate.id ?? "default"}`}
 					encounterId={encounterId}
 					facilityId={facilityId}
-					patientId={patientId}
 					onBack={() => {
 						setSelectedTemplate(null)
-						setMode("template")
+						setMode(editorBackMode)
 					}}
 					onDone={() => {
 						setSelectedTemplate(null)
@@ -74,7 +85,7 @@ export function DocumentationTab({
 				template={selectedTemplate}
 				onBack={() => {
 					setSelectedTemplate(null)
-					setMode("template")
+					setMode(editorBackMode)
 				}}
 				onDone={() => {
 					setSelectedTemplate(null)
@@ -90,9 +101,14 @@ export function DocumentationTab({
 				<CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
 					<CardTitle>Clinical Notes</CardTitle>
 					{canCreateNote && (
-						<Button size="sm" onClick={() => setMode("template")}>
-							New Note
-						</Button>
+						<div className="flex flex-wrap items-center gap-2">
+							<Button size="sm" variant="outline" onClick={startFpe}>
+								New FPE
+							</Button>
+							<Button size="sm" onClick={() => setMode("template")}>
+								New Note
+							</Button>
+						</div>
 					)}
 				</CardHeader>
 				<CardContent className="p-0">

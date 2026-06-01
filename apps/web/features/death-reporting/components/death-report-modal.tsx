@@ -14,6 +14,7 @@ import {
 	DialogTitle,
 } from "@/core/components/ui/dialog"
 import {
+	isDeathReportSubmitted,
 	isMaternalDeathCandidate,
 	isNeonatalDeathCandidate,
 	useDeathReportStatusQuery,
@@ -49,8 +50,8 @@ export function DeathReportModal({
 	const needsFmdrf = isMaternalDeathCandidate(patientSex, patientDateOfBirth)
 	const needsFndrf = isNeonatalDeathCandidate(patientDateOfBirth)
 
-	const fmdrfDone = status?.hasFmdrf ?? false
-	const fndrfDone = status?.hasFndrf ?? false
+	const fmdrfDone = isDeathReportSubmitted(status?.fmdrfStatus)
+	const fndrfDone = isDeathReportSubmitted(status?.fndrfStatus)
 
 	const allDone = (!needsFmdrf || fmdrfDone) && (!needsFndrf || fndrfDone)
 
@@ -65,7 +66,13 @@ export function DeathReportModal({
 				<DialogHeader>
 					<div className="flex items-center gap-2">
 						<AlertTriangle className="text-destructive size-5" />
-						<DialogTitle>Death Reporting Required</DialogTitle>
+						<DialogTitle>
+							{needsFmdrf && !needsFndrf
+								? "Maternal Death Reporting Required"
+								: needsFndrf && !needsFmdrf
+									? "Neonatal Death Reporting Required"
+									: "Death Reporting Required"}
+						</DialogTitle>
 					</div>
 					<DialogDescription>
 						Discharge cannot be saved until the required death review form(s) are completed and
@@ -88,7 +95,7 @@ export function DeathReportModal({
 							</div>
 							{fmdrfDone ? (
 								<Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-									Completed
+									{status?.fmdrfStatus === "completed" ? "Completed" : "Submitted"}
 								</Badge>
 							) : (
 								<Button
@@ -102,7 +109,7 @@ export function DeathReportModal({
 										/>
 									}
 								>
-									Complete
+									Complete FMDRF
 								</Button>
 							)}
 						</div>
@@ -116,7 +123,7 @@ export function DeathReportModal({
 							</div>
 							{fndrfDone ? (
 								<Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-									Completed
+									{status?.fndrfStatus === "completed" ? "Completed" : "Submitted"}
 								</Badge>
 							) : (
 								<Button
@@ -130,7 +137,7 @@ export function DeathReportModal({
 										/>
 									}
 								>
-									Complete
+									Complete FNDRF
 								</Button>
 							)}
 						</div>

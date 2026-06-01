@@ -6,7 +6,7 @@ import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
 import { buildChartAccessActor } from "@/modules/v1/audit/chart-access.service"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { EncountersService } from "./encounters.service"
 
@@ -14,7 +14,11 @@ import { EncountersService } from "./encounters.service"
 export class EncountersController {
 	constructor(private readonly encountersService: EncountersService) {}
 
-	@RequirePermission("patients", "view")
+	@RequireAnyPermissions([
+		{ module: "patients", action: "view" },
+		{ module: "nutrition", action: "view" },
+		{ module: "nutrition", action: "edit" },
+	])
 	@Implement(v1.encounter.list)
 	async list(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.encounter.list).handler(async ({ input }) => {
@@ -22,7 +26,11 @@ export class EncountersController {
 		})
 	}
 
-	@RequirePermission("patients", "view")
+	@RequireAnyPermissions([
+		{ module: "patients", action: "view" },
+		{ module: "nutrition", action: "view" },
+		{ module: "nutrition", action: "edit" },
+	])
 	@Implement(v1.encounter.get)
 	async get(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.encounter.get).handler(async ({ input }) => {
@@ -47,11 +55,28 @@ export class EncountersController {
 	}
 
 	@RequirePermission("adt", "edit")
-	@Implement(v1.encounter.transfer)
-	async transfer(@Session() session: UserSession) {
-		return implement(v1.encounter.transfer).handler(async ({ input }) => {
+	@Implement(v1.encounter.initiateTransfer)
+	async initiateTransfer(@Session() session: UserSession) {
+		return implement(v1.encounter.initiateTransfer).handler(async ({ input }) => {
 			void session
-			return this.encountersService.transfer(input)
+			return this.encountersService.initiateTransfer(input)
+		})
+	}
+
+	@RequirePermission("nursing", "create")
+	@Implement(v1.encounter.receiveTransfer)
+	async receiveTransfer(@Session() session: UserSession) {
+		return implement(v1.encounter.receiveTransfer).handler(async ({ input }) => {
+			void session
+			return this.encountersService.receiveTransfer(input)
+		})
+	}
+
+	@RequirePermission("nursing", "view")
+	@Implement(v1.encounter.listPendingTransfers)
+	async listPendingTransfers() {
+		return implement(v1.encounter.listPendingTransfers).handler(async ({ input }) => {
+			return this.encountersService.listPendingTransfers(input)
 		})
 	}
 
@@ -72,7 +97,7 @@ export class EncountersController {
 		})
 	}
 
-	@RequirePermission("adt", "edit")
+	@RequirePermission("clinical_docs", "sign")
 	@Implement(v1.encounter.close)
 	async close(@Session() session: UserSession) {
 		return implement(v1.encounter.close).handler(async ({ input }) => {

@@ -19,11 +19,18 @@ export function LicenseExpiryBanner() {
 
 	const { data } = useListCliniciansQuery({ limit: 100 })
 
-	const expiringSoon = data?.data.filter(
-		c => c.daysUntilNextExpiry !== null && c.daysUntilNextExpiry <= 30
-	)
+	const expiringSoon =
+		data?.data.filter(
+			c =>
+				c.daysUntilNextExpiry !== null &&
+				c.daysUntilNextExpiry >= 0 &&
+				c.daysUntilNextExpiry <= 30
+		) ?? []
+	const expired =
+		data?.data.filter(c => c.daysUntilNextExpiry !== null && c.daysUntilNextExpiry < 0) ?? []
+	const totalAttention = expiringSoon.length + expired.length
 
-	if (dismissed || !expiringSoon || expiringSoon.length === 0) return null
+	if (dismissed || totalAttention === 0) return null
 
 	function dismiss() {
 		sessionStorage.setItem(SESSION_KEY, "1")
@@ -34,7 +41,17 @@ export function LicenseExpiryBanner() {
 		<Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 mb-4">
 			<AlertDescription className="flex items-center justify-between">
 				<span className="text-amber-800 dark:text-amber-300">
-					{expiringSoon.length} clinician license{expiringSoon.length > 1 ? "s" : ""} expiring within 30 days.{" "}
+					{expired.length > 0 && (
+						<>
+							{expired.length} clinician license{expired.length > 1 ? "s" : ""} expired
+							{expiringSoon.length > 0 ? "; " : ". "}
+						</>
+					)}
+					{expiringSoon.length > 0 && (
+						<>
+							{expiringSoon.length} clinician license{expiringSoon.length > 1 ? "s" : ""} expiring within 30 days.{" "}
+						</>
+					)}
 					<Link href="/admin/clinician-licenses" className="underline font-medium">
 						Review now
 					</Link>

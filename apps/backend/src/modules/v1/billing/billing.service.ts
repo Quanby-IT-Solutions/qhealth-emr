@@ -151,6 +151,7 @@ interface UnbilledEncountersInput {
 	page: number
 	limit: number
 	facilityId: string
+	oecbOnly?: boolean
 }
 
 interface GetSoaInput {
@@ -465,6 +466,7 @@ export class BillingService {
 						assignmentType: assignment.assignmentType,
 						status: assignment.status,
 					})) ?? [],
+				acceptedStatuses: ["finalized"],
 			})
 
 			return coverage.procedures.map(procedure => ({
@@ -506,7 +508,9 @@ export class BillingService {
 			)
 		}
 		if (missingPrimaryLabels.length > 0) {
-			failureMessages.push(`Missing primary RVS code for: ${missingPrimaryLabels.join(", ")}`)
+			failureMessages.push(
+				`Missing finalized primary RVS code for: ${missingPrimaryLabels.join(", ")}`
+			)
 		}
 
 		throw new BadRequestException(
@@ -937,7 +941,7 @@ export class BillingService {
 				throw new BadRequestException("HMO provider is required for HMO payments")
 			if (!input.hmoClaimNumber)
 				throw new BadRequestException("HMO claim number is required for HMO payments")
-			if (input.hmoPercentageCovered == null) {
+			if (input.hmoPercentageCovered === null || input.hmoPercentageCovered === undefined) {
 				throw new BadRequestException("HMO percentage covered is required for HMO payments")
 			}
 			if (input.hmoPercentageCovered < 0 || input.hmoPercentageCovered > 100) {
@@ -969,7 +973,9 @@ export class BillingService {
 				hmoProvider: input.hmoProvider ?? null,
 				hmoClaimNumber: input.hmoClaimNumber ?? null,
 				hmoPercentageCovered:
-					input.hmoPercentageCovered != null ? String(input.hmoPercentageCovered) : null,
+					input.hmoPercentageCovered !== null && input.hmoPercentageCovered !== undefined
+						? String(input.hmoPercentageCovered)
+						: null,
 				receivedByStaffId: staffProfileId,
 				paymentDate: input.paymentDate,
 				notes: input.notes ?? null,
@@ -1366,10 +1372,23 @@ export class BillingService {
 	// ========================================================================
 
 	async listUnbilledEncounters(input: UnbilledEncountersInput) {
-		const { page, limit, facilityId } = input
+		const { page, limit, facilityId, oecbOnly } = input
 		const offset = (page - 1) * limit
 
-		// Encounters that have charges but no invoice
+		const baseWhere = and(
+			eq(encounters.facilityId, facilityId),
+			isNull(invoices.id),
+			or(
+				sql`${charges.id} IS NOT NULL`,
+				and(eq(encounters.oecbEligible, true), eq(encounters.encounterType, "emergency"))
+			),
+			...(oecbOnly
+				? [eq(encounters.oecbEligible, true), eq(encounters.encounterType, "emergency")]
+				: []),
+		)
+
+		// Encounters that have charges but no invoice, plus OECB-routed ED discharges
+		// whose charges are still pending capture.
 		const result = await db
 			.select({
 				encounterId: encounters.id,
@@ -1377,15 +1396,16 @@ export class BillingService {
 				patientName: sql<string>`CONCAT(${patients.firstName}, ' ', ${patients.lastName})`,
 				mrn: patients.mrn,
 				encounterType: encounters.encounterType,
+				oecbEligible: encounters.oecbEligible,
 				admittedAt: encounters.admissionDatetime,
 				totalCharges: sql<number>`COALESCE(SUM(CAST(${charges.totalAmount} AS NUMERIC)), 0)`,
 				chargeCount: sql<number>`COUNT(${charges.id})::int`,
 			})
 			.from(encounters)
 			.innerJoin(patients, eq(patients.id, encounters.patientId))
-			.innerJoin(charges, eq(charges.encounterId, encounters.id))
+			.leftJoin(charges, eq(charges.encounterId, encounters.id))
 			.leftJoin(invoices, eq(invoices.encounterId, encounters.id))
-			.where(and(eq(encounters.facilityId, facilityId), isNull(invoices.id)))
+			.where(baseWhere)
 			.groupBy(encounters.id, patients.id)
 			.orderBy(desc(encounters.admissionDatetime))
 			.limit(limit)
@@ -1395,14 +1415,18 @@ export class BillingService {
 		const countResult = await db
 			.select({ total: sql<number>`COUNT(DISTINCT ${encounters.id})::int` })
 			.from(encounters)
-			.innerJoin(charges, eq(charges.encounterId, encounters.id))
+			.leftJoin(charges, eq(charges.encounterId, encounters.id))
 			.leftJoin(invoices, eq(invoices.encounterId, encounters.id))
-			.where(and(eq(encounters.facilityId, facilityId), isNull(invoices.id)))
+			.where(baseWhere)
 
 		const total = countResult[0]?.total ?? 0
 
 		return {
-			encounters: result,
+			encounters: result.map(row => ({
+				...row,
+				totalCharges: Number(row.totalCharges ?? 0),
+				chargeCount: Number(row.chargeCount ?? 0),
+			})),
 			total,
 			page,
 			limit,
@@ -1743,7 +1767,7 @@ export class BillingService {
 	// Malasakit Center
 	// ========================================================================
 
-	async getMalasakit(input: GetMalasakitInput) {
+	async getMalasakit(_input: GetMalasakitInput) {
 		// In production, query from malasakit_assistance table
 		// For now, return empty summary
 		return {
@@ -1947,7 +1971,9 @@ export class BillingService {
 		else if (input.type === "PWD") discountAmount = subtotal * 0.2
 		else if (input.type === "SOLO_PARENT") discountAmount = subtotal * 0.1
 		else if (input.type === "MANUAL") {
-			if (input.amount == null) throw new BadRequestException("Manual discount requires an amount")
+			if (input.amount === null || input.amount === undefined) {
+				throw new BadRequestException("Manual discount requires an amount")
+			}
 			if (input.amount > subtotal)
 				throw new BadRequestException("Discount cannot exceed invoice subtotal")
 			discountAmount = input.amount
@@ -2361,7 +2387,10 @@ ${procedures.map(proc => `    <Procedure>${esc(proc)}</Procedure>`).join("\n")}
 					memberPin: input.memberPin,
 					memberName: input.memberName ?? null,
 					status: input.status,
-					benefitBalance: input.benefitBalance != null ? String(input.benefitBalance) : null,
+					benefitBalance:
+						input.benefitBalance !== null && input.benefitBalance !== undefined
+							? String(input.benefitBalance)
+							: null,
 					dependentsJson: input.dependentsJson ?? null,
 					rawResponse: input.rawResponse ?? null,
 					capturedByStaffId: staffProfileId,
@@ -2433,7 +2462,7 @@ ${procedures.map(proc => `    <Procedure>${esc(proc)}</Procedure>`).join("\n")}
 	// Check CEWS (BIL-BE-07)
 	// ========================================================================
 
-	async checkCews(input: CheckCewsInput) {
+	async checkCews(_input: CheckCewsInput) {
 		// Stubbed real-time check
 		return {
 			status: "active" as const,

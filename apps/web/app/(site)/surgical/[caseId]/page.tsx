@@ -1,6 +1,7 @@
 "use client"
 
 import { use } from "react"
+import Link from "next/link"
 import { Loader2 } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -72,9 +73,6 @@ export default function SurgicalCaseDetailPage({
 	const canEditPreOp = isAnesthesiologist ? false : canEditSurgical
 	const canEditOperation = isAnesthesiologist ? false : canEditSurgical
 	const canSignOperation = isAnesthesiologist ? false : canSignSurgical
-	const canEditAnesthesia = isSurgeon ? false : canEditSurgical
-	const canSignAnesthesia = isSurgeon ? false : canSignSurgical
-
 	const activeStaffProfile =
 		profile?.staffProfiles?.find((sp: { roles?: { id: string }[] }) =>
 			sp.roles?.some((role: { id: string }) => role.id === profile.activeRole?.id)
@@ -88,6 +86,12 @@ export default function SurgicalCaseDetailPage({
 	const { data: preOpChecklist, isLoading: checklistLoading } = usePreOpChecklistQuery(caseId)
 
 	const isOperationRecordSigned = opRecord?.status === "signed"
+	const isAssignedAnesthesiologist =
+		isAnesthesiologist &&
+		!!surgicalCase?.anesthesiologistStaffId &&
+		surgicalCase.anesthesiologistStaffId === staffId
+	const canEditAnesthesia = isAssignedAnesthesiologist && canEditSurgical
+	const canSignAnesthesia = isAssignedAnesthesiologist && canSignSurgical
 
 	if (caseLoading) {
 		return (
@@ -110,9 +114,9 @@ export default function SurgicalCaseDetailPage({
 		<div className="space-y-4 p-6">
 			{/* Breadcrumb */}
 			<div className="text-muted-foreground flex items-center gap-1 text-xs">
-				<a href="/surgical" className="text-blue-600 hover:underline">
+				<Link href="/surgical" className="text-blue-600 hover:underline">
 					Surgical Services
-				</a>
+				</Link>
 				<span>›</span>
 				<span>Case #{surgicalCase.id.slice(-8).toUpperCase()}</span>
 			</div>

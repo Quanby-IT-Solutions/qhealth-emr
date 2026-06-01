@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { env } from "@/env"
 import { orpc } from "@/services/orpc/client"
 
 // ============================================================================
@@ -27,6 +28,43 @@ interface PreEncounterListParams {
 	status?: "active" | "merged" | "cancelled"
 	page?: number
 	limit?: number
+}
+
+type BackendErrorEnvelope = {
+	error?: {
+		message?: string | string[]
+	}
+}
+
+async function cancelPreEncounter(id: string) {
+	const response = await fetch(
+		`${env.NEXT_PUBLIC_API_BASE_URL}/v1/ed/pre-encounters/${id}/cancel`,
+		{
+			method: "POST",
+			credentials: "include",
+		}
+	)
+
+	if (!response.ok) {
+		let message = "Unable to remove trauma alias."
+
+		try {
+			const body = (await response.json()) as BackendErrorEnvelope
+			const rawMessage = body.error?.message
+
+			if (typeof rawMessage === "string") {
+				message = rawMessage
+			} else if (Array.isArray(rawMessage)) {
+				message = rawMessage.join("; ")
+			}
+		} catch {
+			// Keep the fallback message when the backend returns a non-JSON error.
+		}
+
+		throw new Error(message)
+	}
+
+	return response.json()
 }
 
 export function usePreEncounterListQuery(params: PreEncounterListParams) {
@@ -72,6 +110,15 @@ export function useUpdatePreEncounterMutation() {
 				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
 		})
 	)
+}
+
+export function useCancelPreEncounterMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation({
+		mutationFn: ({ id }: { id: string }) => cancelPreEncounter(id),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+	})
 }
 
 // ============================================================================
@@ -128,4 +175,52 @@ export function useEdDispositionMutation() {
 	)
 }
 
+// ============================================================================
+// Tele-Triage — Inbound Patient Management
+// ============================================================================
 
+export function useInboundTriageListQuery(
+	facilityId: string,
+	status?: "queued" | "arrived" | "cancelled"
+) {
+	return useQuery(
+		orpc.ed.listInboundTriage.queryOptions({
+			input: { facilityId, status },
+			enabled: !!facilityId,
+			refetchInterval: 30_000,
+		})
+	)
+}
+
+export function useCreateInboundTriageMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.ed.createInboundTriage.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+		})
+	)
+}
+
+export function useMarkInboundArrivedMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.ed.markInboundArrived.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+		})
+	)
+}
+
+export function useCancelInboundTriageMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.ed.cancelInboundTriage.mutationOptions({
+			onSuccess: () =>
+				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+		})
+	)
+}

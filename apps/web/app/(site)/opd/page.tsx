@@ -1,14 +1,21 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowRight, Calendar, Loader2, Search, User, X } from "lucide-react"
+import { ArrowRight, Calendar, Loader2, Search, User, UserRound, X } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { OpdFlow } from "@/features/opd/components/opd-flow"
+import {
+	canRoleActOnOpdStep,
+	getPatientActiveOpdStep,
+	OpdFlow,
+} from "@/features/opd/components/opd-flow"
 import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
+
+const OPD_PATIENTS_PAGE_SIZE = 50
 
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
@@ -37,6 +44,7 @@ function getActiveStaffProfile(
 interface SelectedPatient {
 	id: string
 	mrn: string
+	philhealthMemberId: string | null
 	firstName: string
 	lastName: string
 	dateOfBirth: string | null
@@ -46,14 +54,22 @@ export default function OpdPage() {
 	const permSet = usePermissionSet()
 	const { data: profile } = useMyProfile()
 	const activeStaffProfile = getActiveStaffProfile(profile)
+	const activeRoleName = profile?.activeRole?.name
 	const facilityId = activeStaffProfile?.facilityId ?? ""
 
 	const [search, setSearch] = useState("")
+	const [page, setPage] = useState(1)
 	const [selectedPatient, setSelectedPatient] = useState<SelectedPatient | null>(null)
+	const trimmedSearch = search.trim()
 
-	// Always fetch — show full list when empty, filtered results when searching
 	const searchQuery = usePatientSearchQuery(
-		{ facilityId, search: search.trim() || undefined, limit: 50 },
+		{
+			facilityId,
+			search: trimmedSearch || undefined,
+			isActive: true,
+			page,
+			limit: OPD_PATIENTS_PAGE_SIZE,
+		},
 		{ enabled: !!facilityId },
 	)
 
@@ -67,6 +83,32 @@ export default function OpdPage() {
 
 	if (selectedPatient) {
 		const patientName = `${selectedPatient.lastName}, ${selectedPatient.firstName}`
+		const activeStep = getPatientActiveOpdStep(selectedPatient.id)
+		const canOpenSelectedPatient = activeStep
+			? canRoleActOnOpdStep(permSet, activeRoleName, activeStep)
+			: false
+
+		if (!canOpenSelectedPatient) {
+			return (
+				<div className="flex h-full flex-col p-3 md:p-4">
+					<Card className="border-border/60 bg-card shadow-sm">
+						<CardHeader>
+							<CardTitle>OPD Patient Not Ready For Your Role</CardTitle>
+							<CardDescription>
+								This patient is currently waiting for {activeStep?.responsibleRole ?? "another role"}.
+							</CardDescription>
+						</CardHeader>
+						<CardContent>
+							<Button variant="outline" onClick={() => setSelectedPatient(null)}>
+								<X className="mr-1 size-3.5" />
+								Back to eligible patients
+							</Button>
+						</CardContent>
+					</Card>
+				</div>
+			)
+		}
+
 		return (
 			<div>
 				{/* Patient context bar */}
@@ -99,131 +141,169 @@ export default function OpdPage() {
 						Change Patient
 					</Button>
 				</div>
-				<OpdFlow patientId={selectedPatient.id} patientName={patientName} />
+				<OpdFlow
+					patientId={selectedPatient.id}
+					patientName={patientName}
+					patientMrn={selectedPatient.mrn}
+					patientPhilhealthMemberId={selectedPatient.philhealthMemberId}
+				/>
 			</div>
 		)
 	}
 
 	const patients = searchQuery.data?.data ?? []
+	const visiblePatients = patients
+		.map(patient => ({ patient, activeStep: getPatientActiveOpdStep(patient.id) }))
+		.filter(({ activeStep }) =>
+			activeStep ? canRoleActOnOpdStep(permSet, activeRoleName, activeStep) : false,
+		)
+	const totalPages = Math.max(searchQuery.data?.totalPages ?? 1, 1)
+	const currentPage = Math.min(page, totalPages)
 	const isLoading = searchQuery.isLoading
+	const isFetching = searchQuery.isFetching
+	const hasPreviousPage = currentPage > 1
+	const hasNextPage = currentPage < totalPages
+	const visiblePatientCount = visiblePatients.length
 
 	return (
-		<div className="flex h-full flex-col">
-			{/* Header */}
-			<div className="border-b px-6 py-4">
-				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-					<div>
-						<h1 className="text-xl font-semibold">OPD Consultation</h1>
-						<p className="text-sm text-muted-foreground">Select a patient to begin the consultation flow</p>
+		<div className="flex h-full flex-col p-3 md:p-4">
+			<Card className="border-border/60 bg-card shadow-sm">
+				<CardHeader className="border-border/60 border-b pb-3">
+					<div className="flex items-start gap-3">
+						<div className="bg-secondary/60 text-muted-foreground flex size-10 items-center justify-center rounded-xl">
+							<UserRound className="size-4" />
+						</div>
+						<div className="space-y-1">
+							<CardTitle className="tracking-tight">Patient List</CardTitle>
+							<CardDescription>
+								Select a patient to begin the OPD consultation flow.
+							</CardDescription>
+						</div>
 					</div>
-					<div className="relative w-full sm:w-80">
-						<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+				</CardHeader>
+
+				<CardContent className="space-y-3 pt-3">
+					<div className="relative">
+						<Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
 						<Input
-							className="pl-9"
-							placeholder="Search by name or MRN..."
+							placeholder="Filter by name or MRN..."
 							value={search}
-							onChange={e => setSearch(e.target.value)}
+							onChange={e => {
+								setSearch(e.target.value)
+								setPage(1)
+							}}
+							className="h-9 rounded-xl border-border/60 bg-background pl-9"
 							autoFocus
 						/>
-						{isLoading && (
+						{isFetching && (
 							<Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
 						)}
 					</div>
-				</div>
-			</div>
 
-			{/* Patient table */}
-			<div className="flex-1 overflow-auto">
-				{isLoading ? (
-					<div className="flex items-center justify-center py-20 text-muted-foreground">
-						<Loader2 className="mr-2 size-5 animate-spin" />
-						Loading patients...
-					</div>
-				) : patients.length === 0 ? (
-					<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-						<User className="mb-3 size-10 opacity-30" />
-						<p className="font-medium">No patients found</p>
-						{search && <p className="mt-1 text-sm">Try a different name or MRN</p>}
-					</div>
-				) : (
-					<table className="w-full text-sm">
-						<thead className="sticky top-0 bg-muted/60 backdrop-blur-sm">
-							<tr className="border-b">
-								<th className="px-6 py-3 text-left font-medium text-muted-foreground">Patient</th>
-								<th className="px-6 py-3 text-left font-medium text-muted-foreground">MRN</th>
-								<th className="px-6 py-3 text-left font-medium text-muted-foreground">Date of Birth</th>
-								<th className="px-6 py-3 text-left font-medium text-muted-foreground">Sex</th>
-								<th className="px-6 py-3 text-left font-medium text-muted-foreground">Status</th>
-								<th className="px-6 py-3 text-left font-medium text-muted-foreground">Last Visit</th>
-								<th className="px-4 py-3" />
-							</tr>
-						</thead>
-						<tbody className="divide-y">
-							{patients.map(p => (
-								<tr
-									key={p.id}
-									className="cursor-pointer transition-colors hover:bg-muted/40"
-									onClick={() =>
-										setSelectedPatient({
-											id: p.id,
-											mrn: p.mrn,
-											firstName: p.firstName,
-											lastName: p.lastName,
-											dateOfBirth: p.dateOfBirth ? String(p.dateOfBirth) : null,
-										})
-									}
-								>
-									<td className="px-6 py-3">
-										<div className="flex items-center gap-3">
-											<div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
-												<User className="size-4 text-muted-foreground" />
+					{isLoading ? (
+						<div className="border-border/60 bg-secondary/40 text-muted-foreground rounded-2xl border border-dashed px-6 py-10 text-center text-sm">
+							Loading patients...
+						</div>
+					) : patients.length === 0 ? (
+						<div className="border-border/60 bg-secondary/40 text-muted-foreground rounded-2xl border border-dashed px-6 py-10 text-center text-sm">
+							{trimmedSearch ? `No patients match "${search}".` : "No active patients found."}
+						</div>
+					) : visiblePatientCount === 0 ? (
+						<div className="border-border/60 bg-secondary/40 text-muted-foreground rounded-2xl border border-dashed px-6 py-10 text-center text-sm">
+							No OPD patients are waiting for your role on this page.
+						</div>
+					) : (
+						<>
+							<p className="text-xs text-muted-foreground px-0.5">
+								Showing {visiblePatientCount} {visiblePatientCount === 1 ? "patient" : "patients"} waiting for your role
+								{trimmedSearch && ` matching "${search}"`}
+								{isFetching && " · Updating..."}
+							</p>
+
+							<div className="border-border/60 bg-background overflow-hidden rounded-2xl border divide-y divide-border/60">
+								{visiblePatients.map(({ patient: p, activeStep }) => (
+									<div
+										key={p.id}
+										className="hover:bg-secondary/30 flex flex-col gap-2 px-4 py-2.5 transition-colors md:flex-row md:items-center md:justify-between"
+									>
+										<div className="min-w-0 space-y-1.5">
+											<div className="flex flex-wrap items-center gap-2">
+												<span className="text-foreground text-sm font-semibold tracking-tight">
+													{p.firstName} {p.lastName}
+												</span>
+												<Badge
+													variant="secondary"
+													className="border-border/60 bg-secondary/60 text-foreground rounded-full border px-2 py-0.5 font-mono text-[0.68rem] tracking-[0.14em]"
+												>
+													{p.mrn}
+												</Badge>
+												<Badge
+													variant={p.isActive ? "default" : "secondary"}
+													className="rounded-full px-2 py-0.5 text-[0.68rem]"
+												>
+													{p.isActive ? "Active" : "Inactive"}
+												</Badge>
+												{activeStep ? (
+													<Badge variant="outline" className="rounded-full px-2 py-0.5 text-[0.68rem]">
+														Next: {activeStep.label}
+													</Badge>
+												) : null}
 											</div>
-											<span className="font-medium">
-												{p.lastName}, {p.firstName}
-												{p.middleName ? ` ${p.middleName[0]}.` : ""}
-											</span>
+											<p className="text-muted-foreground text-xs">
+												{p.dateOfBirth ? `DOB ${new Date(String(p.dateOfBirth)).toLocaleDateString()}` : "DOB —"}
+												{p.lastEncounterDate
+													? ` · Last encounter ${new Date(String(p.lastEncounterDate)).toLocaleDateString()}`
+													: ""}
+											</p>
 										</div>
-									</td>
-									<td className="px-6 py-3 font-mono text-muted-foreground">{p.mrn}</td>
-									<td className="px-6 py-3 text-muted-foreground">
-										{p.dateOfBirth
-											? new Date(String(p.dateOfBirth)).toLocaleDateString()
-											: "—"}
-									</td>
-									<td className="px-6 py-3 capitalize text-muted-foreground">{p.sex ?? "—"}</td>
-									<td className="px-6 py-3">
-										<Badge
-											variant={p.isActive ? "default" : "secondary"}
-											className="text-xs"
-										>
-											{p.isActive ? "Active" : "Inactive"}
-										</Badge>
-									</td>
-									<td className="px-6 py-3 text-muted-foreground">
-										{p.lastEncounterDate
-											? new Date(String(p.lastEncounterDate)).toLocaleDateString()
-											: "—"}
-									</td>
-									<td className="px-4 py-3 text-right">
-										<Button size="sm" variant="ghost" className="gap-1.5 text-primary hover:text-primary">
-											Start Consultation
-											<ArrowRight className="size-3.5" />
-										</Button>
-									</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				)}
-			</div>
 
-			{/* Footer count */}
-			{!isLoading && patients.length > 0 && (
-				<div className="border-t px-6 py-2 text-xs text-muted-foreground">
-					{patients.length} patient{patients.length !== 1 ? "s" : ""}
-					{search ? ` matching "${search}"` : " in facility"}
-				</div>
-			)}
+										<Button
+											variant="ghost"
+											size="sm"
+											className="shrink-0 justify-between gap-2"
+											onClick={() =>
+												setSelectedPatient({
+													id: p.id,
+													mrn: p.mrn,
+													philhealthMemberId: p.philhealthMemberId,
+													firstName: p.firstName,
+													lastName: p.lastName,
+													dateOfBirth: p.dateOfBirth ? String(p.dateOfBirth) : null,
+												})
+											}
+										>
+											Start consultation
+											<ArrowRight className="size-4" />
+										</Button>
+									</div>
+								))}
+							</div>
+
+							<div className="flex items-center justify-between gap-3 px-0.5">
+								<p className="text-xs text-muted-foreground">Page {currentPage} of {totalPages}</p>
+								<div className="flex items-center gap-2">
+									<Button
+										variant="outline"
+										size="sm"
+										disabled={!hasPreviousPage}
+										onClick={() => setPage(prev => Math.max(1, prev - 1))}
+									>
+										Previous
+									</Button>
+									<Button
+										variant="outline"
+										size="sm"
+										disabled={!hasNextPage}
+										onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+									>
+										Next
+									</Button>
+								</div>
+							</div>
+						</>
+					)}
+				</CardContent>
+			</Card>
 		</div>
 	)
 }

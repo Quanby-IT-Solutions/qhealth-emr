@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { RvsCodeSelector } from "./rvs-code-selector"
@@ -87,16 +87,24 @@ describe("RvsCodeSelector", () => {
 		})
 
 		fireEvent.click(await screen.findByRole("button", { name: /suggest/i }))
+		fireEvent.click(screen.getByRole("button", { name: /add/i }))
 
-		expect(suggestMutate).toHaveBeenCalledWith({
-			caseId: "case-1",
-			rvsCodeId: "rvs-uuid-1",
-			procedureLabel: "Laparoscopic cholecystectomy",
-			assignmentType: "primary",
-		})
+		expect(suggestMutate).toHaveBeenCalledWith(
+			{
+				caseId: "case-1",
+				rvsCodeId: "rvs-uuid-1",
+				procedureLabel: "Laparoscopic cholecystectomy",
+				assignmentType: "primary",
+				modifier: undefined,
+				units: 1,
+			},
+			expect.objectContaining({
+				onSuccess: expect.any(Function),
+			})
+		)
 	})
 
-	it("disables mutating actions until the operation record is signed", async () => {
+	it("disables billing status actions until the operation record is signed", async () => {
 		mockUseRvsAssignmentsQuery.mockReturnValue({
 			data: [
 				{
@@ -133,19 +141,68 @@ describe("RvsCodeSelector", () => {
 			/>
 		)
 
-		expect(screen.getByText(/sign the operative record first/i)).toBeInTheDocument()
+		expect(screen.getByText(/sign the operative record before mapping/i)).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: /validate/i })).toBeDisabled()
-		expect(screen.getByRole("button", { name: /remove 47562/i })).toBeDisabled()
+		expect(screen.queryByRole("button", { name: /remove 47562/i })).not.toBeInTheDocument()
+	})
 
-		fireEvent.change(screen.getByLabelText(/search rvs\/cpt codes/i), {
-			target: { value: "47" },
-		})
-		await act(async () => {
-			await new Promise(resolve => setTimeout(resolve, 350))
+	it("allows removing only suggested mappings after the operation record is signed", () => {
+		mockUseRvsAssignmentsQuery.mockReturnValue({
+			data: [
+				{
+					id: "assignment-1",
+					surgicalCaseId: "case-1",
+					rvsCodeId: "rvs-uuid-1",
+					procedureLabel: "Laparoscopic cholecystectomy",
+					code: "47562",
+					description: "Laparoscopic cholecystectomy",
+					assignmentType: "primary",
+					status: "suggested",
+					suggestedByName: "Dr. Smith",
+					validatedByName: null,
+					finalizedByName: null,
+					suggestedAt: "2026-05-05T00:00:00.000Z",
+					validatedAt: null,
+					finalizedAt: null,
+					modifier: null,
+					units: 1,
+					createdAt: "2026-05-05T00:00:00.000Z",
+				},
+				{
+					id: "assignment-2",
+					surgicalCaseId: "case-1",
+					rvsCodeId: "rvs-uuid-2",
+					procedureLabel: "Laparoscopic cholecystectomy",
+					code: "47563",
+					description: "Laparoscopic cholecystectomy with cholangiography",
+					assignmentType: "adjunct",
+					status: "validated",
+					suggestedByName: "Dr. Smith",
+					validatedByName: "Billing",
+					finalizedByName: null,
+					suggestedAt: "2026-05-05T00:00:00.000Z",
+					validatedAt: "2026-05-05T01:00:00.000Z",
+					finalizedAt: null,
+					modifier: null,
+					units: 1,
+					createdAt: "2026-05-05T00:00:00.000Z",
+				},
+			],
+			isLoading: false,
 		})
 
-		await waitFor(() => {
-			expect(screen.getByRole("button", { name: /suggest/i })).toBeDisabled()
-		})
+		render(
+			<RvsCodeSelector
+				caseId="case-1"
+				operationRecord={{ procedurePerformed: "Laparoscopic cholecystectomy" }}
+				canEdit
+				canValidate
+				canFinalize
+				isOperationRecordSigned
+			/>
+		)
+
+		expect(screen.getByRole("button", { name: /remove 47562/i })).toBeEnabled()
+		expect(screen.queryByRole("button", { name: /remove 47563/i })).not.toBeInTheDocument()
 	})
 })

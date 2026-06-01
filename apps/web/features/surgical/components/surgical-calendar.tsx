@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Calendar, ChevronLeft, ChevronRight, Plus } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -28,7 +29,10 @@ function addDays(date: Date, days: number): Date {
 }
 
 function toIsoDate(date: Date): string {
-	return date.toISOString().split("T")[0]!
+	const year = date.getFullYear()
+	const month = String(date.getMonth() + 1).padStart(2, "0")
+	const day = String(date.getDate()).padStart(2, "0")
+	return `${year}-${month}-${day}`
 }
 
 function formatWeekRange(start: Date): string {
@@ -88,6 +92,7 @@ export function SurgicalCalendar({
 	const {
 		data: slots = [],
 		isLoading,
+		isError,
 		refetch,
 	} = useOrSlotsQuery({
 		facilityId,
@@ -97,16 +102,33 @@ export function SurgicalCalendar({
 	})
 
 	const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+	const visibleSuites = readOnly
+		? OR_SUITES.filter(suite => slots.some(slot => slot.orSuite === suite))
+		: OR_SUITES
 
-	function isSlotOccupied(day: Date, suite: string, timeSlot: string): OrSlot | undefined {
+	function getSlotState(
+		day: Date,
+		suite: string,
+		timeSlot: string
+	): { slot: OrSlot; isStart: boolean; isContinuation: boolean } | null {
 		const dayStr = toIsoDate(day)
 		const slotHour = parseInt(timeSlot.split(":")[0]!)
-		return slots.find(s => {
+		const slot = slots.find(s => {
 			if (s.date !== dayStr || s.orSuite !== suite) return false
 			const startHour = parseInt(s.startTime.split(":")[0]!)
-			const endHour = parseInt(s.endTime.split(":")[0]!)
+			const parsedEndHour = parseInt(s.endTime.split(":")[0]!)
+			const endHour = parsedEndHour > startHour ? parsedEndHour : startHour + 2
 			return slotHour >= startHour && slotHour < endHour
 		})
+
+		if (!slot) return null
+
+		const startHour = parseInt(slot.startTime.split(":")[0]!)
+		return {
+			slot,
+			isStart: slotHour === startHour,
+			isContinuation: slotHour > startHour,
+		}
 	}
 
 	function openBooking(day: Date, suite: string, timeSlot: string) {
@@ -119,6 +141,8 @@ export function SurgicalCalendar({
 	}
 
 	const bookedCount = slots.filter(s => !!s.surgicalCaseId).length
+	const openSlotCount = visibleSuites.length * weekDays.length * TIME_SLOTS.length - bookedCount
+	const summaryLabel = readOnly ? `${bookedCount} assigned this week` : `${bookedCount} booked this week`
 
 	return (
 		<>
@@ -127,11 +151,14 @@ export function SurgicalCalendar({
 					<div>
 						<h1 className="text-2xl font-semibold">OR Schedule</h1>
 						<p className="text-muted-foreground text-sm">
-							Operating room slot management — click an empty cell to book a case
+							{readOnly
+								? "Read-only operating room schedule for your assigned cases"
+								: "Operating room slot management - click an open cell to book a case"}
 						</p>
 					</div>
 					<div className="flex items-center gap-2">
-						<Badge variant="secondary">{bookedCount} booked this week</Badge>
+						<Badge variant="secondary">{summaryLabel}</Badge>
+						{!readOnly && <Badge variant="outline">{openSlotCount} open slots</Badge>}
 						{readOnly && <Badge variant="outline">Read Only</Badge>}
 						<Button variant="outline" size="sm" nativeButton={false} render={<a href={backHref} />}>
 							← {backLabel}
@@ -177,19 +204,50 @@ export function SurgicalCalendar({
 							<div className="text-muted-foreground py-12 text-center text-sm">
 								Loading schedule…
 							</div>
+						) : isError ? (
+							<div className="text-destructive py-12 text-center text-sm">
+								Unable to load the OR schedule. Please try again.
+							</div>
+						) : readOnly && slots.length === 0 ? (
+							<div className="space-y-3 px-4 py-12 text-center">
+								<p className="text-sm font-medium">No assigned OR cases this week</p>
+								<p className="text-muted-foreground text-xs">
+									Scheduler-booked cases assigned to you will appear in this read-only calendar.
+								</p>
+							</div>
 						) : (
-							<table className="w-full border-collapse text-sm">
+							<table className="w-full min-w-[1040px] border-collapse text-sm">
 								<thead>
 									<tr>
-										<th className="bg-muted/50 w-16 border-r border-b px-3 py-2 text-left font-medium">
+										<th className="bg-muted/50 w-20 border-r border-b px-3 py-2 text-left align-bottom font-medium">
 											Time
 										</th>
-										{OR_SUITES.map(suite => (
+										{visibleSuites.map(suite => (
 											<th
 												key={suite}
-												className="bg-muted/50 border-r border-b px-3 py-2 text-center font-medium"
+												className="bg-muted/50 border-r border-b p-0 text-center font-medium"
 											>
-												{suite}
+												<div className="border-b px-3 py-2">{suite}</div>
+												<div className="text-muted-foreground grid grid-cols-7 text-[11px] font-normal">
+													{weekDays.map(day => {
+														const isToday = toIsoDate(day) === toIsoDate(new Date())
+
+														return (
+															<div
+																key={`${suite}-${toIsoDate(day)}`}
+																className={`border-r px-2 py-1 last:border-r-0 ${isToday ? "bg-primary/10 text-primary font-medium" : ""}`}
+															>
+																<div>{day.toLocaleDateString("en-PH", { weekday: "short" })}</div>
+																<div>
+																	{day.toLocaleDateString("en-PH", {
+																		month: "short",
+																		day: "numeric",
+																	})}
+																</div>
+															</div>
+														)
+													})}
+												</div>
 											</th>
 										))}
 									</tr>
@@ -200,43 +258,52 @@ export function SurgicalCalendar({
 											<td className="bg-muted/30 text-muted-foreground w-16 border-r px-3 py-2 text-xs font-medium">
 												{timeSlot}
 											</td>
-											{OR_SUITES.map(suite => {
+											{visibleSuites.map(suite => {
 												const today = toIsoDate(new Date())
-												const todayOccupied = weekDays.map(day => {
-													const occupied = isSlotOccupied(day, suite, timeSlot)
+												const todaySlots = weekDays.map(day => {
+													const slotState = getSlotState(day, suite, timeSlot)
 													const isToday = toIsoDate(day) === today
-													return { day, occupied, isToday }
+													return { day, slotState, isToday }
 												})
 
 												return (
 													<td key={suite} className="border-r p-0">
 														<div className="grid grid-cols-7">
-															{todayOccupied.map(({ day, occupied, isToday }, di) => (
+															{todaySlots.map(({ day, slotState, isToday }, di) => (
 																<div
 																	key={di}
 																	className={`min-h-[40px] border-r p-1 last:border-r-0 ${isToday ? "bg-primary/5" : ""}`}
 																>
-																	{occupied ? (
-																		<div className="bg-primary/10 border-primary/30 h-full rounded border p-1 text-xs">
+																	{slotState?.isStart ? (
+																		<Link
+																			href={`/surgical/${slotState.slot.surgicalCaseId ?? slotState.slot.id}`}
+																			className="bg-primary/10 border-primary/30 hover:bg-primary/15 block h-full rounded border p-1.5 text-xs transition-colors"
+																		>
+																			<Badge
+																				variant="secondary"
+																				className="mb-1 h-4 px-1 text-[10px]"
+																			>
+																				Booked
+																			</Badge>
 																			<p className="text-primary truncate font-semibold">
-																				{occupied.procedureName}
+																				{slotState.slot.procedureName}
 																			</p>
-																			{occupied.surgeonName && (
+																			{slotState.slot.surgeonName && (
 																				<p className="text-muted-foreground truncate">
-																					{occupied.surgeonName}
+																					{slotState.slot.surgeonName}
 																				</p>
 																			)}
-																		</div>
+																		</Link>
+																	) : slotState?.isContinuation && !readOnly ? (
+																		<div className="bg-primary/5 border-primary/20 h-full min-h-[38px] rounded border border-dashed" />
 																	) : (
 																		<div className="flex h-full min-h-[38px] items-center justify-center">
 																			{readOnly ? (
-																				<span className="text-muted-foreground/30 text-xs">
-																					Open
-																				</span>
+																				<span className="sr-only">No assigned case</span>
 																			) : (
 																				<button
 																					onClick={() => openBooking(day, suite, timeSlot)}
-																					className="text-muted-foreground/40 hover:bg-primary/5 hover:text-primary/60 flex h-full min-h-[38px] w-full items-center justify-center rounded transition-colors"
+																					className="text-muted-foreground/50 hover:bg-primary/5 hover:text-primary hover:border-primary/30 flex h-full min-h-[38px] w-full items-center justify-center rounded border border-dashed border-transparent transition-colors"
 																					title={`Book case in ${suite} on ${toIsoDate(day)} at ${timeSlot}`}
 																				>
 																					<Plus className="size-3" />

@@ -2,14 +2,58 @@
 
 import { useState } from "react"
 
+import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, Pencil, Plus, Search, Shield, Trash2 } from "lucide-react"
+
+import { Badge } from "@/core/components/ui/badge"
+import { Button } from "@/core/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import { Checkbox } from "@/core/components/ui/checkbox"
+import { Input } from "@/core/components/ui/input"
+import { Label } from "@/core/components/ui/label"
 import {
-	useDrugGenericsQuery,
-	useFormularyItemsQuery,
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
+import { Separator } from "@/core/components/ui/separator"
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/core/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
+import { Textarea } from "@/core/components/ui/textarea"
+
+import {
 	useCreateFormularyItemMutation,
 	useDeleteFormularyItemMutation,
-	useUpdateFormularyItemMutation,
+	useDrugGenericsQuery,
+	useFormularyItemsQuery,
 	useUpdateFormularyClinicalPolicyMutation,
+	useUpdateFormularyItemMutation,
 } from "@/features/formulary/api/formulary.hooks"
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface FormularyItemRow {
+	id: string
+	genericName: string
+	doseForm: string
+	strength: string
+	route: string
+	isActive: boolean
+	isHighAlert: boolean
+	highAlertNotes: string | null
+	isRestricted: boolean
+	restrictionNotes: string | null
+	formularyNotes: string | null
+}
 
 interface FormularyManagerProps {
 	facilityId: string
@@ -22,10 +66,19 @@ interface FormularyManagerProps {
 	canEditFlags?: boolean
 }
 
-export function FormularyManager({ facilityId, canEdit = false, canDelete = false, canEditFlags = false }: FormularyManagerProps) {
+// ============================================================================
+// Main component
+// ============================================================================
+
+export function FormularyManager({
+	facilityId,
+	canEdit = false,
+	canDelete = false,
+	canEditFlags = false,
+}: FormularyManagerProps) {
 	const [search, setSearch] = useState("")
 	const [page, setPage] = useState(1)
-	const [showAddForm, setShowAddForm] = useState(false)
+	const [sheetMode, setSheetMode] = useState<"add" | "edit" | null>(null)
 	const [editingItem, setEditingItem] = useState<FormularyItemRow | null>(null)
 
 	const { data: itemsData, isLoading } = useFormularyItemsQuery({
@@ -43,170 +96,218 @@ export function FormularyManager({ facilityId, canEdit = false, canDelete = fals
 		totalPages: 0,
 	}
 
+	function openAdd() {
+		setEditingItem(null)
+		setSheetMode("add")
+	}
+
+	function openEdit(item: FormularyItemRow) {
+		setEditingItem(item)
+		setSheetMode("edit")
+	}
+
+	function closeSheet() {
+		setSheetMode(null)
+		setEditingItem(null)
+	}
+
 	return (
-		<>
 		<div className="space-y-4">
-			<div className="flex items-center justify-between gap-4">
-				<input
-					type="text"
-					placeholder="Search formulary items..."
-					value={search}
-					onChange={e => {
-						setSearch(e.target.value)
-						setPage(1)
-					}}
-					className="border-input bg-background ring-offset-background flex h-10 w-full max-w-sm rounded-md border px-3 py-2 text-sm"
-				/>
+			{/* Toolbar */}
+			<div className="flex flex-wrap items-center gap-3">
+				<div className="relative min-w-60 flex-1">
+					<Search className="text-muted-foreground absolute left-2.5 top-2.5 size-4" />
+					<Input
+						placeholder="Search formulary items..."
+						className="pl-9"
+						value={search}
+						onChange={(e) => {
+							setSearch(e.target.value)
+							setPage(1)
+						}}
+					/>
+				</div>
 				{canEdit && (
-					<button
-						onClick={() => setShowAddForm(!showAddForm)}
-						className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium"
-					>
-						{showAddForm ? "Cancel" : "Add to Formulary"}
-					</button>
+					<Button onClick={openAdd}>
+						<Plus className="mr-1.5 size-4" />
+						Add to Formulary
+					</Button>
 				)}
 			</div>
 
-			{showAddForm && (
-				<AddFormularyItemForm
-					facilityId={facilityId}
-					canEditFlags={canEditFlags}
-					onSuccess={() => setShowAddForm(false)}
-				/>
-			)}
-
-			{isLoading ? (
-				<p className="text-muted-foreground">Loading formulary items...</p>
-			) : items.data.length === 0 ? (
-				<p className="text-muted-foreground">No formulary items found.</p>
-			) : (
-				<div className="rounded-md border">
-					<table className="w-full text-sm">
-						<thead>
-							<tr className="border-b">
-								<th className="p-3 text-left font-medium">Drug</th>
-								<th className="p-3 text-left font-medium">Dose Form</th>
-								<th className="p-3 text-left font-medium">Strength</th>
-								<th className="p-3 text-left font-medium">Route</th>
-								<th className="p-3 text-left font-medium">Status</th>
-								<th className="p-3 text-left font-medium">Flags</th>
-								<th className="p-3 text-left font-medium">Actions</th>
-							</tr>
-						</thead>
-						<tbody>
-							{items.data.map((item: FormularyItemRow) => (
-								<tr key={item.id} className="border-b">
-									<td className="p-3">{item.genericName}</td>
-									<td className="p-3">{item.doseForm}</td>
-									<td className="p-3">{item.strength}</td>
-									<td className="p-3">{item.route}</td>
-									<td className="p-3">
-										<span
-											className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-												item.isActive
-													? "bg-green-100 text-green-700"
-													: "bg-gray-100 text-gray-700"
-											}`}
-										>
-											{item.isActive ? "Active" : "Inactive"}
-										</span>
-									</td>
-									<td className="p-3 space-x-1">
-										{item.isHighAlert && (
-											<span className="inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">
-												High Alert
-											</span>
-										)}
-										{item.isRestricted && (
-											<span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700">
-												Restricted
-											</span>
-										)}
-									</td>
-									<td className="p-3 flex gap-2">
-										{canEdit && (
-											<button
-												onClick={() => setEditingItem(item)}
-												className="text-primary hover:underline text-sm"
+			{/* Table */}
+			<Card>
+				<CardHeader className="pb-2">
+					<CardTitle className="text-base">Drug Formulary</CardTitle>
+				</CardHeader>
+				<CardContent>
+					{isLoading ? (
+						<div className="flex items-center justify-center py-16">
+							<Loader2 className="text-muted-foreground size-6 animate-spin" />
+						</div>
+					) : items.data.length === 0 ? (
+						<div className="text-muted-foreground flex flex-col items-center py-16 text-center">
+							<Shield className="mb-3 size-10" />
+							<p className="font-medium">No formulary items found</p>
+						</div>
+					) : (
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>Drug</TableHead>
+									<TableHead>Dose Form</TableHead>
+									<TableHead>Strength</TableHead>
+									<TableHead>Route</TableHead>
+									<TableHead>Status</TableHead>
+									<TableHead>Flags</TableHead>
+									{(canEdit || canDelete) && <TableHead />}
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{items.data.map((item) => (
+									<TableRow
+										key={item.id}
+										className="cursor-pointer hover:bg-muted/50"
+										onClick={() => canEdit && openEdit(item)}
+									>
+										<TableCell className="font-medium">{item.genericName}</TableCell>
+										<TableCell className="text-sm">{item.doseForm}</TableCell>
+										<TableCell className="text-sm">{item.strength}</TableCell>
+										<TableCell className="text-sm">{item.route}</TableCell>
+										<TableCell>
+											<Badge
+												className={
+													item.isActive
+														? "bg-green-600 text-white"
+														: "bg-muted text-muted-foreground"
+												}
 											>
-												Edit
-											</button>
+												{item.isActive ? "Active" : "Inactive"}
+											</Badge>
+										</TableCell>
+										<TableCell className="space-x-1">
+											{item.isHighAlert && (
+												<Badge variant="destructive" className="text-xs">
+													<AlertTriangle className="mr-1 size-3" />
+													High Alert
+												</Badge>
+											)}
+											{item.isRestricted && (
+												<Badge
+													variant="secondary"
+													className="border-amber-400 text-xs text-amber-700"
+												>
+													Restricted
+												</Badge>
+											)}
+										</TableCell>
+										{(canEdit || canDelete) && (
+											<TableCell>
+												<div className="flex gap-1">
+													{canEdit && (
+														<Tooltip>
+															<TooltipTrigger
+																className="focus-visible:ring-ring/50 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md p-0 text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1"
+																aria-label="Edit"
+																onClick={(e) => {
+																	e.stopPropagation()
+																	openEdit(item)
+																}}
+															>
+																<Pencil className="size-4" />
+															</TooltipTrigger>
+															<TooltipContent>Edit</TooltipContent>
+														</Tooltip>
+													)}
+													{canDelete && (
+														<Tooltip>
+															<TooltipTrigger
+																className="focus-visible:ring-ring/50 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md p-0 text-sm text-destructive transition-colors hover:bg-accent hover:text-destructive focus-visible:outline-none focus-visible:ring-1"
+																aria-label="Remove"
+																disabled={deleteMutation.isPending}
+																onClick={(e) => {
+																	e.stopPropagation()
+																	deleteMutation.mutate({ id: item.id })
+																}}
+															>
+																<Trash2 className="size-4" />
+															</TooltipTrigger>
+															<TooltipContent>Remove</TooltipContent>
+														</Tooltip>
+													)}
+												</div>
+											</TableCell>
 										)}
-										{canDelete && (
-											<button
-												onClick={() => deleteMutation.mutate({ id: item.id })}
-												disabled={deleteMutation.isPending}
-												className="text-destructive hover:underline text-sm"
-											>
-												Remove
-											</button>
-										)}
-									</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-			)}
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					)}
 
-			{items.totalPages > 1 && (
-				<div className="flex items-center justify-center gap-2">
-					<button
-						onClick={() => setPage(p => Math.max(1, p - 1))}
-						disabled={page === 1}
-						className="border-input bg-background hover:bg-accent inline-flex h-8 items-center rounded-md border px-3 text-sm disabled:opacity-50"
-					>
-						Previous
-					</button>
-					<span className="text-muted-foreground text-sm">
-						Page {page} of {items.totalPages}
-					</span>
-					<button
-						onClick={() => setPage(p => Math.min(items.totalPages, p + 1))}
-						disabled={page === items.totalPages}
-						className="border-input bg-background hover:bg-accent inline-flex h-8 items-center rounded-md border px-3 text-sm disabled:opacity-50"
-					>
-						Next
-					</button>
-				</div>
-			)}
+					{/* Pagination */}
+					{items.totalPages > 1 && (
+						<div className="mt-4 flex items-center justify-center gap-2">
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => setPage((p) => Math.max(1, p - 1))}
+								disabled={page === 1}
+							>
+								<ChevronLeft className="size-4" />
+								Previous
+							</Button>
+							<span className="text-muted-foreground text-sm">
+								Page {page} of {items.totalPages}
+							</span>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => setPage((p) => Math.min(items.totalPages, p + 1))}
+								disabled={page === items.totalPages}
+							>
+								Next
+								<ChevronRight className="size-4" />
+							</Button>
+						</div>
+					)}
+				</CardContent>
+			</Card>
+
+			{/* Add / Edit Modal */}
+			<Dialog open={sheetMode !== null} onOpenChange={(open) => !open && closeSheet()}>
+				<DialogContent size="lg" className="max-h-[90vh] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>
+							{sheetMode === "add"
+								? "Add Drug to Formulary"
+								: `Edit — ${editingItem?.genericName}`}
+						</DialogTitle>
+					</DialogHeader>
+					{sheetMode === "add" && (
+						<AddFormularyItemForm
+							facilityId={facilityId}
+							canEditFlags={canEditFlags}
+							onSuccess={closeSheet}
+							onCancel={closeSheet}
+						/>
+					)}
+					{sheetMode === "edit" && editingItem && (
+						<EditFormularyItemForm
+							item={editingItem}
+							canEditFlags={canEditFlags}
+							onSuccess={closeSheet}
+							onCancel={closeSheet}
+						/>
+					)}
+				</DialogContent>
+			</Dialog>
 		</div>
-
-		{editingItem && (
-			<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-				<div className="bg-background w-full max-w-2xl rounded-lg p-6 shadow-xl">
-					<EditFormularyItemForm
-						item={editingItem}
-						onSuccess={() => setEditingItem(null)}
-						onCancel={() => setEditingItem(null)}
-						canEditFlags={canEditFlags}
-					/>
-				</div>
-			</div>
-		)}
-		</>
 	)
 }
 
-// ---------------------------------------------------------------------------
-// Edit Formulary Item Form
-// Admin mode (canEditFlags=false): edits master-data fields via item.update
-// Pharmacist mode (canEditFlags=true): edits clinical policy fields via item.updateClinicalPolicy
-// ---------------------------------------------------------------------------
-
-interface FormularyItemRow {
-	id: string
-	genericName: string
-	doseForm: string
-	strength: string
-	route: string
-	isActive: boolean
-	isHighAlert: boolean
-	highAlertNotes: string | null
-	isRestricted: boolean
-	restrictionNotes: string | null
-	formularyNotes: string | null
-}
+// ============================================================================
+// Edit form (dispatches to admin vs pharmacist sub-form)
+// ============================================================================
 
 function EditFormularyItemForm({
 	item,
@@ -220,14 +321,13 @@ function EditFormularyItemForm({
 	canEditFlags?: boolean
 }) {
 	if (canEditFlags) {
-		return (
-			<PharmacistEditForm item={item} onSuccess={onSuccess} onCancel={onCancel} />
-		)
+		return <PharmacistEditForm item={item} onSuccess={onSuccess} onCancel={onCancel} />
 	}
 	return <AdminEditForm item={item} onSuccess={onSuccess} onCancel={onCancel} />
 }
 
-// Admin edit: master-data fields (doseForm, strength, route, isActive)
+// ── Admin edit: master-data fields ────────────────────────────────────────────
+
 function AdminEditForm({
 	item,
 	onSuccess,
@@ -246,86 +346,70 @@ function AdminEditForm({
 
 	function handleSubmit(e: React.FormEvent) {
 		e.preventDefault()
-		updateMutation.mutate(
-			{ id: item.id, doseForm, strength, route, isActive },
-			{ onSuccess }
-		)
+		updateMutation.mutate({ id: item.id, doseForm, strength, route, isActive }, { onSuccess })
 	}
 
 	return (
-		<form onSubmit={handleSubmit} className="space-y-4">
-			<div className="flex items-center justify-between">
-				<h3 className="text-lg font-semibold">Edit Formulary Item</h3>
-				<p className="text-muted-foreground text-sm">{item.genericName}</p>
-			</div>
-
+		<form onSubmit={handleSubmit} className="space-y-5">
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-				<div>
-					<label className="text-sm font-medium">Dose Form</label>
-					<input
-						type="text"
+				<div className="space-y-1.5">
+					<Label htmlFor="doseForm">Dose Form</Label>
+					<Input
+						id="doseForm"
 						value={doseForm}
-						onChange={e => setDoseForm(e.target.value)}
+						onChange={(e) => setDoseForm(e.target.value)}
 						required
-						className="border-input bg-background mt-1 flex h-10 w-full rounded-md border px-3 py-2 text-sm"
 					/>
 				</div>
-
-				<div>
-					<label className="text-sm font-medium">Strength</label>
-					<input
-						type="text"
+				<div className="space-y-1.5">
+					<Label htmlFor="strength">Strength</Label>
+					<Input
+						id="strength"
 						value={strength}
-						onChange={e => setStrength(e.target.value)}
+						onChange={(e) => setStrength(e.target.value)}
 						required
-						className="border-input bg-background mt-1 flex h-10 w-full rounded-md border px-3 py-2 text-sm"
 					/>
 				</div>
-
-				<div>
-					<label className="text-sm font-medium">Route</label>
-					<input
-						type="text"
+				<div className="space-y-1.5">
+					<Label htmlFor="route">Route</Label>
+					<Input
+						id="route"
 						value={route}
-						onChange={e => setRoute(e.target.value)}
+						onChange={(e) => setRoute(e.target.value)}
 						required
-						className="border-input bg-background mt-1 flex h-10 w-full rounded-md border px-3 py-2 text-sm"
 					/>
 				</div>
-
 				<div className="flex items-center gap-2 pt-6">
-					<input
-						type="checkbox"
+					<Checkbox
 						id="isActive"
 						checked={isActive}
-						onChange={e => setIsActive(e.target.checked)}
+						onCheckedChange={(v) => setIsActive(Boolean(v))}
 					/>
-					<label htmlFor="isActive" className="text-sm font-medium">Active</label>
+					<Label htmlFor="isActive">Active</Label>
 				</div>
 			</div>
 
-			{/* Clinical policy — read-only display for admin */}
-			<div className="rounded-md border border-dashed p-3 space-y-1">
-				<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+			{/* Clinical policy — read-only for admins */}
+			<Separator />
+			<div className="space-y-1.5 rounded-md border border-dashed p-3">
+				<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
 					Clinical Policy (managed by Pharmacist)
 				</p>
-				<div className="flex gap-2 flex-wrap">
+				<div className="flex flex-wrap gap-2">
 					{item.isHighAlert && (
-						<span className="inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">
-							High Alert
-						</span>
+						<Badge variant="destructive" className="text-xs">High Alert</Badge>
 					)}
 					{item.isRestricted && (
-						<span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700">
+						<Badge variant="secondary" className="border-amber-400 text-xs text-amber-700">
 							Restricted
-						</span>
+						</Badge>
 					)}
 					{!item.isHighAlert && !item.isRestricted && (
-						<span className="text-xs text-muted-foreground">No clinical policy flags set</span>
+						<span className="text-muted-foreground text-xs">No clinical policy flags set</span>
 					)}
 				</div>
 				{item.formularyNotes && (
-					<p className="text-xs text-muted-foreground mt-1">{item.formularyNotes}</p>
+					<p className="text-muted-foreground mt-1 text-xs">{item.formularyNotes}</p>
 				)}
 			</div>
 
@@ -336,26 +420,21 @@ function AdminEditForm({
 			)}
 
 			<div className="flex justify-end gap-2">
-				<button
-					type="button"
-					onClick={onCancel}
-					className="border-input bg-background hover:bg-accent inline-flex h-10 items-center rounded-md border px-4 py-2 text-sm font-medium"
-				>
+				<Button type="button" variant="outline" onClick={onCancel}>
 					Cancel
-				</button>
-				<button
-					type="submit"
-					disabled={updateMutation.isPending}
-					className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-10 items-center rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
-				>
-					{updateMutation.isPending ? "Saving..." : "Save Changes"}
-				</button>
+				</Button>
+				<Button type="submit" disabled={updateMutation.isPending}>
+					{updateMutation.isPending ? (
+						<><Loader2 className="mr-1.5 size-4 animate-spin" />Saving...</>
+					) : "Save Changes"}
+				</Button>
 			</div>
 		</form>
 	)
 }
 
-// Pharmacist edit: clinical policy fields (isHighAlert, isRestricted, notes)
+// ── Pharmacist edit: clinical policy fields ───────────────────────────────────
+
 function PharmacistEditForm({
 	item,
 	onSuccess,
@@ -389,64 +468,103 @@ function PharmacistEditForm({
 	}
 
 	return (
-		<form onSubmit={handleSubmit} className="space-y-4">
-			<div className="flex items-center justify-between">
-				<h3 className="text-lg font-semibold">Edit Clinical Policy</h3>
-				<p className="text-muted-foreground text-sm">
-					{item.genericName} — {item.doseForm} {item.strength} ({item.route})
+		<form onSubmit={handleSubmit} className="space-y-5">
+			<p className="text-muted-foreground text-sm">
+				{item.doseForm} {item.strength} · {item.route}
+			</p>
+
+		<div className="space-y-3">
+			{/* High Alert toggle card */}
+			<button
+				type="button"
+				onClick={() => setIsHighAlert(v => !v)}
+				className={`w-full rounded-lg border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+					isHighAlert
+						? "border-red-500 bg-red-500/10"
+						: "border-border bg-muted/30 hover:border-red-400 hover:bg-red-500/5"
+				}`}
+			>
+				<div className="flex items-center justify-between">
+					<div className="flex items-center gap-2">
+						<AlertTriangle className={`size-4 ${isHighAlert ? "text-red-600" : "text-muted-foreground"}`} />
+						<span className={`text-sm font-semibold ${isHighAlert ? "text-red-700 dark:text-red-400" : "text-muted-foreground"}`}>
+							High Alert
+						</span>
+					</div>
+					<span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+						isHighAlert
+							? "bg-red-600 text-white"
+							: "bg-muted text-muted-foreground"
+					}`}>
+						{isHighAlert ? "ON" : "OFF"}
+					</span>
+				</div>
+				<p className="mt-1 text-xs text-muted-foreground">
+					Requires double-check verification before dispensing.
 				</p>
+			</button>
+			{isHighAlert && (
+				<Textarea
+					value={highAlertNotes}
+					onChange={(e) => setHighAlertNotes(e.target.value)}
+					placeholder="High-alert notes (e.g. dosing thresholds, required double-checks)..."
+					rows={2}
+					className="border-red-300 focus-visible:ring-red-400"
+				/>
+			)}
+
+			{/* Restricted toggle card */}
+			<button
+				type="button"
+				onClick={() => setIsRestricted(v => !v)}
+				className={`w-full rounded-lg border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+					isRestricted
+						? "border-amber-500 bg-amber-500/10"
+						: "border-border bg-muted/30 hover:border-amber-400 hover:bg-amber-500/5"
+				}`}
+			>
+				<div className="flex items-center justify-between">
+					<div className="flex items-center gap-2">
+						<Shield className={`size-4 ${isRestricted ? "text-amber-600" : "text-muted-foreground"}`} />
+						<span className={`text-sm font-semibold ${isRestricted ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+							Restricted
+						</span>
+					</div>
+					<span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+						isRestricted
+							? "bg-amber-500 text-white"
+							: "bg-muted text-muted-foreground"
+					}`}>
+						{isRestricted ? "ON" : "OFF"}
+					</span>
+				</div>
+				<p className="mt-1 text-xs text-muted-foreground">
+					Requires specialist authorisation before prescribing.
+				</p>
+			</button>
+			{isRestricted && (
+				<Textarea
+					value={restrictionNotes}
+					onChange={(e) => setRestrictionNotes(e.target.value)}
+					placeholder="Restriction notes (e.g. specialist authorisation required)..."
+					rows={2}
+					className="border-amber-300 focus-visible:ring-amber-400"
+				/>
+			)}
+
+			<Separator />
+
+			<div className="space-y-1.5">
+				<Label htmlFor="formularyNotes">Formulary Notes</Label>
+				<Textarea
+					id="formularyNotes"
+					value={formularyNotes}
+					onChange={(e) => setFormularyNotes(e.target.value)}
+					placeholder="General notes about this formulary entry..."
+					rows={3}
+				/>
 			</div>
-
-			<div className="space-y-3">
-				<div className="flex items-start gap-3">
-					<label className="flex items-center gap-2 text-sm font-medium pt-1 min-w-[120px]">
-						<input
-							type="checkbox"
-							checked={isHighAlert}
-							onChange={e => setIsHighAlert(e.target.checked)}
-						/>
-						<span className="text-red-700">High Alert</span>
-					</label>
-					<textarea
-						value={highAlertNotes}
-						onChange={e => setHighAlertNotes(e.target.value)}
-						placeholder="High-alert notes (e.g. dosing thresholds, required double-checks)..."
-						rows={2}
-						disabled={!isHighAlert}
-						className="border-input bg-background flex w-full rounded-md border px-3 py-2 text-sm disabled:opacity-50"
-					/>
-				</div>
-
-				<div className="flex items-start gap-3">
-					<label className="flex items-center gap-2 text-sm font-medium pt-1 min-w-[120px]">
-						<input
-							type="checkbox"
-							checked={isRestricted}
-							onChange={e => setIsRestricted(e.target.checked)}
-						/>
-						<span className="text-yellow-700">Restricted</span>
-					</label>
-					<textarea
-						value={restrictionNotes}
-						onChange={e => setRestrictionNotes(e.target.value)}
-						placeholder="Restriction notes (e.g. specialist authorisation required)..."
-						rows={2}
-						disabled={!isRestricted}
-						className="border-input bg-background flex w-full rounded-md border px-3 py-2 text-sm disabled:opacity-50"
-					/>
-				</div>
-
-				<div>
-					<label className="text-sm font-medium">Formulary Notes</label>
-					<textarea
-						value={formularyNotes}
-						onChange={e => setFormularyNotes(e.target.value)}
-						placeholder="General notes about this formulary entry..."
-						rows={3}
-						className="border-input bg-background mt-1 flex w-full rounded-md border px-3 py-2 text-sm"
-					/>
-				</div>
-			</div>
+		</div>
 
 			{updateMutation.isError && (
 				<p className="text-destructive text-sm">
@@ -455,39 +573,33 @@ function PharmacistEditForm({
 			)}
 
 			<div className="flex justify-end gap-2">
-				<button
-					type="button"
-					onClick={onCancel}
-					className="border-input bg-background hover:bg-accent inline-flex h-10 items-center rounded-md border px-4 py-2 text-sm font-medium"
-				>
+				<Button type="button" variant="outline" onClick={onCancel}>
 					Cancel
-				</button>
-				<button
-					type="submit"
-					disabled={updateMutation.isPending}
-					className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-10 items-center rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
-				>
-					{updateMutation.isPending ? "Saving..." : "Save Changes"}
-				</button>
+				</Button>
+				<Button type="submit" disabled={updateMutation.isPending}>
+					{updateMutation.isPending ? (
+						<><Loader2 className="mr-1.5 size-4 animate-spin" />Saving...</>
+					) : "Save Changes"}
+				</Button>
 			</div>
 		</form>
 	)
 }
 
-// ---------------------------------------------------------------------------
-// Add Formulary Item Form
-// Clinical policy fields (isHighAlert, isRestricted, formularyNotes) are not
-// included — admins create master-data only; pharmacists set policy separately.
-// ---------------------------------------------------------------------------
+// ============================================================================
+// Add form
+// ============================================================================
 
 function AddFormularyItemForm({
 	facilityId,
 	canEditFlags: _canEditFlags = false,
 	onSuccess,
+	onCancel,
 }: {
 	facilityId: string
 	canEditFlags?: boolean
 	onSuccess: () => void
+	onCancel: () => void
 }) {
 	const [drugGenericId, setDrugGenericId] = useState("")
 	const [doseForm, setDoseForm] = useState("")
@@ -497,71 +609,63 @@ function AddFormularyItemForm({
 	const { data: genericsData } = useDrugGenericsQuery({ isActive: true, limit: 100 })
 	const createMutation = useCreateFormularyItemMutation()
 
-	const generics = (genericsData as { data: { id: string; genericName: string }[] })?.data ?? []
+	const generics =
+		(genericsData as { data: { id: string; genericName: string }[] })?.data ?? []
 
 	function handleSubmit(e: React.FormEvent) {
 		e.preventDefault()
-		createMutation.mutate(
-			{ facilityId, drugGenericId, doseForm, strength, route },
-			{ onSuccess }
-		)
+		createMutation.mutate({ facilityId, drugGenericId, doseForm, strength, route }, { onSuccess })
 	}
 
 	return (
-		<form onSubmit={handleSubmit} className="space-y-4 rounded-md border p-4">
-			<h3 className="text-lg font-semibold">Add Drug to Formulary</h3>
-
+		<form onSubmit={handleSubmit} className="space-y-5">
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-				<div>
-					<label className="text-sm font-medium">Drug Generic *</label>
-					<select
-						value={drugGenericId}
-						onChange={e => setDrugGenericId(e.target.value)}
-						required
-						className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
-					>
-						<option value="">Select a drug...</option>
-						{generics.map((g: { id: string; genericName: string }) => (
-							<option key={g.id} value={g.id}>
-								{g.genericName}
-							</option>
-						))}
-					</select>
+				<div className="space-y-1.5 sm:col-span-2">
+					<Label htmlFor="drugGenericId">Drug Generic *</Label>
+					<Select value={drugGenericId} onValueChange={(v) => setDrugGenericId(v ?? "")} required>
+						<SelectTrigger id="drugGenericId">
+							<SelectValue placeholder="Select a drug..." />
+						</SelectTrigger>
+						<SelectContent>
+							{generics.map((g) => (
+								<SelectItem key={g.id} value={g.id}>
+									{g.genericName}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 				</div>
 
-				<div>
-					<label className="text-sm font-medium">Dose Form *</label>
-					<input
-						type="text"
+				<div className="space-y-1.5">
+					<Label htmlFor="addDoseForm">Dose Form *</Label>
+					<Input
+						id="addDoseForm"
 						value={doseForm}
-						onChange={e => setDoseForm(e.target.value)}
+						onChange={(e) => setDoseForm(e.target.value)}
 						placeholder="e.g. Tablet, Capsule, Syrup"
 						required
-						className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
 					/>
 				</div>
 
-				<div>
-					<label className="text-sm font-medium">Strength *</label>
-					<input
-						type="text"
+				<div className="space-y-1.5">
+					<Label htmlFor="addStrength">Strength *</Label>
+					<Input
+						id="addStrength"
 						value={strength}
-						onChange={e => setStrength(e.target.value)}
+						onChange={(e) => setStrength(e.target.value)}
 						placeholder="e.g. 500mg, 250mg/5ml"
 						required
-						className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
 					/>
 				</div>
 
-				<div>
-					<label className="text-sm font-medium">Route *</label>
-					<input
-						type="text"
+				<div className="space-y-1.5">
+					<Label htmlFor="addRoute">Route *</Label>
+					<Input
+						id="addRoute"
 						value={route}
-						onChange={e => setRoute(e.target.value)}
+						onChange={(e) => setRoute(e.target.value)}
 						placeholder="e.g. Oral, IV, IM"
 						required
-						className="border-input bg-background flex h-10 w-full rounded-md border px-3 py-2 text-sm"
 					/>
 				</div>
 			</div>
@@ -572,13 +676,16 @@ function AddFormularyItemForm({
 				</p>
 			)}
 
-			<button
-				type="submit"
-				disabled={createMutation.isPending}
-				className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-10 items-center rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
-			>
-				{createMutation.isPending ? "Adding..." : "Add to Formulary"}
-			</button>
+			<div className="flex justify-end gap-2">
+				<Button type="button" variant="outline" onClick={onCancel}>
+					Cancel
+				</Button>
+				<Button type="submit" disabled={createMutation.isPending}>
+					{createMutation.isPending ? (
+						<><Loader2 className="mr-1.5 size-4 animate-spin" />Adding...</>
+					) : "Add to Formulary"}
+				</Button>
+			</div>
 		</form>
 	)
 }

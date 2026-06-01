@@ -18,17 +18,33 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/core/components/ui/popover"
-import { useFormularyItemsQuery } from "@/features/formulary/api/formulary.hooks"
+import {
+	useDrugGenericsQuery,
+	useFormularyItemsQuery,
+} from "@/features/formulary/api/formulary.hooks"
 
 type V1Outputs = InferContractRouterOutputs<typeof v1Contract>
 type FormularyItem = V1Outputs["formulary"]["item"]["get"]
+type DrugGeneric = V1Outputs["formulary"]["drugGeneric"]["list"]["data"][number]
 type FormularySearchItem = FormularyItem & { brandName?: string | null }
+
+export type DrugSearchSelection = {
+	id: string
+	formularyItemId?: string
+	drugGenericId: string
+	genericName: string
+	brandName?: string | null
+	doseForm?: string
+	strength?: string
+	route?: string
+	isFormulary: boolean
+}
 
 interface DrugSearchComboboxProps {
 	id?: string
 	facilityId: string
 	value: string
-	onSelect: (item: FormularyItem | null) => void
+	onSelect: (item: DrugSearchSelection | null) => void
 	onRawInput: (value: string) => void
 	placeholder: string
 	disabled?: boolean
@@ -61,16 +77,24 @@ export function DrugSearchCombobox({
 
 	const trimmedValue = inputValue.trim()
 	const debouncedValue = useDebounce(trimmedValue, 300)
-	const searchEnabled = !!facilityId && debouncedValue.length >= 2
+	const searchEnabled = !!facilityId && (open || debouncedValue.length >= 2)
 
 	const { data, isLoading } = useFormularyItemsQuery({
 		facilityId: searchEnabled ? facilityId : "",
-		search: searchEnabled ? debouncedValue : undefined,
+		search: debouncedValue || undefined,
+		isActive: true,
+		limit: 20,
+	})
+	const { data: genericData, isLoading: genericsLoading } = useDrugGenericsQuery({
+		search: debouncedValue || undefined,
 		isActive: true,
 		limit: 20,
 	})
 
-	const items = (data?.data ?? []) as FormularySearchItem[]
+	const formularyItems = (searchEnabled ? data?.data ?? [] : []) as FormularySearchItem[]
+	const genericItems = (searchEnabled ? genericData?.data ?? [] : []) as DrugGeneric[]
+	const items = buildSearchSelections(formularyItems, genericItems)
+	const isSearching = isLoading || genericsLoading
 
 	useEffect(() => {
 		setInputValue(value)
@@ -86,44 +110,65 @@ export function DrugSearchCombobox({
 		setInputValue(nextValue)
 		onSelect(null)
 		onRawInput(nextValue)
-		setOpen(!!facilityId && nextValue.trim().length >= 2)
+		setOpen(!!facilityId)
 	}
 
 	function handleOpenChange(nextOpen: boolean) {
-		setOpen(nextOpen && !disabled && !!facilityId && inputValue.trim().length >= 2)
+		setOpen(nextOpen && !disabled && !!facilityId)
 	}
 
-	function handleSelect(item: FormularyItem) {
+	function handleSelect(item: DrugSearchSelection) {
 		setInputValue(item.genericName)
 		onSelect(item)
 		setOpen(false)
 	}
 
+	function openIfSearchable() {
+		if (!disabled && facilityId) {
+			setOpen(true)
+		}
+	}
+
 	return (
 		<Popover open={open} onOpenChange={handleOpenChange}>
 			<Command shouldFilter={false} className="h-auto w-full overflow-visible bg-transparent p-0">
-				<PopoverTrigger render={<div className="w-full" />}>
+				<PopoverTrigger nativeButton={false} render={<div className="w-full" />}>
 					<CommandInput
 						id={id}
 						value={inputValue}
 						onValueChange={handleInputChange}
-						onFocus={() => {
-							if (!disabled && facilityId && inputValue.trim().length >= 2) {
-								setOpen(true)
-							}
+						onPointerDown={event => event.stopPropagation()}
+						onClick={event => {
+							event.stopPropagation()
+							openIfSearchable()
 						}}
+						onFocus={openIfSearchable}
 						placeholder={placeholder}
 						disabled={disabled}
 						autoFocus={autoFocus}
 					/>
 				</PopoverTrigger>
-				<PopoverContent align="start" className="w-(--anchor-width) p-0">
+				<PopoverContent
+					align="start"
+					className="w-(--anchor-width) p-0"
+					initialFocus={false}
+					finalFocus={false}
+				>
 					<CommandList>
-						{isLoading ? (
+						{isSearching ? (
 							<div className="text-muted-foreground px-3 py-4 text-sm">Searching...</div>
 						) : (
 							<>
-								<CommandEmpty>No formulary matches</CommandEmpty>
+								<CommandEmpty>
+									<div className="px-3 py-4 text-left text-sm">
+										<p>No orderable generic found.</p>
+										<p className="text-muted-foreground mt-1 text-xs">
+											Search a specific generic drug name, such as amoxicillin, or check the
+											drug catalog. Allergy classes like penicillin are not orderable unless
+											they exist as active generics.
+										</p>
+									</div>
+								</CommandEmpty>
 								<CommandGroup>
 									{items.map(item => (
 										<CommandItem
@@ -138,9 +183,14 @@ export function DrugSearchCombobox({
 													<span className="text-muted-foreground text-xs">{item.brandName}</span>
 												) : null}
 												<span className="text-muted-foreground text-xs">
-													{[item.doseForm, item.strength, item.route].filter(Boolean).join(" / ")}
+													{item.isFormulary
+														? [item.doseForm, item.strength, item.route].filter(Boolean).join(" / ")
+														: "Non-formulary at this facility"}
 												</span>
 											</div>
+											{item.isFormulary ? null : (
+												<span className="text-muted-foreground shrink-0 text-xs">Generic</span>
+											)}
 										</CommandItem>
 									))}
 								</CommandGroup>
@@ -151,4 +201,45 @@ export function DrugSearchCombobox({
 			</Command>
 		</Popover>
 	)
+}
+
+function buildSearchSelections(
+	formularyItems: FormularySearchItem[],
+	genericItems: DrugGeneric[]
+): DrugSearchSelection[] {
+	const genericNamesWithFormulary = new Set(
+		formularyItems.map(item => normalizeDrugName(item.genericName))
+	)
+	const seenGenericNames = new Set(genericNamesWithFormulary)
+	const uniqueGenericItems = genericItems.filter(generic => {
+		const normalizedName = normalizeDrugName(generic.genericName)
+		if (!normalizedName || seenGenericNames.has(normalizedName)) return false
+		seenGenericNames.add(normalizedName)
+		return true
+	})
+
+	return [
+		...formularyItems.map(item => ({
+			id: item.id,
+			formularyItemId: item.id,
+			drugGenericId: item.drugGenericId,
+			genericName: item.genericName,
+			brandName: item.brandName,
+			doseForm: item.doseForm,
+			strength: item.strength,
+			route: item.route,
+			isFormulary: true,
+		})),
+		...uniqueGenericItems.map(generic => ({
+			id: generic.id,
+			drugGenericId: generic.id,
+			genericName: generic.genericName,
+			brandName: null,
+			isFormulary: false,
+		})),
+	]
+}
+
+function normalizeDrugName(name: string) {
+	return name.trim().replace(/\s+/g, " ").toLowerCase()
 }

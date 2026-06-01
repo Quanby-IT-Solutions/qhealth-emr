@@ -32,25 +32,31 @@ const INPATIENT_STEPS: Step[] = [
 	{
 		id: "chart",
 		label: "Chart",
-		keys: ["discharge_summary_signed", "final_diagnosis_coded"],
+		keys: ["discharge_summary_signed", "final_diagnosis_coded", "followup_instructions"],
 		role: "Clinician",
 	},
 	{
-		id: "pharmacy",
-		label: "Pharmacy",
+		id: "medications",
+		label: "Medications",
 		keys: ["discharge_medications"],
-		role: "Pharmacist",
+		role: "Clinician",
 	},
 	{
 		id: "nursing",
 		label: "Nursing",
-		keys: ["followup_instructions"],
+		keys: ["nursing_clearance"],
 		role: "Nurse",
+	},
+	{
+		id: "pharmacy",
+		label: "Pharmacy",
+		keys: ["pharmacy_clearance"],
+		role: "Pharmacist",
 	},
 	{
 		id: "billing",
 		label: "Billing",
-		keys: ["charges_captured", "invoice_generated", "payment_recorded"],
+		keys: ["charges_captured", "invoice_generated", "payment_recorded", "billing_sign_off"],
 		role: "Biller",
 	},
 	{
@@ -75,6 +81,12 @@ const OUTPATIENT_STEPS: Step[] = [
 		role: "Biller",
 	},
 	{
+		id: "orders",
+		label: "Orders / eRx",
+		keys: ["orders_finalized"],
+		role: "Clinician",
+	},
+	{
 		id: "gate_pass",
 		label: "Gate Pass",
 		keys: [],
@@ -85,10 +97,10 @@ const OUTPATIENT_STEPS: Step[] = [
 function stepDisplayStatus(
 	step: Step,
 	items: ChecklistItem[],
-	isBillingComplete: boolean
+	isGatePassAvailable: boolean
 ): DisplayStatus {
 	if (step.id === "gate_pass") {
-		return isBillingComplete ? "Completed" : "Blocked"
+		return isGatePassAvailable ? "Completed" : "Blocked"
 	}
 	if (step.keys.length === 0) return "Pending"
 	const relevantItems = items.filter(i => step.keys.includes(i.key))
@@ -133,14 +145,13 @@ export function DischargeChecklist({ items, encounterType }: DischargeChecklistP
 	const isOutpatient = encounterType === "outpatient"
 	const steps = isOutpatient ? OUTPATIENT_STEPS : INPATIENT_STEPS
 
-	const billingStep = steps.find(s => s.id === "billing")
-	const isBillingComplete = billingStep
-		? stepDisplayStatus(billingStep, items, true) === "Completed"
-		: false
+	const requiredStepsComplete = steps
+		.filter(step => step.id !== "gate_pass")
+		.every(step => stepDisplayStatus(step, items, false) === "Completed")
 
 	const stepStatuses = steps.map(step => ({
 		step,
-		status: stepDisplayStatus(step, items, isBillingComplete),
+		status: stepDisplayStatus(step, items, requiredStepsComplete),
 		subItems: items.filter(i => step.keys.includes(i.key)),
 	}))
 
@@ -150,7 +161,6 @@ export function DischargeChecklist({ items, encounterType }: DischargeChecklistP
 		<div className="space-y-1">
 			{stepStatuses.map(({ step, status, subItems }, idx) => {
 				const isLast = idx === stepStatuses.length - 1
-				const prevComplete = idx === 0 || stepStatuses[idx - 1]?.status === "Completed"
 
 				return (
 					<div key={step.id}>
@@ -205,7 +215,8 @@ export function DischargeChecklist({ items, encounterType }: DischargeChecklistP
 								{/* Gate Pass special message */}
 								{step.id === "gate_pass" && status === "Blocked" && (
 									<p className="mt-1 text-xs text-red-600 dark:text-red-400">
-										Billing must be completed before Gate Pass is issued.
+										All discharge checklist items must be completed before Gate Pass is
+										issued.
 									</p>
 								)}
 							</div>
@@ -216,7 +227,7 @@ export function DischargeChecklist({ items, encounterType }: DischargeChecklistP
 
 			{allComplete && (
 				<p className="mt-2 text-sm font-medium text-green-600 dark:text-green-400">
-					All steps complete — patient is ready for discharge.
+					All steps complete - patient is ready for discharge.
 				</p>
 			)}
 		</div>

@@ -10,6 +10,7 @@ import { ClinicalDocsModule } from "./clinical-docs/clinical-docs.module"
 import { ClinicianLicensesModule } from "./clinician-licenses/clinician-licenses.module"
 import { DeathReportingModule } from "./death-reporting/death-reporting.module"
 import { DepartmentsModule } from "./departments/departments.module"
+import { DischargeModule } from "./discharge/discharge.module"
 import { EdModule } from "./ed/ed.module"
 import { EncountersModule } from "./encounters/encounters.module"
 import { FacilityProfileModule } from "./facility-profile/facility-profile.module"
@@ -92,6 +93,8 @@ import { TerminologyModule } from "./terminology/terminology.module"
 		AuditorModule,
 		// HIM-BE-01..05: Health Information Management
 		HimModule,
+		// Flow B6 / Story 2.6: Registrar discharge processing (clearances + gate pass)
+		DischargeModule,
 	],
 })
 export class V1Module {}

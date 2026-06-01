@@ -210,8 +210,8 @@ export const nbsKeys = {
 	screening: (encounterId: string) => ["nbs", "screening", encounterId] as const,
 	consent: (nbsId: string) => ["nbs", "consent", nbsId] as const,
 	referrals: (nbsId: string) => ["nbs", "referrals", nbsId] as const,
-	logbook: (facilityId: string, page?: number) =>
-		["nbs", "logbook", facilityId, page] as const,
+	logbook: (facilityId: string, page?: number, limit?: number) =>
+		["nbs", "logbook", facilityId, page, limit] as const,
 }
 
 // ============================================================================
@@ -339,12 +339,12 @@ export function useUpdateNbsReferralMutation() {
 // Logbook hook
 // ============================================================================
 
-export function useNbsLogbookQuery(facilityId: string, page = 1) {
+export function useNbsLogbookQuery(facilityId: string, page = 1, limit = 8) {
 	return useQuery({
-		queryKey: nbsKeys.logbook(facilityId, page),
+		queryKey: nbsKeys.logbook(facilityId, page, limit),
 		queryFn: () =>
 			fetchJson<NbsLogbookResponse>(
-				`${API_BASE}/logbook${buildQueryString({ facilityId, page, limit: 25 })}`
+				`${API_BASE}/logbook${buildQueryString({ facilityId, page, limit })}`
 			),
 		enabled: Boolean(facilityId),
 	})

@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { CheckCircle2, Info, Monitor, Plus, Save, Trash2 } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { CheckCircle2, Info, Monitor, Plus, Save, ShieldAlert, Trash2 } from "lucide-react"
 
 import {
 	AlertDialog,
@@ -171,6 +171,62 @@ const BLANK_VITAL: IntraopVital = {
 	temp: undefined,
 }
 
+function hasText(value: string | null | undefined) {
+	return !!value?.trim()
+}
+
+function wholeNumberInput(value: string) {
+	return value.replace(/\D/g, "")
+}
+
+function clockTimeInput(value: string) {
+	const digits = value.replace(/\D/g, "").slice(0, 4)
+	return digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits
+}
+
+function bloodPressureInput(value: string) {
+	return value
+		.replace(/[^\d/]/g, "")
+		.replace(/\/{2,}/g, "/")
+		.slice(0, 7)
+}
+
+function isClockTime(value: string | null | undefined) {
+	return /^([01]\d|2[0-3]):[0-5]\d$/.test(value?.trim() ?? "")
+}
+
+function isBloodPressure(value: string | null | undefined) {
+	return /^\d{2,3}\/\d{2,3}$/.test(value?.trim() ?? "")
+}
+
+function boundedWholeNumber(value: string, max: number) {
+	const normalized = wholeNumberInput(value)
+	if (!normalized) return ""
+
+	return String(Math.min(Number(normalized), max))
+}
+
+function hasCompleteMedication(form: FormState) {
+	return (
+		form.intraopMedications.some(
+			medication =>
+				hasText(medication.name) &&
+				hasText(medication.dose) &&
+				hasText(medication.route) &&
+				isClockTime(medication.time)
+		) ||
+		form.inductionAgents.some(
+			agent => hasText(agent.agent) && hasText(agent.dose) && isClockTime(agent.time)
+		) ||
+		form.maintenanceAgents.some(
+			agent => hasText(agent.agent) && hasText(agent.dose) && isClockTime(agent.time)
+		) ||
+		form.muscleRelaxants.some(
+			agent => hasText(agent.agent) && hasText(agent.dose) && isClockTime(agent.time)
+		)
+	)
+}
+
 interface AnesthesiaRecordFormProps {
 	caseId: string
 	existing: AnesthesiaRecord | null | undefined
@@ -191,6 +247,40 @@ export function AnesthesiaRecordForm({
 
 	const isSigned = existing?.status === "signed"
 	const fieldsDisabled = isSigned || !canEdit || save.isPending || sign.isPending
+	const signChecklistMissing = useMemo(() => {
+		const missingFields: string[] = []
+		const hasCompleteVital = form.intraopVitals.some(
+			vital =>
+				isClockTime(vital.time) &&
+				isBloodPressure(vital.bp) &&
+				vital.hr > 0 &&
+				vital.spo2 > 0
+		)
+
+		if (!form.anesthesiaType) missingFields.push("anesthesia type")
+		if (!form.asaClass) missingFields.push("ASA physical status class")
+		if (!form.airwayType) missingFields.push("airway device")
+		if (!form.intubationGrade) missingFields.push("Cormack-Lehane grade")
+		if (!form.airwayManagement.trim()) missingFields.push("airway notes")
+		if (!form.totalAnesthesiaMinutes || Number(form.totalAnesthesiaMinutes) <= 0) {
+			missingFields.push("total anesthesia time")
+		}
+		if (!hasCompleteMedication(form)) {
+			missingFields.push("at least one complete medication or anesthetic agent with HH:MM time")
+		}
+		if (!hasCompleteVital) {
+			missingFields.push("at least one complete intraoperative vital with HH:MM time and BP")
+		}
+
+		return missingFields
+	}, [form])
+	const canSignRecord =
+		canSign &&
+		!isSigned &&
+		signChecklistMissing.length === 0 &&
+		(Boolean(existing) || canEdit) &&
+		!sign.isPending &&
+		!save.isPending
 
 	useEffect(() => {
 		setForm(buildInitialState(existing))
@@ -337,6 +427,7 @@ export function AnesthesiaRecordForm({
 	}
 
 	function handleSign() {
+		if (!canSignRecord) return
 		setShowSignConfirm(true)
 	}
 
@@ -404,7 +495,7 @@ export function AnesthesiaRecordForm({
 							onValueChange={v => setField("anesthesiaType", v as AnesthesiaType)}
 							disabled={fieldsDisabled}
 						>
-							<SelectTrigger>
+							<SelectTrigger className="w-full justify-between">
 								<SelectValue>
 									{ANESTHESIA_TYPE_OPTIONS.find(o => o.value === form.anesthesiaType)?.label ??
 										"Select type…"}
@@ -426,7 +517,7 @@ export function AnesthesiaRecordForm({
 							onValueChange={v => setField("asaClass", v as AsaClass)}
 							disabled={fieldsDisabled}
 						>
-							<SelectTrigger>
+							<SelectTrigger className="w-full justify-between">
 								<SelectValue>{form.asaClass ?? "Select class…"}</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
@@ -462,7 +553,7 @@ export function AnesthesiaRecordForm({
 								onValueChange={v => setField("airwayType", v as AirwayType)}
 								disabled={fieldsDisabled}
 							>
-								<SelectTrigger>
+								<SelectTrigger className="w-full justify-between">
 									<SelectValue>
 										{AIRWAY_OPTIONS.find(o => o.value === form.airwayType)?.label ??
 											"Select device…"}
@@ -484,7 +575,7 @@ export function AnesthesiaRecordForm({
 								onValueChange={v => setField("intubationGrade", v as IntubationGrade)}
 								disabled={fieldsDisabled}
 							>
-								<SelectTrigger>
+								<SelectTrigger className="w-full justify-between">
 									<SelectValue>
 										{INTUBATION_GRADE_OPTIONS.find(o => o.value === form.intubationGrade)?.label ??
 											"Select grade…"}
@@ -502,10 +593,10 @@ export function AnesthesiaRecordForm({
 						<div className="space-y-1.5">
 							<Label>Intubation Attempts</Label>
 							<Input
-								type="number"
-								min={1}
+								inputMode="numeric"
+								pattern="[0-9]*"
 								value={form.intubationAttempts}
-								onChange={e => setField("intubationAttempts", e.target.value)}
+								onChange={e => setField("intubationAttempts", wholeNumberInput(e.target.value))}
 								disabled={fieldsDisabled}
 							/>
 						</div>
@@ -575,8 +666,11 @@ export function AnesthesiaRecordForm({
 											<TableCell>
 												<Input
 													value={a.time ?? ""}
-													onChange={e => updateInduction(i, "time", e.target.value)}
+													onChange={e => updateInduction(i, "time", clockTimeInput(e.target.value))}
 													placeholder="HH:MM"
+													inputMode="numeric"
+													pattern="[0-9:]*"
+													maxLength={5}
 													disabled={fieldsDisabled}
 												/>
 											</TableCell>
@@ -646,8 +740,11 @@ export function AnesthesiaRecordForm({
 											<TableCell>
 												<Input
 													value={a.time ?? ""}
-													onChange={e => updateMaintenance(i, "time", e.target.value)}
+													onChange={e => updateMaintenance(i, "time", clockTimeInput(e.target.value))}
 													placeholder="HH:MM"
+													inputMode="numeric"
+													pattern="[0-9:]*"
+													maxLength={5}
 													disabled={fieldsDisabled}
 												/>
 											</TableCell>
@@ -717,8 +814,11 @@ export function AnesthesiaRecordForm({
 											<TableCell>
 												<Input
 													value={a.time ?? ""}
-													onChange={e => updateRelaxant(i, "time", e.target.value)}
+													onChange={e => updateRelaxant(i, "time", clockTimeInput(e.target.value))}
 													placeholder="HH:MM"
+													inputMode="numeric"
+													pattern="[0-9:]*"
+													maxLength={5}
 													disabled={fieldsDisabled}
 												/>
 											</TableCell>
@@ -807,8 +907,11 @@ export function AnesthesiaRecordForm({
 										<TableCell>
 											<Input
 												value={m.time}
-												onChange={e => updateMedication(i, "time", e.target.value)}
+												onChange={e => updateMedication(i, "time", clockTimeInput(e.target.value))}
 												placeholder="HH:MM"
+												inputMode="numeric"
+												pattern="[0-9:]*"
+												maxLength={5}
 												disabled={fieldsDisabled}
 											/>
 										</TableCell>
@@ -849,17 +952,13 @@ export function AnesthesiaRecordForm({
 					</div>
 					<div className="flex items-center gap-2">
 						<Tooltip>
-							<TooltipTrigger>
-								<Button
-									variant="outline"
-									size="sm"
-									disabled
-									className="pointer-events-none"
-									tabIndex={-1}
-								>
+							<TooltipTrigger
+								render={
+									<span className="border-border bg-background text-muted-foreground inline-flex h-7 cursor-not-allowed items-center justify-center gap-1 rounded-[min(var(--radius-md),12px)] border px-2.5 text-[0.8rem] font-medium opacity-50" />
+								}
+							>
 									<Monitor className="mr-1.5 size-3.5" />
 									Connect Monitor
-								</Button>
 							</TooltipTrigger>
 							<TooltipContent side="bottom">
 								Bedside monitor integration is not yet available in this environment
@@ -895,52 +994,60 @@ export function AnesthesiaRecordForm({
 										<TableCell>
 											<Input
 												value={vital.time}
-												onChange={e => updateVital(i, "time", e.target.value)}
+												onChange={e => updateVital(i, "time", clockTimeInput(e.target.value))}
 												placeholder="HH:MM"
+												inputMode="numeric"
+												pattern="[0-9:]*"
+												maxLength={5}
 												disabled={fieldsDisabled}
 											/>
 										</TableCell>
 										<TableCell>
 											<Input
 												value={vital.bp}
-												onChange={e => updateVital(i, "bp", e.target.value)}
+												onChange={e => updateVital(i, "bp", bloodPressureInput(e.target.value))}
 												placeholder="120/80"
+												inputMode="numeric"
+												pattern="[0-9/]*"
+												maxLength={7}
 												disabled={fieldsDisabled}
 											/>
 										</TableCell>
 										<TableCell>
 											<Input
-												type="number"
-												min={0}
+												inputMode="numeric"
+												pattern="[0-9]*"
 												value={vital.hr || ""}
-												onChange={e => updateVital(i, "hr", Number(e.target.value))}
+												onChange={e => {
+													const nextValue = boundedWholeNumber(e.target.value, 300)
+													updateVital(i, "hr", nextValue ? Number(nextValue) : 0)
+												}}
 												placeholder="72"
 												disabled={fieldsDisabled}
 											/>
 										</TableCell>
 										<TableCell>
 											<Input
-												type="number"
-												min={0}
-												max={100}
+												inputMode="numeric"
+												pattern="[0-9]*"
 												value={vital.spo2 || ""}
-												onChange={e => updateVital(i, "spo2", Number(e.target.value))}
+												onChange={e => {
+													const nextValue = boundedWholeNumber(e.target.value, 100)
+													updateVital(i, "spo2", nextValue ? Number(nextValue) : 0)
+												}}
 												placeholder="98"
 												disabled={fieldsDisabled}
 											/>
 										</TableCell>
 										<TableCell>
 											<Input
-												type="number"
-												min={0}
+												inputMode="numeric"
+												pattern="[0-9]*"
 												value={vital.etco2 ?? ""}
-												onChange={e =>
-													updateVital(
-														i,
-														"etco2",
-														e.target.value ? Number(e.target.value) : undefined
-													)
-												}
+												onChange={e => {
+													const nextValue = boundedWholeNumber(e.target.value, 150)
+													updateVital(i, "etco2", nextValue ? Number(nextValue) : undefined)
+												}}
 												placeholder="35"
 												disabled={fieldsDisabled}
 											/>
@@ -952,6 +1059,9 @@ export function AnesthesiaRecordForm({
 												max={45}
 												step={0.1}
 												value={vital.temp ?? ""}
+												onKeyDown={e => {
+													if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault()
+												}}
 												onChange={e =>
 													updateVital(
 														i,
@@ -999,10 +1109,10 @@ export function AnesthesiaRecordForm({
 					<div className="space-y-1.5">
 						<Label>Total Anesthesia Time (min)</Label>
 						<Input
-							type="number"
-							min={0}
+							inputMode="numeric"
+							pattern="[0-9]*"
 							value={form.totalAnesthesiaMinutes}
-							onChange={e => setField("totalAnesthesiaMinutes", e.target.value)}
+							onChange={e => setField("totalAnesthesiaMinutes", wholeNumberInput(e.target.value))}
 							placeholder="0"
 							disabled={fieldsDisabled}
 						/>
@@ -1043,6 +1153,13 @@ export function AnesthesiaRecordForm({
 				<>
 					<Separator />
 
+					{canSign && !isSigned && signChecklistMissing.length > 0 ? (
+						<div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+							<ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+							<p>Complete these fields before signing: {signChecklistMissing.join(", ")}.</p>
+						</div>
+					) : null}
+
 					<div className="flex justify-end gap-3">
 						{!isSigned && (
 							<Button
@@ -1060,7 +1177,7 @@ export function AnesthesiaRecordForm({
 							<Button
 								className="bg-green-700 hover:bg-green-800"
 								onClick={handleSign}
-								disabled={sign.isPending || save.isPending || (!existing && !canEdit)}
+								disabled={!canSignRecord}
 							>
 								<CheckCircle2 className="mr-2 size-4" />
 								{sign.isPending ? "Signing…" : "Sign Anesthesia Record"}

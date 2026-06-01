@@ -2,8 +2,8 @@
  * SLA-017 / SLA-023: Flow 7 certificate request, payment, and release checkpoint tests
  *
  * Covers:
- * - createFmdrf creates as status "draft" with requestedAt but without completedAt (SLA-023)
- * - createFndrf creates as status "draft" with requestedAt (SLA-017)
+ * - createFmdrf creates as status "submitted" with requestedAt/submittedAt but without completedAt
+ * - createFndrf creates as status "submitted" with requestedAt/submittedAt
  * - markDeathReportPaid sets paidAt (SLA-017)
  * - markDeathReportReleased sets releasedAt, releasedByStaffId, completedAt, status "completed" (SLA-023)
  * - CivilRegistryService.createBirthRegistration sets requestedAt
@@ -12,12 +12,25 @@
  * - MedicalRecordsService.markMedicalRecordsPaid sets paidAt
  */
 
-import { NotFoundException } from "@nestjs/common"
+import { BadRequestException, NotFoundException } from "@nestjs/common"
 import { Test, type TestingModule } from "@nestjs/testing"
 
+import { LcrArtifactGeneratorService } from "../civil-registry/lcr-artifact-generator.service"
+import { LcrSubmissionService } from "../civil-registry/lcr-submission.service"
 import { CivilRegistryService } from "../civil-registry/civil-registry.service"
 import { MedicalRecordsService } from "../medical-records/medical-records.service"
 import { DeathReportingService } from "./death-reporting.service"
+
+jest.mock("@/config/env.config", () => ({
+	env: {
+		FILE_STORAGE_BASE_URL: "/storage",
+		FILE_STORAGE_TYPE: "local",
+		LCR_API_BASE_URL: undefined,
+		LCR_API_ENABLED: false,
+		LCR_API_KEY: undefined,
+		LCR_API_TIMEOUT_MS: 30000,
+	},
+}))
 
 // ---------------------------------------------------------------------------
 // DB Mock shared by all services
@@ -40,6 +53,16 @@ const mockDb = {
 	select: mockSelect,
 }
 
+const mockLcrArtifactGenerator = {
+	generateBirthCertificateArtifacts: jest.fn(),
+	generateDeathCertificateArtifacts: jest.fn(),
+}
+
+const mockLcrSubmissionService = {
+	submitBirthCertificate: jest.fn(),
+	submitDeathCertificate: jest.fn(),
+}
+
 jest.mock("@/common/database/database.client", () => ({
 	// Use arrow-function wrappers so mockInsert/mockUpdate/mockSelect are accessed
 	// lazily (at call time, not factory-creation time). This avoids the TDZ error
@@ -54,7 +77,22 @@ jest.mock("@/common/database/database.client", () => ({
 
 // Also mock the db schema symbols the services use
 jest.mock("@repo/db/schema", () => ({
-	deathReports: { id: "id", paidAt: "paidAt", requestedAt: "requestedAt", updatedAt: "updatedAt" },
+	deathReports: {
+		id: "id",
+		facilityId: "facilityId",
+		encounterId: "encounterId",
+		reportType: "reportType",
+		status: "status",
+		paidAt: "paidAt",
+		requestedAt: "requestedAt",
+		updatedAt: "updatedAt",
+	},
+	patients: {
+		id: "id",
+		facilityId: "facilityId",
+		sex: "sex",
+		dateOfBirth: "dateOfBirth",
+	},
 	birthRegistrations: {
 		id: "id",
 		paidAt: "paidAt",
@@ -77,10 +115,16 @@ jest.mock("@repo/db/schema", () => ({
 		status: "status",
 		createdAt: "createdAt",
 	},
-	staffProfiles: { id: "id", userId: "userId" },
+	staffProfiles: { id: "id", userId: "userId", facilityId: "facilityId", isActive: "isActive" },
 	users: { id: "id" },
-	encounters: {},
+	encounters: { id: "id", facilityId: "facilityId", patientId: "patientId" },
 	encounterStatusEvents: {},
+	surveillanceFlags: {
+		id: "id",
+		encounterId: "encounterId",
+		flagType: "flagType",
+		triggerValue: "triggerValue",
+	},
 }))
 
 // ---------------------------------------------------------------------------
@@ -117,6 +161,125 @@ function setupSelectRow(row: Record<string, unknown>) {
 		leftJoin: jest.fn().mockReturnValue({ where: mockSelectWhere }),
 	})
 	mockSelect.mockReturnValue({ from: mockSelectFrom })
+}
+
+function setupReleaseStaffProfileCheck({
+	facilityId = "fac-001",
+	staffProfileId = "staff-001",
+	readyReport = createReadyDeathReport({ facilityId }),
+}: {
+	facilityId?: string
+	staffProfileId?: string
+	readyReport?: Record<string, unknown>
+} = {}) {
+	const reportLimit = jest.fn().mockResolvedValue([{ facilityId }])
+	const reportWhere = jest.fn().mockReturnValue({ limit: reportLimit })
+	const reportFrom = jest.fn().mockReturnValue({ where: reportWhere })
+
+	const staffLimit = jest.fn().mockResolvedValue([{ id: staffProfileId }])
+	const staffWhere = jest.fn().mockReturnValue({ limit: staffLimit })
+	const staffFrom = jest.fn().mockReturnValue({ where: staffWhere })
+
+	const readyReportLimit = jest.fn().mockResolvedValue([readyReport])
+	const readyReportWhere = jest.fn().mockReturnValue({ limit: readyReportLimit })
+	const readyReportFrom = jest.fn().mockReturnValue({ where: readyReportWhere })
+
+	mockSelect
+		.mockReturnValueOnce({ from: reportFrom })
+		.mockReturnValueOnce({ from: staffFrom })
+		.mockReturnValueOnce({ from: readyReportFrom })
+}
+
+function setupMissingReleaseReportCheck() {
+	const reportLimit = jest.fn().mockResolvedValue([])
+	const reportWhere = jest.fn().mockReturnValue({ limit: reportLimit })
+	const reportFrom = jest.fn().mockReturnValue({ where: reportWhere })
+
+	mockSelect.mockReturnValueOnce({ from: reportFrom })
+}
+
+function bypassFmdrfGuards(service: DeathReportingService) {
+	jest
+		.spyOn(
+			service as unknown as { assertCanCreateFmdrf(input: unknown): Promise<void> },
+			"assertCanCreateFmdrf"
+		)
+		.mockResolvedValue(undefined)
+	jest
+		.spyOn(
+			service as unknown as {
+				forwardSubmittedFmdrfToSurveillance(input: unknown, id: string): Promise<void>
+			},
+			"forwardSubmittedFmdrfToSurveillance"
+		)
+		.mockResolvedValue(undefined)
+}
+
+function bypassFndrfGuards(service: DeathReportingService) {
+	jest
+		.spyOn(
+			service as unknown as { assertCanCreateFndrf(input: unknown): Promise<void> },
+			"assertCanCreateFndrf"
+		)
+		.mockResolvedValue(undefined)
+	jest
+		.spyOn(
+			service as unknown as {
+				forwardSubmittedFndrfToSurveillance(input: unknown, id: string): Promise<void>
+			},
+			"forwardSubmittedFndrfToSurveillance"
+		)
+		.mockResolvedValue(undefined)
+}
+
+function createReadyDeathReport(overrides: Record<string, unknown> = {}) {
+	return {
+		id: "death-report-uuid",
+		facilityId: "fac-001",
+		reportType: "fmdrf",
+		causeOfDeath: "Hemorrhage",
+		maternalHistory: {
+			patientName: "Jane Doe",
+			patientMrn: "MRN-001",
+			patientAge: 30,
+			patientAddress: "123 Main St",
+			placeOfDeath: "Ward 3",
+			causeOfDeathUnderlying: "Postpartum hemorrhage",
+		},
+		neonatalDetails: null,
+		physicianCertification: {
+			certifyingPhysicianName: "Dr. Smith",
+			prcLicenseNumber: "PRC-001",
+			certificationDate: "2024-06-01",
+			signatureData: "data:image/png;base64,abc",
+		},
+		paidAt: new Date("2024-06-01T10:00:00Z"),
+		releasedAt: null,
+		releasedByStaffId: null,
+		...overrides,
+	}
+}
+
+function createReadyBirthRegistration(overrides: Record<string, unknown> = {}) {
+	return {
+		id: "birth-reg-uuid",
+		facilityId: "fac-001",
+		certificateNumber: "BC-001",
+		attendantAtBirth: "Physician",
+		placeOfBirthBarangay: "Barangay 1",
+		placeOfBirthMunicipality: "Quezon City",
+		placeOfBirthProvince: "Metro Manila",
+		placeOfBirthRegion: "NCR",
+		fatherName: "John Doe",
+		motherName: "Jane Doe",
+		physicianName: "Dr. Smith",
+		physicianLicenseNo: "PRC-001",
+		physicianSignature: "data:image/png;base64,abc",
+		paidAt: new Date("2024-06-01T10:00:00Z"),
+		releasedAt: null,
+		releasedByStaffId: null,
+		...overrides,
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -187,7 +350,11 @@ describe("CivilRegistryService — SLA-017 checkpoints", () => {
 		jest.clearAllMocks()
 
 		const module: TestingModule = await Test.createTestingModule({
-			providers: [CivilRegistryService],
+			providers: [
+				CivilRegistryService,
+				{ provide: LcrArtifactGeneratorService, useValue: mockLcrArtifactGenerator },
+				{ provide: LcrSubmissionService, useValue: mockLcrSubmissionService },
+			],
 		}).compile()
 
 		service = module.get<CivilRegistryService>(CivilRegistryService)
@@ -213,6 +380,11 @@ describe("CivilRegistryService — SLA-017 checkpoints", () => {
 			}
 
 			setupInsert(created)
+			setupSelectRow({
+				id: "pat-001",
+				facilityId: "fac-001",
+				dateOfBirth: new Date(),
+			})
 
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
@@ -256,6 +428,94 @@ describe("CivilRegistryService — SLA-017 checkpoints", () => {
 			await expect(service.markBirthRegistrationPaid({ id: "nonexistent" })).rejects.toThrow(
 				NotFoundException
 			)
+		})
+	})
+
+	describe("markBirthRegistrationReleased", () => {
+		it("sets releasedAt, releasedByStaffId, completedAt, and status 'completed'", async () => {
+			const id = "birth-reg-uuid"
+			const releasedAt = new Date("2024-06-02T10:00:00Z")
+			const releasedByStaffId = "staff-001"
+			const returnRow = {
+				id,
+				facilityId: "fac-001",
+				releasedByStaffId,
+				releasedAt,
+				completedAt: releasedAt,
+				status: "completed",
+			}
+
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyBirthRegistration({ id }),
+			})
+			setupUpdate(returnRow)
+
+			const result = await service.markBirthRegistrationReleased({
+				id,
+				releasedByStaffId,
+				releasedAt,
+			})
+
+			expect(mockUpdateSet).toHaveBeenCalledWith(
+				expect.objectContaining({
+					releasedByStaffId,
+					releasedAt,
+					completedAt: releasedAt,
+					status: "completed",
+				})
+			)
+			expect(result.status).toBe("completed")
+			expect(result.releasedByStaffId).toBe(releasedByStaffId)
+			expect(result.releasedAt).toBe(releasedAt.toISOString())
+		})
+
+		it("rejects release before payment is recorded", async () => {
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyBirthRegistration({ paidAt: null }),
+			})
+
+			await expect(
+				service.markBirthRegistrationReleased({
+					id: "birth-reg-uuid",
+					releasedByStaffId: "staff-001",
+				})
+			).rejects.toThrow(BadRequestException)
+		})
+
+		it("allows release when required LCR fields are incomplete", async () => {
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyBirthRegistration({ certificateNumber: "" }),
+			})
+			setupUpdate({
+				...createReadyBirthRegistration({ certificateNumber: "" }),
+				completedAt: new Date("2024-06-02T10:00:00Z"),
+				releasedAt: new Date("2024-06-02T10:00:00Z"),
+				releasedByStaffId: "staff-001",
+				status: "completed",
+			})
+
+			const result = await service.markBirthRegistrationReleased({
+				id: "birth-reg-uuid",
+				releasedByStaffId: "staff-001",
+			})
+
+			expect(result.status).toBe("completed")
+			expect(result.releasedByStaffId).toBe("staff-001")
+		})
+
+		it("rejects repeat release requests", async () => {
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyBirthRegistration({
+					releasedAt: new Date("2024-06-02T10:00:00Z"),
+				}),
+			})
+
+			await expect(
+				service.markBirthRegistrationReleased({
+					id: "birth-reg-uuid",
+					releasedByStaffId: "staff-001",
+				})
+			).rejects.toThrow(BadRequestException)
 		})
 	})
 })
@@ -357,8 +617,9 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 		physicianCertification: null,
 		contributingFactors: [],
 		neonatalDetails: null,
-		status: "draft",
+		status: "submitted",
 		requestedAt: new Date(),
+		submittedAt: new Date(),
 		paidAt: null,
 		releasedAt: null,
 		releasedByStaffId: null,
@@ -376,9 +637,10 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 		patientAge: 30,
 		patientAddress: "123 Main St",
 		dateOfDeath: "2024-06-01T00:00:00Z",
+		placeOfDeath: "Ward 3",
 		causeOfDeathImmediate: "Hemorrhage",
 		causeOfDeathAntecedent: "",
-		causeOfDeathUnderlying: "",
+		causeOfDeathUnderlying: "Postpartum hemorrhage",
 		causeOfDeathContributing: null,
 		gravidity: 1,
 		parity: 0,
@@ -412,7 +674,8 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 	})
 
 	describe("createFmdrf", () => {
-		it("creates with status 'draft', not 'completed' (SLA-023: open SLA window)", async () => {
+		it("creates with status 'submitted' after physician signature", async () => {
+			bypassFmdrfGuards(service)
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -423,10 +686,11 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 
 			await service.createFmdrf(minimalFmdrfInput)
 
-			expect(capturedValues.status).toBe("draft")
+			expect(capturedValues.status).toBe("submitted")
 		})
 
-		it("does not set completedAt on creation (SLA-023: lifecycle stays open)", async () => {
+		it("does not set completedAt on physician submission", async () => {
+			bypassFmdrfGuards(service)
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -441,6 +705,7 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 		})
 
 		it("sets requestedAt to now on creation (SLA-017: Step 1 evidence)", async () => {
+			bypassFmdrfGuards(service)
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -452,6 +717,21 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 			await service.createFmdrf(minimalFmdrfInput)
 
 			expect(capturedValues.requestedAt).toBeInstanceOf(Date)
+		})
+
+		it("sets submittedAt to now on physician submission", async () => {
+			bypassFmdrfGuards(service)
+			let capturedValues: Record<string, unknown> = {}
+			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
+				capturedValues = vals
+				return { returning: mockInsertReturning }
+			})
+			mockInsertReturning.mockResolvedValue([baseDeathReport])
+			mockInsert.mockReturnValue({ values: mockInsertValues })
+
+			await service.createFmdrf(minimalFmdrfInput)
+
+			expect(capturedValues.submittedAt).toBeInstanceOf(Date)
 		})
 	})
 
@@ -468,6 +748,7 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 				status: "completed",
 			}
 
+			setupReleaseStaffProfileCheck({ staffProfileId: releasedByStaffId })
 			setupUpdate(returnRow)
 
 			const result = await service.markDeathReportReleased({ id, releasedByStaffId, releasedAt })
@@ -495,6 +776,7 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 				status: "completed",
 			}
 
+			setupReleaseStaffProfileCheck()
 			setupUpdate(returnRow)
 
 			await service.markDeathReportReleased({ id, releasedByStaffId: "staff-001" })
@@ -509,14 +791,41 @@ describe("DeathReportingService — SLA-023 FMDRF lifecycle", () => {
 		})
 
 		it("throws NotFoundException when report not found", async () => {
-			mockUpdateReturning.mockResolvedValue([])
-			mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning })
-			mockUpdateSet.mockReturnValue({ where: mockUpdateWhere })
-			mockUpdate.mockReturnValue({ set: mockUpdateSet })
+			setupMissingReleaseReportCheck()
 
 			await expect(
 				service.markDeathReportReleased({ id: "nonexistent", releasedByStaffId: "staff-001" })
 			).rejects.toThrow(NotFoundException)
+		})
+
+		it("rejects release before payment is recorded", async () => {
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyDeathReport({ paidAt: null }),
+			})
+
+			await expect(
+				service.markDeathReportReleased({ id: "fmdrf-uuid", releasedByStaffId: "staff-001" })
+			).rejects.toThrow(BadRequestException)
+		})
+
+		it("rejects release when required certificate fields are incomplete", async () => {
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyDeathReport({ physicianCertification: { prcLicenseNumber: "" } }),
+			})
+
+			await expect(
+				service.markDeathReportReleased({ id: "fmdrf-uuid", releasedByStaffId: "staff-001" })
+			).rejects.toThrow(BadRequestException)
+		})
+
+		it("rejects repeat release requests", async () => {
+			setupReleaseStaffProfileCheck({
+				readyReport: createReadyDeathReport({ releasedAt: new Date("2024-06-02T10:00:00Z") }),
+			})
+
+			await expect(
+				service.markDeathReportReleased({ id: "fmdrf-uuid", releasedByStaffId: "staff-001" })
+			).rejects.toThrow(BadRequestException)
 		})
 	})
 })
@@ -539,8 +848,9 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 		physicianCertification: null,
 		contributingFactors: [],
 		neonatalDetails: null,
-		status: "draft",
+		status: "submitted",
 		requestedAt: new Date(),
+		submittedAt: new Date(),
 		paidAt: null,
 		releasedAt: null,
 		releasedByStaffId: null,
@@ -561,6 +871,7 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 		deliveryType: "svd" as const,
 		apgarScore1Min: null,
 		apgarScore5Min: null,
+		resuscitationRequired: true,
 		motherName: "Jane Doe",
 		motherAge: 25,
 		motherGravidity: 1,
@@ -594,7 +905,8 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 	})
 
 	describe("createFndrf", () => {
-		it("creates with status 'draft' (SLA-023: parity with corrected FMDRF path)", async () => {
+		it("creates with status 'submitted' after physician signature", async () => {
+			bypassFndrfGuards(service)
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -605,10 +917,11 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 
 			await service.createFndrf(minimalFndrfInput)
 
-			expect(capturedValues.status).toBe("draft")
+			expect(capturedValues.status).toBe("submitted")
 		})
 
 		it("does not set completedAt on creation (lifecycle stays open until release)", async () => {
+			bypassFndrfGuards(service)
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -623,6 +936,7 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 		})
 
 		it("sets requestedAt to now on creation (SLA-017: Step 1 evidence)", async () => {
+			bypassFndrfGuards(service)
 			let capturedValues: Record<string, unknown> = {}
 			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
 				capturedValues = vals
@@ -634,6 +948,46 @@ describe("DeathReportingService — SLA-023 FNDRF lifecycle parity", () => {
 			await service.createFndrf(minimalFndrfInput)
 
 			expect(capturedValues.requestedAt).toBeInstanceOf(Date)
+		})
+
+		it("sets submittedAt to now on physician submission", async () => {
+			bypassFndrfGuards(service)
+			let capturedValues: Record<string, unknown> = {}
+			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
+				capturedValues = vals
+				return { returning: mockInsertReturning }
+			})
+			mockInsertReturning.mockResolvedValue([baseFndrfReport])
+			mockInsert.mockReturnValue({ values: mockInsertValues })
+
+			await service.createFndrf(minimalFndrfInput)
+
+			expect(capturedValues.submittedAt).toBeInstanceOf(Date)
+		})
+
+		it("persists mandated neonatal review details", async () => {
+			bypassFndrfGuards(service)
+			let capturedValues: Record<string, unknown> = {}
+			mockInsertValues.mockImplementation((vals: Record<string, unknown>) => {
+				capturedValues = vals
+				return { returning: mockInsertReturning }
+			})
+			mockInsertReturning.mockResolvedValue([baseFndrfReport])
+			mockInsert.mockReturnValue({ values: mockInsertValues })
+
+			await service.createFndrf(minimalFndrfInput)
+
+			expect(capturedValues.neonatalDetails).toEqual(
+				expect.objectContaining({
+					newbornName: "Baby Doe",
+					newbornMrn: "MRN-002",
+					birthWeight: 950,
+					gestationalAgeWeeks: 28,
+					resuscitationRequired: true,
+					motherName: "Jane Doe",
+					placeOfDeath: "NICU",
+				})
+			)
 		})
 	})
 })

@@ -138,8 +138,7 @@ export function roleNameMatches(roleName: string | null | undefined, allowedRole
  * Visibility rules (per TOR role bundles in seed-dev.ts):
  *
  * Dashboard          — always visible
- * Register Patient   — registrar/admin full MRN registration (triage uses /triage)
- * Patients & Encounters — registrar patient search, encounter creation, transfer, discharge
+ * Patient Management — registrar unified page: dedup search + patient list + MRN registration dialog
  * Bed Management     — registrar bed assignment and post-discharge bed status
  * Chart Merge        — registrar trauma-alias merge into permanent MRN
  * Civil Registry     — registrar birth/death certificate generation and tracking
@@ -156,7 +155,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		requiredPermissions: [],
 	},
 	{
-		title: "Register Patient",
+		title: "Patient Management",
 		href: "/patients/register",
 		iconName: "patient",
 		requiredPermissions: [{ module: "adt", action: "create" }],
@@ -169,7 +168,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		excludeAllPermissions: TRIAGE_ROLE_BUNDLE,
 	},
 	{
-		title: "Triage",
+		title: "Triage Queue",
 		href: "/triage",
 		iconName: "emergency",
 		requiredPermissions: [{ module: "adt", action: "create" }],
@@ -179,16 +178,31 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		],
 	},
 	{
-		// Registrar patient list: search records, create encounters, then access
-		// encounter transfer and discharge tabs from the patient chart.
-		title: "Patients & Encounters",
-		href: "/patients/search",
-		iconName: "patient",
-		requiredPermissions: [{ module: "patients", action: "view" }],
+		title: "Trauma Alias",
+		href: "/triage/trauma-alias",
+		iconName: "records",
+		requiredPermissions: [{ module: "adt", action: "create" }],
 		requireAllPermissions: [
-			{ module: "adt", action: "create" },
-			{ module: "patients", action: "edit" },
+			{ module: "nursing", action: "create" },
+			{ module: "ed", action: "create" },
 		],
+	},
+	{
+		title: "Tele-Triage",
+		href: "/triage/tele",
+		iconName: "video",
+		requiredPermissions: [{ module: "adt", action: "create" }],
+		requireAllPermissions: [
+			{ module: "nursing", action: "create" },
+			{ module: "ed", action: "create" },
+		],
+	},
+	{
+		title: "OPD Tele-Triage",
+		href: "/triage/opd-tele",
+		iconName: "video",
+		requiredPermissions: [{ module: "opd", action: "view" }],
+		requireAllPermissions: [{ module: "nursing", action: "create" }],
 	},
 	{
 		// Nurse-specific patient list: browse & filter all active patients without
@@ -241,7 +255,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 	{
 		title: "Clinic Templates",
 		href: "/scheduling/templates",
-		iconName: "calendar",
+		iconName: "records",
 		// Scheduler Story 13.1 — define provider clinic templates.
 		requiredPermissions: [{ module: "scheduling", action: "view" }],
 		requireAllPermissions: [{ module: "scheduling", action: "edit" }],
@@ -262,7 +276,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 	{
 		title: "Appointment Booking",
 		href: "/scheduling/book",
-		iconName: "calendar",
+		iconName: "patient",
 		// Scheduler Story 13.2 — search/select patient inside booking workflow.
 		requiredPermissions: [{ module: "scheduling", action: "view" }],
 		requireAllPermissions: [{ module: "scheduling", action: "create" }],
@@ -271,7 +285,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 	{
 		title: "Check-In",
 		href: "/scheduling/check-in",
-		iconName: "calendar",
+		iconName: "nursing",
 		// Scheduler Story 13.2 — mark appointments arrived and issue queue numbers.
 		requiredPermissions: [{ module: "scheduling", action: "view" }],
 		requireAllPermissions: [{ module: "scheduling", action: "create" }],
@@ -280,7 +294,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 	{
 		title: "OPD Queue",
 		href: "/scheduling/queue",
-		iconName: "calendar",
+		iconName: "sla",
 		// Scheduler Story 13.2 — monitor and advance the OPD queue.
 		requiredPermissions: [{ module: "scheduling", action: "view" }],
 		requireAllPermissions: [{ module: "scheduling", action: "edit" }],
@@ -313,6 +327,13 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		],
 		// Exclude Scheduler who has adt:view/create but shouldn't manage beds
 		excludePermissions: [{ module: "scheduling", action: "view" }],
+	},
+	{
+		title: "Housekeeping",
+		href: "/beds/housekeeping",
+		iconName: "bed",
+		requiredPermissions: [{ module: "adt", action: "edit" }],
+		requireAllPermissions: REGISTRAR_ROLE_BUNDLE,
 	},
 	{
 		title: "Emergency",
@@ -354,6 +375,20 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		href: "/registrar/civil-registry",
 		iconName: "records",
 		requiredPermissions: [{ module: "civil_registry", action: "view" }],
+		requireAllPermissions: REGISTRAR_ROLE_BUNDLE,
+	},
+	{
+		title: "Patient Transfers",
+		href: "/registrar/transfers",
+		iconName: "bed",
+		requiredPermissions: [{ module: "adt", action: "edit" }],
+		requireAllPermissions: REGISTRAR_ROLE_BUNDLE,
+	},
+	{
+		title: "Discharge Processing",
+		href: "/registrar/discharge",
+		iconName: "bed",
+		requiredPermissions: [{ module: "adt", action: "edit" }],
 		requireAllPermissions: REGISTRAR_ROLE_BUNDLE,
 	},
 	{
@@ -438,6 +473,13 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		requiredPermissions: [{ module: "nursing", action: "view" }],
 		// Physicians have nursing:view to read nursing notes, not to manage the nursing dashboard
 		excludePermissions: [{ module: "clinical_docs", action: "sign" }],
+		excludeAllPermissions: TRIAGE_ROLE_BUNDLE,
+	},
+	{
+		title: "Pending Transfers",
+		href: "/nursing/transfers",
+		iconName: "bed",
+		requiredPermissions: [{ module: "nursing", action: "create" }],
 		excludeAllPermissions: TRIAGE_ROLE_BUNDLE,
 	},
 	{
@@ -662,15 +704,6 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		isSecondary: true,
 	},
 	{
-		title: "Nutrition",
-		href: "/nutrition",
-		iconName: "nutrition",
-		// nutrition:view is the dedicated module permission (seeded for Clinical Dietitian)
-		// Nurses access dietary information via clinical notes, not the Nutrition module
-		requiredPermissions: [{ module: "nutrition", action: "view" }],
-		isSecondary: true,
-	},
-	{
 		title: "Blood Bank",
 		href: "/blood-bank",
 		iconName: "blood-bank",
@@ -682,7 +715,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 	},
 	{
 		title: "Patients",
-		href: "/patients/register",
+		href: "/patients/search",
 		iconName: "patient",
 		// Lab Techs, Radiologists, and Pharmacists access patients from SECONDARY for contextual lookup
 		requiredPermissions: [
@@ -700,14 +733,6 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		requiredPermissions: [{ module: "formulary", action: "view" }],
 		// Dual-gate: admin governance surface requires admin:view (FORM-005)
 		requireAllPermissions: [{ module: "admin", action: "view" }],
-		isSecondary: true,
-	},
-	{
-		title: "OPD Dispensing",
-		href: "/pharmacy/opd",
-		iconName: "pill",
-		// OPD dispensing for outpatient prescription processing
-		requiredPermissions: [{ module: "orders", action: "verify" }],
 		isSecondary: true,
 	},
 	{

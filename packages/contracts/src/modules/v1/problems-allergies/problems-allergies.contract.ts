@@ -26,6 +26,7 @@ import {
 	TerminologySearchSchema,
 	UpdateAllergySchema,
 	UpdateProblemSchema,
+	VerifyAllergySchema,
 } from "./problems-allergies.schema.js"
 
 export const problemsAllergiesContract = {
@@ -87,7 +88,7 @@ export const problemsAllergiesContract = {
 		.route({
 			method: "DELETE",
 			path: "/problems/{id}",
-			summary: "Delete a problem",
+			summary: "Mark a problem as entered in error",
 			tags: ["Problems & Allergies"],
 		})
 		.input(DeleteProblemSchema)
@@ -145,6 +146,16 @@ export const problemsAllergiesContract = {
 			tags: ["Problems & Allergies"],
 		})
 		.input(DeactivateAllergySchema)
+		.output(AllergySchema),
+
+	verifyAllergy: oc
+		.route({
+			method: "PUT",
+			path: "/allergies/{id}/verify",
+			summary: "Physician verification of an allergy record (Flow D5 gate for CDS blocking)",
+			tags: ["Problems & Allergies"],
+		})
+		.input(VerifyAllergySchema)
 		.output(AllergySchema),
 
 	// ========================================================================

@@ -48,6 +48,8 @@ const dialogContentVariants = cva(
 				lg: "sm:max-w-2xl",
 				xl: "sm:max-w-5xl",
 				full: "sm:max-w-[min(1100px,calc(100vw-2rem))]",
+			stepper:
+				"sm:max-w-[min(1100px,calc(100vw-2rem))] max-h-[calc(100svh-2rem)] overflow-y-auto",
 			},
 		},
 		defaultVariants: {

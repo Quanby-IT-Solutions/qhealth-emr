@@ -34,6 +34,7 @@
   - **So that** electronic prescriptions and controlled drug orders remain legally compliant with FDA and PDEA mandates
   - **Pages**: Clinician License Management Page, License Verification Page
 
+DONE - RICARDO
 - **Story 1.5 – Break-Glass Emergency Access**
   - **As a** Physician
   - **I want to** request emergency override access to a patient chart with a justification
@@ -103,6 +104,7 @@
   - **I want to** generate Birth and Death Certificates with inherited patient data
   - **So that** I can submit official documentation to the Local Civil Registry without duplicate entry
   - **Pages**: Birth Certificate Generation Page, Death Certificate Generation Page, LCR Tracking Page
+  - **Boundary**: Registrar death certificates use Civil Registry records; FMDRF and FNDRF stay under Death Reporting for maternal and neonatal review.
 
 - **Story 2.9 – Post-Discharge Bed Cleaning Status**
   - **As a** Registrar
@@ -126,7 +128,7 @@
   - **So that** non-admitted emergency cases are routed to the correct PhilHealth outpatient billing workflow
   - **Pages**: ER Disposition Page, OECB Tag Page
 
-for rechecking - KARL
+DONE - KARL
 - **Story 3.3 – ER Patient Tracker**
   - **As a** Nurse
   - **I want to** view all active ER patients with acuity, status, and elapsed time
@@ -378,6 +380,7 @@ DONE - KARL
   - **So that** prescribers receive guidance without inventory-level coupling
   - **Pages**: Formulary Management Page, Formulary Note Editor
 
+DONE - KARL
 - **Story 10.3 – Outpatient Pharmacy Dispensing**
   - **As a** Pharmacist
   - **I want to** scan an e-Prescription barcode/MRN to retrieve valid CPOE prescriptions and dispense medications
@@ -410,6 +413,7 @@ DONE - KARL
   - **As a** Billing Officer
   - **I want to** capture charges for clinical services rendered
   - **So that** invoices accurately reflect the care delivered
+  
   - **Pages**: Charge Capture Page, Service Item Page
 
 - **Story 12.2 – Invoice & Payment Processing**
@@ -496,6 +500,7 @@ DONE - KARL
   - **As a** Physician
   - **I want to** initiate a virtual encounter via an integrated commercial video platform link (Zoom/Teams)
   - **So that** telemedicine consultations are documented natively in the EMR
+  - **Clarification**: The system defaults the encounter context from the appointment source: standalone when booked as a virtual-only consult, or linked when booked as a follow-up to an existing OPD, ER, or inpatient visit. The physician confirms or changes the context when documenting.
   - **Pages**: Telemedicine Encounter Page, Video Link Launch Page
 
 - **Story 14.2 – Tele-Encounter Clinical Abstract & e-Rx**

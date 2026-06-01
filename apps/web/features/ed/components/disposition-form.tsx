@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ArrowRightLeft, BedDouble, HeartOff, LogOut } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -16,6 +16,7 @@ import {
 import { useBedListQuery, useWardsQuery } from "@/features/beds/api/beds.hooks"
 import { useNotesQuery } from "@/features/clinical-docs/api/clinical-docs.hooks"
 import {
+	isDeathReportSubmitted,
 	isMaternalDeathCandidate,
 	isNeonatalDeathCandidate,
 	useDeathReportStatusQuery,
@@ -118,8 +119,15 @@ export function DispositionForm({
 	const needsFndrf = patientDateOfBirth ? isNeonatalDeathCandidate(patientDateOfBirth) : false
 	const needsDeathReport = disposition === "deceased" && (needsFmdrf || needsFndrf)
 	const deathReportsDone =
-		(!needsFmdrf || (deathStatus?.hasFmdrf ?? false)) &&
-		(!needsFndrf || (deathStatus?.hasFndrf ?? false))
+		(!needsFmdrf || isDeathReportSubmitted(deathStatus?.fmdrfStatus)) &&
+		(!needsFndrf || isDeathReportSubmitted(deathStatus?.fndrfStatus))
+
+	useEffect(() => {
+		if (needsDeathReport && !deathReportsDone) {
+			// eslint-disable-next-line react-hooks/set-state-in-effect
+			setDeathReportOpen(true)
+		}
+	}, [deathReportsDone, needsDeathReport])
 
 	function doDispose() {
 		if (!disposition) return
@@ -127,8 +135,7 @@ export function DispositionForm({
 			{
 				encounterId,
 				disposition,
-				oecbEligible:
-					disposition === "discharge" || disposition === "transfer" ? oecbEligible : false,
+				oecbEligible: disposition === "discharge" ? oecbEligible : false,
 				admitWardId: disposition === "admit" && admitWardId ? admitWardId : undefined,
 				admitBedId: disposition === "admit" && admitBedId ? admitBedId : undefined,
 			},
@@ -176,7 +183,7 @@ export function DispositionForm({
 									type="button"
 									onClick={() => {
 										setDisposition(opt.value)
-										if (opt.value !== "discharge" && opt.value !== "transfer") {
+										if (opt.value !== "discharge") {
 											setOecbChecklist(OECB_CRITERIA.map(() => false))
 											setTagAsOecb(false)
 										}
@@ -212,7 +219,7 @@ export function DispositionForm({
 							>
 								<SelectTrigger className="w-full">
 									<SelectValue placeholder="Select ward...">
-									        {admitWardId ? (wards ?? []).find(w => w.id === admitWardId)?.name : undefined}
+										{admitWardId ? (wards ?? []).find(w => w.id === admitWardId)?.name : undefined}
 									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
@@ -231,7 +238,9 @@ export function DispositionForm({
 								<Select value={admitBedId || null} onValueChange={v => setAdmitBedId(v ?? "")}>
 									<SelectTrigger className="w-full">
 										<SelectValue placeholder="Select bed...">
-										        {admitBedId ? availableBeds.find(b => b.id === admitBedId)?.bedNumber : undefined}
+											{admitBedId
+												? availableBeds.find(b => b.id === admitBedId)?.bedNumber
+												: undefined}
 										</SelectValue>
 									</SelectTrigger>
 									<SelectContent>
@@ -248,7 +257,7 @@ export function DispositionForm({
 				)}
 
 				{/* OECB eligibility checklist */}
-				{(disposition === "discharge" || disposition === "transfer") && (
+				{disposition === "discharge" && (
 					<div className="space-y-2">
 						<Label>OECB Eligibility Checklist</Label>
 						<div className="space-y-2 rounded-md border p-3">
@@ -265,8 +274,7 @@ export function DispositionForm({
 											Tag as OECB (Outpatient Emergency Care Benefit)
 										</Label>
 										<p className="text-xs text-blue-800">
-											Routes eligible ED discharge or transfer cases to PhilHealth outpatient
-											billing.
+											Routes eligible ED discharge cases to PhilHealth outpatient billing.
 										</p>
 									</div>
 								</div>

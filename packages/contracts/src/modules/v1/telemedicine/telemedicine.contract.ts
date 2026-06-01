@@ -7,24 +7,37 @@ import {
 	CreateAppointmentInputSchema,
 	CreateEncounterInputSchema,
 	CreatePrescriptionInputSchema,
+	EndLiveKitSessionInputSchema,
 	EPrescriptionSchema,
 	GenerateAbstractInputSchema,
 	GetAbstractInputSchema,
 	GetAppointmentInputSchema,
 	GetEncounterInputSchema,
 	GetPrescriptionInputSchema,
+	JoinLiveKitRoomInputSchema,
+	JoinPatientLiveKitRoomInputSchema,
 	ListAppointmentsInputSchema,
 	ListEncounterAbstractsInputSchema,
 	ListPrescriptionsInputSchema,
+	LiveKitSessionEndResponseSchema,
+	LiveKitTokenResponseSchema,
+	PatientInviteActionInputSchema,
+	PatientInvitePreviewSchema,
+	PatientInviteResponseSchema,
+	PatientInviteStatusResponseSchema,
+	PatientInviteTokenInputSchema,
 	SendAbstractInputSchema,
+	SendPrescriptionInputSchema,
 	SignAbstractInputSchema,
+	SignPrescriptionInputSchema,
 	TeleAbstractSchema,
 	TelemedicineAppointmentSchema,
 	TelemedicineEncounterSchema,
+	UpdateAppointmentInputSchema,
 } from "./telemedicine.schema.js"
 
 export const telemedicineContract = {
-	// ─── Appointments ──────────────────────────────────────────────────────────
+	// Appointments
 
 	listAppointments: oc
 		.route({
@@ -56,6 +69,16 @@ export const telemedicineContract = {
 		.input(CreateAppointmentInputSchema)
 		.output(TelemedicineAppointmentSchema),
 
+	updateAppointment: oc
+		.route({
+			method: "PATCH",
+			path: "/appointments/{id}",
+			summary: "Update a telemedicine appointment",
+			tags: ["Telemedicine"],
+		})
+		.input(UpdateAppointmentInputSchema)
+		.output(TelemedicineAppointmentSchema),
+
 	cancelAppointment: oc
 		.route({
 			method: "POST",
@@ -66,7 +89,67 @@ export const telemedicineContract = {
 		.input(CancelAppointmentInputSchema)
 		.output(z.void()),
 
-	// ─── Encounters ────────────────────────────────────────────────────────────
+	joinLiveKitRoom: oc
+		.route({
+			method: "POST",
+			path: "/appointments/{id}/livekit-token",
+			summary: "Get a LiveKit access token for a telemedicine appointment",
+			tags: ["Telemedicine"],
+		})
+		.input(JoinLiveKitRoomInputSchema)
+		.output(LiveKitTokenResponseSchema),
+
+	endLiveKitSession: oc
+		.route({
+			method: "POST",
+			path: "/appointments/{id}/livekit-session/end",
+			summary: "Mark a LiveKit session as ended for a telemedicine appointment",
+			tags: ["Telemedicine"],
+		})
+		.input(EndLiveKitSessionInputSchema)
+		.output(LiveKitSessionEndResponseSchema),
+
+	regeneratePatientInvite: oc
+		.route({
+			method: "POST",
+			path: "/appointments/{id}/patient-invite/regenerate",
+			summary: "Regenerate the patient LiveKit invite for a telemedicine appointment",
+			tags: ["Telemedicine"],
+		})
+		.input(PatientInviteActionInputSchema)
+		.output(PatientInviteResponseSchema),
+
+	revokePatientInvite: oc
+		.route({
+			method: "POST",
+			path: "/appointments/{id}/patient-invite/revoke",
+			summary: "Revoke the patient LiveKit invite for a telemedicine appointment",
+			tags: ["Telemedicine"],
+		})
+		.input(PatientInviteActionInputSchema)
+		.output(PatientInviteStatusResponseSchema),
+
+	getPatientInvitePreview: oc
+		.route({
+			method: "GET",
+			path: "/patient-invites/{token}",
+			summary: "Get public appointment preview for a patient LiveKit invite",
+			tags: ["Telemedicine"],
+		})
+		.input(PatientInviteTokenInputSchema)
+		.output(PatientInvitePreviewSchema),
+
+	joinPatientLiveKitRoom: oc
+		.route({
+			method: "POST",
+			path: "/patient-invites/{token}/livekit-token",
+			summary: "Get a patient LiveKit access token for a telemedicine invite",
+			tags: ["Telemedicine"],
+		})
+		.input(JoinPatientLiveKitRoomInputSchema)
+		.output(LiveKitTokenResponseSchema),
+
+	// Encounters
 
 	getEncounter: oc
 		.route({
@@ -88,7 +171,7 @@ export const telemedicineContract = {
 		.input(CreateEncounterInputSchema)
 		.output(TelemedicineEncounterSchema),
 
-	// ─── Prescriptions ─────────────────────────────────────────────────────────
+	// Prescriptions
 
 	getPrescription: oc
 		.route({
@@ -120,7 +203,29 @@ export const telemedicineContract = {
 		.input(CreatePrescriptionInputSchema)
 		.output(EPrescriptionSchema),
 
-	// ─── Abstracts ─────────────────────────────────────────────────────────────
+	// Prescription Actions
+
+	signPrescription: oc
+		.route({
+			method: "POST",
+			path: "/prescriptions/{id}/sign",
+			summary: "Sign a telemedicine e-prescription",
+			tags: ["Telemedicine"],
+		})
+		.input(SignPrescriptionInputSchema)
+		.output(EPrescriptionSchema),
+
+	sendPrescription: oc
+		.route({
+			method: "POST",
+			path: "/prescriptions/{id}/send",
+			summary: "Send a telemedicine e-prescription",
+			tags: ["Telemedicine"],
+		})
+		.input(SendPrescriptionInputSchema)
+		.output(EPrescriptionSchema),
+
+	// Abstracts
 
 	generateAbstract: oc
 		.route({

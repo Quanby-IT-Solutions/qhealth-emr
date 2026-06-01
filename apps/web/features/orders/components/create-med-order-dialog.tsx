@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { AlertCircle, Eye, ShieldAlert } from "lucide-react"
+import { AlertCircle, AlertTriangle, Ban, Bell, CheckCircle2, Eye, ShieldAlert } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -31,12 +31,13 @@ import {
 	useCreateMedOrderMutation,
 	useCreateTranchedOrdersMutation,
 	useEvaluateCdsMutation,
+	useMedOrderListQuery,
 	type CdsEvaluateResponse,
 } from "@/features/orders/api/orders.hooks"
 import { DrugSearchCombobox } from "@/features/orders/components/drug-search-combobox"
 
-import { AllergyAlertBanner, type AllergyAlertItem } from "./allergy-alert-banner"
-import { CdsAlertBanner, type CdsAlertItem } from "./cds-alert-banner"
+import type { AllergyAlertItem } from "./allergy-alert-banner"
+import type { CdsAlertItem } from "./cds-alert-banner"
 import {
 	HighAlertVerificationDialog,
 	type HighAlertVerificationDraft,
@@ -45,8 +46,33 @@ import { S2ValidationModal } from "./s2-validation-modal"
 import { TranchingPreviewModal, type TrancheRow } from "./tranching-preview-modal"
 
 const TRANCHE_THRESHOLD_DAYS = 30
+const MAX_CONTROLLED_DAYS = 90
+
+const PDEA_SCHEDULE_OPTIONS = [
+	{ value: "S-2", label: "S-2 / List A" },
+	{ value: "S-3", label: "S-3" },
+	{ value: "S-4", label: "S-4" },
+] as const
 
 type CdsResult = CdsEvaluateResponse
+
+type SafetyReviewRow =
+	| {
+			id: string
+			source: "cds"
+			severity: CdsAlertItem["severity"]
+			title: string
+			message: string
+			canOverride: boolean
+	  }
+	| {
+			id: string
+			source: "allergy"
+			severity: AllergyAlertItem["blockType"]
+			title: string
+			message: string
+			canOverride: boolean
+	  }
 
 const FREQUENCY_OPTIONS = [
 	{ value: "stat", label: "STAT (immediately)" },
@@ -64,7 +90,17 @@ const FREQUENCY_OPTIONS = [
 
 type FrequencyValue = (typeof FREQUENCY_OPTIONS)[number]["value"]
 
-const REPEATING_FREQUENCIES: FrequencyValue[] = ["q4h", "q6h", "q8h", "q12h", "daily", "bid", "tid", "qid"]
+const REPEATING_FREQUENCIES: FrequencyValue[] = [
+	"q4h",
+	"q6h",
+	"q8h",
+	"q12h",
+	"daily",
+	"bid",
+	"tid",
+	"qid",
+]
+const OPEN_MED_ORDER_STATUSES = new Set(["pending_verification", "verified", "active"])
 
 function getNextHour(): string {
 	const d = new Date()
@@ -100,6 +136,222 @@ function formatDisplayDate(dateStr: string | null | undefined) {
 	})
 }
 
+function isPastDate(dateStr: string | null | undefined) {
+	if (!dateStr) return false
+	const date = new Date(dateStr)
+	date.setHours(0, 0, 0, 0)
+	const today = new Date()
+	today.setHours(0, 0, 0, 0)
+	return date < today
+}
+
+function formatAllergyDetails(alert: AllergyAlertItem) {
+	return [
+		alert.severity,
+		alert.matchType === "class" && alert.allergyClass ? alert.allergyClass : null,
+		alert.reactionType,
+	]
+		.filter(Boolean)
+		.join(" / ")
+}
+
+function buildSafetyRows(cdsAlerts: CdsAlertItem[], allergyAlerts: AllergyAlertItem[]) {
+	const rows: SafetyReviewRow[] = [
+		...cdsAlerts.map(alert => ({
+			id: alert.id,
+			source: "cds" as const,
+			severity: alert.severity,
+			title:
+				alert.severity === "hard_block"
+					? "Hard block"
+					: alert.severity === "soft_block"
+						? "Override required"
+						: alert.severity === "high_alert"
+							? "High-alert medication"
+							: "Warning",
+			message: alert.message,
+			canOverride: alert.severity === "soft_block",
+		})),
+		...allergyAlerts.map(alert => {
+			const details = formatAllergyDetails(alert)
+			return {
+				id: alert.id,
+				source: "allergy" as const,
+				severity: alert.blockType,
+				title:
+					alert.blockType === "hard_block" ? "Allergy hard block" : "Allergy override required",
+				message: `${alert.allergenName}${details ? ` (${details})` : ""}`,
+				canOverride: alert.blockType === "soft_block",
+			}
+		}),
+	]
+
+	const rank = (row: SafetyReviewRow) =>
+		row.severity === "hard_block"
+			? 0
+			: row.severity === "high_alert"
+				? 1
+				: row.severity === "soft_block"
+					? 2
+					: 3
+
+	return rows.sort((a, b) => rank(a) - rank(b))
+}
+
+function SafetyReviewPanel({
+	rows,
+	overrideReasons,
+	allergyOverrideReasons,
+	overriddenAlerts,
+	allergyOverriddenAlerts,
+	onOverrideReasonChange,
+	onAllergyOverrideReasonChange,
+	onOverride,
+	onAllergyOverride,
+}: {
+	rows: SafetyReviewRow[]
+	overrideReasons: Record<string, string>
+	allergyOverrideReasons: Record<string, string>
+	overriddenAlerts: Set<string>
+	allergyOverriddenAlerts: Set<string>
+	onOverrideReasonChange: (id: string, reason: string) => void
+	onAllergyOverrideReasonChange: (id: string, reason: string) => void
+	onOverride: (id: string, reason: string) => void
+	onAllergyOverride: (id: string, reason: string) => void
+}) {
+	const [openOverrideId, setOpenOverrideId] = useState<string | null>(null)
+
+	if (rows.length === 0) return null
+
+	return (
+		<section className="bg-background overflow-hidden rounded-lg border">
+			<div className="bg-muted/30 flex items-center justify-between gap-3 border-b px-3 py-2.5">
+				<div>
+					<h3 className="text-sm font-semibold">Safety Review</h3>
+					<p className="text-muted-foreground text-xs">
+						{rows.length} alert{rows.length === 1 ? "" : "s"} from the latest drug safety check
+					</p>
+				</div>
+			</div>
+			<div className="divide-y">
+				{rows.map(row => {
+					const key = `${row.source}-${row.id}`
+					const isHardBlock = row.severity === "hard_block"
+					const isSoftBlock = row.severity === "soft_block"
+					const isHighAlert = row.severity === "high_alert"
+					const isAllergy = row.source === "allergy"
+					const reason = isAllergy ? allergyOverrideReasons[row.id] : overrideReasons[row.id]
+					const isOverridden = isAllergy
+						? allergyOverriddenAlerts.has(row.id)
+						: overriddenAlerts.has(row.id)
+					const Icon = isHardBlock
+						? Ban
+						: isHighAlert
+							? ShieldAlert
+							: isSoftBlock
+								? AlertTriangle
+								: Bell
+
+					return (
+						<div
+							key={key}
+							data-testid={`${row.source}-alert-${row.id}`}
+							className={cn(
+								"px-3 py-3",
+								isHardBlock && "bg-red-500/5",
+								isSoftBlock && "bg-amber-500/5"
+							)}
+						>
+							<div className="flex items-start gap-3">
+								<div
+									className={cn(
+										"mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full",
+										isHardBlock && "bg-red-500/10 text-red-600 dark:text-red-400",
+										isSoftBlock && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+										isHighAlert && "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+										!isHardBlock && !isSoftBlock && !isHighAlert && "bg-muted text-muted-foreground"
+									)}
+								>
+									<Icon className="size-4" />
+								</div>
+								<div className="min-w-0 flex-1">
+									<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+										<span className="text-sm font-semibold">{row.title}</span>
+										<span
+											data-testid={
+												row.source === "cds" ? `cds-alert-${row.id}-severity` : undefined
+											}
+											className="sr-only"
+										>
+											{row.severity}
+										</span>
+										{isOverridden ? (
+											<span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+												<CheckCircle2 className="size-3" />
+												Overridden
+											</span>
+										) : null}
+									</div>
+									<p className="text-muted-foreground mt-0.5 text-sm">{row.message}</p>
+								</div>
+								{isHardBlock ? (
+									<span className="text-muted-foreground shrink-0 text-xs font-medium">
+										Cannot proceed
+									</span>
+								) : row.canOverride ? (
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										aria-label={`${isOverridden ? "Edit override" : "Override"} ${row.id}`}
+										className="h-8 shrink-0 text-amber-700 hover:bg-amber-500/10 hover:text-amber-800 dark:text-amber-300"
+										onClick={() => setOpenOverrideId(openOverrideId === key ? null : key)}
+									>
+										{openOverrideId === key ? "Cancel" : isOverridden ? "Edit" : "Override"}
+									</Button>
+								) : null}
+							</div>
+
+							{row.canOverride && openOverrideId === key ? (
+								<div className="mt-3 space-y-2 pl-10">
+									<Label className="text-xs font-medium">Override reason</Label>
+									<Textarea
+										rows={2}
+										value={reason ?? ""}
+										onChange={event =>
+											isAllergy
+												? onAllergyOverrideReasonChange(row.id, event.target.value)
+												: onOverrideReasonChange(row.id, event.target.value)
+										}
+										placeholder="Document the clinical justification..."
+										className="text-sm"
+									/>
+									<Button
+										type="button"
+										size="sm"
+										disabled={!reason?.trim()}
+										onClick={() => {
+											if (!reason?.trim()) return
+											if (isAllergy) {
+												onAllergyOverride(row.id, reason.trim())
+											} else {
+												onOverride(row.id, reason.trim())
+											}
+											setOpenOverrideId(null)
+										}}
+									>
+										Confirm Override
+									</Button>
+								</div>
+							) : null}
+						</div>
+					)
+				})}
+			</div>
+		</section>
+	)
+}
+
 export function CreateMedOrderDialog({
 	open,
 	onOpenChange,
@@ -112,6 +364,7 @@ export function CreateMedOrderDialog({
 	// ── Drug fields ──────────────────────────────────────────────────────────
 	const [genericName, setGenericName] = useState("")
 	const [formularyItemId, setFormularyItemId] = useState<string | undefined>(undefined)
+	const [selectedGenericIsNonFormulary, setSelectedGenericIsNonFormulary] = useState(false)
 	const [brandName, setBrandName] = useState("")
 	const [dose, setDose] = useState("")
 	const [doseUnit, setDoseUnit] = useState("")
@@ -160,16 +413,16 @@ export function CreateMedOrderDialog({
 	const createHighAlertVerification = useCreateHighAlertVerificationMutation()
 	const createMedOrder = useCreateMedOrderMutation()
 	const createTranchedOrders = useCreateTranchedOrdersMutation()
+	const existingMedOrders = useMedOrderListQuery({ encounterId, limit: 100 })
 
 	// ── PDEA validation ──────────────────────────────────────────────────────
 	const staffProfile =
-		profile?.staffProfiles?.find(p => p.id === orderingStaffId) ??
-		profile?.staffProfiles?.find(p => p.facilityId === facilityId) ??
-		profile?.staffProfiles?.[0]
+		profile?.staffProfiles?.find(p => p.id === orderingStaffId && p.facilityId === facilityId) ??
+		profile?.staffProfiles?.find(p => p.facilityId === facilityId)
 	const pdeaLicense = staffProfile?.pdeaS2License ?? null
 	const pdeaExpiry = staffProfile?.pdeaS2Expiry ?? null
-	const pdeaExpired = pdeaExpiry != null ? new Date(pdeaExpiry) < new Date() : false
-	const pdeaValid = pdeaLicense != null && !pdeaExpired
+	const pdeaExpired = isPastDate(pdeaExpiry)
+	const pdeaValid = pdeaLicense !== null && pdeaExpiry !== null && !pdeaExpired
 	const pdeaLicenseStatus = useCheckPdeaLicenseQuery({
 		staffId: orderingStaffId,
 		facilityId,
@@ -180,6 +433,11 @@ export function CreateMedOrderDialog({
 	const livePdeaCanPrescribe = !isControlledSubstance
 		? true
 		: Boolean(livePdeaStatus?.canPrescribeControlled)
+	const duplicateOpenMedOrder = (existingMedOrders.data?.data ?? []).find(
+		order =>
+			OPEN_MED_ORDER_STATUSES.has(order.status) &&
+			order.genericName.trim().toLowerCase() === genericName.trim().toLowerCase()
+	)
 
 	function handleControlledSubstanceChange(checked: boolean) {
 		if (!checked) {
@@ -204,14 +462,7 @@ export function CreateMedOrderDialog({
 				genericName: genericName.trim().toLowerCase(),
 				isControlledSubstance,
 			}),
-		[
-			patientId,
-			facilityId,
-			orderingStaffId,
-			formularyItemId,
-			genericName,
-			isControlledSubstance,
-		]
+		[patientId, facilityId, orderingStaffId, formularyItemId, genericName, isControlledSubstance]
 	)
 	const hasFreshCdsCheck = cdsResult !== null && lastCdsCheckSignature === cdsCheckSignature
 	const freshCdsAlerts = hasFreshCdsCheck ? (cdsResult?.alerts ?? []) : []
@@ -239,6 +490,8 @@ export function CreateMedOrderDialog({
 				allergenName?: string
 				severity?: string
 				reactionType?: string | null
+				matchType?: "exact" | "class"
+				allergyClass?: string | null
 			}
 
 			return {
@@ -247,6 +500,8 @@ export function CreateMedOrderDialog({
 				allergenName: details.allergenName ?? genericName.trim(),
 				severity: details.severity ?? "unknown",
 				reactionType: details.reactionType ?? null,
+				matchType: details.matchType,
+				allergyClass: details.allergyClass ?? null,
 			}
 		})
 
@@ -255,16 +510,22 @@ export function CreateMedOrderDialog({
 		a => a.blockType === "soft_block" && !allergyOverriddenAlerts.has(a.id)
 	)
 	const allergyAllSoftBlocksOverridden = unoverriddenAllergySoftBlocks.length === 0
+	const safetyReviewRows = buildSafetyRows(normalizedAlerts, normalizedAllergyAlerts)
 
 	// ── Tranche helpers ──────────────────────────────────────────────────────
 	const durationNum = durationDays ? Number(durationDays) : 0
-	const needsTranching = isControlledSubstance && durationNum > TRANCHE_THRESHOLD_DAYS
+	const controlledDurationMissing = isControlledSubstance && !durationDays
+	const controlledDurationTooLong = isControlledSubstance && durationNum > MAX_CONTROLLED_DAYS
+	const needsTranching =
+		isControlledSubstance &&
+		durationNum > TRANCHE_THRESHOLD_DAYS &&
+		durationNum <= MAX_CONTROLLED_DAYS
 
 	// ── Schedule anchor helpers ──────────────────────────────────────────────
-	const isRepeatingFrequency = frequency !== "" && REPEATING_FREQUENCIES.includes(frequency as FrequencyValue)
-	const needsInpatientFields =
-		encounterType === "inpatient" || encounterType === "emergency"
-	const durationRequired = isRepeatingFrequency
+	const isRepeatingFrequency =
+		frequency !== "" && REPEATING_FREQUENCIES.includes(frequency as FrequencyValue)
+	const needsInpatientFields = encounterType === "inpatient" || encounterType === "emergency"
+	const durationRequired = isRepeatingFrequency || isControlledSubstance
 	const firstDoseRequired = needsInpatientFields
 
 	// ── Submission readiness ─────────────────────────────────────────────────
@@ -281,11 +542,15 @@ export function CreateMedOrderDialog({
 		hasFreshCdsCheck &&
 		(!durationRequired || !!durationDays) &&
 		(!firstDoseRequired || !!firstDoseAt) &&
+		!controlledDurationMissing &&
+		!controlledDurationTooLong &&
+		(!isControlledSubstance || durationNum > 0) &&
 		(!isControlledSubstance || !!pdeaSchedule.trim()) &&
 		!hasHardBlock &&
 		allSoftBlocksOverridden &&
 		!hasAllergyHardBlock &&
 		allergyAllSoftBlocksOverridden &&
+		!duplicateOpenMedOrder &&
 		hasLivePdeaValidation &&
 		livePdeaCanPrescribe
 	const canSubmit = canProceedToSubmit && (!requiresDoubleVerification || highAlertVerified)
@@ -311,6 +576,7 @@ export function CreateMedOrderDialog({
 	function resetForm() {
 		setGenericName("")
 		setFormularyItemId(undefined)
+		setSelectedGenericIsNonFormulary(false)
 		setBrandName("")
 		setDose("")
 		setDoseUnit("")
@@ -377,6 +643,9 @@ export function CreateMedOrderDialog({
 					setPendingSubmitOptions(null)
 					setHighAlertVerificationError(null)
 				},
+				onError: err => {
+					setSubmitError(err instanceof Error ? err.message : "Failed to run drug safety check")
+				},
 			}
 		)
 	}
@@ -399,13 +668,17 @@ export function CreateMedOrderDialog({
 		}
 	}
 
-	function handleOrderCreated(orderId: string) {
-		if (requiresDoubleVerification && pendingHighAlertVerification) {
+	function handleOrderCreated(
+		orderId: string,
+		highAlertVerificationDraft = pendingHighAlertVerification
+	) {
+		if (requiresDoubleVerification && highAlertVerificationDraft) {
 			createHighAlertVerification.mutate(
 				{
 					medicationOrderId: orderId,
-					verifyingStaffId: pendingHighAlertVerification.verifyingStaffId,
-					notes: pendingHighAlertVerification.notes,
+					verifyingStaffId: highAlertVerificationDraft.verifyingStaffId,
+					coSignerPassword: highAlertVerificationDraft.coSignerPassword,
+					notes: highAlertVerificationDraft.notes,
 				},
 				{
 					onSuccess: () => handleOpenChange(false),
@@ -444,7 +717,12 @@ export function CreateMedOrderDialog({
 		return overrides.length > 0 ? { overrides } : undefined
 	}
 
-	function doSubmit(trancheNumber?: number, trancheTotal?: number, trancheDays?: number) {
+	function doSubmit(
+		trancheNumber?: number,
+		trancheTotal?: number,
+		trancheDays?: number,
+		highAlertVerificationDraft?: HighAlertVerificationDraft | null
+	) {
 		const cdsOverrides = buildCdsOverrides()
 
 		setSubmitError(null)
@@ -474,13 +752,17 @@ export function CreateMedOrderDialog({
 				cdsOverrides,
 			},
 			{
-				onSuccess: order => handleOrderCreated(order.id),
-				onError: err => setSubmitError(err instanceof Error ? err.message : "Failed to create order"),
+				onSuccess: order => handleOrderCreated(order.id, highAlertVerificationDraft),
+				onError: err =>
+					setSubmitError(err instanceof Error ? err.message : "Failed to create order"),
 			}
 		)
 	}
 
-	function submitTranchedOrder(startDate?: string) {
+	function submitTranchedOrder(
+		startDate?: string,
+		highAlertVerificationDraft?: HighAlertVerificationDraft | null
+	) {
 		const cdsOverrides = buildCdsOverrides()
 
 		createTranchedOrders.mutate(
@@ -507,8 +789,9 @@ export function CreateMedOrderDialog({
 				cdsOverrides,
 			},
 			{
-				onSuccess: result => handleOrderCreated(result.parentOrder.id),
-				onError: err => setSubmitError(err instanceof Error ? err.message : "Failed to create order"),
+				onSuccess: result => handleOrderCreated(result.parentOrder.id, highAlertVerificationDraft),
+				onError: err =>
+					setSubmitError(err instanceof Error ? err.message : "Failed to create order"),
 			}
 		)
 	}
@@ -557,7 +840,13 @@ export function CreateMedOrderDialog({
 		setHighAlertVerificationError(null)
 	}
 
-	function handleHighAlertVerified() {
+	function handleHighAlertVerified(draft?: HighAlertVerificationDraft) {
+		const verificationDraft = draft ?? pendingHighAlertVerification
+
+		if (draft) {
+			setPendingHighAlertVerification(draft)
+		}
+
 		if (pendingHighAlertOrderId) {
 			setHighAlertVerified(true)
 			setHighAlertVerificationError(null)
@@ -572,11 +861,16 @@ export function CreateMedOrderDialog({
 		setPendingSubmitOptions(null)
 
 		if (submitOptions.useTranchedOrders) {
-			submitTranchedOrder(submitOptions.trancheStartDate)
+			submitTranchedOrder(submitOptions.trancheStartDate, verificationDraft)
 			return
 		}
 
-		doSubmit(submitOptions.trancheNumber, submitOptions.trancheTotal, submitOptions.trancheDays)
+		doSubmit(
+			submitOptions.trancheNumber,
+			submitOptions.trancheTotal,
+			submitOptions.trancheDays,
+			verificationDraft
+		)
 	}
 
 	return (
@@ -594,9 +888,25 @@ export function CreateMedOrderDialog({
 					<div className="grid gap-4 py-4">
 						{/* ── Generic Name (primary / required) ─────────── */}
 						<div className="space-y-2">
-							<Label htmlFor="genericName">
-								Generic Name <span className="text-destructive">*</span>
-							</Label>
+							<div className="flex items-center gap-2">
+								<Label htmlFor="genericName">
+									Generic Name <span className="text-destructive">*</span>
+								</Label>
+								<Badge
+									variant="outline"
+									className="border-emerald-400 text-[10px] text-emerald-700 dark:text-emerald-400"
+								>
+									RA 6675
+								</Badge>
+								{selectedGenericIsNonFormulary ? (
+									<Badge
+										variant="outline"
+										className="border-amber-400 text-[10px] text-amber-700 dark:text-amber-300"
+									>
+										Non-formulary
+									</Badge>
+								) : null}
+							</div>
 							<DrugSearchCombobox
 								id="genericName"
 								facilityId={facilityId}
@@ -606,17 +916,19 @@ export function CreateMedOrderDialog({
 
 									if (!item) {
 										setFormularyItemId(undefined)
+										setSelectedGenericIsNonFormulary(false)
 										return
 									}
 
 									setGenericName(item.genericName)
-									setFormularyItemId(item.id)
+									setFormularyItemId(item.formularyItemId)
+									setSelectedGenericIsNonFormulary(!item.isFormulary)
 
-									if (!doseForm.trim()) {
+									if (item.doseForm && !doseForm.trim()) {
 										setDoseForm(item.doseForm)
 									}
 
-									if (!route.trim()) {
+									if (item.route && !route.trim()) {
 										setRoute(item.route)
 									}
 								}}
@@ -625,65 +937,88 @@ export function CreateMedOrderDialog({
 								autoFocus
 							/>
 							<p className="text-muted-foreground text-xs">
-								Per RA 6675 (Generics Act), orders must specify the generic name.
+								Generic-first ordering is required. Brand and formulary status stay subordinate to
+								the generic name.
 							</p>
+							{duplicateOpenMedOrder ? (
+								<div className="border-destructive/30 bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+									<AlertCircle className="size-4 shrink-0" />
+									<span>
+										This encounter already has an open {duplicateOpenMedOrder.genericName} order.
+										Discontinue or update the existing order before creating another one.
+									</span>
+								</div>
+							) : null}
 						</div>
 
 						{/* ── Brand Name (secondary — only after generic entered) */}
 						{genericName.trim() && (
-							<div className="space-y-2">
-								<Label htmlFor="brandName">Brand Name (optional)</Label>
+							<div className="border-muted-foreground/25 space-y-1 border-l-2 pl-3">
+								<Label htmlFor="brandName" className="text-muted-foreground text-xs font-normal">
+									Brand Name (optional)
+								</Label>
 								<Input
 									id="brandName"
 									value={brandName}
 									onChange={e => setBrandName(e.target.value)}
-									placeholder="e.g., Amoxil — leave blank to dispense any generic"
+									placeholder="e.g., Amoxil — leave blank to dispense any generic equivalent"
+									className="h-8 text-sm"
+									aria-describedby="brand-name-hint"
 								/>
+								<p id="brand-name-hint" className="text-muted-foreground text-xs">
+									Generic name is required by the Generics Act of 1988. Brand name is optional.
+								</p>
 							</div>
 						)}
 
 						{/* ── CDS Check ────────────────────────────────── */}
-						<div className="bg-muted/30 space-y-2 rounded-lg border p-3">
-							<Button
-								type="button"
-								className="w-full justify-center font-semibold"
-								size="lg"
-								disabled={!genericName.trim() || !orderingStaffId || evaluateCds.isPending}
-								onClick={handleCheckCds}
-							>
-								<ShieldAlert className="size-4" />
-								{evaluateCds.isPending
-									? "Checking…"
-									: hasFreshCdsCheck
-										? "Re-run Drug Safety Check"
-										: "Run Drug Safety Check"}
-							</Button>
-							{cdsResult ? (
-								<p className="text-muted-foreground text-xs">
-									{hasFreshCdsCheck
-										? cdsResult.alerts.length === 0
-											? "✓ Safety check complete - no alerts"
-											: `${cdsResult.alerts.length} alert(s) found`
-										: "Safety check out of date - re-run before creating the order"}
-								</p>
-							) : (
-								<p className="text-muted-foreground text-xs">
-									Run the safety check before creating the order.
-								</p>
-							)}
+						<div className="bg-background rounded-lg border p-3">
+							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+								<div className="min-w-0">
+									<p className="text-sm font-semibold">Drug Safety Check</p>
+									<p className="text-muted-foreground text-xs">
+										{cdsResult
+											? hasFreshCdsCheck
+												? cdsResult.alerts.length === 0
+													? "Safety check complete - no medication-safety alerts for this order"
+													: `${cdsResult.alerts.length} alert${cdsResult.alerts.length === 1 ? "" : "s"} found`
+												: "Safety check out of date - re-run before creating the order"
+											: "Run once after selecting the generic drug."}
+									</p>
+								</div>
+								<Button
+									type="button"
+									variant={hasFreshCdsCheck ? "outline" : "default"}
+									className="shrink-0 font-semibold"
+									disabled={!genericName.trim() || !orderingStaffId || evaluateCds.isPending}
+									onClick={handleCheckCds}
+								>
+									<ShieldAlert className="size-4" />
+									{evaluateCds.isPending
+										? "Checking..."
+										: hasFreshCdsCheck
+											? "Re-run"
+											: "Run Drug Safety Check"}
+								</Button>
+							</div>
 						</div>
 
 						{/* ── CDS Alert Banner ─────────────────────────── */}
-						{normalizedAlerts.length > 0 && (
-							<CdsAlertBanner
-								alerts={normalizedAlerts}
-								overrideReasons={overrideReasons}
-								onOverrideReasonChange={(id, reason) =>
-									setOverrideReasons(prev => ({ ...prev, [id]: reason }))
-								}
-								onOverride={handleOverride}
-							/>
-						)}
+						<SafetyReviewPanel
+							rows={safetyReviewRows}
+							overrideReasons={overrideReasons}
+							allergyOverrideReasons={allergyOverrideReasons}
+							overriddenAlerts={overriddenAlerts}
+							allergyOverriddenAlerts={allergyOverriddenAlerts}
+							onOverrideReasonChange={(id, reason) =>
+								setOverrideReasons(prev => ({ ...prev, [id]: reason }))
+							}
+							onAllergyOverrideReasonChange={(id, reason) =>
+								setAllergyOverrideReasons(prev => ({ ...prev, [id]: reason }))
+							}
+							onOverride={handleOverride}
+							onAllergyOverride={handleAllergyOverride}
+						/>
 
 						{/* ── Allergy Alert Banner ──────────────────────── */}
 						{requiresDoubleVerification && (
@@ -708,17 +1043,6 @@ export function CreateMedOrderDialog({
 								<AlertCircle className="size-4 shrink-0" />
 								<span>{submitError}</span>
 							</div>
-						)}
-
-						{normalizedAllergyAlerts.length > 0 && (
-							<AllergyAlertBanner
-								alerts={normalizedAllergyAlerts}
-								overrideReasons={allergyOverrideReasons}
-								onOverrideReasonChange={(id, reason) =>
-									setAllergyOverrideReasons(prev => ({ ...prev, [id]: reason }))
-								}
-								onOverride={handleAllergyOverride}
-							/>
 						)}
 
 						{/* ── Dosing ───────────────────────────────────── */}
@@ -794,8 +1118,7 @@ export function CreateMedOrderDialog({
 							</div>
 							<div className="space-y-2">
 								<Label htmlFor="durationDays">
-									Duration (days){" "}
-									{durationRequired && <span className="text-destructive">*</span>}
+									Duration (days) {durationRequired && <span className="text-destructive">*</span>}
 								</Label>
 								<Input
 									id="durationDays"
@@ -834,6 +1157,12 @@ export function CreateMedOrderDialog({
 									This order spans more than 30 days. PDEA regulations require dispensing in 30-day
 									tranches. Click <strong>Preview Tranches</strong> to review before submitting.
 								</span>
+							</div>
+						)}
+						{controlledDurationTooLong && (
+							<div className="border-destructive bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+								<AlertCircle className="size-4 shrink-0" />
+								PDEA controlled substance orders cannot exceed {MAX_CONTROLLED_DAYS} days.
 							</div>
 						)}
 
@@ -893,10 +1222,17 @@ export function CreateMedOrderDialog({
 									ordering controlled substances.
 								</div>
 							)}
-							{pdeaLicense != null && pdeaExpired && (
+							{pdeaLicense !== null && pdeaExpired && (
 								<div className="border-destructive bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
 									<AlertCircle className="size-4 shrink-0" />
 									PDEA S-2 license expired ({pdeaExpiry}). Renew your license before ordering
+									controlled substances.
+								</div>
+							)}
+							{pdeaLicense !== null && !pdeaExpiry && (
+								<div className="border-destructive bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+									<AlertCircle className="size-4 shrink-0" />
+									PDEA S-2 license expiry is not recorded. Contact administration before ordering
 									controlled substances.
 								</div>
 							)}
@@ -945,8 +1281,8 @@ export function CreateMedOrderDialog({
 									</div>
 									<div className="text-xs">
 										Days Until Expiry:{" "}
-										{livePdeaStatus?.daysUntilExpiry != null
-											? livePdeaStatus.daysUntilExpiry
+										{(livePdeaStatus?.daysUntilExpiry ?? null) !== null
+											? livePdeaStatus?.daysUntilExpiry
 											: "--"}
 									</div>
 									{livePdeaStatus?.errorMessage && (
@@ -965,12 +1301,24 @@ export function CreateMedOrderDialog({
 							{isControlledSubstance && (
 								<div className="space-y-2 pl-6">
 									<Label htmlFor="pdeaSchedule">PDEA Schedule</Label>
-									<Input
-										id="pdeaSchedule"
+									<Select
 										value={pdeaSchedule}
-										onChange={e => setPdeaSchedule(e.target.value)}
-										placeholder="e.g., S2, S3"
-									/>
+										onValueChange={value => setPdeaSchedule(value ?? "")}
+									>
+										<SelectTrigger id="pdeaSchedule" className="w-full">
+											<SelectValue>
+												{PDEA_SCHEDULE_OPTIONS.find(o => o.value === pdeaSchedule)?.label ??
+													"Select PDEA schedule..."}
+											</SelectValue>
+										</SelectTrigger>
+										<SelectContent>
+											{PDEA_SCHEDULE_OPTIONS.map(option => (
+												<SelectItem key={option.value} value={option.value}>
+													{option.label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
 								</div>
 							)}
 						</div>
@@ -1044,6 +1392,7 @@ export function CreateMedOrderDialog({
 				onOpenChange={handleHighAlertDialogOpenChange}
 				medicationOrderId={pendingHighAlertOrderId ?? ""}
 				requestingStaffId={orderingStaffId}
+				facilityId={facilityId}
 				drugName={genericName.trim()}
 				onPrepareVerification={handleHighAlertPrepared}
 				onVerified={handleHighAlertVerified}

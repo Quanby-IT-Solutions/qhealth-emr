@@ -1,4 +1,5 @@
 import { Logger, type INestApplication } from "@nestjs/common"
+import path from "node:path"
 import * as express from "express"
 
 import { env } from "@/config/env.config"
@@ -35,6 +36,10 @@ export type IntegrationCredentialRef = (typeof INTEGRATION_CREDENTIAL_ENV_VARS)[
  */
 function configureBodyParser(app: INestApplication): void {
 	const httpAdapter = app.getHttpAdapter()
+	// LiveKit webhooks deliver an HMAC-signed body that must be verified against
+	// the exact raw text. Register a text parser for the webhook route before
+	// express.json() so req.body arrives as a string.
+	httpAdapter.use("/api/v1/webhooks/livekit", express.text({ type: () => true, limit: "1mb" }))
 	httpAdapter.use(express.json())
 	httpAdapter.use(express.urlencoded({ extended: true }))
 	logger.log("Body parser middleware configured")
@@ -47,6 +52,29 @@ function configureCors(app: INestApplication): void {
 	const origins = env.CORS_ORIGINS.split(",").map(origin => origin.trim())
 	app.enableCors({ origin: origins, credentials: true })
 	logger.log(`CORS enabled for origins: ${origins.join(", ")}`)
+}
+
+/**
+ * Serve local generated artifacts when FILE_STORAGE_TYPE=local.
+ * S3 deployments return signed S3 URLs and do not need this middleware.
+ */
+function configureLocalFileStorage(app: INestApplication): void {
+	if (env.FILE_STORAGE_TYPE !== "local") return
+
+	const storageBasePath = env.FILE_STORAGE_BASE_URL.startsWith("http")
+		? new URL(env.FILE_STORAGE_BASE_URL).pathname
+		: env.FILE_STORAGE_BASE_URL
+	const mountPath = `/${storageBasePath.replace(/^\/+|\/+$/g, "")}`
+	const storagePath = path.resolve(env.FILE_STORAGE_PATH)
+
+	app.getHttpAdapter().use(
+		mountPath,
+		express.static(storagePath, {
+			fallthrough: false,
+			index: false,
+		})
+	)
+	logger.log(`Local file storage mounted at ${mountPath} from ${storagePath}`)
 }
 
 /**
@@ -77,5 +105,6 @@ function enableGracefulShutdown(app: INestApplication): void {
 export function configureApp(app: INestApplication): void {
 	configureBodyParser(app)
 	configureCors(app)
+	configureLocalFileStorage(app)
 	enableGracefulShutdown(app)
 }
