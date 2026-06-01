@@ -1,31 +1,61 @@
 "use client"
 
-import { useMemo, useRef, useState, type ChangeEvent } from "react"
-import { useSearchParams } from "next/navigation"
+import { useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
+	Ban,
+	CheckCircle2,
+	Clock3,
 	ExternalLink,
+	FileCheck2,
 	ImageOff,
 	Maximize2,
 	MonitorPlay,
-	Paperclip,
-	Trash2,
-	Upload,
-	ZoomIn,
+	Pencil,
+	Play,
+	RotateCcw,
+	Search,
+	Square,
 } from "lucide-react"
 import { toast } from "sonner"
 
+import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
+import { Label } from "@/core/components/ui/label"
+import { ScrollArea } from "@/core/components/ui/scroll-area"
+import { Separator } from "@/core/components/ui/separator"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
+import { Tabs, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { Textarea } from "@/core/components/ui/textarea"
+import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
+import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
 	useImagingOrderDetailQuery,
+	useImagingOrderListQuery,
+	useSignImagingReportMutation,
 	useUpdateImagingOrderMutation,
 	type ImagingOrder,
 } from "@/features/orders/api/orders.hooks"
 
 type ReportStatus = "draft" | "signed"
+type WorklistTab = "pending" | "in_progress" | "completed"
 
 interface ReportAttachment {
 	id: string
@@ -36,34 +66,36 @@ interface ReportAttachment {
 	dataUrl: string
 }
 
+interface ReportAmendment {
+	amendmentReason?: string
+	amendedAt?: string
+}
+
 interface StructuredReport {
+	technique?: string
 	findings?: string
 	impression?: string
+	recommendations?: string
 	pacsUrl?: string
+	accessionNumber?: string
+	studyUid?: string
 	radiologistName?: string
 	reportedAt?: string
 	draftedAt?: string
 	reportStatus?: ReportStatus
 	attachments?: ReportAttachment[]
+	amendments?: ReportAmendment[]
 }
 
 interface RadiologyReportEditorProps {
-	orderId: string
-	order: ImagingOrder | undefined
-	radiologistName: string | undefined
+	order: ImagingOrder
+	facilityId: string
 	hasEditPermission: boolean
 }
 
-const DEFAULT_FINDINGS =
-	"Bilateral pulmonary nodules, largest 1.4 cm in right upper lobe\nNo pleural effusion. Heart size normal.\nMediastinal lymph node enlargement, station 4R measuring 1.8 cm.\nNo bony lesions."
-
-const DEFAULT_IMPRESSION =
-	"1. Multiple pulmonary nodules suspicious for metastatic disease.\n2. Mediastinal adenopathy. Recommend PET-CT correlation."
-
-const DEFAULT_CLINICAL_HISTORY =
-	"67F with persistent dry cough x 6 weeks, weight loss, history of breast carcinoma. Rule out metastatic disease."
-
-const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
+const PENDING_STATUSES = new Set(["ordered", "scheduled"])
+const ACTIVE_STATUSES = new Set(["in_progress"])
+const COMPLETED_STATUSES = new Set(["completed", "cancelled"])
 
 function can(
 	permissions: Array<{ module: string; action: string }>,
@@ -99,42 +131,98 @@ function formatFileSize(bytes: number) {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function createAttachmentId() {
-	return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
+function formatDateTime(value: string | null | undefined) {
+	if (!value) return "-"
+	const date = new Date(value)
+	if (Number.isNaN(date.getTime())) return "-"
 
-function readFileAsDataUrl(file: File) {
-	return new Promise<string>((resolve, reject) => {
-		const reader = new FileReader()
-		reader.onload = () => resolve(String(reader.result ?? ""))
-		reader.onerror = () => reject(reader.error)
-		reader.readAsDataURL(file)
+	return date.toLocaleString("en-PH", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
 	})
 }
 
-async function fileToAttachment(file: File): Promise<ReportAttachment> {
-	return {
-		id: createAttachmentId(),
-		name: file.name,
-		size: file.size,
-		type: file.type || "application/octet-stream",
-		uploadedAt: new Date().toISOString(),
-		dataUrl: await readFileAsDataUrl(file),
+function formatShortId(value: string) {
+	return value.slice(0, 8).toUpperCase()
+}
+
+function composeReport({
+	technique,
+	findings,
+	impression,
+	recommendations,
+}: {
+	technique: string
+	findings: string
+	impression: string
+	recommendations: string
+}) {
+	return [
+		technique.trim() ? `Technique:\n${technique.trim()}` : "",
+		`Findings:\n${findings.trim()}`,
+		`Impression:\n${impression.trim()}`,
+		recommendations.trim() ? `Recommendations:\n${recommendations.trim()}` : "",
+	]
+		.filter(Boolean)
+		.join("\n\n")
+}
+
+function getSafePacsUrl(raw: string | undefined) {
+	if (!raw) return ""
+
+	try {
+		const url = new URL(raw)
+		return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : ""
+	} catch {
+		return ""
 	}
 }
 
-function composeReport(findings: string, impression: string) {
-	return [`Findings:\n${findings.trim()}`, `Impression:\n${impression.trim()}`].join("\n\n")
+function orderStatusLabel(status: string) {
+	return status.replace(/_/g, " ")
+}
+
+function orderStatusVariant(status: string) {
+	if (status === "cancelled") return "destructive" as const
+	if (status === "completed") return "default" as const
+	if (status === "in_progress") return "secondary" as const
+	return "outline" as const
+}
+
+function classifyOrder(order: ImagingOrder): WorklistTab {
+	if (COMPLETED_STATUSES.has(order.status)) return "completed"
+	if (ACTIVE_STATUSES.has(order.status)) return "in_progress"
+	return "pending"
+}
+
+function getReportStatus(order: ImagingOrder) {
+	const structured = parseStructuredResults(order.structuredResults)
+	if (structured.reportStatus === "signed") {
+		return { label: "Report released", variant: "default" as const }
+	}
+	if (structured.reportStatus === "draft") {
+		return { label: "Draft", variant: "secondary" as const }
+	}
+	if (order.status === "completed") {
+		return { label: "Report pending", variant: "secondary" as const }
+	}
+	return { label: "Not recorded", variant: "outline" as const }
 }
 
 export default function RadiologyPage() {
+	const router = useRouter()
 	const searchParams = useSearchParams()
 	const orderId = searchParams.get("orderId") ?? searchParams.get("imagingOrderId") ?? ""
+	const facilityId = useActiveFacilityId()
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
 	const hasViewPermission = can(permissions, "radiology", "view")
 	const hasEditPermission = can(permissions, "radiology", "edit")
-	const imagingOrderQuery = useImagingOrderDetailQuery(orderId)
+	const worklistQuery = useImagingOrderListQuery({ facilityId, limit: 100 })
+	const imagingOrderQuery = useImagingOrderDetailQuery(orderId, facilityId)
 
 	if (!hasViewPermission) {
 		return (
@@ -144,317 +232,545 @@ export default function RadiologyPage() {
 		)
 	}
 
-	if (orderId && imagingOrderQuery.isLoading) {
-		return (
-			<div className="space-y-6">
-				<div>
-					<h1 className="text-2xl font-semibold">Radiology Report</h1>
-					<p className="text-muted-foreground text-sm">Loading imaging order...</p>
-				</div>
-				<Card>
-					<CardContent className="text-muted-foreground flex min-h-40 items-center justify-center text-sm">
-						Loading imaging order...
-					</CardContent>
-				</Card>
+	return (
+		<div className="space-y-6">
+			<div>
+				<h1 className="text-2xl font-semibold">Radiology</h1>
+				<p className="text-muted-foreground text-sm">
+					Review imaging orders, track study progress, open PACS studies, and release reports.
+				</p>
 			</div>
-		)
+
+			<RadiologyWorklist
+				orders={worklistQuery.data?.data ?? []}
+				selectedOrderId={orderId}
+				isLoading={!facilityId || worklistQuery.isLoading}
+				isError={worklistQuery.isError}
+				onSelect={id => router.push(`/radiology?orderId=${encodeURIComponent(id)}`)}
+			/>
+
+			<Dialog
+				open={Boolean(orderId)}
+				onOpenChange={open => {
+					if (!open) router.replace("/radiology")
+				}}
+			>
+				<DialogContent
+					size="full"
+					className="h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-[min(1500px,calc(100vw-2rem))]"
+				>
+					<DialogHeader className="bg-background border-b px-4 py-4 pr-14">
+						<DialogTitle>Radiology Order Details</DialogTitle>
+						<DialogDescription>
+							Review the imaging workflow, PACS study, and radiology report.
+						</DialogDescription>
+					</DialogHeader>
+
+					<ScrollArea className="min-h-0">
+						<div className="p-4">
+							{imagingOrderQuery.isLoading ? (
+								<LoadingOrder />
+							) : imagingOrderQuery.isError || !imagingOrderQuery.data ? (
+								<OrderLoadError />
+							) : facilityId ? (
+								<RadiologyReportEditor
+									key={imagingOrderQuery.data.updatedAt}
+									order={imagingOrderQuery.data}
+									facilityId={facilityId}
+									hasEditPermission={hasEditPermission}
+								/>
+							) : (
+								<LoadingOrder />
+							)}
+						</div>
+					</ScrollArea>
+				</DialogContent>
+			</Dialog>
+		</div>
+	)
+}
+
+function RadiologyWorklist({
+	orders,
+	selectedOrderId,
+	isLoading,
+	isError,
+	onSelect,
+}: {
+	orders: ImagingOrder[]
+	selectedOrderId: string
+	isLoading: boolean
+	isError: boolean
+	onSelect: (id: string) => void
+}) {
+	const [tab, setTab] = useState<WorklistTab>("pending")
+	const [search, setSearch] = useState("")
+	const normalizedSearch = search.trim().toLowerCase()
+	const counts = {
+		pending: orders.filter(order => classifyOrder(order) === "pending").length,
+		in_progress: orders.filter(order => classifyOrder(order) === "in_progress").length,
+		completed: orders.filter(order => classifyOrder(order) === "completed").length,
 	}
+	const filtered = orders.filter(order => {
+		if (classifyOrder(order) !== tab) return false
+		if (!normalizedSearch) return true
+
+		return [order.patientName, order.patientMrn, order.modality, order.bodyPart, order.id].some(
+			value => value?.toLowerCase().includes(normalizedSearch)
+		)
+	})
 
 	return (
-		<RadiologyReportEditor
-			key={(imagingOrderQuery.data?.updatedAt ?? orderId) || "demo-radiology-report"}
-			orderId={orderId}
-			order={imagingOrderQuery.data}
-			radiologistName={profile?.user?.name}
-			hasEditPermission={hasEditPermission}
-		/>
+		<Card className="gap-0 py-0">
+			<CardHeader className="bg-muted/10 gap-4 border-b py-4">
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<CardTitle className="text-base">Radiology Worklist</CardTitle>
+					<div className="relative w-full max-w-xs">
+						<Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+						<Input
+							value={search}
+							onChange={event => setSearch(event.target.value)}
+							placeholder="Search patient, MRN, or study"
+							className="pl-9"
+						/>
+					</div>
+				</div>
+				<Tabs value={tab} onValueChange={value => setTab(value as WorklistTab)}>
+					<TabsList>
+						<TabsTrigger value="pending">Pending ({counts.pending})</TabsTrigger>
+						<TabsTrigger value="in_progress">In progress ({counts.in_progress})</TabsTrigger>
+						<TabsTrigger value="completed">Completed ({counts.completed})</TabsTrigger>
+					</TabsList>
+				</Tabs>
+			</CardHeader>
+			<CardContent className="p-0">
+				{isLoading ? (
+					<div className="text-muted-foreground p-8 text-center text-sm">Loading worklist...</div>
+				) : isError ? (
+					<div className="text-destructive p-8 text-center text-sm">
+						Unable to load the radiology worklist.
+					</div>
+				) : filtered.length === 0 ? (
+					<div className="text-muted-foreground p-8 text-center text-sm">
+						No {tab.replace("_", " ")} imaging orders found.
+					</div>
+				) : (
+					<Table className="min-w-[1040px]">
+						<TableHeader className="bg-muted/30">
+							<TableRow>
+								<TableHead className="h-11 px-4 text-xs font-semibold tracking-wide uppercase">
+									Patient
+								</TableHead>
+								<TableHead className="h-11 px-4 text-xs font-semibold tracking-wide uppercase">
+									Study
+								</TableHead>
+								<TableHead className="h-11 px-4 text-xs font-semibold tracking-wide uppercase">
+									Priority
+								</TableHead>
+								<TableHead className="h-11 px-4 text-xs font-semibold tracking-wide uppercase">
+									Order status
+								</TableHead>
+								<TableHead className="h-11 px-4 text-xs font-semibold tracking-wide uppercase">
+									Report
+								</TableHead>
+								<TableHead className="h-11 px-4 text-xs font-semibold tracking-wide uppercase">
+									Ordered
+								</TableHead>
+								<TableHead className="h-11 px-4 text-right text-xs font-semibold tracking-wide uppercase">
+									Action
+								</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{filtered.map(order => {
+								const reportStatus = getReportStatus(order)
+
+								return (
+									<TableRow
+										key={order.id}
+										className={cn(
+											"group cursor-pointer",
+											order.id === selectedOrderId ? "bg-muted/60" : "hover:bg-muted/30"
+										)}
+										onClick={() => onSelect(order.id)}
+									>
+										<TableCell className="px-4 py-4">
+											<div className="font-medium">{order.patientName ?? "Unknown patient"}</div>
+											<div className="text-muted-foreground mt-0.5 text-xs">
+												MRN {order.patientMrn ?? "-"}
+											</div>
+										</TableCell>
+										<TableCell className="px-4 py-4">
+											<div className="font-medium uppercase">{order.modality}</div>
+											<div className="text-muted-foreground mt-0.5 text-xs">{order.bodyPart}</div>
+										</TableCell>
+										<TableCell className="px-4 py-4">
+											<Badge
+												variant={order.priority === "stat" ? "destructive" : "outline"}
+												className="capitalize"
+											>
+												{order.priority}
+											</Badge>
+										</TableCell>
+										<TableCell className="px-4 py-4">
+											<Badge variant={orderStatusVariant(order.status)} className="capitalize">
+												{orderStatusLabel(order.status)}
+											</Badge>
+										</TableCell>
+										<TableCell className="px-4 py-4">
+											<Badge variant={reportStatus.variant}>{reportStatus.label}</Badge>
+										</TableCell>
+										<TableCell className="text-muted-foreground px-4 py-4 text-xs">
+											{formatDateTime(order.createdAt)}
+										</TableCell>
+										<TableCell className="px-4 py-4 text-right">
+											<Button
+												size="sm"
+												variant={order.id === selectedOrderId ? "secondary" : "outline"}
+												className="group-hover:border-foreground/20"
+												onClick={event => {
+													event.stopPropagation()
+													onSelect(order.id)
+												}}
+											>
+												Open
+											</Button>
+										</TableCell>
+									</TableRow>
+								)
+							})}
+						</TableBody>
+					</Table>
+				)}
+			</CardContent>
+		</Card>
+	)
+}
+
+function LoadingOrder() {
+	return (
+		<Card>
+			<CardContent className="text-muted-foreground flex min-h-48 items-center justify-center text-sm">
+				Loading imaging order...
+			</CardContent>
+		</Card>
+	)
+}
+
+function OrderLoadError() {
+	return (
+		<Card>
+			<CardContent className="text-destructive flex min-h-48 items-center justify-center text-sm">
+				The selected imaging order could not be loaded.
+			</CardContent>
+		</Card>
 	)
 }
 
 function RadiologyReportEditor({
-	orderId,
 	order,
-	radiologistName,
+	facilityId,
 	hasEditPermission,
 }: RadiologyReportEditorProps) {
-	const fileInputRef = useRef<HTMLInputElement | null>(null)
 	const updateImagingOrder = useUpdateImagingOrderMutation()
-	const structured = useMemo(() => parseStructuredResults(order?.structuredResults), [order])
-	const initialAttachments = useMemo(
-		() => (structured.attachments ?? []).filter(isReportAttachment),
-		[structured.attachments]
-	)
-
-	const [findings, setFindings] = useState(structured.findings ?? order?.report ?? DEFAULT_FINDINGS)
-	const [impression, setImpression] = useState(structured.impression ?? DEFAULT_IMPRESSION)
-	const [pacsUrl, setPacsUrl] = useState(structured.pacsUrl ?? "")
-	const [attachments, setAttachments] = useState<ReportAttachment[]>(initialAttachments)
-	const [reportStatus, setReportStatus] = useState<ReportStatus>(
-		structured.reportStatus ?? (order?.report ? "signed" : "draft")
-	)
-
-	const trimmedPacsUrl = pacsUrl.trim()
-	const pacsConnected = trimmedPacsUrl.length > 0
-	const studyTitle = order
-		? `${order.modality.toUpperCase()} ${order.bodyPart}`
-		: "Chest CT - Mei Lin Chen - Acct# R-8842-1109"
-	const clinicalHistory = order?.clinicalIndication ?? DEFAULT_CLINICAL_HISTORY
-	const isSaving = updateImagingOrder.isPending
+	const signImagingReport = useSignImagingReportMutation()
+	const structured = useMemo(() => parseStructuredResults(order.structuredResults), [order])
+	const [technique, setTechnique] = useState(structured.technique ?? "")
+	const [findings, setFindings] = useState(structured.findings ?? "")
+	const [impression, setImpression] = useState(structured.impression ?? "")
+	const [recommendations, setRecommendations] = useState(structured.recommendations ?? "")
+	const [amendmentReason, setAmendmentReason] = useState("")
+	const [isAmending, setIsAmending] = useState(false)
+	const isReleased = structured.reportStatus === "signed"
+	const isCancelled = order.status === "cancelled"
+	const canEditReport = hasEditPermission && !isCancelled && (!isReleased || isAmending)
+	const canRelease =
+		hasEditPermission && order.status === "completed" && (!isReleased || isAmending)
+	const isSaving = updateImagingOrder.isPending || signImagingReport.isPending
+	const pacsUrl = getSafePacsUrl(structured.pacsUrl)
+	const attachments = (structured.attachments ?? []).filter(isReportAttachment)
+	const reportStatus = getReportStatus(order)
 
 	function buildStructuredReport(status: ReportStatus): StructuredReport {
-		const now = new Date().toISOString()
-
 		return {
 			...structured,
+			technique: technique.trim() || undefined,
 			findings: findings.trim(),
 			impression: impression.trim(),
-			pacsUrl: trimmedPacsUrl || undefined,
-			attachments,
+			recommendations: recommendations.trim() || undefined,
 			reportStatus: status,
-			draftedAt: status === "draft" ? now : structured.draftedAt,
-			reportedAt: status === "signed" ? now : structured.reportedAt,
-			radiologistName: radiologistName ?? structured.radiologistName,
+			draftedAt: status === "draft" ? new Date().toISOString() : structured.draftedAt,
 		}
 	}
 
-	function ensureCanEdit() {
-		if (hasEditPermission) return true
-		toast.error("Radiology edit permission is required to save this report.")
-		return false
+	function resetEditor() {
+		setTechnique(structured.technique ?? "")
+		setFindings(structured.findings ?? "")
+		setImpression(structured.impression ?? "")
+		setRecommendations(structured.recommendations ?? "")
+		setAmendmentReason("")
+		setIsAmending(false)
+	}
+
+	function handleLifecycleUpdate(
+		input: Parameters<typeof updateImagingOrder.mutate>[0],
+		successMessage: string
+	) {
+		if (!hasEditPermission) return
+
+		updateImagingOrder.mutate(input, {
+			onSuccess: () => toast.success(successMessage),
+			onError: error => {
+				toast.error(error instanceof Error ? error.message : "Unable to update imaging order.")
+			},
+		})
 	}
 
 	function handleSaveDraft() {
-		if (!ensureCanEdit()) return
+		if (!canEditReport || isReleased) return
 
-		if (!orderId) {
-			setReportStatus("draft")
-			toast.success("Draft saved locally. Select an imaging order to persist it.")
-			return
-		}
-
-		updateImagingOrder.mutate(
+		handleLifecycleUpdate(
 			{
-				id: orderId,
+				id: order.id,
+				facilityId,
 				structuredResults: buildStructuredReport("draft"),
 			},
-			{
-				onSuccess: () => {
-					setReportStatus("draft")
-					toast.success("Radiology report draft saved.")
-				},
-				onError: () => {
-					toast.error("Unable to save radiology draft.")
-				},
-			}
+			"Radiology report draft saved."
 		)
 	}
 
-	function handleSignAndRelease() {
-		if (!ensureCanEdit()) return
+	function handleRelease() {
+		if (!canRelease) return
 		if (!findings.trim() || !impression.trim()) {
 			toast.error("Findings and impression are required before release.")
 			return
 		}
-
-		if (!orderId) {
-			setReportStatus("signed")
-			toast.success("Report signed locally. Select an imaging order to persist it.")
+		if (isAmending && !amendmentReason.trim()) {
+			toast.error("Enter the reason for this amendment before release.")
 			return
 		}
 
-		updateImagingOrder.mutate(
+		signImagingReport.mutate(
 			{
-				id: orderId,
-				status: "completed",
-				completedDatetime: new Date().toISOString(),
-				report: composeReport(findings, impression),
+				id: order.id,
+				facilityId,
+				report: composeReport({ technique, findings, impression, recommendations }),
 				structuredResults: buildStructuredReport("signed"),
+				...(isAmending ? { amendmentReason: amendmentReason.trim() } : {}),
 			},
 			{
 				onSuccess: () => {
-					setReportStatus("signed")
-					toast.success("Radiology report signed and released.")
+					setIsAmending(false)
+					setAmendmentReason("")
+					toast.success(isAmending ? "Report amendment released." : "Radiology report released.")
 				},
-				onError: () => {
-					toast.error("Unable to sign and release radiology report.")
+				onError: error => {
+					toast.error(error instanceof Error ? error.message : "Unable to release report.")
 				},
 			}
 		)
 	}
 
-	async function handleAttachFiles(event: ChangeEvent<HTMLInputElement>) {
-		const selectedFiles = Array.from(event.target.files ?? [])
-		event.currentTarget.value = ""
-		if (selectedFiles.length === 0) return
-
-		const oversizedFiles = selectedFiles.filter(file => file.size > MAX_ATTACHMENT_BYTES)
-		if (oversizedFiles.length > 0) {
-			toast.error("Each attachment must be 8 MB or smaller.")
-		}
-
-		const filesToAttach = selectedFiles.filter(file => file.size <= MAX_ATTACHMENT_BYTES)
-		if (filesToAttach.length === 0) return
-
-		try {
-			const newAttachments = await Promise.all(filesToAttach.map(fileToAttachment))
-			setAttachments(current => [...current, ...newAttachments])
-			toast.success(
-				`${newAttachments.length} attachment${newAttachments.length === 1 ? "" : "s"} added.`
-			)
-		} catch {
-			toast.error("Unable to attach one or more files.")
-		}
-	}
-
-	function handleOpenAttachment(attachment: ReportAttachment) {
-		window.open(attachment.dataUrl, "_blank", "noopener,noreferrer")
-	}
-
-	function handleOpenExternalPacs() {
-		if (!trimmedPacsUrl) {
-			toast.error("Enter a PACS URL before opening the external viewer.")
-			return
-		}
-		window.open(trimmedPacsUrl, "_blank", "noopener,noreferrer")
-	}
-
-	function handleOpenEmbeddedPacs() {
-		if (orderId) {
-			window.open(`/radiology/pacs-viewer?orderId=${encodeURIComponent(orderId)}`, "_blank")
-			return
-		}
-		handleOpenExternalPacs()
-	}
-
 	return (
 		<div className="space-y-6">
-			<div className="flex items-start justify-between gap-4">
-				<div>
-					<h1 className="text-2xl font-semibold">Radiology Report</h1>
-					<p className="text-muted-foreground text-sm">{studyTitle}</p>
-				</div>
-				<div className="flex items-center gap-3">
-					<Button
-						variant="outline"
-						onClick={handleSaveDraft}
-						disabled={isSaving || !hasEditPermission}
-					>
-						{isSaving && reportStatus === "draft" ? "Saving..." : "Save draft"}
-					</Button>
-					<Button onClick={handleSignAndRelease} disabled={isSaving || !hasEditPermission}>
-						{isSaving && reportStatus === "signed" ? "Saving..." : "Sign & release"}
-					</Button>
-				</div>
-			</div>
-
-			<div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-				<div className="md:col-span-2">
-					<Card className="overflow-hidden">
-						<div className="bg-background flex items-center justify-between border-b px-4 py-2.5">
-							<div className="flex items-center gap-2.5">
-								<MonitorPlay className="text-muted-foreground h-4 w-4" />
-								<span className="text-sm font-medium">PACS Viewer - Embedded</span>
-								<span
-									className={
-										pacsConnected
-											? "inline-flex items-center gap-1.5 rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs text-green-500"
-											: "inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-500"
+			<Card>
+				<CardContent className="space-y-5">
+					<div className="flex flex-wrap items-start justify-between gap-4">
+						<div>
+							<div className="flex flex-wrap items-center gap-2">
+								<h2 className="text-xl font-semibold">
+									{order.modality.toUpperCase()} {order.bodyPart}
+								</h2>
+								<Badge variant={orderStatusVariant(order.status)}>
+									{orderStatusLabel(order.status)}
+								</Badge>
+								<Badge variant={reportStatus.variant}>{reportStatus.label}</Badge>
+							</div>
+							<p className="text-muted-foreground mt-1 text-sm">
+								Accession {structured.accessionNumber ?? formatShortId(order.id)}
+							</p>
+						</div>
+						<div className="flex flex-wrap gap-2">
+							{order.status === "ordered" && (
+								<Button
+									size="sm"
+									onClick={() =>
+										handleLifecycleUpdate(
+											{ id: order.id, facilityId, status: "scheduled" },
+											"Imaging order receipt acknowledged."
+										)
+									}
+									disabled={!hasEditPermission || isSaving}
+								>
+									<CheckCircle2 className="mr-2 size-4" />
+									Acknowledge receipt
+								</Button>
+							)}
+							{order.status === "scheduled" && (
+								<Button
+									size="sm"
+									onClick={() =>
+										handleLifecycleUpdate(
+											{ id: order.id, facilityId, status: "in_progress" },
+											"Imaging study started."
+										)
+									}
+									disabled={!hasEditPermission || !order.billingClearedAt || isSaving}
+									title={
+										order.billingClearedAt
+											? "Start imaging study"
+											: "Billing clearance is required before the study starts."
 									}
 								>
-									<span
-										className={
-											pacsConnected
-												? "inline-block h-1.5 w-1.5 rounded-full bg-green-500"
-												: "inline-block h-1.5 w-1.5 rounded-full bg-amber-500"
-										}
-									/>
-									{pacsConnected ? "Connected" : "Not linked"}
-								</span>
+									<Play className="mr-2 size-4" />
+									Start study
+								</Button>
+							)}
+							{order.status === "in_progress" && (
+								<Button
+									size="sm"
+									onClick={() =>
+										handleLifecycleUpdate(
+											{
+												id: order.id,
+												facilityId,
+												status: "completed",
+												completedDatetime: new Date().toISOString(),
+											},
+											"Imaging study completed."
+										)
+									}
+									disabled={!hasEditPermission || isSaving}
+								>
+									<Square className="mr-2 size-4" />
+									Complete study
+								</Button>
+							)}
+							{PENDING_STATUSES.has(order.status) || order.status === "in_progress" ? (
+								<Button
+									size="sm"
+									variant="outline"
+									onClick={() =>
+										handleLifecycleUpdate(
+											{ id: order.id, facilityId, status: "cancelled" },
+											"Imaging order cancelled."
+										)
+									}
+									disabled={!hasEditPermission || isSaving}
+								>
+									<Ban className="mr-2 size-4" />
+									Cancel
+								</Button>
+							) : null}
+						</div>
+					</div>
+
+					<div className="grid gap-4 text-sm md:grid-cols-4">
+						<Detail label="Patient" value={order.patientName ?? "Unknown patient"} />
+						<Detail label="MRN" value={order.patientMrn ?? "-"} />
+						<Detail label="Date of birth" value={order.patientDateOfBirth ?? "-"} />
+						<Detail
+							label="Encounter"
+							value={order.encounterId ? formatShortId(order.encounterId) : "-"}
+						/>
+						<Detail label="Priority" value={order.priority} />
+						<Detail label="Ordered by" value={order.orderingStaffName ?? "-"} />
+						<Detail label="Ordered at" value={formatDateTime(order.createdAt)} />
+						<Detail label="Study UID" value={structured.studyUid ?? "Not assigned"} />
+					</div>
+
+					<Separator />
+
+					<div className="grid gap-3 text-sm md:grid-cols-5">
+						<WorkflowCheckpoint
+							label="Order received"
+							value={order.imagingOrderReceivedAt}
+							complete={Boolean(order.imagingOrderReceivedAt)}
+						/>
+						<WorkflowCheckpoint
+							label="Billing clearance"
+							value={order.billingClearedAt}
+							complete={Boolean(order.billingClearedAt)}
+						/>
+						<WorkflowCheckpoint
+							label="Study started"
+							value={order.studyStartedAt}
+							complete={Boolean(order.studyStartedAt)}
+						/>
+						<WorkflowCheckpoint
+							label="Study completed"
+							value={order.completedDatetime}
+							complete={Boolean(order.completedDatetime)}
+						/>
+						<WorkflowCheckpoint
+							label="Report released"
+							value={structured.reportedAt}
+							complete={isReleased}
+						/>
+					</div>
+
+					{order.status === "scheduled" && !order.billingClearedAt && (
+						<div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+							The study is waiting for billing clearance. Radiology can review the order but cannot
+							start acquisition yet.
+						</div>
+					)}
+				</CardContent>
+			</Card>
+
+			<div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+				<div className="space-y-4 xl:col-span-2">
+					<Card className="overflow-hidden">
+						<div className="bg-background flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+							<div className="flex items-center gap-2.5">
+								<MonitorPlay className="text-muted-foreground size-4" />
+								<span className="text-sm font-medium">PACS Viewer</span>
+								<Badge variant={pacsUrl ? "secondary" : "outline"}>
+									{pacsUrl ? "Study linked" : "No study linked"}
+								</Badge>
 							</div>
 							<div className="flex items-center gap-1">
 								<Button
 									variant="ghost"
 									size="icon"
-									className="h-8 w-8"
-									disabled={!pacsConnected}
-									onClick={handleOpenEmbeddedPacs}
+									className="size-8"
+									disabled={!pacsUrl}
+									onClick={() =>
+										window.open(
+											`/radiology/pacs-viewer?orderId=${encodeURIComponent(order.id)}`,
+											"_blank"
+										)
+									}
 								>
-									<ZoomIn className="h-4 w-4" />
-								</Button>
-								<Button
-									variant="ghost"
-									size="icon"
-									className="h-8 w-8"
-									disabled={!pacsConnected && !orderId}
-									onClick={handleOpenEmbeddedPacs}
-								>
-									<Maximize2 className="h-4 w-4" />
+									<Maximize2 className="size-4" />
 								</Button>
 								<Button
 									variant="ghost"
 									size="sm"
 									className="gap-1.5 text-xs"
-									onClick={handleOpenExternalPacs}
-									disabled={!pacsConnected}
+									disabled={!pacsUrl}
+									onClick={() => window.open(pacsUrl, "_blank", "noopener,noreferrer")}
 								>
-									<ExternalLink className="h-3.5 w-3.5" />
+									<ExternalLink className="size-3.5" />
 									Open external
 								</Button>
 							</div>
 						</div>
-
 						<div className="bg-black">
-							{pacsConnected ? (
+							{pacsUrl ? (
 								<iframe
 									title="Embedded PACS viewer"
-									src={trimmedPacsUrl}
+									src={pacsUrl}
 									className="h-[548px] w-full border-0 bg-black"
 									referrerPolicy="no-referrer"
 									sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
 								/>
 							) : (
-								<>
-									<div className="grid grid-cols-2 divide-x divide-zinc-800">
-										<div className="relative flex h-64 items-center justify-center border-b border-zinc-800">
-											<div className="absolute top-2 left-3 font-mono text-[10px] tracking-widest text-zinc-500">
-												SLICE 8
-											</div>
-											<EmptySlice />
-										</div>
-										<div className="relative flex h-64 items-center justify-center border-b border-zinc-800">
-											<div className="absolute top-2 left-3 font-mono text-[10px] tracking-widest text-zinc-500">
-												SLICE 16
-											</div>
-											<EmptySlice />
-										</div>
-										<div className="relative flex h-64 items-center justify-center">
-											<div className="absolute top-2 left-3 font-mono text-[10px] tracking-widest text-zinc-500">
-												SLICE 24
-											</div>
-											<EmptySlice />
-											<div className="absolute bottom-2 left-3 font-mono text-[10px] text-zinc-400">
-												{order
-													? `${order.modality.toUpperCase()} ${order.bodyPart}`
-													: "CHEN, MEI LIN - 67F - CT CHEST W/CONTRAST"}
-											</div>
-										</div>
-										<div className="relative flex h-64 items-center justify-center">
-											<div className="absolute top-2 left-3 font-mono text-[10px] tracking-widest text-zinc-500">
-												SLICE 32
-											</div>
-											<EmptySlice />
-										</div>
-									</div>
-
-									<div className="flex items-center justify-between border-t border-zinc-800 px-3 py-2">
-										<span className="font-mono text-[11px] text-zinc-500">
-											4 series - 248 images - Acquired 09:02
-										</span>
-										<span className="font-mono text-[11px] text-zinc-500">
-											Study UID: 1.2.840.113619.2.5.1762583153.4421
-										</span>
-									</div>
-								</>
+								<div className="flex h-[548px] flex-col items-center justify-center gap-2 text-zinc-500">
+									<ImageOff className="size-8" />
+									<div className="font-mono text-xs">NO PACS STUDY LINKED</div>
+									<div className="text-xs">The PACS integration has not attached a study URL.</div>
+								</div>
 							)}
 						</div>
 					</Card>
@@ -466,133 +782,253 @@ function RadiologyReportEditor({
 							<CardTitle className="text-sm">Clinical History</CardTitle>
 						</CardHeader>
 						<CardContent>
-							<div className="text-muted-foreground text-sm">{clinicalHistory}</div>
+							<div className="text-muted-foreground text-sm">
+								{order.clinicalIndication ?? "No clinical indication recorded."}
+							</div>
 						</CardContent>
 					</Card>
 
 					<Card>
 						<CardHeader>
-							<CardTitle className="text-sm">PACS Link</CardTitle>
+							<CardTitle className="text-sm">PACS Integration</CardTitle>
 						</CardHeader>
-						<CardContent>
-							<Input
-								value={pacsUrl}
-								onChange={event => setPacsUrl(event.target.value)}
-								placeholder="https://pacs.example.com/viewer/study"
-								disabled={!hasEditPermission}
-							/>
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardHeader>
-							<CardTitle className="text-sm">Findings</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<Textarea
-								className="h-32"
-								value={findings}
-								onChange={event => setFindings(event.target.value)}
-								disabled={!hasEditPermission}
-							/>
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardHeader>
-							<CardTitle className="text-sm">Impression</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<Textarea
-								className="h-24"
-								value={impression}
-								onChange={event => setImpression(event.target.value)}
-								disabled={!hasEditPermission}
-							/>
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardHeader>
-							<CardTitle className="text-sm">Attachments</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<div className="space-y-2">
-								<input
-									ref={fileInputRef}
-									type="file"
-									accept=".pdf,image/*,.doc,.docx"
-									multiple
-									className="hidden"
-									onChange={handleAttachFiles}
-								/>
-								{attachments.length === 0 ? (
-									<div className="text-muted-foreground rounded border px-3 py-2 text-sm">
-										No files attached.
-									</div>
-								) : (
-									attachments.map(attachment => (
-										<div
-											key={attachment.id}
-											className="bg-background flex items-center justify-between gap-3 rounded px-3 py-2"
-										>
-											<div className="flex min-w-0 items-center gap-2">
-												<Paperclip className="text-muted-foreground size-3.5 shrink-0" />
-												<div className="min-w-0">
-													<div className="truncate text-sm">{attachment.name}</div>
-													<div className="text-muted-foreground text-xs">
-														{formatFileSize(attachment.size)}
-													</div>
-												</div>
-											</div>
-											<div className="flex shrink-0 items-center gap-1">
-												<Button
-													variant="ghost"
-													size="sm"
-													onClick={() => handleOpenAttachment(attachment)}
-												>
-													Open
-												</Button>
-												<Button
-													variant="ghost"
-													size="icon"
-													className="size-8"
-													disabled={!hasEditPermission}
-													onClick={() =>
-														setAttachments(current =>
-															current.filter(item => item.id !== attachment.id)
-														)
-													}
-												>
-													<Trash2 className="size-3.5" />
-												</Button>
-											</div>
-										</div>
-									))
-								)}
-								<button
-									type="button"
-									disabled={!hasEditPermission}
-									onClick={() => fileInputRef.current?.click()}
-									className="border-border text-muted-foreground hover:border-muted-foreground/40 mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded border-2 border-dashed p-3 text-center text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-								>
-									<Upload className="size-4" />
-									Attach file
-								</button>
+						<CardContent className="space-y-2 text-sm">
+							<div className="text-muted-foreground">
+								Study links are supplied by the configured PACS integration.
+							</div>
+							<div className="font-medium">
+								{pacsUrl ? "Linked study available" : "Awaiting PACS study link"}
 							</div>
 						</CardContent>
 					</Card>
 				</div>
 			</div>
+
+			<Card>
+				<CardHeader className="gap-3">
+					<div className="flex flex-wrap items-start justify-between gap-3">
+						<div>
+							<CardTitle className="text-base">Radiology Report</CardTitle>
+							<p className="text-muted-foreground mt-1 text-sm">
+								{isReleased
+									? `Released by ${structured.radiologistName ?? "radiologist"} at ${formatDateTime(
+											structured.reportedAt
+										)}`
+									: "Record a draft after reviewing the PACS study, then release the final report."}
+							</p>
+						</div>
+						<div className="flex flex-wrap gap-2">
+							{isReleased && !isAmending && (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setIsAmending(true)}
+									disabled={!hasEditPermission || isSaving}
+								>
+									<Pencil className="mr-2 size-4" />
+									Amend report
+								</Button>
+							)}
+							{isAmending && (
+								<Button variant="outline" size="sm" onClick={resetEditor} disabled={isSaving}>
+									<RotateCcw className="mr-2 size-4" />
+									Cancel amendment
+								</Button>
+							)}
+							{!isReleased && (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={handleSaveDraft}
+									disabled={!canEditReport || isSaving}
+								>
+									{updateImagingOrder.isPending ? "Saving..." : "Save draft"}
+								</Button>
+							)}
+							{(!isReleased || isAmending) && (
+								<Button size="sm" onClick={handleRelease} disabled={!canRelease || isSaving}>
+									<FileCheck2 className="mr-2 size-4" />
+									{signImagingReport.isPending
+										? "Releasing..."
+										: isAmending
+											? "Release amendment"
+											: "Sign & release"}
+								</Button>
+							)}
+						</div>
+					</div>
+
+					{!isReleased && order.status !== "completed" && (
+						<div className="text-muted-foreground text-xs">
+							Complete the imaging study before signing and releasing the report.
+						</div>
+					)}
+				</CardHeader>
+				<CardContent className="space-y-4">
+					{isAmending && (
+						<div className="space-y-2">
+							<Label htmlFor="amendment-reason">Amendment reason</Label>
+							<Textarea
+								id="amendment-reason"
+								value={amendmentReason}
+								onChange={event => setAmendmentReason(event.target.value)}
+								placeholder="Explain why the released report needs an amendment."
+								className="min-h-20"
+							/>
+						</div>
+					)}
+
+					<div className="grid gap-4 lg:grid-cols-2">
+						<ReportField
+							id="technique"
+							label="Technique"
+							value={technique}
+							onChange={setTechnique}
+							disabled={!canEditReport}
+							className="min-h-28"
+						/>
+						<ReportField
+							id="findings"
+							label="Findings"
+							value={findings}
+							onChange={setFindings}
+							disabled={!canEditReport}
+							className="min-h-28"
+						/>
+						<ReportField
+							id="impression"
+							label="Impression"
+							value={impression}
+							onChange={setImpression}
+							disabled={!canEditReport}
+							className="min-h-24"
+						/>
+						<ReportField
+							id="recommendations"
+							label="Recommendations"
+							value={recommendations}
+							onChange={setRecommendations}
+							disabled={!canEditReport}
+							className="min-h-24"
+						/>
+					</div>
+
+					<Separator />
+
+					<div className="space-y-2">
+						<div className="text-sm font-medium">Attachments</div>
+						{attachments.length === 0 ? (
+							<div className="text-muted-foreground rounded-md border p-3 text-sm">
+								No report attachments. New files should be stored through the protected PACS or
+								document integration.
+							</div>
+						) : (
+							attachments.map(attachment => (
+								<div
+									key={attachment.id}
+									className="flex items-center justify-between gap-3 rounded-md border p-3"
+								>
+									<div className="min-w-0">
+										<div className="truncate text-sm font-medium">{attachment.name}</div>
+										<div className="text-muted-foreground text-xs">
+											Legacy attachment - {formatFileSize(attachment.size)}
+										</div>
+									</div>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => window.open(attachment.dataUrl, "_blank", "noopener,noreferrer")}
+									>
+										Open
+									</Button>
+								</div>
+							))
+						)}
+					</div>
+
+					{structured.amendments && structured.amendments.length > 0 && (
+						<>
+							<Separator />
+							<div className="space-y-2">
+								<div className="text-sm font-medium">Amendment history</div>
+								{structured.amendments.map((amendment, index) => (
+									<div key={`${amendment.amendedAt ?? "amendment"}-${index}`} className="text-sm">
+										<span className="text-muted-foreground">
+											{formatDateTime(amendment.amendedAt)}
+										</span>
+										{" - "}
+										{amendment.amendmentReason ?? "Reason not recorded"}
+									</div>
+								))}
+							</div>
+						</>
+					)}
+				</CardContent>
+			</Card>
 		</div>
 	)
 }
 
-function EmptySlice() {
+function Detail({ label, value }: { label: string; value: string }) {
 	return (
-		<div className="flex flex-col items-center justify-center gap-2 select-none">
-			<ImageOff className="h-6 w-6 text-zinc-700" />
-			<span className="font-mono text-[11px] tracking-wide text-zinc-600">NO IMAGE LOADED</span>
+		<div>
+			<div className="text-muted-foreground text-xs">{label}</div>
+			<div className="truncate font-medium capitalize" title={value}>
+				{value}
+			</div>
+		</div>
+	)
+}
+
+function WorkflowCheckpoint({
+	label,
+	value,
+	complete,
+}: {
+	label: string
+	value: string | null | undefined
+	complete: boolean
+}) {
+	return (
+		<div className="flex gap-2 rounded-md border p-3">
+			{complete ? (
+				<CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-600" />
+			) : (
+				<Clock3 className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+			)}
+			<div>
+				<div className="text-xs font-medium">{label}</div>
+				<div className="text-muted-foreground mt-1 text-xs">{formatDateTime(value)}</div>
+			</div>
+		</div>
+	)
+}
+
+function ReportField({
+	id,
+	label,
+	value,
+	onChange,
+	disabled,
+	className,
+}: {
+	id: string
+	label: string
+	value: string
+	onChange: (value: string) => void
+	disabled: boolean
+	className?: string
+}) {
+	return (
+		<div className="space-y-2">
+			<Label htmlFor={id}>{label}</Label>
+			<Textarea
+				id={id}
+				value={value}
+				onChange={event => onChange(event.target.value)}
+				disabled={disabled}
+				className={className}
+			/>
 		</div>
 	)
 }

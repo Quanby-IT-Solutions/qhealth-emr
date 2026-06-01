@@ -126,7 +126,7 @@ export class OrdersController {
 	@Implement(v1.orders.getImagingOrder)
 	async getImagingOrder() {
 		return implement(v1.orders.getImagingOrder).handler(async ({ input }) => {
-			return this.ordersService.findImagingOrder(input.id)
+			return this.ordersService.findImagingOrder(input.id, input.facilityId)
 		})
 	}
 
@@ -146,6 +146,14 @@ export class OrdersController {
 	async updateImagingOrder() {
 		return implement(v1.orders.updateImagingOrder).handler(async ({ input }) => {
 			return this.ordersService.updateImagingOrder(input)
+		})
+	}
+
+	@RequirePermission("radiology", "edit")
+	@Implement(v1.orders.signImagingReport)
+	async signImagingReport(@Session() session: UserSession) {
+		return implement(v1.orders.signImagingReport).handler(async ({ input }) => {
+			return this.ordersService.signImagingReport(input, session.user.id)
 		})
 	}
 

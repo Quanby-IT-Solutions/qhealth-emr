@@ -335,6 +335,10 @@ export const ImagingOrderSchema = z.object({
 	facilityId: z.string().uuid(),
 	encounterId: z.string().uuid().nullable(),
 	preEncounterId: z.string().uuid().nullable(),
+	patientId: z.string().uuid().nullable().optional(),
+	patientName: z.string().nullable().optional(),
+	patientMrn: z.string().nullable().optional(),
+	patientDateOfBirth: z.string().nullable().optional(),
 	modality: ImagingModalityEnum,
 	bodyPart: z.string(),
 	clinicalIndication: z.string().nullable(),
@@ -357,13 +361,17 @@ export const ImagingOrderSchema = z.object({
 	updatedAt: dateOrString,
 })
 
-export const ImagingOrderIdSchema = z.object({ id: z.string().uuid() })
+export const ImagingOrderIdSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+})
 
 // SLA-016/SLA-019: update imaging order — status transition to "in_progress" auto-sets studyStartedAt;
 // imagingOrderReceivedAt is provided explicitly when radiology acknowledges receipt (Flow 3 Step 1);
 // billingClearedAt is provided explicitly when billing clears the order (Flow 3 Step 2).
 export const UpdateImagingOrderSchema = z.object({
 	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
 	status: ImagingOrderStatusEnum.optional(),
 	scheduledDatetime: dateOrString.optional(),
 	completedDatetime: dateOrString.optional(),
@@ -373,6 +381,14 @@ export const UpdateImagingOrderSchema = z.object({
 	imagingOrderReceivedAt: dateOrString.optional(),
 	/** Explicit billing-clearance timestamp (Flow 3 Step 2). Set by billing staff when payment clears. */
 	billingClearedAt: dateOrString.optional(),
+})
+
+export const SignImagingReportSchema = z.object({
+	id: z.string().uuid(),
+	facilityId: z.string().uuid(),
+	report: z.string().trim().min(1),
+	structuredResults: z.unknown(),
+	amendmentReason: z.string().trim().min(1).optional(),
 })
 
 export const CreateImagingOrderSchema = z.object({
@@ -386,9 +402,12 @@ export const CreateImagingOrderSchema = z.object({
 })
 
 export const ImagingOrderListSchema = PaginationInputSchema.extend({
+	facilityId: z.string().uuid().optional(),
 	encounterId: z.string().uuid().optional(),
 	preEncounterId: z.string().uuid().optional(),
 	status: ImagingOrderStatusEnum.optional(),
+}).refine(input => Boolean(input.facilityId || input.encounterId || input.preEncounterId), {
+	message: "facilityId, encounterId, or preEncounterId is required",
 })
 
 export const ImagingOrderListResponseSchema = PaginatedResponseSchema.extend({

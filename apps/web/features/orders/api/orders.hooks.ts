@@ -131,6 +131,10 @@ export interface ImagingOrder {
 	facilityId: string
 	encounterId: string | null
 	preEncounterId: string | null
+	patientId?: string | null
+	patientName?: string | null
+	patientMrn?: string | null
+	patientDateOfBirth?: string | null
 	modality: string
 	bodyPart: string
 	clinicalIndication: string | null
@@ -139,6 +143,9 @@ export interface ImagingOrder {
 	orderingStaffId: string
 	orderingStaffName: string | null
 	scheduledDatetime: string | null
+	studyStartedAt: string | null
+	imagingOrderReceivedAt: string | null
+	billingClearedAt: string | null
 	completedDatetime: string | null
 	report: string | null
 	structuredResults: unknown
@@ -234,6 +241,9 @@ function mapImagingOrder(order: RawImagingOrder): ImagingOrder {
 	return {
 		...order,
 		scheduledDatetime: serializeDate(order.scheduledDatetime),
+		studyStartedAt: serializeDate(order.studyStartedAt),
+		imagingOrderReceivedAt: serializeDate(order.imagingOrderReceivedAt),
+		billingClearedAt: serializeDate(order.billingClearedAt),
 		completedDatetime: serializeDate(order.completedDatetime),
 		createdAt: serializeRequiredDate(order.createdAt),
 		updatedAt: serializeRequiredDate(order.updatedAt),
@@ -480,6 +490,7 @@ export function useCreateLabOrderMutation() {
 }
 
 interface ImagingOrderListParams {
+	facilityId?: string
 	encounterId?: string
 	preEncounterId?: string
 	status?: string
@@ -491,23 +502,24 @@ export function useImagingOrderListQuery(params: ImagingOrderListParams) {
 	return useQuery(
 		orpc.orders.listImagingOrders.queryOptions({
 			input: {
+				facilityId: params.facilityId,
 				encounterId: params.encounterId,
 				preEncounterId: params.preEncounterId,
 				status: params.status as V1Inputs["orders"]["listImagingOrders"]["status"],
 				page: params.page ?? 1,
 				limit: params.limit ?? 50,
 			},
-			enabled: !!(params.encounterId || params.preEncounterId),
+			enabled: !!(params.facilityId || params.encounterId || params.preEncounterId),
 			select: mapPaginatedImagingOrders,
 		})
 	)
 }
 
-export function useImagingOrderDetailQuery(id: string) {
+export function useImagingOrderDetailQuery(id: string, facilityId?: string) {
 	return useQuery(
 		orpc.orders.getImagingOrder.queryOptions({
-			input: { id },
-			enabled: !!id,
+			input: { id, facilityId: facilityId! },
+			enabled: !!id && !!facilityId,
 			select: mapImagingOrder,
 		})
 	)
@@ -533,6 +545,18 @@ export function useUpdateImagingOrderMutation() {
 
 	return useMutation(
 		orpc.orders.updateImagingOrder.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
+			},
+		})
+	)
+}
+
+export function useSignImagingReportMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.orders.signImagingReport.mutationOptions({
 			onSuccess: () => {
 				queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
 			},

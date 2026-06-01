@@ -5,6 +5,7 @@ import { ExternalLink, ImageOff, MonitorPlay } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent } from "@/core/components/ui/card"
+import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useImagingOrderDetailQuery } from "@/features/orders/api/orders.hooks"
 
@@ -33,9 +34,10 @@ function parseStructuredResults(raw: unknown): PacsStructuredResults {
 export default function PacsViewerPage() {
 	const searchParams = useSearchParams()
 	const orderId = searchParams.get("orderId") ?? ""
+	const facilityId = useActiveFacilityId()
 	const permSet = usePermissionSet()
 	const hasViewPermission = can(permSet, "radiology", "view") || can(permSet, "orders", "view")
-	const imagingOrderQuery = useImagingOrderDetailQuery(orderId)
+	const imagingOrderQuery = useImagingOrderDetailQuery(orderId, facilityId)
 	const order = imagingOrderQuery.data
 	const pacsUrl = parseStructuredResults(order?.structuredResults).pacsUrl?.trim() ?? ""
 
