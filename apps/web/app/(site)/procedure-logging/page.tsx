@@ -108,7 +108,7 @@ function isToday(value: Date | string | null | undefined) {
 }
 
 function scanTypeLabel(scanType: ScanType) {
-	return scanType === "start" ? "START" : "END"
+	return scanType === "start" ? "input" : "END"
 }
 
 function procedureStatusLabel(status: ProcedureStatus) {
@@ -458,12 +458,14 @@ export default function ProcedureLoggingPage() {
 														MRN {patientDetail.mrn ?? trimmedPatientBarcode}
 													</div>
 												</div>
-												{procedureStatusDetail && (
+												{procedureStatusDetail ? (
 													<Badge
 														variant={procedureStatusBadgeVariant(procedureStatusDetail.status)}
 													>
 														{procedureStatusLabel(procedureStatusDetail.status)}
 													</Badge>
+												) : (
+													<Badge variant="outline">Not Recorded</Badge>
 												)}
 											</div>
 											<div className="grid grid-cols-2 gap-3 text-xs">
@@ -494,7 +496,7 @@ export default function ProcedureLoggingPage() {
 											<div className="flex flex-col items-center gap-2 text-sm">
 												<Scan className="text-muted-foreground size-6" />
 												<span className="text-muted-foreground">
-													Awaiting {scanTypeLabel(selectedScanType)} scan...
+													Awaiting {scanTypeLabel(selectedScanType)} MRN...
 												</span>
 											</div>
 										</div>
