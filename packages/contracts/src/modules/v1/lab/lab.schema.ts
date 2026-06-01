@@ -102,6 +102,7 @@ export const CrossMatchRequestSchema = z.object({
 export const CrossMatchListQuerySchema = z.object({
 	facilityId: z.string().uuid(),
 	status: CrossMatchStatusEnum.optional(),
+	patientMrn: z.string().min(1).max(50).optional(),
 	page: z.coerce.number().int().positive().optional().default(1),
 	limit: z.coerce.number().int().positive().max(100).optional().default(50),
 })
@@ -120,13 +121,15 @@ export const CrossMatchIdSchema = z.object({
 
 export const CreateCrossMatchSchema = z.object({
 	facilityId: z.string().uuid(),
-	patientId: z.string().uuid(),
+	patientId: z.string().min(1).max(100),
 	encounterId: z.string().uuid().optional(),
 	sourceLabOrderId: z.string().uuid().optional(),
 	bloodType: BloodTypeEnum.optional(),
 	componentType: z.string().min(1).max(100),
 	unitsRequested: z.number().int().positive(),
 	urgency: CrossMatchUrgencyEnum,
+	donorId: z.string().uuid().optional(),
+	bloodUnitBarcode: z.string().min(1).max(50).optional(),
 	clinicalIndication: z.string().max(500).optional(),
 })
 

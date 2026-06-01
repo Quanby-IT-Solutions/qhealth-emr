@@ -74,6 +74,11 @@ interface NavItemConfig {
 	href: string
 	iconName: NavIconName
 	/**
+	 * Optional role-name allowlist for workflows whose permissions overlap with
+	 * other roles. Names are matched case-insensitively.
+	 */
+	allowedRoleNames?: string[]
+	/**
 	 * Always-show when empty. Otherwise the item is visible if the user holds
 	 * ANY of the listed module+action pairs. Use this instead of requiredModules
 	 * to distinguish between roles that share the same module but have different
@@ -114,6 +119,18 @@ const REGISTRAR_ROLE_BUNDLE: RequiredPermission[] = [
 	{ module: "adt", action: "edit" },
 	{ module: "patients", action: "edit" },
 ]
+
+export const LAB_TECH_ROLE_NAMES = ["Lab Technologist", "Lab Technician", "Lab Tech"]
+export const BLOOD_BANK_ROLE_NAMES = ["Blood Bank Technician", "Blood Bank Officer"]
+export const NURSE_ROLE_NAMES = ["Nurse"]
+export const RADIOLOGIST_ROLE_NAMES = ["Radiologist"]
+
+export function roleNameMatches(roleName: string | null | undefined, allowedRoleNames: string[]) {
+	const normalizedRoleName = roleName?.trim().toLowerCase()
+	if (!normalizedRoleName) return false
+
+	return allowedRoleNames.some(allowed => allowed.trim().toLowerCase() === normalizedRoleName)
+}
 
 /**
  * Primary navigation items visible in the sidebar.
@@ -375,19 +392,52 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		requireAllPermissions: REGISTRAR_ROLE_BUNDLE,
 	},
 	{
-		title: "Laboratory",
+		title: "Lab Result Entry & Validation",
 		href: "/laboratory",
 		iconName: "laboratory",
 		// Laboratory module is seeded for Lab Technologist role
 		// Admin does not have laboratory access per TOR
+		allowedRoleNames: LAB_TECH_ROLE_NAMES,
 		requiredPermissions: [{ module: "laboratory", action: "view" }],
 	},
 	{
-		title: "Radiology",
+		title: "Critical Result Flagging",
+		href: "/laboratory/critical-results",
+		iconName: "laboratory",
+		allowedRoleNames: LAB_TECH_ROLE_NAMES,
+		requiredPermissions: [{ module: "laboratory", action: "view" }],
+	},
+	{
+		title: "Blood Bank Approval",
+		href: "/laboratory/blood-bank",
+		iconName: "blood-bank",
+		allowedRoleNames: BLOOD_BANK_ROLE_NAMES,
+		requiredPermissions: [{ module: "laboratory", action: "view" }],
+	},
+	{
+		title: "Transfusion Verification",
+		href: "/transfusion",
+		iconName: "blood-bank",
+		allowedRoleNames: NURSE_ROLE_NAMES,
+		requiredPermissions: [{ module: "nursing", action: "view" }],
+	},
+	{
+		title: "Procedure Barcode Logging",
+		href: "/procedure-logging",
+		iconName: "laboratory",
+		allowedRoleNames: [...LAB_TECH_ROLE_NAMES, ...RADIOLOGIST_ROLE_NAMES],
+		requiredPermissions: [
+			{ module: "laboratory", action: "view" },
+			{ module: "radiology", action: "view" },
+		],
+	},
+	{
+		title: "Radiology Report Attachment",
 		href: "/radiology",
 		iconName: "radiology",
 		// Radiology module is seeded for Radiologist role
 		// Admin does not have radiology access per TOR
+		allowedRoleNames: RADIOLOGIST_ROLE_NAMES,
 		requiredPermissions: [{ module: "radiology", action: "view" }],
 	},
 	{
@@ -657,8 +707,9 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		title: "Blood Bank",
 		href: "/blood-bank",
 		iconName: "blood-bank",
-		// Blood Bank is tied to Laboratory module (Lab Techs handle cross-matching)
+		// Blood Bank is tied to Laboratory module but owned by Blood Bank staff.
 		// Admin does not have blood bank access per TOR
+		allowedRoleNames: BLOOD_BANK_ROLE_NAMES,
 		requiredPermissions: [{ module: "laboratory", action: "view" }],
 		isSecondary: true,
 	},
@@ -772,10 +823,18 @@ export function getDefaultPatientsHref(permissions: Permission[]): string {
  * integration_registry:view, etc.). Clinical module nav items must not include
  * admin:view in their requiredPermissions.
  */
-export function filterNavItems(items: NavItemConfig[], permissions: Permission[]): NavItemConfig[] {
+export function filterNavItems(
+	items: NavItemConfig[],
+	permissions: Permission[],
+	roleName?: string | null
+): NavItemConfig[] {
 	const permSet = new Set(permissions.map(p => `${p.module}:${p.action}`))
 
 	return items.filter(item => {
+		if (item.allowedRoleNames?.length && !roleNameMatches(roleName, item.allowedRoleNames)) {
+			return false
+		}
+
 		// Check excludes first (takes precedence over includes)
 		if (item.excludePermissions?.some(p => permSet.has(`${p.module}:${p.action}`))) {
 			return false

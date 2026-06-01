@@ -3,7 +3,17 @@
 import { Clock, FileText } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
+import { Button } from "@/core/components/ui/button"
 import { Separator } from "@/core/components/ui/separator"
+
+interface ReportAttachment {
+	id: string
+	name: string
+	size: number
+	type: string
+	uploadedAt: string
+	dataUrl: string
+}
 
 interface StructuredReport {
 	technique?: string
@@ -12,6 +22,8 @@ interface StructuredReport {
 	recommendations?: string
 	radiologistName?: string
 	reportedAt?: string
+	reportStatus?: "draft" | "signed"
+	attachments?: ReportAttachment[]
 }
 
 export interface RadiologyReportProps {
@@ -41,6 +53,16 @@ function formatDate(dateStr: string | null | undefined): string | null {
 	})
 }
 
+function formatFileSize(bytes: number) {
+	if (bytes < 1024) return `${bytes} B`
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function openAttachment(attachment: ReportAttachment) {
+	window.open(attachment.dataUrl, "_blank", "noopener,noreferrer")
+}
+
 export function RadiologyReport({
 	report,
 	structuredResults,
@@ -52,7 +74,14 @@ export function RadiologyReport({
 	completedDatetime,
 }: RadiologyReportProps) {
 	const structured = parseStructuredResults(structuredResults)
-	const hasReport = !!report || !!structured
+	const structuredIsReleased = !structured?.reportStatus || structured.reportStatus === "signed"
+	const hasStructuredReport =
+		structuredIsReleased &&
+		(!!structured?.findings ||
+			!!structured?.impression ||
+			!!structured?.recommendations ||
+			!!structured?.attachments?.length)
+	const hasReport = !!report || hasStructuredReport
 	const diagnosis = [indicationIcd10Code, indicationIcd10Display]
 		.filter(Boolean)
 		.join(" - ")
@@ -92,7 +121,7 @@ export function RadiologyReport({
 			{/* Clinical Indication */}
 			{(clinicalIndication || diagnosis) && (
 				<div>
-					<p className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
+					<p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
 						Clinical Indication
 					</p>
 					{clinicalIndication && <p className="text-sm">{clinicalIndication}</p>}
@@ -103,7 +132,7 @@ export function RadiologyReport({
 			{/* Technique */}
 			{structured?.technique && (
 				<div>
-					<p className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
+					<p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
 						Technique
 					</p>
 					<p className="text-sm">{structured.technique}</p>
@@ -113,33 +142,60 @@ export function RadiologyReport({
 			{/* Findings */}
 			{(structured?.findings ?? report) && (
 				<div>
-					<p className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
+					<p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
 						Findings
 					</p>
-					<p className="whitespace-pre-wrap text-sm">{structured?.findings ?? report}</p>
+					<p className="text-sm whitespace-pre-wrap">{structured?.findings ?? report}</p>
 				</div>
 			)}
 
 			{/* Impression */}
 			{structured?.impression && (
 				<div>
-					<p className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
+					<p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
 						Impression
 					</p>
-					<p className="bg-muted rounded-md p-3 text-sm font-medium">
-						{structured.impression}
-					</p>
+					<p className="bg-muted rounded-md p-3 text-sm font-medium">{structured.impression}</p>
 				</div>
 			)}
 
 			{/* Recommendations */}
 			{structured?.recommendations && (
 				<div>
-					<p className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
+					<p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
 						Recommendations
 					</p>
 					<p className="text-sm">{structured.recommendations}</p>
 				</div>
+			)}
+
+			{structured?.attachments && structured.attachments.length > 0 && (
+				<>
+					<Separator />
+					<div>
+						<p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
+							Attachments
+						</p>
+						<div className="space-y-2">
+							{structured.attachments.map(attachment => (
+								<div
+									key={attachment.id}
+									className="bg-background flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+								>
+									<div className="min-w-0">
+										<p className="truncate text-sm font-medium">{attachment.name}</p>
+										<p className="text-muted-foreground text-xs">
+											{formatFileSize(attachment.size)}
+										</p>
+									</div>
+									<Button variant="outline" size="sm" onClick={() => openAttachment(attachment)}>
+										Open
+									</Button>
+								</div>
+							))}
+						</div>
+					</div>
+				</>
 			)}
 
 			<Separator />

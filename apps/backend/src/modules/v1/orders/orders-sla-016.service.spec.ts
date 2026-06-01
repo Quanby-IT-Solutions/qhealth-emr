@@ -10,7 +10,7 @@
  * - updateImagingOrder does NOT overwrite an existing studyStartedAt
  */
 
-import { NotFoundException } from "@nestjs/common"
+import { BadRequestException, NotFoundException } from "@nestjs/common"
 import { Test, type TestingModule } from "@nestjs/testing"
 
 import { OrdersService } from "./orders.service"
@@ -19,16 +19,13 @@ import { OrdersService } from "./orders.service"
 // DB Mock
 // ---------------------------------------------------------------------------
 const mockSelect = jest.fn()
+const mockInsert = jest.fn()
 const mockUpdate = jest.fn()
 const mockSet = jest.fn()
 const mockWhere = jest.fn()
 const mockLimit = jest.fn()
 const mockReturning = jest.fn()
-
-const mockDb = {
-	select: mockSelect,
-	update: mockUpdate,
-}
+const mockValues = jest.fn()
 
 // Bypass the @repo/contracts barrel (which transitively loads @orpc/contract
 // as ESM) — these tests don't use any contract objects at runtime.
@@ -39,6 +36,7 @@ jest.mock("@repo/contracts", () => ({
 jest.mock("@/common/database/database.client", () => ({
 	db: {
 		select: (...args: unknown[]) => mockSelect(...args),
+		insert: (...args: unknown[]) => mockInsert(...args),
 		update: (...args: unknown[]) => mockUpdate(...args),
 	},
 }))
@@ -108,6 +106,7 @@ function buildImagingOrder(overrides: Record<string, unknown> = {}) {
 		report: null,
 		structuredResults: null,
 		studyStartedAt: null,
+		imagingOrderReceivedAt: null,
 		billingClearedAt: null,
 		cdsAlerts: null,
 		createdAt: new Date("2024-01-01"),
@@ -135,6 +134,8 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 		mockWhere.mockReturnValue({ returning: mockReturning, limit: mockLimit })
 		mockSet.mockReturnValue({ where: mockWhere })
 		mockUpdate.mockReturnValue({ set: mockSet })
+		mockValues.mockResolvedValue([])
+		mockInsert.mockReturnValue({ values: mockValues })
 
 		const module: TestingModule = await Test.createTestingModule({
 			providers: [OrdersService, { provide: ProblemsAllergiesService, useValue: {} }],
@@ -221,7 +222,11 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 
 	describe("updateImagingOrder", () => {
 		it("auto-sets studyStartedAt when status transitions to 'in_progress' and no existing value", async () => {
-			const order = buildImagingOrder({ status: "scheduled", studyStartedAt: null })
+			const order = buildImagingOrder({
+				status: "scheduled",
+				studyStartedAt: null,
+				billingClearedAt: new Date("2024-06-01T09:00:00Z"),
+			})
 
 			mockSelect.mockImplementation(() => buildSelectChain([order]))
 
@@ -233,7 +238,11 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 				}
 			})
 
-			await service.updateImagingOrder({ id: order.id as string, status: "in_progress" })
+			await service.updateImagingOrder({
+				id: order.id as string,
+				facilityId: order.facilityId as string,
+				status: "in_progress",
+			})
 
 			expect(capturedSet.studyStartedAt).toBeInstanceOf(Date)
 			expect(capturedSet.status).toBe("in_progress")
@@ -241,7 +250,11 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 
 		it("does NOT overwrite an existing studyStartedAt", async () => {
 			const existingTimestamp = new Date("2024-06-01T09:30:00Z")
-			const order = buildImagingOrder({ status: "in_progress", studyStartedAt: existingTimestamp })
+			const order = buildImagingOrder({
+				status: "in_progress",
+				studyStartedAt: existingTimestamp,
+				billingClearedAt: new Date("2024-06-01T09:00:00Z"),
+			})
 
 			mockSelect.mockImplementation(() => buildSelectChain([order]))
 
@@ -253,7 +266,11 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 				}
 			})
 
-			await service.updateImagingOrder({ id: order.id as string, status: "in_progress" })
+			await service.updateImagingOrder({
+				id: order.id as string,
+				facilityId: order.facilityId as string,
+				status: "in_progress",
+			})
 
 			expect(capturedSet.studyStartedAt).toBeUndefined()
 		})
@@ -272,17 +289,115 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 				}
 			})
 
-			await service.updateImagingOrder({ id: order.id as string, billingClearedAt: billingTs })
+			await service.updateImagingOrder({
+				id: order.id as string,
+				facilityId: order.facilityId as string,
+				billingClearedAt: billingTs,
+			})
 
 			expect(capturedSet.billingClearedAt).toBe(billingTs)
+		})
+
+		it("requires billing clearance before a study starts", async () => {
+			const order = buildImagingOrder({ status: "scheduled", billingClearedAt: null })
+
+			mockSelect.mockImplementation(() => buildSelectChain([order]))
+
+			await expect(
+				service.updateImagingOrder({
+					id: order.id as string,
+					facilityId: order.facilityId as string,
+					status: "in_progress",
+				})
+			).rejects.toThrow(BadRequestException)
 		})
 
 		it("throws NotFoundException when imaging order does not exist", async () => {
 			mockSelect.mockImplementation(() => buildSelectChain([]))
 
 			await expect(
-				service.updateImagingOrder({ id: "non-existent", status: "in_progress" })
+				service.updateImagingOrder({
+					id: "non-existent",
+					facilityId: "fac-001",
+					status: "in_progress",
+				})
 			).rejects.toThrow(NotFoundException)
+		})
+	})
+
+	describe("signImagingReport", () => {
+		it("releases a completed report with server-derived signer metadata and an audit record", async () => {
+			const order = buildImagingOrder({
+				status: "completed",
+				structuredResults: { reportStatus: "draft" },
+			})
+			const releasedOrder = buildImagingOrder({
+				status: "completed",
+				report: "Findings:\nNo acute process.\n\nImpression:\nNo acute process.",
+				structuredResults: { reportStatus: "signed" },
+			})
+			mockSelect
+				.mockImplementationOnce(() => buildSelectChain([order]))
+				.mockImplementationOnce(() =>
+					buildSelectChain([{ id: "staff-rad-001", name: "Dr. Reyes" }])
+				)
+				.mockImplementationOnce(() => buildSelectChain([releasedOrder]))
+
+			let capturedSet: Record<string, unknown> = {}
+			mockSet.mockImplementation((data: Record<string, unknown>) => {
+				capturedSet = data
+				return { where: jest.fn().mockResolvedValue([]) }
+			})
+
+			await service.signImagingReport(
+				{
+					id: order.id as string,
+					facilityId: order.facilityId as string,
+					report: "Findings:\nNo acute process.\n\nImpression:\nNo acute process.",
+					structuredResults: {
+						findings: "No acute process.",
+						impression: "No acute process.",
+					},
+				},
+				"user-rad-001"
+			)
+
+			expect(capturedSet.status).toBe("completed")
+			expect(capturedSet.structuredResults).toMatchObject({
+				findings: "No acute process.",
+				impression: "No acute process.",
+				radiologistName: "Dr. Reyes",
+				radiologistStaffId: "staff-rad-001",
+				reportStatus: "signed",
+			})
+			expect(mockValues).toHaveBeenCalledWith(
+				expect.objectContaining({
+					action: "sign",
+					entityType: "imaging_order",
+					entityId: order.id,
+					staffProfileId: "staff-rad-001",
+				})
+			)
+		})
+
+		it("rejects report release until the study is complete", async () => {
+			const order = buildImagingOrder({ status: "in_progress" })
+			mockSelect.mockImplementation(() => buildSelectChain([order]))
+
+			await expect(
+				service.signImagingReport(
+					{
+						id: order.id as string,
+						facilityId: order.facilityId as string,
+						report: "Findings:\nNo acute process.\n\nImpression:\nNo acute process.",
+						structuredResults: {
+							findings: "No acute process.",
+							impression: "No acute process.",
+						},
+					},
+					"user-rad-001"
+				)
+			).rejects.toThrow(BadRequestException)
 		})
 	})
 })

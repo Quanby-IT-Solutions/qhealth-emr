@@ -246,6 +246,21 @@ export const ancillaryClearance = createTable(
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
 		clearedAt: t.timestamp("cleared_at"),
 		overrideReason: t.text("override_reason"),
+		procedureStartAt: t.timestamp("procedure_start_at"),
+		procedureEndAt: t.timestamp("procedure_end_at"),
+		procedureStartBarcode: t.text("procedure_start_barcode"),
+		procedureEndBarcode: t.text("procedure_end_barcode"),
+		procedureStartBarcodeMatched: t
+			.boolean("procedure_start_barcode_matched")
+			.notNull()
+			.default(false),
+		procedureEndBarcodeMatched: t.boolean("procedure_end_barcode_matched").notNull().default(false),
+		procedureStartedByStaffId: t
+			.uuid("procedure_started_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		procedureEndedByStaffId: t
+			.uuid("procedure_ended_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 	}),
@@ -253,5 +268,7 @@ export const ancillaryClearance = createTable(
 		index("ancillary_clearance_order_id_idx").on(t.orderId),
 		index("ancillary_clearance_encounter_id_idx").on(t.encounterId),
 		index("ancillary_clearance_status_idx").on(t.status),
+		index("ancillary_clearance_procedure_start_at_idx").on(t.procedureStartAt),
+		index("ancillary_clearance_procedure_end_at_idx").on(t.procedureEndAt),
 	]
 )

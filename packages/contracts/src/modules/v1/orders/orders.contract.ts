@@ -52,6 +52,7 @@ import {
 	PrescriptionSchema,
 	SaveCounselingLogInputSchema,
 	SendPrescriptionSchema,
+	SignImagingReportSchema,
 	SignPrescriptionSchema,
 	TranchedOrdersResponseSchema,
 	TranchePreviewInputSchema,
@@ -222,6 +223,16 @@ export const ordersContract = {
 			tags: ["Orders — Imaging"],
 		})
 		.input(UpdateImagingOrderSchema)
+		.output(ImagingOrderSchema),
+
+	signImagingReport: oc
+		.route({
+			method: "POST",
+			path: "/imaging/{id}/sign",
+			summary: "Sign and release a radiology report",
+			tags: ["Orders â€” Imaging"],
+		})
+		.input(SignImagingReportSchema)
 		.output(ImagingOrderSchema),
 
 	// ========================================================================

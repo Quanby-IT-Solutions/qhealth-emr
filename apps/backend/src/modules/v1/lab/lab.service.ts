@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
-import { and, count, desc, eq, inArray } from "drizzle-orm"
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm"
 
 import type {
 	ApproveCrossMatch,
@@ -28,6 +28,8 @@ import { db } from "@/common/database/database.client"
 type CrossMatchRow = typeof crossMatchRequests.$inferSelect
 type BloodUnitRow = typeof bloodUnits.$inferSelect
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 @Injectable()
 export class LabService {
 	// ========================================================================
@@ -41,10 +43,15 @@ export class LabService {
 		const conditions = [eq(crossMatchRequests.facilityId, query.facilityId)]
 
 		if (query.status) conditions.push(eq(crossMatchRequests.status, query.status))
+		if (query.patientMrn) conditions.push(eq(patients.mrn, query.patientMrn))
 
 		const whereClause = and(...conditions)
 		const [[totalRow], rows] = await Promise.all([
-			db.select({ total: count() }).from(crossMatchRequests).where(whereClause),
+			db
+				.select({ total: count() })
+				.from(crossMatchRequests)
+				.innerJoin(patients, eq(crossMatchRequests.patientId, patients.id))
+				.where(whereClause),
 			db
 				.select({
 					request: crossMatchRequests,
@@ -83,37 +90,59 @@ export class LabService {
 	): Promise<CrossMatchRequest> {
 		const staff = await this.getStaffProfileForUser(requestedById)
 
-		const [patient] = await db
-			.select({ id: patients.id, facilityId: patients.facilityId })
-			.from(patients)
-			.where(eq(patients.id, input.patientId))
+		const patient = await this.getPatientForCrossMatch(input.patientId, input.facilityId)
 
-		if (!patient) throw new NotFoundException(`Patient ${input.patientId} not found`)
 		if (patient.facilityId !== input.facilityId) {
 			throw new BadRequestException("Patient does not belong to the selected facility")
 		}
 
-		const encounterId = await this.resolveEncounterId(input)
+		const encounterId = await this.resolveEncounterId(input, patient.id)
+		const donorUnits = await this.getCompatibleDonorUnits(input)
+		const createdId = await db.transaction(async tx => {
+			const crossMatchedAt = donorUnits.length > 0 ? new Date() : null
+			const [created] = await tx
+				.insert(crossMatchRequests)
+				.values({
+					facilityId: input.facilityId,
+					patientId: patient.id,
+					encounterId,
+					sourceLabOrderId: input.sourceLabOrderId ?? null,
+					bloodType: input.bloodType ?? null,
+					componentType: input.componentType,
+					unitsRequested: input.unitsRequested,
+					urgency: input.urgency,
+					clinicalIndication: input.clinicalIndication ?? null,
+					compatibilityResult: "pending",
+					status: donorUnits.length > 0 ? "cross_matched" : "pending",
+					requestedByStaffId: staff.id,
+					crossMatchedByStaffId: donorUnits.length > 0 ? staff.id : null,
+					crossMatchedAt,
+				})
+				.returning({ id: crossMatchRequests.id })
 
-		const [created] = await db
-			.insert(crossMatchRequests)
-			.values({
-				facilityId: input.facilityId,
-				patientId: input.patientId,
-				encounterId,
-				sourceLabOrderId: input.sourceLabOrderId ?? null,
-				bloodType: input.bloodType ?? null,
-				componentType: input.componentType,
-				unitsRequested: input.unitsRequested,
-				urgency: input.urgency,
-				clinicalIndication: input.clinicalIndication ?? null,
-				compatibilityResult: "pending",
-				status: "pending",
-				requestedByStaffId: staff.id,
-			})
-			.returning({ id: crossMatchRequests.id })
+			if (!created) throw new BadRequestException("Unable to create cross-match request")
 
-		return this.getCrossMatchOrThrow(created!.id)
+			if (donorUnits.length > 0) {
+				const bloodUnitIds = donorUnits.map(unit => unit.id)
+
+				await tx
+					.update(bloodUnits)
+					.set({ status: "reserved", updatedAt: new Date() })
+					.where(inArray(bloodUnits.id, bloodUnitIds))
+
+				await tx.insert(crossMatchUnitAssignments).values(
+					bloodUnitIds.map(bloodUnitId => ({
+						crossMatchRequestId: created.id,
+						bloodUnitId,
+						status: "reserved" as const,
+					}))
+				)
+			}
+
+			return created.id
+		})
+
+		return this.getCrossMatchOrThrow(createdId)
 	}
 
 	async approveCrossMatch(
@@ -132,54 +161,84 @@ export class LabService {
 		}
 
 		if (input.compatibilityResult === "incompatible") {
-			await db
-				.update(crossMatchRequests)
-				.set({
-					status: "cancelled",
-					compatibilityResult: "incompatible",
-					crossMatchedByStaffId: staff.id,
-					crossMatchedAt: new Date(),
-					approvedByStaffId: staff.id,
-					approvedAt: new Date(),
-					cancelledByStaffId: staff.id,
-					cancelledAt: new Date(),
-					rejectionReason: input.rejectionReason ?? "Cross-match incompatible",
-					updatedAt: new Date(),
-				})
-				.where(eq(crossMatchRequests.id, input.id))
+			await db.transaction(async tx => {
+				const assignedUnits = await tx
+					.select({ bloodUnitId: crossMatchUnitAssignments.bloodUnitId })
+					.from(crossMatchUnitAssignments)
+					.where(eq(crossMatchUnitAssignments.crossMatchRequestId, input.id))
+				const assignedBloodUnitIds = assignedUnits.map(unit => unit.bloodUnitId)
+
+				if (assignedBloodUnitIds.length > 0) {
+					await tx
+						.update(bloodUnits)
+						.set({ status: "available", updatedAt: new Date() })
+						.where(inArray(bloodUnits.id, assignedBloodUnitIds))
+
+					await tx
+						.update(crossMatchUnitAssignments)
+						.set({ status: "released", updatedAt: new Date() })
+						.where(eq(crossMatchUnitAssignments.crossMatchRequestId, input.id))
+				}
+
+				await tx
+					.update(crossMatchRequests)
+					.set({
+						status: "cancelled",
+						compatibilityResult: "incompatible",
+						crossMatchedByStaffId: staff.id,
+						crossMatchedAt: new Date(),
+						approvedByStaffId: staff.id,
+						approvedAt: new Date(),
+						cancelledByStaffId: staff.id,
+						cancelledAt: new Date(),
+						rejectionReason: input.rejectionReason ?? "Cross-match incompatible",
+						updatedAt: new Date(),
+					})
+					.where(eq(crossMatchRequests.id, input.id))
+			})
 
 			return this.getCrossMatchOrThrow(input.id)
 		}
 
-		const bloodUnitIds = input.bloodUnitIds ?? []
+		const existingAssignments = await db
+			.select({ bloodUnitId: crossMatchUnitAssignments.bloodUnitId })
+			.from(crossMatchUnitAssignments)
+			.where(eq(crossMatchUnitAssignments.crossMatchRequestId, input.id))
+		const existingAssignedUnitIds = existingAssignments.map(row => row.bloodUnitId)
+		const existingAssignedUnitIdSet = new Set(existingAssignedUnitIds)
+		const submittedBloodUnitIds = [...new Set(input.bloodUnitIds ?? [])]
+		const bloodUnitIds =
+			submittedBloodUnitIds.length > 0 ? submittedBloodUnitIds : existingAssignedUnitIds
 
-		if (bloodUnitIds.length === 0) {
-			throw new BadRequestException("At least one blood unit is required for compatible approval")
-		}
-		if (bloodUnitIds.length < request.unitsRequested) {
+		if (bloodUnitIds.length > 0 && bloodUnitIds.length < request.unitsRequested) {
 			throw new BadRequestException("Assigned blood units are fewer than the requested units")
 		}
-		if (!request.bloodType) {
+		if (bloodUnitIds.length > 0 && !request.bloodType) {
 			throw new BadRequestException("Patient blood type is required before compatible approval")
 		}
 
 		await db.transaction(async tx => {
-			const units = await tx.select().from(bloodUnits).where(inArray(bloodUnits.id, bloodUnitIds))
+			if (bloodUnitIds.length > 0) {
+				const units = await tx.select().from(bloodUnits).where(inArray(bloodUnits.id, bloodUnitIds))
 
-			this.validateBloodUnitsForApproval(request, units, bloodUnitIds)
+				this.validateBloodUnitsForApproval(request, units, bloodUnitIds, existingAssignedUnitIdSet)
+				const newBloodUnitIds = bloodUnitIds.filter(id => !existingAssignedUnitIdSet.has(id))
 
-			await tx
-				.update(bloodUnits)
-				.set({ status: "reserved", updatedAt: new Date() })
-				.where(inArray(bloodUnits.id, bloodUnitIds))
+				await tx
+					.update(bloodUnits)
+					.set({ status: "reserved", updatedAt: new Date() })
+					.where(inArray(bloodUnits.id, bloodUnitIds))
 
-			await tx.insert(crossMatchUnitAssignments).values(
-				bloodUnitIds.map(bloodUnitId => ({
-					crossMatchRequestId: input.id,
-					bloodUnitId,
-					status: "reserved" as const,
-				}))
-			)
+				if (newBloodUnitIds.length > 0) {
+					await tx.insert(crossMatchUnitAssignments).values(
+						newBloodUnitIds.map(bloodUnitId => ({
+							crossMatchRequestId: input.id,
+							bloodUnitId,
+							status: "reserved" as const,
+						}))
+					)
+				}
+			}
 
 			await tx
 				.update(crossMatchRequests)
@@ -239,20 +298,23 @@ export class LabService {
 			unitMatch,
 			statusAllowsTransfusion,
 		})
-		const staff = verifiedById ? await this.getOptionalStaffProfileForUser(verifiedById) : null
 
-		await db.insert(transfusionVerifications).values({
-			crossMatchRequestId: input.crossMatchId,
-			bloodUnitId: assignedUnit?.unit.id ?? null,
-			patientId: row.patientId,
-			verifiedByStaffId: staff?.id ?? null,
-			unitBarcode: input.unitBarcode,
-			patientWristbandBarcode: input.patientWristbandBarcode,
-			verified,
-			patientMatch,
-			unitMatch,
-			message,
-		})
+		if (verified) {
+			const staff = verifiedById ? await this.getOptionalStaffProfileForUser(verifiedById) : null
+
+			await db.insert(transfusionVerifications).values({
+				crossMatchRequestId: input.crossMatchId,
+				bloodUnitId: assignedUnit?.unit.id ?? null,
+				patientId: row.patientId,
+				verifiedByStaffId: staff?.id ?? null,
+				unitBarcode: input.unitBarcode,
+				patientWristbandBarcode: input.patientWristbandBarcode,
+				verified,
+				patientMatch,
+				unitMatch,
+				message,
+			})
+		}
 
 		return { verified, patientMatch, unitMatch, message }
 	}
@@ -372,7 +434,25 @@ export class LabService {
 		return staff ?? null
 	}
 
-	private async resolveEncounterId(input: CreateCrossMatch): Promise<string | null> {
+	private async getPatientForCrossMatch(patientIdentifier: string, facilityId: string) {
+		const normalizedIdentifier = patientIdentifier.trim()
+		const whereClause = UUID_REGEX.test(normalizedIdentifier)
+			? eq(patients.id, normalizedIdentifier)
+			: and(eq(patients.facilityId, facilityId), eq(patients.mrn, normalizedIdentifier))
+		const [patient] = await db
+			.select({ id: patients.id, facilityId: patients.facilityId })
+			.from(patients)
+			.where(whereClause)
+
+		if (!patient) throw new NotFoundException(`Patient ${patientIdentifier} not found`)
+
+		return patient
+	}
+
+	private async resolveEncounterId(
+		input: CreateCrossMatch,
+		resolvedPatientId: string
+	): Promise<string | null> {
 		let encounterId = input.encounterId ?? null
 
 		if (input.sourceLabOrderId) {
@@ -403,7 +483,7 @@ export class LabService {
 				.where(eq(encounters.id, encounterId))
 
 			if (!encounter) throw new NotFoundException(`Encounter ${encounterId} not found`)
-			if (encounter.facilityId !== input.facilityId || encounter.patientId !== input.patientId) {
+			if (encounter.facilityId !== input.facilityId || encounter.patientId !== resolvedPatientId) {
 				throw new BadRequestException("Encounter does not match the selected patient and facility")
 			}
 		}
@@ -411,10 +491,48 @@ export class LabService {
 		return encounterId
 	}
 
+	private async getCompatibleDonorUnits(input: CreateCrossMatch): Promise<BloodUnitRow[]> {
+		if (!input.donorId && !input.bloodUnitBarcode) return []
+
+		const identifierCondition = input.donorId
+			? eq(bloodUnits.donorId, input.donorId)
+			: eq(bloodUnits.unitBarcode, input.bloodUnitBarcode!)
+		const identifierLabel = input.donorId
+			? `Donor ${input.donorId}`
+			: `Blood unit ${input.bloodUnitBarcode}`
+
+		const units = await db
+			.select()
+			.from(bloodUnits)
+			.where(
+				and(
+					eq(bloodUnits.facilityId, input.facilityId),
+					identifierCondition,
+					eq(bloodUnits.componentType, input.componentType),
+					eq(bloodUnits.status, "available")
+				)
+			)
+			.orderBy(asc(bloodUnits.expiryDate))
+
+		const recipientBloodType = input.bloodType
+		const compatibleUnits = recipientBloodType
+			? units.filter(unit => this.isBloodTypeCompatible(recipientBloodType, unit.bloodType))
+			: units
+
+		if (compatibleUnits.length < input.unitsRequested) {
+			throw new BadRequestException(
+				`${identifierLabel} does not have enough compatible available ${input.componentType} units`
+			)
+		}
+
+		return compatibleUnits.slice(0, input.unitsRequested)
+	}
+
 	private validateBloodUnitsForApproval(
 		request: CrossMatchRow,
 		units: BloodUnitRow[],
-		requestedUnitIds: string[]
+		requestedUnitIds: string[],
+		existingAssignedUnitIds = new Set<string>()
 	) {
 		if (units.length !== requestedUnitIds.length) {
 			throw new NotFoundException("One or more blood units were not found")
@@ -424,7 +542,9 @@ export class LabService {
 			if (unit.facilityId !== request.facilityId) {
 				throw new BadRequestException(`Blood unit ${unit.unitBarcode} belongs to another facility`)
 			}
-			if (unit.status !== "available") {
+			const isAlreadyReservedForRequest =
+				unit.status === "reserved" && existingAssignedUnitIds.has(unit.id)
+			if (unit.status !== "available" && !isAlreadyReservedForRequest) {
 				throw new BadRequestException(`Blood unit ${unit.unitBarcode} is not available`)
 			}
 			if (unit.componentType !== request.componentType) {

@@ -66,4 +66,12 @@ export class PatientsController {
 			return this.patientsService.registerWithOpdEncounter(input, session.user.id)
 		})
 	}
+
+	@RequirePermission("laboratory", "view")
+	@Implement(v1.patient.verifyMrn)
+	async verifyMrn() {
+		return implement(v1.patient.verifyMrn).handler(async ({ input }) => {
+			return this.patientsService.verifyMrn(input)
+		})
+	}
 }

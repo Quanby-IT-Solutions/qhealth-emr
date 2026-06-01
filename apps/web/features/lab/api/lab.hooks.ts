@@ -75,6 +75,9 @@ export interface LabOrder {
 	preEncounterId: string | null
 	patientId: string | null
 	patientName: string | null
+	patientMrn?: string | null
+	wardName?: string | null
+	bedNumber?: string | null
 	loincCode: string | null
 	panelCode: string | null
 	testName: string
@@ -129,7 +132,7 @@ export const labKeys = {
 interface LabDashboardParams {
 	facilityId: string
 	status?: LabOrderStatus
-	priority?: string
+	priority?: LabOrder["priority"]
 	page?: number
 	limit?: number
 }

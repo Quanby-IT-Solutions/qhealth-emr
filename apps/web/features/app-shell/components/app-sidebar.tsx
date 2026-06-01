@@ -51,8 +51,9 @@ export function AppSidebar() {
 	const { isOnline } = useOfflineSync()
 
 	const permissions = profile?.activeRole?.permissions ?? []
-	const primaryItems = filterNavItems(PRIMARY_NAV_ITEMS, permissions)
-	const allSecondaryItems = filterNavItems(SECONDARY_NAV_ITEMS, permissions)
+	const activeRoleName = profile?.activeRole?.name
+	const primaryItems = filterNavItems(PRIMARY_NAV_ITEMS, permissions, activeRoleName)
+	const allSecondaryItems = filterNavItems(SECONDARY_NAV_ITEMS, permissions, activeRoleName)
 	const secondaryItems = allSecondaryItems.filter(item => !item.adminGroup)
 
 	const adminGroupMap = new Map(
@@ -146,7 +147,7 @@ export function AppSidebar() {
 										<SidebarMenu>
 											{secondaryItems.map(item => {
 												const Icon = NAV_ICONS[item.iconName]
-											const isActive = isNavActive(item.href)
+												const isActive = isNavActive(item.href)
 												return (
 													<SidebarMenuItem key={`secondary-${item.href}`}>
 														<SidebarMenuButton isActive={isActive} tooltip={item.title}>
@@ -189,7 +190,7 @@ export function AppSidebar() {
 												<SidebarMenu>
 													{items.map(item => {
 														const Icon = NAV_ICONS[item.iconName]
-												const isActive = isNavActive(item.href)
+														const isActive = isNavActive(item.href)
 														return (
 															<SidebarMenuItem key={`admin-${item.href}`}>
 																<SidebarMenuButton isActive={isActive} tooltip={item.title}>

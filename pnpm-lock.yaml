@@ -418,6 +418,9 @@ importers:
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      pg:
+        specifier: 'catalog:'
+        version: 8.16.3
       philippine-administrative-divisions:
         specifier: ^2.0.3
         version: 2.0.3
@@ -485,6 +488,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.3
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.16.0
       '@types/qrcode':
         specifier: ^1.5.6
         version: 1.5.6

@@ -237,3 +237,26 @@ export const PatientProfileResponseSchema = PatientSchema.extend({
 })
 
 export type PatientProfileResponse = z.infer<typeof PatientProfileResponseSchema>
+
+// ============================================================================
+// Verify MRN Input
+// ============================================================================
+
+export const VerifyMrnInputSchema = z.object({
+	facilityId: z.string().uuid(),
+	mrn: z.string().min(1, "MRN is required"),
+})
+
+export type VerifyMrnInput = z.infer<typeof VerifyMrnInputSchema>
+
+export const VerifyMrnResponseSchema = z.object({
+	patientId: z.string().uuid(),
+	mrn: z.string(),
+	firstName: z.string(),
+	lastName: z.string(),
+	middleName: z.string().nullable(),
+	dateOfBirth: z.string(),
+	sex: z.enum(["male", "female", "other"]),
+})
+
+export type VerifyMrnResponse = z.infer<typeof VerifyMrnResponseSchema>

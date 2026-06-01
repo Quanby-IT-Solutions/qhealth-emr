@@ -11,6 +11,7 @@ import { and, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import {
 	accounts,
 	auditLogs,
+	beds,
 	counselingLogs,
 	dispenseLogs,
 	drugBrands,
@@ -31,6 +32,7 @@ import {
 	prescriptions,
 	staffProfiles,
 	users,
+	wards,
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
@@ -50,6 +52,7 @@ type UpdateLabOrderInput = V1Inputs["orders"]["updateLabOrder"]
 type ImagingOrderListInput = V1Inputs["orders"]["listImagingOrders"]
 type CreateImagingOrderInput = V1Inputs["orders"]["createImagingOrder"]
 type UpdateImagingOrderInput = V1Inputs["orders"]["updateImagingOrder"]
+type SignImagingReportInput = V1Inputs["orders"]["signImagingReport"]
 type VerificationQueueInput = V1Inputs["orders"]["getVerificationQueue"]
 type VerifyOrderInput = V1Inputs["orders"]["verifyOrder"]
 type CreateHighAlertVerificationInput = V1Inputs["orders"]["createHighAlertVerification"]
@@ -1377,19 +1380,24 @@ export class OrdersService {
 					specimenType: labOrders.specimenType,
 					orderingStaffId: labOrders.orderingStaffId,
 					orderingStaffName: users.name,
+					patientId: patients.id,
+					patientFirstName: patients.firstName,
+					patientLastName: patients.lastName,
+					patientMrn: patients.mrn,
+					wardName: wards.name,
+					bedNumber: beds.bedNumber,
 					collectionDatetime: labOrders.collectionDatetime,
 					resultedDatetime: labOrders.resultedDatetime,
 					results: labOrders.results,
 					cdsAlerts: labOrders.cdsAlerts,
-					patientId: patients.id,
-					patientFirstName: patients.firstName,
-					patientLastName: patients.lastName,
 					createdAt: labOrders.createdAt,
 					updatedAt: labOrders.updatedAt,
 				})
 				.from(labOrders)
 				.leftJoin(encounters, eq(labOrders.encounterId, encounters.id))
 				.leftJoin(patients, eq(encounters.patientId, patients.id))
+				.leftJoin(beds, eq(encounters.bedId, beds.id))
+				.leftJoin(wards, eq(beds.wardId, wards.id))
 				.leftJoin(staffProfiles, eq(labOrders.orderingStaffId, staffProfiles.id))
 				.leftJoin(users, eq(staffProfiles.userId, users.id))
 				.where(whereClause)
@@ -1436,21 +1444,26 @@ export class OrdersService {
 				specimenType: labOrders.specimenType,
 				orderingStaffId: labOrders.orderingStaffId,
 				orderingStaffName: users.name,
+				patientId: patients.id,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+				patientMrn: patients.mrn,
+				wardName: wards.name,
+				bedNumber: beds.bedNumber,
 				collectionDatetime: labOrders.collectionDatetime,
 				resultedDatetime: labOrders.resultedDatetime,
 				results: labOrders.results,
 				cdsAlerts: labOrders.cdsAlerts,
 				specimenReceivedAt: labOrders.specimenReceivedAt,
 				billingClearedAt: labOrders.billingClearedAt,
-				patientId: patients.id,
-				patientFirstName: patients.firstName,
-				patientLastName: patients.lastName,
 				createdAt: labOrders.createdAt,
 				updatedAt: labOrders.updatedAt,
 			})
 			.from(labOrders)
 			.leftJoin(encounters, eq(labOrders.encounterId, encounters.id))
 			.leftJoin(patients, eq(encounters.patientId, patients.id))
+			.leftJoin(beds, eq(encounters.bedId, beds.id))
+			.leftJoin(wards, eq(beds.wardId, wards.id))
 			.leftJoin(staffProfiles, eq(labOrders.orderingStaffId, staffProfiles.id))
 			.leftJoin(users, eq(staffProfiles.userId, users.id))
 			.where(eq(labOrders.id, id))
@@ -1634,17 +1647,19 @@ export class OrdersService {
 					status: imagingOrders.status,
 					orderingStaffId: imagingOrders.orderingStaffId,
 					orderingStaffName: users.name,
-					scheduledDatetime: imagingOrders.scheduledDatetime,
-					completedDatetime: imagingOrders.completedDatetime,
-					studyStartedAt: imagingOrders.studyStartedAt,
-					imagingOrderReceivedAt: imagingOrders.imagingOrderReceivedAt,
-					report: imagingOrders.report,
-					structuredResults: imagingOrders.structuredResults,
-					cdsAlerts: imagingOrders.cdsAlerts,
 					patientId: patients.id,
 					patientFirstName: patients.firstName,
 					patientLastName: patients.lastName,
 					patientMrn: patients.mrn,
+					patientDateOfBirth: patients.dateOfBirth,
+					scheduledDatetime: imagingOrders.scheduledDatetime,
+					studyStartedAt: imagingOrders.studyStartedAt,
+					imagingOrderReceivedAt: imagingOrders.imagingOrderReceivedAt,
+					billingClearedAt: imagingOrders.billingClearedAt,
+					completedDatetime: imagingOrders.completedDatetime,
+					report: imagingOrders.report,
+					structuredResults: imagingOrders.structuredResults,
+					cdsAlerts: imagingOrders.cdsAlerts,
 					createdAt: imagingOrders.createdAt,
 					updatedAt: imagingOrders.updatedAt,
 				})
@@ -1678,7 +1693,7 @@ export class OrdersService {
 		}
 	}
 
-	async findImagingOrder(id: string) {
+	async findImagingOrder(id: string, facilityId?: string) {
 		const [row] = await db
 			.select({
 				id: imagingOrders.id,
@@ -1694,6 +1709,11 @@ export class OrdersService {
 				status: imagingOrders.status,
 				orderingStaffId: imagingOrders.orderingStaffId,
 				orderingStaffName: users.name,
+				patientId: patients.id,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+				patientMrn: patients.mrn,
+				patientDateOfBirth: patients.dateOfBirth,
 				scheduledDatetime: imagingOrders.scheduledDatetime,
 				completedDatetime: imagingOrders.completedDatetime,
 				report: imagingOrders.report,
@@ -1702,10 +1722,6 @@ export class OrdersService {
 				studyStartedAt: imagingOrders.studyStartedAt,
 				imagingOrderReceivedAt: imagingOrders.imagingOrderReceivedAt,
 				billingClearedAt: imagingOrders.billingClearedAt,
-				patientId: patients.id,
-				patientFirstName: patients.firstName,
-				patientLastName: patients.lastName,
-				patientMrn: patients.mrn,
 				createdAt: imagingOrders.createdAt,
 				updatedAt: imagingOrders.updatedAt,
 			})
@@ -1714,7 +1730,11 @@ export class OrdersService {
 			.leftJoin(patients, eq(encounters.patientId, patients.id))
 			.leftJoin(staffProfiles, eq(imagingOrders.orderingStaffId, staffProfiles.id))
 			.leftJoin(users, eq(staffProfiles.userId, users.id))
-			.where(eq(imagingOrders.id, id))
+			.where(
+				facilityId
+					? and(eq(imagingOrders.id, id), eq(imagingOrders.facilityId, facilityId))
+					: eq(imagingOrders.id, id)
+			)
 
 		if (!row) throw new NotFoundException(`Imaging order ${id} not found`)
 		return {
@@ -1785,7 +1805,7 @@ export class OrdersService {
 			})
 		}
 
-		return this.findImagingOrder(created!.id)
+		return this.findImagingOrder(created!.id, input.facilityId)
 	}
 
 	private async assertImagingOrderIndicationIsReady(input: CreateImagingOrderInput) {
@@ -1824,8 +1844,30 @@ export class OrdersService {
 	 * - billingClearedAt is accepted explicitly from billing staff (Flow 3 Step 2).
 	 */
 	async updateImagingOrder(input: UpdateImagingOrderInput) {
-		// Check order exists (throws NotFoundException if not)
-		await this.findImagingOrder(input.id)
+		const existing = await this.findImagingOrder(input.id, input.facilityId)
+		const existingStructured =
+			existing.structuredResults &&
+			typeof existing.structuredResults === "object" &&
+			!Array.isArray(existing.structuredResults)
+				? (existing.structuredResults as Record<string, unknown>)
+				: {}
+
+		if (existingStructured.reportStatus === "signed") {
+			throw new BadRequestException(
+				"Signed radiology reports must be amended through report release."
+			)
+		}
+		if (existing.status === "cancelled") {
+			throw new BadRequestException("Cancelled imaging orders cannot be updated.")
+		}
+		if (input.status === "in_progress" && !existing.billingClearedAt) {
+			throw new BadRequestException(
+				"Billing clearance is required before the imaging study starts."
+			)
+		}
+		if (input.status === "completed" && existing.status !== "in_progress") {
+			throw new BadRequestException("Start the imaging study before marking it complete.")
+		}
 
 		const updateData: Record<string, unknown> = { updatedAt: new Date() }
 
@@ -1875,9 +1917,114 @@ export class OrdersService {
 		// SLA-016 Step 2: billing clearance timestamp persisted explicitly
 		if (input.billingClearedAt !== undefined) updateData.billingClearedAt = input.billingClearedAt
 
-		await db.update(imagingOrders).set(updateData).where(eq(imagingOrders.id, input.id))
+		await db
+			.update(imagingOrders)
+			.set(updateData)
+			.where(
+				input.facilityId
+					? and(eq(imagingOrders.id, input.id), eq(imagingOrders.facilityId, input.facilityId))
+					: eq(imagingOrders.id, input.id)
+			)
 
-		return this.findImagingOrder(input.id)
+		return this.findImagingOrder(input.id, input.facilityId)
+	}
+
+	async signImagingReport(input: SignImagingReportInput, userId: string) {
+		const existing = await this.findImagingOrder(input.id, input.facilityId)
+		if (existing.status === "cancelled") {
+			throw new BadRequestException("Cancelled imaging orders cannot be released.")
+		}
+		if (existing.status !== "completed") {
+			throw new BadRequestException("Complete the imaging study before releasing its report.")
+		}
+
+		const incomingStructured =
+			input.structuredResults &&
+			typeof input.structuredResults === "object" &&
+			!Array.isArray(input.structuredResults)
+				? (input.structuredResults as Record<string, unknown>)
+				: {}
+		const findings =
+			typeof incomingStructured.findings === "string" ? incomingStructured.findings.trim() : ""
+		const impression =
+			typeof incomingStructured.impression === "string" ? incomingStructured.impression.trim() : ""
+
+		if (!findings || !impression) {
+			throw new BadRequestException("Findings and impression are required before release.")
+		}
+
+		const existingStructured =
+			existing.structuredResults &&
+			typeof existing.structuredResults === "object" &&
+			!Array.isArray(existing.structuredResults)
+				? (existing.structuredResults as Record<string, unknown>)
+				: {}
+		const isAmendment = existingStructured.reportStatus === "signed"
+		if (isAmendment && !input.amendmentReason) {
+			throw new BadRequestException("An amendment reason is required for a released report.")
+		}
+
+		const [staff] = await db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.leftJoin(users, eq(staffProfiles.userId, users.id))
+			.where(and(eq(staffProfiles.userId, userId), eq(staffProfiles.facilityId, input.facilityId)))
+			.limit(1)
+
+		if (!staff) throw new NotFoundException("Radiologist staff profile not found for facility")
+
+		const now = new Date()
+		const structuredResults: Record<string, unknown> = {
+			...incomingStructured,
+			findings,
+			impression,
+			reportStatus: "signed",
+			radiologistName: staff.name ?? "Unknown radiologist",
+			radiologistStaffId: staff.id,
+			reportedAt: now.toISOString(),
+		}
+
+		if (isAmendment) {
+			const reportSnapshot = { ...existingStructured }
+			delete reportSnapshot.amendments
+			structuredResults.amendments = [
+				...(Array.isArray(existingStructured.amendments) ? existingStructured.amendments : []),
+				{
+					report: existing.report,
+					structuredResults: reportSnapshot,
+					amendedAt: now.toISOString(),
+					amendedByStaffId: staff.id,
+					amendmentReason: input.amendmentReason,
+				},
+			]
+			structuredResults.amendmentReason = input.amendmentReason
+		}
+
+		await db
+			.update(imagingOrders)
+			.set({
+				status: "completed",
+				completedDatetime: existing.completedDatetime ?? now,
+				report: input.report,
+				structuredResults,
+				updatedAt: now,
+			})
+			.where(and(eq(imagingOrders.id, input.id), eq(imagingOrders.facilityId, input.facilityId)))
+
+		await this.writeAuditLog({
+			facilityId: input.facilityId,
+			userId,
+			staffProfileId: staff.id,
+			action: "sign",
+			entityType: "imaging_order",
+			entityId: input.id,
+			metadata: {
+				isAmendment,
+				amendmentReason: input.amendmentReason ?? null,
+			},
+		})
+
+		return this.findImagingOrder(input.id, input.facilityId)
 	}
 
 	// ========================================================================

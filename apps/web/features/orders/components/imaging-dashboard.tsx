@@ -195,8 +195,24 @@ interface ReportStatus {
 }
 
 function getReportStatus(order: ImagingOrderItem): ReportStatus {
-	const hasReport =
-		!!order.report || (!!order.structuredResults && typeof order.structuredResults === "object")
+	const structured =
+		order.structuredResults && typeof order.structuredResults === "object"
+			? (order.structuredResults as {
+					reportStatus?: unknown
+					findings?: unknown
+					impression?: unknown
+					recommendations?: unknown
+					attachments?: unknown[]
+				})
+			: null
+	const structuredIsReleased = !structured?.reportStatus || structured.reportStatus === "signed"
+	const hasStructuredReport =
+		structuredIsReleased &&
+		(!!structured?.findings ||
+			!!structured?.impression ||
+			!!structured?.recommendations ||
+			!!structured?.attachments?.length)
+	const hasReport = !!order.report || hasStructuredReport
 
 	if (hasReport) return { label: "Report Available", variant: "default" }
 	if (COMPLETED_STATUSES.has(order.status) && order.status !== "cancelled") {

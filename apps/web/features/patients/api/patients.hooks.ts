@@ -130,3 +130,11 @@ export function useListCliniciansQuery(facilityId: string | undefined) {
 		})
 	)
 }
+
+// ============================================================================
+// Verify MRN
+// ============================================================================
+
+export function useVerifyMrnMutation() {
+	return useMutation(orpc.patient.verifyMrn.mutationOptions())
+}
