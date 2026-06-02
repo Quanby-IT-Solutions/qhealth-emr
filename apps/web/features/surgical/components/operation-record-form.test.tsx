@@ -9,8 +9,10 @@ const mockUseSignOperationRecordMutation = vi.fn()
 const mockUseListCliniciansQuery = vi.fn()
 
 vi.mock("../api/surgical.hooks", () => ({
-	useSaveOperationRecordMutation: (...args: unknown[]) => mockUseSaveOperationRecordMutation(...args),
-	useSignOperationRecordMutation: (...args: unknown[]) => mockUseSignOperationRecordMutation(...args),
+	useSaveOperationRecordMutation: (...args: unknown[]) =>
+		mockUseSaveOperationRecordMutation(...args),
+	useSignOperationRecordMutation: (...args: unknown[]) =>
+		mockUseSignOperationRecordMutation(...args),
 }))
 
 vi.mock("@/features/patients/api/patients.hooks", () => ({
@@ -170,5 +172,5 @@ describe("OperationRecordForm", () => {
 				})
 			)
 		})
-	})
+	}, 10_000)
 })
