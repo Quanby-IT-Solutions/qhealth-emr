@@ -5,16 +5,16 @@ import type { ContractRouterClient } from "@orpc/contract"
 import { createTanstackQueryUtils } from "@orpc/tanstack-query"
 
 import {
-	ancillaryClearanceContract,
-	annexSignaturesContract,
-	assessmentsContract,
-	billingContract,
-	coeContract,
-	himContract,
-	malasakitContract,
-	mswBaseContract,
-	reportingContract,
-	v1Contract,
+	type ancillaryClearanceContract,
+	type annexSignaturesContract,
+	type assessmentsContract,
+	type billingContract,
+	type coeContract,
+	type himContract,
+	type malasakitContract,
+	type mswBaseContract,
+	type reportingContract,
+	type v1Contract,
 } from "@repo/contracts"
 
 import { getCookieHeader } from "@/core/lib/cookie-utils"

@@ -906,8 +906,7 @@ export class ProblemsAllergiesService {
 
 		const updateValues: Record<string, unknown> = { updatedAt: new Date() }
 		const materiallyChanged =
-			(input.allergenName !== undefined &&
-				input.allergenName.trim() !== existing.allergenName) ||
+			(input.allergenName !== undefined && input.allergenName.trim() !== existing.allergenName) ||
 			(input.allergenType !== undefined && input.allergenType !== existing.allergenType) ||
 			(input.reactionType !== undefined &&
 				this.normalizeOptionalText(input.reactionType) !== existing.reactionType) ||

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { env } from "@/env"
 import { orpc } from "@/services/orpc/client"
 
 function shouldRetryDetailQuery(error: unknown, failureCount: number) {
@@ -149,7 +150,7 @@ export function useSlaStatusQuery(encounterId: string, options?: { enabled?: boo
 		queryKey: ["encounters", "sla-status", encounterId] as const,
 		queryFn: async () => {
 			const res = await fetch(
-				`${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/sla/events?encounterId=${encounterId}`,
+				`${env.NEXT_PUBLIC_API_BASE_URL}/v1/sla/events?encounterId=${encounterId}`,
 				{ credentials: "include" }
 			)
 			if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -184,7 +185,7 @@ export function useDeathReportTriggerMutation() {
 	return useMutation({
 		mutationFn: async (data: DeathReportTriggerInput) => {
 			const res = await fetch(
-				`${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/death-reporting/trigger`,
+				`${env.NEXT_PUBLIC_API_BASE_URL}/v1/death-reporting/trigger`,
 				{
 					method: "POST",
 					credentials: "include",

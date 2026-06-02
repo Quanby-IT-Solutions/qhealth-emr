@@ -94,7 +94,7 @@ export function IntegrationCreate() {
 
 				<div className="space-y-1.5">
 					<Label htmlFor="kind">Kind</Label>
-					<Select value={kind} onValueChange={setKind}>
+					<Select value={kind} onValueChange={v => setKind(v ?? "")}>
 						<SelectTrigger id="kind">
 							<SelectValue placeholder="Select kind…" />
 						</SelectTrigger>
@@ -136,7 +136,7 @@ export function IntegrationCreate() {
 					<Label htmlFor="credentialsRef">Credential reference</Label>
 					<Select
 						value={credentialsRef || "__none__"}
-						onValueChange={v => setCredentialsRef(v === "__none__" ? "" : v)}
+						onValueChange={v => setCredentialsRef(v === "__none__" ? "" : (v ?? ""))}
 					>
 						<SelectTrigger id="credentialsRef">
 							<SelectValue placeholder="No credential" />

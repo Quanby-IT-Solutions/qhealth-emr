@@ -67,7 +67,7 @@ export function PermissionMatrix() {
 		const exists = hasPermission(mod, action)
 		const updated = exists
 			? effectivePermissions.filter(p => !(p.module === mod && p.action === action))
-			: [...effectivePermissions, { module: mod, action: action }]
+			: [...effectivePermissions, { module: mod, action }]
 		setDraftPermissions(updated)
 		setPermsDirty(true)
 	}

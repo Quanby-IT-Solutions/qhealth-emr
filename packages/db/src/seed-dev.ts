@@ -1613,7 +1613,9 @@ async function ensureReferenceData(facilityId: string) {
 	let [generic] = await db
 		.select()
 		.from(drugGenerics)
-		.where(sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g')) = ${"paracetamol"}`)
+		.where(
+			sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g')) = ${"paracetamol"}`
+		)
 	if (!generic) {
 		;[generic] = await db
 			.insert(drugGenerics)
@@ -2505,7 +2507,9 @@ async function ensureNursingScenarios(params: {
 	let [amlodipineGeneric] = await db
 		.select()
 		.from(drugGenerics)
-		.where(sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g')) = ${"amlodipine"}`)
+		.where(
+			sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g')) = ${"amlodipine"}`
+		)
 	if (!amlodipineGeneric) {
 		;[amlodipineGeneric] = await db
 			.insert(drugGenerics)
@@ -3467,8 +3471,7 @@ async function main() {
 		scheduledDatetime: scheduledOrTime,
 		estimatedDurationMinutes: 120,
 		requiredEquipment: ["laparoscope", "electrocautery"],
-		notes:
-			"Dev smoke case for Surgeon workflow: operation record signing and RVS mapping.",
+		notes: "Dev smoke case for Surgeon workflow: operation record signing and RVS mapping.",
 	})
 
 	const refs = await ensureReferenceData(mainFacility.id)

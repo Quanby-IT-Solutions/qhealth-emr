@@ -140,7 +140,7 @@ export function GatePassCard({ gatePass }: { gatePass: GatePass }) {
 			</Card>
 
 			<style
-				// eslint-disable-next-line react/no-danger
+
 				dangerouslySetInnerHTML={{
 					__html: `@media print{body>*:not(.gate-pass-print){display:none!important}.no-print{display:none!important}.gate-pass-print{box-shadow:none;border:1px solid #ccc}}`,
 				}}

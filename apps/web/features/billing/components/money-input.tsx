@@ -1,7 +1,6 @@
 "use client"
 
-import type { InputHTMLAttributes } from "react"
-import { forwardRef, useCallback, useState } from "react"
+import { forwardRef, type InputHTMLAttributes, useCallback, useState } from "react"
 
 import { cn } from "@/core/lib/utils"
 

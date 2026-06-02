@@ -54,7 +54,11 @@ export class ProblemsAllergiesController {
 	@Implement(v1.problemsAllergies.resolveProblem)
 	async resolveProblem(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.resolveProblem).handler(async ({ input }) => {
-			return this.service.resolveProblem(input, session.user.id, buildChartAccessActor(session, req))
+			return this.service.resolveProblem(
+				input,
+				session.user.id,
+				buildChartAccessActor(session, req)
+			)
 		})
 	}
 
@@ -62,7 +66,11 @@ export class ProblemsAllergiesController {
 	@Implement(v1.problemsAllergies.deleteProblem)
 	async deleteProblem(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.deleteProblem).handler(async ({ input }) => {
-			return this.service.deleteProblem(input.id, session.user.id, buildChartAccessActor(session, req))
+			return this.service.deleteProblem(
+				input.id,
+				session.user.id,
+				buildChartAccessActor(session, req)
+			)
 		})
 	}
 
@@ -106,7 +114,11 @@ export class ProblemsAllergiesController {
 	@Implement(v1.problemsAllergies.deactivateAllergy)
 	async deactivateAllergy(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.problemsAllergies.deactivateAllergy).handler(async ({ input }) => {
-			return this.service.deactivateAllergy(input.id, session.user.id, buildChartAccessActor(session, req))
+			return this.service.deactivateAllergy(
+				input.id,
+				session.user.id,
+				buildChartAccessActor(session, req)
+			)
 		})
 	}
 

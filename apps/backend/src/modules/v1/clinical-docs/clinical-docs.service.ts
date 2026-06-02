@@ -356,9 +356,7 @@ export class ClinicalDocsService {
 			return
 		}
 
-		throw new BadRequestException(
-			"ICD-10 diagnosis is required before signing this clinical note."
-		)
+		throw new BadRequestException("ICD-10 diagnosis is required before signing this clinical note.")
 	}
 
 	private async assertNoteCanBeSaved(input: {
@@ -660,9 +658,7 @@ export class ClinicalDocsService {
 		const data = rows.map(({ patientFirstName, patientLastName, ...note }) => ({
 			...note,
 			patientName:
-				patientFirstName && patientLastName
-					? `${patientLastName}, ${patientFirstName}`
-					: null,
+				patientFirstName && patientLastName ? `${patientLastName}, ${patientFirstName}` : null,
 		}))
 
 		return {
@@ -896,7 +892,9 @@ export class ClinicalDocsService {
 
 		const { valid, missingFields } = this.validateKonsultaCompleteness(existing.structuredData)
 		if (!valid) {
-			throw new BadRequestException(`FPE data is incomplete or invalid: ${missingFields.join(", ")}`)
+			throw new BadRequestException(
+				`FPE data is incomplete or invalid: ${missingFields.join(", ")}`
+			)
 		}
 
 		if (!existing.encounterId) {
@@ -930,7 +928,9 @@ export class ClinicalDocsService {
 			.limit(1)
 
 		if (!patient?.philhealthMemberId) {
-			throw new BadRequestException("Patient does not have an active PhilHealth PIN for Konsulta FPE.")
+			throw new BadRequestException(
+				"Patient does not have an active PhilHealth PIN for Konsulta FPE."
+			)
 		}
 
 		const [dpaConsent] = await db

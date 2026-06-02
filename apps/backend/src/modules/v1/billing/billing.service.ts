@@ -1384,7 +1384,7 @@ export class BillingService {
 			),
 			...(oecbOnly
 				? [eq(encounters.oecbEligible, true), eq(encounters.encounterType, "emergency")]
-				: []),
+				: [])
 		)
 
 		// Encounters that have charges but no invoice, plus OECB-routed ED discharges

@@ -390,7 +390,7 @@ export function FhirNutritionOrderEditor({
 				<CardContent className="grid gap-4 sm:grid-cols-2">
 					<div className="space-y-1">
 						<Label className="text-xs">Diet Type</Label>
-						<Select value={dietType} onValueChange={setDietType}>
+						<Select value={dietType} onValueChange={v => setDietType(v ?? "")}>
 							<SelectTrigger>
 								<SelectValue />
 							</SelectTrigger>
@@ -406,7 +406,7 @@ export function FhirNutritionOrderEditor({
 
 					<div className="space-y-1">
 						<Label className="text-xs">Feeding Route</Label>
-						<Select value={feedingRoute} onValueChange={setFeedingRoute}>
+						<Select value={feedingRoute} onValueChange={v => setFeedingRoute(v ?? "")}>
 							<SelectTrigger>
 								<SelectValue />
 							</SelectTrigger>
@@ -423,7 +423,7 @@ export function FhirNutritionOrderEditor({
 					{(feedingRoute === "oral" || feedingRoute === "mixed") && (
 						<div className="space-y-1">
 							<Label className="text-xs">Texture Modification (IDDSI)</Label>
-							<Select value={textureModification} onValueChange={setTextureModification}>
+							<Select value={textureModification} onValueChange={v => setTextureModification(v ?? "")}>
 								<SelectTrigger>
 									<SelectValue />
 								</SelectTrigger>

@@ -7,7 +7,6 @@ import { eq } from "drizzle-orm"
 import { staffProfiles } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
-
 import { v1 } from "@/config/api-versions.config"
 import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 

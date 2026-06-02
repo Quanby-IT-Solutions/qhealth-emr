@@ -77,7 +77,7 @@ export function useOfflineNursingMutation<TData extends object, TInput>(
 				: ((await res.json()) as TData)
 			return data
 		},
-		// eslint-disable-next-line react-hooks/exhaustive-deps
+
 		[opts]
 	)
 

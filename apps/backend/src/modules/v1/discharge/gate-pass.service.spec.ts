@@ -72,7 +72,9 @@ describe("GatePassService", () => {
 	it("blocks inpatient gate pass issuance when the clinical discharge checklist is incomplete", async () => {
 		jest
 			.spyOn(
-				service as unknown as { inpatientClinicalChecklistComplete: (encounterId: string) => Promise<boolean> },
+				service as unknown as {
+					inpatientClinicalChecklistComplete: (encounterId: string) => Promise<boolean>
+				},
 				"inpatientClinicalChecklistComplete"
 			)
 			.mockResolvedValue(false)
@@ -103,7 +105,9 @@ describe("GatePassService", () => {
 
 	it("does not require the inpatient clinical checklist for outpatient gate passes", async () => {
 		const clinicalChecklistSpy = jest.spyOn(
-			service as unknown as { inpatientClinicalChecklistComplete: (encounterId: string) => Promise<boolean> },
+			service as unknown as {
+				inpatientClinicalChecklistComplete: (encounterId: string) => Promise<boolean>
+			},
 			"inpatientClinicalChecklistComplete"
 		)
 
@@ -145,7 +149,9 @@ describe("GatePassService", () => {
 	it("finalizes a pending-discharge encounter and releases the bed after issuing a gate pass", async () => {
 		jest
 			.spyOn(
-				service as unknown as { inpatientClinicalChecklistComplete: (encounterId: string) => Promise<boolean> },
+				service as unknown as {
+					inpatientClinicalChecklistComplete: (encounterId: string) => Promise<boolean>
+				},
 				"inpatientClinicalChecklistComplete"
 			)
 			.mockResolvedValue(true)
@@ -170,9 +176,7 @@ describe("GatePassService", () => {
 			.mockImplementationOnce(() =>
 				createSelectBuilder([{ firstName: "Juan", lastName: "Dela Cruz" }])
 			)
-			.mockImplementationOnce(() =>
-				createSelectBuilder([{ bedNumber: "101", wardId: "ward-1" }])
-			)
+			.mockImplementationOnce(() => createSelectBuilder([{ bedNumber: "101", wardId: "ward-1" }]))
 			.mockImplementationOnce(() => createSelectBuilder([{ name: "Medical Ward" }]))
 
 		mockDb.insert.mockImplementationOnce(() => ({

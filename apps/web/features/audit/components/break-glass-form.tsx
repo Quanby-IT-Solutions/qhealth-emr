@@ -1,11 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 
-import { z } from "zod"
+import { type z } from "zod"
 import { AlertTriangle, Clock, Shield, ShieldAlert } from "lucide-react"
 
-import { BreakGlassReasonCategoryEnum } from "@repo/contracts"
+import { type BreakGlassReasonCategoryEnum } from "@repo/contracts"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -14,8 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
 
-import { useCreateBreakGlassMutation } from "@/features/audit/api/audit.hooks"
-import type { BreakGlassEvent } from "@/features/audit/api/audit.hooks"
+import { type BreakGlassEvent, useCreateBreakGlassMutation } from "@/features/audit/api/audit.hooks"
 
 type ReasonCategory = z.infer<typeof BreakGlassReasonCategoryEnum>
 
@@ -169,7 +168,7 @@ export function BreakGlassForm({
 		acknowledged &&
 		!createBreakGlassMutation.isPending
 
-	const handleSubmit = useCallback(() => {
+	function handleSubmit() {
 		if (!canSubmit) return
 
 		createBreakGlassMutation.mutate(
@@ -182,7 +181,7 @@ export function BreakGlassForm({
 			},
 			{ onSuccess: () => onSuccess?.() }
 		)
-	}, [canSubmit, createBreakGlassMutation, facilityId, patientId, reasonCategory, justification, durationHours, onSuccess])
+	}
 
 	return (
 		<div className="space-y-6">

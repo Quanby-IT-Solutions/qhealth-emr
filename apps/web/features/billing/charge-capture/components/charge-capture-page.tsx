@@ -91,7 +91,7 @@ export function ChargeCapturePageComponent({ encounterId, facilityId, patientId 
 			}
 			if (filterDateTo) {
 				const d = new Date(c.createdAt)
-				if (d > new Date(filterDateTo + "T23:59:59")) return false
+				if (d > new Date(`${filterDateTo}T23:59:59`)) return false
 			}
 			return true
 		})

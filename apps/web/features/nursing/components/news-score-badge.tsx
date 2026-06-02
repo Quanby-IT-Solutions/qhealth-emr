@@ -12,8 +12,8 @@ export function NewsScoreBadge({ score, riskLevel, showScore = true }: NewsScore
 	}
 
 	const label = (() => {
-		if (showScore && score != null && riskLevel) return `NEWS ${score} · ${riskLevel.toUpperCase()}`
 		if (showScore && score != null) return `NEWS ${score}`
+		if (showScore && score !== null) return `NEWS ${score}`
 		if (riskLevel) return riskLevel.toUpperCase()
 		return "—"
 	})()

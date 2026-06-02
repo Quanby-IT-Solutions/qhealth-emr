@@ -284,7 +284,11 @@ export class SurgicalService {
 		await Promise.all([
 			this.requireFacilityStaffProfile(input.surgeonStaffId, facilityId, "Surgeon"),
 			this.requireFacilityStaffProfile(input.firstAssistantStaffId, facilityId, "First assistant"),
-			this.requireFacilityStaffProfile(input.secondAssistantStaffId, facilityId, "Second assistant"),
+			this.requireFacilityStaffProfile(
+				input.secondAssistantStaffId,
+				facilityId,
+				"Second assistant"
+			),
 			this.requireFacilityStaffProfile(input.scrubNurseStaffId, facilityId, "Scrub nurse"),
 			this.requireFacilityStaffProfile(
 				input.circulatingNurseStaffId,
@@ -399,16 +403,13 @@ export class SurgicalService {
 					this.hasText(agent.time)
 			) ||
 			record.inductionAgents?.some(
-				agent =>
-					this.hasText(agent.agent) && this.hasText(agent.dose) && this.hasText(agent.time)
+				agent => this.hasText(agent.agent) && this.hasText(agent.dose) && this.hasText(agent.time)
 			) ||
 			record.maintenanceAgents?.some(
-				agent =>
-					this.hasText(agent.agent) && this.hasText(agent.dose) && this.hasText(agent.time)
+				agent => this.hasText(agent.agent) && this.hasText(agent.dose) && this.hasText(agent.time)
 			) ||
 			record.muscleRelaxants?.some(
-				agent =>
-					this.hasText(agent.agent) && this.hasText(agent.dose) && this.hasText(agent.time)
+				agent => this.hasText(agent.agent) && this.hasText(agent.dose) && this.hasText(agent.time)
 			) ||
 			record.intraopMedications?.some(
 				medication =>
@@ -1147,10 +1148,7 @@ export class SurgicalService {
 	async saveAnesthesiaRecord(input: SaveAnesthesiaRecordInput, staffProfileId: string | null) {
 		this.logger.log(`Saving anesthesia record for case: ${input.caseId}`)
 
-		const surgCase = await this.requireAssignedAnesthesiologistForCase(
-			input.caseId,
-			staffProfileId
-		)
+		const surgCase = await this.requireAssignedAnesthesiologistForCase(input.caseId, staffProfileId)
 		if (
 			input.anesthesiologistStaffId !== undefined &&
 			input.anesthesiologistStaffId !== surgCase.anesthesiologistStaffId
@@ -1249,10 +1247,7 @@ export class SurgicalService {
 	async signAnesthesiaRecord(input: SignAnesthesiaRecordInput, staffProfileId: string | null) {
 		this.logger.log(`Signing anesthesia record for case: ${input.caseId}`)
 
-		const surgCase = await this.requireAssignedAnesthesiologistForCase(
-			input.caseId,
-			staffProfileId
-		)
+		const surgCase = await this.requireAssignedAnesthesiologistForCase(input.caseId, staffProfileId)
 
 		const [existing] = await db
 			.select()

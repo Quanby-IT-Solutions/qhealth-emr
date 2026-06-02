@@ -94,7 +94,7 @@ function formatDate(dateStr: string) {
 /** Returns a short excerpt (first 120 chars) of the note content. */
 function noteExcerpt(content: string) {
 	const stripped = content.replace(/^#+\s.*/gm, "").trim()
-	return stripped.length > 120 ? stripped.slice(0, 120) + "…" : stripped
+	return stripped.length > 120 ? `${stripped.slice(0, 120)}…` : stripped
 }
 
 /**

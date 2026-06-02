@@ -4,10 +4,10 @@ import {
 	ArtaSlaSchema,
 	ExportDefaultsSchema,
 	OfflineModeSchema,
+	OfflineSummarySnapshotSchema,
 	PolicySectionsSchema,
 	PrivacyConsentSchema,
 	SystemSettingsSchema,
-	OfflineSummarySnapshotSchema,
 	UpdateSystemSettingsSchema,
 } from "./system-settings.schema"
 

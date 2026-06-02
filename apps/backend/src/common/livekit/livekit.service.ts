@@ -21,7 +21,9 @@ export class LiveKitService {
 	isConfigured(): boolean {
 		return Boolean(
 			env.LIVEKIT_MODE === "real" &&
-			env.LIVEKIT_API_KEY?.trim() && env.LIVEKIT_API_SECRET?.trim() && env.LIVEKIT_WS_URL?.trim()
+			env.LIVEKIT_API_KEY?.trim() &&
+			env.LIVEKIT_API_SECRET?.trim() &&
+			env.LIVEKIT_WS_URL?.trim()
 		)
 	}
 

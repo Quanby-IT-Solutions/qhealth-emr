@@ -171,8 +171,8 @@ export default function BreakGlassReportPage() {
 												<p className="text-xs text-muted-foreground">{String(r.timestamp)}</p>
 											)}
 											<p className="font-mono text-xs break-all">
-												{r.resourceType != null ? `${String(r.resourceType)}: ` : ""}
 												{r.resourceId != null ? String(r.resourceId) : JSON.stringify(r)}
+												{r.resourceId !== null ? String(r.resourceId) : JSON.stringify(r)}
 											</p>
 										</div>
 									</li>

@@ -7,8 +7,7 @@ import { CheckCircle2 } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
 import { useNursingSync } from "@/features/nursing/lib/use-nursing-sync"
-import { SyncConflict } from "@/features/nursing/components/sync-conflict"
-import type { ConflictRecord } from "@/features/nursing/components/sync-conflict"
+import { type ConflictRecord, SyncConflict } from "@/features/nursing/components/sync-conflict"
 
 export default function NursingConflictPage() {
 	const router = useRouter()

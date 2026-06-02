@@ -37,13 +37,15 @@ export function MmReportClient() {
 
 	function updateParam(key: string, value: string) {
 		const params = new URLSearchParams(searchParams.toString())
-		value === "all" ? params.delete(key) : params.set(key, value)
+		if (value === "all") params.delete(key)
+		else params.set(key, value)
 		router.replace(`?${params.toString()}`, { scroll: false })
 	}
 
 	function setType(value: "mortality" | "morbidity") {
 		const params = new URLSearchParams(searchParams.toString())
-		value === "mortality" ? params.delete("type") : params.set("type", value)
+		if (value === "mortality") params.delete("type")
+		else params.set("type", value)
 		router.replace(`?${params.toString()}`, { scroll: false })
 	}
 

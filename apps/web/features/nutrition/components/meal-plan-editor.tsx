@@ -17,8 +17,8 @@ import {
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 
-import type { CreateMealPlanInput } from "@/features/nutrition/api/nutrition.hooks"
 import {
+	type CreateMealPlanInput,
 	useMealPlanQuery,
 	useSaveMealPlanMutation,
 } from "@/features/nutrition/api/nutrition.hooks"
@@ -281,7 +281,7 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 					{/* Diet type */}
 					<div className="space-y-1.5">
 						<Label htmlFor="dietType">Diet Type</Label>
-						<Select value={form.dietType} onValueChange={(v) => update("dietType", v)}>
+						<Select value={form.dietType} onValueChange={(v) => update("dietType", v ?? "")}>
 							<SelectTrigger id="dietType">
 								<SelectValue />
 							</SelectTrigger>

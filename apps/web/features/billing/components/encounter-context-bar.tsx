@@ -14,7 +14,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 function maskName(name: string): string {
 	const parts = name.trim().split(" ")
 	return parts
-		.map((part, i) => (i === 0 ? part[0] + "*".repeat(Math.max(part.length - 1, 1)) : part[0] + "***"))
+		.map((part, i) => (i === 0 ? part[0] + "*".repeat(Math.max(part.length - 1, 1)) : `${part[0]}***`))
 		.join(" ")
 }
 

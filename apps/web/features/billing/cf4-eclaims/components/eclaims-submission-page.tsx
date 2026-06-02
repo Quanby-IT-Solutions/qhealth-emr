@@ -18,11 +18,9 @@ import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Skeleton } from "@/core/components/ui/skeleton"
 
-import { ClaimStatusTimeline } from "@/features/billing/components/claim-status-timeline"
+import { type ClaimStatus, ClaimStatusTimeline } from "@/features/billing/components/claim-status-timeline"
 import { EncounterContextBar } from "@/features/billing/components/encounter-context-bar"
 import { useCf4Query, useFinalizeCf4Mutation, usePollCf4StatusMutation, useResubmitCf4Mutation } from "../api/cf4.hooks"
-
-import type { ClaimStatus } from "@/features/billing/components/claim-status-timeline"
 
 type Cf4Status = "draft" | "submitted" | "returned" | "resubmitted" | "approved" | "rejected"
 const TIMELINE_STATUS_MAP: Record<string, ClaimStatus> = {

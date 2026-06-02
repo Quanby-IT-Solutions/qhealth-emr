@@ -228,7 +228,9 @@ export class ClinicianLicensesService {
 		return updated!
 	}
 
-	private async propagateVerifiedLicenseToStaffProfile(license: typeof clinicianLicenses.$inferSelect) {
+	private async propagateVerifiedLicenseToStaffProfile(
+		license: typeof clinicianLicenses.$inferSelect
+	) {
 		const updatedAt = new Date()
 
 		switch (license.licenseType) {

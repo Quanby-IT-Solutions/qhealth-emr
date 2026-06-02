@@ -110,7 +110,9 @@ function appointmentRow() {
 	}
 }
 
-function createInput(overrides: Partial<Parameters<TelemedicineService["createEncounter"]>[0]> = {}) {
+function createInput(
+	overrides: Partial<Parameters<TelemedicineService["createEncounter"]>[0]> = {}
+) {
 	return {
 		appointmentId: APPOINTMENT_ID,
 		encounterType: "linked" as const,

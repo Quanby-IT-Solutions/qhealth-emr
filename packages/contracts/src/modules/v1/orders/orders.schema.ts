@@ -331,28 +331,30 @@ export const UpdateLabOrderSchema = z.object({
 	billingClearedAt: dateOrString.optional(),
 })
 
-export const CreateLabOrderSchema = z.object({
-	facilityId: z.string().uuid(),
-	encounterId: z.string().uuid().optional(),
-	preEncounterId: z.string().uuid().optional(),
-	loincCode: z.string().optional(),
-	panelCode: z.string().optional(),
-	testName: z.string().min(1),
-	panelName: z.string().optional(),
-	priority: OrderPriorityEnum.optional(),
-	specimenType: z.string().optional(),
-	clinicalIndication: z.string().trim().min(1).optional(),
-	indicationIcd10Code: z.string().trim().min(1).optional(),
-	indicationIcd10Display: z.string().trim().min(1).optional(),
-}).superRefine((value, ctx) => {
-	if (!value.encounterId && !value.preEncounterId) {
-		ctx.addIssue({
-			code: "custom",
-			path: ["encounterId"],
-			message: "encounterId or preEncounterId is required for lab orders.",
-		})
-	}
-})
+export const CreateLabOrderSchema = z
+	.object({
+		facilityId: z.string().uuid(),
+		encounterId: z.string().uuid().optional(),
+		preEncounterId: z.string().uuid().optional(),
+		loincCode: z.string().optional(),
+		panelCode: z.string().optional(),
+		testName: z.string().min(1),
+		panelName: z.string().optional(),
+		priority: OrderPriorityEnum.optional(),
+		specimenType: z.string().optional(),
+		clinicalIndication: z.string().trim().min(1).optional(),
+		indicationIcd10Code: z.string().trim().min(1).optional(),
+		indicationIcd10Display: z.string().trim().min(1).optional(),
+	})
+	.superRefine((value, ctx) => {
+		if (!value.encounterId && !value.preEncounterId) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["encounterId"],
+				message: "encounterId or preEncounterId is required for lab orders.",
+			})
+		}
+	})
 
 export const LabOrderListSchema = PaginationInputSchema.extend({
 	facilityId: z.string().uuid().optional(),
@@ -433,25 +435,27 @@ export const SignImagingReportSchema = z.object({
 	amendmentReason: z.string().trim().min(1).optional(),
 })
 
-export const CreateImagingOrderSchema = z.object({
-	facilityId: z.string().uuid(),
-	encounterId: z.string().uuid().optional(),
-	preEncounterId: z.string().uuid().optional(),
-	modality: ImagingModalityEnum,
-	bodyPart: z.string().min(1),
-	clinicalIndication: z.string().trim().min(1),
-	indicationIcd10Code: z.string().trim().min(1),
-	indicationIcd10Display: z.string().trim().min(1).optional(),
-	priority: OrderPriorityEnum.optional(),
-}).superRefine((value, ctx) => {
-	if (!value.encounterId && !value.preEncounterId) {
-		ctx.addIssue({
-			code: "custom",
-			path: ["encounterId"],
-			message: "encounterId or preEncounterId is required for imaging orders.",
-		})
-	}
-})
+export const CreateImagingOrderSchema = z
+	.object({
+		facilityId: z.string().uuid(),
+		encounterId: z.string().uuid().optional(),
+		preEncounterId: z.string().uuid().optional(),
+		modality: ImagingModalityEnum,
+		bodyPart: z.string().min(1),
+		clinicalIndication: z.string().trim().min(1),
+		indicationIcd10Code: z.string().trim().min(1),
+		indicationIcd10Display: z.string().trim().min(1).optional(),
+		priority: OrderPriorityEnum.optional(),
+	})
+	.superRefine((value, ctx) => {
+		if (!value.encounterId && !value.preEncounterId) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["encounterId"],
+				message: "encounterId or preEncounterId is required for imaging orders.",
+			})
+		}
+	})
 
 export const ImagingOrderListSchema = PaginationInputSchema.extend({
 	facilityId: z.string().uuid().optional(),

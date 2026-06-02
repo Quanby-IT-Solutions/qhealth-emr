@@ -289,7 +289,7 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 								<Label htmlFor="kind">Kind</Label>
 								<Select
 									value={draft.kind}
-									onValueChange={v => patch("kind", v)}
+									onValueChange={v => patch("kind", v ?? "")}
 								>
 									<SelectTrigger id="kind">
 										<SelectValue />
@@ -329,7 +329,7 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 							<Select
 								value={draft.credentialsRef || "__none__"}
 								onValueChange={v =>
-									patch("credentialsRef", v === "__none__" ? "" : v)
+									patch("credentialsRef", v === "__none__" ? "" : (v ?? ""))
 								}
 							>
 								<SelectTrigger id="credentialsRef">

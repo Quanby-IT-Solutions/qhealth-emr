@@ -148,7 +148,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== "")
 	if (!entries.length) return ""
-	return "?" + entries.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&")
+	return `?${entries.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&")}`
 }
 
 // ============================================================================
@@ -169,10 +169,10 @@ export const fhirKeys = {
 
 export function useExportListQuery(facilityId: string, page = 1, limit = 20) {
 	return useQuery<FhirExportListResponse>({
-		queryKey: [...fhirKeys.exports(facilityId), page],
+		queryKey: [...fhirKeys.exports(facilityId), page, limit],
 		queryFn: () =>
 			fetchJson(
-				API_BASE + "/exports" + buildQueryString({ facilityId, page, limit }),
+				`${API_BASE}/exports${buildQueryString({ facilityId, page, limit })}`,
 			),
 		enabled: !!facilityId,
 	})
@@ -181,7 +181,7 @@ export function useExportListQuery(facilityId: string, page = 1, limit = 20) {
 export function useExportDetailQuery(exportId: string | null) {
 	return useQuery<FhirExport>({
 		queryKey: fhirKeys.export(exportId ?? ""),
-		queryFn: () => fetchJson(API_BASE + `/exports/${exportId}`),
+		queryFn: () => fetchJson(`${API_BASE}/exports/${exportId}`),
 		enabled: !!exportId,
 	})
 }
@@ -189,7 +189,7 @@ export function useExportDetailQuery(exportId: string | null) {
 export function useValidationReportQuery(exportId: string | null) {
 	return useQuery<FhirValidationReport>({
 		queryKey: fhirKeys.validation(exportId ?? ""),
-		queryFn: () => fetchJson(API_BASE + `/exports/${exportId}/validation`),
+		queryFn: () => fetchJson(`${API_BASE}/exports/${exportId}/validation`),
 		enabled: !!exportId,
 	})
 }
@@ -198,7 +198,7 @@ export function useNhdrSubmissionsQuery(facilityId: string) {
 	return useQuery<NhdrSubmission[]>({
 		queryKey: fhirKeys.submissions(facilityId),
 		queryFn: () =>
-			fetchJson(API_BASE + "/nhdr-submissions" + buildQueryString({ facilityId })),
+			fetchJson(`${API_BASE}/nhdr-submissions${buildQueryString({ facilityId })}`),
 		enabled: !!facilityId,
 	})
 }
@@ -211,7 +211,7 @@ export function useCreateExportMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<FhirExport, Error, CreateExportInput>({
 		mutationFn: input =>
-			fetchJson(API_BASE + "/exports", {
+			fetchJson(`${API_BASE}/exports`, {
 				method: "POST",
 				body: JSON.stringify(input),
 			}),
@@ -225,7 +225,7 @@ export function useSubmitToNhdrMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<NhdrSubmission, Error, { exportId: string; facilityId: string }>({
 		mutationFn: ({ exportId }) =>
-			fetchJson(API_BASE + `/exports/${exportId}/submit-nhdr`, { method: "POST" }),
+			fetchJson(`${API_BASE}/exports/${exportId}/submit-nhdr`, { method: "POST" }),
 		onSuccess: (data) => {
 			void queryClient.invalidateQueries({ queryKey: fhirKeys.submissions(data.facilityId) })
 			void queryClient.invalidateQueries({ queryKey: fhirKeys.exports(data.facilityId) })
@@ -243,7 +243,7 @@ export function useSubmitToNhdrMutation() {
  * fetching through the credentialed API base and creating a Blob URL.
  */
 export async function downloadBundleAsync(exportId: string): Promise<void> {
-	const res = await fetch(API_BASE + `/exports/${exportId}/bundle`, {
+	const res = await fetch(`${API_BASE}/exports/${exportId}/bundle`, {
 		credentials: "include",
 	})
 	if (!res.ok) {
@@ -276,7 +276,7 @@ export interface FhirSystemStatus {
 export function useNhdrSystemStatusQuery(facilityId: string) {
 	return useQuery<FhirSystemStatus>({
 		queryKey: ["fhir", "system-status", facilityId],
-		queryFn: () => fetchJson(API_BASE + "/system-status" + buildQueryString({ facilityId })),
+		queryFn: () => fetchJson(`${API_BASE}/system-status${buildQueryString({ facilityId })}`),
 		enabled: !!facilityId,
 	})
 }

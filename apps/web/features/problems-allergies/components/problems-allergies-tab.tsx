@@ -749,7 +749,7 @@ export function ProblemsAllergiesTab({
 										<label className={filterLabelClassName}>Documented By</label>
 										<Select
 											value={problemDocumentedByFilter}
-											onValueChange={setProblemDocumentedByFilter}
+											onValueChange={v => setProblemDocumentedByFilter(v ?? "")}
 										>
 											<SelectTrigger
 												aria-label="Filter documented by"

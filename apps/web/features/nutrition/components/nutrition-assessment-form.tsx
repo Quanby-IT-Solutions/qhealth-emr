@@ -18,8 +18,9 @@ import { Textarea } from "@/core/components/ui/textarea"
 
 import { MalnutritionRiskBadge } from "@/features/nutrition/components/malnutrition-risk-badge"
 
-import type { MalnutritionRisk, ScreeningTool } from "@/features/nutrition/api/nutrition.hooks"
 import {
+	type MalnutritionRisk,
+	type ScreeningTool,
 	useCreateNutritionAssessmentMutation,
 	useNutritionAssessmentsQuery,
 } from "@/features/nutrition/api/nutrition.hooks"
@@ -217,7 +218,7 @@ export function NutritionAssessmentForm({
 							<>
 								<div className="space-y-1.5">
 									<Label htmlFor="nrsNutritional">Nutritional Status Score</Label>
-									<Select value={nrsNutritional} onValueChange={setNrsNutritional}>
+									<Select value={nrsNutritional} onValueChange={v => setNrsNutritional(v ?? "")}>
 										<SelectTrigger id="nrsNutritional">
 											<SelectValue />
 										</SelectTrigger>
@@ -232,7 +233,7 @@ export function NutritionAssessmentForm({
 								</div>
 								<div className="space-y-1.5">
 									<Label htmlFor="nrsDisease">Disease Severity Score</Label>
-									<Select value={nrsDisease} onValueChange={setNrsDisease}>
+									<Select value={nrsDisease} onValueChange={v => setNrsDisease(v ?? "")}>
 										<SelectTrigger id="nrsDisease">
 											<SelectValue />
 										</SelectTrigger>
@@ -247,7 +248,7 @@ export function NutritionAssessmentForm({
 								</div>
 								<div className="space-y-1.5">
 									<Label htmlFor="nrsAge">Age ≥ 70 years</Label>
-									<Select value={nrsAgeOver70} onValueChange={setNrsAgeOver70}>
+									<Select value={nrsAgeOver70} onValueChange={v => setNrsAgeOver70(v ?? "")}>
 										<SelectTrigger id="nrsAge">
 											<SelectValue />
 										</SelectTrigger>
@@ -265,7 +266,7 @@ export function NutritionAssessmentForm({
 							<>
 								<div className="space-y-1.5">
 									<Label htmlFor="mustBmi">BMI Score</Label>
-									<Select value={mustBmi} onValueChange={setMustBmi}>
+									<Select value={mustBmi} onValueChange={v => setMustBmi(v ?? "")}>
 										<SelectTrigger id="mustBmi">
 											<SelectValue />
 										</SelectTrigger>
@@ -280,7 +281,7 @@ export function NutritionAssessmentForm({
 								</div>
 								<div className="space-y-1.5">
 									<Label htmlFor="mustWeight">Weight Loss Score</Label>
-									<Select value={mustWeight} onValueChange={setMustWeight}>
+									<Select value={mustWeight} onValueChange={v => setMustWeight(v ?? "")}>
 										<SelectTrigger id="mustWeight">
 											<SelectValue />
 										</SelectTrigger>
@@ -295,7 +296,7 @@ export function NutritionAssessmentForm({
 								</div>
 								<div className="space-y-1.5">
 									<Label htmlFor="mustAcute">Acute Disease Effect Score</Label>
-									<Select value={mustAcute} onValueChange={setMustAcute}>
+									<Select value={mustAcute} onValueChange={v => setMustAcute(v ?? "")}>
 										<SelectTrigger id="mustAcute">
 											<SelectValue />
 										</SelectTrigger>
@@ -315,7 +316,7 @@ export function NutritionAssessmentForm({
 						{tool === "sga" && (
 							<div className="space-y-1.5">
 								<Label htmlFor="sgaGrade">Subjective Global Assessment Grade</Label>
-								<Select value={sgaGrade} onValueChange={setSgaGrade}>
+								<Select value={sgaGrade} onValueChange={v => setSgaGrade(v ?? "")}>
 									<SelectTrigger id="sgaGrade">
 										<SelectValue />
 									</SelectTrigger>

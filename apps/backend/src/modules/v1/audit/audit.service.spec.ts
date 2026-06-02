@@ -184,7 +184,10 @@ describe("AuditService.createBreakGlass", () => {
 		const eventInsert = makeInsertChain(event)
 		const auditInsert = makeInsertChain(auditRow)
 		const tx = {
-			insert: jest.fn().mockReturnValueOnce(eventInsert.insertResult).mockReturnValueOnce(auditInsert.insertResult),
+			insert: jest
+				.fn()
+				.mockReturnValueOnce(eventInsert.insertResult)
+				.mockReturnValueOnce(auditInsert.insertResult),
 		}
 		;(db.transaction as jest.Mock).mockImplementation(async callback => callback(tx))
 
@@ -237,7 +240,10 @@ describe("AuditService.createBreakGlass", () => {
 		const eventInsert = makeInsertChain(event)
 		const auditInsert = makeInsertChain(null, { reject: new Error("audit insert failed") })
 		const tx = {
-			insert: jest.fn().mockReturnValueOnce(eventInsert.insertResult).mockReturnValueOnce(auditInsert.insertResult),
+			insert: jest
+				.fn()
+				.mockReturnValueOnce(eventInsert.insertResult)
+				.mockReturnValueOnce(auditInsert.insertResult),
 		}
 		;(db.transaction as jest.Mock).mockImplementation(async callback => callback(tx))
 

@@ -9,6 +9,7 @@ import { orpc } from "@/services/orpc/client"
 
 type V1Outputs = InferContractRouterOutputs<typeof v1Contract>
 export type LoincCode = V1Outputs["formulary"]["loinc"]["search"]["data"][number]
+export type CatalogType = "icd10" | "loinc" | "rxnorm" | "rvs" | "snomed_ct"
 
 // ============================================================================
 // Drug Generics
@@ -299,7 +300,7 @@ export function useSnomedCtSearchQuery(
 
 export function useCodeSetUploadsQuery(
 	params: {
-		catalogType?: string
+		catalogType?: CatalogType
 		page?: number
 		limit?: number
 	} = {}
@@ -342,7 +343,7 @@ export function useSetCodeActiveMutation() {
 
 export function useDeprecatedMappingsQuery(
 	params: {
-		catalogType?: string
+		catalogType?: CatalogType
 		fromCode?: string
 		isActive?: boolean
 		page?: number

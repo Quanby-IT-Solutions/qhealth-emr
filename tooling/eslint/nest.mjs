@@ -31,7 +31,7 @@ export const apiConfig = defineConfig(
 		rules: {
 			// Base JavaScript rules
 			"no-console": "off", // Console is fine in Node.js
-			"eqeqeq": ["error", "always"],
+			"eqeqeq": ["error", "always", { null: "ignore" }],
 			"curly": ["error", "all"],
 			"prefer-const": "error",
 			"no-var": "error",

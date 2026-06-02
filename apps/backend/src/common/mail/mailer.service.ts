@@ -31,10 +31,10 @@ export class MailerService {
 	isConfigured(): boolean {
 		return Boolean(
 			env.MAILER_MODE === "smtp" &&
-				env.SMTP_HOST?.trim() &&
-				env.SMTP_USER?.trim() &&
-				env.SMTP_PASS?.trim() &&
-				env.SMTP_FROM?.trim()
+			env.SMTP_HOST?.trim() &&
+			env.SMTP_USER?.trim() &&
+			env.SMTP_PASS?.trim() &&
+			env.SMTP_FROM?.trim()
 		)
 	}
 

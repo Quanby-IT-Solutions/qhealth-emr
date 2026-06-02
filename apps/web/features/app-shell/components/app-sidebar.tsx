@@ -71,7 +71,7 @@ export function AppSidebar() {
 
 	function isNavActive(href: string): boolean {
 		if (pathname === href) return true
-		if (!pathname.startsWith(href + "/")) return false
+		if (!pathname.startsWith(`${href}/`)) return false
 		// Only highlight the prefix if no more-specific item also matches
 		return ![...allNavHrefs].some(
 			other => other !== href && other.startsWith(href) && pathname.startsWith(other)

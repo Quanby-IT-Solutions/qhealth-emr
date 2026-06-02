@@ -64,7 +64,7 @@ function RadioQuestion({
 	return (
 		<div className="space-y-2">
 			<p className="text-sm font-medium">{label}</p>
-			<RadioGroup value={value} onValueChange={onChange} className="space-y-1">
+			<RadioGroup value={value} onValueChange={v => onChange(String(v))} className="space-y-1">
 				{options.map((opt) => (
 					<div key={opt.value} className="flex items-start gap-2 rounded-md border p-3 hover:bg-muted/40">
 						<RadioGroupItem value={opt.value} id={`${label}-${opt.value}`} className="mt-0.5" />
@@ -142,7 +142,7 @@ function Nrs2002Form({
 		<div className="space-y-6">
 			<div className="space-y-2">
 				<p className="text-sm font-medium">Patient Age</p>
-				<Select value={age} onValueChange={onAgeChange}>
+				<Select value={age} onValueChange={v => onAgeChange(v ?? "")}>
 					<SelectTrigger className="w-48">
 						<SelectValue placeholder="Select age range" />
 					</SelectTrigger>
@@ -392,7 +392,7 @@ export function ScreeningTool({ defaultTool = "nrs_2002", onResult }: ScreeningT
 					<Label>Screening Tool</Label>
 					<RadioGroup
 						value={tool}
-						onValueChange={handleToolChange}
+						onValueChange={v => handleToolChange(String(v))}
 						className="grid gap-2 sm:grid-cols-3"
 					>
 						{(["nrs_2002", "must", "sga"] as const).map((t) => (

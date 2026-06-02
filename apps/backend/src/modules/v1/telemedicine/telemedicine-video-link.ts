@@ -29,7 +29,11 @@ export function assertTelemedicineVideoLink(
 		throw new BadRequestException("Video link must be a valid HTTPS URL.")
 	}
 
-	if (platform && platform !== "livekit" && !isAllowedHost(url.hostname, PLATFORM_HOSTS[platform])) {
+	if (
+		platform &&
+		platform !== "livekit" &&
+		!isAllowedHost(url.hostname, PLATFORM_HOSTS[platform])
+	) {
 		const label = platform === "zoom" ? "Zoom" : "Microsoft Teams"
 		throw new BadRequestException(`Video link must use an approved ${label} meeting domain.`)
 	}

@@ -110,7 +110,11 @@ export class SurgicalController {
 	@Implement(v1.surgical.saveOperationRecord)
 	async saveOperationRecord(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.surgical.saveOperationRecord).handler(async ({ input }) => {
-			return this.surgicalService.saveOperationRecord(input, session, extractActiveStaffProfileId(req))
+			return this.surgicalService.saveOperationRecord(
+				input,
+				session,
+				extractActiveStaffProfileId(req)
+			)
 		})
 	}
 

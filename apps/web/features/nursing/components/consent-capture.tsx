@@ -95,6 +95,7 @@ export function SignatureCanvas({ label, onCapture, onClear, disabled }: Signatu
 		const scaleY = canvas.height / rect.height
 		if ("touches" in e) {
 			const touch = e.touches[0]
+			if (!touch) return { x: 0, y: 0 }
 			return {
 				x: (touch.clientX - rect.left) * scaleX,
 				y: (touch.clientY - rect.top) * scaleY,

@@ -20,6 +20,7 @@ import {
 	useDeleteCatalogEntryMutation,
 	useCatalogVersionsQuery,
 	usePublishCatalogVersionMutation,
+	type CatalogType,
 } from "@/features/formulary/api/formulary.hooks"
 
 type CodeSetType = "icd10" | "loinc" | "rxnorm" | "rvs" | "snomedCt" | "admin"
@@ -430,14 +431,14 @@ function CodeSetAdminPanel({ canEdit }: { canEdit: boolean }) {
 // -------- Catalog Upload History --------
 
 function CatalogUploadHistorySection({ canEdit }: { canEdit: boolean }) {
-	const [catalogType, setCatalogType] = useState("")
+	const [catalogType, setCatalogType] = useState<CatalogType | "">("")
 	const [showForm, setShowForm] = useState(false)
 
 	const { data } = useCodeSetUploadsQuery({ catalogType: catalogType || undefined })
 	const uploads = (data as { data: CatalogUploadRow[] } | undefined)?.data ?? []
 	const recordMutation = useRecordCatalogUploadMutation()
 
-	const [formCatalogType, setFormCatalogType] = useState("icd10")
+	const [formCatalogType, setFormCatalogType] = useState<CatalogType>("icd10")
 	const [version, setVersion] = useState("")
 	const [entryCount, setEntryCount] = useState("")
 	const [notes, setNotes] = useState("")
@@ -471,7 +472,7 @@ function CatalogUploadHistorySection({ canEdit }: { canEdit: boolean }) {
 							<label className="text-sm font-medium">Catalog Type</label>
 							<select
 								value={formCatalogType}
-								onChange={e => setFormCatalogType(e.target.value)}
+								onChange={e => setFormCatalogType(e.target.value as CatalogType)}
 								className="border-input bg-background mt-1 flex h-10 w-full rounded-md border px-3 py-2 text-sm"
 							>
 								{["icd10", "loinc", "rxnorm", "rvs", "snomed_ct"].map(t => (
@@ -524,7 +525,7 @@ function CatalogUploadHistorySection({ canEdit }: { canEdit: boolean }) {
 			<div className="flex gap-2">
 				<select
 					value={catalogType}
-					onChange={e => setCatalogType(e.target.value)}
+					onChange={e => setCatalogType(e.target.value as CatalogType | "")}
 					className="border-input bg-background h-9 rounded-md border px-3 text-sm"
 				>
 					<option value="">All catalogs</option>
@@ -585,7 +586,7 @@ interface CatalogUploadRow {
 // -------- Deprecated Code Mappings --------
 
 function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
-	const [catalogType, setCatalogType] = useState("")
+	const [catalogType, setCatalogType] = useState<CatalogType | "">("")
 	const [showForm, setShowForm] = useState(false)
 
 	const { data } = useDeprecatedMappingsQuery({ catalogType: catalogType || undefined })
@@ -598,7 +599,7 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 	const [fromCode, setFromCode] = useState("")
 	const [toCode, setToCode] = useState("")
 	const [notes, setNotes] = useState("")
-	const [formCatalogType, setFormCatalogType] = useState("icd10")
+	const [formCatalogType, setFormCatalogType] = useState<CatalogType>("icd10")
 
 	function handleCreate(e: React.FormEvent) {
 		e.preventDefault()
@@ -609,7 +610,7 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 	}
 
 	const [toggleCodeId, setToggleCodeId] = useState("")
-	const [toggleCatalogType, setToggleCatalogType] = useState("icd10")
+	const [toggleCatalogType, setToggleCatalogType] = useState<CatalogType>("icd10")
 	const [toggleActive, setToggleActive] = useState(true)
 
 	function handleToggle(e: React.FormEvent) {
@@ -639,7 +640,7 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 								<label className="text-sm font-medium">Catalog Type</label>
 								<select
 									value={formCatalogType}
-									onChange={e => setFormCatalogType(e.target.value)}
+									onChange={e => setFormCatalogType(e.target.value as CatalogType)}
 									className="border-input bg-background mt-1 flex h-10 w-full rounded-md border px-3 py-2 text-sm"
 								>
 									{["icd10", "loinc", "rxnorm", "rvs", "snomed_ct"].map(t => (
@@ -691,7 +692,7 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 
 				<select
 					value={catalogType}
-					onChange={e => setCatalogType(e.target.value)}
+					onChange={e => setCatalogType(e.target.value as CatalogType | "")}
 					className="border-input bg-background h-9 rounded-md border px-3 text-sm"
 				>
 					<option value="">All catalogs</option>
@@ -754,7 +755,7 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 						<label className="text-xs font-medium">Catalog</label>
 						<select
 							value={toggleCatalogType}
-							onChange={e => setToggleCatalogType(e.target.value)}
+							onChange={e => setToggleCatalogType(e.target.value as CatalogType)}
 							className="border-input bg-background mt-1 flex h-9 rounded-md border px-3 text-sm"
 						>
 							{["icd10", "loinc", "rxnorm", "rvs", "snomed_ct"].map(t => (
@@ -818,7 +819,7 @@ interface DeprecatedMappingRow {
 // Catalog Entry Editor — FORM-006
 // ============================================================================
 
-type CatalogTypeKey = "icd10" | "loinc" | "rxnorm" | "rvs" | "snomed_ct"
+type CatalogTypeKey = CatalogType
 
 const CATALOG_TYPE_OPTIONS: { value: CatalogTypeKey; label: string }[] = [
 	{ value: "icd10", label: "ICD-10" },

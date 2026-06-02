@@ -62,7 +62,7 @@ export function AdminBreadcrumb() {
 
 	const crumbs = segments.map((seg, i) => ({
 		label: labelFor(seg),
-		href: "/" + segments.slice(0, i + 1).join("/"),
+		href: `/${segments.slice(0, i + 1).join("/")}`,
 		isLast: i === segments.length - 1,
 	}))
 

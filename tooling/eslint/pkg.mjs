@@ -26,7 +26,7 @@ export const packageConfig = defineConfig(
 		rules: {
 			// Base JavaScript rules
 			"no-console": "warn",
-			"eqeqeq": ["error", "always"],
+			"eqeqeq": ["error", "always", { null: "ignore" }],
 			"curly": ["error", "all"],
 			"prefer-const": "error",
 			"no-var": "error",

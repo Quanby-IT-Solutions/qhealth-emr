@@ -54,7 +54,9 @@ async function seedDrugGenerics() {
 		await db.insert(drugGenerics).values(missing)
 	}
 
-	console.log(`Seeded ${missing.length} drug generics (${data.length - missing.length} already present)`)
+	console.log(
+		`Seeded ${missing.length} drug generics (${data.length - missing.length} already present)`
+	)
 	return db.select().from(drugGenerics)
 }
 
@@ -99,7 +101,9 @@ async function seedDrugBrands(generics: { id: string; genericName: string }[]) {
 		await db.insert(drugBrands).values(missing)
 	}
 
-	console.log(`Seeded ${missing.length} drug brands (${data.length - missing.length} already present)`)
+	console.log(
+		`Seeded ${missing.length} drug brands (${data.length - missing.length} already present)`
+	)
 }
 
 async function seedIcd10Codes() {

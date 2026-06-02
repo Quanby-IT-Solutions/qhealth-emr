@@ -683,10 +683,7 @@ export class EdService {
 			.where(
 				and(
 					eq(encounters.facilityId, input.facilityId),
-					or(
-						eq(encounters.encounterType, "emergency"),
-						eq(wards.wardType, "er")
-					),
+					or(eq(encounters.encounterType, "emergency"), eq(wards.wardType, "er")),
 					eq(encounters.status, "active")
 				)
 			)

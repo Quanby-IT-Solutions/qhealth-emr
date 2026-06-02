@@ -232,9 +232,7 @@ describe("ProblemsAllergiesService", () => {
 			.mockImplementationOnce(() =>
 				createSelectBuilder([{ id: "550e8400-e29b-41d4-a716-446655440002" }])
 			)
-			.mockImplementationOnce(() =>
-				createSelectBuilder([updatedProblem], { resolveOnWhere: true })
-			)
+			.mockImplementationOnce(() => createSelectBuilder([updatedProblem], { resolveOnWhere: true }))
 		mockDb.update.mockReturnValue(updateBuilder)
 
 		const result = await service.deleteProblem(problem.id, "user-1", actor as never)

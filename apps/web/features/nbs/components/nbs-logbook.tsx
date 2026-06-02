@@ -14,8 +14,7 @@ import {
 	DialogTitle,
 } from "@/core/components/ui/dialog"
 
-import type { NbsLogbookEntry, NbsStatus } from "@/features/nbs/api/nbs.hooks"
-import { useNbsLogbookQuery } from "@/features/nbs/api/nbs.hooks"
+import { type NbsLogbookEntry, type NbsStatus, useNbsLogbookQuery } from "@/features/nbs/api/nbs.hooks"
 import { NbsReferralTracker } from "@/features/nbs/components/nbs-referral-tracker"
 
 // ============================================================================

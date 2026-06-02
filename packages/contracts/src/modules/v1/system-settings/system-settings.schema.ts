@@ -117,9 +117,9 @@ export type UpdateSystemSettingsInput = z.infer<typeof UpdateSystemSettingsSchem
 // Offline patient summary snapshots
 // ============================================================================
 
-const OfflineDateStringSchema = z.union([z.date(), z.string()]).transform(v =>
-	typeof v === "string" ? v : v.toISOString()
-)
+const OfflineDateStringSchema = z
+	.union([z.date(), z.string()])
+	.transform(v => (typeof v === "string" ? v : v.toISOString()))
 
 export const OfflinePatientDemographicsSchema = z.object({
 	id: z.string().uuid(),

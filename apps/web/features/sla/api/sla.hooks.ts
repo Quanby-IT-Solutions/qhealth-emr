@@ -25,12 +25,9 @@ function buildQueryString(
 ): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
 	if (entries.length === 0) return ""
-	return (
-		"?" +
-		entries
-			.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-			.join("&")
-	)
+	return `?${entries
+		.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+		.join("&")}`
 }
 
 // ============================================================================
@@ -172,18 +169,16 @@ export function useSlaEventsQuery(params: {
 	paused?: boolean
 }) {
 	return useQuery<SlaEventListResponse>({
-		queryKey: [...slaKeys.events(params.facilityId), params.status, params.workflowType, params.page],
+		queryKey: [...slaKeys.events(params.facilityId), params.status, params.workflowType, params.page, params.limit],
 		queryFn: () =>
 			fetchJson(
-				API_BASE +
-					"/events" +
-					buildQueryString({
-						facilityId: params.facilityId,
-						status: params.status !== "all" ? params.status : undefined,
-						workflowType: params.workflowType,
-						page: params.page ?? 1,
-						limit: params.limit ?? 50,
-					})
+				`${API_BASE}/events${buildQueryString({
+					facilityId: params.facilityId,
+					status: params.status !== "all" ? params.status : undefined,
+					workflowType: params.workflowType,
+					page: params.page ?? 1,
+					limit: params.limit ?? 50,
+				})}`
 			),
 		refetchInterval: params.paused ? false : 30_000,
 		staleTime: 25_000,
@@ -194,7 +189,7 @@ export function useSlaEventsByEncounterQuery(encounterId: string | null) {
 	return useQuery<SlaEvent[]>({
 		queryKey: slaKeys.eventsByEncounter(encounterId ?? ""),
 		queryFn: () =>
-			fetchJson(API_BASE + `/events/encounter/${encounterId}`),
+			fetchJson(`${API_BASE}/events/encounter/${encounterId}`),
 		enabled: !!encounterId,
 	})
 }
@@ -207,7 +202,7 @@ export function useSlaConfigsQuery(facilityId: string) {
 	return useQuery<SlaConfigListResponse>({
 		queryKey: slaKeys.configs(facilityId),
 		queryFn: () =>
-			fetchJson(API_BASE + "/configs" + buildQueryString({ facilityId })),
+			fetchJson(`${API_BASE}/configs${buildQueryString({ facilityId })}`),
 	})
 }
 
@@ -215,7 +210,7 @@ export function useCreateSlaConfigMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<SlaConfig, Error, CreateSlaConfigInput>({
 		mutationFn: input =>
-			fetchJson(API_BASE + "/configs", {
+			fetchJson(`${API_BASE}/configs`, {
 				method: "POST",
 				body: JSON.stringify(input),
 			}),
@@ -229,7 +224,7 @@ export function useUpdateSlaConfigMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<SlaConfig, Error, { id: string; facilityId: string } & UpdateSlaConfigInput>({
 		mutationFn: ({ id, facilityId: _fid, ...input }) =>
-			fetchJson(API_BASE + `/configs/${id}`, {
+			fetchJson(`${API_BASE}/configs/${id}`, {
 				method: "PATCH",
 				body: JSON.stringify(input),
 			}),
@@ -243,7 +238,7 @@ export function useDeleteSlaConfigMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<void, Error, { id: string; facilityId: string }>({
 		mutationFn: ({ id }) =>
-			fetchJson(API_BASE + `/configs/${id}`, { method: "DELETE" }),
+			fetchJson(`${API_BASE}/configs/${id}`, { method: "DELETE" }),
 		onSuccess: (_, variables) => {
 			void queryClient.invalidateQueries({ queryKey: slaKeys.configs(variables.facilityId) })
 		},
@@ -263,13 +258,11 @@ export function useSlaComplianceReportQuery(params: {
 		queryKey: slaKeys.compliance(params.facilityId, params.periodStart, params.periodEnd),
 		queryFn: () =>
 			fetchJson(
-				API_BASE +
-					"/compliance" +
-					buildQueryString({
-						facilityId: params.facilityId,
-						periodStart: params.periodStart,
-						periodEnd: params.periodEnd,
-					})
+				`${API_BASE}/compliance${buildQueryString({
+					facilityId: params.facilityId,
+					periodStart: params.periodStart,
+					periodEnd: params.periodEnd,
+				})}`
 			),
 		enabled: !!params.facilityId && !!params.periodStart && !!params.periodEnd,
 	})
@@ -406,7 +399,7 @@ export function useSlaStepConfigsQuery(facilityId: string) {
 	return useQuery<SlaStepConfigListResponse>({
 		queryKey: slaStepKeys.list(facilityId),
 		queryFn: () =>
-			fetchJson(API_BASE + "/step-configs" + buildQueryString({ facilityId })),
+			fetchJson(`${API_BASE}/step-configs${buildQueryString({ facilityId })}`),
 		enabled: !!facilityId,
 	})
 }
@@ -415,7 +408,7 @@ export function useCreateSlaStepConfigMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<SlaStepConfig, Error, CreateSlaStepConfigInput>({
 		mutationFn: input =>
-			fetchJson(API_BASE + "/step-configs", {
+			fetchJson(`${API_BASE}/step-configs`, {
 				method: "POST",
 				body: JSON.stringify(input),
 			}),
@@ -429,7 +422,7 @@ export function useUpdateSlaStepConfigMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<SlaStepConfig, Error, { id: string; facilityId: string } & UpdateSlaStepConfigInput>({
 		mutationFn: ({ id, facilityId: _fid, ...input }) =>
-			fetchJson(API_BASE + `/step-configs/${id}`, {
+			fetchJson(`${API_BASE}/step-configs/${id}`, {
 				method: "PATCH",
 				body: JSON.stringify(input),
 			}),
@@ -443,7 +436,7 @@ export function useDeleteSlaStepConfigMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<void, Error, { id: string; facilityId: string }>({
 		mutationFn: ({ id }) =>
-			fetchJson(API_BASE + `/step-configs/${id}`, { method: "DELETE" }),
+			fetchJson(`${API_BASE}/step-configs/${id}`, { method: "DELETE" }),
 		onSuccess: (_, variables) => {
 			void queryClient.invalidateQueries({ queryKey: slaStepKeys.list(variables.facilityId) })
 		},

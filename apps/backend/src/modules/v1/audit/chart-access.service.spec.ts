@@ -2,8 +2,12 @@ import { ForbiddenException } from "@nestjs/common"
 
 import { db } from "@/common/database/database.client"
 
-import { AuditService } from "./audit.service"
-import { BREAK_GLASS_REQUIRED_MESSAGE, ChartAccessService, type ChartAccessActor } from "./chart-access.service"
+import { type AuditService } from "./audit.service"
+import {
+	BREAK_GLASS_REQUIRED_MESSAGE,
+	ChartAccessService,
+	type ChartAccessActor,
+} from "./chart-access.service"
 
 jest.mock("@/common/database/database.client", () => ({
 	db: {

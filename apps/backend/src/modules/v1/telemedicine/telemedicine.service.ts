@@ -941,7 +941,11 @@ export class TelemedicineService {
 		})
 
 		const shouldStartSession = this.shouldStartLiveKitSession(appointment.status)
-		if (!appointment.livekitRoomName || !appointment.livekitSessionStartedAt || shouldStartSession) {
+		if (
+			!appointment.livekitRoomName ||
+			!appointment.livekitSessionStartedAt ||
+			shouldStartSession
+		) {
 			const now = new Date()
 			const updates: Partial<typeof telemedicineAppointments.$inferInsert> = {
 				updatedAt: now,
@@ -1067,7 +1071,9 @@ export class TelemedicineService {
 		try {
 			event = await this.liveKitService.verifyWebhook(body, authHeader)
 		} catch (error) {
-			this.logger.warn(`Rejected LiveKit webhook: ${error instanceof Error ? error.message : error}`)
+			this.logger.warn(
+				`Rejected LiveKit webhook: ${error instanceof Error ? error.message : error}`
+			)
 			throw new ForbiddenException("Invalid LiveKit webhook signature.")
 		}
 
@@ -1093,7 +1099,9 @@ export class TelemedicineService {
 			.limit(1)
 
 		if (!appointment) {
-			this.logger.warn(`LiveKit webhook ${eventName} references unknown appointment ${appointmentId}`)
+			this.logger.warn(
+				`LiveKit webhook ${eventName} references unknown appointment ${appointmentId}`
+			)
 			return
 		}
 
@@ -1622,7 +1630,9 @@ export class TelemedicineService {
 		}
 
 		if (input.encounterType === "linked" && !input.linkedEncounterId) {
-			throw new BadRequestException("linkedEncounterId is required for linked telemedicine encounters.")
+			throw new BadRequestException(
+				"linkedEncounterId is required for linked telemedicine encounters."
+			)
 		}
 
 		if (input.encounterType === "standalone" && input.linkedEncounterId) {
@@ -2318,11 +2328,7 @@ export class TelemedicineService {
 			throw new NotFoundException(`Tele-abstract ${id} not found`)
 		}
 
-		this.assertAssignedClinician(
-			requesterStaffId,
-			row.clinicianStaffId,
-			"download this abstract"
-		)
+		this.assertAssignedClinician(requesterStaffId, row.clinicianStaffId, "download this abstract")
 		if (abstract.status === "draft" || !abstract.signedAt) {
 			throw new BadRequestException("Abstract must be signed before PDF generation.")
 		}
@@ -2378,7 +2384,10 @@ export class TelemedicineService {
 		drawText("TELEMEDICINE ENCOUNTER ABSTRACT", margin, 14, true)
 		y -= 4
 		drawText(`Patient: ${abstract.patientName}`, margin, 10, true)
-		drawText(`Clinician: ${abstract.clinicianName}    PRC #${abstract.clinicianPrcNumber || "--"}`, margin)
+		drawText(
+			`Clinician: ${abstract.clinicianName}    PRC #${abstract.clinicianPrcNumber || "--"}`,
+			margin
+		)
 		drawText(`Generated: ${new Date(abstract.createdAt).toLocaleString("en-PH")}`, margin)
 		y -= 6
 
@@ -2651,11 +2660,12 @@ export class TelemedicineService {
 			.where(eq(telemedicineAbstracts.id, input.id))
 
 		if (notificationTarget) {
-			let mailResult: { delivered: boolean; messageId: string | null; transport: "smtp" | "log" } = {
-				delivered: false,
-				messageId: null,
-				transport: "log",
-			}
+			let mailResult: { delivered: boolean; messageId: string | null; transport: "smtp" | "log" } =
+				{
+					delivered: false,
+					messageId: null,
+					transport: "log",
+				}
 			let mailerError: string | null = null
 			try {
 				const pdf = await this.generateAbstractPdf(input.id, sentByStaffId)

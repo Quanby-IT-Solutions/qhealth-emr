@@ -41,7 +41,7 @@ export class CoeService {
 					? "malasakit"
 					: "other"
 
-		return await db.transaction(async tx => {
+		return db.transaction(async tx => {
 			await tx
 				.update(mswEvaluations)
 				.set({ coeIssued: true, coeProgram, approvedAt: new Date() })
@@ -74,7 +74,7 @@ export class CoeService {
 		if (!cert) throw new NotFoundException("Certificate not found")
 		if (cert.voidedAt) throw new BadRequestException("Certificate already revoked")
 
-		return await db.transaction(async tx => {
+		return db.transaction(async tx => {
 			await tx
 				.update(mswEvaluations)
 				.set({ coeIssued: false, approvedAt: null })

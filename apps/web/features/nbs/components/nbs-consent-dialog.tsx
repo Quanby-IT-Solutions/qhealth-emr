@@ -24,8 +24,9 @@ import {
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 
-import type { CreateNbsConsentInput, NbsConsentType } from "@/features/nbs/api/nbs.hooks"
 import {
+	type CreateNbsConsentInput,
+	type NbsConsentType,
 	useCreateNbsConsentMutation,
 	useNbsConsentQuery,
 } from "@/features/nbs/api/nbs.hooks"
@@ -54,6 +55,7 @@ function SignatureCanvas({ onCapture, onClear }: SignatureCanvasProps) {
 		const scaleY = canvas.height / rect.height
 		if ("touches" in e) {
 			const touch = e.touches[0]
+			if (!touch) return { x: 0, y: 0 }
 			return {
 				x: (touch.clientX - rect.left) * scaleX,
 				y: (touch.clientY - rect.top) * scaleY,

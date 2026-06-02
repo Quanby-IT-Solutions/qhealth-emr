@@ -374,12 +374,14 @@ describe("EdService.cancelPreEncounter()", () => {
 			status: "cancelled",
 			updatedAt: expect.any(Date),
 		})
-		expect((service as unknown as { notificationService: { broadcast: jest.Mock } }).notificationService.broadcast)
-			.toHaveBeenCalledWith(
-				"ed_queue",
-				"ED Queue Updated",
-				"Trauma alias pre-encounter removed from queue"
-			)
+		expect(
+			(service as unknown as { notificationService: { broadcast: jest.Mock } }).notificationService
+				.broadcast
+		).toHaveBeenCalledWith(
+			"ed_queue",
+			"ED Queue Updated",
+			"Trauma alias pre-encounter removed from queue"
+		)
 	})
 
 	it("throws NotFoundException when pre-encounter is not found", async () => {

@@ -77,7 +77,7 @@ export function WorkflowSection() {
 		}
 	]
 
-	const [activeFlow, setActiveFlow] = useState(flows[0])
+	const [activeFlow, setActiveFlow] = useState(flows[0]!)
 
 	return (
 		<section id="workflows" className="py-24 bg-background">

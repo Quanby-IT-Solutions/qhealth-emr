@@ -20,14 +20,12 @@ import {
 import { Textarea } from "@/core/components/ui/textarea"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/core/components/ui/tooltip"
 
-import type {
-	CreateNbsScreeningInput,
-	NbsScreening,
-	NbsSpecimenType,
-	NbsStatus,
-	UpdateNbsScreeningInput,
-} from "@/features/nbs/api/nbs.hooks"
 import {
+	type CreateNbsScreeningInput,
+	type NbsScreening,
+	type NbsSpecimenType,
+	type NbsStatus,
+	type UpdateNbsScreeningInput,
 	useCreateNbsScreeningMutation,
 	useUpdateNbsScreeningMutation,
 } from "@/features/nbs/api/nbs.hooks"

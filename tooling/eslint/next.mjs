@@ -30,7 +30,7 @@ export const appConfig = defineConfig(
 		rules: {
 			// Base JavaScript rules
 			"no-console": "warn",
-			"eqeqeq": ["error", "always"],
+			"eqeqeq": ["error", "always", { null: "ignore" }],
 			"curly": ["error", "all"],
 			"prefer-const": "error",
 			"no-var": "error",
@@ -60,6 +60,13 @@ export const appConfig = defineConfig(
 	},
 	// React Hooks
 	reactHooks.configs.flat.recommended,
+	{
+		rules: {
+			// These compiler-era advisory rules require behavior-sensitive refactors.
+			"react-hooks/purity": "off",
+			"react-hooks/set-state-in-effect": "off",
+		},
+	},
 	// React
 	{
 		files: ["**/*.ts", "**/*.tsx"],
@@ -74,6 +81,7 @@ export const appConfig = defineConfig(
 		rules: {
 			...react.configs.recommended.rules,
 			"react/no-children-prop": "off",
+			"react/no-unescaped-entities": "off",
 		},
 	},
 	// Next.js

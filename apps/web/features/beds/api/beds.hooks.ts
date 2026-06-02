@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { env } from "@/env"
 import { orpc } from "@/services/orpc/client"
 
 export function useWardsQuery(facilityId: string) {
@@ -99,7 +100,7 @@ export function useBedSuggestionMutation() {
 	return useMutation({
 		mutationFn: async (data: BedSuggestionInput) => {
 			const res = await fetch(
-				`${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/beds/suggest`,
+				`${env.NEXT_PUBLIC_API_BASE_URL}/v1/beds/suggest`,
 				{
 					method: "POST",
 					credentials: "include",
@@ -156,7 +157,7 @@ export function useCensusMetricsQuery(
 			const queryParams = new URLSearchParams({ facilityId: params.facilityId })
 			if (params.date) queryParams.set("date", params.date)
 			const res = await fetch(
-				`${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/beds/census/metrics?${queryParams}`,
+				`${env.NEXT_PUBLIC_API_BASE_URL}/v1/beds/census/metrics?${queryParams}`,
 				{ credentials: "include" }
 			)
 			if (!res.ok) throw new Error(`HTTP ${res.status}`)

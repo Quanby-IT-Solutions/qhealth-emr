@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { useLoginMutation } from "@/features/auth/login/api/login.hooks"
 import { authClient } from "@/services/better-auth/auth-client"
 import { cn } from "@/core/lib/utils"
+import { env } from "@/env"
 
 const DEV_ACCOUNTS = [
 	{ email: "admin@qhealth.local", label: "Administrator", category: "Admin" },
@@ -52,7 +53,7 @@ export function DevQuickLogin() {
 	const [loggingIn, setLoggingIn] = useState<string | null>(null)
 	const { mutateAsync: login } = useLoginMutation()
 
-	if (process.env.NODE_ENV === "production") return null
+	if (env.NODE_ENV === "production") return null
 
 	const grouped = CATEGORY_ORDER.map(cat => ({
 		category: cat,
@@ -130,7 +131,7 @@ export function DevQuickLogin() {
 														<motion.span
 															initial={{ opacity: 0 }}
 															animate={{ opacity: 1 }}
-															transition={{ repeat: Infinity, duration: 0.8, direction: "alternate" }}
+															transition={{ repeat: Infinity, duration: 0.8, repeatType: "reverse" }}
 														>
 															...
 														</motion.span>

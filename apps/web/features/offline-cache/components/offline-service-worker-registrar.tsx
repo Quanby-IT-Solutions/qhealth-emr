@@ -2,6 +2,8 @@
 
 import { useEffect } from "react"
 
+import { env } from "@/env"
+
 const SW_URL = "/offline-sw.js"
 const OFFLINE_CACHE_PREFIX = "qhealth-emr-offline-"
 
@@ -35,7 +37,7 @@ export function OfflineServiceWorkerRegistrar() {
 	useEffect(() => {
 		if (!("serviceWorker" in navigator)) return
 
-		if (process.env.NODE_ENV !== "production") {
+		if (env.NODE_ENV !== "production") {
 			void unregisterStaleWorkers()
 			return
 		}

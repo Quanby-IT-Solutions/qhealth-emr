@@ -15,9 +15,9 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common"
 import { Test, type TestingModule } from "@nestjs/testing"
 
+import { CivilRegistryService } from "../civil-registry/civil-registry.service"
 import { LcrArtifactGeneratorService } from "../civil-registry/lcr-artifact-generator.service"
 import { LcrSubmissionService } from "../civil-registry/lcr-submission.service"
-import { CivilRegistryService } from "../civil-registry/civil-registry.service"
 import { MedicalRecordsService } from "../medical-records/medical-records.service"
 import { DeathReportingService } from "./death-reporting.service"
 

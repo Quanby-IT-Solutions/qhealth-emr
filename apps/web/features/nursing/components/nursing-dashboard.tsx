@@ -285,7 +285,7 @@ export function NursingDashboard() {
 				</TabsContent>
 
 				<TabsContent value="er" className="mt-4">
-					<EdDashboard facilityId={facilityId} />
+					<EdDashboard />
 				</TabsContent>
 
 				<TabsContent value="hai" className="mt-4">

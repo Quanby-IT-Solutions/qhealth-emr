@@ -44,10 +44,10 @@ function DatePicker({
 		<div className="space-y-1">
 			<Label className="text-xs">{label}</Label>
 			<Popover>
-				<PopoverTrigger asChild>
-					<Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">
+				<PopoverTrigger
+					render={<Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm" />}
+				>
 						{dateValue ? dateValue.toLocaleDateString("en-PH") : "Select date…"}
-					</Button>
 				</PopoverTrigger>
 				<PopoverContent align="start" className="w-auto p-0">
 					<Calendar

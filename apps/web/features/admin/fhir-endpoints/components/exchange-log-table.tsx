@@ -36,7 +36,7 @@ export function ExchangeLogTable() {
 		if (resourceFilter && !e.resourceType.toLowerCase().includes(resourceFilter.toLowerCase())) return false
 		if (statusFilter !== "all" && e.status !== statusFilter) return false
 		if (dateFrom && e.occurredAt < dateFrom) return false
-		if (dateTo && e.occurredAt > dateTo + "T23:59:59") return false
+		if (dateTo && e.occurredAt > `${dateTo}T23:59:59`) return false
 		return true
 	})
 

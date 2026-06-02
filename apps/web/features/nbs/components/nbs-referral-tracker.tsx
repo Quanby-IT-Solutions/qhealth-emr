@@ -18,12 +18,10 @@ import {
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 
-import type {
-	CreateNbsReferralInput,
-	NbsReferralStatus,
-	UpdateNbsReferralInput,
-} from "@/features/nbs/api/nbs.hooks"
 import {
+	type CreateNbsReferralInput,
+	type NbsReferralStatus,
+	type UpdateNbsReferralInput,
 	useCreateNbsReferralMutation,
 	useNbsReferralsQuery,
 	useUpdateNbsReferralMutation,

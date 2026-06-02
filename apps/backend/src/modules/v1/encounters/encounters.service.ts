@@ -507,8 +507,7 @@ export class EncountersService {
 					clinicianName: row.clinicianName ?? null,
 				})),
 			].sort(
-				(a, b) =>
-					new Date(b.admissionDatetime).getTime() - new Date(a.admissionDatetime).getTime()
+				(a, b) => new Date(b.admissionDatetime).getTime() - new Date(a.admissionDatetime).getTime()
 			),
 		}
 	}
@@ -1651,9 +1650,7 @@ export class EncountersService {
 							key: "followup_instructions",
 							label: "Follow-up instructions entered",
 							category: "clinical" as ChecklistCategory,
-							status: (followupInstructionsEntered
-								? "complete"
-								: "incomplete") as ChecklistStatus,
+							status: (followupInstructionsEntered ? "complete" : "incomplete") as ChecklistStatus,
 							responsibleRole: "Clinician",
 						},
 						{
@@ -1779,9 +1776,7 @@ export class EncountersService {
 									)
 								)
 							const signedPrescriptionMedOrderIds = new Set(
-								rxRows
-									.map(row => row.medicationOrderId)
-									.filter((id): id is string => Boolean(id))
+								rxRows.map(row => row.medicationOrderId).filter((id): id is string => Boolean(id))
 							)
 
 							const hasUnresolvedMedicationOrder = medRows.some(order => {

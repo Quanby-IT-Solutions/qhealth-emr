@@ -114,7 +114,6 @@ export function XmlPreviewPane({ xml, className, title = "XML Preview" }: XmlPre
 									? "bg-yellow-100/60 dark:bg-yellow-900/30"
 									: ""
 							)}
-							// eslint-disable-next-line react/no-danger
 							dangerouslySetInnerHTML={{ __html: highlightXml(line) }}
 						/>
 					))}

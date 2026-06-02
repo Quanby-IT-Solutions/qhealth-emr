@@ -132,7 +132,7 @@ export function NutritionDashboard() {
 		const today = new Date().toDateString()
 		return {
 			assessedToday: all.filter(
-				(a) => new Date(a.assessedAt).toDateString() === today
+				(a) => new Date(a.createdAt).toDateString() === today
 			).length,
 			highRisk: all.filter((a) => a.malnutritionRisk === "high").length,
 			pending: all.filter((a) => !a.mealPlanStatus || a.mealPlanStatus === "none").length,
@@ -265,7 +265,7 @@ export function NutritionDashboard() {
 												<MealPlanBadge status={assessment.mealPlanStatus} />
 											</TableCell>
 											<TableCell className="text-xs text-muted-foreground">
-												{formatDate(assessment.assessedAt)}
+												{formatDate(assessment.createdAt)}
 											</TableCell>
 										</TableRow>
 									))}

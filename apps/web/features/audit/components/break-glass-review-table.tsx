@@ -14,8 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
 import { Skeleton } from "@/core/components/ui/skeleton"
 
-import type { BreakGlassEvent } from "@/features/audit/api/audit.hooks"
 import {
+	type BreakGlassEvent,
 	useBreakGlassEventsQuery,
 	useBreakGlassExportMutation,
 	useBreakGlassPatternsQuery,

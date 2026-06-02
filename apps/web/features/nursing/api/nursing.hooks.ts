@@ -810,9 +810,16 @@ export interface ConsentRecord {
 
 export interface CreateConsentInput {
 	facilityId: string
-	encounterId?: string
+	encounterId: string
+	patientId: string
 	preEncounterId?: string
 	consentType: string
+	signedByName: string
+	relationship: string
+	content?: string
+	signatureData?: unknown
+	signedAt?: string | Date
+	witnessStaffId?: string
 	consentText?: string
 	patientSignature?: string
 	guardianSignature?: string
@@ -846,7 +853,7 @@ export function useConsentsQuery(params: {
 export function useConsentQuery(id: string | null) {
 	return useQuery({
 		...orpc.nursing.getConsent.queryOptions({
-			input: id ? { id } : undefined,
+			input: { id: id ?? "" },
 			enabled: !!id,
 		}),
 		queryKey: [...nursingKeys.all, "consent", id ?? ""] as const,

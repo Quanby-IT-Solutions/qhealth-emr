@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useForm } from "@tanstack/react-form"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, type Variants } from "framer-motion"
 
 import { Button, buttonVariants } from "@/core/components/ui/button"
 import { Card, CardContent } from "@/core/components/ui/card"
@@ -89,7 +89,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 		},
 	})
 
-	const containerVariants = {
+	const containerVariants: Variants = {
 		hidden: { opacity: 0 },
 		show: {
 			opacity: 1,
@@ -97,10 +97,12 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 		}
 	}
 
-	const itemVariants = {
+	const itemVariants: Variants = {
 		hidden: { opacity: 0, y: 12 },
 		show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 20 } }
 	}
+
+	const activeTrustStatement = TRUST_STATEMENTS[activeStatement] ?? TRUST_STATEMENTS[0]!
 
 	return (
 		<div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -320,10 +322,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 										className="flex flex-col items-center gap-4"
 									>
 										<div className="flex h-12 w-12 items-center justify-center rounded-full bg-background border border-border shadow-sm">
-											{TRUST_STATEMENTS[activeStatement].icon}
+											{activeTrustStatement.icon}
 										</div>
 										<h2 className="text-xl font-serif font-medium text-foreground text-balance leading-snug">
-											{TRUST_STATEMENTS[activeStatement].text}
+											{activeTrustStatement.text}
 										</h2>
 									</motion.div>
 								</AnimatePresence>
