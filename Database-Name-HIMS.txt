@@ -1,0 +1,24 @@
+Database Name: HIMS
+Password: DhetllAnq7yb8h8t
+Project URL: https://kaxsjjiblmrcmmqiuvxo.supabase.co
+
+Anon Key:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtheHNqamlibG1yY21tcWl1dnhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNjUzODcsImV4cCI6MjA5NTk0MTM4N30.7B56uOIHbo5Bt0NuyTrPMN_qI38nZ3k25RyrTso2uSo
+
+Secret Role Key:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtheHNqamlibG1yY21tcWl1dnhvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDM2NTM4NywiZXhwIjoyMDk1OTQxMzg3fQ.2l7_eRtfn1L-IkALGw14b6ZmKjg-9oBVN-NS0zqBRfg
+
+
+ORM Connection:
+# Connect to Postgres via the shared transaction-mode pooler (IPv4-only)
+DATABASE_URL="postgresql://postgres.kaxsjjiblmrcmmqiuvxo:[YOUR-PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+
+# Connect to Postgres via the shared session-mode pooler (used for migrations)
+DIRECT_URL="postgresql://postgres.kaxsjjiblmrcmmqiuvxo:[YOUR-PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+
+# For paid projects, if your network supports IPv6, or you purchased the IPv4 add-on, use the dedicated transaction-mode pooler with a direct connection to Postgres for migrations as an alternative
+# DATABASE_URL="postgres://postgres:[YOUR-PASSWORD]@db.kaxsjjiblmrcmmqiuvxo.supabase.co:6543/postgres?pgbouncer=true"
+# DIRECT_URL="postgres://postgres:[YOUR-PASSWORD]@db.kaxsjjiblmrcmmqiuvxo.supabase.co:5432/postgres"
+
+Bucket Name: hims
+ 

@@ -57,6 +57,11 @@ pnpm dev
 | Variable                      | Required | App         | Description                           |
 | ----------------------------- | -------- | ----------- | ------------------------------------- |
 | `DATABASE_URL`                | ✅       | Backend, DB | PostgreSQL connection string          |
+| `DIRECT_URL`                  | ✅       | Backend, DB | Session-mode connection for migrations |
+| `SUPABASE_URL`                | ❌       | Backend, DB | Supabase project URL                   |
+| `SUPABASE_ANON_KEY`           | ❌       | Backend     | Supabase anon API key                  |
+| `SUPABASE_SERVICE_ROLE_KEY`   | ❌       | Backend, Web (server only) | Supabase service role key |
+| `SUPABASE_BUCKET_NAME`        | ❌       | Backend, Web, DB | Supabase Storage bucket name      |
 | `BETTER_AUTH_SECRET`          | ✅       | Backend     | Auth secret (openssl rand -base64 32) |
 | `BETTER_AUTH_TRUSTED_ORIGINS` | ✅       | Backend     | Comma-separated trusted origins       |
 | `CORS_ORIGINS`                | ✅       | Backend     | Comma-separated CORS origins          |
@@ -66,8 +71,35 @@ pnpm dev
 | `NEXT_PUBLIC_APP_URL`         | ✅       | Web         | Web app URL                           |
 | `NEXT_PUBLIC_API_BASE_URL`    | ✅       | Web         | Backend API base URL                  |
 | `NEXT_PUBLIC_API_VERSION`     | ✅       | Web         | API version (default: 1)              |
+| `NEXT_PUBLIC_SUPABASE_URL`    | ❌       | Web         | Public Supabase project URL            |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ❌     | Web         | Public Supabase anon API key           |
 
 Copy from `.env.example` in each app: `apps/backend/.env`, `apps/web/.env`, `packages/db/.env`.
+
+### Supabase Setup Guide
+
+1. Open your Supabase project and copy these values:
+	- Project URL
+	- Anon key
+	- Service role key
+	- Pooled connection strings (transaction mode and session mode)
+2. Copy env examples to local env files:
+	- `apps/backend/.env.example` -> `apps/backend/.env`
+	- `apps/web/.env.example` -> `apps/web/.env`
+	- `packages/db/.env.example` -> `packages/db/.env`
+3. Replace placeholders in all three env files:
+	- `<project-ref>`
+	- `[YOUR-PASSWORD]`
+	- `[YOUR-ANON-KEY]`
+	- `[YOUR-SERVICE-ROLE-KEY]`
+4. Keep connection usage consistent:
+	- `DATABASE_URL`: transaction pooler (port 6543) for runtime queries
+	- `DIRECT_URL`: session pooler (port 5432) for migrations
+5. Run database commands:
+	- `pnpm db:push` for schema sync
+	- `pnpm db:studio` to inspect data
+
+Note: Never expose `SUPABASE_SERVICE_ROLE_KEY` in client-side code. Only variables prefixed with `NEXT_PUBLIC_` are sent to the browser.
 
 ## Scripts
 
