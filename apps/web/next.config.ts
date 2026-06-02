@@ -24,7 +24,10 @@ const config: NextConfig = {
 	],
 
 	typescript: { ignoreBuildErrors: true },
-	reactCompiler: true,
+	// React Compiler crashes Turbopack's dev server (segfault) in Next.js 16.1.1,
+	// which leaves routes stuck on "Rendering…" forever. Enable it only for
+	// production builds (webpack), where it runs without crashing.
+	reactCompiler: process.env.NODE_ENV === "production",
 
 	devIndicators: {
 		position: "bottom-right",
