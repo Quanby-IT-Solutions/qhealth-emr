@@ -6,7 +6,8 @@ import { useTheme } from "next-themes"
 import Link from "next/link"
 
 export function Navbar() {
-	const { theme, setTheme } = useTheme()
+	const { resolvedTheme, setTheme } = useTheme()
+	const isDark = resolvedTheme === "dark"
 	const [mounted, setMounted] = useState(false)
 	const { scrollY } = useScroll()
 	const [scrolled, setScrolled] = useState(false)
@@ -58,7 +59,7 @@ export function Navbar() {
 				<div className="hidden md:flex items-center gap-4">
 					{mounted && (
 						<button
-							onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+							onClick={() => setTheme(isDark ? "light" : "dark")}
 							className="relative flex h-8 w-14 cursor-pointer items-center rounded-full border border-border bg-card p-1 shadow-sm transition-colors"
 							aria-label="Toggle Dark Mode"
 						>
@@ -66,9 +67,9 @@ export function Navbar() {
 								className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
 								layout
 								transition={{ type: "spring", stiffness: 700, damping: 30 }}
-								style={{ marginLeft: theme === "dark" ? "auto" : "0" }}
+								style={{ marginLeft: isDark ? "auto" : "0" }}
 							>
-								{theme === "dark" ? (
+								{isDark ? (
 									<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
 										<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
 									</svg>
@@ -134,10 +135,10 @@ export function Navbar() {
 							</Link>
 							{mounted && (
 								<button
-									onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+									onClick={() => setTheme(isDark ? "light" : "dark")}
 									className="flex items-center gap-3 text-sm font-medium text-muted-foreground"
 								>
-									{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+									{isDark ? "Light Mode" : "Dark Mode"}
 								</button>
 							)}
 						</div>

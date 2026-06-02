@@ -202,7 +202,8 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		href: "/triage/opd-tele",
 		iconName: "video",
 		requiredPermissions: [{ module: "opd", action: "view" }],
-		requireAllPermissions: [{ module: "nursing", action: "create" }],
+		// Story 3.4 / Flow C4: tele-triage intake is triage-officer owned.
+		requireAllPermissions: TRIAGE_ROLE_BUNDLE,
 	},
 	{
 		// Nurse-specific patient list: browse & filter all active patients without

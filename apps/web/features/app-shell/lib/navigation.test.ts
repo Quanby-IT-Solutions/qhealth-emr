@@ -90,6 +90,25 @@ const surgeonPermissions = [
 	{ module: "audit", action: "create" },
 ]
 
+const nursePermissions = [
+	{ module: "adt", action: "view" },
+	{ module: "adt", action: "edit" },
+	{ module: "patients", action: "view" },
+	{ module: "clinical_docs", action: "view" },
+	{ module: "orders", action: "view" },
+	{ module: "nursing", action: "view" },
+	{ module: "nursing", action: "create" },
+	{ module: "nursing", action: "edit" },
+	{ module: "nursing", action: "sign" },
+	{ module: "formulary", action: "view" },
+	{ module: "ed", action: "view" },
+	{ module: "ed", action: "edit" },
+	{ module: "nbs", action: "view" },
+	{ module: "nbs", action: "create" },
+	{ module: "nbs", action: "edit" },
+	{ module: "opd", action: "view" },
+]
+
 describe("filterNavItems", () => {
 	it("keeps the Triage Officer sidebar scoped to triage-owned workflows", () => {
 		const primaryTitles = filterNavItems(PRIMARY_NAV_ITEMS, triagePermissions).map(
@@ -185,6 +204,18 @@ describe("filterNavItems", () => {
 			"OPD",
 		])
 		expect(secondaryTitles).toEqual([])
+	})
+
+	it("hides triage-only OPD Tele-Triage from Nurse role", () => {
+		const primaryTitles = filterNavItems(PRIMARY_NAV_ITEMS, nursePermissions).map(
+			item => item.title
+		)
+
+		expect(primaryTitles).not.toContain("Triage Queue")
+		expect(primaryTitles).not.toContain("Trauma Alias")
+		expect(primaryTitles).not.toContain("Tele-Triage")
+		expect(primaryTitles).not.toContain("OPD Tele-Triage")
+		expect(primaryTitles).toContain("OPD")
 	})
 })
 

@@ -1005,7 +1005,8 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 		pathname.startsWith("/telemedicine/appointments/") && pathname.endsWith("/video")
 	const isNoPaddingRoute =
 		pathname === "/patients/search" || pathname === "/opd" || isVideoRoomRoute
-	const { theme, setTheme } = useTheme()
+	const { resolvedTheme, setTheme } = useTheme()
+	const isDark = resolvedTheme === "dark"
 	const { isOnline } = useOfflineSync()
 	useNursingSync()
 	const { data: profile } = useMyProfile()
@@ -1241,13 +1242,26 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 								<span className="text-muted-foreground text-xs">{user?.email}</span>
 							</div>
 							<DropdownMenuSeparator className="bg-sidebar-border" />
-							<DropdownMenuItem className="hover:bg-sidebar-accent focus:bg-sidebar-accent cursor-pointer gap-3 p-2">
-								<Icons.Settings className="size-4 opacity-70" />
-								<span className="text-sm font-medium">Account Settings</span>
+							<DropdownMenuItem
+								className="data-highlighted:bg-sidebar-accent hover:bg-sidebar-accent focus:bg-sidebar-accent cursor-pointer gap-3 p-2"
+							>
+								<Icons.Settings
+									className="size-4"
+									strokeWidth={2.1}
+									style={{
+										color: "var(--sidebar-foreground)",
+										stroke: "var(--sidebar-foreground)",
+										opacity: 1,
+									}}
+								/>
+								<span className="text-sm font-medium" style={{ color: "var(--sidebar-foreground)" }}>
+									Account Settings
+								</span>
 							</DropdownMenuItem>
 							<DropdownMenuSeparator className="bg-sidebar-border" />
 							<DropdownMenuItem
-								className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer gap-3 p-2"
+								variant="destructive"
+								className="data-highlighted:bg-destructive/10 data-highlighted:text-destructive data-highlighted:**:text-destructive focus:bg-destructive/10 focus:text-destructive focus:**:text-destructive cursor-pointer gap-3 p-2"
 								onClick={() => signOut.mutate()}
 								disabled={signOut.isPending}
 							>
@@ -1413,7 +1427,7 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 						{/* Theme Toggle */}
 						{mounted && (
 							<button
-								onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+								onClick={() => setTheme(isDark ? "light" : "dark")}
 								className="border-border bg-card hover:bg-accent/10 focus-visible:ring-ring hidden h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border p-0.5 transition-colors focus-visible:ring-2 focus-visible:outline-none sm:flex"
 								aria-label="Toggle Dark Mode"
 							>
@@ -1421,9 +1435,9 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 									className="bg-primary text-primary-foreground flex h-5 w-5 items-center justify-center rounded-full shadow-sm"
 									layout
 									transition={{ type: "spring", stiffness: 700, damping: 30 }}
-									style={{ marginLeft: theme === "dark" ? "auto" : "0" }}
+									style={{ marginLeft: isDark ? "auto" : "0" }}
 								>
-									{theme === "dark" ? (
+									{isDark ? (
 										<svg
 											width="12"
 											height="12"

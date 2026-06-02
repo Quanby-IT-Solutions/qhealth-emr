@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { CheckCircle2, Scan, XCircle } from "lucide-react"
+import { CheckCircle2, XCircle } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/core/components/ui/button"
@@ -58,8 +58,7 @@ function VerificationField({
 }: VerificationFieldProps) {
 	return (
 		<div className="space-y-2">
-			<Label htmlFor={id} className="flex items-center gap-1 text-sm">
-				<Scan className="size-3.5" />
+			<Label htmlFor={id} className="text-sm font-medium">
 				{label}
 				<span className="text-destructive">*</span>
 			</Label>
@@ -89,6 +88,30 @@ function VerificationField({
 				)}
 			</div>
 			{error && <p className="text-destructive text-xs">{error}</p>}
+		</div>
+	)
+}
+
+function ReadinessBadge({ ready }: { ready: boolean }) {
+	return (
+		<span
+			className={cn(
+				"inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+				ready
+					? "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300"
+					: "bg-muted text-muted-foreground"
+			)}
+		>
+			{ready ? "Ready" : "Missing"}
+		</span>
+	)
+}
+
+function RecordStatusRow({ label, ready }: { label: string; ready: boolean }) {
+	return (
+		<div className="flex items-center justify-between gap-3">
+			<span className="text-muted-foreground">{label}</span>
+			<ReadinessBadge ready={ready} />
 		</div>
 	)
 }
@@ -252,10 +275,7 @@ export default function TransfusionPage() {
 			<div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
 				<Card>
 					<CardHeader>
-						<CardTitle className="flex items-center gap-2 text-base">
-							<Scan className="size-4" />
-							Transfusion verification
-						</CardTitle>
+						<CardTitle className="text-base">Verification details</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-4">
 						<VerificationField
@@ -287,8 +307,14 @@ export default function TransfusionPage() {
 						/>
 						{selectedCrossMatch && (
 							<div className="bg-muted/40 text-muted-foreground rounded-md border p-3 text-xs">
-								Matched {selectedCrossMatch.patientName} - Status {selectedCrossMatch.status} -
-								Requested {new Date(selectedCrossMatch.requestedAt).toLocaleString()}
+								<p>
+									<span className="text-foreground font-medium">Matched request:</span>{" "}
+									{selectedCrossMatch.patientName}
+								</p>
+								<p className="mt-1">
+									Status {selectedCrossMatch.status} · Requested{" "}
+									{new Date(selectedCrossMatch.requestedAt).toLocaleString()}
+								</p>
 							</div>
 						)}
 
@@ -331,7 +357,6 @@ export default function TransfusionPage() {
 
 						<div className="flex flex-wrap gap-2 pt-2">
 							<Button className="min-w-36" onClick={handleVerify} disabled={!canSubmit}>
-								<Scan className="mr-2 size-4" />
 								{verifyMutation.isPending ? "Verifying..." : "Verify match"}
 							</Button>
 							<Button variant="outline" onClick={handleReset} disabled={verifyMutation.isPending}>
@@ -346,35 +371,19 @@ export default function TransfusionPage() {
 						<CardTitle className="text-base">Verification record</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-3 text-sm">
-						<div className="flex items-center justify-between gap-3">
-							<span className="text-muted-foreground">cross_match_request_id</span>
-							<span className={crossMatchId.trim() ? "text-green-700" : "text-muted-foreground"}>
-								{crossMatchId.trim() ? "Ready" : "Missing"}
-							</span>
-						</div>
-						<div className="flex items-center justify-between gap-3">
-							<span className="text-muted-foreground">patient_wristband_barcode</span>
-							<span
-								className={
-									patientWristbandBarcode.trim() ? "text-green-700" : "text-muted-foreground"
-								}
-							>
-								{patientWristbandBarcode.trim() ? "Ready" : "Missing"}
-							</span>
-						</div>
-						<div className="flex items-center justify-between gap-3">
-							<span className="text-muted-foreground">unit_barcode</span>
-							<span className={unitBarcode.trim() ? "text-green-700" : "text-muted-foreground"}>
-								{unitBarcode.trim() ? "Ready" : "Missing"}
-							</span>
-						</div>
+						<RecordStatusRow label="Cross-match request ID" ready={Boolean(crossMatchId.trim())} />
+						<RecordStatusRow
+							label="Patient wristband barcode"
+							ready={Boolean(patientWristbandBarcode.trim())}
+						/>
+						<RecordStatusRow label="Blood unit barcode" ready={Boolean(unitBarcode.trim())} />
 						<div className="bg-muted/40 text-muted-foreground rounded-md border p-3 text-xs">
 							Patient, blood unit, staff, match flags, message, and timestamps are resolved by the
 							bedside verification service when the match is submitted.
 						</div>
 						{!hasVerifyPermission && (
 							<div className="border-destructive bg-destructive/10 text-destructive rounded-md border p-3 text-xs">
-								You can view this page, but laboratory edit permission is required to submit a
+								You can view this page, but nursing edit permission is required to submit a
 								transfusion verification.
 							</div>
 						)}
