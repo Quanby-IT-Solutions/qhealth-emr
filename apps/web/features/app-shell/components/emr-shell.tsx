@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useSyncExternalStore } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import { useTheme } from "next-themes"
 
@@ -1001,6 +1001,7 @@ function SidebarItem({
 
 export function EmrShell({ children }: { children: React.ReactNode }) {
 	const pathname = usePathname()
+	const router = useRouter()
 	const isVideoRoomRoute =
 		pathname.startsWith("/telemedicine/appointments/") && pathname.endsWith("/video")
 	const isNoPaddingRoute =
@@ -1244,6 +1245,7 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 							<DropdownMenuSeparator className="bg-sidebar-border" />
 							<DropdownMenuItem
 								className="data-highlighted:bg-sidebar-accent hover:bg-sidebar-accent focus:bg-sidebar-accent cursor-pointer gap-3 p-2"
+								onClick={() => router.push("/account/settings")}
 							>
 								<Icons.Settings
 									className="size-4"
