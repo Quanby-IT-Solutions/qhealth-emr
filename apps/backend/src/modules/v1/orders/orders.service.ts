@@ -36,6 +36,7 @@ import {
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
+import { supabase, unwrap } from "@/common/database/supabase.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { closeOpenSlaStep } from "@/utils/sla-events"
 import { resolveStepTarget } from "@/utils/sla-step-target"
@@ -1485,27 +1486,32 @@ export class OrdersService {
 		await this.assertAncillaryOrderContextInFacility(input)
 		await this.assertLabOrderTerminologyIsReady(input)
 
-		const [created] = await db
-			.insert(labOrders)
-			.values({
-				facilityId: input.facilityId,
-				encounterId: input.encounterId ?? null,
-				preEncounterId: input.preEncounterId ?? null,
-				loincCode: input.loincCode ?? null,
-				panelCode: input.panelCode ?? null,
-				testName: input.testName,
-				panelName: input.panelName ?? null,
-				clinicalIndication: input.clinicalIndication ?? null,
-				indicationIcd10Code: input.indicationIcd10Code ?? null,
-				indicationIcd10Display: input.indicationIcd10Display ?? null,
-				priority: input.priority ?? "routine",
-				status: "ordered",
-				specimenType: input.specimenType ?? null,
-				orderingStaffId: staff.id,
-			})
-			.returning()
+		const created = unwrap(
+			await supabase
+				.from("lab_orders")
+				.insert({
+					facility_id: input.facilityId,
+					encounter_id: input.encounterId ?? null,
+					pre_encounter_id: input.preEncounterId ?? null,
+					loinc_code: input.loincCode ?? null,
+					panel_code: input.panelCode ?? null,
+					test_name: input.testName,
+					panel_name: input.panelName ?? null,
+					clinical_indication: input.clinicalIndication ?? null,
+					indication_icd10_code: input.indicationIcd10Code ?? null,
+					indication_icd10_display: input.indicationIcd10Display ?? null,
+					priority: input.priority ?? "routine",
+					status: "ordered",
+					specimen_type: input.specimenType ?? null,
+					ordering_staff_id: staff.id,
+				})
+				.select("id")
+				.single()
+		)
 
-		this.logger.log(`Created lab order ${created!.id}`)
+		if (!created) throw new BadRequestException("Unable to create lab order")
+
+		this.logger.log(`Created lab order ${created.id}`)
 
 		await this.writeAuditLog({
 			facilityId: input.facilityId,
@@ -1513,7 +1519,7 @@ export class OrdersService {
 			staffProfileId: staff.id,
 			action: "sign",
 			entityType: "lab_order",
-			entityId: created!.id,
+			entityId: created.id,
 			metadata: {
 				encounterId: input.encounterId ?? null,
 				preEncounterId: input.preEncounterId ?? null,
@@ -1527,20 +1533,22 @@ export class OrdersService {
 		// Only encounter-linked orders carry an SLA clock.
 		if (input.encounterId) {
 			const slaMins = await resolveStepTarget(input.facilityId, "ancillary", "lab_ordered")
-			await db.insert(encounterStatusEvents).values({
-				facilityId: input.facilityId,
-				encounterId: input.encounterId,
-				fromStatus: null,
-				toStatus: "lab_ordered",
-				workflowType: "ancillary" as const,
-				staffId: staff.id,
-				slaTargetMinutes: slaMins,
-				notes: `Lab order: ${input.testName ?? input.panelName ?? "Unknown"}`,
-				occurredAt: new Date(),
-			})
+			unwrap(
+				await supabase.from("encounter_status_events").insert({
+					facility_id: input.facilityId,
+					encounter_id: input.encounterId,
+					from_status: null,
+					to_status: "lab_ordered",
+					workflow_type: "ancillary",
+					staff_id: staff.id,
+					sla_target_minutes: slaMins,
+					notes: `Lab order: ${input.testName ?? input.panelName ?? "Unknown"}`,
+					occurred_at: new Date().toISOString(),
+				})
+			)
 		}
 
-		return this.findLabOrder(created!.id)
+		return this.findLabOrder(created.id)
 	}
 
 	private async assertLabOrderTerminologyIsReady(input: CreateLabOrderInput) {
@@ -1554,11 +1562,15 @@ export class OrdersService {
 			throw new BadRequestException("Select an active LOINC lab test before signing a lab order.")
 		}
 
-		const [loincMatch] = await db
-			.select({ loincNum: loincCodes.loincNum })
-			.from(loincCodes)
-			.where(and(eq(loincCodes.loincNum, loincCode), eq(loincCodes.isActive, true)))
-			.limit(1)
+		const loincMatch = unwrap(
+			await supabase
+				.from("loinc_codes")
+				.select("loinc_num")
+				.eq("loinc_num", loincCode)
+				.eq("is_active", true)
+				.limit(1)
+				.maybeSingle()
+		)
 
 		if (!loincMatch) {
 			throw new BadRequestException("Select an active LOINC lab test before signing a lab order.")
@@ -1569,11 +1581,15 @@ export class OrdersService {
 			throw new BadRequestException("ICD-10 indication is required before signing a lab order.")
 		}
 
-		const [icd10Match] = await db
-			.select({ code: icd10Codes.code })
-			.from(icd10Codes)
-			.where(and(eq(icd10Codes.code, icd10Code), eq(icd10Codes.isActive, true)))
-			.limit(1)
+		const icd10Match = unwrap(
+			await supabase
+				.from("icd10_codes")
+				.select("code")
+				.eq("code", icd10Code)
+				.eq("is_active", true)
+				.limit(1)
+				.maybeSingle()
+		)
 
 		if (!icd10Match) {
 			throw new BadRequestException(
@@ -1590,23 +1606,23 @@ export class OrdersService {
 	async updateLabOrder(input: UpdateLabOrderInput) {
 		const existing = await this.findLabOrder(input.id)
 
-		const updateData: Record<string, unknown> = { updatedAt: new Date() }
+		const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
 		if (input.status !== undefined) {
 			updateData.status = input.status
 			// Auto-set specimenReceivedAt when lab acknowledges specimen receipt (SLA-016 Step 1)
 			if (input.status === "collected" && !existing.specimenReceivedAt) {
-				updateData.specimenReceivedAt = new Date()
+				updateData.specimen_received_at = new Date().toISOString()
 			}
 		}
 		if (input.collectionDatetime !== undefined)
-			updateData.collectionDatetime = input.collectionDatetime
-		if (input.resultedDatetime !== undefined) updateData.resultedDatetime = input.resultedDatetime
+			updateData.collection_datetime = input.collectionDatetime
+		if (input.resultedDatetime !== undefined) updateData.resulted_datetime = input.resultedDatetime
 		if (input.results !== undefined) updateData.results = input.results
 		// SLA-016 Step 2: billing clearance timestamp persisted explicitly
-		if (input.billingClearedAt !== undefined) updateData.billingClearedAt = input.billingClearedAt
+		if (input.billingClearedAt !== undefined) updateData.billing_cleared_at = input.billingClearedAt
 
-		await db.update(labOrders).set(updateData).where(eq(labOrders.id, input.id))
+		unwrap(await supabase.from("lab_orders").update(updateData).eq("id", input.id))
 
 		return this.findLabOrder(input.id)
 	}
@@ -1964,14 +1980,21 @@ export class OrdersService {
 			throw new BadRequestException("An amendment reason is required for a released report.")
 		}
 
-		const [staff] = await db
-			.select({ id: staffProfiles.id, name: users.name })
-			.from(staffProfiles)
-			.leftJoin(users, eq(staffProfiles.userId, users.id))
-			.where(and(eq(staffProfiles.userId, userId), eq(staffProfiles.facilityId, input.facilityId)))
-			.limit(1)
+		const staffRow = unwrap(
+			await supabase
+				.from("staff_profiles")
+				.select("id, user_id")
+				.eq("user_id", userId)
+				.eq("facility_id", input.facilityId)
+				.maybeSingle()
+		)
 
-		if (!staff) throw new NotFoundException("Radiologist staff profile not found for facility")
+		if (!staffRow) throw new NotFoundException("Radiologist staff profile not found for facility")
+
+		const radiologist = unwrap(
+			await supabase.from("users").select("name").eq("id", staffRow.user_id).maybeSingle()
+		)
+		const staff = { id: staffRow.id as string, name: (radiologist?.name as string | null) ?? null }
 
 		const now = new Date()
 		const structuredResults: Record<string, unknown> = {
@@ -2000,16 +2023,19 @@ export class OrdersService {
 			structuredResults.amendmentReason = input.amendmentReason
 		}
 
-		await db
-			.update(imagingOrders)
-			.set({
-				status: "completed",
-				completedDatetime: existing.completedDatetime ?? now,
-				report: input.report,
-				structuredResults,
-				updatedAt: now,
-			})
-			.where(and(eq(imagingOrders.id, input.id), eq(imagingOrders.facilityId, input.facilityId)))
+		unwrap(
+			await supabase
+				.from("imaging_orders")
+				.update({
+					status: "completed",
+					completed_datetime: existing.completedDatetime ?? now.toISOString(),
+					report: input.report,
+					structured_results: structuredResults,
+					updated_at: now.toISOString(),
+				})
+				.eq("id", input.id)
+				.eq("facility_id", input.facilityId)
+		)
 
 		await this.writeAuditLog({
 			facilityId: input.facilityId,

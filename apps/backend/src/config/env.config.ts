@@ -21,6 +21,13 @@ export const env = createEnv({
 		// Database
 		DATABASE_URL: z.string(),
 
+		// Supabase (used by modules migrated off Drizzle to the Supabase JS client).
+		// Optional at validation time so non-migrated contexts (tests, lint) don't
+		// fail; the Supabase client factory throws a clear error if they're missing
+		// when actually needed.
+		SUPABASE_URL: optionalUrl,
+		SUPABASE_SERVICE_ROLE_KEY: optionalString,
+
 		// Authentication
 		BETTER_AUTH_SECRET: z.string(),
 		BETTER_AUTH_TRUSTED_ORIGINS: z.string(),

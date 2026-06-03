@@ -31,6 +31,60 @@ jest.mock("@/common/database/database.client", () => ({
 	},
 }))
 
+// Supabase client mock — createLabOrder was migrated off Drizzle. `results` is a
+// FIFO queue consumed by each terminal call; `calls` records from/insert/update.
+const mockSupabase: {
+	results: Array<{ data: unknown; error: unknown }>
+	calls: Array<{ table: string; method: string; payload?: unknown }>
+} = { results: [], calls: [] }
+
+jest.mock("@/common/database/supabase.client", () => {
+	const next = () => mockSupabase.results.shift() ?? { data: null, error: null }
+	const makeBuilder = (table: string) => {
+		const builder: Record<string, unknown> = {}
+		const record = (method: string, payload?: unknown) => {
+			mockSupabase.calls.push({ table, method, payload })
+			return builder
+		}
+		builder.select = () => record("select")
+		builder.insert = (p: unknown) => record("insert", p)
+		builder.update = (p: unknown) => record("update", p)
+		builder.delete = () => record("delete")
+		builder.eq = () => builder
+		builder.or = () => builder
+		builder.in = () => builder
+		builder.order = () => builder
+		builder.range = () => builder
+		builder.limit = () => builder
+		builder.single = () => Promise.resolve(next())
+		builder.maybeSingle = () => Promise.resolve(next())
+		builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+			Promise.resolve(next()).then(resolve, reject)
+		return builder
+	}
+	return {
+		supabase: {
+			from: (table: string) => makeBuilder(table),
+			rpc: (name: string, args: unknown) => {
+				mockSupabase.calls.push({ table: "rpc", method: name, payload: args })
+				return Promise.resolve(next())
+			},
+		},
+		unwrap: (r: { data: unknown; error: { message: string } | null }) => {
+			if (r.error) throw new Error(r.error.message)
+			return r.data
+		},
+		unwrapMany: (r: { data: unknown[] | null; error: { message: string } | null }) => {
+			if (r.error) throw new Error(r.error.message)
+			return r.data ?? []
+		},
+	}
+})
+
+function supabaseCall(table: string, method: string) {
+	return mockSupabase.calls.find(c => c.table === table && c.method === method)
+}
+
 jest.mock("@repo/db/schema", () => {
 	const createTable = () =>
 		new Proxy(
@@ -138,6 +192,8 @@ describe("OrdersService", () => {
 
 	beforeEach(() => {
 		jest.clearAllMocks()
+		mockSupabase.results = []
+		mockSupabase.calls = []
 		mockDb = db as unknown as MockDb
 		problemsAllergiesMock = {
 			getActiveAllergies: jest.fn(),
@@ -1064,12 +1120,11 @@ describe("OrdersService", () => {
 		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
 		const encounterId = "99999999-9999-4999-9999-999999999999"
 		const labOrderId = "11111111-1111-4111-8111-111111111111"
-		const orderInsertBuilder = createInsertBuilder([{ id: labOrderId }])
 		const auditInsertBuilder = createInsertBuilder([])
-		const slaInsertBuilder = createInsertBuilder([])
 
 		jest.spyOn(service, "findLabOrder").mockResolvedValue({ id: labOrderId } as never)
 
+		// getOrderingStaffProfile + assertAncillaryOrderContextInFacility use Drizzle.
 		mockDb.select
 			.mockImplementationOnce(() =>
 				createSelectBuilder(
@@ -1080,15 +1135,16 @@ describe("OrdersService", () => {
 			.mockImplementationOnce(() =>
 				createSelectBuilder([{ id: encounterId, facilityId }], { withLimit: true })
 			)
-			.mockImplementationOnce(() =>
-				createSelectBuilder([{ loincNum: "57021-8" }], { withLimit: true })
-			)
-			.mockImplementationOnce(() => createSelectBuilder([{ code: "J18.9" }], { withLimit: true }))
 
-		mockDb.insert
-			.mockImplementationOnce(() => orderInsertBuilder)
-			.mockImplementationOnce(() => auditInsertBuilder)
-			.mockImplementationOnce(() => slaInsertBuilder)
+		// writeAuditLog still uses Drizzle; the order + SLA event inserts and the
+		// LOINC/ICD-10 lookups go through Supabase.
+		mockDb.insert.mockImplementationOnce(() => auditInsertBuilder)
+		mockSupabase.results = [
+			{ data: { loinc_num: "57021-8" }, error: null }, // loinc_codes
+			{ data: { code: "J18.9" }, error: null }, // icd10_codes
+			{ data: { id: labOrderId }, error: null }, // lab_orders insert
+			{ data: null, error: null }, // encounter_status_events insert
+		]
 
 		const result = await service.createLabOrder(
 			{
@@ -1105,20 +1161,18 @@ describe("OrdersService", () => {
 			"user-1"
 		)
 
-		expect(orderInsertBuilder.values).toHaveBeenCalledWith(
-			expect.objectContaining({
-				facilityId,
-				encounterId,
-				testName: "Complete Blood Count",
-				loincCode: "57021-8",
-				clinicalIndication: "Fever and productive cough",
-				indicationIcd10Code: "J18.9",
-				indicationIcd10Display: "Pneumonia, unspecified organism",
-				priority: "stat",
-				status: "ordered",
-				orderingStaffId: "staff-physician",
-			})
-		)
+		expect(supabaseCall("lab_orders", "insert")?.payload).toMatchObject({
+			facility_id: facilityId,
+			encounter_id: encounterId,
+			test_name: "Complete Blood Count",
+			loinc_code: "57021-8",
+			clinical_indication: "Fever and productive cough",
+			indication_icd10_code: "J18.9",
+			indication_icd10_display: "Pneumonia, unspecified organism",
+			priority: "stat",
+			status: "ordered",
+			ordering_staff_id: "staff-physician",
+		})
 		expect(auditInsertBuilder.values).toHaveBeenCalledWith(
 			expect.objectContaining({
 				facilityId,
@@ -1133,14 +1187,12 @@ describe("OrdersService", () => {
 				}),
 			})
 		)
-		expect(slaInsertBuilder.values).toHaveBeenCalledWith(
-			expect.objectContaining({
-				facilityId,
-				encounterId,
-				toStatus: "lab_ordered",
-				staffId: "staff-physician",
-			})
-		)
+		expect(supabaseCall("encounter_status_events", "insert")?.payload).toMatchObject({
+			facility_id: facilityId,
+			encounter_id: encounterId,
+			to_status: "lab_ordered",
+			staff_id: "staff-physician",
+		})
 		expect(result).toEqual({ id: labOrderId })
 	})
 
@@ -1190,10 +1242,11 @@ describe("OrdersService", () => {
 			.mockImplementationOnce(() =>
 				createSelectBuilder([{ id: encounterId, facilityId }], { withLimit: true })
 			)
-			.mockImplementationOnce(() =>
-				createSelectBuilder([{ loincNum: "57021-8" }], { withLimit: true })
-			)
-			.mockImplementationOnce(() => createSelectBuilder([], { withLimit: true }))
+		// LOINC matches but ICD-10 lookup returns nothing → ICD-10 rejection.
+		mockSupabase.results = [
+			{ data: { loinc_num: "57021-8" }, error: null },
+			{ data: null, error: null },
+		]
 
 		await expect(
 			service.createLabOrder(

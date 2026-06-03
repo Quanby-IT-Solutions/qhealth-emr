@@ -15,6 +15,7 @@ import {
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
+import { supabase, unwrap } from "@/common/database/supabase.client"
 
 type CoverageSource = {
 	type: "malasakit" | "philhealth" | "coe"
@@ -22,8 +23,38 @@ type CoverageSource = {
 	amount: number
 }
 
+type AncillaryClearanceRow = typeof ancillaryClearance.$inferSelect
+
 const ANCILLARY_PROCEDURE_SLA_MINUTES = 120
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const toClearanceDate = (value: unknown): Date | null =>
+	value == null ? null : new Date(value as string)
+const toClearanceDateReq = (value: unknown): Date => new Date(value as string)
+
+/** Map a snake_case ancillary_clearance row from Supabase to the camelCase row shape. */
+function toAncillaryClearanceRow(r: Record<string, unknown>): AncillaryClearanceRow {
+	return {
+		id: r.id,
+		orderId: r.order_id,
+		encounterId: r.encounter_id,
+		appliedCoverages: r.applied_coverages_json,
+		status: r.status,
+		clearedByStaffId: r.cleared_by_staff_id,
+		clearedAt: toClearanceDate(r.cleared_at),
+		overrideReason: r.override_reason,
+		procedureStartAt: toClearanceDate(r.procedure_start_at),
+		procedureEndAt: toClearanceDate(r.procedure_end_at),
+		procedureStartBarcode: r.procedure_start_barcode,
+		procedureEndBarcode: r.procedure_end_barcode,
+		procedureStartBarcodeMatched: r.procedure_start_barcode_matched,
+		procedureEndBarcodeMatched: r.procedure_end_barcode_matched,
+		procedureStartedByStaffId: r.procedure_started_by_staff_id,
+		procedureEndedByStaffId: r.procedure_ended_by_staff_id,
+		createdAt: toClearanceDateReq(r.created_at),
+		updatedAt: toClearanceDateReq(r.updated_at),
+	} as AncillaryClearanceRow
+}
 
 @Injectable()
 export class AncillaryClearanceService {
@@ -338,30 +369,70 @@ export class AncillaryClearanceService {
 			throw new BadRequestException("Clearance ID or order ID must be a UUID")
 		}
 
-		const [row] = await this.db
-			.select({
-				clearance: ancillaryClearance,
-				patientId: patients.id,
-				patientMrn: patients.mrn,
-				patientFirstName: patients.firstName,
-				patientMiddleName: patients.middleName,
-				patientLastName: patients.lastName,
-			})
-			.from(ancillaryClearance)
-			.leftJoin(labOrders, eq(ancillaryClearance.orderId, labOrders.id))
-			.leftJoin(imagingOrders, eq(ancillaryClearance.orderId, imagingOrders.id))
-			.leftJoin(encounters, this.clearanceEncounterJoinCondition())
-			.leftJoin(patients, eq(encounters.patientId, patients.id))
-			.where(or(eq(ancillaryClearance.id, identifier), eq(ancillaryClearance.orderId, identifier)))
-			.limit(1)
+		// Fetch the clearance record (by clearance id or order id).
+		const clearanceRaw = unwrap(
+			await supabase
+				.from("ancillary_clearance")
+				.select("*")
+				.or(`id.eq.${identifier},order_id.eq.${identifier}`)
+				.limit(1)
+				.maybeSingle()
+		)
 
-		if (!row) {
+		if (!clearanceRaw) {
 			throw new NotFoundException("Ancillary clearance record not found")
 		}
+		const clearance = toAncillaryClearanceRow(clearanceRaw)
 
-		const patientIdentifiers = [row.patientId, row.patientMrn].filter((value): value is string =>
-			Boolean(value)
-		)
+		// Resolve the encounter (clearance → lab/imaging order → encounter) then patient.
+		let encounterId: string | null = clearance.encounterId
+		if (!encounterId) {
+			const labOrder = unwrap(
+				await supabase
+					.from("lab_orders")
+					.select("encounter_id")
+					.eq("id", clearance.orderId)
+					.maybeSingle()
+			)
+			encounterId = (labOrder?.encounter_id as string | null) ?? null
+			if (!encounterId) {
+				const imagingOrder = unwrap(
+					await supabase
+						.from("imaging_orders")
+						.select("encounter_id")
+						.eq("id", clearance.orderId)
+						.maybeSingle()
+				)
+				encounterId = (imagingOrder?.encounter_id as string | null) ?? null
+			}
+		}
+
+		let patient: Record<string, unknown> | null = null
+		if (encounterId) {
+			const encounter = unwrap(
+				await supabase.from("encounters").select("patient_id").eq("id", encounterId).maybeSingle()
+			)
+			if (encounter?.patient_id) {
+				patient = unwrap(
+					await supabase
+						.from("patients")
+						.select("id, mrn, first_name, middle_name, last_name")
+						.eq("id", encounter.patient_id)
+						.maybeSingle()
+				)
+			}
+		}
+
+		const nameRow = {
+			patientFirstName: (patient?.first_name as string | null) ?? null,
+			patientMiddleName: (patient?.middle_name as string | null) ?? null,
+			patientLastName: (patient?.last_name as string | null) ?? null,
+		}
+
+		const patientIdentifiers = [
+			patient?.id as string | null,
+			patient?.mrn as string | null,
+		].filter((value): value is string => Boolean(value))
 		if (patientIdentifiers.length === 0) {
 			throw new BadRequestException("Unable to verify patient barcode for this clearance record")
 		}
@@ -378,56 +449,62 @@ export class AncillaryClearanceService {
 		const staff = input.staffId ? await this.getOptionalStaffProfileForUser(input.staffId) : null
 
 		if (input.scanType === "start") {
-			if (row.clearance.procedureStartAt) {
+			if (clearance.procedureStartAt) {
 				throw new BadRequestException("Procedure start is already recorded")
 			}
 
-			const [updated] = await this.db
-				.update(ancillaryClearance)
-				.set({
-					procedureStartAt: now,
-					procedureStartBarcode: patientBarcode,
-					procedureStartBarcodeMatched: true,
-					procedureStartedByStaffId: staff?.id ?? null,
-					updatedAt: now,
-				})
-				.where(eq(ancillaryClearance.id, row.clearance.id))
-				.returning()
+			const updated = unwrap(
+				await supabase
+					.from("ancillary_clearance")
+					.update({
+						procedure_start_at: now.toISOString(),
+						procedure_start_barcode: patientBarcode,
+						procedure_start_barcode_matched: true,
+						procedure_started_by_staff_id: staff?.id ?? null,
+						updated_at: now.toISOString(),
+					})
+					.eq("id", clearance.id)
+					.select("*")
+					.single()
+			)
 
 			if (!updated) throw new BadRequestException("Procedure start scan failed")
 
 			return {
-				record: this.formatRecord(updated),
+				record: this.formatRecord(toAncillaryClearanceRow(updated)),
 				patientBarcodeMatched,
-				message: `Procedure start recorded for ${this.formatPatientName(row)}.`,
+				message: `Procedure start recorded for ${this.formatPatientName(nameRow)}.`,
 			}
 		}
 
-		if (!row.clearance.procedureStartAt) {
+		if (!clearance.procedureStartAt) {
 			throw new BadRequestException("Record the procedure start scan before marking end")
 		}
-		if (row.clearance.procedureEndAt) {
+		if (clearance.procedureEndAt) {
 			throw new BadRequestException("Procedure end is already recorded")
 		}
 
-		const [updated] = await this.db
-			.update(ancillaryClearance)
-			.set({
-				procedureEndAt: now,
-				procedureEndBarcode: patientBarcode,
-				procedureEndBarcodeMatched: true,
-				procedureEndedByStaffId: staff?.id ?? null,
-				updatedAt: now,
-			})
-			.where(eq(ancillaryClearance.id, row.clearance.id))
-			.returning()
+		const updated = unwrap(
+			await supabase
+				.from("ancillary_clearance")
+				.update({
+					procedure_end_at: now.toISOString(),
+					procedure_end_barcode: patientBarcode,
+					procedure_end_barcode_matched: true,
+					procedure_ended_by_staff_id: staff?.id ?? null,
+					updated_at: now.toISOString(),
+				})
+				.eq("id", clearance.id)
+				.select("*")
+				.single()
+		)
 
 		if (!updated) throw new BadRequestException("Procedure end scan failed")
 
 		return {
-			record: this.formatRecord(updated),
+			record: this.formatRecord(toAncillaryClearanceRow(updated)),
 			patientBarcodeMatched,
-			message: `Procedure end recorded for ${this.formatPatientName(row)}.`,
+			message: `Procedure end recorded for ${this.formatPatientName(nameRow)}.`,
 		}
 	}
 

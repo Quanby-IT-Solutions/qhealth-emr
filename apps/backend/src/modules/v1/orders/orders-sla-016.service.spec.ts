@@ -41,6 +41,62 @@ jest.mock("@/common/database/database.client", () => ({
 	},
 }))
 
+// Supabase client mock — createLabOrder/updateLabOrder/signImagingReport were
+// migrated off Drizzle. `mockSupabase.results` is a FIFO queue consumed by each
+// terminal call (single/maybeSingle/await); `mockSupabase.calls` records every
+// from/insert/update so tests can assert payloads.
+const mockSupabase: {
+	results: Array<{ data: unknown; error: unknown }>
+	calls: Array<{ table: string; method: string; payload?: unknown }>
+} = { results: [], calls: [] }
+
+jest.mock("@/common/database/supabase.client", () => {
+	const next = () => mockSupabase.results.shift() ?? { data: null, error: null }
+	const makeBuilder = (table: string) => {
+		const builder: Record<string, unknown> = {}
+		const record = (method: string, payload?: unknown) => {
+			mockSupabase.calls.push({ table, method, payload })
+			return builder
+		}
+		builder.select = () => record("select")
+		builder.insert = (p: unknown) => record("insert", p)
+		builder.update = (p: unknown) => record("update", p)
+		builder.delete = () => record("delete")
+		builder.eq = () => builder
+		builder.or = () => builder
+		builder.in = () => builder
+		builder.order = () => builder
+		builder.range = () => builder
+		builder.limit = () => builder
+		builder.single = () => Promise.resolve(next())
+		builder.maybeSingle = () => Promise.resolve(next())
+		builder.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+			Promise.resolve(next()).then(resolve, reject)
+		return builder
+	}
+	return {
+		supabase: {
+			from: (table: string) => makeBuilder(table),
+			rpc: (name: string, args: unknown) => {
+				mockSupabase.calls.push({ table: "rpc", method: name, payload: args })
+				return Promise.resolve(next())
+			},
+		},
+		unwrap: (r: { data: unknown; error: { message: string } | null }) => {
+			if (r.error) throw new Error(r.error.message)
+			return r.data
+		},
+		unwrapMany: (r: { data: unknown[] | null; error: { message: string } | null }) => {
+			if (r.error) throw new Error(r.error.message)
+			return r.data ?? []
+		},
+	}
+})
+
+function supabaseCall(table: string, method: string) {
+	return mockSupabase.calls.find(c => c.table === table && c.method === method)
+}
+
 // ProblemsAllergiesService mock (required constructor dep)
 jest.mock("../problems-allergies/problems-allergies.service")
 const { ProblemsAllergiesService } = jest.requireMock(
@@ -123,6 +179,8 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 
 	beforeEach(async () => {
 		jest.clearAllMocks()
+		mockSupabase.results = []
+		mockSupabase.calls = []
 
 		// Default chain for select: returns empty
 		mockLimit.mockResolvedValue([])
@@ -152,20 +210,14 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 		it("auto-sets specimenReceivedAt when status transitions to 'collected' and no existing value", async () => {
 			const order = buildLabOrder({ status: "pending", specimenReceivedAt: null })
 
-			// findLabOrder calls select; second call is the post-update fetch
+			// findLabOrder (pre + post) uses Drizzle; the update goes through Supabase.
 			mockSelect.mockImplementation(() => buildSelectChain([order]))
-			mockReturning.mockResolvedValue([order])
-
-			let capturedSet: Record<string, unknown> = {}
-			mockSet.mockImplementation((data: Record<string, unknown>) => {
-				capturedSet = data
-				return { where: jest.fn().mockReturnValue({ returning: mockReturning }) }
-			})
 
 			await service.updateLabOrder({ id: order.id as string, status: "collected" })
 
-			expect(capturedSet.specimenReceivedAt).toBeInstanceOf(Date)
-			expect(capturedSet.status).toBe("collected")
+			const payload = supabaseCall("lab_orders", "update")?.payload as Record<string, unknown>
+			expect(typeof payload.specimen_received_at).toBe("string")
+			expect(payload.status).toBe("collected")
 		})
 
 		it("does NOT overwrite an existing specimenReceivedAt", async () => {
@@ -174,18 +226,11 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 
 			mockSelect.mockImplementation(() => buildSelectChain([order]))
 
-			let capturedSet: Record<string, unknown> = {}
-			mockSet.mockImplementation((data: Record<string, unknown>) => {
-				capturedSet = data
-				return {
-					where: jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([order]) }),
-				}
-			})
-
 			await service.updateLabOrder({ id: order.id as string, status: "collected" })
 
-			// specimenReceivedAt should NOT be present in the update payload
-			expect(capturedSet.specimenReceivedAt).toBeUndefined()
+			const payload = supabaseCall("lab_orders", "update")?.payload as Record<string, unknown>
+			// specimen_received_at should NOT be present in the update payload
+			expect(payload.specimen_received_at).toBeUndefined()
 		})
 
 		it("persists explicit billingClearedAt (SLA-016 Step 2)", async () => {
@@ -194,17 +239,10 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 
 			mockSelect.mockImplementation(() => buildSelectChain([order]))
 
-			let capturedSet: Record<string, unknown> = {}
-			mockSet.mockImplementation((data: Record<string, unknown>) => {
-				capturedSet = data
-				return {
-					where: jest.fn().mockReturnValue({ returning: jest.fn().mockResolvedValue([order]) }),
-				}
-			})
-
 			await service.updateLabOrder({ id: order.id as string, billingClearedAt: billingTs })
 
-			expect(capturedSet.billingClearedAt).toBe(billingTs)
+			const payload = supabaseCall("lab_orders", "update")?.payload as Record<string, unknown>
+			expect(payload.billing_cleared_at).toBe(billingTs)
 		})
 
 		it("throws NotFoundException when lab order does not exist", async () => {
@@ -336,18 +374,16 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 				report: "Findings:\nNo acute process.\n\nImpression:\nNo acute process.",
 				structuredResults: { reportStatus: "signed" },
 			})
+			// findImagingOrder (pre + post) uses Drizzle; staff lookup + the imaging
+			// update go through Supabase.
 			mockSelect
 				.mockImplementationOnce(() => buildSelectChain([order]))
-				.mockImplementationOnce(() =>
-					buildSelectChain([{ id: "staff-rad-001", name: "Dr. Reyes" }])
-				)
 				.mockImplementationOnce(() => buildSelectChain([releasedOrder]))
-
-			let capturedSet: Record<string, unknown> = {}
-			mockSet.mockImplementation((data: Record<string, unknown>) => {
-				capturedSet = data
-				return { where: jest.fn().mockResolvedValue([]) }
-			})
+			mockSupabase.results = [
+				{ data: { id: "staff-rad-001", user_id: "user-rad-001" }, error: null }, // staff_profiles
+				{ data: { name: "Dr. Reyes" }, error: null }, // users
+				{ data: null, error: null }, // imaging_orders update
+			]
 
 			await service.signImagingReport(
 				{
@@ -362,8 +398,9 @@ describe("OrdersService — SLA-016 checkpoints", () => {
 				"user-rad-001"
 			)
 
-			expect(capturedSet.status).toBe("completed")
-			expect(capturedSet.structuredResults).toMatchObject({
+			const payload = supabaseCall("imaging_orders", "update")?.payload as Record<string, unknown>
+			expect(payload.status).toBe("completed")
+			expect(payload.structured_results).toMatchObject({
 				findings: "No acute process.",
 				impression: "No acute process.",
 				radiologistName: "Dr. Reyes",
