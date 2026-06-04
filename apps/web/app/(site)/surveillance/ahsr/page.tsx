@@ -1,8 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query"
 
-import { getQueryClient } from "@/services/tanstack-query/query-client"
 import { prepareServerOrpc, reportingServerOrpc, serverOrpc } from "@/services/orpc/orpc-server"
-
+import { getQueryClient } from "@/services/tanstack-query/query-client"
 import { AhsrDashboardClient } from "@/features/surveillance/ahsr/components/ahsr-dashboard"
 
 export default async function AhsrPage() {

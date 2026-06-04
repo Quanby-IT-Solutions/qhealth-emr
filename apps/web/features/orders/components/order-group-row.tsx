@@ -105,9 +105,7 @@ export function OrderGroupRow({
 								{parent.genericName}
 							</div>
 							{parentTrancheLabel && (
-								<div className="text-muted-foreground truncate text-xs">
-									{parentTrancheLabel}
-								</div>
+								<div className="text-muted-foreground truncate text-xs">{parentTrancheLabel}</div>
 							)}
 							{parent.brandName && (
 								<div className="text-muted-foreground truncate text-xs" title={parent.brandName}>

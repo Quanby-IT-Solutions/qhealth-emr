@@ -67,7 +67,7 @@ export function HousekeepingPanel() {
 
 			<div>
 				<h1 className="text-xl font-semibold">Housekeeping Queue</h1>
-				<p className="text-sm text-muted-foreground">
+				<p className="text-muted-foreground text-sm">
 					Beds marked dirty after discharge — confirm cleaning to return them to the available pool.
 				</p>
 			</div>
@@ -75,9 +75,12 @@ export function HousekeepingPanel() {
 			{dirtyBeds.length === 0 ? (
 				<Card>
 					<CardContent className="py-12 text-center">
-						<HugeiconsIcon icon={CheckmarkCircle01FreeIcons} className="mx-auto mb-3 size-8 text-green-500" />
+						<HugeiconsIcon
+							icon={CheckmarkCircle01FreeIcons}
+							className="mx-auto mb-3 size-8 text-green-500"
+						/>
 						<p className="font-medium text-green-700 dark:text-green-400">All beds are clean</p>
-						<p className="mt-1 text-sm text-muted-foreground">
+						<p className="text-muted-foreground mt-1 text-sm">
 							No beds pending housekeeping at this time.
 						</p>
 					</CardContent>
@@ -86,7 +89,7 @@ export function HousekeepingPanel() {
 				<div className="rounded-lg border">
 					<table className="w-full text-sm">
 						<thead>
-							<tr className="border-b bg-muted/50">
+							<tr className="bg-muted/50 border-b">
 								<th className="px-4 py-3 text-left font-medium">Ward</th>
 								<th className="px-4 py-3 text-left font-medium">Bed</th>
 								<th className="px-4 py-3 text-left font-medium">Time since discharge</th>
@@ -95,15 +98,15 @@ export function HousekeepingPanel() {
 						</thead>
 						<tbody>
 							{dirtyBeds.map(bed => (
-								<tr key={bed.id} className="border-b last:border-0 hover:bg-muted/30">
+								<tr key={bed.id} className="hover:bg-muted/30 border-b last:border-0">
 									<td className="px-4 py-3">
 										<span className="font-medium">{bed.wardName}</span>
-										<span className="ml-2 text-xs capitalize text-muted-foreground">
+										<span className="text-muted-foreground ml-2 text-xs capitalize">
 											{bed.wardType}
 										</span>
 									</td>
 									<td className="px-4 py-3 font-medium">{bed.bedNumber}</td>
-									<td className="px-4 py-3 text-muted-foreground">
+									<td className="text-muted-foreground px-4 py-3">
 										{timeSince((bed as { updatedAt?: Date | string }).updatedAt)}
 									</td>
 									<td className="px-4 py-3 text-right">
@@ -112,9 +115,7 @@ export function HousekeepingPanel() {
 											variant="outline"
 											className="h-7 px-3 text-xs"
 											disabled={updateBedStatus.isPending}
-											onClick={() =>
-												updateBedStatus.mutate({ id: bed.id, status: "available" })
-											}
+											onClick={() => updateBedStatus.mutate({ id: bed.id, status: "available" })}
 										>
 											Mark Cleaned
 										</Button>
@@ -123,7 +124,7 @@ export function HousekeepingPanel() {
 							))}
 						</tbody>
 					</table>
-					<div className="px-4 py-2 text-xs text-muted-foreground">
+					<div className="text-muted-foreground px-4 py-2 text-xs">
 						{dirtyBeds.length} bed{dirtyBeds.length === 1 ? "" : "s"} pending cleaning
 					</div>
 				</div>

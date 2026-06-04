@@ -27,16 +27,16 @@ export function DeliveryActivityPanel({ records, isLoading }: DeliveryActivityPa
 	if (isLoading) {
 		return (
 			<div className="space-y-2">
-				{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+				{[...Array(2)].map((_, i) => (
+					<Skeleton key={i} className="h-12 w-full" />
+				))}
 			</div>
 		)
 	}
 
 	if (records.length === 0) {
 		return (
-			<p className="text-xs text-muted-foreground text-center py-4">
-				No deliveries recorded yet.
-			</p>
+			<p className="text-muted-foreground py-4 text-center text-xs">No deliveries recorded yet.</p>
 		)
 	}
 
@@ -45,9 +45,12 @@ export function DeliveryActivityPanel({ records, isLoading }: DeliveryActivityPa
 			{records.map(r => {
 				const sentAt = r.sentAt ? new Date(r.sentAt) : null
 				return (
-					<div key={r.id} className="flex items-start gap-3 rounded-md border bg-muted/20 px-3 py-2 text-xs">
-						<div className="flex-1 min-w-0">
-							<div className="flex items-center gap-2 flex-wrap">
+					<div
+						key={r.id}
+						className="bg-muted/20 flex items-start gap-3 rounded-md border px-3 py-2 text-xs"
+					>
+						<div className="min-w-0 flex-1">
+							<div className="flex flex-wrap items-center gap-2">
 								<span className="font-medium">{CHANNEL_LABEL[r.channel] ?? r.channel}</span>
 								{r.recipient && (
 									<span className="text-muted-foreground truncate">{r.recipient}</span>
@@ -56,15 +59,24 @@ export function DeliveryActivityPanel({ records, isLoading }: DeliveryActivityPa
 							{sentAt && (
 								<p className="text-muted-foreground mt-0.5">
 									{sentAt.toLocaleDateString("en-PH", {
-										year: "numeric", month: "short", day: "numeric",
-										hour: "2-digit", minute: "2-digit",
+										year: "numeric",
+										month: "short",
+										day: "numeric",
+										hour: "2-digit",
+										minute: "2-digit",
 									})}
 								</p>
 							)}
 						</div>
 						<Badge
-							variant={r.status === "sent" ? "default" : r.status === "failed" ? "destructive" : "secondary"}
-							className="text-[10px] h-4 px-1 shrink-0"
+							variant={
+								r.status === "sent"
+									? "default"
+									: r.status === "failed"
+										? "destructive"
+										: "secondary"
+							}
+							className="h-4 shrink-0 px-1 text-[10px]"
 						>
 							{r.status}
 						</Badge>

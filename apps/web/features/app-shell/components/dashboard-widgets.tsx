@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-
 import {
 	Alert02FreeIcons,
 	Analytics01FreeIcons,
@@ -20,14 +19,20 @@ interface DashboardWidgetProps {
 
 const WIDGET_META: Record<
 	string,
-	{ title: string; icon: typeof Alert02FreeIcons; description: string; linkHref?: string; linkLabel?: string }
+	{
+		title: string
+		icon: typeof Alert02FreeIcons
+		description: string
+		linkHref?: string
+		linkLabel?: string
+	}
 > = {
 	"quick-stats": {
 		title: "Quick Stats",
 		icon: Analytics01FreeIcons,
 		description: "Key metrics for your role will appear here.",
 	},
-	alerts: {
+	"alerts": {
 		title: "Alerts",
 		icon: Alert02FreeIcons,
 		description: "Active clinical alerts and notifications will appear here.",

@@ -23,11 +23,7 @@ import {
 	type Icd10SearchResult,
 } from "@/features/problems-allergies/api/problems-allergies.hooks"
 
-import {
-	requiresTemplate,
-	TemplateSelector,
-	type NoteTypeValue,
-} from "./template-selector"
+import { requiresTemplate, TemplateSelector, type NoteTypeValue } from "./template-selector"
 
 interface DiagnosisEntry {
 	code: string
@@ -104,8 +100,7 @@ function Icd10DiagnosisPicker({
 				</Badge>
 			</div>
 			<p className="text-muted-foreground text-xs">
-				Search by diagnosis words or ICD-10 code. Drafts may be created without an
-				ICD-10 diagnosis.
+				Search by diagnosis words or ICD-10 code. Drafts may be created without an ICD-10 diagnosis.
 			</p>
 			<div className="relative z-30">
 				<Input
@@ -212,11 +207,7 @@ export function CreateNoteDialog({
 		setSelectedTemplate(tpl)
 		// Pre-populate content from template sections
 		if (tpl) {
-			setContent(
-				tpl.sections
-					.map(s => `## ${s.label}\n\n${s.defaultContent ?? ""}`)
-					.join("\n\n")
-			)
+			setContent(tpl.sections.map(s => `## ${s.label}\n\n${s.defaultContent ?? ""}`).join("\n\n"))
 		} else {
 			setContent("")
 		}
@@ -252,10 +243,7 @@ export function CreateNoteDialog({
 		)
 	}
 
-	const canSubmit =
-		!!noteType &&
-		!requiresTemplate(noteType, templateId) &&
-		!createNote.isPending
+	const canSubmit = !!noteType && !requiresTemplate(noteType, templateId) && !createNote.isPending
 
 	return (
 		<Dialog
@@ -265,13 +253,13 @@ export function CreateNoteDialog({
 				onOpenChange(v)
 			}}
 		>
-			<DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+			<DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
 				<DialogHeader>
 					<DialogTitle>Create Clinical Note</DialogTitle>
 					<DialogDescription>
-						Select a note type and choose a template. Admission Notes, Discharge
-						Summaries, FPE notes, and Consultation notes require a template.
-						Consultation notes use the SOAP structure (Subjective, Objective, Assessment, Plan).
+						Select a note type and choose a template. Admission Notes, Discharge Summaries, FPE
+						notes, and Consultation notes require a template. Consultation notes use the SOAP
+						structure (Subjective, Objective, Assessment, Plan).
 					</DialogDescription>
 				</DialogHeader>
 
@@ -297,24 +285,24 @@ export function CreateNoteDialog({
 						</>
 					)}
 
-				{noteType && (
-					<>
-						<Separator />
-						<div className="space-y-2">
-							<Label>Note Content</Label>
-							<Textarea
-								placeholder={
-									selectedTemplate
-										? "Sections pre-filled from template. Edit as needed…"
-										: "Enter note content…"
-								}
-								rows={8}
-								value={content}
-								onChange={e => setContent(e.target.value)}
-							/>
-						</div>
-					</>
-				)}
+					{noteType && (
+						<>
+							<Separator />
+							<div className="space-y-2">
+								<Label>Note Content</Label>
+								<Textarea
+									placeholder={
+										selectedTemplate
+											? "Sections pre-filled from template. Edit as needed…"
+											: "Enter note content…"
+									}
+									rows={8}
+									value={content}
+									onChange={e => setContent(e.target.value)}
+								/>
+							</div>
+						</>
+					)}
 				</div>
 
 				<DialogFooter>

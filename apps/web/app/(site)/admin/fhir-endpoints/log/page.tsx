@@ -7,7 +7,9 @@ export default function FhirExchangeLogPage() {
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-2xl font-semibold">FHIR Exchange Log</h1>
-				<p className="text-sm text-muted-foreground mt-1">History of FHIR resource pushes and pulls with retry capability.</p>
+				<p className="text-muted-foreground mt-1 text-sm">
+					History of FHIR resource pushes and pulls with retry capability.
+				</p>
 			</div>
 			<ExchangeLogTable />
 		</div>

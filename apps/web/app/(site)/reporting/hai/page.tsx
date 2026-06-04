@@ -6,7 +6,9 @@ import { HaiReport } from "@/features/reporting/components/hai-report"
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 export default function HaiReportingPage() {
@@ -16,7 +18,7 @@ export default function HaiReportingPage() {
 
 	if (!permSet.has("reporting:edit")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access HAI reporting.
 			</div>
 		)
@@ -34,9 +36,7 @@ export default function HaiReportingPage() {
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-2xl font-bold">HAI Surveillance Report</h1>
-				<p className="text-muted-foreground">
-					Healthcare-associated infection metrics by type
-				</p>
+				<p className="text-muted-foreground">Healthcare-associated infection metrics by type</p>
 			</div>
 			<HaiReport facilityId={facilityId} />
 		</div>

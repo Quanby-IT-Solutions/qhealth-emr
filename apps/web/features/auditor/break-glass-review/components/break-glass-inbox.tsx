@@ -1,27 +1,49 @@
 "use client"
 
 import { Fragment, useCallback, useState } from "react"
-
 import Link from "next/link"
 import { BellRing, ChevronDown, ChevronRight } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button, buttonVariants } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { Textarea } from "@/core/components/ui/textarea"
 import { cn } from "@/core/lib/utils"
-
 import {
-	type BreakGlassEvent,
 	useApproveMutation,
 	useBreakGlassInboxQuery,
+	type BreakGlassEvent,
 } from "@/features/auditor/break-glass-review/api/break-glass.hooks"
-import { formatDateTime, isSlaBreached, STATUS_COLORS } from "@/features/auditor/break-glass-review/lib/break-glass.utils"
+import {
+	formatDateTime,
+	isSlaBreached,
+	STATUS_COLORS,
+} from "@/features/auditor/break-glass-review/lib/break-glass.utils"
 
 import { AddNoteDrawer } from "./add-note-drawer"
 import { BreakGlassExportModal } from "./break-glass-export-modal"
@@ -29,37 +51,49 @@ import { InvestigationFlagDrawer } from "./investigation-flag-drawer"
 
 function AccessLogDetail({ event }: { event: BreakGlassEvent }) {
 	return (
-		<div className="grid grid-cols-2 gap-x-6 gap-y-2 bg-muted/40 px-4 py-3 text-xs">
+		<div className="bg-muted/40 grid grid-cols-2 gap-x-6 gap-y-2 px-4 py-3 text-xs">
 			<div>
-				<span className="font-semibold uppercase tracking-wide text-muted-foreground">Clinician Staff ID</span>
-				<p className="mt-0.5 break-all font-mono">{event.clinicianStaffId}</p>
+				<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+					Clinician Staff ID
+				</span>
+				<p className="mt-0.5 font-mono break-all">{event.clinicianStaffId}</p>
 			</div>
 			<div>
-				<span className="font-semibold uppercase tracking-wide text-muted-foreground">Patient ID</span>
-				<p className="mt-0.5 break-all font-mono">{event.patientId}</p>
+				<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+					Patient ID
+				</span>
+				<p className="mt-0.5 font-mono break-all">{event.patientId}</p>
 			</div>
 			{event.reviewedByStaffId && (
 				<div>
-					<span className="font-semibold uppercase tracking-wide text-muted-foreground">Reviewed By</span>
-					<p className="mt-0.5 break-all font-mono">{event.reviewedByStaffId}</p>
+					<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+						Reviewed By
+					</span>
+					<p className="mt-0.5 font-mono break-all">{event.reviewedByStaffId}</p>
 				</div>
 			)}
 			{event.reviewedAt && (
 				<div>
-					<span className="font-semibold uppercase tracking-wide text-muted-foreground">Reviewed At</span>
+					<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+						Reviewed At
+					</span>
 					<p className="mt-0.5">{formatDateTime(event.reviewedAt)}</p>
 				</div>
 			)}
 			{event.reviewNotes && (
 				<div className="col-span-2">
-					<span className="font-semibold uppercase tracking-wide text-muted-foreground">Review Notes</span>
+					<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+						Review Notes
+					</span>
 					<p className="mt-0.5">{event.reviewNotes}</p>
 				</div>
 			)}
 			{event.recordsAccessed !== null && event.recordsAccessed !== undefined && (
 				<div className="col-span-2">
-					<span className="font-semibold uppercase tracking-wide text-muted-foreground">Records Accessed</span>
-					<pre className="mt-0.5 max-h-32 overflow-y-auto rounded bg-muted p-2 text-[11px]">
+					<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+						Records Accessed
+					</span>
+					<pre className="bg-muted mt-0.5 max-h-32 overflow-y-auto rounded p-2 text-[11px]">
 						{JSON.stringify(event.recordsAccessed, null, 2)}
 					</pre>
 				</div>
@@ -79,7 +113,11 @@ export function BreakGlassInbox({ facilityId }: BreakGlassInboxProps) {
 	const [page, setPage] = useState(1)
 	const [expandedId, setExpandedId] = useState<string | null>(null)
 
-	const { data, isLoading: loading, error } = useBreakGlassInboxQuery({
+	const {
+		data,
+		isLoading: loading,
+		error,
+	} = useBreakGlassInboxQuery({
 		facilityId,
 		status: statusFilter === "all" ? undefined : statusFilter,
 		dateFrom: dateFrom || undefined,
@@ -88,16 +126,25 @@ export function BreakGlassInbox({ facilityId }: BreakGlassInboxProps) {
 	})
 
 	// Approve dialog state
-	const [approveDialog, setApproveDialog] = useState<{ open: boolean; eventId: string }>({ open: false, eventId: "" })
+	const [approveDialog, setApproveDialog] = useState<{ open: boolean; eventId: string }>({
+		open: false,
+		eventId: "",
+	})
 	const [approveReason, setApproveReason] = useState("")
 	const [approveError, setApproveError] = useState<string | null>(null)
 	const approveMutation = useApproveMutation()
 
 	// Flag drawer state
-	const [flagDrawer, setFlagDrawer] = useState<{ open: boolean; eventId: string }>({ open: false, eventId: "" })
+	const [flagDrawer, setFlagDrawer] = useState<{ open: boolean; eventId: string }>({
+		open: false,
+		eventId: "",
+	})
 
 	// Add Note drawer state
-	const [noteDrawer, setNoteDrawer] = useState<{ open: boolean; eventId: string }>({ open: false, eventId: "" })
+	const [noteDrawer, setNoteDrawer] = useState<{ open: boolean; eventId: string }>({
+		open: false,
+		eventId: "",
+	})
 
 	// Export modal state
 	const [showExport, setShowExport] = useState(false)
@@ -162,7 +209,10 @@ export function BreakGlassInbox({ facilityId }: BreakGlassInboxProps) {
 									type="date"
 									className="h-9 w-36 text-xs"
 									value={dateFrom}
-									onChange={e => { setDateFrom(e.target.value); setPage(1) }}
+									onChange={e => {
+										setDateFrom(e.target.value)
+										setPage(1)
+									}}
 								/>
 							</div>
 							<div className="flex flex-col gap-1">
@@ -171,11 +221,23 @@ export function BreakGlassInbox({ facilityId }: BreakGlassInboxProps) {
 									type="date"
 									className="h-9 w-36 text-xs"
 									value={dateTo}
-									onChange={e => { setDateTo(e.target.value); setPage(1) }}
+									onChange={e => {
+										setDateTo(e.target.value)
+										setPage(1)
+									}}
 								/>
 							</div>
 							{(dateFrom || dateTo) && (
-								<Button variant="ghost" size="sm" className="text-xs" onClick={() => { setDateFrom(""); setDateTo(""); setPage(1) }}>
+								<Button
+									variant="ghost"
+									size="sm"
+									className="text-xs"
+									onClick={() => {
+										setDateFrom("")
+										setDateTo("")
+										setPage(1)
+									}}
+								>
 									Clear dates
 								</Button>
 							)}
@@ -208,41 +270,57 @@ export function BreakGlassInbox({ facilityId }: BreakGlassInboxProps) {
 							<TableBody>
 								{loading && !data && (
 									<TableRow>
-										<TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+										<TableCell colSpan={9} className="text-muted-foreground py-8 text-center">
 											Loading...
 										</TableCell>
 									</TableRow>
 								)}
 
 								{data?.data.map((event: BreakGlassEvent) => {
-									const overdue = event.reviewStatus === "pending" && isSlaBreached(event.accessExpiresAt)
-									const severity = overdue ? "critical" : event.reviewStatus === "flagged" ? "warning" : "info"
-									const severityColor = severity === "critical"
-										? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-										: severity === "warning"
-										? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-										: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+									const overdue =
+										event.reviewStatus === "pending" && isSlaBreached(event.accessExpiresAt)
+									const severity = overdue
+										? "critical"
+										: event.reviewStatus === "flagged"
+											? "warning"
+											: "info"
+									const severityColor =
+										severity === "critical"
+											? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+											: severity === "warning"
+												? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+												: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
 
 									return (
 										<Fragment key={event.id}>
 											<TableRow
-												className="cursor-pointer hover:bg-muted/50"
+												className="hover:bg-muted/50 cursor-pointer"
 												onClick={() => setExpandedId(prev => (prev === event.id ? null : event.id))}
 											>
-												<TableCell className="w-8 text-muted-foreground">
-													{expandedId === event.id ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+												<TableCell className="text-muted-foreground w-8">
+													{expandedId === event.id ? (
+														<ChevronDown className="size-4" />
+													) : (
+														<ChevronRight className="size-4" />
+													)}
 												</TableCell>
 												<TableCell className="text-xs">
 													{new Date(event.createdAt as unknown as string).toLocaleString()}
 												</TableCell>
-												<TableCell className="max-w-28 truncate text-xs">{event.clinicianStaffId}</TableCell>
-												<TableCell className="max-w-28 truncate text-xs">{event.patientId}</TableCell>
+												<TableCell className="max-w-28 truncate text-xs">
+													{event.clinicianStaffId}
+												</TableCell>
+												<TableCell className="max-w-28 truncate text-xs">
+													{event.patientId}
+												</TableCell>
 												<TableCell className="text-xs capitalize">
 													{event.reasonCategory.replace(/_/g, " ")}
 												</TableCell>
 												<TableCell className="text-xs">
 													<span className="block">{formatDateTime(event.accessGrantedAt)}</span>
-													<span className="block text-muted-foreground">→ {formatDateTime(event.accessExpiresAt)}</span>
+													<span className="text-muted-foreground block">
+														→ {formatDateTime(event.accessExpiresAt)}
+													</span>
 												</TableCell>
 												<TableCell>
 													<Badge variant="secondary" className={severityColor}>
@@ -251,7 +329,10 @@ export function BreakGlassInbox({ facilityId }: BreakGlassInboxProps) {
 												</TableCell>
 												<TableCell>
 													<div className="flex items-center gap-1.5">
-														<Badge variant="secondary" className={STATUS_COLORS[event.reviewStatus] ?? ""}>
+														<Badge
+															variant="secondary"
+															className={STATUS_COLORS[event.reviewStatus] ?? ""}
+														>
 															{event.reviewStatus}
 														</Badge>
 														{event.reviewStatus === "pending" && (
@@ -273,7 +354,10 @@ export function BreakGlassInbox({ facilityId }: BreakGlassInboxProps) {
 															<Button
 																variant="outline"
 																size="sm"
-																onClick={e => { e.stopPropagation(); openApprove(event.id) }}
+																onClick={e => {
+																	e.stopPropagation()
+																	openApprove(event.id)
+																}}
 															>
 																Approve
 															</Button>
@@ -288,14 +372,20 @@ export function BreakGlassInbox({ facilityId }: BreakGlassInboxProps) {
 														<Button
 															variant="outline"
 															size="sm"
-															onClick={e => { e.stopPropagation(); setFlagDrawer({ open: true, eventId: event.id }) }}
+															onClick={e => {
+																e.stopPropagation()
+																setFlagDrawer({ open: true, eventId: event.id })
+															}}
 														>
 															Flag
 														</Button>
 														<Button
 															variant="ghost"
 															size="sm"
-															onClick={e => { e.stopPropagation(); setNoteDrawer({ open: true, eventId: event.id }) }}
+															onClick={e => {
+																e.stopPropagation()
+																setNoteDrawer({ open: true, eventId: event.id })
+															}}
 														>
 															Note
 														</Button>
@@ -316,7 +406,7 @@ export function BreakGlassInbox({ facilityId }: BreakGlassInboxProps) {
 
 								{data?.data.length === 0 && (
 									<TableRow>
-										<TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+										<TableCell colSpan={9} className="text-muted-foreground py-8 text-center">
 											No break-glass events found.
 										</TableCell>
 									</TableRow>
@@ -327,14 +417,24 @@ export function BreakGlassInbox({ facilityId }: BreakGlassInboxProps) {
 
 					{data && data.totalPages > 1 && (
 						<div className="mt-4 flex items-center justify-between">
-							<p className="text-sm text-muted-foreground">
+							<p className="text-muted-foreground text-sm">
 								Page {data.page} of {data.totalPages} ({data.total} total)
 							</p>
 							<div className="flex gap-2">
-								<Button variant="outline" size="sm" disabled={data.page <= 1} onClick={() => setPage(data.page - 1)}>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={data.page <= 1}
+									onClick={() => setPage(data.page - 1)}
+								>
 									Previous
 								</Button>
-								<Button variant="outline" size="sm" disabled={data.page >= data.totalPages} onClick={() => setPage(data.page + 1)}>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={data.page >= data.totalPages}
+									onClick={() => setPage(data.page + 1)}
+								>
 									Next
 								</Button>
 							</div>
@@ -365,7 +465,9 @@ export function BreakGlassInbox({ facilityId }: BreakGlassInboxProps) {
 								rows={3}
 							/>
 							{approveReason.length > 0 && approveReason.length < 10 && (
-								<p className="text-xs text-destructive">{10 - approveReason.length} more character(s) required</p>
+								<p className="text-destructive text-xs">
+									{10 - approveReason.length} more character(s) required
+								</p>
 							)}
 						</div>
 						{approveError && (

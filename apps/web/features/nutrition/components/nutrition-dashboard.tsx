@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState } from "react"
-
 import {
 	AlertTriangle,
 	ClipboardList,
@@ -30,11 +29,10 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
-
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
-	type WorklistAssessment,
 	useNutritionWorklistQuery,
+	type WorklistAssessment,
 } from "@/features/nutrition/api/nutrition.hooks"
 
 // ============================================================================
@@ -102,7 +100,9 @@ function StatCard({ title, value, icon, accent = "default" }: StatCardProps) {
 				<span className={accentClass}>{icon}</span>
 			</CardHeader>
 			<CardContent>
-				<p className={`text-2xl font-bold ${accent === "danger" ? "text-red-600" : accent === "warning" ? "text-amber-600" : ""}`}>
+				<p
+					className={`text-2xl font-bold ${accent === "danger" ? "text-red-600" : accent === "warning" ? "text-amber-600" : ""}`}
+				>
 					{value}
 				</p>
 			</CardContent>
@@ -131,11 +131,9 @@ export function NutritionDashboard() {
 		const all = data?.data ?? []
 		const today = new Date().toDateString()
 		return {
-			assessedToday: all.filter(
-				(a) => new Date(a.createdAt).toDateString() === today
-			).length,
-			highRisk: all.filter((a) => a.malnutritionRisk === "high").length,
-			pending: all.filter((a) => !a.mealPlanStatus || a.mealPlanStatus === "none").length,
+			assessedToday: all.filter(a => new Date(a.createdAt).toDateString() === today).length,
+			highRisk: all.filter(a => a.malnutritionRisk === "high").length,
+			pending: all.filter(a => !a.mealPlanStatus || a.mealPlanStatus === "none").length,
 		}
 	}, [data])
 
@@ -144,7 +142,7 @@ export function NutritionDashboard() {
 			<div className="space-y-6">
 				<div>
 					<h1 className="text-2xl font-semibold">Nutrition</h1>
-					<p className="text-sm text-muted-foreground">Loading…</p>
+					<p className="text-muted-foreground text-sm">Loading…</p>
 				</div>
 			</div>
 		)
@@ -156,7 +154,7 @@ export function NutritionDashboard() {
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-2xl font-semibold">Nutrition &amp; Dietetics</h1>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Malnutrition screening, meal planning, and FHIR diet order management
 					</p>
 				</div>
@@ -189,21 +187,21 @@ export function NutritionDashboard() {
 
 			{/* Worklist Table */}
 			<Card>
-				<CardHeader className="flex flex-row items-center justify-between pb-2 gap-4 flex-wrap">
-					<CardTitle className="text-base flex items-center gap-2">
+				<CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 pb-2">
+					<CardTitle className="flex items-center gap-2 text-base">
 						<TrendingUp className="size-4" />
 						Patient Assessment Worklist
 					</CardTitle>
 					<div className="flex items-center gap-2">
-						<Filter className="size-4 text-muted-foreground" />
+						<Filter className="text-muted-foreground size-4" />
 						<Select
 							value={riskFilter}
-							onValueChange={(v) => {
+							onValueChange={v => {
 								setRiskFilter(v as typeof riskFilter)
 								setPage(1)
 							}}
 						>
-							<SelectTrigger className="w-36 h-8 text-xs">
+							<SelectTrigger className="h-8 w-36 text-xs">
 								<SelectValue placeholder="Risk level" />
 							</SelectTrigger>
 							<SelectContent>
@@ -218,15 +216,15 @@ export function NutritionDashboard() {
 				<CardContent className="p-0">
 					{isLoading ? (
 						<div className="flex items-center justify-center py-16">
-							<Loader2 className="size-6 animate-spin text-muted-foreground" />
+							<Loader2 className="text-muted-foreground size-6 animate-spin" />
 						</div>
 					) : !data?.data?.length ? (
 						<div className="flex flex-col items-center justify-center py-16 text-center">
-							<Utensils className="mb-3 size-10 text-muted-foreground" />
+							<Utensils className="text-muted-foreground mb-3 size-10" />
 							<p className="font-medium">No assessments found</p>
-							<p className="text-sm text-muted-foreground mt-1">
-								Nutrition assessments will appear here as clinicians complete
-								screenings within patient encounters.
+							<p className="text-muted-foreground mt-1 text-sm">
+								Nutrition assessments will appear here as clinicians complete screenings within
+								patient encounters.
 							</p>
 						</div>
 					) : (
@@ -245,16 +243,14 @@ export function NutritionDashboard() {
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{data.data.map((assessment) => (
+									{data.data.map(assessment => (
 										<TableRow key={assessment.id}>
-											<TableCell className="font-medium">
-												{assessment.patientName ?? "—"}
-											</TableCell>
+											<TableCell className="font-medium">{assessment.patientName ?? "—"}</TableCell>
 											<TableCell className="font-mono text-xs">
 												{assessment.patientMrn ?? "—"}
 											</TableCell>
 											<TableCell>{assessment.ward ?? "—"}</TableCell>
-											<TableCell className="uppercase text-xs">
+											<TableCell className="text-xs uppercase">
 												{assessment.screeningTool}
 											</TableCell>
 											<TableCell>{assessment.screeningScore}</TableCell>
@@ -264,7 +260,7 @@ export function NutritionDashboard() {
 											<TableCell>
 												<MealPlanBadge status={assessment.mealPlanStatus} />
 											</TableCell>
-											<TableCell className="text-xs text-muted-foreground">
+											<TableCell className="text-muted-foreground text-xs">
 												{formatDate(assessment.createdAt)}
 											</TableCell>
 										</TableRow>
@@ -274,8 +270,8 @@ export function NutritionDashboard() {
 
 							{/* Pagination */}
 							{data.totalPages > 1 && (
-								<div className="flex items-center justify-between px-4 py-3 border-t">
-									<p className="text-xs text-muted-foreground">
+								<div className="flex items-center justify-between border-t px-4 py-3">
+									<p className="text-muted-foreground text-xs">
 										Page {data.page} of {data.totalPages} · {data.total} total
 									</p>
 									<div className="flex gap-2">
@@ -283,7 +279,7 @@ export function NutritionDashboard() {
 											variant="outline"
 											size="sm"
 											disabled={page <= 1}
-											onClick={() => setPage((p) => p - 1)}
+											onClick={() => setPage(p => p - 1)}
 										>
 											Previous
 										</Button>
@@ -291,7 +287,7 @@ export function NutritionDashboard() {
 											variant="outline"
 											size="sm"
 											disabled={page >= data.totalPages}
-											onClick={() => setPage((p) => p + 1)}
+											onClick={() => setPage(p => p + 1)}
 										>
 											Next
 										</Button>

@@ -119,7 +119,7 @@ export function SchedulerBookedCasesList({ facilityId }: SchedulerBookedCasesLis
 					</CardTitle>
 				</CardHeader>
 				<CardContent className="p-0">
-					<div className="border-b px-4 pb-3 pt-1">
+					<div className="border-b px-4 pt-1 pb-3">
 						<Tabs value={activeTab} onValueChange={v => setActiveTab(v as SurgeryStatus)}>
 							<TabsList>
 								{STATUS_TABS.map(tab => (
@@ -165,9 +165,7 @@ export function SchedulerBookedCasesList({ facilityId }: SchedulerBookedCasesLis
 										<TableCell>{c.anesthesiologistName ?? "—"}</TableCell>
 										<TableCell>{formatDateTime(c.scheduledDatetime)}</TableCell>
 										<TableCell>
-											<Badge variant={statusVariant(c.status)}>
-												{c.status.replace(/_/g, " ")}
-											</Badge>
+											<Badge variant={statusVariant(c.status)}>{c.status.replace(/_/g, " ")}</Badge>
 										</TableCell>
 									</TableRow>
 								))}

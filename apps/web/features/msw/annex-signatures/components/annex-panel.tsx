@@ -122,11 +122,9 @@ export function AnnexPanel({ annexType, encounterId }: AnnexPanelProps) {
 			<div className="flex flex-col items-center gap-4 py-10 text-center">
 				<CheckCircle className="size-10 text-green-500" />
 				<div>
-					<p className="font-medium">
-						Annex {annexType.toUpperCase()} signed and archived.
-					</p>
+					<p className="font-medium">Annex {annexType.toUpperCase()} signed and archived.</p>
 					{sig && (
-						<p className="mt-1 text-xs text-muted-foreground">
+						<p className="text-muted-foreground mt-1 text-xs">
 							Signed{" "}
 							{new Date(sig.signedAt).toLocaleDateString(undefined, {
 								day: "numeric",
@@ -158,34 +156,29 @@ export function AnnexPanel({ annexType, encounterId }: AnnexPanelProps) {
 			{/* Scrollable consent text */}
 			<div
 				onScroll={handleScroll}
-				className="h-52 overflow-y-auto rounded-lg border bg-muted/30 p-4 text-sm leading-relaxed"
+				className="bg-muted/30 h-52 overflow-y-auto rounded-lg border p-4 text-sm leading-relaxed"
 			>
-				<pre className="whitespace-pre-wrap font-sans">{meta.body}</pre>
+				<pre className="font-sans whitespace-pre-wrap">{meta.body}</pre>
 			</div>
 
 			{!canSign && (
-				<p className="text-xs text-muted-foreground">
-					↓ Scroll to the bottom to enable signing
-				</p>
+				<p className="text-muted-foreground text-xs">↓ Scroll to the bottom to enable signing</p>
 			)}
 
 			{canSign && (
 				<div className="space-y-4">
-					<SignatureCanvas
-						label="Patient Signature"
-						onChange={setPatientSignature}
-					/>
+					<SignatureCanvas label="Patient Signature" onChange={setPatientSignature} />
 					<SignatureCanvas
 						label="Witness Signature (Social Worker)"
 						onChange={setWitnessSignature}
 					/>
 
-					<p className="text-xs text-muted-foreground">
+					<p className="text-muted-foreground text-xs">
 						Sign in the boxes above using mouse or touch. Witness signature is optional.
 					</p>
 
 					{captureMutation.isError && (
-						<div className="flex items-center gap-2 text-sm text-destructive">
+						<div className="text-destructive flex items-center gap-2 text-sm">
 							<AlertCircle className="size-4 shrink-0" />
 							<span>Failed to save signature. Please try again.</span>
 						</div>

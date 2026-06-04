@@ -30,8 +30,7 @@ export function useCaptureAnnexSignatureMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		mswOrpc.annexSignatures.capture.mutationOptions({
-			onSuccess: () =>
-				qc.invalidateQueries({ queryKey: mswOrpc.annexSignatures.list.key() }),
+			onSuccess: () => qc.invalidateQueries({ queryKey: mswOrpc.annexSignatures.list.key() }),
 		})
 	)
 }

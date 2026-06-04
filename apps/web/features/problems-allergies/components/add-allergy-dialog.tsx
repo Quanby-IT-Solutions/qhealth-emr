@@ -24,8 +24,8 @@ import {
 	useAllergenSearchQuery,
 	useAllergiesQuery,
 	useCreateAllergyMutation,
-	type Allergy,
 	type AllergenType,
+	type Allergy,
 	type AllergySeverity,
 } from "@/features/problems-allergies/api/problems-allergies.hooks"
 
@@ -83,11 +83,11 @@ export function AddAllergyDialog({
 	)
 	const canSubmit = Boolean(
 		allergenName.trim() &&
-			allergenType &&
-			severity &&
-			facilityId &&
-			!duplicateAllergy &&
-			!createAllergy.isPending
+		allergenType &&
+		severity &&
+		facilityId &&
+		!duplicateAllergy &&
+		!createAllergy.isPending
 	)
 
 	function selectAllergen(result: { allergenName: string; allergenType: AllergenType }) {
@@ -157,8 +157,8 @@ export function AddAllergyDialog({
 					<div className="space-y-2">
 						<Label>Allergen Name *</Label>
 						<p className="text-muted-foreground text-xs">
-							Record the trigger or substance, for example Penicillin, shrimp, latex, or dust
-							mites. Put symptoms such as itching or rash in Reaction Type.
+							Record the trigger or substance, for example Penicillin, shrimp, latex, or dust mites.
+							Put symptoms such as itching or rash in Reaction Type.
 						</p>
 						<div className="relative">
 							<Input
@@ -198,7 +198,7 @@ export function AddAllergyDialog({
 													key={`${result.allergenType}-${result.allergenName}-${result.source}`}
 													type="button"
 													disabled={disabled}
-													className="hover:bg-muted focus:bg-muted disabled:text-muted-foreground disabled:hover:bg-transparent flex w-full items-start justify-between gap-3 rounded-sm px-3 py-2 text-left outline-hidden disabled:cursor-not-allowed disabled:opacity-70"
+													className="hover:bg-muted focus:bg-muted disabled:text-muted-foreground flex w-full items-start justify-between gap-3 rounded-sm px-3 py-2 text-left outline-hidden disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-transparent"
 													onMouseDown={event => event.preventDefault()}
 													onClick={() => {
 														if (!disabled) selectAllergen(result)
@@ -206,7 +206,9 @@ export function AddAllergyDialog({
 												>
 													<span className="min-w-0 break-words">{result.allergenName}</span>
 													<span className="flex shrink-0 items-center gap-2 text-xs">
-														{disabled && <span className="text-muted-foreground">Already active</span>}
+														{disabled && (
+															<span className="text-muted-foreground">Already active</span>
+														)}
 														<span className="text-muted-foreground capitalize">
 															{result.allergenType}
 														</span>
@@ -227,8 +229,8 @@ export function AddAllergyDialog({
 					{duplicateAllergy && (
 						<Alert variant="destructive">
 							<AlertDescription>
-								This patient already has an active {duplicateAllergy.allergenName} allergy.
-								Edit the existing allergy or deactivate it before adding another active entry.
+								This patient already has an active {duplicateAllergy.allergenName} allergy. Edit the
+								existing allergy or deactivate it before adding another active entry.
 							</AlertDescription>
 						</Alert>
 					)}
@@ -289,7 +291,12 @@ export function AddAllergyDialog({
 				</div>
 
 				<DialogFooter>
-					<Button type="button" variant="outline" onClick={handleCancel} disabled={createAllergy.isPending}>
+					<Button
+						type="button"
+						variant="outline"
+						onClick={handleCancel}
+						disabled={createAllergy.isPending}
+					>
 						Cancel
 					</Button>
 					<Button onClick={handleSubmit} disabled={!canSubmit}>

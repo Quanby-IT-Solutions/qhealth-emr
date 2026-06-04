@@ -14,8 +14,8 @@ import {
 	TableRow,
 } from "@/core/components/ui/table"
 import {
-	type ConsentRecord,
 	useConsentsQuery,
+	type ConsentRecord,
 } from "@/features/clinical-docs/api/clinical-docs.hooks"
 
 import { ConsentRevocation } from "./consent-revocation"
@@ -86,9 +86,7 @@ export function ConsentRecordsTab({
 				</CardHeader>
 				<CardContent className="p-0">
 					{isLoading ? (
-						<div className="text-muted-foreground py-8 text-center text-sm">
-							Loading consents…
-						</div>
+						<div className="text-muted-foreground py-8 text-center text-sm">Loading consents…</div>
 					) : consents.length > 0 ? (
 						<Table>
 							<TableHeader>
@@ -107,28 +105,18 @@ export function ConsentRecordsTab({
 									const isRevoked = !!consent.revokedAt
 									return (
 										<TableRow key={consent.id}>
-											<TableCell>
-												{consentTypeLabel(consent.consentType)}
-											</TableCell>
+											<TableCell>{consentTypeLabel(consent.consentType)}</TableCell>
 											<TableCell>{consent.signedByName}</TableCell>
+											<TableCell>{relationshipLabel(consent.relationship)}</TableCell>
 											<TableCell>
-												{relationshipLabel(consent.relationship)}
-											</TableCell>
-											<TableCell>
-												<Badge
-													variant={isRevoked ? "destructive" : "default"}
-												>
+												<Badge variant={isRevoked ? "destructive" : "default"}>
 													{isRevoked ? "Revoked" : "Active"}
 												</Badge>
 											</TableCell>
+											<TableCell>{formatDateTime(consent.signedAt)}</TableCell>
+											<TableCell>{consent.witnessStaffName ?? "—"}</TableCell>
 											<TableCell>
-												{formatDateTime(consent.signedAt)}
-											</TableCell>
-											<TableCell>
-												{consent.witnessStaffName ?? "—"}
-											</TableCell>
-											<TableCell>
-											{!isRevoked && canManageConsents && (
+												{!isRevoked && canManageConsents && (
 													<Button
 														size="sm"
 														variant="outline"
@@ -145,8 +133,7 @@ export function ConsentRecordsTab({
 						</Table>
 					) : (
 						<div className="text-muted-foreground py-8 text-center text-sm">
-							No consent records yet. Click "Capture Consent" to record patient
-							consent.
+							No consent records yet. Click "Capture Consent" to record patient consent.
 						</div>
 					)}
 				</CardContent>

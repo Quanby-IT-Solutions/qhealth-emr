@@ -4,12 +4,7 @@ import { useState } from "react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/core/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import {
@@ -21,10 +16,7 @@ import {
 	TableRow,
 } from "@/core/components/ui/table"
 import { Textarea } from "@/core/components/ui/textarea"
-import {
-	useAdministerMarMutation,
-	useMarEntriesQuery,
-} from "@/features/nursing/api/nursing.hooks"
+import { useAdministerMarMutation, useMarEntriesQuery } from "@/features/nursing/api/nursing.hooks"
 
 function formatDateTime(dateStr: string | null | undefined) {
 	if (!dateStr) return "—"
@@ -40,7 +32,10 @@ function formatDateTime(dateStr: string | null | undefined) {
 type MarStatus = "due" | "given" | "missed" | "held" | "refused"
 
 function statusBadge(status: MarStatus) {
-	const config: Record<MarStatus, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+	const config: Record<
+		MarStatus,
+		{ variant: "default" | "secondary" | "destructive" | "outline"; label: string }
+	> = {
 		due: { variant: "secondary", label: "Due" },
 		given: { variant: "default", label: "Given" },
 		missed: { variant: "destructive", label: "Missed" },
@@ -79,27 +74,15 @@ function AdministerForm({ marId, onClose }: AdministerFormProps) {
 		<form onSubmit={handleSubmit} className="grid gap-3">
 			<div>
 				<Label htmlFor="administeredDose">Dose Given</Label>
-				<Input
-					id="administeredDose"
-					name="administeredDose"
-					placeholder="e.g. 500mg"
-				/>
+				<Input id="administeredDose" name="administeredDose" placeholder="e.g. 500mg" />
 			</div>
 			<div>
 				<Label htmlFor="administeredRoute">Route</Label>
-				<Input
-					id="administeredRoute"
-					name="administeredRoute"
-					placeholder="e.g. PO, IV, IM"
-				/>
+				<Input id="administeredRoute" name="administeredRoute" placeholder="e.g. PO, IV, IM" />
 			</div>
 			<div>
 				<Label htmlFor="prnReason">PRN Reason</Label>
-				<Input
-					id="prnReason"
-					name="prnReason"
-					placeholder="Required for PRN medications"
-				/>
+				<Input id="prnReason" name="prnReason" placeholder="Required for PRN medications" />
 			</div>
 			<div>
 				<Label htmlFor="notes">Notes</Label>
@@ -138,10 +121,7 @@ export function MarScreen({ encounterId, facilityId, readOnly }: MarScreenProps)
 						<DialogTitle>Administer Medication</DialogTitle>
 					</DialogHeader>
 					{administeringId && (
-						<AdministerForm
-							marId={administeringId}
-							onClose={() => setAdministeringId(null)}
-						/>
+						<AdministerForm marId={administeringId} onClose={() => setAdministeringId(null)} />
 					)}
 				</DialogContent>
 			</Dialog>
@@ -149,9 +129,7 @@ export function MarScreen({ encounterId, facilityId, readOnly }: MarScreenProps)
 			{marEntries.isLoading ? (
 				<div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
 			) : !marEntries.data?.data?.length ? (
-				<div className="text-muted-foreground py-8 text-center text-sm">
-					No MAR entries yet.
-				</div>
+				<div className="text-muted-foreground py-8 text-center text-sm">No MAR entries yet.</div>
 			) : (
 				<div className="overflow-auto rounded-md border">
 					<Table>
@@ -176,22 +154,14 @@ export function MarScreen({ encounterId, facilityId, readOnly }: MarScreenProps)
 									<TableCell>{statusBadge(m.status)}</TableCell>
 									<TableCell>{m.administeredDose ?? "—"}</TableCell>
 									<TableCell>{m.administeredRoute ?? "—"}</TableCell>
-									<TableCell className="max-w-[160px] truncate">
-										{m.prnReason ?? "—"}
-									</TableCell>
+									<TableCell className="max-w-[160px] truncate">{m.prnReason ?? "—"}</TableCell>
 									<TableCell className="whitespace-nowrap">
 										{formatDateTime(m.administeredAt)}
 									</TableCell>
-									<TableCell className="max-w-[200px] truncate">
-										{m.notes ?? "—"}
-									</TableCell>
+									<TableCell className="max-w-[200px] truncate">{m.notes ?? "—"}</TableCell>
 									<TableCell>
 										{!readOnly && m.status === "due" && (
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() => setAdministeringId(m.id)}
-											>
+											<Button size="sm" variant="outline" onClick={() => setAdministeringId(m.id)}>
 												Administer
 											</Button>
 										)}

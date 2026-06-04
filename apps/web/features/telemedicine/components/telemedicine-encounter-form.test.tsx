@@ -112,9 +112,7 @@ describe("TelemedicineEncounterForm", () => {
 		renderForm()
 
 		expect(screen.getByRole("button", { name: /follow-up to in-person visit/i })).toBeDisabled()
-		expect(
-			screen.getByText(/no prior opd, er, or inpatient visit found/i)
-		).toBeInTheDocument()
+		expect(screen.getByText(/no prior opd, er, or inpatient visit found/i)).toBeInTheDocument()
 	})
 
 	it("auto-detects follow-up mode when the appointment has a linked source encounter", () => {

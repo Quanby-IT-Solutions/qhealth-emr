@@ -12,11 +12,11 @@ import { Label } from "@/core/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/core/components/ui/radio-group"
 import { Skeleton } from "@/core/components/ui/skeleton"
 import { Textarea } from "@/core/components/ui/textarea"
-
-import { EncounterContextBar } from "@/features/billing/components/encounter-context-bar"
 import { orpc } from "@/services/orpc/client"
+import { EncounterContextBar } from "@/features/billing/components/encounter-context-bar"
+
+import { useConfirmDrgMutation, useSuggestDrgMutation } from "../api/drg.hooks"
 import { formatConfidence } from "../lib/drg-confidence"
-import { useSuggestDrgMutation, useConfirmDrgMutation } from "../api/drg.hooks"
 
 interface DrgMappingPageProps {
 	encounterId: string
@@ -33,9 +33,16 @@ export function DrgMappingPage({ encounterId, facilityId, patientId }: DrgMappin
 	const { data: problemsData, isLoading: problemsLoading } = useQuery(
 		orpc.problemsAllergies.listProblems.queryOptions({ input: { patientId } })
 	)
-	const icd10Codes = (problemsData?.data ?? []).filter(p => !!p.icd10Code).map(p => ({ code: p.icd10Code!, description: p.description ?? p.icd10Code! }))
+	const icd10Codes = (problemsData?.data ?? [])
+		.filter(p => !!p.icd10Code)
+		.map(p => ({ code: p.icd10Code!, description: p.description ?? p.icd10Code! }))
 
-	const { mutate: suggestDrg, isPending: suggesting, data: suggestions, error: suggestError } = useSuggestDrgMutation()
+	const {
+		mutate: suggestDrg,
+		isPending: suggesting,
+		data: suggestions,
+		error: suggestError,
+	} = useSuggestDrgMutation()
 	const { mutate: confirmDrg, isPending: confirming } = useConfirmDrgMutation()
 
 	useEffect(() => {
@@ -69,18 +76,18 @@ export function DrgMappingPage({ encounterId, facilityId, patientId }: DrgMappin
 		<div className="space-y-4">
 			<EncounterContextBar />
 
-			<div className="px-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+			<div className="grid grid-cols-1 gap-4 px-4 md:grid-cols-2">
 				{/* Left: ICD-10 + RVS */}
 				<Card>
 					<CardHeader className="pb-2">
 						<CardTitle className="text-sm">ICD-10 Codes (Encounter)</CardTitle>
 					</CardHeader>
-				<CardContent className="space-y-2">
-					{problemsLoading && <Skeleton className="h-16 w-full" />}
-					{!problemsLoading && icd10Codes.length === 0 && (
-						<p className="text-sm text-muted-foreground">No ICD-10 codes on problem list.</p>
-					)}
-					{icd10Codes.map(icd => (
+					<CardContent className="space-y-2">
+						{problemsLoading && <Skeleton className="h-16 w-full" />}
+						{!problemsLoading && icd10Codes.length === 0 && (
+							<p className="text-muted-foreground text-sm">No ICD-10 codes on problem list.</p>
+						)}
+						{icd10Codes.map(icd => (
 							<div key={icd.code} className="flex gap-2 text-sm">
 								<span className="font-mono font-semibold">{icd.code}</span>
 								<span className="text-muted-foreground">{icd.description}</span>
@@ -109,7 +116,9 @@ export function DrgMappingPage({ encounterId, facilityId, patientId }: DrgMappin
 						<CardContent className="space-y-3">
 							{suggesting && !suggestions && (
 								<div className="space-y-2">
-									{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+									{[...Array(3)].map((_, i) => (
+										<Skeleton key={i} className="h-16 w-full" />
+									))}
 								</div>
 							)}
 
@@ -131,7 +140,7 @@ export function DrgMappingPage({ encounterId, facilityId, patientId }: DrgMappin
 									{candidates.map((c, idx) => (
 										<div
 											key={c.code}
-											className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors ${
+											className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors ${
 												selectedDrg === c.code ? "border-primary bg-primary/5" : "hover:bg-muted/40"
 											}`}
 											onClick={() => {
@@ -139,38 +148,38 @@ export function DrgMappingPage({ encounterId, facilityId, patientId }: DrgMappin
 												setOverrideReason("")
 											}}
 										>
-											<RadioGroupItem
-												value={c.code}
-												id={`drg-${c.code}`}
-												className="mt-0.5"
-											/>
-											<div className="flex-1 min-w-0">
-												<div className="flex items-center gap-2 flex-wrap">
+											<RadioGroupItem value={c.code} id={`drg-${c.code}`} className="mt-0.5" />
+											<div className="min-w-0 flex-1">
+												<div className="flex flex-wrap items-center gap-2">
 													<Label
 														htmlFor={`drg-${c.code}`}
-														className="font-mono font-semibold text-sm cursor-pointer"
+														className="cursor-pointer font-mono text-sm font-semibold"
 													>
 														{c.code}
 													</Label>
 													{idx === 0 && (
-														<Badge variant="default" className="text-[10px] h-4 px-1">
+														<Badge variant="default" className="h-4 px-1 text-[10px]">
 															Top Match
 														</Badge>
 													)}
 													<Badge
 														variant="outline"
-														className={`text-[10px] h-4 px-1 ${
-															c.confidence > 0.8 ? "text-green-700 border-green-300" :
-															c.confidence >= 0.5 ? "text-yellow-700 border-yellow-300" :
-															"text-red-700 border-red-300"
+														className={`h-4 px-1 text-[10px] ${
+															c.confidence > 0.8
+																? "border-green-300 text-green-700"
+																: c.confidence >= 0.5
+																	? "border-yellow-300 text-yellow-700"
+																	: "border-red-300 text-red-700"
 														}`}
 													>
 														{formatConfidence(c.confidence)}
 													</Badge>
 												</div>
-												<p className="text-xs text-muted-foreground mt-0.5">{c.description}</p>
+												<p className="text-muted-foreground mt-0.5 text-xs">{c.description}</p>
 												{c.rationale && (
-													<p className="text-[10px] text-muted-foreground/80 mt-1 italic">{c.rationale}</p>
+													<p className="text-muted-foreground/80 mt-1 text-[10px] italic">
+														{c.rationale}
+													</p>
 												)}
 											</div>
 										</div>
@@ -179,7 +188,7 @@ export function DrgMappingPage({ encounterId, facilityId, patientId }: DrgMappin
 							)}
 
 							{candidates.length === 0 && !suggesting && !suggestError && (
-								<p className="text-sm text-muted-foreground text-center py-4">
+								<p className="text-muted-foreground py-4 text-center text-sm">
 									No DRG suggestions available.
 								</p>
 							)}
@@ -188,11 +197,11 @@ export function DrgMappingPage({ encounterId, facilityId, patientId }: DrgMappin
 
 					{requiresOverride && (
 						<Card className="border-yellow-200 bg-yellow-50/50">
-							<CardContent className="pt-4 space-y-2">
+							<CardContent className="space-y-2 pt-4">
 								<Label htmlFor="override-reason" className="text-sm">
 									Override Justification <span className="text-destructive">*</span>
 								</Label>
-								<p className="text-xs text-muted-foreground">
+								<p className="text-muted-foreground text-xs">
 									You selected a DRG other than the top recommendation. Provide a clinical reason.
 								</p>
 								<Textarea
@@ -207,11 +216,7 @@ export function DrgMappingPage({ encounterId, facilityId, patientId }: DrgMappin
 						</Card>
 					)}
 
-					<Button
-						onClick={handleConfirm}
-						disabled={!canConfirm || confirming}
-						className="w-full"
-					>
+					<Button onClick={handleConfirm} disabled={!canConfirm || confirming} className="w-full">
 						{confirming ? "Confirming..." : "Confirm DRG Mapping"}
 					</Button>
 				</div>

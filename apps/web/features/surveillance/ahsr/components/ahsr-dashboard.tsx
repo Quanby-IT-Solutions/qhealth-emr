@@ -1,8 +1,8 @@
 "use client"
 
+import { Card, CardContent } from "@/core/components/ui/card"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { AhsrDashboard } from "@/features/reporting/components/ahsr-dashboard"
-import { Card, CardContent } from "@/core/components/ui/card"
 
 export function AhsrDashboardClient() {
 	const { data: profile, isLoading } = useMyProfile()
@@ -11,7 +11,7 @@ export function AhsrDashboardClient() {
 	if (isLoading) {
 		return (
 			<Card>
-				<CardContent className="py-8 text-center text-sm text-muted-foreground">
+				<CardContent className="text-muted-foreground py-8 text-center text-sm">
 					Loading…
 				</CardContent>
 			</Card>
@@ -21,7 +21,7 @@ export function AhsrDashboardClient() {
 	if (!facilityId) {
 		return (
 			<Card>
-				<CardContent className="py-8 text-center text-sm text-muted-foreground">
+				<CardContent className="text-muted-foreground py-8 text-center text-sm">
 					No facility assigned to your profile. Contact your administrator.
 				</CardContent>
 			</Card>

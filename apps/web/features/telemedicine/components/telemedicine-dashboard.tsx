@@ -20,8 +20,8 @@ import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
 	formatAppointmentStatusLabel,
 	getAppointmentStatusColor,
-	type TelemedicineAppointment,
 	useAppointmentQuery,
+	type TelemedicineAppointment,
 } from "@/features/telemedicine/api/telemedicine.hooks"
 import { EPrescriptionCard } from "@/features/telemedicine/components/e-prescription-card"
 import { PhysicianAppointmentList } from "@/features/telemedicine/components/physician-appointment-list"
@@ -30,10 +30,7 @@ import { TelemedicineEncounterForm } from "@/features/telemedicine/components/te
 import { TelemedicineEncounterSummary } from "@/features/telemedicine/components/telemedicine-encounter-summary"
 import { VideoCallPanel } from "@/features/telemedicine/components/video-call-panel"
 import { VirtualVisitScheduler } from "@/features/telemedicine/components/virtual-visit-scheduler"
-import {
-	formatJoinWindowRange,
-	getJoinWindowState,
-} from "@/features/telemedicine/lib/join-window"
+import { formatJoinWindowRange, getJoinWindowState } from "@/features/telemedicine/lib/join-window"
 
 // ============================================================================
 // Types
@@ -169,12 +166,12 @@ function TabNavigation<TTab extends string>({
 						].join(" ")}
 					>
 						{completed && !disabled && (
-							<span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-success text-success-foreground">
+							<span className="bg-success text-success-foreground absolute top-2 right-2 flex size-5 items-center justify-center rounded-full">
 								<CheckCircle2 className="size-3.5" />
 							</span>
 						)}
 						{disabled && (
-							<span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-muted text-muted-foreground">
+							<span className="bg-muted text-muted-foreground absolute top-2 right-2 flex size-5 items-center justify-center rounded-full">
 								<Lock className="size-3" />
 							</span>
 						)}
@@ -189,9 +186,7 @@ function TabNavigation<TTab extends string>({
 							<Icon className="size-4" />
 						</div>
 						<div>
-							<p
-								className={`text-sm font-semibold ${isActive && !disabled ? "text-primary" : ""}`}
-							>
+							<p className={`text-sm font-semibold ${isActive && !disabled ? "text-primary" : ""}`}>
 								{label}
 							</p>
 							<p className="text-muted-foreground text-xs leading-tight">
@@ -585,14 +580,10 @@ function PhysicianTelemedicineDashboard({ profile }: { profile?: MyProfile }) {
 			id: "encounter",
 			label: "Encounter",
 			icon: ClipboardList,
-			description: hasAppointment
-				? "Document the SOAP note"
-				: "Select an appointment to begin",
+			description: hasAppointment ? "Document the SOAP note" : "Select an appointment to begin",
 			completed: hasEncounter,
 			disabled: !hasAppointment || blocksNewEncounter,
-			disabledReason: blocksNewEncounter
-				? "Video window passed"
-				: "Select an appointment first",
+			disabledReason: blocksNewEncounter ? "Video window passed" : "Select an appointment first",
 		},
 		{
 			id: "video",
@@ -621,7 +612,8 @@ function PhysicianTelemedicineDashboard({ profile }: { profile?: MyProfile }) {
 			<div className="space-y-1">
 				<h1 className="text-2xl font-bold">Telemedicine</h1>
 				<p className="text-muted-foreground text-sm">
-					Your assigned virtual consultations · {hasAppointment ? "Active patient selected" : "Pick an appointment to begin"}
+					Your assigned virtual consultations ·{" "}
+					{hasAppointment ? "Active patient selected" : "Pick an appointment to begin"}
 				</p>
 			</div>
 
@@ -710,7 +702,7 @@ function PhysicianTelemedicineDashboard({ profile }: { profile?: MyProfile }) {
 				<>
 					{hasEncounter && currentEncounterId ? (
 						<div className="space-y-4">
-							<div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-primary">
+							<div className="border-primary/30 bg-primary/10 text-primary rounded-lg border px-4 py-3 text-sm">
 								<p className="font-medium">Documents for {patientName}</p>
 								<p className="text-primary/80 text-xs">
 									Generate the medical abstract and sign before issuing the e-prescription. Both

@@ -1,7 +1,7 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { InferContractRouterOutputs } from "@orpc/contract"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import type { v1Contract } from "@repo/contracts"
 
@@ -87,8 +87,7 @@ export function useCreateDrugBrandMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.formulary.drugBrand.create.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.formulary.drugBrand.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.formulary.drugBrand.key() }),
 		})
 	)
 }
@@ -97,8 +96,7 @@ export function useUpdateDrugBrandMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.formulary.drugBrand.update.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.formulary.drugBrand.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.formulary.drugBrand.key() }),
 		})
 	)
 }
@@ -149,8 +147,7 @@ export function useCreateFormularyItemMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.formulary.item.create.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.formulary.item.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.formulary.item.key() }),
 		})
 	)
 }
@@ -159,8 +156,7 @@ export function useUpdateFormularyItemMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.formulary.item.update.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.formulary.item.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.formulary.item.key() }),
 		})
 	)
 }
@@ -169,8 +165,7 @@ export function useUpdateFormularyClinicalPolicyMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.formulary.item.updateClinicalPolicy.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.formulary.item.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.formulary.item.key() }),
 		})
 	)
 }
@@ -179,8 +174,7 @@ export function useDeleteFormularyItemMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.formulary.item.delete.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.formulary.item.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.formulary.item.key() }),
 		})
 	)
 }
@@ -331,8 +325,7 @@ export function useSetCodeActiveMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.formulary.codeSetAdmin.setCodeActive.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.formulary.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.formulary.key() }),
 		})
 	)
 }

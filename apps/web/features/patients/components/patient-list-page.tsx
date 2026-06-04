@@ -7,7 +7,13 @@ import { ArrowRight, Baby, Loader2, Search, ShieldAlert, UserRound, WifiOff } fr
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/core/components/ui/card"
 import {
 	Dialog,
 	DialogContent,
@@ -17,10 +23,10 @@ import {
 } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
+import { orpc } from "@/services/orpc/client"
 import { BreakGlassForm } from "@/features/audit/components/break-glass-form"
 import { useOfflinePatients } from "@/features/offline-cache/lib/use-offline-patients"
 import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
-import { orpc } from "@/services/orpc/client"
 
 const BREAK_GLASS_REQUIRED_MESSAGE = "Break-glass required for this patient chart."
 const PATIENTS_PAGE_SIZE = 8
@@ -89,9 +95,7 @@ export function PatientListCard() {
 	const handleOpenChart = async (patientId: string) => {
 		setCheckingPatientId(patientId)
 		try {
-			await queryClient.fetchQuery(
-				orpc.patient.get.queryOptions({ input: { id: patientId } })
-			)
+			await queryClient.fetchQuery(orpc.patient.get.queryOptions({ input: { id: patientId } }))
 			router.push(`/patients/${patientId}?from=list`)
 		} catch (error) {
 			if (isBreakGlassRequiredError(error)) {
@@ -133,7 +137,10 @@ export function PatientListCard() {
 	}, [offlinePatients, trimmed])
 
 	const totalPatients = isOnline ? (data?.total ?? 0) : offlineFiltered.length
-	const totalPages = Math.max(1, isOnline ? (data?.totalPages ?? 1) : Math.ceil(totalPatients / PATIENTS_PAGE_SIZE))
+	const totalPages = Math.max(
+		1,
+		isOnline ? (data?.totalPages ?? 1) : Math.ceil(totalPatients / PATIENTS_PAGE_SIZE)
+	)
 	const currentPage = Math.min(page, totalPages)
 
 	const pagePatients = useMemo(() => {
@@ -180,12 +187,12 @@ export function PatientListCard() {
 
 				<CardContent className="space-y-3 pt-3">
 					<div className="relative">
-						<Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+						<Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
 						<Input
 							placeholder="Filter by name or MRN…"
 							value={filter}
 							onChange={e => setFilter(e.target.value)}
-							className="h-9 rounded-xl border-border/60 bg-background pl-9"
+							className="border-border/60 bg-background h-9 rounded-xl pl-9"
 						/>
 					</div>
 
@@ -199,19 +206,22 @@ export function PatientListCard() {
 						</div>
 					) : (
 						<>
-							<p className="text-xs text-muted-foreground px-0.5">
-								Showing {pageStart}-{pageEnd} of {totalPatients} {totalPatients === 1 ? "patient" : "patients"}
+							<p className="text-muted-foreground px-0.5 text-xs">
+								Showing {pageStart}-{pageEnd} of {totalPatients}{" "}
+								{totalPatients === 1 ? "patient" : "patients"}
 								{trimmed && ` matching "${filter}"`}
 								{isFetching && isOnline && " · Updating..."}
 							</p>
-							<div className="border-border/60 bg-background overflow-hidden rounded-2xl border divide-y divide-border/60">
+							<div className="border-border/60 bg-background divide-border/60 divide-y overflow-hidden rounded-2xl border">
 								{pagePatients.map(patient => {
 									const name = formatPatientName(patient)
-									const dob = "dateOfBirth" in patient ? (patient as { dateOfBirth: string }).dateOfBirth : ""
+									const dob =
+										"dateOfBirth" in patient ? (patient as { dateOfBirth: string }).dateOfBirth : ""
 									const newborn = dob ? isNewborn(dob) : false
-									const lastEncounter = "lastEncounterDate" in patient
-										? (patient as { lastEncounterDate?: string | null }).lastEncounterDate
-										: null
+									const lastEncounter =
+										"lastEncounterDate" in patient
+											? (patient as { lastEncounterDate?: string | null }).lastEncounterDate
+											: null
 
 									return (
 										<div
@@ -230,7 +240,7 @@ export function PatientListCard() {
 														{patient.mrn}
 													</Badge>
 													{newborn && (
-														<Badge className="gap-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 text-[0.68rem] px-2 py-0.5">
+														<Badge className="gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[0.68rem] text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
 															<Baby className="size-2.5" />
 															Newborn
 														</Badge>
@@ -266,7 +276,7 @@ export function PatientListCard() {
 								})}
 							</div>
 							<div className="flex items-center justify-between gap-3 px-0.5">
-								<p className="text-xs text-muted-foreground">
+								<p className="text-muted-foreground text-xs">
 									Page {currentPage} of {totalPages}
 								</p>
 								<div className="flex items-center gap-2">
@@ -293,7 +303,12 @@ export function PatientListCard() {
 				</CardContent>
 			</Card>
 
-			<Dialog open={!!breakGlassPatientId} onOpenChange={open => { if (!open) setBreakGlassPatientId(null) }}>
+			<Dialog
+				open={!!breakGlassPatientId}
+				onOpenChange={open => {
+					if (!open) setBreakGlassPatientId(null)
+				}}
+			>
 				<DialogContent className="max-w-2xl">
 					<DialogHeader>
 						<div className="flex items-center gap-3">
@@ -334,8 +349,8 @@ export function PatientListCard() {
 
 export function PatientListPage() {
 	return (
-		<div className="flex flex-col min-h-svh">
-			<header className="border-b bg-background/80 sticky top-0 z-10 backdrop-blur supports-backdrop-filter:bg-background/60">
+		<div className="flex min-h-svh flex-col">
+			<header className="bg-background/80 supports-backdrop-filter:bg-background/60 sticky top-0 z-10 border-b backdrop-blur">
 				<div className="flex h-11 items-center gap-2 px-3">
 					<div className="flex-1">
 						<h1 className="text-sm font-semibold tracking-tight">Patients</h1>

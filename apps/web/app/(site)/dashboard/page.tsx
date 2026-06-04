@@ -19,15 +19,13 @@ export default function DashboardPage() {
 	)
 	const widgetIds = getDashboardWidgetsForPermissions(permissions)
 	const canViewAdminDashboard = permSet.has("admin:view")
-	const canViewNursingDashboard =
-		permSet.has("nursing:view") && !permSet.has("clinical_docs:sign")
+	const canViewNursingDashboard = permSet.has("nursing:view") && !permSet.has("clinical_docs:sign")
 	const canViewPharmacyDashboard = permSet.has("orders:verify")
 	const canViewNutritionDashboard = permSet.has("nutrition:view")
 	const canViewSurgeonDashboard =
 		profile?.activeRole?.name?.toLowerCase() === "surgeon" && permSet.has("surgical:view")
 	const canViewAnesthesiologistDashboard =
-		profile?.activeRole?.name?.toLowerCase() === "anesthesiologist" &&
-		permSet.has("surgical:view")
+		profile?.activeRole?.name?.toLowerCase() === "anesthesiologist" && permSet.has("surgical:view")
 	const canViewPhysicianDashboard = permSet.has("clinical_docs:sign")
 
 	if (isLoading) {

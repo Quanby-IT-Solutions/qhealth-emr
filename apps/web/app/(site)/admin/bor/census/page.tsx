@@ -7,7 +7,9 @@ export default function CensusPage() {
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-2xl font-semibold">Daily Census Report</h1>
-				<p className="text-sm text-muted-foreground mt-1">Bed occupancy snapshots by ward and date.</p>
+				<p className="text-muted-foreground mt-1 text-sm">
+					Bed occupancy snapshots by ward and date.
+				</p>
 			</div>
 			<CensusReportPage />
 		</div>

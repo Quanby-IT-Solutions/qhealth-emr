@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-
 import { Wifi, WifiOff } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/core/components/ui/alert"
+
 import { useOfflineSync } from "../lib/use-offline-sync"
 
 export function OfflineModeIndicator() {

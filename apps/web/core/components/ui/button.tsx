@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -63,22 +62,18 @@ function Button({
 
 	if (asChild && React.isValidElement(children)) {
 		const child = children as React.ReactElement<{
-			className?: string
+			"className"?: string
 			"data-slot"?: string
 		}>
 		return React.cloneElement(child, {
 			...props,
 			"data-slot": "button",
-			className: cn(composedClassName, child.props.className),
+			"className": cn(composedClassName, child.props.className),
 		})
 	}
 
 	return (
-		<ButtonPrimitive
-			data-slot="button"
-			className={composedClassName}
-			{...props}
-		>
+		<ButtonPrimitive data-slot="button" className={composedClassName} {...props}>
 			{children}
 		</ButtonPrimitive>
 	)

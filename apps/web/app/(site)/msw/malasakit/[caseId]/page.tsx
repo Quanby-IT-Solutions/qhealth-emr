@@ -53,7 +53,7 @@ export default function MalasakitCasePage({ params }: CaseDetailPageProps) {
 	const { data: log, isLoading: logLoading } = useMalasakitStatusLogQuery(caseId)
 	const updateMutation = useUpdateMalasakitCaseMutation()
 
-	const allowedNext = caseData ? STATUS_TRANSITIONS[caseData.status as MalasakitStatus] ?? [] : []
+	const allowedNext = caseData ? (STATUS_TRANSITIONS[caseData.status as MalasakitStatus] ?? []) : []
 
 	const handleUpdate = () => {
 		if (!newStatus) return
@@ -90,15 +90,13 @@ export default function MalasakitCasePage({ params }: CaseDetailPageProps) {
 			) : caseData ? (
 				<div>
 					<div className="flex items-center gap-3">
-						<h1 className="text-xl font-semibold">
-							{caseData.patientName ?? caseData.patientId}
-						</h1>
+						<h1 className="text-xl font-semibold">{caseData.patientName ?? caseData.patientId}</h1>
 						<Badge variant={STATUS_VARIANT[caseData.status] ?? "secondary"}>
 							{caseData.status}
 						</Badge>
 					</div>
-					<p className="mt-1 font-mono text-xs text-muted-foreground">{caseId}</p>
-					<div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+					<p className="text-muted-foreground mt-1 font-mono text-xs">{caseId}</p>
+					<div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-4 text-sm">
 						<span>Source: {caseData.source}</span>
 						{caseData.amountGranted != null && (
 							<span>Amount: ₱{caseData.amountGranted.toLocaleString()}</span>
@@ -108,7 +106,7 @@ export default function MalasakitCasePage({ params }: CaseDetailPageProps) {
 								Reconciled · Ref: {caseData.referenceNo}
 							</Badge>
 						) : caseData.status === "released" ? (
-							<Badge variant="outline" className="text-xs text-muted-foreground">
+							<Badge variant="outline" className="text-muted-foreground text-xs">
 								Pending Reconciliation
 							</Badge>
 						) : null}
@@ -136,12 +134,12 @@ export default function MalasakitCasePage({ params }: CaseDetailPageProps) {
 									/>
 									<div>
 										<p className="text-sm font-medium">
-											{entry.fromStatus ? `${entry.fromStatus} → ${entry.toStatus}` : entry.toStatus}
+											{entry.fromStatus
+												? `${entry.fromStatus} → ${entry.toStatus}`
+												: entry.toStatus}
 										</p>
-										{entry.note && (
-											<p className="text-xs text-muted-foreground">{entry.note}</p>
-										)}
-										<p className="text-xs text-muted-foreground">
+										{entry.note && <p className="text-muted-foreground text-xs">{entry.note}</p>}
+										<p className="text-muted-foreground text-xs">
 											{new Date(entry.changedAt).toLocaleString()}
 										</p>
 									</div>
@@ -149,7 +147,7 @@ export default function MalasakitCasePage({ params }: CaseDetailPageProps) {
 							))}
 						</div>
 					) : (
-						<p className="text-sm text-muted-foreground">No status history yet.</p>
+						<p className="text-muted-foreground text-sm">No status history yet.</p>
 					)}
 				</CardContent>
 			</Card>
@@ -162,10 +160,7 @@ export default function MalasakitCasePage({ params }: CaseDetailPageProps) {
 					<CardContent className="space-y-3">
 						<div className="space-y-1.5">
 							<Label>New Status</Label>
-							<Select
-								value={newStatus}
-								onValueChange={v => setNewStatus(v as MalasakitStatus)}
-							>
+							<Select value={newStatus} onValueChange={v => setNewStatus(v as MalasakitStatus)}>
 								<SelectTrigger className="w-[200px]">
 									<SelectValue>{newStatus || "Select…"}</SelectValue>
 								</SelectTrigger>
@@ -215,9 +210,7 @@ export default function MalasakitCasePage({ params }: CaseDetailPageProps) {
 						</Button>
 
 						{updateMutation.isError && (
-							<p className="text-xs text-destructive">
-								{(updateMutation.error as Error).message}
-							</p>
+							<p className="text-destructive text-xs">{(updateMutation.error as Error).message}</p>
 						)}
 					</CardContent>
 				</Card>

@@ -1,7 +1,7 @@
 "use client"
 
-import Link from "next/link"
 import { useState } from "react"
+import Link from "next/link"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -113,9 +113,7 @@ export default function RegistrarDischargePage() {
 												</Badge>
 											)}
 										</TableCell>
-										<TableCell className="text-sm">
-											{enc.attendingStaffName ?? "—"}
-										</TableCell>
+										<TableCell className="text-sm">{enc.attendingStaffName ?? "—"}</TableCell>
 										<TableCell className="text-sm">
 											{formatDatetime(enc.admissionDatetime)}
 										</TableCell>

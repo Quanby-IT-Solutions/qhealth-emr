@@ -38,7 +38,12 @@ export function PidsrCaseDetail({ caseId, onClose }: PidsrCaseDetailProps) {
 	}
 
 	return (
-		<Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+		<Dialog
+			open
+			onOpenChange={open => {
+				if (!open) onClose()
+			}}
+		>
 			<DialogContent className="max-w-lg">
 				<DialogHeader>
 					<DialogTitle>PIDSR Case Detail</DialogTitle>
@@ -52,17 +57,15 @@ export function PidsrCaseDetail({ caseId, onClose }: PidsrCaseDetailProps) {
 					<div className="space-y-4 text-sm">
 						{/* Patient */}
 						<div>
-							<p className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
+							<p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
 								Patient
 							</p>
 							<div className="grid grid-cols-2 gap-x-4 gap-y-1">
 								<div>
-									<span className="text-muted-foreground">Name:</span>{" "}
-									{detail.patientName ?? "—"}
+									<span className="text-muted-foreground">Name:</span> {detail.patientName ?? "—"}
 								</div>
 								<div>
-									<span className="text-muted-foreground">MRN:</span>{" "}
-									{detail.patientMrn ?? "—"}
+									<span className="text-muted-foreground">MRN:</span> {detail.patientMrn ?? "—"}
 								</div>
 							</div>
 						</div>
@@ -71,17 +74,15 @@ export function PidsrCaseDetail({ caseId, onClose }: PidsrCaseDetailProps) {
 
 						{/* Disease */}
 						<div>
-							<p className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
+							<p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
 								Disease Information
 							</p>
 							<div className="grid grid-cols-2 gap-x-4 gap-y-1">
 								<div>
-									<span className="text-muted-foreground">Disease:</span>{" "}
-									{detail.diseaseName}
+									<span className="text-muted-foreground">Disease:</span> {detail.diseaseName}
 								</div>
 								<div>
-									<span className="text-muted-foreground">ICD-10:</span>{" "}
-									{detail.diseaseCode}
+									<span className="text-muted-foreground">ICD-10:</span> {detail.diseaseCode}
 								</div>
 								<div>
 									<span className="text-muted-foreground">Classification:</span>{" "}
@@ -116,13 +117,12 @@ export function PidsrCaseDetail({ caseId, onClose }: PidsrCaseDetailProps) {
 
 						{/* Encounter */}
 						<div>
-							<p className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
+							<p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
 								Encounter
 							</p>
 							<div className="grid grid-cols-2 gap-x-4 gap-y-1">
 								<div>
-									<span className="text-muted-foreground">Type:</span>{" "}
-									{detail.encounterType ?? "—"}
+									<span className="text-muted-foreground">Type:</span> {detail.encounterType ?? "—"}
 								</div>
 								<div>
 									<span className="text-muted-foreground">Physician:</span>{" "}
@@ -142,7 +142,7 @@ export function PidsrCaseDetail({ caseId, onClose }: PidsrCaseDetailProps) {
 							<>
 								<Separator />
 								<div>
-									<p className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
+									<p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
 										Submission Data
 									</p>
 									<div className="bg-muted rounded-md p-3 font-mono text-xs">

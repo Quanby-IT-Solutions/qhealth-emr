@@ -2,8 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { env } from "@/env"
 import { orpc } from "@/services/orpc/client"
+import { env } from "@/env"
 
 export function useWardsQuery(facilityId: string) {
 	return useQuery(
@@ -16,7 +16,18 @@ export function useWardsQuery(facilityId: string) {
 }
 
 export function useBedListQuery(
-	params: { facilityId: string; wardId?: string; status?: "available" | "occupied" | "out_of_service" | "dirty" | "reserved" | "cleaning" | "pending_transfer" },
+	params: {
+		facilityId: string
+		wardId?: string
+		status?:
+			| "available"
+			| "occupied"
+			| "out_of_service"
+			| "dirty"
+			| "reserved"
+			| "cleaning"
+			| "pending_transfer"
+	},
 	options?: { enabled?: boolean }
 ) {
 	return useQuery(
@@ -99,15 +110,12 @@ interface BedSuggestionResponse {
 export function useBedSuggestionMutation() {
 	return useMutation({
 		mutationFn: async (data: BedSuggestionInput) => {
-			const res = await fetch(
-				`${env.NEXT_PUBLIC_API_BASE_URL}/v1/beds/suggest`,
-				{
-					method: "POST",
-					credentials: "include",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(data),
-				}
-			)
+			const res = await fetch(`${env.NEXT_PUBLIC_API_BASE_URL}/v1/beds/suggest`, {
+				method: "POST",
+				credentials: "include",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(data),
+			})
 			if (!res.ok) throw new Error(`HTTP ${res.status}`)
 			return res.json() as Promise<BedSuggestionResponse>
 		},

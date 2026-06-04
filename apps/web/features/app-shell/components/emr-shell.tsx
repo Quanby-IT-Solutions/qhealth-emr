@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import { useTheme } from "next-themes"
 
+import { NotificationCenter } from "@/core/components/notification-center"
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -13,18 +14,20 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/core/components/ui/dropdown-menu"
-import { NotificationCenter } from "@/core/components/notification-center"
 import { cn, getInitials } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { filterNavItems, PRIMARY_NAV_ITEMS, SECONDARY_NAV_ITEMS } from "@/features/app-shell/lib/navigation"
+import {
+	filterNavItems,
+	PRIMARY_NAV_ITEMS,
+	SECONDARY_NAV_ITEMS,
+} from "@/features/app-shell/lib/navigation"
 import { useSignOutMutation } from "@/features/auth/api/session.hooks"
 import { useNursingSync } from "@/features/nursing/lib/use-nursing-sync"
 import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 
 // --- Custom SVGs ---
 
-const UUID_SEGMENT_RE =
-	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const UUID_SEGMENT_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 const ROUTE_SEGMENT_LABELS: Record<string, string> = {
 	"admin": "Admin",
@@ -1256,7 +1259,10 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 										opacity: 1,
 									}}
 								/>
-								<span className="text-sm font-medium" style={{ color: "var(--sidebar-foreground)" }}>
+								<span
+									className="text-sm font-medium"
+									style={{ color: "var(--sidebar-foreground)" }}
+								>
 									Account Settings
 								</span>
 							</DropdownMenuItem>

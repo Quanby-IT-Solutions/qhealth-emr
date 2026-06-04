@@ -30,8 +30,7 @@ export function useCreateMswEvaluationMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		mswOrpc.create.mutationOptions({
-			onSuccess: () =>
-				qc.invalidateQueries({ queryKey: mswOrpc.list.key() }),
+			onSuccess: () => qc.invalidateQueries({ queryKey: mswOrpc.list.key() }),
 		})
 	)
 }
@@ -40,8 +39,7 @@ export function useUpdateMswEvaluationMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		mswOrpc.update.mutationOptions({
-			onSuccess: () =>
-				qc.invalidateQueries({ queryKey: mswOrpc.list.key() }),
+			onSuccess: () => qc.invalidateQueries({ queryKey: mswOrpc.list.key() }),
 		})
 	)
 }
@@ -62,8 +60,7 @@ export function useTagBenefitsMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		mswOrpc.tagBenefits.mutationOptions({
-			onSuccess: () =>
-				qc.invalidateQueries({ queryKey: mswOrpc.getByEncounter.key() }),
+			onSuccess: () => qc.invalidateQueries({ queryKey: mswOrpc.getByEncounter.key() }),
 		})
 	)
 }

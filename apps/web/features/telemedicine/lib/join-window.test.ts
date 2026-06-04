@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import {
-	formatJoinWindowRange,
-	getJoinWindowState,
-	parseTelemedicineDateTime,
-} from "./join-window"
+import { formatJoinWindowRange, getJoinWindowState, parseTelemedicineDateTime } from "./join-window"
 
 const appointment = {
 	scheduledDate: "2026-05-24",
@@ -41,8 +37,8 @@ describe("telemedicine join window", () => {
 	it("formats the video access window in friendly text", () => {
 		const state = getJoinWindowState(appointment, new Date("2026-05-24T05:30:00.000Z"))
 
-		expect(state.startsAt && state.endsAt ? formatJoinWindowRange(state.startsAt, state.endsAt) : "").toBe(
-			"May 24, 2026, 1:30 PM to 4:30 PM"
-		)
+		expect(
+			state.startsAt && state.endsAt ? formatJoinWindowRange(state.startsAt, state.endsAt) : ""
+		).toBe("May 24, 2026, 1:30 PM to 4:30 PM")
 	})
 })

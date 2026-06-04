@@ -151,7 +151,9 @@ export function AddProblemDialog({
 						/>
 					</div>
 
-					<div className={`grid gap-4 ${status === "resolved" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+					<div
+						className={`grid gap-4 ${status === "resolved" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+					>
 						<div className="space-y-2">
 							<Label>Status</Label>
 							<Select value={status} onValueChange={value => setStatus(value as ProblemStatus)}>
@@ -188,7 +190,12 @@ export function AddProblemDialog({
 				</div>
 
 				<DialogFooter>
-					<Button type="button" variant="outline" onClick={handleCancel} disabled={createProblem.isPending}>
+					<Button
+						type="button"
+						variant="outline"
+						onClick={handleCancel}
+						disabled={createProblem.isPending}
+					>
 						Cancel
 					</Button>
 					<Button onClick={handleSubmit} disabled={!canSubmit}>

@@ -506,7 +506,13 @@ function SidebarMenuButton({
 			},
 			props
 		),
-		render: !shouldUseTooltip ? render : render ? <TooltipTrigger render={render} /> : TooltipTrigger,
+		render: !shouldUseTooltip ? (
+			render
+		) : render ? (
+			<TooltipTrigger render={render} />
+		) : (
+			TooltipTrigger
+		),
 		state: {
 			slot: "sidebar-menu-button",
 			sidebar: "menu-button",

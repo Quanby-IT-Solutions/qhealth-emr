@@ -482,7 +482,9 @@ export function useRegeneratePatientInviteMutation() {
 			),
 		onSuccess: (_data, appointmentId) => {
 			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.appointment(appointmentId) })
-			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.patientInvite(appointmentId) })
+			void queryClient.invalidateQueries({
+				queryKey: telemedicineKeys.patientInvite(appointmentId),
+			})
 		},
 	})
 }
@@ -497,7 +499,9 @@ export function useRevokePatientInviteMutation() {
 			),
 		onSuccess: (_data, appointmentId) => {
 			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.appointment(appointmentId) })
-			void queryClient.invalidateQueries({ queryKey: telemedicineKeys.patientInvite(appointmentId) })
+			void queryClient.invalidateQueries({
+				queryKey: telemedicineKeys.patientInvite(appointmentId),
+			})
 		},
 	})
 }

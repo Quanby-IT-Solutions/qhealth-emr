@@ -43,7 +43,7 @@ export function TestConnectionDrawer({
 				</SheetHeader>
 				<div className="mt-6 space-y-4">
 					{testMutation.isPending && (
-						<p className="animate-pulse text-sm text-muted-foreground">Connecting...</p>
+						<p className="text-muted-foreground animate-pulse text-sm">Connecting...</p>
 					)}
 					{result && (
 						<div className="space-y-3">
@@ -52,19 +52,17 @@ export function TestConnectionDrawer({
 									{isOk ? "Connected" : "Failed"}
 								</Badge>
 								{result.httpStatus != null && (
-									<span className="text-sm text-muted-foreground">HTTP {result.httpStatus}</span>
+									<span className="text-muted-foreground text-sm">HTTP {result.httpStatus}</span>
 								)}
 								{result.latencyMs != null && (
-									<span className="text-sm text-muted-foreground">{result.latencyMs}ms</span>
+									<span className="text-muted-foreground text-sm">{result.latencyMs}ms</span>
 								)}
 							</div>
 							<p className="text-sm">{result.detail}</p>
 						</div>
 					)}
 					{testMutation.isError && (
-						<p className="text-sm text-destructive">
-							Test failed. Check endpoint configuration.
-						</p>
+						<p className="text-destructive text-sm">Test failed. Check endpoint configuration.</p>
 					)}
 					<Button onClick={handleTest} disabled={testMutation.isPending} size="sm">
 						{testMutation.isPending ? "Testing..." : result ? "Re-test" : "Test Connection"}

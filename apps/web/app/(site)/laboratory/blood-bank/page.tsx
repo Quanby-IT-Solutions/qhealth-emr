@@ -24,7 +24,7 @@ export default function LaboratoryBloodBankPage() {
 
 	if (!can(permSet, "laboratory", "view") || !roleNameMatches(roleName, BLOOD_BANK_ROLE_NAMES)) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access blood bank.
 			</div>
 		)

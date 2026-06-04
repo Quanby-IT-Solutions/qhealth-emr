@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-
 import { AlertCircle, CheckCircle, RotateCcw } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -23,12 +22,11 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
-
 import {
-	type CreateNbsConsentInput,
-	type NbsConsentType,
 	useCreateNbsConsentMutation,
 	useNbsConsentQuery,
+	type CreateNbsConsentInput,
+	type NbsConsentType,
 } from "@/features/nbs/api/nbs.hooks"
 
 // ============================================================================
@@ -75,9 +73,7 @@ function SignatureCanvas({ onCapture, onClear }: SignatureCanvasProps) {
 		lastPosRef.current = getPos(e)
 	}
 
-	const draw = (
-		e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
-	) => {
+	const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
 		e.preventDefault()
 		if (!isDrawingRef.current) return
 		const canvas = canvasRef.current
@@ -134,7 +130,7 @@ function SignatureCanvas({ onCapture, onClear }: SignatureCanvasProps) {
 				ref={canvasRef}
 				width={560}
 				height={150}
-				className="w-full touch-none rounded border border-border cursor-crosshair"
+				className="border-border w-full cursor-crosshair touch-none rounded border"
 				style={{ aspectRatio: "560/150" }}
 				onMouseDown={startDrawing}
 				onMouseMove={draw}
@@ -212,13 +208,13 @@ export function NbsConsentDialog({
 					</DialogHeader>
 					<div className="space-y-3 text-sm">
 						<div>
-							<p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-1">
+							<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 								Type
 							</p>
 							<p className="capitalize">{existing.consentType}</p>
 						</div>
 						<div>
-							<p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-1">
+							<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 								Parent / Guardian
 							</p>
 							<p>
@@ -227,7 +223,7 @@ export function NbsConsentDialog({
 						</div>
 						{existing.waiversReason && (
 							<div>
-								<p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-1">
+								<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 									Waiver Reason
 								</p>
 								<p>{existing.waiversReason}</p>
@@ -235,14 +231,14 @@ export function NbsConsentDialog({
 						)}
 						{existing.signatureDataUrl && (
 							<div>
-								<p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-1">
+								<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 									Signature
 								</p>
 								{/* eslint-disable-next-line @next/next/no-img-element */}
 								<img
 									src={existing.signatureDataUrl}
 									alt="Parent signature"
-									className="max-h-24 rounded border border-border bg-muted/20"
+									className="border-border bg-muted/20 max-h-24 rounded border"
 								/>
 							</div>
 						)}
@@ -276,18 +272,13 @@ export function NbsConsentDialog({
 				<form onSubmit={handleSubmit} className="space-y-4">
 					<div className="space-y-1.5">
 						<Label htmlFor="consentType">Decision</Label>
-						<Select
-							value={consentType}
-							onValueChange={(v) => setConsentType(v as NbsConsentType)}
-						>
+						<Select value={consentType} onValueChange={v => setConsentType(v as NbsConsentType)}>
 							<SelectTrigger id="consentType">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="consent">Consent — parent agrees to screening</SelectItem>
-								<SelectItem value="waiver">
-									Waiver — parent declines screening
-								</SelectItem>
+								<SelectItem value="waiver">Waiver — parent declines screening</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
@@ -301,7 +292,7 @@ export function NbsConsentDialog({
 								id="parentName"
 								placeholder="Full name"
 								value={parentName}
-								onChange={(e) => setParentName(e.target.value)}
+								onChange={e => setParentName(e.target.value)}
 								required
 							/>
 						</div>
@@ -313,7 +304,7 @@ export function NbsConsentDialog({
 								id="relationship"
 								placeholder="e.g. Mother, Father, Guardian"
 								value={relationship}
-								onChange={(e) => setRelationship(e.target.value)}
+								onChange={e => setRelationship(e.target.value)}
 								required
 							/>
 						</div>
@@ -329,7 +320,7 @@ export function NbsConsentDialog({
 								rows={2}
 								placeholder="State the reason for declining NBS…"
 								value={waiverReason}
-								onChange={(e) => setWaiverReason(e.target.value)}
+								onChange={e => setWaiverReason(e.target.value)}
 								required={consentType === "waiver"}
 							/>
 						</div>
@@ -349,12 +340,12 @@ export function NbsConsentDialog({
 							id="witnessName"
 							placeholder="Witness full name"
 							value={witnessName}
-							onChange={(e) => setWitnessName(e.target.value)}
+							onChange={e => setWitnessName(e.target.value)}
 						/>
 					</div>
 
 					{createMutation.isError && (
-						<div className="flex items-center gap-2 text-sm text-destructive">
+						<div className="text-destructive flex items-center gap-2 text-sm">
 							<AlertCircle className="size-4 shrink-0" />
 							<span>Failed to save consent. Please try again.</span>
 						</div>
@@ -367,11 +358,7 @@ export function NbsConsentDialog({
 					)}
 
 					<DialogFooter>
-						<Button
-							type="button"
-							variant="outline"
-							onClick={() => onOpenChange(false)}
-						>
+						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
 							Cancel
 						</Button>
 						<Button type="submit" disabled={createMutation.isPending}>

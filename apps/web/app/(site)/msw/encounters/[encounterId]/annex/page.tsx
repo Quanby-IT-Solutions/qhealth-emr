@@ -7,8 +7,8 @@ import { ArrowLeft, CheckCircle } from "lucide-react"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent } from "@/core/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
-import { EncounterContextBar } from "@/features/msw/components/encounter-context-bar"
 import { AnnexPanel } from "@/features/msw/annex-signatures/components/annex-panel"
+import { EncounterContextBar } from "@/features/msw/components/encounter-context-bar"
 
 interface AnnexPageProps {
 	params: Promise<{ encounterId: string }>
@@ -32,7 +32,7 @@ export default function AnnexPage({ params }: AnnexPageProps) {
 
 			<div>
 				<h1 className="text-xl font-semibold">PhilHealth Annex A &amp; B Signature Capture</h1>
-				<p className="text-sm text-muted-foreground">Story 12.9 · Flow L9 · Tablet-optimised</p>
+				<p className="text-muted-foreground text-sm">Story 12.9 · Flow L9 · Tablet-optimised</p>
 			</div>
 
 			<Card>

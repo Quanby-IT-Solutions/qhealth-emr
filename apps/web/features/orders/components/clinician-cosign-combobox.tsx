@@ -100,9 +100,7 @@ export function ClinicianCoSignCombobox({
 						) : (
 							<>
 								<CommandEmpty>
-									{inputValue.trim()
-										? "No matching clinicians"
-										: "No active co-signers available"}
+									{inputValue.trim() ? "No matching clinicians" : "No active co-signers available"}
 								</CommandEmpty>
 								<CommandGroup>
 									{(data ?? []).map(item => (

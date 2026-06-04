@@ -80,7 +80,7 @@ export function CreateImagingOrderDialog({
 			},
 			{
 				onSuccess: () => handleOpenChange(false),
-			},
+			}
 		)
 	}
 
@@ -89,9 +89,7 @@ export function CreateImagingOrderDialog({
 			<DialogContent className="max-w-lg">
 				<DialogHeader>
 					<DialogTitle>New Imaging Order</DialogTitle>
-					<DialogDescription>
-						Enter the imaging study details.
-					</DialogDescription>
+					<DialogDescription>Enter the imaging study details.</DialogDescription>
 				</DialogHeader>
 
 				<div className="grid gap-4 py-4">
@@ -121,7 +119,7 @@ export function CreateImagingOrderDialog({
 						<Input
 							id="imgBodyPart"
 							value={bodyPart}
-							onChange={(e) => setBodyPart(e.target.value)}
+							onChange={e => setBodyPart(e.target.value)}
 							placeholder="e.g., Chest, Abdomen"
 						/>
 					</div>
@@ -131,7 +129,7 @@ export function CreateImagingOrderDialog({
 						<Textarea
 							id="imgClinicalIndication"
 							value={clinicalIndication}
-							onChange={(e) => setClinicalIndication(e.target.value)}
+							onChange={e => setClinicalIndication(e.target.value)}
 							rows={2}
 							placeholder="Medical necessity for the requested imaging study"
 						/>

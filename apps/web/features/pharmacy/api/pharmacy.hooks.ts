@@ -217,7 +217,7 @@ function mapPharmacyQueueItem(order: RawMedOrder): PharmacyQueueItem {
 		criticalAlertCount: order.criticalAlertCount ?? 0,
 		receivedAt: serializeRequiredDate(order.receivedAt ?? order.createdAt),
 	}
-	}
+}
 
 function mapSafetyChecks(order: RawMedOrder): SafetyCheck[] {
 	return (order.safetyChecks ?? []).map(check => ({
@@ -249,40 +249,33 @@ function filterQueueResponse(
 ): PaginatedResponse<PharmacyQueueItem> {
 	const searchTerm = params.search?.trim().toLowerCase()
 
-	const data = response.data
-		.map(mapPharmacyQueueItem)
-		.filter(item => {
-			if (params.status && params.status !== "all" && item.status !== params.status) {
-				return false
-			}
+	const data = response.data.map(mapPharmacyQueueItem).filter(item => {
+		if (params.status && params.status !== "all" && item.status !== params.status) {
+			return false
+		}
 
-			if (params.priority && item.priority !== params.priority) {
-				return false
-			}
+		if (params.priority && item.priority !== params.priority) {
+			return false
+		}
 
-			if (
-				params.isControlledSubstance !== undefined &&
-				item.isControlledSubstance !== params.isControlledSubstance
-			) {
-				return false
-			}
+		if (
+			params.isControlledSubstance !== undefined &&
+			item.isControlledSubstance !== params.isControlledSubstance
+		) {
+			return false
+		}
 
-			if (!searchTerm) {
-				return true
-			}
+		if (!searchTerm) {
+			return true
+		}
 
-			const haystack = [
-				item.patientName,
-				item.patientMrn,
-				item.genericName,
-				item.brandName,
-			]
-				.filter(Boolean)
-				.join(" ")
-				.toLowerCase()
+		const haystack = [item.patientName, item.patientMrn, item.genericName, item.brandName]
+			.filter(Boolean)
+			.join(" ")
+			.toLowerCase()
 
-			return haystack.includes(searchTerm)
-		})
+		return haystack.includes(searchTerm)
+	})
 
 	return {
 		data,
@@ -301,12 +294,9 @@ export const pharmacyKeys = {
 	all: ["pharmacy"] as const,
 	queue: (params: object) => [...pharmacyKeys.all, "queue", params] as const,
 	order: (id: string) => [...pharmacyKeys.all, "order", id] as const,
-	dispenseRecords: (orderId: string) =>
-		[...pharmacyKeys.all, "dispense-records", orderId] as const,
-	opdPrescription: (search: string) =>
-		[...pharmacyKeys.all, "opd-prescription", search] as const,
-	opdDispenseHistory: (params: object) =>
-		[...pharmacyKeys.all, "opd-history", params] as const,
+	dispenseRecords: (orderId: string) => [...pharmacyKeys.all, "dispense-records", orderId] as const,
+	opdPrescription: (search: string) => [...pharmacyKeys.all, "opd-prescription", search] as const,
+	opdDispenseHistory: (params: object) => [...pharmacyKeys.all, "opd-history", params] as const,
 }
 
 // ============================================================================
@@ -378,8 +368,7 @@ export function useVerifyPharmacyOrderMutation() {
 				medicationOrderId: data.medicationOrderId,
 				action: data.action === "on_hold" ? "modified" : data.action,
 				rejectionReason: data.rejectionReason,
-				modificationNotes:
-					data.modificationNotes ?? data.overrideNotes,
+				modificationNotes: data.modificationNotes ?? data.overrideNotes,
 			})
 
 			return { success: true }
@@ -552,8 +541,7 @@ export interface CounselingLogListParams {
 export function useSaveCounselingLogMutation() {
 	const queryClient = useQueryClient()
 	return useMutation({
-		mutationFn: (data: SaveCounselingLogInput) =>
-			orpc.orders.saveCounselingLog.call(data),
+		mutationFn: (data: SaveCounselingLogInput) => orpc.orders.saveCounselingLog.call(data),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: pharmacyKeys.all })
 		},

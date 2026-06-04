@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { AlertTriangle, Ban, Bell, ShieldAlert } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -27,8 +26,7 @@ const SEVERITY_CONFIG = {
 	hard_block: {
 		label: "Hard Block",
 		icon: Ban,
-		containerCn:
-			"border-destructive bg-destructive/10 text-destructive dark:bg-destructive/20",
+		containerCn: "border-destructive bg-destructive/10 text-destructive dark:bg-destructive/20",
 		iconCn: "text-destructive",
 		canOverride: false,
 	},
@@ -81,9 +79,7 @@ function SingleAlert({
 					<div className="flex items-center justify-between gap-2">
 						<div>
 							<span className="font-semibold">{config.label}</span>
-							{alert.field && (
-								<span className="ml-1 opacity-70">({alert.field})</span>
-							)}
+							{alert.field && <span className="ml-1 opacity-70">({alert.field})</span>}
 							<span className="ml-1">—</span>
 							<span className="ml-1">{alert.message}</span>
 						</div>
@@ -93,7 +89,7 @@ function SingleAlert({
 								variant="outline"
 								size="sm"
 								className="shrink-0 border-orange-400 text-orange-700 hover:bg-orange-100 dark:text-orange-300 dark:hover:bg-orange-900"
-								onClick={() => setShowOverride((v) => !v)}
+								onClick={() => setShowOverride(v => !v)}
 							>
 								{showOverride ? "Cancel Override" : "Override"}
 							</Button>
@@ -102,13 +98,11 @@ function SingleAlert({
 
 					{config.canOverride && showOverride && (
 						<div className="mt-2 space-y-1">
-							<Label className="text-xs font-medium">
-								Override reason (required)
-							</Label>
+							<Label className="text-xs font-medium">Override reason (required)</Label>
 							<Textarea
 								rows={2}
 								value={overrideReason ?? ""}
-								onChange={(e) => onReasonChange?.(e.target.value)}
+								onChange={e => onReasonChange?.(e.target.value)}
 								placeholder="Provide clinical justification…"
 								className="bg-white text-sm dark:bg-orange-950"
 							/>
@@ -142,24 +136,22 @@ export function CdsAlertBanner({
 }: CdsAlertBannerProps) {
 	if (alerts.length === 0) return null
 
-	const hardBlocks = alerts.filter((a) => a.severity === "hard_block")
-	const softBlocks = alerts.filter((a) => a.severity === "soft_block")
-	const warnings = alerts.filter((a) => a.severity === "warning")
-	const highAlerts = alerts.filter((a) => a.severity === "high_alert")
+	const hardBlocks = alerts.filter(a => a.severity === "hard_block")
+	const softBlocks = alerts.filter(a => a.severity === "soft_block")
+	const warnings = alerts.filter(a => a.severity === "warning")
+	const highAlerts = alerts.filter(a => a.severity === "high_alert")
 
 	const ordered = [...hardBlocks, ...highAlerts, ...softBlocks, ...warnings]
 
 	return (
 		<div className="space-y-2">
-			{ordered.map((alert) => (
+			{ordered.map(alert => (
 				<SingleAlert
 					key={alert.id}
 					alert={alert}
 					overrideReason={overrideReasons[alert.id]}
-					onReasonChange={(reason) => onOverrideReasonChange?.(alert.id, reason)}
-					onOverride={
-						onOverride ? (reason) => onOverride(alert.id, reason) : undefined
-					}
+					onReasonChange={reason => onOverrideReasonChange?.(alert.id, reason)}
+					onOverride={onOverride ? reason => onOverride(alert.id, reason) : undefined}
 				/>
 			))}
 		</div>

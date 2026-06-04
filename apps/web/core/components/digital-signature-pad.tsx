@@ -40,7 +40,7 @@ export function DigitalSignaturePad({
 
 	const getPos = (
 		e: MouseEvent | TouchEvent,
-		canvas: HTMLCanvasElement,
+		canvas: HTMLCanvasElement
 	): { x: number; y: number } => {
 		const rect = canvas.getBoundingClientRect()
 		const scaleX = canvas.width / rect.width
@@ -72,7 +72,7 @@ export function DigitalSignaturePad({
 			ctx.moveTo(x, y)
 			setIsEmpty(false)
 		},
-		[disabled],
+		[disabled]
 	)
 
 	const draw = useCallback((e: MouseEvent | TouchEvent) => {
@@ -133,7 +133,7 @@ export function DigitalSignaturePad({
 
 	return (
 		<div className={cn("flex flex-col gap-3", className)}>
-			<div className="overflow-hidden rounded-md border border-input bg-white">
+			<div className="border-input overflow-hidden rounded-md border bg-white">
 				<canvas
 					ref={canvasRef}
 					width={width}
@@ -149,12 +149,7 @@ export function DigitalSignaturePad({
 						<Button variant="outline" size="sm" onClick={handleClear} type="button">
 							Clear
 						</Button>
-						<Button
-							size="sm"
-							onClick={handleSave}
-							disabled={isEmpty}
-							type="button"
-						>
+						<Button size="sm" onClick={handleSave} disabled={isEmpty} type="button">
 							Save Signature
 						</Button>
 					</div>

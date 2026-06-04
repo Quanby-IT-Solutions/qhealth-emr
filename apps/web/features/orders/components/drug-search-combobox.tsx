@@ -13,11 +13,7 @@ import {
 	CommandItem,
 	CommandList,
 } from "@/core/components/ui/command"
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/core/components/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger } from "@/core/components/ui/popover"
 import {
 	useDrugGenericsQuery,
 	useFormularyItemsQuery,
@@ -91,8 +87,8 @@ export function DrugSearchCombobox({
 		limit: 20,
 	})
 
-	const formularyItems = (searchEnabled ? data?.data ?? [] : []) as FormularySearchItem[]
-	const genericItems = (searchEnabled ? genericData?.data ?? [] : []) as DrugGeneric[]
+	const formularyItems = (searchEnabled ? (data?.data ?? []) : []) as FormularySearchItem[]
+	const genericItems = (searchEnabled ? (genericData?.data ?? []) : []) as DrugGeneric[]
 	const items = buildSearchSelections(formularyItems, genericItems)
 	const isSearching = isLoading || genericsLoading
 
@@ -163,9 +159,9 @@ export function DrugSearchCombobox({
 									<div className="px-3 py-4 text-left text-sm">
 										<p>No orderable generic found.</p>
 										<p className="text-muted-foreground mt-1 text-xs">
-											Search a specific generic drug name, such as amoxicillin, or check the
-											drug catalog. Allergy classes like penicillin are not orderable unless
-											they exist as active generics.
+											Search a specific generic drug name, such as amoxicillin, or check the drug
+											catalog. Allergy classes like penicillin are not orderable unless they exist
+											as active generics.
 										</p>
 									</div>
 								</CommandEmpty>

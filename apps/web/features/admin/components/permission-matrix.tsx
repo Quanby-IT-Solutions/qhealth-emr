@@ -6,17 +6,38 @@ import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Checkbox } from "@/core/components/ui/checkbox"
 import { Input } from "@/core/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
-	useListRolesQuery,
-	useUpdateRolePermissionsMutation,
-	useCreateRoleMutation,
-	useUpdateRoleMutation,
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
+import {
 	useArchiveRoleMutation,
+	useCreateRoleMutation,
+	useListRolesQuery,
+	useUpdateRoleMutation,
+	useUpdateRolePermissionsMutation,
 } from "@/features/admin/api/admin.hooks"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
-const MODULES = ["adt", "clinical_docs", "orders", "nursing", "billing", "formulary", "reporting", "audit", "admin", "feature_flags", "system_settings", "facility_profile", "integration_registry"] as const
+const MODULES = [
+	"adt",
+	"clinical_docs",
+	"orders",
+	"nursing",
+	"billing",
+	"formulary",
+	"reporting",
+	"audit",
+	"admin",
+	"feature_flags",
+	"system_settings",
+	"facility_profile",
+	"integration_registry",
+] as const
 const ACTIONS = ["view", "create", "edit", "sign", "delete", "verify", "export"] as const
 
 type Module = (typeof MODULES)[number]
@@ -33,7 +54,10 @@ export function PermissionMatrix() {
 	const updateRoleMutation = useUpdateRoleMutation()
 
 	// Draft permissions state (local, saved explicitly)
-	const [draftPermissions, setDraftPermissions] = useState<Array<{ module: Module; action: Action }> | null>(null)
+	const [draftPermissions, setDraftPermissions] = useState<Array<{
+		module: Module
+		action: Action
+	}> | null>(null)
 	const [permsDirty, setPermsDirty] = useState(false)
 
 	// New role form state
@@ -54,10 +78,11 @@ export function PermissionMatrix() {
 	// Build effective permissions from draft or persisted
 	const effectivePermissions: Array<{ module: Module; action: Action }> =
 		draftPermissions ??
-		(selectedRole?.permissions.map(p => ({
+		selectedRole?.permissions.map(p => ({
 			module: p.module as Module,
 			action: p.action as Action,
-		})) ?? [])
+		})) ??
+		[]
 
 	const hasPermission = (mod: Module, action: Action) =>
 		effectivePermissions.some(p => p.module === mod && p.action === action)
@@ -150,7 +175,9 @@ export function PermissionMatrix() {
 		<div className="flex gap-6">
 			{/* Left Rail — Role list */}
 			<div className="w-56 shrink-0 space-y-2">
-				<p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide mb-2">Roles</p>
+				<p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
+					Roles
+				</p>
 				{rolesData?.map(role => (
 					<div key={role.id} className="group">
 						{renamingRoleId === role.id ? (
@@ -162,27 +189,46 @@ export function PermissionMatrix() {
 									autoFocus
 									onKeyDown={e => {
 										if (e.key === "Enter") handleRename(role.id)
-										if (e.key === "Escape") { setRenamingRoleId(null); setRenameValue("") }
+										if (e.key === "Escape") {
+											setRenamingRoleId(null)
+											setRenameValue("")
+										}
 									}}
 								/>
-								<Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => handleRename(role.id)}>
+								<Button
+									size="sm"
+									variant="ghost"
+									className="h-7 px-2 text-xs"
+									onClick={() => handleRename(role.id)}
+								>
 									✓
 								</Button>
 							</div>
 						) : archivingRoleId === role.id ? (
-							<div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 space-y-1">
+							<div className="border-destructive/40 bg-destructive/5 space-y-1 rounded-md border p-2">
 								{archiveConflict ? (
 									<>
-										<p className="text-xs text-destructive">
-											Cannot archive: {archiveConflict.assignedUserCount} user(s) still assigned. Remove all assignments first.
+										<p className="text-destructive text-xs">
+											Cannot archive: {archiveConflict.assignedUserCount} user(s) still assigned.
+											Remove all assignments first.
 										</p>
-										<Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => { setArchivingRoleId(null); setArchiveConflict(null) }}>
+										<Button
+											size="sm"
+											variant="ghost"
+											className="h-6 px-2 text-xs"
+											onClick={() => {
+												setArchivingRoleId(null)
+												setArchiveConflict(null)
+											}}
+										>
 											OK
 										</Button>
 									</>
 								) : (
 									<>
-										<p className="text-xs text-destructive">Archive "{role.name}"? It will no longer be assignable.</p>
+										<p className="text-destructive text-xs">
+											Archive "{role.name}"? It will no longer be assignable.
+										</p>
 										<div className="flex gap-1">
 											<Button
 												size="sm"
@@ -193,7 +239,15 @@ export function PermissionMatrix() {
 											>
 												Archive
 											</Button>
-											<Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => { setArchivingRoleId(null); setArchiveConflict(null) }}>
+											<Button
+												size="sm"
+												variant="ghost"
+												className="h-6 px-2 text-xs"
+												onClick={() => {
+													setArchivingRoleId(null)
+													setArchiveConflict(null)
+												}}
+											>
 												Cancel
 											</Button>
 										</div>
@@ -202,26 +256,24 @@ export function PermissionMatrix() {
 							</div>
 						) : (
 							<div
-								className={`flex items-center justify-between rounded-md px-2 py-1.5 cursor-pointer transition-colors ${
-									selectedRoleId === role.id
-										? "bg-primary/10 text-primary"
-										: "hover:bg-muted"
+								className={`flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 transition-colors ${
+									selectedRoleId === role.id ? "bg-primary/10 text-primary" : "hover:bg-muted"
 								}`}
 								onClick={() => handleSelectRole(role.id)}
 							>
-								<div className="flex items-center gap-1.5 min-w-0">
-									<span className="text-sm truncate">{role.name}</span>
+								<div className="flex min-w-0 items-center gap-1.5">
+									<span className="truncate text-sm">{role.name}</span>
 									{role.isSystemDefault && (
-										<Badge variant="secondary" className="text-[10px] px-1">
+										<Badge variant="secondary" className="px-1 text-[10px]">
 											System
 										</Badge>
 									)}
 								</div>
 								{!role.isSystemDefault && (
-									<div className="hidden group-hover:flex gap-0.5 shrink-0">
+									<div className="hidden shrink-0 gap-0.5 group-hover:flex">
 										<button
 											type="button"
-											className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+											className="text-muted-foreground hover:text-foreground rounded p-0.5"
 											title="Rename"
 											onClick={e => {
 												e.stopPropagation()
@@ -233,7 +285,7 @@ export function PermissionMatrix() {
 										</button>
 										<button
 											type="button"
-											className="rounded p-0.5 text-muted-foreground hover:text-destructive"
+											className="text-muted-foreground hover:text-destructive rounded p-0.5"
 											title="Archive role"
 											onClick={e => {
 												e.stopPropagation()
@@ -261,10 +313,19 @@ export function PermissionMatrix() {
 							autoFocus
 							onKeyDown={e => {
 								if (e.key === "Enter") handleCreateRole()
-								if (e.key === "Escape") { setShowNewRole(false); setNewRoleName("") }
+								if (e.key === "Escape") {
+									setShowNewRole(false)
+									setNewRoleName("")
+								}
 							}}
 						/>
-						<Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={handleCreateRole} disabled={createRoleMutation.isPending}>
+						<Button
+							size="sm"
+							variant="ghost"
+							className="h-7 px-2 text-xs"
+							onClick={handleCreateRole}
+							disabled={createRoleMutation.isPending}
+						>
 							✓
 						</Button>
 					</div>
@@ -272,7 +333,7 @@ export function PermissionMatrix() {
 					<Button
 						size="sm"
 						variant="ghost"
-						className="w-full justify-start text-muted-foreground text-sm"
+						className="text-muted-foreground w-full justify-start text-sm"
 						onClick={() => setShowNewRole(true)}
 					>
 						+ New role
@@ -284,7 +345,9 @@ export function PermissionMatrix() {
 			<div className="flex-1 space-y-3">
 				{permsDirty && (
 					<div className="flex items-center gap-2 rounded-md border border-yellow-400/40 bg-yellow-50 px-3 py-2 dark:bg-yellow-900/20">
-						<p className="text-sm text-yellow-800 dark:text-yellow-200 flex-1">Unsaved permission changes</p>
+						<p className="flex-1 text-sm text-yellow-800 dark:text-yellow-200">
+							Unsaved permission changes
+						</p>
 						<Button
 							size="sm"
 							onClick={handleSavePermissions}
@@ -305,7 +368,7 @@ export function PermissionMatrix() {
 								<TableRow>
 									<TableHead className="w-40">Module</TableHead>
 									{ACTIONS.map(action => (
-										<TableHead key={action} className="capitalize text-center">
+										<TableHead key={action} className="text-center capitalize">
 											{action}
 										</TableHead>
 									))}
@@ -337,7 +400,7 @@ export function PermissionMatrix() {
 						</Table>
 					</div>
 				) : (
-					<p className="text-muted-foreground text-sm py-8 text-center">
+					<p className="text-muted-foreground py-8 text-center text-sm">
 						Select a role from the left to view and edit its permissions
 					</p>
 				)}

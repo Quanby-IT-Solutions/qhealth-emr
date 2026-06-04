@@ -9,13 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { Label } from "@/core/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/core/components/ui/radio-group"
 import { Textarea } from "@/core/components/ui/textarea"
-import { DocumentUploadDrawer } from "@/features/msw/assessment-coe/components/document-upload-drawer"
-import { MswEvaluationForm } from "@/features/msw/assessment-coe/components/msw-evaluation-form"
-import { EncounterContextBar } from "@/features/msw/components/encounter-context-bar"
 import {
 	useMswEvaluationQuery,
 	useUpsertAssessmentMutation,
 } from "@/features/msw/assessment-coe/api/assessment.hooks"
+import { DocumentUploadDrawer } from "@/features/msw/assessment-coe/components/document-upload-drawer"
+import { MswEvaluationForm } from "@/features/msw/assessment-coe/components/msw-evaluation-form"
+import { EncounterContextBar } from "@/features/msw/components/encounter-context-bar"
 
 type EligibilityDecision = "malasakit" | "z_benefits" | "indigent" | "not_eligible"
 
@@ -55,9 +55,8 @@ export default function AssessmentPage({ params }: AssessmentPageProps) {
 	const { data: evaluation } = useMswEvaluationQuery(encounterId)
 	const upsertMutation = useUpsertAssessmentMutation()
 
-	const storedDecision = (
-		evaluation?.evaluationFindings as Record<string, unknown> | null
-	)?.eligibilityDecision as EligibilityDecision | undefined
+	const storedDecision = (evaluation?.evaluationFindings as Record<string, unknown> | null)
+		?.eligibilityDecision as EligibilityDecision | undefined
 
 	const [eligibilityDecision, setEligibilityDecision] = useState<EligibilityDecision>(
 		storedDecision ?? "not_eligible"
@@ -86,7 +85,7 @@ export default function AssessmentPage({ params }: AssessmentPageProps) {
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-xl font-semibold">Financial Evaluation & Assessment</h1>
-					<p className="text-sm text-muted-foreground">Story 12.8 · Flow L8</p>
+					<p className="text-muted-foreground text-sm">Story 12.8 · Flow L8</p>
 				</div>
 				<Link href={`/msw/encounters/${encounterId}/coe`}>
 					<Button
@@ -101,7 +100,11 @@ export default function AssessmentPage({ params }: AssessmentPageProps) {
 				</Link>
 			</div>
 
-			<MswEvaluationForm encounterId={encounterId} patientId={evaluation?.patientId ?? ""} facilityId={evaluation?.facilityId} />
+			<MswEvaluationForm
+				encounterId={encounterId}
+				patientId={evaluation?.patientId ?? ""}
+				facilityId={evaluation?.facilityId}
+			/>
 
 			<Card>
 				<CardHeader>
@@ -119,23 +122,23 @@ export default function AssessmentPage({ params }: AssessmentPageProps) {
 				<CardContent className="space-y-4">
 					<RadioGroup
 						value={eligibilityDecision}
-						onValueChange={(v) => {
+						onValueChange={v => {
 							setEligibilityDecision(v as EligibilityDecision)
 							setDecisionSaved(false)
 						}}
 					>
 						<div className="grid gap-3 sm:grid-cols-2">
-							{ELIGIBILITY_OPTIONS.map((opt) => (
+							{ELIGIBILITY_OPTIONS.map(opt => (
 								<div
 									key={opt.value}
-									className="flex items-start gap-3 rounded-lg border p-3 hover:bg-accent/50"
+									className="hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3"
 								>
 									<RadioGroupItem value={opt.value} id={opt.value} className="mt-0.5" />
 									<div>
 										<Label htmlFor={opt.value} className="cursor-pointer font-medium">
 											{opt.label}
 										</Label>
-										<p className="text-xs text-muted-foreground">{opt.description}</p>
+										<p className="text-muted-foreground text-xs">{opt.description}</p>
 									</div>
 								</div>
 							))}
@@ -149,14 +152,12 @@ export default function AssessmentPage({ params }: AssessmentPageProps) {
 							rows={3}
 							placeholder="MSW recommendation and next steps…"
 							value={recommendationNotes}
-							onChange={(e) => setRecommendationNotes(e.target.value)}
+							onChange={e => setRecommendationNotes(e.target.value)}
 						/>
 					</div>
 
 					{upsertMutation.isError && (
-						<p className="text-xs text-destructive">
-							{(upsertMutation.error as Error).message}
-						</p>
+						<p className="text-destructive text-xs">{(upsertMutation.error as Error).message}</p>
 					)}
 
 					{decisionSaved && (

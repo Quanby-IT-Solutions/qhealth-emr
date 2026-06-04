@@ -26,10 +26,7 @@ function highlightXml(line: string): string {
 			/\s([A-Za-z][A-Za-z0-9:.-]*)=/g,
 			' <span class="text-amber-600 dark:text-amber-400">$1</span>='
 		)
-		.replace(
-			/"([^"]*)"/g,
-			'"<span class="text-green-600 dark:text-green-400">$1</span>"'
-		)
+		.replace(/"([^"]*)"/g, '"<span class="text-green-600 dark:text-green-400">$1</span>"')
 }
 
 export function XmlPreviewPane({ xml, className, title = "XML Preview" }: XmlPreviewPaneProps) {
@@ -39,7 +36,8 @@ export function XmlPreviewPane({ xml, className, title = "XML Preview" }: XmlPre
 	const inputRef = useRef<HTMLInputElement>(null)
 
 	const lines = useMemo(() => xml.split("\n"), [xml])
-	const visibleLines = expanded || lines.length <= COLLAPSE_THRESHOLD ? lines : lines.slice(0, COLLAPSE_THRESHOLD)
+	const visibleLines =
+		expanded || lines.length <= COLLAPSE_THRESHOLD ? lines : lines.slice(0, COLLAPSE_THRESHOLD)
 
 	const filteredLines = useMemo(() => {
 		if (!search.trim()) return visibleLines
@@ -57,26 +55,23 @@ export function XmlPreviewPane({ xml, className, title = "XML Preview" }: XmlPre
 		}
 	}, [xml])
 
-	const handleKeyDown = useCallback(
-		(e: React.KeyboardEvent) => {
-			if ((e.ctrlKey || e.metaKey) && e.key === "f") {
-				e.preventDefault()
-				inputRef.current?.focus()
-			}
-		},
-		[]
-	)
+	const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+		if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+			e.preventDefault()
+			inputRef.current?.focus()
+		}
+	}, [])
 
 	return (
 		<div
-			className={cn("flex flex-col rounded-md border bg-muted/30", className)}
+			className={cn("bg-muted/30 flex flex-col rounded-md border", className)}
 			onKeyDown={handleKeyDown}
 			role="region"
 			aria-label={title}
 		>
 			{/* Toolbar */}
 			<div className="flex items-center gap-2 border-b px-3 py-2">
-				<span className="text-xs font-medium text-muted-foreground flex-1">{title}</span>
+				<span className="text-muted-foreground flex-1 text-xs font-medium">{title}</span>
 				<input
 					ref={inputRef}
 					type="search"
@@ -84,8 +79,8 @@ export function XmlPreviewPane({ xml, className, title = "XML Preview" }: XmlPre
 					onChange={e => setSearch(e.target.value)}
 					placeholder="Search… (Ctrl+F)"
 					className={cn(
-						"h-6 w-36 rounded border bg-background px-2 text-xs outline-none",
-						"focus:ring-1 focus:ring-ring"
+						"bg-background h-6 w-36 rounded border px-2 text-xs outline-none",
+						"focus:ring-ring focus:ring-1"
 					)}
 					aria-label="Search XML content"
 				/>
@@ -103,7 +98,7 @@ export function XmlPreviewPane({ xml, className, title = "XML Preview" }: XmlPre
 			{/* Code content */}
 			<div className="overflow-auto">
 				<pre
-					className="px-3 py-2 font-mono text-xs leading-relaxed text-foreground"
+					className="text-foreground px-3 py-2 font-mono text-xs leading-relaxed"
 					aria-label="XML content"
 				>
 					{filteredLines.map((line, idx) => (
@@ -125,7 +120,7 @@ export function XmlPreviewPane({ xml, className, title = "XML Preview" }: XmlPre
 				<div className="border-t px-3 py-2 text-center">
 					<button
 						type="button"
-						className="text-xs text-muted-foreground hover:text-foreground underline"
+						className="text-muted-foreground hover:text-foreground text-xs underline"
 						onClick={() => setExpanded(v => !v)}
 						aria-expanded={expanded}
 					>

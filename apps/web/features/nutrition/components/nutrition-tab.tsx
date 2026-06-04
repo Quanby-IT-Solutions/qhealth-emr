@@ -1,14 +1,12 @@
 "use client"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
-
+import { useNutritionAssessmentsQuery } from "@/features/nutrition/api/nutrition.hooks"
 import { DietOrderCard } from "@/features/nutrition/components/diet-order-card"
 import { FhirNutritionOrderEditor } from "@/features/nutrition/components/fhir-nutrition-order-editor"
 import { MalnutritionRiskBadge } from "@/features/nutrition/components/malnutrition-risk-badge"
 import { MealPlanEditor } from "@/features/nutrition/components/meal-plan-editor"
 import { NutritionAssessmentForm } from "@/features/nutrition/components/nutrition-assessment-form"
-
-import { useNutritionAssessmentsQuery } from "@/features/nutrition/api/nutrition.hooks"
 
 interface NutritionTabProps {
 	encounterId: string
@@ -26,12 +24,12 @@ export function NutritionTab({ encounterId, patientId, facilityId }: NutritionTa
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="text-lg font-semibold">Nutrition</h2>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Malnutrition screening, meal planning, and diet orders
 					</p>
 				</div>
 				{latestAssessment && (
-					<div className="flex items-center gap-2 text-sm text-muted-foreground">
+					<div className="text-muted-foreground flex items-center gap-2 text-sm">
 						<span>Malnutrition risk:</span>
 						<MalnutritionRiskBadge risk={latestAssessment.malnutritionRisk} />
 					</div>
@@ -47,7 +45,11 @@ export function NutritionTab({ encounterId, patientId, facilityId }: NutritionTa
 				</TabsList>
 
 				<TabsContent value="assessment" className="mt-4">
-					<NutritionAssessmentForm encounterId={encounterId} patientId={patientId} facilityId={facilityId} />
+					<NutritionAssessmentForm
+						encounterId={encounterId}
+						patientId={patientId}
+						facilityId={facilityId}
+					/>
 				</TabsContent>
 
 				<TabsContent value="meal-plan" className="mt-4">

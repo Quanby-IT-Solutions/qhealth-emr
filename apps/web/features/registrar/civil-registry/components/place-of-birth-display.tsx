@@ -1,11 +1,6 @@
 import type { BirthLocation } from "@/features/registrar/civil-registry/lib/philippines-locations"
 
-export function PlaceOfBirthDisplay({
-	barangay,
-	municipality,
-	province,
-	region,
-}: BirthLocation) {
+export function PlaceOfBirthDisplay({ barangay, municipality, province, region }: BirthLocation) {
 	const parts = [
 		barangay ? `Barangay ${barangay.replace(/^barangay\s+/i, "")}` : undefined,
 		municipality,
@@ -14,7 +9,7 @@ export function PlaceOfBirthDisplay({
 	].filter(Boolean)
 
 	return (
-		<p className="rounded-lg border border-dashed border-border/70 bg-secondary/30 px-3 py-2 text-sm text-muted-foreground">
+		<p className="border-border/70 bg-secondary/30 text-muted-foreground rounded-lg border border-dashed px-3 py-2 text-sm">
 			{parts.length > 0 ? parts.join(", ") : "No place of birth location selected."}
 		</p>
 	)

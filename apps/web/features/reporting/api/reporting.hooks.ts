@@ -2,8 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { env } from "@/env"
 import { reportingOrpc } from "@/services/orpc/client"
+import { env } from "@/env"
 
 // ============================================================================
 // Surveillance Flag Hooks
@@ -144,7 +144,13 @@ export function useAhsrDrilldownQuery(
 				...params,
 				page: params.page ?? 1,
 				limit: params.limit ?? 20,
-				metric: params.metric as "admissions" | "discharges" | "deaths" | "morbidity" | "mortality" | "hai",
+				metric: params.metric as
+					| "admissions"
+					| "discharges"
+					| "deaths"
+					| "morbidity"
+					| "mortality"
+					| "hai",
 			},
 			enabled,
 		})
@@ -227,17 +233,10 @@ export interface HaiCaseListResponse {
 	cases: HaiCaseDetail[]
 }
 
-export function useHaiReportQuery(params: {
-	facilityId: string
-	year: number
-	month?: number
-}) {
+export function useHaiReportQuery(params: { facilityId: string; year: number; month?: number }) {
 	return useQuery({
 		queryKey: ["reporting", "hai", params] as const,
-		queryFn: () =>
-			fetchJson<HaiReportResponse>(
-				`${API_BASE}/hai${buildQueryString(params)}`
-			),
+		queryFn: () => fetchJson<HaiReportResponse>(`${API_BASE}/hai${buildQueryString(params)}`),
 		enabled: !!params.facilityId,
 	})
 }
@@ -256,9 +255,7 @@ export function useHaiCasesQuery(
 	return useQuery({
 		queryKey: ["reporting", "hai-cases", params] as const,
 		queryFn: () =>
-			fetchJson<HaiCaseListResponse>(
-				`${API_BASE}/hai/cases${buildQueryString(params)}`
-			),
+			fetchJson<HaiCaseListResponse>(`${API_BASE}/hai/cases${buildQueryString(params)}`),
 		enabled: enabled && !!params.facilityId,
 	})
 }

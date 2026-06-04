@@ -4,11 +4,7 @@ import { use } from "react"
 
 import { OpdTriageForm } from "@/features/opd-triage/components/opd-triage-form"
 
-export default function NewTriagePage({
-	params,
-}: {
-	params: Promise<{ patientId: string }>
-}) {
+export default function NewTriagePage({ params }: { params: Promise<{ patientId: string }> }) {
 	const { patientId } = use(params)
 
 	return (

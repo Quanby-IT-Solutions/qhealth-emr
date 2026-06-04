@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-
 import { AlertTriangle, Clock3, Pill, RefreshCw, ShieldAlert, Syringe } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -10,9 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 import {
-	type PharmacyQueueItem,
 	useOpdPrescriptionQueueQuery,
 	usePharmacyQueueQuery,
+	type PharmacyQueueItem,
 } from "../api/pharmacy.hooks"
 
 const PRIORITY_WEIGHT = {

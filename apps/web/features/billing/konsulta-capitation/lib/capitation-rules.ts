@@ -12,7 +12,9 @@ export function getCapitationTag(benefit: CapitationBenefit): "Eligible" | "Pend
 }
 
 export function getCapitationTooltip(tag: string): string {
-	if (tag === "Eligible") return "Patient has remaining Konsulta consultations for this benefit year."
-	if (tag === "Pending") return "Patient has used all allowed consultations; additional visits are pending approval."
+	if (tag === "Eligible")
+		return "Patient has remaining Konsulta consultations for this benefit year."
+	if (tag === "Pending")
+		return "Patient has used all allowed consultations; additional visits are pending approval."
 	return "Patient's Konsulta benefit is lapsed or inactive for this period."
 }

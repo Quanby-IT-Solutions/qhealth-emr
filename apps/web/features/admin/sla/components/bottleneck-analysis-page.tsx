@@ -5,11 +5,7 @@ import { useState } from "react"
 import { Card, CardContent } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Skeleton } from "@/core/components/ui/skeleton"
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/core/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { useSlaBottleneckQuery } from "@/features/sla/api/sla-orpc.hooks"
 
@@ -20,11 +16,11 @@ interface BottleneckAnalysisPageProps {
 const WORKFLOW_LABELS: Record<string, string> = {
 	"opd-triage": "OPD Triage",
 	"lab-results": "Lab Results",
-	radiology: "Radiology",
-	admission: "Admission",
-	discharge: "Discharge",
-	emergency: "Emergency",
-	pharmacy: "Pharmacy Dispensing",
+	"radiology": "Radiology",
+	"admission": "Admission",
+	"discharge": "Discharge",
+	"emergency": "Emergency",
+	"pharmacy": "Pharmacy Dispensing",
 }
 
 export function BottleneckAnalysisPage({ workflowId }: BottleneckAnalysisPageProps) {
@@ -53,7 +49,7 @@ export function BottleneckAnalysisPage({ workflowId }: BottleneckAnalysisPagePro
 			<h2 className="text-lg font-medium">{label} Bottleneck Analysis</h2>
 
 			<div className="space-y-1">
-				<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+				<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 					Date range
 				</p>
 				<div className="flex items-center gap-2">
@@ -63,7 +59,7 @@ export function BottleneckAnalysisPage({ workflowId }: BottleneckAnalysisPagePro
 						onChange={e => setDateFrom(e.target.value)}
 						className="w-40"
 					/>
-					<span className="text-sm text-muted-foreground">to</span>
+					<span className="text-muted-foreground text-sm">to</span>
 					<Input
 						type="date"
 						value={dateTo}
@@ -74,7 +70,7 @@ export function BottleneckAnalysisPage({ workflowId }: BottleneckAnalysisPagePro
 			</div>
 
 			{!hasDateRange && (
-				<p className="py-4 text-center text-sm text-muted-foreground">
+				<p className="text-muted-foreground py-4 text-center text-sm">
 					Select a date range to load bottleneck data.
 				</p>
 			)}
@@ -82,7 +78,7 @@ export function BottleneckAnalysisPage({ workflowId }: BottleneckAnalysisPagePro
 			{hasDateRange && isLoading && <Skeleton className="h-64 w-full" />}
 
 			{hasDateRange && !isLoading && steps.length === 0 && (
-				<p className="py-8 text-center text-sm text-muted-foreground">
+				<p className="text-muted-foreground py-8 text-center text-sm">
 					No bottleneck data available for this period.
 				</p>
 			)}
@@ -99,15 +95,13 @@ export function BottleneckAnalysisPage({ workflowId }: BottleneckAnalysisPagePro
 						return (
 							<Card
 								key={step.stepType}
-								className={`cursor-pointer transition-colors ${isBottleneck ? "border-amber-400" : ""} ${isSelected ? "ring-2 ring-primary" : ""}`}
-								onClick={() =>
-									setSelectedStep(s => (s === step.stepType ? null : step.stepType))
-								}
+								className={`cursor-pointer transition-colors ${isBottleneck ? "border-amber-400" : ""} ${isSelected ? "ring-primary ring-2" : ""}`}
+								onClick={() => setSelectedStep(s => (s === step.stepType ? null : step.stepType))}
 							>
 								<CardContent className="py-3">
 									<div className="mb-2 flex items-center justify-between">
 										<span className="text-sm font-medium">{step.stepLabel}</span>
-										<div className="flex gap-4 text-xs text-muted-foreground">
+										<div className="text-muted-foreground flex gap-4 text-xs">
 											<span>Median: {step.medianMinutes}m</span>
 											<span>P95: {step.p95Minutes}m</span>
 											{outlierCount > 0 && (
@@ -116,20 +110,19 @@ export function BottleneckAnalysisPage({ workflowId }: BottleneckAnalysisPagePro
 														{outlierCount} outlier{outlierCount !== 1 ? "s" : ""}
 													</TooltipTrigger>
 													<TooltipContent>
-														Outliers = encounters with step duration &gt;P95 (
-														{step.p95Minutes}m)
+														Outliers = encounters with step duration &gt;P95 ({step.p95Minutes}m)
 													</TooltipContent>
 												</Tooltip>
 											)}
 										</div>
 									</div>
-									<div className="relative h-3 overflow-hidden rounded-full bg-muted">
+									<div className="bg-muted relative h-3 overflow-hidden rounded-full">
 										<div
-											className="absolute h-full rounded-full bg-primary/60"
+											className="bg-primary/60 absolute h-full rounded-full"
 											style={{ width: `${barPct}%` }}
 										/>
 										<div
-											className="absolute h-full w-0.5 bg-destructive/70"
+											className="bg-destructive/70 absolute h-full w-0.5"
 											style={{ left: `${p95Pct}%` }}
 										/>
 									</div>
@@ -137,12 +130,12 @@ export function BottleneckAnalysisPage({ workflowId }: BottleneckAnalysisPagePro
 							</Card>
 						)
 					})}
-					<p className="text-xs text-muted-foreground">
-						Bar = median duration. Red line = P95 duration. Amber border = bottleneck step.
-						Click a step to filter encounters.
+					<p className="text-muted-foreground text-xs">
+						Bar = median duration. Red line = P95 duration. Amber border = bottleneck step. Click a
+						step to filter encounters.
 					</p>
 					{selectedStep && (
-						<p className="text-sm text-muted-foreground">
+						<p className="text-muted-foreground text-sm">
 							Filtering encounters that breached at:{" "}
 							<span className="font-medium">
 								{steps.find(s => s.stepType === selectedStep)?.stepLabel ?? selectedStep}

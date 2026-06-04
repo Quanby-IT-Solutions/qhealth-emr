@@ -29,14 +29,20 @@ export function useAuditLogExportMutation() {
 			onSuccess: data => {
 				if (data.data.length === 0) return
 
-				const headers = ["id", "userId", "action", "entityType", "entityId", "ipAddress", "createdAt"]
+				const headers = [
+					"id",
+					"userId",
+					"action",
+					"entityType",
+					"entityId",
+					"ipAddress",
+					"createdAt",
+				]
 				const rows = data.data.map(log =>
 					headers
 						.map(h => {
 							const val = log[h as keyof AuditLog]
-							return typeof val === "string"
-								? `"${val.replace(/"/g, '""')}"`
-								: String(val ?? "")
+							return typeof val === "string" ? `"${val.replace(/"/g, '""')}"` : String(val ?? "")
 						})
 						.join(",")
 				)
@@ -129,7 +135,7 @@ export function usePatientBreakGlassEventsQuery(params: {
 export function useBreakGlassExportMutation() {
 	return useMutation(
 		orpc.audit.breakGlass.exportCsv.mutationOptions({
-			onSuccess: (data) => {
+			onSuccess: data => {
 				if (data.data.length === 0) return
 
 				const headers = [
@@ -237,10 +243,6 @@ export function useMyActiveBreakGlassQuery(params: {
 				patientId: params.patientId!,
 			},
 		}),
-		enabled:
-			(params.enabled ?? true) &&
-			!!params.facilityId &&
-			!!params.patientId,
+		enabled: (params.enabled ?? true) && !!params.facilityId && !!params.patientId,
 	})
 }
-

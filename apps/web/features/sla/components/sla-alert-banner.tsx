@@ -4,7 +4,11 @@ import { useEffect, useState } from "react"
 import { AlertTriangle, Clock, XCircle } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
-import { WORKFLOW_LABELS, useSlaEventsByEncounterQuery, type SlaEvent } from "@/features/sla/api/sla.hooks"
+import {
+	useSlaEventsByEncounterQuery,
+	WORKFLOW_LABELS,
+	type SlaEvent,
+} from "@/features/sla/api/sla.hooks"
 
 // ============================================================================
 // Helpers
@@ -33,7 +37,9 @@ function SlaAlertItem({ event, onDismiss }: { event: SlaEvent; onDismiss: (id: s
 		? "border border-red-300 bg-red-50 text-red-900 dark:border-red-700 dark:bg-red-900/20 dark:text-red-200"
 		: "border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
 
-	const iconClass = isExceeded ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
+	const iconClass = isExceeded
+		? "text-red-600 dark:text-red-400"
+		: "text-amber-600 dark:text-amber-400"
 
 	const Icon = isExceeded ? XCircle : AlertTriangle
 
@@ -47,9 +53,9 @@ function SlaAlertItem({ event, onDismiss }: { event: SlaEvent; onDismiss: (id: s
 						{WORKFLOW_LABELS[event.workflowType]}
 					</p>
 					<p className="text-xs">
-					<span className="font-medium">{event.patientName ?? "—"}</span> ·{" "}
-						{formatMinutes(event.elapsedMinutes)} elapsed of {formatMinutes(event.targetMinutes)} target (
-						{pct}%)
+						<span className="font-medium">{event.patientName ?? "—"}</span> ·{" "}
+						{formatMinutes(event.elapsedMinutes)} elapsed of {formatMinutes(event.targetMinutes)}{" "}
+						target ({pct}%)
 					</p>
 				</div>
 			</div>
@@ -93,9 +99,7 @@ export function SlaAlertBanner({ encounterId }: SlaAlertBannerProps) {
 	}
 
 	const visible = (events ?? []).filter(
-		e =>
-			(e.status === "approaching" || e.status === "exceeded") &&
-			!dismissed.has(e.id)
+		e => (e.status === "approaching" || e.status === "exceeded") && !dismissed.has(e.id)
 	)
 
 	if (visible.length === 0) return null

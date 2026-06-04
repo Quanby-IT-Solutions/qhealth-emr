@@ -1,7 +1,7 @@
 "use client"
 
-import { OrdersTab } from "@/features/orders/components/orders-tab"
 import { useChartContext } from "@/features/encounters/context/chart-context"
+import { OrdersTab } from "@/features/orders/components/orders-tab"
 
 export default function OrdersPage() {
 	const { encounterId, patientId, facilityId, encounter } = useChartContext()

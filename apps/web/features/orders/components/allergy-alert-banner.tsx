@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { AlertTriangle, Ban } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -30,8 +29,7 @@ const BLOCK_CONFIG = {
 	hard_block: {
 		label: "Allergy Hard Block",
 		icon: Ban,
-		containerCn:
-			"border-destructive bg-destructive/10 text-destructive dark:bg-destructive/20",
+		containerCn: "border-destructive bg-destructive/10 text-destructive dark:bg-destructive/20",
 		iconCn: "text-destructive",
 		canOverride: false,
 	},
@@ -48,7 +46,7 @@ const BLOCK_CONFIG = {
 function formatSeverityLabel(severity: string) {
 	return severity
 		.split("-")
-		.map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+		.map(s => s.charAt(0).toUpperCase() + s.slice(1))
 		.join("-")
 }
 
@@ -91,7 +89,7 @@ function SingleAllergyAlert({
 								variant="outline"
 								size="sm"
 								className="shrink-0 border-orange-400 text-orange-700 hover:bg-orange-100 dark:text-orange-300 dark:hover:bg-orange-900"
-								onClick={() => setShowOverride((v) => !v)}
+								onClick={() => setShowOverride(v => !v)}
 							>
 								{showOverride ? "Cancel" : "Override"}
 							</Button>
@@ -100,13 +98,11 @@ function SingleAllergyAlert({
 
 					{config.canOverride && showOverride && (
 						<div className="mt-2 space-y-1">
-							<Label className="text-xs font-medium">
-								Override reason (required)
-							</Label>
+							<Label className="text-xs font-medium">Override reason (required)</Label>
 							<Textarea
 								rows={2}
 								value={overrideReason ?? ""}
-								onChange={(e) => onReasonChange?.(e.target.value)}
+								onChange={e => onReasonChange?.(e.target.value)}
 								placeholder="Provide clinical justification…"
 								className="bg-white text-sm dark:bg-orange-950"
 							/>
@@ -142,16 +138,16 @@ export function AllergyAlertBanner({
 
 	return (
 		<div className="space-y-2">
-			<p className="text-xs font-medium text-muted-foreground">
+			<p className="text-muted-foreground text-xs font-medium">
 				Matched Patient Medication Allergy Alerts
 			</p>
-			{alerts.map((alert) => (
+			{alerts.map(alert => (
 				<SingleAllergyAlert
 					key={alert.id}
 					alert={alert}
 					overrideReason={overrideReasons?.[alert.id]}
-					onReasonChange={(reason) => onOverrideReasonChange?.(alert.id, reason)}
-					onOverride={(reason) => onOverride?.(alert.id, reason)}
+					onReasonChange={reason => onOverrideReasonChange?.(alert.id, reason)}
+					onOverride={reason => onOverride?.(alert.id, reason)}
 				/>
 			))}
 		</div>

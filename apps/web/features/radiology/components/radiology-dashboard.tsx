@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { ChevronDown, ChevronUp, ScanSearch } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -27,8 +26,8 @@ import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { PacsLink } from "@/features/orders/components/pacs-link"
 import { RadiologyReport } from "@/features/orders/components/radiology-report"
 import {
-	type ImagingDashboardOrder,
 	useImagingDashboardQuery,
+	type ImagingDashboardOrder,
 } from "@/features/radiology/api/radiology.hooks"
 
 // ============================================================================
@@ -140,11 +139,11 @@ function ImagingOrderRow({
 					<div>
 						<p className="font-medium">{order.patientName ?? "—"}</p>
 						{order.patientMrn && (
-							<p className="text-xs text-muted-foreground">MRN: {order.patientMrn}</p>
+							<p className="text-muted-foreground text-xs">MRN: {order.patientMrn}</p>
 						)}
 					</div>
 				</TableCell>
-				<TableCell className="text-xs text-muted-foreground">
+				<TableCell className="text-muted-foreground text-xs">
 					{order.encounterId ? `${order.encounterId.slice(0, 8)}…` : "—"}
 				</TableCell>
 				<TableCell className="font-medium uppercase">{order.modality}</TableCell>
@@ -153,7 +152,7 @@ function ImagingOrderRow({
 					<div className="max-w-[220px]">
 						<p className="truncate text-sm">{indication.clinical ?? "—"}</p>
 						{indication.diagnosis && (
-							<p className="truncate text-xs text-muted-foreground">{indication.diagnosis}</p>
+							<p className="text-muted-foreground truncate text-xs">{indication.diagnosis}</p>
 						)}
 					</div>
 				</TableCell>
@@ -162,7 +161,7 @@ function ImagingOrderRow({
 				<TableCell>{order.orderingStaffName ?? "—"}</TableCell>
 				<TableCell>{formatDateTime(order.createdAt)}</TableCell>
 				{tab === "completed" && (
-					<TableCell className="text-xs text-muted-foreground">
+					<TableCell className="text-muted-foreground text-xs">
 						{formatTAT(order.createdAt, order.completedDatetime)}
 					</TableCell>
 				)}
@@ -174,12 +173,7 @@ function ImagingOrderRow({
 							modality={order.modality}
 							bodyPart={order.bodyPart}
 						/>
-						<Button
-							variant="ghost"
-							size="sm"
-							className="gap-1"
-							onClick={onToggleExpand}
-						>
+						<Button variant="ghost" size="sm" className="gap-1" onClick={onToggleExpand}>
 							{isExpanded ? (
 								<>
 									<ChevronUp className="size-3.5" />
@@ -232,17 +226,15 @@ function ImagingOrdersTable({
 
 	if (isLoading) {
 		return (
-			<div className="py-12 text-center text-sm text-muted-foreground">
-				Loading imaging orders…
-			</div>
+			<div className="text-muted-foreground py-12 text-center text-sm">Loading imaging orders…</div>
 		)
 	}
 
 	if (orders.length === 0) {
 		return (
 			<div className="flex flex-col items-center gap-2 py-12">
-				<ScanSearch className="size-8 text-muted-foreground/40" />
-				<p className="text-sm text-muted-foreground">No orders found.</p>
+				<ScanSearch className="text-muted-foreground/40 size-8" />
+				<p className="text-muted-foreground text-sm">No orders found.</p>
 			</div>
 		)
 	}
@@ -265,14 +257,12 @@ function ImagingOrdersTable({
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{orders.map((order) => (
+				{orders.map(order => (
 					<ImagingOrderRow
 						key={order.id}
 						order={order}
 						isExpanded={expandedId === order.id}
-						onToggleExpand={() =>
-							setExpandedId(expandedId === order.id ? null : order.id)
-						}
+						onToggleExpand={() => setExpandedId(expandedId === order.id ? null : order.id)}
 					/>
 				))}
 			</TableBody>
@@ -297,15 +287,20 @@ export function RadiologyDashboard() {
 		limit: 50,
 	})
 
-	const orderedQuery = useImagingDashboardQuery(buildParams("ordered"), { enabled: activeTab === "pending" })
-	const scheduledQuery = useImagingDashboardQuery(buildParams("scheduled"), { enabled: activeTab === "pending" })
-	const inProgressQuery = useImagingDashboardQuery(buildParams("in_progress"), { enabled: activeTab === "in_progress" })
-	const completedQuery = useImagingDashboardQuery(buildParams("completed"), { enabled: activeTab === "completed" })
+	const orderedQuery = useImagingDashboardQuery(buildParams("ordered"), {
+		enabled: activeTab === "pending",
+	})
+	const scheduledQuery = useImagingDashboardQuery(buildParams("scheduled"), {
+		enabled: activeTab === "pending",
+	})
+	const inProgressQuery = useImagingDashboardQuery(buildParams("in_progress"), {
+		enabled: activeTab === "in_progress",
+	})
+	const completedQuery = useImagingDashboardQuery(buildParams("completed"), {
+		enabled: activeTab === "completed",
+	})
 
-	const pendingOrders = [
-		...(orderedQuery.data?.data ?? []),
-		...(scheduledQuery.data?.data ?? []),
-	]
+	const pendingOrders = [...(orderedQuery.data?.data ?? []), ...(scheduledQuery.data?.data ?? [])]
 	const pendingLoading = orderedQuery.isLoading || scheduledQuery.isLoading
 	const inProgressOrders = inProgressQuery.data?.data ?? []
 	const completedOrders = completedQuery.data?.data ?? []
@@ -319,12 +314,12 @@ export function RadiologyDashboard() {
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-2xl font-semibold">Imaging Orders</h1>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Radiologist worklist — facility-wide imaging order tracking
 					</p>
 				</div>
 
-				<Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v ?? "all")}>
+				<Select value={priorityFilter} onValueChange={v => setPriorityFilter(v ?? "all")}>
 					<SelectTrigger className="w-36">
 						<SelectValue placeholder="All priorities" />
 					</SelectTrigger>
@@ -343,8 +338,8 @@ export function RadiologyDashboard() {
 					<CardTitle className="text-base">Worklist</CardTitle>
 				</CardHeader>
 				<CardContent className="pt-0">
-					<Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-						<TabsList className="mb-4 mt-2">
+					<Tabs value={activeTab} onValueChange={v => setActiveTab(v as typeof activeTab)}>
+						<TabsList className="mt-2 mb-4">
 							<TabsTrigger value="pending">
 								Pending
 								{pendingTotal > 0 && (
@@ -365,11 +360,7 @@ export function RadiologyDashboard() {
 						</TabsList>
 
 						<TabsContent value="pending">
-							<ImagingOrdersTable
-								orders={pendingOrders}
-								isLoading={pendingLoading}
-								tab="pending"
-							/>
+							<ImagingOrdersTable orders={pendingOrders} isLoading={pendingLoading} tab="pending" />
 						</TabsContent>
 
 						<TabsContent value="in_progress">

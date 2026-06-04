@@ -39,8 +39,7 @@ export function useAddLicenseMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.clinicianLicenses.add.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.clinicianLicenses.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.clinicianLicenses.key() }),
 		})
 	)
 }
@@ -49,8 +48,7 @@ export function useVerifyLicenseMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.clinicianLicenses.verify.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.clinicianLicenses.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.clinicianLicenses.key() }),
 		})
 	)
 }
@@ -59,8 +57,7 @@ export function useMarkPendingMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.clinicianLicenses.markPending.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.clinicianLicenses.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.clinicianLicenses.key() }),
 		})
 	)
 }
@@ -69,8 +66,7 @@ export function useDeleteLicenseMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.clinicianLicenses.delete.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.clinicianLicenses.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.clinicianLicenses.key() }),
 		})
 	)
 }

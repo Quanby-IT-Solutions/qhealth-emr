@@ -2,10 +2,10 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { sessionKeys } from "@/features/auth/api/session.hooks"
 import { authClient } from "@/services/better-auth/auth-client"
 import { orpc } from "@/services/orpc/client"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { sessionKeys } from "@/features/auth/api/session.hooks"
 
 type UpdateOwnAccountInput = {
 	name: string

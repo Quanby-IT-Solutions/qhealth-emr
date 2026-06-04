@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { AlertCircle, CheckCircle, Pencil } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -16,6 +15,7 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
+
 import { useMswEvaluationQuery, useUpsertAssessmentMutation } from "../api/assessment.hooks"
 
 // ============================================================================
@@ -107,8 +107,7 @@ function findingsToForm(f: Record<string, unknown>): FormState {
 		monthlyFamilyIncome: String(f.monthlyFamilyIncome ?? ""),
 		numberOfDependents: String(f.numberOfDependents ?? ""),
 		monthlyExpenses: String(f.monthlyExpenses ?? ""),
-		incomeSource:
-			(f.incomeSources as Array<{ source: string }> | undefined)?.[0]?.source ?? "",
+		incomeSource: (f.incomeSources as Array<{ source: string }> | undefined)?.[0]?.source ?? "",
 		homeOwnership: (f.homeOwnership as HomeOwnership | undefined) ?? "owned",
 		financialClass: (f.financialClass as FinancialClass | undefined) ?? "c3",
 		classificationNotes: (f.classificationNotes as string | undefined) ?? "",
@@ -192,7 +191,7 @@ export function MswEvaluationForm({
 	if (isLoading) {
 		return (
 			<Card>
-				<CardContent className="py-6 text-center text-sm text-muted-foreground">
+				<CardContent className="text-muted-foreground py-6 text-center text-sm">
 					Loading financial evaluation…
 				</CardContent>
 			</Card>
@@ -219,7 +218,7 @@ export function MswEvaluationForm({
 				</CardHeader>
 				<CardContent className="grid gap-4 sm:grid-cols-2">
 					<div>
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Employment Status
 						</p>
 						<p className="text-sm">
@@ -229,7 +228,7 @@ export function MswEvaluationForm({
 						</p>
 					</div>
 					<div>
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Monthly Family Income
 						</p>
 						<p className="text-sm font-medium">
@@ -237,13 +236,13 @@ export function MswEvaluationForm({
 						</p>
 					</div>
 					<div>
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Number of Dependents
 						</p>
 						<p className="text-sm">{String(findings.numberOfDependents ?? "—")}</p>
 					</div>
 					<div>
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Monthly Expenses
 						</p>
 						<p className="text-sm">
@@ -253,28 +252,26 @@ export function MswEvaluationForm({
 						</p>
 					</div>
 					<div>
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Income Source
 						</p>
 						<p className="text-sm">
-							{(findings.incomeSources as Array<{ source: string }> | undefined)?.[0]
-								?.source ?? "—"}
+							{(findings.incomeSources as Array<{ source: string }> | undefined)?.[0]?.source ??
+								"—"}
 						</p>
 					</div>
 					<div>
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Financial Class
 						</p>
 						<p className="text-sm font-medium">
 							{fc?.label ?? String(findings.financialClass)}{" "}
-							{fc && (
-								<span className="font-normal text-muted-foreground">— {fc.description}</span>
-							)}
+							{fc && <span className="text-muted-foreground font-normal">— {fc.description}</span>}
 						</p>
 					</div>
 					{!!findings.psychosocialAssessment && (
 						<div className="sm:col-span-2">
-							<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+							<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 								Psychosocial Assessment
 							</p>
 							<p className="text-sm whitespace-pre-wrap">
@@ -284,7 +281,7 @@ export function MswEvaluationForm({
 					)}
 					{!!findings.recommendedInterventions && (
 						<div className="sm:col-span-2">
-							<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+							<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 								Recommended Interventions
 							</p>
 							<p className="text-sm whitespace-pre-wrap">
@@ -306,12 +303,7 @@ export function MswEvaluationForm({
 						{hasFindings ? "Edit Financial Evaluation" : "Financial Evaluation"}
 					</CardTitle>
 					{hasFindings && (
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							onClick={() => setEditing(false)}
-						>
+						<Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)}>
 							Cancel
 						</Button>
 					)}
@@ -319,7 +311,7 @@ export function MswEvaluationForm({
 				<CardContent className="space-y-5">
 					{/* Employment */}
 					<div>
-						<p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+						<p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
 							Employment &amp; Income
 						</p>
 						<div className="grid gap-4 sm:grid-cols-2">
@@ -378,7 +370,7 @@ export function MswEvaluationForm({
 
 					{/* Household */}
 					<div>
-						<p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+						<p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
 							Household Profile
 						</p>
 						<div className="grid gap-4 sm:grid-cols-3">
@@ -430,7 +422,7 @@ export function MswEvaluationForm({
 
 					{/* Classification */}
 					<div>
-						<p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+						<p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
 							Classification
 						</p>
 						<div className="space-y-1.5">
@@ -455,7 +447,7 @@ export function MswEvaluationForm({
 
 					{/* Assessment */}
 					<div>
-						<p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+						<p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
 							Assessment Notes
 						</p>
 						<div className="space-y-4">
@@ -495,7 +487,7 @@ export function MswEvaluationForm({
 					</div>
 
 					{upsertMutation.isError && (
-						<div className="flex items-center gap-2 text-sm text-destructive">
+						<div className="text-destructive flex items-center gap-2 text-sm">
 							<AlertCircle className="size-4 shrink-0" />
 							<span>Failed to save evaluation. Please try again.</span>
 						</div>

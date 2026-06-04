@@ -1,12 +1,14 @@
 "use client"
 
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { AdminSettingsPanel } from "@/features/admin/components/admin-settings-panel"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -18,7 +20,7 @@ export default function AdminSettingsPage() {
 
 	if (!can(permSet, "admin", "view") || !can(permSet, "system_settings", "view")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access system settings.
 			</div>
 		)

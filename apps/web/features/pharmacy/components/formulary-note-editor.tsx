@@ -1,18 +1,13 @@
 "use client"
 
 import { useState } from "react"
-
 import { CheckCircle2, Loader2, Trash2 } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
 import { Calendar } from "@/core/components/ui/calendar"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/core/components/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger } from "@/core/components/ui/popover"
 import {
 	Select,
 	SelectContent,
@@ -45,15 +40,20 @@ function DatePicker({
 			<Label className="text-xs">{label}</Label>
 			<Popover>
 				<PopoverTrigger
-					render={<Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm" />}
+					render={
+						<Button
+							variant="outline"
+							className="h-9 w-full justify-start text-left text-sm font-normal"
+						/>
+					}
 				>
-						{dateValue ? dateValue.toLocaleDateString("en-PH") : "Select date…"}
+					{dateValue ? dateValue.toLocaleDateString("en-PH") : "Select date…"}
 				</PopoverTrigger>
 				<PopoverContent align="start" className="w-auto p-0">
 					<Calendar
 						mode="single"
 						selected={dateValue}
-						onSelect={(d) => onChange(d ? d.toISOString().slice(0, 10) : "")}
+						onSelect={d => onChange(d ? d.toISOString().slice(0, 10) : "")}
 					/>
 				</PopoverContent>
 			</Popover>
@@ -93,25 +93,25 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 		setIsSaving(true)
 
 		// Simulate async save (replace with real mutation)
-		await new Promise((r) => setTimeout(r, 600))
+		await new Promise(r => setTimeout(r, 600))
 
 		const updated: FormularyItem = {
 			id: item?.id ?? crypto.randomUUID(),
 			genericName: genericName.trim(),
 			brandNames: brandNamesRaw
 				.split(",")
-				.map((s) => s.trim())
+				.map(s => s.trim())
 				.filter(Boolean),
 			drugClass: drugClass.trim(),
 			dosageForms: dosageFormsRaw
 				.split(";")
-				.map((s) => s.trim())
+				.map(s => s.trim())
 				.filter(Boolean),
 			status,
 			restriction: restriction.trim() || undefined,
 			alternatives: alternativesRaw
 				.split(",")
-				.map((s) => s.trim())
+				.map(s => s.trim())
 				.filter(Boolean),
 			costNote: costNote.trim() || undefined,
 			clinicalRationale: clinicalRationale.trim() || undefined,
@@ -128,9 +128,9 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 	if (saved) {
 		return (
 			<div className="flex flex-col items-center py-10 text-center">
-				<CheckCircle2 className="size-12 text-green-500 mb-3" />
+				<CheckCircle2 className="mb-3 size-12 text-green-500" />
 				<p className="font-semibold">Saved</p>
-				<p className="text-sm text-muted-foreground mt-1">Formulary entry updated.</p>
+				<p className="text-muted-foreground mt-1 text-sm">Formulary entry updated.</p>
 			</div>
 		)
 	}
@@ -143,7 +143,7 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 					<Label className="text-xs">Generic Name *</Label>
 					<Input
 						value={genericName}
-						onChange={(e) => setGenericName(e.target.value)}
+						onChange={e => setGenericName(e.target.value)}
 						placeholder="e.g., Amoxicillin"
 					/>
 				</div>
@@ -151,7 +151,7 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 					<Label className="text-xs">Brand Name(s) (comma-separated)</Label>
 					<Input
 						value={brandNamesRaw}
-						onChange={(e) => setBrandNamesRaw(e.target.value)}
+						onChange={e => setBrandNamesRaw(e.target.value)}
 						placeholder="e.g., Amoxil, Trimox"
 					/>
 				</div>
@@ -159,7 +159,7 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 					<Label className="text-xs">Drug Class</Label>
 					<Input
 						value={drugClass}
-						onChange={(e) => setDrugClass(e.target.value)}
+						onChange={e => setDrugClass(e.target.value)}
 						placeholder="e.g., Penicillin Antibiotic"
 					/>
 				</div>
@@ -167,7 +167,7 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 					<Label className="text-xs">Dosage Forms (semicolon-separated)</Label>
 					<Input
 						value={dosageFormsRaw}
-						onChange={(e) => setDosageFormsRaw(e.target.value)}
+						onChange={e => setDosageFormsRaw(e.target.value)}
 						placeholder="e.g., 500mg capsule; 250mg/5mL suspension"
 					/>
 				</div>
@@ -178,7 +178,7 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 			{/* Formulary status */}
 			<div className="space-y-1">
 				<Label className="text-xs">Formulary Status</Label>
-				<Select value={status} onValueChange={(v) => setStatus(v as FormularyStatus)}>
+				<Select value={status} onValueChange={v => setStatus(v as FormularyStatus)}>
 					<SelectTrigger>
 						<SelectValue />
 					</SelectTrigger>
@@ -198,7 +198,7 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 					<Textarea
 						rows={3}
 						value={restriction}
-						onChange={(e) => setRestriction(e.target.value)}
+						onChange={e => setRestriction(e.target.value)}
 						placeholder="Specify approval requirements, criteria for use, or reason for off-formulary status…"
 					/>
 				</div>
@@ -208,7 +208,7 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 				<Label className="text-xs">Alternative Drug(s) (comma-separated)</Label>
 				<Input
 					value={alternativesRaw}
-					onChange={(e) => setAlternativesRaw(e.target.value)}
+					onChange={e => setAlternativesRaw(e.target.value)}
 					placeholder="e.g., Piperacillin-Tazobactam, Ceftriaxone"
 				/>
 			</div>
@@ -221,7 +221,7 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 				<Textarea
 					rows={2}
 					value={costNote}
-					onChange={(e) => setCostNote(e.target.value)}
+					onChange={e => setCostNote(e.target.value)}
 					placeholder="PhilHealth coverage status, cost considerations, generic availability…"
 				/>
 			</div>
@@ -231,7 +231,7 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 				<Textarea
 					rows={3}
 					value={clinicalRationale}
-					onChange={(e) => setClinicalRationale(e.target.value)}
+					onChange={e => setClinicalRationale(e.target.value)}
 					placeholder="Evidence-based rationale, local antibiogram data, committee decision…"
 				/>
 			</div>
@@ -240,11 +240,7 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 
 			{/* Effective / discontinue dates */}
 			<div className="grid gap-4 sm:grid-cols-2">
-				<DatePicker
-					label="Effective Date"
-					value={effectiveDate}
-					onChange={setEffectiveDate}
-				/>
+				<DatePicker label="Effective Date" value={effectiveDate} onChange={setEffectiveDate} />
 				<DatePicker
 					label="Discontinue Date (if applicable)"
 					value={discontinueDate}
@@ -253,7 +249,7 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 			</div>
 
 			{/* Actions */}
-			<div className="flex justify-between items-center pt-2">
+			<div className="flex items-center justify-between pt-2">
 				{item && (
 					<Button
 						variant="ghost"
@@ -265,7 +261,7 @@ export function FormularyNoteEditor({ item, onSave, onCancel }: FormularyNoteEdi
 						Archive
 					</Button>
 				)}
-				<div className="flex gap-2 ml-auto">
+				<div className="ml-auto flex gap-2">
 					<Button variant="outline" onClick={onCancel}>
 						Cancel
 					</Button>

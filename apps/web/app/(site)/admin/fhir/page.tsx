@@ -6,7 +6,9 @@ import { FhirExportDashboard } from "@/features/fhir/components/fhir-export-dash
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -18,7 +20,7 @@ export default function AdminFhirPage() {
 
 	if (!can(permSet, "admin", "view")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access this page.
 			</div>
 		)
@@ -26,7 +28,7 @@ export default function AdminFhirPage() {
 
 	if (!can(permSet, "fhir", "view")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access FHIR export management.
 			</div>
 		)

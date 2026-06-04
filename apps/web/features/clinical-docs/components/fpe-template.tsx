@@ -101,18 +101,18 @@ export const EMPTY_FPE_DATA: FpeData = {
 
 function SectionHeader({ number, title }: { number: number; title: string }) {
 	return (
-		<div className="flex items-center gap-3 mb-3">
-			<div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+		<div className="mb-3 flex items-center gap-3">
+			<div className="bg-primary text-primary-foreground flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold">
 				{number}
 			</div>
-			<h4 className="text-sm font-semibold uppercase tracking-wide">{title}</h4>
+			<h4 className="text-sm font-semibold tracking-wide uppercase">{title}</h4>
 		</div>
 	)
 }
 
 function ReadOnlyText({ value, placeholder }: { value: string; placeholder?: string }) {
 	return (
-		<div className="bg-muted/30 rounded-md border px-3 py-2 text-sm whitespace-pre-wrap min-h-[3rem]">
+		<div className="bg-muted/30 min-h-[3rem] rounded-md border px-3 py-2 text-sm whitespace-pre-wrap">
 			{value || <span className="text-muted-foreground italic">{placeholder ?? "-"}</span>}
 		</div>
 	)
@@ -126,19 +126,19 @@ function FieldError({ show, children }: { show: boolean; children: ReactNode }) 
 function calculateBmi(weightKg: string, heightCm: string) {
 	const weight = Number(weightKg)
 	const heightMeters = Number(heightCm) / 100
-	if (!Number.isFinite(weight) || !Number.isFinite(heightMeters) || weight <= 0 || heightMeters <= 0) {
+	if (
+		!Number.isFinite(weight) ||
+		!Number.isFinite(heightMeters) ||
+		weight <= 0 ||
+		heightMeters <= 0
+	) {
 		return null
 	}
 
 	return (weight / (heightMeters * heightMeters)).toFixed(1)
 }
 
-export function FpeTemplate({
-	value,
-	onChange,
-	readOnly = false,
-	validation,
-}: FpeTemplateProps) {
+export function FpeTemplate({ value, onChange, readOnly = false, validation }: FpeTemplateProps) {
 	const isReadOnly = readOnly || !onChange
 	const missing = new Set(validation?.submitMissingFields ?? [])
 	const fieldErrors = validation?.fieldErrors ?? {}
@@ -160,9 +160,7 @@ export function FpeTemplate({
 	function setPrimaryDiag(field: "code" | "description", val: string) {
 		const key: FpeFieldKey = `primaryDiagnosis.${field}`
 		const sanitized =
-			field === "code"
-				? sanitizeIcd10Code(val)
-				: sanitizeFpeText(val, maxLengthForFpeField(key))
+			field === "code" ? sanitizeIcd10Code(val) : sanitizeFpeText(val, maxLengthForFpeField(key))
 		onChange?.({ ...value, primaryDiagnosis: { ...value.primaryDiagnosis, [field]: sanitized } })
 	}
 
@@ -178,7 +176,7 @@ export function FpeTemplate({
 		<div className="space-y-7">
 			<div className="flex items-center justify-between">
 				<div>
-					<p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+					<p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
 						PhilHealth Konsulta Program
 					</p>
 					<h3 className="text-base font-semibold">First Patient Encounter (FPE)</h3>
@@ -204,7 +202,9 @@ export function FpeTemplate({
 						<FieldError show={missing.has("Chief Complaint") && !errorFor("chiefComplaint")}>
 							Chief Complaint is required before Review & Submit.
 						</FieldError>
-						<FieldError show={!!errorFor("chiefComplaint")}>{errorFor("chiefComplaint")}</FieldError>
+						<FieldError show={!!errorFor("chiefComplaint")}>
+							{errorFor("chiefComplaint")}
+						</FieldError>
 					</>
 				)}
 			</section>
@@ -223,7 +223,9 @@ export function FpeTemplate({
 							onChange={e => setText("historyOfPresentIllness", e.target.value)}
 						/>
 						<FieldError
-							show={missing.has("History of Present Illness") && !errorFor("historyOfPresentIllness")}
+							show={
+								missing.has("History of Present Illness") && !errorFor("historyOfPresentIllness")
+							}
 						>
 							History of Present Illness is required before Review & Submit.
 						</FieldError>
@@ -237,7 +239,10 @@ export function FpeTemplate({
 			<section>
 				<SectionHeader number={3} title="Past Medical History" />
 				{isReadOnly ? (
-					<ReadOnlyText value={value.pastMedicalHistory} placeholder="No past medical history recorded" />
+					<ReadOnlyText
+						value={value.pastMedicalHistory}
+						placeholder="No past medical history recorded"
+					/>
 				) : (
 					<Textarea
 						placeholder="Chronic conditions, previous hospitalizations, surgeries, current medications, allergies, immunizations..."
@@ -284,7 +289,9 @@ export function FpeTemplate({
 					/>
 				)}
 				<FieldError
-					show={!isReadOnly && missing.has("Lifestyle / Social History") && !errorFor("socialHistory")}
+					show={
+						!isReadOnly && missing.has("Lifestyle / Social History") && !errorFor("socialHistory")
+					}
 				>
 					Lifestyle / Social History is required before Review &amp; Submit.
 				</FieldError>
@@ -296,7 +303,10 @@ export function FpeTemplate({
 			<section>
 				<SectionHeader number={6} title="Mental Health Screening" />
 				{isReadOnly ? (
-					<ReadOnlyText value={value.mentalHealthScreening} placeholder="No mental health screening recorded" />
+					<ReadOnlyText
+						value={value.mentalHealthScreening}
+						placeholder="No mental health screening recorded"
+					/>
 				) : (
 					<Textarea
 						placeholder="Mood, sleep, appetite, stressors, safety concerns, self-harm risk, and referral needs..."
@@ -344,7 +354,7 @@ export function FpeTemplate({
 				<SectionHeader number={8} title="Physical Examination" />
 
 				<div>
-					<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+					<p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
 						Vital Signs
 					</p>
 					<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -364,7 +374,7 @@ export function FpeTemplate({
 									{label} <span className="text-muted-foreground">({unit})</span>
 								</Label>
 								{isReadOnly ? (
-									<div className="border rounded-md px-3 py-1.5 text-sm bg-muted/30">
+									<div className="bg-muted/30 rounded-md border px-3 py-1.5 text-sm">
 										{value.vitalSigns[key] || "-"}
 									</div>
 								) : (
@@ -393,7 +403,7 @@ export function FpeTemplate({
 							</div>
 						))}
 					</div>
-					<div className="mt-3 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+					<div className="bg-muted/30 mt-3 rounded-md border px-3 py-2 text-sm">
 						<span className="font-medium">BMI:</span>{" "}
 						{calculateBmi(value.vitalSigns.weight, value.vitalSigns.height) ?? "-"}
 					</div>
@@ -411,7 +421,7 @@ export function FpeTemplate({
 					] as Array<[keyof FpeData, string]>
 				).map(([key, label]) => (
 					<div key={key} className="space-y-1.5">
-						<Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+						<Label className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 							{label}
 						</Label>
 						{isReadOnly ? (
@@ -449,7 +459,7 @@ export function FpeTemplate({
 				<SectionHeader number={9} title="Assessment / Diagnosis" />
 
 				<div className="space-y-2">
-					<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+					<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 						Primary Diagnosis (ICD-10) *
 					</p>
 					{isReadOnly ? (
@@ -467,10 +477,7 @@ export function FpeTemplate({
 									onChange={e => setPrimaryDiag("code", e.target.value)}
 								/>
 								<FieldError
-									show={
-										missing.has("Primary Diagnosis Code") &&
-										!errorFor("primaryDiagnosis.code")
-									}
+									show={missing.has("Primary Diagnosis Code") && !errorFor("primaryDiagnosis.code")}
 								>
 									Primary Diagnosis Code is required before saving the draft.
 								</FieldError>
@@ -503,7 +510,7 @@ export function FpeTemplate({
 
 				{value.secondaryDiagnoses.length > 0 && (
 					<div className="space-y-2">
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+						<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 							Secondary Diagnoses
 						</p>
 						{value.secondaryDiagnoses.map((diag, i) => (

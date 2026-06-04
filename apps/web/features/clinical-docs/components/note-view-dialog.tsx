@@ -84,8 +84,7 @@ function readDiagnoses(value: unknown): DiagnosisEntry[] {
 		return [
 			{
 				code: selected.icd10Code.trim(),
-				description:
-					typeof selected.icd10Display === "string" ? selected.icd10Display.trim() : "",
+				description: typeof selected.icd10Display === "string" ? selected.icd10Display.trim() : "",
 			},
 		]
 	}
@@ -184,8 +183,8 @@ function Icd10DiagnosisEditField({
 				</Badge>
 			</div>
 			<p className="text-muted-foreground text-xs">
-				Search by diagnosis words or ICD-10 code. Typing ICD-10 inside the note text will
-				not count for signing.
+				Search by diagnosis words or ICD-10 code. Typing ICD-10 inside the note text will not count
+				for signing.
 			</p>
 			<div className="relative z-30">
 				<Input
@@ -465,7 +464,7 @@ export function NoteViewDialog({
 																<Badge
 																	key={diagnosis.code}
 																	variant="secondary"
-																	className="max-w-full justify-start gap-1.5 whitespace-normal text-left"
+																	className="max-w-full justify-start gap-1.5 text-left whitespace-normal"
 																>
 																	<span className="font-mono">{diagnosis.code}</span>
 																	<span>- {diagnosis.description}</span>

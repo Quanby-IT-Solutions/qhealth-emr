@@ -3,12 +3,7 @@
 import { useState } from "react"
 
 import { Button } from "@/core/components/ui/button"
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/core/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import {
@@ -21,7 +16,7 @@ import {
 } from "@/core/components/ui/table"
 import { useCreateVitalMutation, useVitalsQuery } from "@/features/nursing/api/nursing.hooks"
 
-import { NewsScoreBadge, computeNewsScore } from "./news-score-badge"
+import { computeNewsScore, NewsScoreBadge } from "./news-score-badge"
 
 function formatDateTime(dateStr: string | null | undefined) {
 	if (!dateStr) return "—"
@@ -94,9 +89,7 @@ export function VitalsEntryForm({
 				bpSystolic: fields.bpSystolic ? Number(fields.bpSystolic) : undefined,
 				bpDiastolic: fields.bpDiastolic ? Number(fields.bpDiastolic) : undefined,
 				heartRate: fields.heartRate ? Number(fields.heartRate) : undefined,
-				respiratoryRate: fields.respiratoryRate
-					? Number(fields.respiratoryRate)
-					: undefined,
+				respiratoryRate: fields.respiratoryRate ? Number(fields.respiratoryRate) : undefined,
 				spo2: fields.spo2 ? Number(fields.spo2) : undefined,
 				painScore: fields.painScore ? Number(fields.painScore) : undefined,
 				weight: fields.weight ? Number(fields.weight) : undefined,
@@ -246,9 +239,7 @@ export function VitalsEntryForm({
 								<button
 									key={level}
 									type="button"
-									onClick={() =>
-										handleChange("consciousnessAlert", level === "Alert")
-									}
+									onClick={() => handleChange("consciousnessAlert", level === "Alert")}
 									className={`rounded-md border px-3 py-1 text-sm ${
 										(level === "Alert") === fields.consciousnessAlert
 											? "bg-primary text-primary-foreground border-primary"
@@ -347,10 +338,7 @@ export function VitalsPanel({ encounterId, facilityId, readOnly }: VitalsPanelPr
 									<TableCell>{v.spo2 != null ? `${v.spo2}%` : "—"}</TableCell>
 									<TableCell>{v.painScore ?? "—"}</TableCell>
 									<TableCell>
-										<NewsScoreBadge
-											score={v.newsScore}
-											riskLevel={v.newsRiskLevel}
-										/>
+										<NewsScoreBadge score={v.newsScore} riskLevel={v.newsRiskLevel} />
 									</TableCell>
 								</TableRow>
 							))}

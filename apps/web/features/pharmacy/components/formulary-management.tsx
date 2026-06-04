@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState } from "react"
-
 import {
 	AlertTriangle,
 	BookOpen,
@@ -15,12 +14,7 @@ import {
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-} from "@/core/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import {
 	Select,
@@ -29,12 +23,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/core/components/ui/select"
-import {
-	Sheet,
-	SheetContent,
-	SheetHeader,
-	SheetTitle,
-} from "@/core/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/core/components/ui/sheet"
 import {
 	Table,
 	TableBody,
@@ -103,7 +92,8 @@ const DEMO_FORMULARY: FormularyItem[] = [
 		drugClass: "Oxazolidinone Antibiotic",
 		dosageForms: ["600mg tablet", "600mg/300mL IV bag"],
 		status: "restricted",
-		restriction: "Reserved for vancomycin-resistant enterococcal (VRE) infections. Pharmacy committee pre-approval required.",
+		restriction:
+			"Reserved for vancomycin-resistant enterococcal (VRE) infections. Pharmacy committee pre-approval required.",
 		alternatives: ["Daptomycin", "Tedizolid"],
 		costNote: "High cost — PhilHealth coverage limited. Patient co-pay applies.",
 		effectiveDate: "2024-01-01",
@@ -116,7 +106,8 @@ const DEMO_FORMULARY: FormularyItem[] = [
 		drugClass: "Phosphodiesterase-3 Inhibitor",
 		dosageForms: ["100mg tablet"],
 		status: "off_formulary",
-		clinicalRationale: "Insufficient evidence for routine use. Not covered under PhilHealth Z benefit. Refer to vascular surgery for alternative management.",
+		clinicalRationale:
+			"Insufficient evidence for routine use. Not covered under PhilHealth Z benefit. Refer to vascular surgery for alternative management.",
 		alternatives: ["Pentoxifylline"],
 		updatedAt: "2024-05-15",
 	},
@@ -176,26 +167,29 @@ export function FormularyManagement() {
 	const filtered = useMemo(() => {
 		let items = formularyItems
 		if (statusFilter !== "all") {
-			items = items.filter((i) => i.status === statusFilter)
+			items = items.filter(i => i.status === statusFilter)
 		}
 		if (search.trim()) {
 			const q = search.toLowerCase()
 			items = items.filter(
-				(i) =>
+				i =>
 					i.genericName.toLowerCase().includes(q) ||
-					i.brandNames.some((b) => b.toLowerCase().includes(q)) ||
+					i.brandNames.some(b => b.toLowerCase().includes(q)) ||
 					i.drugClass.toLowerCase().includes(q)
 			)
 		}
 		return items
 	}, [formularyItems, search, statusFilter])
 
-	const stats = useMemo(() => ({
-		total: formularyItems.length,
-		onFormulary: formularyItems.filter((i) => i.status === "on_formulary").length,
-		restricted: formularyItems.filter((i) => i.status === "restricted").length,
-		offFormulary: formularyItems.filter((i) => i.status === "off_formulary").length,
-	}), [formularyItems])
+	const stats = useMemo(
+		() => ({
+			total: formularyItems.length,
+			onFormulary: formularyItems.filter(i => i.status === "on_formulary").length,
+			restricted: formularyItems.filter(i => i.status === "restricted").length,
+			offFormulary: formularyItems.filter(i => i.status === "off_formulary").length,
+		}),
+		[formularyItems]
+	)
 
 	function openEditor(item: FormularyItem) {
 		setSelected(item)
@@ -213,7 +207,7 @@ export function FormularyManagement() {
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-2xl font-semibold">Formulary Management</h1>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Institutional drug formulary — restrictions, alternatives, and cost notes
 					</p>
 				</div>
@@ -226,10 +220,30 @@ export function FormularyManagement() {
 			{/* Stats */}
 			<div className="grid gap-4 sm:grid-cols-4">
 				{[
-					{ label: "Total Drugs", value: stats.total, icon: <BookOpen className="size-4" />, accent: "default" },
-					{ label: "On Formulary", value: stats.onFormulary, icon: <CheckCircle2 className="size-4 text-green-600" />, accent: "default" },
-					{ label: "Restricted", value: stats.restricted, icon: <AlertTriangle className="size-4 text-amber-500" />, accent: "warning" },
-					{ label: "Off Formulary", value: stats.offFormulary, icon: <AlertTriangle className="size-4 text-red-500" />, accent: "danger" },
+					{
+						label: "Total Drugs",
+						value: stats.total,
+						icon: <BookOpen className="size-4" />,
+						accent: "default",
+					},
+					{
+						label: "On Formulary",
+						value: stats.onFormulary,
+						icon: <CheckCircle2 className="size-4 text-green-600" />,
+						accent: "default",
+					},
+					{
+						label: "Restricted",
+						value: stats.restricted,
+						icon: <AlertTriangle className="size-4 text-amber-500" />,
+						accent: "warning",
+					},
+					{
+						label: "Off Formulary",
+						value: stats.offFormulary,
+						icon: <AlertTriangle className="size-4 text-red-500" />,
+						accent: "danger",
+					},
 				].map(({ label, value, icon }) => (
 					<Card key={label}>
 						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -246,29 +260,29 @@ export function FormularyManagement() {
 			{/* Filters */}
 			<Card>
 				<CardHeader className="pb-2">
-					<CardTitle className="text-base flex items-center gap-2">
+					<CardTitle className="flex items-center gap-2 text-base">
 						<BookOpen className="size-4" />
 						Drug Formulary
 					</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<div className="flex flex-wrap gap-3">
-						<div className="relative flex-1 min-w-48">
-							<Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+						<div className="relative min-w-48 flex-1">
+							<Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
 							<Input
 								placeholder="Search by generic name, brand, or drug class…"
 								className="pl-9"
 								value={search}
-								onChange={(e) => setSearch(e.target.value)}
+								onChange={e => setSearch(e.target.value)}
 							/>
 						</div>
 						<div className="flex items-center gap-2">
-							<Filter className="size-4 text-muted-foreground" />
+							<Filter className="text-muted-foreground size-4" />
 							<Select
 								value={statusFilter}
-								onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
+								onValueChange={v => setStatusFilter(v as typeof statusFilter)}
 							>
-								<SelectTrigger className="w-40 h-9">
+								<SelectTrigger className="h-9 w-40">
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
@@ -283,11 +297,11 @@ export function FormularyManagement() {
 
 					{isLoading ? (
 						<div className="flex items-center justify-center py-16">
-							<Loader2 className="size-6 animate-spin text-muted-foreground" />
+							<Loader2 className="text-muted-foreground size-6 animate-spin" />
 						</div>
 					) : filtered.length === 0 ? (
 						<div className="flex flex-col items-center py-16 text-center">
-							<BookOpen className="size-10 text-muted-foreground mb-3" />
+							<BookOpen className="text-muted-foreground mb-3 size-10" />
 							<p className="font-medium">No drugs match the current filters</p>
 						</div>
 					) : (
@@ -304,31 +318,31 @@ export function FormularyManagement() {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{filtered.map((item) => (
+								{filtered.map(item => (
 									<TableRow
 										key={item.id}
-										className="cursor-pointer hover:bg-muted/50"
+										className="hover:bg-muted/50 cursor-pointer"
 										onClick={() => openEditor(item)}
 									>
 										<TableCell className="font-medium">{item.genericName}</TableCell>
-										<TableCell className="text-sm text-muted-foreground">
+										<TableCell className="text-muted-foreground text-sm">
 											{item.brandNames.join(", ")}
 										</TableCell>
 										<TableCell className="text-sm">{item.drugClass}</TableCell>
-										<TableCell className="text-xs text-muted-foreground">
+										<TableCell className="text-muted-foreground text-xs">
 											{item.dosageForms.join(" · ")}
 										</TableCell>
 										<TableCell>
 											<StatusBadge status={item.status} />
 										</TableCell>
-										<TableCell className="text-xs text-muted-foreground">
+										<TableCell className="text-muted-foreground text-xs">
 											{new Date(item.updatedAt).toLocaleDateString("en-PH")}
 										</TableCell>
 										<TableCell>
 											<Button
 												variant="ghost"
 												size="sm"
-												onClick={(e) => {
+												onClick={e => {
 													e.stopPropagation()
 													openEditor(item)
 												}}
@@ -346,7 +360,7 @@ export function FormularyManagement() {
 
 			{/* Editor Sheet */}
 			<Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-				<SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+				<SheetContent className="w-full overflow-y-auto sm:max-w-xl">
 					<SheetHeader>
 						<SheetTitle>
 							{selected ? `Edit — ${selected.genericName}` : "Add Drug to Formulary"}

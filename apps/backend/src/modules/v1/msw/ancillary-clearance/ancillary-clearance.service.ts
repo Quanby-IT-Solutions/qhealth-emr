@@ -429,10 +429,9 @@ export class AncillaryClearanceService {
 			patientLastName: (patient?.last_name as string | null) ?? null,
 		}
 
-		const patientIdentifiers = [
-			patient?.id as string | null,
-			patient?.mrn as string | null,
-		].filter((value): value is string => Boolean(value))
+		const patientIdentifiers = [patient?.id as string | null, patient?.mrn as string | null].filter(
+			(value): value is string => Boolean(value)
+		)
 		if (patientIdentifiers.length === 0) {
 			throw new BadRequestException("Unable to verify patient barcode for this clearance record")
 		}

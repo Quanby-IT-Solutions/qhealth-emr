@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-
 import { AlertCircle, Loader2, Plus, X } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/core/components/ui/alert"
@@ -27,9 +26,9 @@ import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
 import { useStaffClinicianListQuery } from "@/features/scheduling/api/scheduling.hooks"
 
 import {
-	type OrConflict,
 	useCheckOrConflictsMutation,
 	useCreateSurgicalCaseMutation,
+	type OrConflict,
 } from "../api/surgical.hooks"
 
 interface OrCaseBookingDialogProps {
@@ -221,11 +220,11 @@ export function OrCaseBookingDialog({
 								{patientSearch.length >= 2 && (
 									<div className="border-border absolute z-10 mt-1 w-full rounded-md border bg-white shadow-lg">
 										{patientSearchQuery.isLoading ? (
-											<div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+											<div className="text-muted-foreground flex items-center gap-2 px-3 py-2 text-sm">
 												<Loader2 className="size-3 animate-spin" /> Searching…
 											</div>
 										) : (patientSearchQuery.data?.data ?? []).length === 0 ? (
-											<div className="px-3 py-2 text-sm text-muted-foreground">
+											<div className="text-muted-foreground px-3 py-2 text-sm">
 												No patients found
 											</div>
 										) : (
@@ -235,9 +234,7 @@ export function OrCaseBookingDialog({
 													className="hover:bg-muted w-full px-3 py-2 text-left text-sm"
 													onClick={() => {
 														setSelectedPatientId(p.id)
-														setSelectedPatientLabel(
-															`${p.firstName} ${p.lastName} · ${p.mrn ?? ""}`
-														)
+														setSelectedPatientLabel(`${p.firstName} ${p.lastName} · ${p.mrn ?? ""}`)
 														setPatientSearch("")
 													}}
 												>
@@ -245,9 +242,7 @@ export function OrCaseBookingDialog({
 														{p.firstName} {p.lastName}
 													</span>
 													{p.mrn && (
-														<span className="text-muted-foreground ml-2 text-xs">
-															{p.mrn}
-														</span>
+														<span className="text-muted-foreground ml-2 text-xs">{p.mrn}</span>
 													)}
 												</button>
 											))
@@ -273,9 +268,16 @@ export function OrCaseBookingDialog({
 						</div>
 						<div className="space-y-1">
 							<Label>Surgical Type</Label>
-							<Select value={surgicalType} onValueChange={v => { if (v) setSurgicalType(v) }}>
+							<Select
+								value={surgicalType}
+								onValueChange={v => {
+									if (v) setSurgicalType(v)
+								}}
+							>
 								<SelectTrigger>
-									<SelectValue>{SURGICAL_TYPES.find(t => t.value === surgicalType)?.label ?? surgicalType}</SelectValue>
+									<SelectValue>
+										{SURGICAL_TYPES.find(t => t.value === surgicalType)?.label ?? surgicalType}
+									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
 									{SURGICAL_TYPES.map(t => (
@@ -321,12 +323,15 @@ export function OrCaseBookingDialog({
 							<Label>Anesthesiologist</Label>
 							<Select
 								value={anesthesiologistStaffId}
-								onValueChange={v => { if (v) setAnesthesiologistStaffId(v) }}
+								onValueChange={v => {
+									if (v) setAnesthesiologistStaffId(v)
+								}}
 							>
 								<SelectTrigger>
 									<SelectValue>
 										{anesthesiologistStaffId
-											? (clinicians.find(c => c.id === anesthesiologistStaffId)?.name ?? "Select anesthesiologist…")
+											? (clinicians.find(c => c.id === anesthesiologistStaffId)?.name ??
+												"Select anesthesiologist…")
 											: "Select anesthesiologist…"}
 									</SelectValue>
 								</SelectTrigger>
@@ -424,15 +429,13 @@ export function OrCaseBookingDialog({
 							onClick={handleCheckConflicts}
 							disabled={checkConflictsMut.isPending}
 						>
-							{checkConflictsMut.isPending && (
-								<Loader2 className="mr-1.5 size-3 animate-spin" />
-							)}
+							{checkConflictsMut.isPending && <Loader2 className="mr-1.5 size-3 animate-spin" />}
 							Check Scheduling Conflicts
 						</Button>
 
 						{conflictChecked && conflicts.length === 0 && (
 							<Alert className="border-green-200 bg-green-50">
-								<AlertDescription className="text-green-700 text-sm">
+								<AlertDescription className="text-sm text-green-700">
 									No conflicts detected. Safe to book.
 								</AlertDescription>
 							</Alert>

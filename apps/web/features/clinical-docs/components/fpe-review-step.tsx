@@ -47,8 +47,9 @@ export function FpeReviewStep({
 			<div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
 				<CheckCircle2 className="size-12 text-green-500" />
 				<h3 className="text-lg font-semibold">FPE Archived</h3>
-				<p className="text-sm text-muted-foreground max-w-sm">
-					The FPE note has been signed and archived, and the Konsulta capitation activity has been recorded.
+				<p className="text-muted-foreground max-w-sm text-sm">
+					The FPE note has been signed and archived, and the Konsulta capitation activity has been
+					recorded.
 				</p>
 				<Button onClick={onSuccess}>Done</Button>
 			</div>
@@ -63,7 +64,7 @@ export function FpeReviewStep({
 				</Button>
 				<div>
 					<h2 className="text-base font-semibold">PhilHealth FPE - Review &amp; Submit</h2>
-					<p className="text-xs text-muted-foreground">Verify all fields before archiving</p>
+					<p className="text-muted-foreground text-xs">Verify all fields before archiving</p>
 				</div>
 			</div>
 
@@ -85,9 +86,7 @@ export function FpeReviewStep({
 				<Alert variant="destructive">
 					<AlertTriangle className="size-4" />
 					<AlertDescription>
-						{submitFpe.error instanceof Error
-							? submitFpe.error.message
-							: "Submission failed"}
+						{submitFpe.error instanceof Error ? submitFpe.error.message : "Submission failed"}
 					</AlertDescription>
 				</Alert>
 			)}

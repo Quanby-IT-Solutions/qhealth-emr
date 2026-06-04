@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { AlertCircle, CheckCircle, ChevronDown } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -15,15 +14,13 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
-
-import { MalnutritionRiskBadge } from "@/features/nutrition/components/malnutrition-risk-badge"
-
 import {
-	type MalnutritionRisk,
-	type ScreeningTool,
 	useCreateNutritionAssessmentMutation,
 	useNutritionAssessmentsQuery,
+	type MalnutritionRisk,
+	type ScreeningTool,
 } from "@/features/nutrition/api/nutrition.hooks"
+import { MalnutritionRiskBadge } from "@/features/nutrition/components/malnutrition-risk-badge"
 
 // ============================================================================
 // Score calculation helpers
@@ -81,8 +78,14 @@ const NRS2002_NUTRITIONAL_OPTIONS = [
 
 const NRS2002_DISEASE_OPTIONS = [
 	{ value: "0", label: "0 – Normal requirements" },
-	{ value: "1", label: "1 – Hip fracture / chronic disease (COPD, cirrhosis, dialysis, DM, cancer)" },
-	{ value: "2", label: "2 – Major abdominal surgery / stroke / severe pneumonia / haematologic malignancy" },
+	{
+		value: "1",
+		label: "1 – Hip fracture / chronic disease (COPD, cirrhosis, dialysis, DM, cancer)",
+	},
+	{
+		value: "2",
+		label: "2 – Major abdominal surgery / stroke / severe pneumonia / haematologic malignancy",
+	},
 	{ value: "3", label: "3 – Head injury / bone marrow transplant / ICU patients (APACHE > 10)" },
 ]
 
@@ -135,20 +138,15 @@ export function NutritionAssessmentForm({
 	const [notes, setNotes] = useState("")
 	const [showHistory, setShowHistory] = useState(false)
 
-	const { data: history, isLoading: historyLoading } = useNutritionAssessmentsQuery(
-		encounterId,
-		{ limit: 10 }
-	)
+	const { data: history, isLoading: historyLoading } = useNutritionAssessmentsQuery(encounterId, {
+		limit: 10,
+	})
 	const createMutation = useCreateNutritionAssessmentMutation()
 
 	// Derive current score / risk
 	const derived = (() => {
 		if (tool === "nrs_2002") {
-			return calcNrs2002(
-				Number(nrsNutritional),
-				Number(nrsDisease),
-				nrsAgeOver70 === "yes"
-			)
+			return calcNrs2002(Number(nrsNutritional), Number(nrsDisease), nrsAgeOver70 === "yes")
 		}
 		if (tool === "must") {
 			return calcMust(Number(mustBmi), Number(mustWeight), Number(mustAcute))
@@ -196,7 +194,7 @@ export function NutritionAssessmentForm({
 						<div className="space-y-1.5">
 							<Label htmlFor="screeningTool">Screening Tool</Label>
 							<div className="flex gap-2">
-								{(Object.keys(TOOL_LABELS) as ScreeningTool[]).map((t) => (
+								{(Object.keys(TOOL_LABELS) as ScreeningTool[]).map(t => (
 									<button
 										key={t}
 										type="button"
@@ -214,7 +212,7 @@ export function NutritionAssessmentForm({
 						</div>
 
 						{/* NRS-2002 fields */}
-					{tool === "nrs_2002" && (
+						{tool === "nrs_2002" && (
 							<>
 								<div className="space-y-1.5">
 									<Label htmlFor="nrsNutritional">Nutritional Status Score</Label>
@@ -223,7 +221,7 @@ export function NutritionAssessmentForm({
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											{NRS2002_NUTRITIONAL_OPTIONS.map((o) => (
+											{NRS2002_NUTRITIONAL_OPTIONS.map(o => (
 												<SelectItem key={o.value} value={o.value}>
 													{o.label}
 												</SelectItem>
@@ -238,7 +236,7 @@ export function NutritionAssessmentForm({
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											{NRS2002_DISEASE_OPTIONS.map((o) => (
+											{NRS2002_DISEASE_OPTIONS.map(o => (
 												<SelectItem key={o.value} value={o.value}>
 													{o.label}
 												</SelectItem>
@@ -271,7 +269,7 @@ export function NutritionAssessmentForm({
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											{MUST_BMI_OPTIONS.map((o) => (
+											{MUST_BMI_OPTIONS.map(o => (
 												<SelectItem key={o.value} value={o.value}>
 													{o.label}
 												</SelectItem>
@@ -286,7 +284,7 @@ export function NutritionAssessmentForm({
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											{MUST_WEIGHT_OPTIONS.map((o) => (
+											{MUST_WEIGHT_OPTIONS.map(o => (
 												<SelectItem key={o.value} value={o.value}>
 													{o.label}
 												</SelectItem>
@@ -301,7 +299,7 @@ export function NutritionAssessmentForm({
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											{MUST_ACUTE_OPTIONS.map((o) => (
+											{MUST_ACUTE_OPTIONS.map(o => (
 												<SelectItem key={o.value} value={o.value}>
 													{o.label}
 												</SelectItem>
@@ -321,7 +319,7 @@ export function NutritionAssessmentForm({
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										{SGA_GRADE_OPTIONS.map((o) => (
+										{SGA_GRADE_OPTIONS.map(o => (
 											<SelectItem key={o.value} value={o.value}>
 												{o.label}
 											</SelectItem>
@@ -332,16 +330,14 @@ export function NutritionAssessmentForm({
 						)}
 
 						{/* Score summary */}
-						<div className="flex items-center gap-3 rounded-md border bg-muted/40 px-4 py-3">
+						<div className="bg-muted/40 flex items-center gap-3 rounded-md border px-4 py-3">
 							{tool === "sga" ? (
 								<span className="text-sm font-medium">
-									SGA Grade{" "}
-									<span className="font-bold uppercase">{sgaGrade}</span>
+									SGA Grade <span className="font-bold uppercase">{sgaGrade}</span>
 								</span>
 							) : (
 								<span className="text-sm font-medium">
-									Total Score:{" "}
-									<span className="font-bold">{derived.score}</span>
+									Total Score: <span className="font-bold">{derived.score}</span>
 								</span>
 							)}
 							<MalnutritionRiskBadge risk={derived.risk} />
@@ -355,12 +351,12 @@ export function NutritionAssessmentForm({
 								placeholder="Add relevant clinical observations…"
 								rows={3}
 								value={notes}
-								onChange={(e) => setNotes(e.target.value)}
+								onChange={e => setNotes(e.target.value)}
 							/>
 						</div>
 
 						{createMutation.isError && (
-							<div className="flex items-center gap-2 text-sm text-destructive">
+							<div className="text-destructive flex items-center gap-2 text-sm">
 								<AlertCircle className="size-4 shrink-0" />
 								<span>Failed to save assessment. Please try again.</span>
 							</div>
@@ -384,15 +380,15 @@ export function NutritionAssessmentForm({
 			<div>
 				<button
 					type="button"
-					className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
-					onClick={() => setShowHistory((p) => !p)}
+					className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm font-medium"
+					onClick={() => setShowHistory(p => !p)}
 				>
 					<ChevronDown
 						className={`size-4 transition-transform ${showHistory ? "rotate-180" : ""}`}
 					/>
 					Assessment History
 					{history && history.total > 0 && (
-						<span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-xs">
+						<span className="bg-muted ml-1 rounded-full px-1.5 py-0.5 text-xs">
 							{history.total}
 						</span>
 					)}
@@ -402,12 +398,14 @@ export function NutritionAssessmentForm({
 					<Card className="mt-3">
 						<CardContent className="pt-4">
 							{historyLoading ? (
-								<p className="text-sm text-muted-foreground">Loading history…</p>
-			) : !history?.data.length ? (
-							<p className="text-sm text-muted-foreground">No prior assessments for this encounter.</p>
-						) : (
-							<div className="divide-y">
-								{history.data.map((a) => (
+								<p className="text-muted-foreground text-sm">Loading history…</p>
+							) : !history?.data.length ? (
+								<p className="text-muted-foreground text-sm">
+									No prior assessments for this encounter.
+								</p>
+							) : (
+								<div className="divide-y">
+									{history.data.map(a => (
 										<div key={a.id} className="flex items-center justify-between py-3 text-sm">
 											<div className="flex flex-col gap-0.5">
 												<span className="font-medium">
@@ -416,7 +414,7 @@ export function NutritionAssessmentForm({
 													{a.screeningTool === "sga" &&
 														` — Grade ${a.screeningScore === 0 ? "A" : a.screeningScore === 1 ? "B" : "C"}`}
 												</span>
-												<span className="text-xs text-muted-foreground">
+												<span className="text-muted-foreground text-xs">
 													{a.assessedByStaffName} ·{" "}
 													{new Date(a.createdAt).toLocaleDateString(undefined, {
 														day: "numeric",

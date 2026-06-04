@@ -3,10 +3,12 @@
 import Link from "next/link"
 import {
 	AlertCircleFreeIcons,
-	CheckmarkSquare01FreeIcons,
 	ArrowLeft01FreeIcons,
+	CheckmarkSquare01FreeIcons,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
+
+import type { DataQualitySection } from "@repo/contracts"
 
 import { Alert, AlertDescription, AlertTitle } from "@/core/components/ui/alert"
 import { Badge } from "@/core/components/ui/badge"
@@ -14,9 +16,6 @@ import { buttonVariants } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Skeleton } from "@/core/components/ui/skeleton"
 import { cn } from "@/core/lib/utils"
-
-import type { DataQualitySection } from "@repo/contracts"
-
 import { useAdminDashboardSummaryQuery } from "@/features/admin/api/admin-dashboard.hooks"
 
 // ── Metric Row ────────────────────────────────────────────────────────────────
@@ -33,21 +32,21 @@ function MetricRow({
 	isIssue?: boolean
 }) {
 	return (
-		<div className="flex items-start justify-between gap-4 py-3 border-b last:border-0">
+		<div className="flex items-start justify-between gap-4 border-b py-3 last:border-0">
 			<div className="min-w-0 flex-1">
 				<div className="flex items-center gap-2">
 					<span className="text-sm font-medium">{label}</span>
 					{isIssue && (
-						<Badge className="text-[10px] px-1.5 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
+						<Badge className="bg-yellow-100 px-1.5 text-[10px] text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
 							Action needed
 						</Badge>
 					)}
 				</div>
-				<p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+				<p className="text-muted-foreground mt-0.5 text-xs">{description}</p>
 			</div>
 			<span
 				className={cn(
-					"text-2xl font-bold tabular-nums flex-shrink-0",
+					"flex-shrink-0 text-2xl font-bold tabular-nums",
 					isIssue ? "text-yellow-600 dark:text-yellow-400" : "text-foreground"
 				)}
 			>
@@ -77,10 +76,10 @@ export function DataQualityPanel() {
 			</div>
 
 			<div className="flex items-center gap-3">
-				<HugeiconsIcon icon={CheckmarkSquare01FreeIcons} className="size-6 text-muted-foreground" />
+				<HugeiconsIcon icon={CheckmarkSquare01FreeIcons} className="text-muted-foreground size-6" />
 				<div>
 					<h1 className="text-xl font-semibold">Clinical Data Quality Oversight</h1>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Read-only governance view of HIM, PhilHealth, ICD-10, CF4, RVS, and AHSR readiness
 					</p>
 				</div>
@@ -108,7 +107,7 @@ export function DataQualityPanel() {
 					<Card>
 						<CardHeader className="pb-2">
 							<CardTitle className="text-sm font-medium">ICD-10 Coding Completeness</CardTitle>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								Resolved diagnoses that still have no ICD-10 code assigned. These affect PhilHealth
 								billing accuracy and statutory disease reporting.
 							</p>
@@ -121,11 +120,11 @@ export function DataQualityPanel() {
 								isIssue={dq.missingIcd10Count > 0}
 							/>
 							<div className="pt-3">
-								<p className="text-xs text-muted-foreground">
-									<strong>What this means:</strong> Each uncodified resolved problem represents a completed
-									clinical encounter where the diagnosis was not coded. For PhilHealth Konsulta and CF4
-									claims, ICD-10 codes are required. Coding officers should review these records in the
-									HIM module.
+								<p className="text-muted-foreground text-xs">
+									<strong>What this means:</strong> Each uncodified resolved problem represents a
+									completed clinical encounter where the diagnosis was not coded. For PhilHealth
+									Konsulta and CF4 claims, ICD-10 codes are required. Coding officers should review
+									these records in the HIM module.
 								</p>
 							</div>
 						</CardContent>
@@ -135,7 +134,7 @@ export function DataQualityPanel() {
 					<Card>
 						<CardHeader className="pb-2">
 							<CardTitle className="text-sm font-medium">CF4 / PhilHealth Claims</CardTitle>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								Status of PhilHealth CF4 claim records for this facility.
 							</p>
 						</CardHeader>
@@ -152,10 +151,10 @@ export function DataQualityPanel() {
 								value={dq.cf4SubmittedThisMonth}
 							/>
 							<div className="pt-3">
-								<p className="text-xs text-muted-foreground">
-									<strong>What this means:</strong> Drafts older than the current billing period should be
-									reviewed and submitted or voided. The submitted count for the current month indicates
-									billing throughput.
+								<p className="text-muted-foreground text-xs">
+									<strong>What this means:</strong> Drafts older than the current billing period
+									should be reviewed and submitted or voided. The submitted count for the current
+									month indicates billing throughput.
 								</p>
 							</div>
 						</CardContent>
@@ -164,11 +163,14 @@ export function DataQualityPanel() {
 					{/* AD-016: CF4 Extraction Completeness */}
 					<Card>
 						<CardHeader className="pb-2">
-							<CardTitle className="text-sm font-medium">CF4 Clinical Extraction Completeness</CardTitle>
-							<p className="text-xs text-muted-foreground">
-								Whether auto-extracted clinical content in submitted and approved CF4 claims is complete
-								enough for compliant PhilHealth submission. A claim can be submitted with an incomplete
-								extraction payload, leading to rejection or manual re-entry by billing staff.
+							<CardTitle className="text-sm font-medium">
+								CF4 Clinical Extraction Completeness
+							</CardTitle>
+							<p className="text-muted-foreground text-xs">
+								Whether auto-extracted clinical content in submitted and approved CF4 claims is
+								complete enough for compliant PhilHealth submission. A claim can be submitted with
+								an incomplete extraction payload, leading to rejection or manual re-entry by billing
+								staff.
 							</p>
 						</CardHeader>
 						<CardContent>
@@ -190,12 +192,20 @@ export function DataQualityPanel() {
 								isIssue={dq.cf4ExtractionCompletePct < 80}
 							/>
 							{dq.cf4SectionCompleteness.some(s => s.missingCount > 0) && (
-								<div className="pt-3 space-y-1.5">
-									<p className="text-xs font-medium">Missing required CF4 sections (in extracted claims)</p>
+								<div className="space-y-1.5 pt-3">
+									<p className="text-xs font-medium">
+										Missing required CF4 sections (in extracted claims)
+									</p>
 									{dq.cf4SectionCompleteness.map(s => (
 										<div key={s.section} className="flex items-center justify-between text-xs">
 											<span className="text-muted-foreground">{s.section}</span>
-											<span className={s.missingCount > 0 ? "font-medium text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"}>
+											<span
+												className={
+													s.missingCount > 0
+														? "font-medium text-yellow-600 dark:text-yellow-400"
+														: "text-muted-foreground"
+												}
+											>
 												{s.missingCount} missing
 											</span>
 										</div>
@@ -203,11 +213,11 @@ export function DataQualityPanel() {
 								</div>
 							)}
 							<div className="pt-3">
-								<p className="text-xs text-muted-foreground">
+								<p className="text-muted-foreground text-xs">
 									<strong>What this means:</strong> The TOR requires automatic CF4 extraction from
-									finalized clinical notes. Claims with null or incomplete extractions rely on manual
-									data entry, increasing rejection risk and billing staff workload. Resolve extraction
-									gaps by finalizing clinical notes before generating CF4 claims.
+									finalized clinical notes. Claims with null or incomplete extractions rely on
+									manual data entry, increasing rejection risk and billing staff workload. Resolve
+									extraction gaps by finalizing clinical notes before generating CF4 claims.
 								</p>
 							</div>
 						</CardContent>
@@ -217,7 +227,7 @@ export function DataQualityPanel() {
 					<Card>
 						<CardHeader className="pb-2">
 							<CardTitle className="text-sm font-medium">Surgical RVS Assignment</CardTitle>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								Surgical operations that have not been assigned a Relative Value Scale (RVS) code.
 							</p>
 						</CardHeader>
@@ -229,10 +239,10 @@ export function DataQualityPanel() {
 								isIssue={dq.missingRvsCount > 0}
 							/>
 							<div className="pt-3">
-								<p className="text-xs text-muted-foreground">
-									<strong>What this means:</strong> RVS codes are required for correct PhilHealth surgical
-									benefit claims. Operations without codes cannot be billed and may be rejected by
-									PhilHealth auditors.
+								<p className="text-muted-foreground text-xs">
+									<strong>What this means:</strong> RVS codes are required for correct PhilHealth
+									surgical benefit claims. Operations without codes cannot be billed and may be
+									rejected by PhilHealth auditors.
 								</p>
 							</div>
 						</CardContent>
@@ -244,7 +254,7 @@ export function DataQualityPanel() {
 							<CardTitle className="text-sm font-medium">
 								Annual Hospital Statistical Report (AHSR)
 							</CardTitle>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								DOH-required monthly hospital activity snapshots that feed the AHSR submission.
 							</p>
 						</CardHeader>
@@ -262,11 +272,11 @@ export function DataQualityPanel() {
 								isIssue={!dq.ahsrCurrentMonthReady}
 							/>
 							<div className="pt-3">
-								<p className="text-xs text-muted-foreground">
-									<strong>What this means:</strong> AHSR snapshots must be generated monthly as part of the
-									DOH reporting workflow. A missing current-month snapshot indicates the monthly close
-									process has not been run. Contact the reporting officer to generate the snapshot in the
-									Reporting module.
+								<p className="text-muted-foreground text-xs">
+									<strong>What this means:</strong> AHSR snapshots must be generated monthly as part
+									of the DOH reporting workflow. A missing current-month snapshot indicates the
+									monthly close process has not been run. Contact the reporting officer to generate
+									the snapshot in the Reporting module.
 								</p>
 							</div>
 						</CardContent>
@@ -275,12 +285,12 @@ export function DataQualityPanel() {
 					{/* Guidance */}
 					<Card className="border-dashed">
 						<CardContent className="pt-4">
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								<strong>This is a read-only oversight view.</strong> To resolve data quality issues,
-								use the HIM module for ICD-10 coding, the Billing module for CF4 claims, the Surgical
-								module for RVS assignments, and the Reporting module for AHSR snapshots. Administrators
-								can use this page to monitor overall readiness without accessing clinical workflows
-								directly.
+								use the HIM module for ICD-10 coding, the Billing module for CF4 claims, the
+								Surgical module for RVS assignments, and the Reporting module for AHSR snapshots.
+								Administrators can use this page to monitor overall readiness without accessing
+								clinical workflows directly.
 							</p>
 						</CardContent>
 					</Card>

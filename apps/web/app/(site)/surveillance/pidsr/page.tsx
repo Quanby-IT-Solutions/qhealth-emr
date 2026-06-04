@@ -1,8 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query"
 
-import { getQueryClient } from "@/services/tanstack-query/query-client"
 import { prepareServerOrpc, reportingServerOrpc, serverOrpc } from "@/services/orpc/orpc-server"
-
+import { getQueryClient } from "@/services/tanstack-query/query-client"
 import { PidsrInboxClient } from "@/features/surveillance/pidsr/components/pidsr-inbox"
 
 export default async function PidsrPage() {

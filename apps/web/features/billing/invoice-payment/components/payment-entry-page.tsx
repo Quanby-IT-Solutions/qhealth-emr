@@ -16,15 +16,21 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
-
 import { EncounterContextBar } from "@/features/billing/components/encounter-context-bar"
 import { MoneyInput } from "@/features/billing/components/money-input"
+
 import { useInvoicesQuery, useRecordPaymentMutation } from "../api/invoices.hooks"
 import { computeChange, paymentMethodLabel } from "../lib/invoice-utils"
 
 type PaymentMethod = "cash" | "card" | "gcash" | "hmo" | "malasakit" | "philhealth" | "coe"
 const PAYMENT_METHODS: PaymentMethod[] = [
-	"cash", "card", "gcash", "hmo", "malasakit", "philhealth", "coe",
+	"cash",
+	"card",
+	"gcash",
+	"hmo",
+	"malasakit",
+	"philhealth",
+	"coe",
 ]
 
 interface PaymentEntryPageProps {
@@ -74,7 +80,7 @@ export function PaymentEntryPage({ encounterId, facilityId }: PaymentEntryPagePr
 		const n = parseFloat(pct)
 		if (!Number.isNaN(n) && n >= 0 && n <= 100) {
 			setHmoPercentage(n)
-			setHmoCoveredAmount(Math.round(grossTotal * n / 100 * 100) / 100)
+			setHmoCoveredAmount(Math.round(((grossTotal * n) / 100) * 100) / 100)
 		} else if (pct === "") {
 			setHmoPercentage("")
 			setHmoCoveredAmount(0)
@@ -105,21 +111,32 @@ export function PaymentEntryPage({ encounterId, facilityId }: PaymentEntryPagePr
 			}
 		)
 	}, [
-		invoice, facilityId, method, amountTendered, patientResponsibility,
-		reference, hmoProvider, hmoClaimNumber, hmoPercentage, isHmo, isCash,
-		recordPayment, encounterId, router,
+		invoice,
+		facilityId,
+		method,
+		amountTendered,
+		patientResponsibility,
+		reference,
+		hmoProvider,
+		hmoClaimNumber,
+		hmoPercentage,
+		isHmo,
+		isCash,
+		recordPayment,
+		encounterId,
+		router,
 	])
 
 	return (
 		<div className="space-y-4">
 			<EncounterContextBar />
 
-			<div className="px-4 max-w-lg space-y-4">
+			<div className="max-w-lg space-y-4 px-4">
 				<h1 className="text-lg font-semibold">Record Payment</h1>
 
 				{invoice && (
 					<Card>
-						<CardContent className="pt-4 space-y-1.5">
+						<CardContent className="space-y-1.5 pt-4">
 							<div className="flex justify-between text-sm">
 								<span className="text-muted-foreground">Gross Total</span>
 								<span className="tabular-nums">
@@ -156,7 +173,9 @@ export function PaymentEntryPage({ encounterId, facilityId }: PaymentEntryPagePr
 							</SelectTrigger>
 							<SelectContent>
 								{PAYMENT_METHODS.map(m => (
-									<SelectItem key={m} value={m}>{paymentMethodLabel(m)}</SelectItem>
+									<SelectItem key={m} value={m}>
+										{paymentMethodLabel(m)}
+									</SelectItem>
 								))}
 							</SelectContent>
 						</Select>
@@ -171,23 +190,23 @@ export function PaymentEntryPage({ encounterId, facilityId }: PaymentEntryPagePr
 									aria-label="Amount tendered"
 								/>
 								{amountTendered > 0 && (
-									<p className="text-sm text-muted-foreground">
+									<p className="text-muted-foreground text-sm">
 										Change: ₱{change.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
 									</p>
 								)}
 								{amountTendered > 0 && amountTendered < patientResponsibility && (
 									<Alert variant="destructive">
-										<AlertDescription>
-											Amount tendered is less than the total due.
-										</AlertDescription>
+										<AlertDescription>Amount tendered is less than the total due.</AlertDescription>
 									</Alert>
 								)}
 							</div>
 						)}
 
 						{isHmo && (
-							<div className="space-y-3 rounded-md border bg-muted/30 p-3">
-								<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">HMO Details</p>
+							<div className="bg-muted/30 space-y-3 rounded-md border p-3">
+								<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+									HMO Details
+								</p>
 
 								<div className="space-y-1.5">
 									<Label htmlFor="hmo-provider">

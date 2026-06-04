@@ -6,7 +6,13 @@ import { AlertCircle, ExternalLink } from "lucide-react"
 import { Badge } from "@/core/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Progress } from "@/core/components/ui/progress"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import {
 	Table,
 	TableBody,
@@ -15,7 +21,6 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
-
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useValidateAhsrQuery } from "@/features/surveillance/ahsr/api/ahsr.hooks"
 
@@ -27,7 +32,12 @@ const ISSUE_LABELS: Record<string, string> = {
 
 function issueTypeBadge(type: string) {
 	if (type === "missing_icd10") return <Badge variant="destructive">{ISSUE_LABELS[type]}</Badge>
-	if (type === "deprecated_code") return <Badge variant="outline" className="border-orange-400 text-orange-600">{ISSUE_LABELS[type]}</Badge>
+	if (type === "deprecated_code")
+		return (
+			<Badge variant="outline" className="border-orange-400 text-orange-600">
+				{ISSUE_LABELS[type]}
+			</Badge>
+		)
 	return <Badge variant="secondary">{ISSUE_LABELS[type] ?? type}</Badge>
 }
 
@@ -47,13 +57,15 @@ export default function AhsrValidatePage() {
 
 	const readiness = data?.readinessPercent ?? 0
 	const allIssues = data?.issues ?? []
-	const issues = selectedType ? allIssues.filter((i) => i.issueType === selectedType) : allIssues
+	const issues = selectedType ? allIssues.filter(i => i.issueType === selectedType) : allIssues
 	const issuesByType = data?.issuesByType ?? {}
 
 	if (profileLoading) {
 		return (
 			<Card>
-				<CardContent className="py-8 text-center text-sm text-muted-foreground">Loading…</CardContent>
+				<CardContent className="text-muted-foreground py-8 text-center text-sm">
+					Loading…
+				</CardContent>
 			</Card>
 		)
 	}
@@ -61,7 +73,7 @@ export default function AhsrValidatePage() {
 	if (!facilityId) {
 		return (
 			<Card>
-				<CardContent className="py-8 text-center text-sm text-muted-foreground">
+				<CardContent className="text-muted-foreground py-8 text-center text-sm">
 					No facility assigned to your profile. Contact your administrator.
 				</CardContent>
 			</Card>
@@ -73,9 +85,11 @@ export default function AhsrValidatePage() {
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-xl font-semibold">AHSR Validation</h1>
-					<p className="text-sm text-muted-foreground">Data quality issues for the current reporting period.</p>
+					<p className="text-muted-foreground text-sm">
+						Data quality issues for the current reporting period.
+					</p>
 				</div>
-				<Select value={quarter} onValueChange={(v) => setQuarter(v ?? "all")}>
+				<Select value={quarter} onValueChange={v => setQuarter(v ?? "all")}>
 					<SelectTrigger className="w-[140px]">
 						<SelectValue />
 					</SelectTrigger>
@@ -92,20 +106,25 @@ export default function AhsrValidatePage() {
 			{/* Readiness tile */}
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-sm">AHSR Readiness — {currentYear}{quarter !== "all" ? ` Q${quarter}` : ""}</CardTitle>
+					<CardTitle className="text-sm">
+						AHSR Readiness — {currentYear}
+						{quarter !== "all" ? ` Q${quarter}` : ""}
+					</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-3">
 					{isLoading ? (
-						<p className="text-sm text-muted-foreground">Calculating readiness…</p>
+						<p className="text-muted-foreground text-sm">Calculating readiness…</p>
 					) : (
 						<>
 							<div className="flex items-center justify-between text-sm">
 								<span className="font-medium">{readiness.toFixed(1)}%</span>
-								<span className="text-muted-foreground">{data?.total ?? 0} issue{data?.total !== 1 ? "s" : ""} found</span>
+								<span className="text-muted-foreground">
+									{data?.total ?? 0} issue{data?.total !== 1 ? "s" : ""} found
+								</span>
 							</div>
 							<Progress value={readiness} className="h-2" />
 							{readiness < 95 && (
-								<p className="text-xs text-muted-foreground flex items-center gap-1">
+								<p className="text-muted-foreground flex items-center gap-1 text-xs">
 									<AlertCircle className="size-3 text-amber-500" />
 									Readiness below 95% — export disabled until resolved.
 								</p>
@@ -123,14 +142,14 @@ export default function AhsrValidatePage() {
 						return (
 							<Card
 								key={type}
-								className={`cursor-pointer transition-shadow hover:shadow-md ${active ? "ring-2 ring-primary" : ""}`}
+								className={`cursor-pointer transition-shadow hover:shadow-md ${active ? "ring-primary ring-2" : ""}`}
 								onClick={() => setSelectedType(active ? null : type)}
 							>
 								<CardContent className="flex items-center justify-between p-4">
 									<div className="space-y-1">
 										{issueTypeBadge(type)}
 										{active && (
-											<p className="text-xs text-muted-foreground">Click to clear filter</p>
+											<p className="text-muted-foreground text-xs">Click to clear filter</p>
 										)}
 									</div>
 									<span className="text-2xl font-bold">{count}</span>
@@ -152,11 +171,15 @@ export default function AhsrValidatePage() {
 				</CardHeader>
 				<CardContent>
 					{isLoading ? (
-						<p className="text-center text-sm text-muted-foreground py-6">Scanning encounters…</p>
+						<p className="text-muted-foreground py-6 text-center text-sm">Scanning encounters…</p>
 					) : isError ? (
-						<p className="text-center text-sm text-destructive py-6">Failed to load validation results.</p>
+						<p className="text-destructive py-6 text-center text-sm">
+							Failed to load validation results.
+						</p>
 					) : issues.length === 0 ? (
-						<p className="text-center text-sm text-muted-foreground py-6">No data quality issues found for this period.</p>
+						<p className="text-muted-foreground py-6 text-center text-sm">
+							No data quality issues found for this period.
+						</p>
 					) : (
 						<Table>
 							<TableHeader>
@@ -170,12 +193,14 @@ export default function AhsrValidatePage() {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{issues.map((issue) => (
+								{issues.map(issue => (
 									<TableRow key={issue.id}>
 										<TableCell>{issueTypeBadge(issue.issueType)}</TableCell>
 										<TableCell>{issue.patientName ?? "—"}</TableCell>
 										<TableCell className="font-mono text-xs">{issue.patientMrn ?? "—"}</TableCell>
-										<TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">{issue.detail ?? "—"}</TableCell>
+										<TableCell className="text-muted-foreground max-w-[200px] truncate text-xs">
+											{issue.detail ?? "—"}
+										</TableCell>
 										<TableCell>
 											<Badge variant={issue.status === "resolved" ? "default" : "outline"}>
 												{issue.status}
@@ -188,7 +213,7 @@ export default function AhsrValidatePage() {
 													target="_blank"
 													rel="noreferrer"
 													title="Open in HIM"
-													className="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+													className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex items-center justify-center rounded-md p-1"
 												>
 													<ExternalLink className="size-3" />
 												</a>

@@ -11,5 +11,7 @@ export default function InvoicePage({ params }: { params: Promise<{ encounterId:
 
 	if (!facilityId) return null
 
-	return <InvoicePageComponent encounterId={encounterId} facilityId={facilityId} patientId={patientId} />
+	return (
+		<InvoicePageComponent encounterId={encounterId} facilityId={facilityId} patientId={patientId} />
+	)
 }

@@ -4,7 +4,6 @@ import { useRef, useState } from "react"
 import { FileUp, X } from "lucide-react"
 
 import { Button, buttonVariants } from "@/core/components/ui/button"
-import { cn } from "@/core/lib/utils"
 import { Label } from "@/core/components/ui/label"
 import {
 	Select,
@@ -20,6 +19,7 @@ import {
 	SheetTitle,
 	SheetTrigger,
 } from "@/core/components/ui/sheet"
+import { cn } from "@/core/lib/utils"
 
 type DocumentCategory = "brgy_indigency" | "id" | "income_proof" | "other"
 
@@ -95,21 +95,16 @@ export function DocumentUploadDrawer({ onDocumentsChange }: DocumentUploadDrawer
 				<div className="mt-4 space-y-4">
 					<div className="space-y-1.5">
 						<Label>Category</Label>
-						<Select
-							value={category}
-							onValueChange={(v) => setCategory(v as DocumentCategory)}
-						>
+						<Select value={category} onValueChange={v => setCategory(v as DocumentCategory)}>
 							<SelectTrigger>
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								{(Object.entries(CATEGORY_LABELS) as [DocumentCategory, string][]).map(
-									([v, l]) => (
-										<SelectItem key={v} value={v}>
-											{l}
-										</SelectItem>
-									)
-								)}
+								{(Object.entries(CATEGORY_LABELS) as [DocumentCategory, string][]).map(([v, l]) => (
+									<SelectItem key={v} value={v}>
+										{l}
+									</SelectItem>
+								))}
 							</SelectContent>
 						</Select>
 					</div>
@@ -133,7 +128,7 @@ export function DocumentUploadDrawer({ onDocumentsChange }: DocumentUploadDrawer
 						/>
 					</div>
 
-					{error && <p className="text-sm text-destructive">{error}</p>}
+					{error && <p className="text-destructive text-sm">{error}</p>}
 
 					{docs.length > 0 && (
 						<ul className="space-y-2">
@@ -144,9 +139,7 @@ export function DocumentUploadDrawer({ onDocumentsChange }: DocumentUploadDrawer
 								>
 									<div>
 										<p className="max-w-[200px] truncate font-medium">{d.name}</p>
-										<p className="text-xs text-muted-foreground">
-											{CATEGORY_LABELS[d.category]}
-										</p>
+										<p className="text-muted-foreground text-xs">{CATEGORY_LABELS[d.category]}</p>
 									</div>
 									<Button
 										type="button"

@@ -161,11 +161,9 @@ function ImportSheet({ catalogId, open, onOpenChange }: ImportSheetProps) {
 					</div>
 					{errors.length > 0 && (
 						<div className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-3">
-							<p className="text-sm font-medium text-destructive">
-								Row errors ({errors.length}):
-							</p>
+							<p className="text-destructive text-sm font-medium">Row errors ({errors.length}):</p>
 							{errors.map(e => (
-								<p key={e.row} className="text-xs text-destructive">
+								<p key={e.row} className="text-destructive text-xs">
 									Row {e.row}: {e.message}
 								</p>
 							))}
@@ -219,9 +217,7 @@ export function CatalogEditorPage({ catalogId }: CatalogEditorPageProps) {
 						}}
 						className="w-64"
 					/>
-					{total > 0 && (
-						<span className="text-sm text-muted-foreground">{total} items</span>
-					)}
+					{total > 0 && <span className="text-muted-foreground text-sm">{total} items</span>}
 				</div>
 				<Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
 					Import CSV
@@ -235,7 +231,7 @@ export function CatalogEditorPage({ catalogId }: CatalogEditorPageProps) {
 					))}
 				</div>
 			) : items.length === 0 ? (
-				<p className="py-8 text-center text-sm text-muted-foreground">
+				<p className="text-muted-foreground py-8 text-center text-sm">
 					{search ? "No items match your search." : "No items in this catalog."}
 				</p>
 			) : (
@@ -270,10 +266,8 @@ export function CatalogEditorPage({ catalogId }: CatalogEditorPageProps) {
 											<Button
 												variant="ghost"
 												size="sm"
-												className="h-7 text-xs text-muted-foreground hover:text-destructive"
-												onClick={() =>
-													setDeprecateTarget({ id: item.id, name: item.name })
-												}
+												className="text-muted-foreground hover:text-destructive h-7 text-xs"
+												onClick={() => setDeprecateTarget({ id: item.id, name: item.name })}
 											>
 												Deprecate
 											</Button>
@@ -294,7 +288,7 @@ export function CatalogEditorPage({ catalogId }: CatalogEditorPageProps) {
 							>
 								Previous
 							</Button>
-							<span className="text-sm text-muted-foreground">
+							<span className="text-muted-foreground text-sm">
 								Page {page} of {totalPages}
 							</span>
 							<Button

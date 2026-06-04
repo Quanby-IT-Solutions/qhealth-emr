@@ -1,5 +1,5 @@
-import { cn } from "@/core/lib/utils"
 import { Card, CardContent } from "@/core/components/ui/card"
+import { cn } from "@/core/lib/utils"
 
 interface KpiTileProps {
 	label: string
@@ -9,11 +9,17 @@ interface KpiTileProps {
 	className?: string
 }
 
-export function KpiTile({ label, value, delta, deltaDirection = "neutral", className }: KpiTileProps) {
+export function KpiTile({
+	label,
+	value,
+	delta,
+	deltaDirection = "neutral",
+	className,
+}: KpiTileProps) {
 	return (
 		<Card className={cn("min-w-0", className)}>
 			<CardContent className="pt-4">
-				<p className="text-muted-foreground truncate text-xs font-medium uppercase tracking-wide">
+				<p className="text-muted-foreground truncate text-xs font-medium tracking-wide uppercase">
 					{label}
 				</p>
 				<p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
@@ -25,7 +31,8 @@ export function KpiTile({ label, value, delta, deltaDirection = "neutral", class
 							"text-muted-foreground": deltaDirection === "neutral",
 						})}
 					>
-						{deltaDirection === "up" && "+"}{delta}
+						{deltaDirection === "up" && "+"}
+						{delta}
 					</p>
 				)}
 			</CardContent>

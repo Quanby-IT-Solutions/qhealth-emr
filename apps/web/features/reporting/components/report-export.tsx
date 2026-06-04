@@ -38,7 +38,7 @@ export function ReportExport({ facilityId }: ReportExportProps) {
 				month: month === "all" ? undefined : Number(month),
 			},
 			{
-				onSuccess: (data) => {
+				onSuccess: data => {
 					setResultMsg(data.message)
 					setSnapshotId(data.snapshotId)
 				},
@@ -81,7 +81,7 @@ export function ReportExport({ facilityId }: ReportExportProps) {
 							<Label>Year</Label>
 							<Select
 								value={String(year)}
-								onValueChange={(v) => {
+								onValueChange={v => {
 									if (v) setYear(Number(v))
 								}}
 							>
@@ -89,7 +89,7 @@ export function ReportExport({ facilityId }: ReportExportProps) {
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{[currentYear, currentYear - 1, currentYear - 2].map((y) => (
+									{[currentYear, currentYear - 1, currentYear - 2].map(y => (
 										<SelectItem key={y} value={String(y)}>
 											{y}
 										</SelectItem>
@@ -102,7 +102,7 @@ export function ReportExport({ facilityId }: ReportExportProps) {
 							<Label>Month (optional)</Label>
 							<Select
 								value={month}
-								onValueChange={(v) => {
+								onValueChange={v => {
 									if (v) setMonth(v)
 								}}
 							>
@@ -110,7 +110,7 @@ export function ReportExport({ facilityId }: ReportExportProps) {
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{months.map((m) => (
+									{months.map(m => (
 										<SelectItem key={m.value} value={m.value}>
 											{m.label}
 										</SelectItem>
@@ -126,7 +126,7 @@ export function ReportExport({ facilityId }: ReportExportProps) {
 				</form>
 
 				{resultMsg && (
-					<div className="mt-4 rounded-md border p-3 text-sm space-y-1">
+					<div className="mt-4 space-y-1 rounded-md border p-3 text-sm">
 						<p>{resultMsg}</p>
 						{snapshotId && (
 							<p className="text-muted-foreground text-xs">Snapshot ID: {snapshotId}</p>

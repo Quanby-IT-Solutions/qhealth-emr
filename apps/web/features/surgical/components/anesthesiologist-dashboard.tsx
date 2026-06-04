@@ -20,7 +20,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { Input } from "@/core/components/ui/input"
 import type { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
-import { useSurgicalCaseListQuery, type SurgicalCase, type SurgeryStatus } from "../api/surgical.hooks"
+import {
+	useSurgicalCaseListQuery,
+	type SurgeryStatus,
+	type SurgicalCase,
+} from "../api/surgical.hooks"
 
 type MyProfile = NonNullable<ReturnType<typeof useMyProfile>["data"]>
 type StaffProfile = MyProfile["staffProfiles"][number]
@@ -53,7 +57,13 @@ function statusLabel(status: SurgeryStatus) {
 	return status.replace(/_/g, " ")
 }
 
-function CaseRow({ surgicalCase, actionLabel }: { surgicalCase: SurgicalCase; actionLabel: string }) {
+function CaseRow({
+	surgicalCase,
+	actionLabel,
+}: {
+	surgicalCase: SurgicalCase
+	actionLabel: string
+}) {
 	return (
 		<div className="hover:bg-secondary/40 flex flex-col gap-2 rounded-lg border p-3 transition-colors sm:flex-row sm:items-center sm:justify-between">
 			<div className="min-w-0 space-y-1">
@@ -64,7 +74,8 @@ function CaseRow({ surgicalCase, actionLabel }: { surgicalCase: SurgicalCase; ac
 					</Badge>
 				</div>
 				<p className="text-muted-foreground text-xs">
-					{surgicalCase.patientName ?? "Patient not linked"} - {surgicalCase.orSuite ?? "OR not assigned"} -{" "}
+					{surgicalCase.patientName ?? "Patient not linked"} -{" "}
+					{surgicalCase.orSuite ?? "OR not assigned"} -{" "}
 					{formatDateTime(surgicalCase.scheduledDatetime)}
 				</p>
 			</div>
@@ -176,7 +187,9 @@ export function AnesthesiologistDashboard({ profile }: AnesthesiologistDashboard
 							<CardHeader className="flex flex-row items-center justify-between gap-3 border-b pb-2">
 								<div className="space-y-1">
 									<CardTitle className="text-base">Now</CardTitle>
-									<p className="text-muted-foreground text-xs">The next anesthesia action to take.</p>
+									<p className="text-muted-foreground text-xs">
+										The next anesthesia action to take.
+									</p>
 								</div>
 								<Badge variant={nextCase ? "default" : "secondary"}>
 									{nextCase ? "Ready" : "Clear"}
@@ -287,14 +300,17 @@ export function AnesthesiologistDashboard({ profile }: AnesthesiologistDashboard
 							<CardHeader className="border-b pb-2">
 								<CardTitle className="text-base">Role Boundary</CardTitle>
 							</CardHeader>
-							<CardContent className="space-y-2 pt-3 text-xs text-muted-foreground">
+							<CardContent className="text-muted-foreground space-y-2 pt-3 text-xs">
 								<div className="flex gap-2">
 									<HeartPulse className="mt-0.5 size-4 shrink-0" />
 									<p>Anesthesiologist owns anesthesia record signing, airway, vitals, and meds.</p>
 								</div>
 								<div className="flex gap-2">
 									<Activity className="mt-0.5 size-4 shrink-0" />
-									<p>Monitor data is documented manually unless the facility has an external integration.</p>
+									<p>
+										Monitor data is documented manually unless the facility has an external
+										integration.
+									</p>
 								</div>
 								<div className="flex gap-2">
 									<ShieldCheck className="mt-0.5 size-4 shrink-0" />

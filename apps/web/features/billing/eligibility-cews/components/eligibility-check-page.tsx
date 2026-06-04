@@ -30,7 +30,7 @@ export function EligibilityCheckPage({ encounterId }: EligibilityCheckPageProps)
 	}
 
 	return (
-		<div className="px-4 space-y-4 max-w-lg">
+		<div className="max-w-lg space-y-4 px-4">
 			<h1 className="text-lg font-semibold">CEWS Eligibility Check</h1>
 
 			<div className="space-y-2">
@@ -39,13 +39,17 @@ export function EligibilityCheckPage({ encounterId }: EligibilityCheckPageProps)
 					id="member-pin"
 					value={pinInput}
 					onChange={handlePinChange}
-					onKeyDown={e => { if (e.key === "Enter") handleVerify() }}
+					onKeyDown={e => {
+						if (e.key === "Enter") handleVerify()
+					}}
 					placeholder="12-345678901-2"
 					maxLength={14}
 					aria-label="PhilHealth member PIN"
 				/>
 				{pinInput.length > 0 && !isValid && (
-					<p className="text-xs text-destructive" role="alert">PIN must be exactly 12 digits.</p>
+					<p className="text-destructive text-xs" role="alert">
+						PIN must be exactly 12 digits.
+					</p>
 				)}
 			</div>
 

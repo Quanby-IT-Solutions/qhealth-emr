@@ -17,10 +17,18 @@ import {
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Skeleton } from "@/core/components/ui/skeleton"
-
-import { type ClaimStatus, ClaimStatusTimeline } from "@/features/billing/components/claim-status-timeline"
+import {
+	ClaimStatusTimeline,
+	type ClaimStatus,
+} from "@/features/billing/components/claim-status-timeline"
 import { EncounterContextBar } from "@/features/billing/components/encounter-context-bar"
-import { useCf4Query, useFinalizeCf4Mutation, usePollCf4StatusMutation, useResubmitCf4Mutation } from "../api/cf4.hooks"
+
+import {
+	useCf4Query,
+	useFinalizeCf4Mutation,
+	usePollCf4StatusMutation,
+	useResubmitCf4Mutation,
+} from "../api/cf4.hooks"
 
 type Cf4Status = "draft" | "submitted" | "returned" | "resubmitted" | "approved" | "rejected"
 const TIMELINE_STATUS_MAP: Record<string, ClaimStatus> = {
@@ -48,12 +56,22 @@ export function EclaimsSubmissionPage({ cf4Id }: EclaimsSubmissionPageProps) {
 	const handleResubmit = useCallback(() => {
 		resubmitCf4(
 			{ id: cf4Id, reason: resubmitReason },
-			{ onSuccess: () => { setResubmitOpen(false); setResubmitReason("") } }
+			{
+				onSuccess: () => {
+					setResubmitOpen(false)
+					setResubmitReason("")
+				},
+			}
 		)
 	}, [resubmitCf4, cf4Id, resubmitReason])
 
 	if (isLoading) {
-		return <div className="space-y-4 px-4"><EncounterContextBar /><Skeleton className="h-64 w-full" /></div>
+		return (
+			<div className="space-y-4 px-4">
+				<EncounterContextBar />
+				<Skeleton className="h-64 w-full" />
+			</div>
+		)
 	}
 
 	if (!claim) {
@@ -71,22 +89,27 @@ export function EclaimsSubmissionPage({ cf4Id }: EclaimsSubmissionPageProps) {
 	const isReturned = currentStatus === "returned" || currentStatus === "rejected"
 	const timelineStatus: ClaimStatus = TIMELINE_STATUS_MAP[currentStatus] ?? "draft"
 	const submittedAt = claim.submittedAt
-		? (claim.submittedAt instanceof Date ? claim.submittedAt.toISOString() : String(claim.submittedAt))
+		? claim.submittedAt instanceof Date
+			? claim.submittedAt.toISOString()
+			: String(claim.submittedAt)
 		: undefined
 
 	return (
 		<div className="space-y-4">
 			<EncounterContextBar />
 
-			<div className="px-4 space-y-4">
+			<div className="space-y-4 px-4">
 				<div className="flex items-center justify-between">
 					<div>
 						<h1 className="text-lg font-semibold">eClaims Submission</h1>
 						{claim.claimNumber && (
-							<p className="text-sm text-muted-foreground">Claim #: {claim.claimNumber}</p>
+							<p className="text-muted-foreground text-sm">Claim #: {claim.claimNumber}</p>
 						)}
 					</div>
-					<Badge variant={currentStatus === "approved" ? "default" : "secondary"} className="capitalize">
+					<Badge
+						variant={currentStatus === "approved" ? "default" : "secondary"}
+						className="capitalize"
+					>
 						{currentStatus}
 					</Badge>
 				</div>
@@ -106,29 +129,19 @@ export function EclaimsSubmissionPage({ cf4Id }: EclaimsSubmissionPageProps) {
 
 				<div className="flex flex-wrap gap-2">
 					{currentStatus === "draft" && (
-						<Button
-							onClick={() => finalizeCf4({ id: cf4Id })}
-							disabled={finalizing}
-						>
+						<Button onClick={() => finalizeCf4({ id: cf4Id })} disabled={finalizing}>
 							{finalizing ? "Submitting..." : "Submit to PhilHealth"}
 						</Button>
 					)}
 
 					{currentStatus === "submitted" && (
-						<Button
-							variant="outline"
-							onClick={() => pollStatus({ id: cf4Id })}
-							disabled={polling}
-						>
+						<Button variant="outline" onClick={() => pollStatus({ id: cf4Id })} disabled={polling}>
 							{polling ? "Polling..." : "Refresh Status"}
 						</Button>
 					)}
 
 					{isReturned && (
-						<Button
-							variant="destructive"
-							onClick={() => setResubmitOpen(true)}
-						>
+						<Button variant="destructive" onClick={() => setResubmitOpen(true)}>
 							Resubmit Claim
 						</Button>
 					)}
@@ -154,11 +167,10 @@ export function EclaimsSubmissionPage({ cf4Id }: EclaimsSubmissionPageProps) {
 						/>
 					</div>
 					<DialogFooter>
-						<Button variant="outline" onClick={() => setResubmitOpen(false)}>Cancel</Button>
-						<Button
-							onClick={handleResubmit}
-							disabled={!resubmitReason.trim() || resubmitting}
-						>
+						<Button variant="outline" onClick={() => setResubmitOpen(false)}>
+							Cancel
+						</Button>
+						<Button onClick={handleResubmit} disabled={!resubmitReason.trim() || resubmitting}>
 							{resubmitting ? "Resubmitting..." : "Confirm Resubmit"}
 						</Button>
 					</DialogFooter>

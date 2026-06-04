@@ -14,35 +14,35 @@ import {
 } from "@/core/components/ui/breadcrumb"
 
 const SEGMENT_LABELS: Record<string, string> = {
-	admin: "Admin",
-	users: "Users",
-	new: "New",
-	roles: "Roles",
+	"admin": "Admin",
+	"users": "Users",
+	"new": "New",
+	"roles": "Roles",
 	"feature-flags": "Feature Flags",
 	"clinician-licenses": "Clinician Licenses",
-	bor: "BOR & Census",
-	census: "Census Report",
+	"bor": "BOR & Census",
+	"census": "Census Report",
 	"fhir-endpoints": "FHIR Endpoints",
-	log: "Exchange Log",
-	terminology: "Terminology",
-	sla: "SLA",
-	config: "Configuration",
+	"log": "Exchange Log",
+	"terminology": "Terminology",
+	"sla": "SLA",
+	"config": "Configuration",
 	"status-log": "Status Log",
-	turnaround: "Turnaround",
-	bottleneck: "Bottleneck",
-	facility: "Facility",
-	departments: "Departments",
-	wards: "Wards",
+	"turnaround": "Turnaround",
+	"bottleneck": "Bottleneck",
+	"facility": "Facility",
+	"departments": "Departments",
+	"wards": "Wards",
 	"master-data": "Master Data",
-	integrations: "Integrations",
-	keys: "API Keys",
-	settings: "Settings",
+	"integrations": "Integrations",
+	"keys": "API Keys",
+	"settings": "Settings",
 	"facility-profile": "Facility Profile",
 	"integration-registry": "Integration Registry",
-	fhir: "FHIR Export",
-	formulary: "Formulary",
+	"fhir": "FHIR Export",
+	"formulary": "Formulary",
 	"code-sets": "Code Sets",
-	offline: "Offline",
+	"offline": "Offline",
 	"config-history": "Config History",
 	"data-quality": "Data Quality",
 	"export-compliance": "Export Compliance",
@@ -53,7 +53,9 @@ const SEGMENT_LABELS: Record<string, string> = {
 }
 
 function labelFor(segment: string): string {
-	return SEGMENT_LABELS[segment] ?? segment.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+	return (
+		SEGMENT_LABELS[segment] ?? segment.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+	)
 }
 
 export function AdminBreadcrumb() {
@@ -77,9 +79,7 @@ export function AdminBreadcrumb() {
 					) : (
 						<React.Fragment key={crumb.href}>
 							<BreadcrumbItem>
-								<BreadcrumbLink render={<Link href={crumb.href} />}>
-									{crumb.label}
-								</BreadcrumbLink>
+								<BreadcrumbLink render={<Link href={crumb.href} />}>{crumb.label}</BreadcrumbLink>
 							</BreadcrumbItem>
 							{i < crumbs.length - 1 && <BreadcrumbSeparator />}
 						</React.Fragment>

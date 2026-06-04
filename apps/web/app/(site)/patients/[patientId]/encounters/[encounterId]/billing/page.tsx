@@ -1,8 +1,8 @@
 "use client"
 
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { BillingTab } from "@/features/billing/components/billing-tab"
 import { useChartContext } from "@/features/encounters/context/chart-context"
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 export default function BillingPage() {
 	const { encounterId, patientId, facilityId } = useChartContext()
@@ -24,10 +24,6 @@ export default function BillingPage() {
 	}
 
 	return (
-		<BillingTab
-			encounterId={encounterId}
-			patientId={patientId}
-			facilityId={facilityId ?? ""}
-		/>
+		<BillingTab encounterId={encounterId} patientId={patientId} facilityId={facilityId ?? ""} />
 	)
 }

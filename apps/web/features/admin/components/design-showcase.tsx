@@ -4,6 +4,7 @@ import { useState } from "react"
 
 import { StatusBadge } from "@/core/components/status-badge"
 import { Separator } from "@/core/components/ui/separator"
+
 import { AdminPageHeader } from "./admin-page-header"
 import { DataTableShell } from "./data-table-shell"
 import { KpiTile } from "./kpi-tile"
@@ -20,7 +21,11 @@ export function DesignShowcase() {
 			{/* AdminPageHeader */}
 			<section className="space-y-4">
 				<h2 className="text-lg font-semibold">AdminPageHeader</h2>
-				<AdminPageHeader title="Page Title" description="Optional description text." action={<span className="text-muted-foreground text-xs">[action slot]</span>} />
+				<AdminPageHeader
+					title="Page Title"
+					description="Optional description text."
+					action={<span className="text-muted-foreground text-xs">[action slot]</span>}
+				/>
 				<AdminPageHeader title="No description, no action" />
 			</section>
 
@@ -58,7 +63,7 @@ export function DesignShowcase() {
 			{/* ToggleListItem */}
 			<section className="space-y-4">
 				<h2 className="text-lg font-semibold">ToggleListItem</h2>
-				<div className="rounded-md border divide-y">
+				<div className="divide-y rounded-md border">
 					<ToggleListItem
 						label="Telemedicine"
 						description="Enable virtual consultations with video call integration."

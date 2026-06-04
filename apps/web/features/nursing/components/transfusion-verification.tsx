@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useRef, useState } from "react"
-
 import {
 	AlertCircle,
 	CheckCircle2,
@@ -60,7 +59,7 @@ interface StepIndicatorProps {
 
 function StepIndicator({ current, completed }: StepIndicatorProps) {
 	return (
-		<div className="flex items-center gap-0 flex-wrap">
+		<div className="flex flex-wrap items-center gap-0">
 			{STEPS.map((step, idx) => {
 				const Icon = step.icon
 				const isActive = step.key === current
@@ -77,11 +76,7 @@ function StepIndicator({ current, completed }: StepIndicatorProps) {
 										: "text-muted-foreground"
 							}`}
 						>
-							{isDone ? (
-								<CheckCircle2 className="size-4" />
-							) : (
-								<Icon className="size-4" />
-							)}
+							{isDone ? <CheckCircle2 className="size-4" /> : <Icon className="size-4" />}
 							<span className="hidden sm:inline">{step.label}</span>
 						</div>
 						{idx < STEPS.length - 1 && (
@@ -108,15 +103,7 @@ interface ScanStepProps {
 	onClear: () => void
 }
 
-function ScanStep({
-	title,
-	description,
-	icon,
-	placeholder,
-	scan,
-	onScan,
-	onClear,
-}: ScanStepProps) {
+function ScanStep({ title, description, icon, placeholder, scan, onScan, onClear }: ScanStepProps) {
 	const [input, setInput] = useState(scan.value)
 
 	function handleSubmit() {
@@ -132,17 +119,17 @@ function ScanStep({
 				</CardTitle>
 			</CardHeader>
 			<CardContent className="space-y-4">
-				<p className="text-sm text-muted-foreground">{description}</p>
+				<p className="text-muted-foreground text-sm">{description}</p>
 
 				<div className="flex gap-2">
 					<div className="relative flex-1">
-						<QrCode className="text-muted-foreground absolute left-2.5 top-2.5 size-4" />
+						<QrCode className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
 						<Input
 							className="pl-9"
 							placeholder={placeholder}
 							value={input}
-							onChange={(e) => setInput(e.target.value)}
-							onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+							onChange={e => setInput(e.target.value)}
+							onKeyDown={e => e.key === "Enter" && handleSubmit()}
 							disabled={scan.status === "pass"}
 						/>
 					</div>
@@ -203,27 +190,30 @@ function VitalsEntry({ vitals, onChange }: VitalsEntryProps) {
 		})
 	}
 
-	const fields: Array<{ key: keyof VitalsCapture["baseline"]; label: string; placeholder: string }> =
-		[
-			{ key: "bp", label: "BP (mmHg)", placeholder: "120/80" },
-			{ key: "hr", label: "HR (bpm)", placeholder: "72" },
-			{ key: "temp", label: "Temp (°C)", placeholder: "36.8" },
-			{ key: "spo2", label: "SpO₂ (%)", placeholder: "98" },
-		]
+	const fields: Array<{
+		key: keyof VitalsCapture["baseline"]
+		label: string
+		placeholder: string
+	}> = [
+		{ key: "bp", label: "BP (mmHg)", placeholder: "120/80" },
+		{ key: "hr", label: "HR (bpm)", placeholder: "72" },
+		{ key: "temp", label: "Temp (°C)", placeholder: "36.8" },
+		{ key: "spo2", label: "SpO₂ (%)", placeholder: "98" },
+	]
 
 	return (
 		<div className="space-y-6">
-			{(["baseline", "fifteenMin", "end"] as VitalsTimePoint[]).map((point) => (
+			{(["baseline", "fifteenMin", "end"] as VitalsTimePoint[]).map(point => (
 				<div key={point}>
-					<p className="text-sm font-medium mb-3">{VITALS_LABELS[point]}</p>
-					<div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
-						{fields.map((f) => (
+					<p className="mb-3 text-sm font-medium">{VITALS_LABELS[point]}</p>
+					<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+						{fields.map(f => (
 							<div key={f.key} className="space-y-1">
 								<Label className="text-xs">{f.label}</Label>
 								<Input
 									placeholder={f.placeholder}
 									value={vitals[point][f.key]}
-									onChange={(e) => updatePoint(point, f.key, e.target.value)}
+									onChange={e => updatePoint(point, f.key, e.target.value)}
 								/>
 							</div>
 						))}
@@ -238,7 +228,7 @@ function VitalsEntry({ vitals, onChange }: VitalsEntryProps) {
 					rows={3}
 					placeholder="Document any adverse reactions, patient complaints, or nursing interventions…"
 					value={vitals.notes}
-					onChange={(e) => onChange({ ...vitals, notes: e.target.value })}
+					onChange={e => onChange({ ...vitals, notes: e.target.value })}
 				/>
 			</div>
 		</div>
@@ -257,9 +247,7 @@ interface MatchSummaryProps {
 
 function MatchSummary({ patientScan, productScan, orderScan }: MatchSummaryProps) {
 	const allPass =
-		patientScan.status === "pass" &&
-		productScan.status === "pass" &&
-		orderScan.status === "pass"
+		patientScan.status === "pass" && productScan.status === "pass" && orderScan.status === "pass"
 
 	return (
 		<Card>
@@ -275,7 +263,7 @@ function MatchSummary({ patientScan, productScan, orderScan }: MatchSummaryProps
 					<div key={label} className="flex items-center justify-between">
 						<span className="text-sm">{label}</span>
 						<div className="flex items-center gap-2">
-							<span className="text-xs text-muted-foreground font-mono">{scan.value || "—"}</span>
+							<span className="text-muted-foreground font-mono text-xs">{scan.value || "—"}</span>
 							{scan.status === "pass" ? (
 								<Badge className="bg-green-600 text-white">✓ Match</Badge>
 							) : scan.status === "fail" ? (
@@ -308,10 +296,7 @@ interface TransfusionVerificationProps {
 	onCancel?: () => void
 }
 
-export function TransfusionVerification({
-	onComplete,
-	onCancel,
-}: TransfusionVerificationProps) {
+export function TransfusionVerification({ onComplete, onCancel }: TransfusionVerificationProps) {
 	const [step, setStep] = useState<TransfusionStep>("patient")
 	const [completed, setCompleted] = useState<TransfusionStep[]>([])
 
@@ -327,7 +312,7 @@ export function TransfusionVerification({
 	})
 
 	const markComplete = useCallback((s: TransfusionStep) => {
-		setCompleted((prev) => (prev.includes(s) ? prev : [...prev, s]))
+		setCompleted(prev => (prev.includes(s) ? prev : [...prev, s]))
 	}, [])
 
 	// Simplified validation: any non-empty scan passes (real impl would check against backend)
@@ -368,7 +353,7 @@ export function TransfusionVerification({
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="text-lg font-semibold">Bedside Transfusion Verification</h2>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Complete the 3-way barcode match before initiating blood transfusion.
 					</p>
 				</div>
@@ -426,26 +411,17 @@ export function TransfusionVerification({
 
 			{step === "vitals" && (
 				<div className="space-y-4">
-					<MatchSummary
-						patientScan={patientScan}
-						productScan={productScan}
-						orderScan={orderScan}
-					/>
+					<MatchSummary patientScan={patientScan} productScan={productScan} orderScan={orderScan} />
 					<Card>
 						<CardHeader>
-							<CardTitle className="text-base">
-								Step 4 — Record Transfusion Vital Signs
-							</CardTitle>
+							<CardTitle className="text-base">Step 4 — Record Transfusion Vital Signs</CardTitle>
 						</CardHeader>
 						<CardContent>
 							<VitalsEntry vitals={vitals} onChange={setVitals} />
 						</CardContent>
 					</Card>
 					<div className="flex justify-end">
-						<Button
-							onClick={handleFinish}
-							disabled={!vitals.baseline.bp || !vitals.baseline.hr}
-						>
+						<Button onClick={handleFinish} disabled={!vitals.baseline.bp || !vitals.baseline.hr}>
 							Complete &amp; Save Transfusion Record
 						</Button>
 					</div>
@@ -455,9 +431,9 @@ export function TransfusionVerification({
 			{step === "complete" && (
 				<Card>
 					<CardContent className="flex flex-col items-center justify-center py-12 text-center">
-						<CheckCircle2 className="size-14 text-green-500 mb-4" />
-						<p className="font-semibold text-lg">Transfusion Verified &amp; Recorded</p>
-						<p className="text-sm text-muted-foreground mt-1">
+						<CheckCircle2 className="mb-4 size-14 text-green-500" />
+						<p className="text-lg font-semibold">Transfusion Verified &amp; Recorded</p>
+						<p className="text-muted-foreground mt-1 text-sm">
 							3-way barcode match confirmed. Vital signs documented. Record saved.
 						</p>
 					</CardContent>

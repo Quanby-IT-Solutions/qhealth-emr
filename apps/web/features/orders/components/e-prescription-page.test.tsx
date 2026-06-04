@@ -22,8 +22,7 @@ vi.mock("@/features/encounters/api/encounters.hooks", () => ({
 vi.mock("@/features/orders/api/orders.hooks", () => ({
 	useMedOrderListQuery: (...args: unknown[]) => mockUseMedOrderListQuery(...args),
 	usePrescriptionListQuery: (...args: unknown[]) => mockUsePrescriptionListQuery(...args),
-	useCreatePrescriptionMutation: (...args: unknown[]) =>
-		mockUseCreatePrescriptionMutation(...args),
+	useCreatePrescriptionMutation: (...args: unknown[]) => mockUseCreatePrescriptionMutation(...args),
 	useSignPrescriptionMutation: (...args: unknown[]) => mockUseSignPrescriptionMutation(...args),
 }))
 
@@ -105,9 +104,7 @@ describe("EPrescriptionPage", () => {
 			isPending: false,
 		})
 
-		render(
-			<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />
-		)
+		render(<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />)
 
 		expect(screen.getByText(/PRC PRC-100001/i)).toBeInTheDocument()
 		expect(screen.getByText(/PTR PTR-100001/i)).toBeInTheDocument()
@@ -170,9 +167,7 @@ describe("EPrescriptionPage", () => {
 			isLoading: false,
 		})
 
-		render(
-			<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />
-		)
+		render(<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />)
 
 		expect(
 			screen.getByText(/no active staff profile was found for this facility/i)
@@ -227,9 +222,7 @@ describe("EPrescriptionPage", () => {
 			isPending: false,
 		})
 
-		render(
-			<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />
-		)
+		render(<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />)
 
 		expect(screen.getByText(/PRC license expired/i)).toBeInTheDocument()
 		expect(screen.getByText(/PTR expired/i)).toBeInTheDocument()
@@ -287,9 +280,7 @@ describe("EPrescriptionPage", () => {
 			isPending: false,
 		})
 
-		render(
-			<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />
-		)
+		render(<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />)
 
 		expect(screen.getByText(/PRC license expires/i)).toBeInTheDocument()
 		expect(screen.getByText(/PTR expires/i)).toBeInTheDocument()
@@ -351,9 +342,7 @@ describe("EPrescriptionPage", () => {
 			isLoading: false,
 		})
 
-		render(
-			<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />
-		)
+		render(<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />)
 
 		expect(screen.queryByText(/Morphine parent course/i)).toBeNull()
 		expect(screen.getByText(/Morphine tranche one/i)).toBeInTheDocument()
@@ -371,11 +360,11 @@ describe("EPrescriptionPage", () => {
 			},
 		})
 
-		render(
-			<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />
-		)
+		render(<EPrescriptionPage encounterId="enc-1" facilityId="facility-1" patientId="patient-1" />)
 
-		expect(screen.getByText(/you do not have permission to access e-prescription/i)).toBeInTheDocument()
+		expect(
+			screen.getByText(/you do not have permission to access e-prescription/i)
+		).toBeInTheDocument()
 		expect(screen.queryByText(/ready to prescribe/i)).toBeNull()
 	})
 })

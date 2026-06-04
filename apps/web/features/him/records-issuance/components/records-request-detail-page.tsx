@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-
 import { ErrorState, SkeletonRows } from "@/features/admin/components/state-views"
-import { useRecordsAuditQuery } from "../api/records.hooks"
+
 import { useMedicalRecordsRequestQuery } from "../api/medical-records.hooks"
+import { useRecordsAuditQuery } from "../api/records.hooks"
 
 interface RecordsRequestDetailPageProps {
 	requestId: string
@@ -27,7 +27,8 @@ export function RecordsRequestDetailPage({ requestId }: RecordsRequestDetailPage
 	if (isError) return <ErrorState error={error} retry={refetch} />
 	if (!r) return null
 
-	const releaseDisabled = !r.dpaConsentObtained || !r.paidAt || !r.identityVerified || r.status === "completed"
+	const releaseDisabled =
+		!r.dpaConsentObtained || !r.paidAt || !r.identityVerified || r.status === "completed"
 	const auditEntries = auditData?.entries ?? []
 	const dpaEntry = auditEntries.find(entry => entry.action === "dpa_consent")
 	const identityEntry = auditEntries.find(entry => entry.action === "identity_proof")
@@ -35,12 +36,14 @@ export function RecordsRequestDetailPage({ requestId }: RecordsRequestDetailPage
 	const releaseEntry = auditEntries.find(entry => entry.action === "release")
 
 	return (
-		<div className="space-y-3 p-4 max-w-2xl">
-			<Button variant="ghost" size="sm" onClick={() => router.back()} className="-ml-2">← Back</Button>
+		<div className="max-w-2xl space-y-3 p-4">
+			<Button variant="ghost" size="sm" onClick={() => router.back()} className="-ml-2">
+				← Back
+			</Button>
 
 			<div>
 				<h1 className="text-lg font-semibold capitalize">{r.requestType.replace(/_/g, " ")}</h1>
-				<p className="text-xs text-muted-foreground">
+				<p className="text-muted-foreground text-xs">
 					Requested by {r.requestedByName}
 					{r.requestedByRelationship ? ` (${r.requestedByRelationship})` : ""}
 				</p>
@@ -51,11 +54,23 @@ export function RecordsRequestDetailPage({ requestId }: RecordsRequestDetailPage
 					<CardTitle className="text-sm">Status</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-2 text-sm">
-					<Row label="Current" value={<Badge variant={r.status === "completed" ? "default" : "secondary"} className="capitalize">{r.status}</Badge>} />
+					<Row
+						label="Current"
+						value={
+							<Badge
+								variant={r.status === "completed" ? "default" : "secondary"}
+								className="capitalize"
+							>
+								{r.status}
+							</Badge>
+						}
+					/>
 					<Row label="DPA Consent" value={<Gate ok={r.dpaConsentObtained} />} />
 					<Row label="Identity Verified" value={<Gate ok={r.identityVerified} />} />
 					<Row label="Payment Cleared" value={<Gate ok={!!r.paidAt} />} />
-					{r.releasedAt && <Row label="Released" value={new Date(r.releasedAt).toLocaleString("en-PH")} />}
+					{r.releasedAt && (
+						<Row label="Released" value={new Date(r.releasedAt).toLocaleString("en-PH")} />
+					)}
 					{r.purpose && <Row label="Purpose" value={r.purpose} />}
 				</CardContent>
 			</Card>
@@ -66,19 +81,43 @@ export function RecordsRequestDetailPage({ requestId }: RecordsRequestDetailPage
 				</CardHeader>
 				<CardContent className="space-y-2 text-sm">
 					<Row label="Requested document" value={r.requestType.replace(/_/g, " ")} />
-					<Row label="Relationship" value={r.requestedByRelationship?.replace(/_/g, " ") ?? "Unspecified"} />
-					<Row label="DPA consent evidence" value={dpaEntry ? formatAuditEntry(dpaEntry.occurredAt) : "Pending capture"} />
+					<Row
+						label="Relationship"
+						value={r.requestedByRelationship?.replace(/_/g, " ") ?? "Unspecified"}
+					/>
+					<Row
+						label="DPA consent evidence"
+						value={dpaEntry ? formatAuditEntry(dpaEntry.occurredAt) : "Pending capture"}
+					/>
 					<Row
 						label="Identity proof evidence"
-						value={identityEntry ? formatAuditEntry(identityEntry.occurredAt, identityEntry.documentTypes?.join(", ") ?? undefined) : "Pending verification"}
+						value={
+							identityEntry
+								? formatAuditEntry(
+										identityEntry.occurredAt,
+										identityEntry.documentTypes?.join(", ") ?? undefined
+									)
+								: "Pending verification"
+						}
 					/>
 					<Row
 						label="Physician signature"
-						value={physicianSignatureEntry ? formatAuditEntry(physicianSignatureEntry.occurredAt) : "Not attached"}
+						value={
+							physicianSignatureEntry
+								? formatAuditEntry(physicianSignatureEntry.occurredAt)
+								: "Not attached"
+						}
 					/>
 					<Row
 						label="Release artifact log"
-						value={releaseEntry ? formatAuditEntry(releaseEntry.occurredAt, releaseEntry.documentTypes?.join(", ") ?? undefined) : "Not yet released"}
+						value={
+							releaseEntry
+								? formatAuditEntry(
+										releaseEntry.occurredAt,
+										releaseEntry.documentTypes?.join(", ") ?? undefined
+									)
+								: "Not yet released"
+						}
 					/>
 				</CardContent>
 			</Card>
@@ -90,7 +129,10 @@ export function RecordsRequestDetailPage({ requestId }: RecordsRequestDetailPage
 				>
 					{r.status === "completed" ? "Released" : "Process Release"}
 				</Button>
-				<Button variant="outline" onClick={() => router.push(`/him/records-audit?req=${requestId}`)}>
+				<Button
+					variant="outline"
+					onClick={() => router.push(`/him/records-audit?req=${requestId}`)}
+				>
 					View Audit
 				</Button>
 			</div>

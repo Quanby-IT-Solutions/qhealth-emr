@@ -14,7 +14,9 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 function maskName(name: string): string {
 	const parts = name.trim().split(" ")
 	return parts
-		.map((part, i) => (i === 0 ? part[0] + "*".repeat(Math.max(part.length - 1, 1)) : `${part[0]}***`))
+		.map((part, i) =>
+			i === 0 ? part[0] + "*".repeat(Math.max(part.length - 1, 1)) : `${part[0]}***`
+		)
 		.join(" ")
 }
 
@@ -38,17 +40,24 @@ interface EncounterContextBarProps {
 	className?: string
 }
 
-export function EncounterContextBar({ dpaFlag = false, drgCode, esoaVersion, esoaGeneratedAt, cewsStatus, className }: EncounterContextBarProps) {
+export function EncounterContextBar({
+	dpaFlag = false,
+	drgCode,
+	esoaVersion,
+	esoaGeneratedAt,
+	cewsStatus,
+	className,
+}: EncounterContextBarProps) {
 	const { encounter, isLoading } = useChartContext()
 
 	if (isLoading) {
 		return (
 			<div
-				className={cn("sticky top-0 z-10 border-b bg-background px-4 py-2", className)}
+				className={cn("bg-background sticky top-0 z-10 border-b px-4 py-2", className)}
 				aria-busy="true"
 				aria-label="Loading encounter context"
 			>
-				<div className="h-5 w-72 animate-pulse rounded bg-muted" />
+				<div className="bg-muted h-5 w-72 animate-pulse rounded" />
 			</div>
 		)
 	}
@@ -60,7 +69,7 @@ export function EncounterContextBar({ dpaFlag = false, drgCode, esoaVersion, eso
 	return (
 		<div
 			className={cn(
-				"sticky top-0 z-10 border-b bg-background/95 px-4 py-2 backdrop-blur-sm",
+				"bg-background/95 sticky top-0 z-10 border-b px-4 py-2 backdrop-blur-sm",
 				className
 			)}
 			aria-label="Encounter context"
@@ -68,7 +77,7 @@ export function EncounterContextBar({ dpaFlag = false, drgCode, esoaVersion, eso
 			{/* Full layout ≥768px */}
 			<div className="hidden items-center gap-x-4 gap-y-1 sm:flex sm:flex-wrap">
 				<div className="flex items-center gap-2">
-					<span className="font-semibold text-sm">{displayName}</span>
+					<span className="text-sm font-semibold">{displayName}</span>
 					{dpaFlag && (
 						<Badge variant="outline" className="text-xs">
 							DPA
@@ -78,11 +87,14 @@ export function EncounterContextBar({ dpaFlag = false, drgCode, esoaVersion, eso
 
 				<span className="text-muted-foreground text-xs">MRN: {encounter.patientMrn}</span>
 
-				<Badge variant="outline" className="capitalize text-xs">
+				<Badge variant="outline" className="text-xs capitalize">
 					{encounter.encounterType}
 				</Badge>
 
-				<Badge variant={STATUS_VARIANT[encounter.status] ?? "secondary"} className="capitalize text-xs">
+				<Badge
+					variant={STATUS_VARIANT[encounter.status] ?? "secondary"}
+					className="text-xs capitalize"
+				>
 					{encounter.status}
 				</Badge>
 
@@ -107,7 +119,10 @@ export function EncounterContextBar({ dpaFlag = false, drgCode, esoaVersion, eso
 				)}
 
 				{cewsStatus && (
-					<Badge variant={CEWS_STATUS_VARIANT[cewsStatus.toLowerCase()] ?? "outline"} className="capitalize text-xs">
+					<Badge
+						variant={CEWS_STATUS_VARIANT[cewsStatus.toLowerCase()] ?? "outline"}
+						className="text-xs capitalize"
+					>
 						CEWS: {cewsStatus}
 					</Badge>
 				)}
@@ -115,9 +130,12 @@ export function EncounterContextBar({ dpaFlag = false, drgCode, esoaVersion, eso
 
 			{/* Collapsed single-line <768px */}
 			<div className="flex items-center gap-2 sm:hidden">
-				<span className="truncate font-semibold text-sm">{displayName}</span>
-				<span className="text-muted-foreground text-xs shrink-0">· {encounter.patientMrn}</span>
-				<Badge variant={STATUS_VARIANT[encounter.status] ?? "secondary"} className="capitalize text-xs shrink-0">
+				<span className="truncate text-sm font-semibold">{displayName}</span>
+				<span className="text-muted-foreground shrink-0 text-xs">· {encounter.patientMrn}</span>
+				<Badge
+					variant={STATUS_VARIANT[encounter.status] ?? "secondary"}
+					className="shrink-0 text-xs capitalize"
+				>
 					{encounter.status}
 				</Badge>
 			</div>

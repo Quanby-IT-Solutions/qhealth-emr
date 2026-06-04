@@ -19,9 +19,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 	return res.json() as Promise<T>
 }
 
-function buildQueryString(
-	params: Record<string, string | number | boolean | undefined>,
-): string {
+function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
 	if (entries.length === 0) return ""
 	return `?${entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&")}`
@@ -88,12 +86,15 @@ interface ImagingDashboardParams {
 	limit?: number
 }
 
-export function useImagingDashboardQuery(params: ImagingDashboardParams, options?: { enabled?: boolean }) {
+export function useImagingDashboardQuery(
+	params: ImagingDashboardParams,
+	options?: { enabled?: boolean }
+) {
 	return useQuery({
 		queryKey: radiologyKeys.dashboard(params),
 		queryFn: () =>
 			fetchJson<PaginatedImagingDashboardOrders>(
-				`${ORDERS_BASE}/imaging${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`,
+				`${ORDERS_BASE}/imaging${buildQueryString(params as unknown as Record<string, string | number | boolean | undefined>)}`
 			),
 		enabled: !!params.facilityId && (options?.enabled ?? true),
 		refetchInterval: 30 * 1000,

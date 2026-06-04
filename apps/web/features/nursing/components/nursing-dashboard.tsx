@@ -1,6 +1,15 @@
 "use client"
 
-import { Activity, AlertTriangle, ClipboardList, Heart, RefreshCw, Stethoscope, Wifi } from "lucide-react"
+import Link from "next/link"
+import {
+	Activity,
+	AlertTriangle,
+	ClipboardList,
+	Heart,
+	RefreshCw,
+	Stethoscope,
+	Wifi,
+} from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -8,9 +17,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { EdDashboard } from "@/features/ed/components/ed-dashboard"
-import { HaiTagForm } from "@/features/nursing/components/hai-tag-form"
 import { NbsLogbook } from "@/features/nbs/components/nbs-logbook"
-import Link from "next/link"
+import { HaiTagForm } from "@/features/nursing/components/hai-tag-form"
 
 import { useHaiTagsQuery, useVitalsQuery } from "../api/nursing.hooks"
 import { useNursingSync } from "../lib/use-nursing-sync"
@@ -43,7 +51,7 @@ function StatCard({ title, value, subtitle, icon, accent = "default" }: StatCard
 			</CardHeader>
 			<CardContent>
 				<div className="text-2xl font-bold">{value}</div>
-				{subtitle && <p className="text-muted-foreground text-xs mt-0.5">{subtitle}</p>}
+				{subtitle && <p className="text-muted-foreground mt-0.5 text-xs">{subtitle}</p>}
 			</CardContent>
 		</Card>
 	)
@@ -62,43 +70,43 @@ function NewsAlertTable({ facilityId }: NewsAlertTableProps) {
 
 	const highAlerts =
 		data?.data.filter(
-			(v) => v.newsRiskLevel === "high" || (v.newsScore !== null && v.newsScore >= 5)
+			v => v.newsRiskLevel === "high" || (v.newsScore !== null && v.newsScore >= 5)
 		) ?? []
 
 	if (isLoading) {
-		return <p className="text-muted-foreground text-sm py-4">Loading vitals…</p>
+		return <p className="text-muted-foreground py-4 text-sm">Loading vitals…</p>
 	}
 
 	if (highAlerts.length === 0) {
 		return (
 			<div className="flex flex-col items-center justify-center py-10 text-center">
-				<Heart className="size-10 text-green-500 mb-2" />
-				<p className="font-medium text-sm">No high NEWS alerts</p>
-				<p className="text-muted-foreground text-xs mt-1">All monitored patients are stable.</p>
+				<Heart className="mb-2 size-10 text-green-500" />
+				<p className="text-sm font-medium">No high NEWS alerts</p>
+				<p className="text-muted-foreground mt-1 text-xs">All monitored patients are stable.</p>
 			</div>
 		)
 	}
 
 	return (
 		<div className="space-y-2">
-			{highAlerts.map((vital) => (
+			{highAlerts.map(vital => (
 				<div
 					key={vital.id}
 					className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/30 dark:bg-red-950/20"
 				>
 					<div>
 						<p className="text-sm font-medium">Encounter: {vital.encounterId ?? "—"}</p>
-						<p className="text-xs text-muted-foreground">
-							BP {vital.bpSystolic ?? "—"}/{vital.bpDiastolic ?? "—"} · HR{" "}
-							{vital.heartRate ?? "—"} · SpO₂ {vital.spo2 ?? "—"}%
+						<p className="text-muted-foreground text-xs">
+							BP {vital.bpSystolic ?? "—"}/{vital.bpDiastolic ?? "—"} · HR {vital.heartRate ?? "—"}{" "}
+							· SpO₂ {vital.spo2 ?? "—"}%
 						</p>
-						<p className="text-xs text-muted-foreground">
+						<p className="text-muted-foreground text-xs">
 							{new Date(vital.recordedAt).toLocaleString("en-PH")}
 						</p>
 					</div>
 					<div className="flex flex-col items-end gap-1">
 						<Badge variant="destructive">NEWS {vital.newsScore ?? "—"}</Badge>
-						<span className="text-xs text-red-600 font-medium">Escalate to Physician</span>
+						<span className="text-xs font-medium text-red-600">Escalate to Physician</span>
 					</div>
 				</div>
 			))}
@@ -132,21 +140,21 @@ function HaiSummaryTab({ facilityId }: HaiSummaryTabProps) {
 
 	return (
 		<div className="space-y-6">
-			<div className="grid gap-3 grid-cols-2 sm:grid-cols-5">
+			<div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
 				{Object.entries(HAI_LABELS).map(([key, label]) => (
 					<Card key={key}>
 						<CardContent className="pt-4">
 							<div className="text-2xl font-bold">{byType[key] ?? 0}</div>
-							<p className="text-xs text-muted-foreground">{label}</p>
+							<p className="text-muted-foreground text-xs">{label}</p>
 						</CardContent>
 					</Card>
 				))}
 			</div>
 			<div className="rounded-md border p-4">
-				<p className="text-sm font-medium mb-3">Tag a New HAI</p>
-				<p className="text-xs text-muted-foreground">
-					Open a patient encounter to log a new Healthcare-Associated Infection tag.
-					Navigate to <strong>Patients → Encounter → Nursing tab → HAI Tags</strong>.
+				<p className="mb-3 text-sm font-medium">Tag a New HAI</p>
+				<p className="text-muted-foreground text-xs">
+					Open a patient encounter to log a new Healthcare-Associated Infection tag. Navigate to{" "}
+					<strong>Patients → Encounter → Nursing tab → HAI Tags</strong>.
 				</p>
 			</div>
 		</div>
@@ -168,25 +176,26 @@ export function NursingDashboard() {
 	})
 	const { data: haiData } = useHaiTagsQuery({ facilityId, limit: 100 })
 
-	const totalVitalsToday = vitalsData?.data.filter((v) => {
-		const today = new Date()
-		today.setHours(0, 0, 0, 0)
-		return new Date(v.recordedAt) >= today
-	}).length ?? 0
+	const totalVitalsToday =
+		vitalsData?.data.filter(v => {
+			const today = new Date()
+			today.setHours(0, 0, 0, 0)
+			return new Date(v.recordedAt) >= today
+		}).length ?? 0
 
 	const highNewsCount =
 		vitalsData?.data.filter(
-			(v) => v.newsRiskLevel === "high" || (v.newsScore !== null && v.newsScore >= 5)
+			v => v.newsRiskLevel === "high" || (v.newsScore !== null && v.newsScore >= 5)
 		).length ?? 0
 
-	const activeHaiCount = haiData?.data.filter((h) => h.status !== "resolved").length ?? 0
+	const activeHaiCount = haiData?.data.filter(h => h.status !== "resolved").length ?? 0
 
 	if (isLoading) {
 		return (
 			<div className="space-y-6">
 				<div>
 					<h1 className="text-2xl font-semibold">Nursing</h1>
-					<p className="text-sm text-muted-foreground">Loading…</p>
+					<p className="text-muted-foreground text-sm">Loading…</p>
 				</div>
 			</div>
 		)
@@ -198,7 +207,7 @@ export function NursingDashboard() {
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-2xl font-semibold">Nursing Dashboard</h1>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Vitals monitoring, care records, and patient safety
 					</p>
 				</div>
@@ -233,7 +242,7 @@ export function NursingDashboard() {
 				<Card className="flex flex-col justify-between">
 					<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
 						<CardTitle className="text-sm font-medium">Offline Sync</CardTitle>
-						<Wifi className="size-4 text-muted-foreground" />
+						<Wifi className="text-muted-foreground size-4" />
 					</CardHeader>
 					<CardContent>
 						<div className="text-2xl font-bold">
@@ -296,7 +305,7 @@ export function NursingDashboard() {
 					{facilityId ? (
 						<NbsLogbook facilityId={facilityId} />
 					) : (
-						<p className="text-muted-foreground text-sm py-4">No facility assigned.</p>
+						<p className="text-muted-foreground py-4 text-sm">No facility assigned.</p>
 					)}
 				</TabsContent>
 			</Tabs>

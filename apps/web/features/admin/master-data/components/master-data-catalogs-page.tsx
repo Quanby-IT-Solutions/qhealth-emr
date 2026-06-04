@@ -39,7 +39,7 @@ export function MasterDataCatalogsPage() {
 				<Card key={catalog.id}>
 					<CardHeader className="pb-2">
 						<CardTitle className="text-base">{catalog.name}</CardTitle>
-						<p className="text-xs text-muted-foreground">{catalog.description}</p>
+						<p className="text-muted-foreground text-xs">{catalog.description}</p>
 					</CardHeader>
 					<CardContent>
 						{catalog.linkedTo ? (

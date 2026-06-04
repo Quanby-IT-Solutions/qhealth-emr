@@ -12,9 +12,9 @@ interface ActivityTimelineProps {
 }
 
 const TYPE_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
-	FPE: "default",
+	"FPE": "default",
 	"Follow-up": "secondary",
-	Lab: "outline",
+	"Lab": "outline",
 }
 
 export function ActivityTimeline({ patientId, facilityId }: ActivityTimelineProps) {
@@ -41,28 +41,28 @@ export function ActivityTimeline({ patientId, facilityId }: ActivityTimelineProp
 				)}
 
 				{!isLoading && activities.length === 0 && (
-					<p className="text-sm text-muted-foreground py-4 text-center">
+					<p className="text-muted-foreground py-4 text-center text-sm">
 						No activities recorded for this patient.
 					</p>
 				)}
 
 				{activities.length > 0 && (
-					<ol className="relative border-l border-muted ml-2 space-y-4 py-1">
+					<ol className="border-muted relative ml-2 space-y-4 border-l py-1">
 						{activities.map(activity => (
 							<li key={activity.id} className="ml-4">
-								<div className="absolute -left-1.5 mt-1.5 size-3 rounded-full border border-background bg-muted-foreground/40" />
-								<div className="flex items-start gap-2 flex-wrap">
+								<div className="border-background bg-muted-foreground/40 absolute -left-1.5 mt-1.5 size-3 rounded-full border" />
+								<div className="flex flex-wrap items-start gap-2">
 									<Badge
 										variant={TYPE_VARIANT[activity.activityType] ?? "outline"}
-										className="text-[10px] h-4 px-1.5"
+										className="h-4 px-1.5 text-[10px]"
 									>
 										{activity.activityType}
 									</Badge>
-									<span className="text-xs tabular-nums text-muted-foreground">
+									<span className="text-muted-foreground text-xs tabular-nums">
 										{activity.activityDate}
 									</span>
 									{activity.sourceRef && (
-										<span className="text-[10px] text-muted-foreground/70 font-mono">
+										<span className="text-muted-foreground/70 font-mono text-[10px]">
 											ref: {activity.sourceRef}
 										</span>
 									)}

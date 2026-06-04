@@ -22,9 +22,7 @@ export function LicenseExpiryBanner() {
 	const expiringSoon =
 		data?.data.filter(
 			c =>
-				c.daysUntilNextExpiry !== null &&
-				c.daysUntilNextExpiry >= 0 &&
-				c.daysUntilNextExpiry <= 30
+				c.daysUntilNextExpiry !== null && c.daysUntilNextExpiry >= 0 && c.daysUntilNextExpiry <= 30
 		) ?? []
 	const expired =
 		data?.data.filter(c => c.daysUntilNextExpiry !== null && c.daysUntilNextExpiry < 0) ?? []
@@ -38,7 +36,7 @@ export function LicenseExpiryBanner() {
 	}
 
 	return (
-		<Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 mb-4">
+		<Alert className="mb-4 border-amber-300 bg-amber-50 dark:bg-amber-950/20">
 			<AlertDescription className="flex items-center justify-between">
 				<span className="text-amber-800 dark:text-amber-300">
 					{expired.length > 0 && (
@@ -49,14 +47,20 @@ export function LicenseExpiryBanner() {
 					)}
 					{expiringSoon.length > 0 && (
 						<>
-							{expiringSoon.length} clinician license{expiringSoon.length > 1 ? "s" : ""} expiring within 30 days.{" "}
+							{expiringSoon.length} clinician license{expiringSoon.length > 1 ? "s" : ""} expiring
+							within 30 days.{" "}
 						</>
 					)}
-					<Link href="/admin/clinician-licenses" className="underline font-medium">
+					<Link href="/admin/clinician-licenses" className="font-medium underline">
 						Review now
 					</Link>
 				</span>
-				<Button variant="ghost" size="sm" onClick={dismiss} className="text-amber-700 hover:text-amber-900 -mr-2">
+				<Button
+					variant="ghost"
+					size="sm"
+					onClick={dismiss}
+					className="-mr-2 text-amber-700 hover:text-amber-900"
+				>
 					Dismiss
 				</Button>
 			</AlertDescription>

@@ -1,20 +1,24 @@
 "use client"
 
 import { useEffect, useState } from "react"
-
-import { type z } from "zod"
 import { AlertTriangle, Clock, Shield, ShieldAlert } from "lucide-react"
+import { type z } from "zod"
 
 import { type BreakGlassReasonCategoryEnum } from "@repo/contracts"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
-
-import { type BreakGlassEvent, useCreateBreakGlassMutation } from "@/features/audit/api/audit.hooks"
+import { useCreateBreakGlassMutation, type BreakGlassEvent } from "@/features/audit/api/audit.hooks"
 
 type ReasonCategory = z.infer<typeof BreakGlassReasonCategoryEnum>
 
@@ -63,7 +67,10 @@ export function BreakGlassCountdown({ accessExpiresAt }: { accessExpiresAt: stri
 
 	if (remainingMs === 0) {
 		return (
-			<Badge variant="secondary" className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+			<Badge
+				variant="secondary"
+				className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+			>
 				Access expired
 			</Badge>
 		)
@@ -124,30 +131,35 @@ export function BreakGlassForm({
 					<div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/50">
 						<Shield className="size-4 text-orange-600 dark:text-orange-400" />
 					</div>
-					<div className="flex-1 min-w-0">
+					<div className="min-w-0 flex-1">
 						<p className="text-sm font-semibold text-orange-800 dark:text-orange-200">
 							Break-Glass Session Active
 						</p>
-						<p className="text-xs text-orange-700 dark:text-orange-300 mt-0.5">
+						<p className="mt-0.5 text-xs text-orange-700 dark:text-orange-300">
 							Temporary access expires at{" "}
 							<span className="font-medium">
-								{new Date(activeEvent.accessExpiresAt as unknown as string).toLocaleString("en-PH", {
-									hour: "2-digit",
-									minute: "2-digit",
-									day: "numeric",
-									month: "short",
-								})}
+								{new Date(activeEvent.accessExpiresAt as unknown as string).toLocaleString(
+									"en-PH",
+									{
+										hour: "2-digit",
+										minute: "2-digit",
+										day: "numeric",
+										month: "short",
+									}
+								)}
 							</span>
 						</p>
 					</div>
 					{activeEvent.accessExpiresAt && (
-						<BreakGlassCountdown accessExpiresAt={activeEvent.accessExpiresAt as unknown as string} />
+						<BreakGlassCountdown
+							accessExpiresAt={activeEvent.accessExpiresAt as unknown as string}
+						/>
 					)}
 				</div>
 
-				<p className="text-sm text-muted-foreground">
-					Your emergency override session is already active for this patient. Temporary read access remains
-					available until it expires automatically.
+				<p className="text-muted-foreground text-sm">
+					Your emergency override session is already active for this patient. Temporary read access
+					remains available until it expires automatically.
 				</p>
 
 				<div className="flex justify-end">
@@ -190,8 +202,8 @@ export function BreakGlassForm({
 				<AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
 				<p className="text-sm text-amber-800 dark:text-amber-200">
 					You do not have regular access to this patient&apos;s record. This action is{" "}
-					<span className="font-semibold">logged, audited, and reviewed</span> by the Privacy Officer.
-					Unauthorized access may lead to disciplinary action.
+					<span className="font-semibold">logged, audited, and reviewed</span> by the Privacy
+					Officer. Unauthorized access may lead to disciplinary action.
 				</p>
 			</div>
 
@@ -204,7 +216,9 @@ export function BreakGlassForm({
 					<Select value={reasonCategory || null} onValueChange={v => setReasonCategory(v ?? "")}>
 						<SelectTrigger id="reason-category" className="w-full">
 							<SelectValue placeholder="Select reason…">
-								{reasonCategory ? REASON_CATEGORIES.find(c => c.value === reasonCategory)?.label : undefined}
+								{reasonCategory
+									? REASON_CATEGORIES.find(c => c.value === reasonCategory)?.label
+									: undefined}
 							</SelectValue>
 						</SelectTrigger>
 						<SelectContent className="w-max min-w-[var(--anchor-width)]">
@@ -218,8 +232,8 @@ export function BreakGlassForm({
 				</div>
 
 				<div className="space-y-2">
-					<Label htmlFor="duration" className="text-sm font-medium flex items-center gap-1.5">
-						<Clock className="size-3.5 text-muted-foreground" />
+					<Label htmlFor="duration" className="flex items-center gap-1.5 text-sm font-medium">
+						<Clock className="text-muted-foreground size-3.5" />
 						Access Duration <span className="text-destructive">*</span>
 					</Label>
 					<Select
@@ -228,7 +242,9 @@ export function BreakGlassForm({
 					>
 						<SelectTrigger id="duration" className="w-full">
 							<SelectValue placeholder="Select duration…">
-								{durationHours ? DURATION_OPTIONS.find(o => o.value === durationHours)?.label : undefined}
+								{durationHours
+									? DURATION_OPTIONS.find(o => o.value === durationHours)?.label
+									: undefined}
 							</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
@@ -239,7 +255,7 @@ export function BreakGlassForm({
 							))}
 						</SelectContent>
 					</Select>
-					<p className="text-xs text-muted-foreground">Access expires automatically.</p>
+					<p className="text-muted-foreground text-xs">Access expires automatically.</p>
 				</div>
 			</div>
 
@@ -256,7 +272,13 @@ export function BreakGlassForm({
 					className="resize-none"
 				/>
 				<div className="flex items-center justify-between gap-3 text-xs">
-					<p className={justification.trim().length < MIN_JUSTIFICATION_LENGTH ? "text-destructive" : "text-muted-foreground"}>
+					<p
+						className={
+							justification.trim().length < MIN_JUSTIFICATION_LENGTH
+								? "text-destructive"
+								: "text-muted-foreground"
+						}
+					>
 						Minimum {MIN_JUSTIFICATION_LENGTH} characters required.
 					</p>
 					<p className="text-muted-foreground text-right">
@@ -283,7 +305,7 @@ export function BreakGlassForm({
 					onChange={e => setAcknowledged(e.target.checked)}
 					className="mt-0.5 size-4 shrink-0 accent-orange-600"
 				/>
-				<span className="text-sm leading-snug text-foreground">
+				<span className="text-foreground text-sm leading-snug">
 					I acknowledge that accessing this record will be{" "}
 					<span className="font-medium">logged, audited, and reviewed</span> by the Privacy Officer.
 					Unauthorized access may lead to disciplinary action.
@@ -291,15 +313,20 @@ export function BreakGlassForm({
 			</label>
 
 			{createBreakGlassMutation.error && (
-				<div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+				<div className="border-destructive/30 bg-destructive/10 text-destructive flex items-start gap-2 rounded-lg border px-4 py-3 text-sm">
 					<AlertTriangle className="mt-0.5 size-4 shrink-0" />
 					{String(createBreakGlassMutation.error)}
 				</div>
 			)}
 
-			<div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">
+			<div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
 				{onCancel && (
-					<Button variant="outline" onClick={onCancel} disabled={createBreakGlassMutation.isPending} className="w-full sm:w-auto">
+					<Button
+						variant="outline"
+						onClick={onCancel}
+						disabled={createBreakGlassMutation.isPending}
+						className="w-full sm:w-auto"
+					>
 						Cancel
 					</Button>
 				)}
@@ -307,7 +334,7 @@ export function BreakGlassForm({
 					variant="destructive"
 					onClick={handleSubmit}
 					disabled={!canSubmit}
-					className="w-full sm:w-auto gap-2"
+					className="w-full gap-2 sm:w-auto"
 				>
 					<ShieldAlert className="size-4" />
 					{createBreakGlassMutation.isPending ? "Requesting Access…" : "Request Emergency Access"}
@@ -316,4 +343,3 @@ export function BreakGlassForm({
 		</div>
 	)
 }
-

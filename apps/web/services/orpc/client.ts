@@ -4,6 +4,7 @@ import { OpenAPILink } from "@orpc/openapi-client/fetch"
 import { createTanstackQueryUtils } from "@orpc/tanstack-query"
 
 import {
+	v1Contract,
 	type ancillaryClearanceContract,
 	type annexSignaturesContract,
 	type assessmentsContract,
@@ -13,8 +14,9 @@ import {
 	type malasakitContract,
 	type mswBaseContract,
 	type reportingContract,
-	v1Contract,
 } from "@repo/contracts"
+
+import { env } from "@/env"
 
 type V1Contract = typeof v1Contract
 type BillingContract = typeof billingContract
@@ -31,8 +33,6 @@ type MswContract = typeof mswBaseContract & {
 	malasakit: typeof malasakitContract
 	ancillaryClearance: typeof ancillaryClearanceContract
 }
-
-import { env } from "@/env"
 
 type ORPCErrorCode = ConstructorParameters<typeof ORPCError>[0]
 

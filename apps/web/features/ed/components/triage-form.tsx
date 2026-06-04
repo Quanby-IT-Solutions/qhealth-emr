@@ -44,7 +44,13 @@ function suggestAcuityLevel({
 }) {
 	const complaint = chiefComplaint.toLowerCase()
 	const levelOneKeywords = ["cardiac arrest", "unresponsive", "seizure", "severe trauma"]
-	const levelTwoKeywords = ["chest pain", "stroke", "difficulty breathing", "severe pain", "bleeding"]
+	const levelTwoKeywords = [
+		"chest pain",
+		"stroke",
+		"difficulty breathing",
+		"severe pain",
+		"bleeding",
+	]
 
 	if (
 		levelOneKeywords.some(keyword => complaint.includes(keyword)) ||
@@ -137,7 +143,10 @@ export function TriageForm({ facilityId, triageStaffId, onSuccess }: TriageFormP
 			{/* Acuity Scale */}
 			<div className="space-y-2">
 				<Label>Acuity Scale</Label>
-				<Select value={acuityScale} onValueChange={v => setAcuityScale((v ?? "esi") as AcuityScale)}>
+				<Select
+					value={acuityScale}
+					onValueChange={v => setAcuityScale((v ?? "esi") as AcuityScale)}
+				>
 					<SelectTrigger className="w-full">
 						<SelectValue />
 					</SelectTrigger>
@@ -152,10 +161,7 @@ export function TriageForm({ facilityId, triageStaffId, onSuccess }: TriageFormP
 			{/* Acuity Level */}
 			<div className="space-y-2">
 				<Label>Acuity Level (1 = most urgent, 5 = least urgent)</Label>
-				<Select
-					value={String(acuityLevel)}
-					onValueChange={v => setAcuityLevel(Number(v ?? "3"))}
-				>
+				<Select value={String(acuityLevel)} onValueChange={v => setAcuityLevel(Number(v ?? "3"))}>
 					<SelectTrigger className="w-full">
 						<SelectValue />
 					</SelectTrigger>
@@ -167,7 +173,7 @@ export function TriageForm({ facilityId, triageStaffId, onSuccess }: TriageFormP
 						<SelectItem value="5">5 - Non-Urgent</SelectItem>
 					</SelectContent>
 				</Select>
-				<div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-sm">
+				<div className="bg-muted/40 flex items-center justify-between rounded-md border px-3 py-2 text-sm">
 					<span>Suggested level: {suggestedLevel}</span>
 					<Button
 						type="button"
@@ -280,18 +286,12 @@ export function TriageForm({ facilityId, triageStaffId, onSuccess }: TriageFormP
 				</div>
 			</div>
 
-			<Button
-				type="submit"
-				className="w-full"
-				disabled={createPreEncounter.isPending}
-			>
+			<Button type="submit" className="w-full" disabled={createPreEncounter.isPending}>
 				{createPreEncounter.isPending ? "Creating…" : "Create Pre-Encounter"}
 			</Button>
 
 			{createPreEncounter.isError && (
-				<p className="text-destructive text-sm">
-					{createPreEncounter.error.message}
-				</p>
+				<p className="text-destructive text-sm">{createPreEncounter.error.message}</p>
 			)}
 		</form>
 	)

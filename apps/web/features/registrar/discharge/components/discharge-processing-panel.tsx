@@ -11,7 +11,12 @@ import {
 	useEncounterDetailQuery,
 } from "@/features/encounters/api/encounters.hooks"
 import { DischargeChecklist } from "@/features/encounters/components/discharge-checklist"
-import { useClearanceStatusQuery, useGatePassQuery, useIssueGatePassMutation } from "../api/discharge.hooks"
+
+import {
+	useClearanceStatusQuery,
+	useGatePassQuery,
+	useIssueGatePassMutation,
+} from "../api/discharge.hooks"
 import { ClearanceStatusCard } from "./clearance-status-card"
 
 function formatDatetime(value: Date | string | null) {
@@ -25,7 +30,10 @@ function formatDatetime(value: Date | string | null) {
 	})
 }
 
-function computeLos(admissionDatetime: Date | string | null, dischargeDatetime: Date | string | null) {
+function computeLos(
+	admissionDatetime: Date | string | null,
+	dischargeDatetime: Date | string | null
+) {
 	const start = admissionDatetime ? new Date(admissionDatetime).getTime() : null
 	const end = dischargeDatetime ? new Date(dischargeDatetime).getTime() : Date.now()
 	if (!start) return "Unknown"
@@ -71,9 +79,7 @@ export function DischargeProcessingPanel({ encounterId }: { encounterId: string 
 	}
 
 	if (!encounter) {
-		return (
-			<div className="text-muted-foreground py-8 text-center">Encounter not found.</div>
-		)
+		return <div className="text-muted-foreground py-8 text-center">Encounter not found.</div>
 	}
 
 	const isDeceased = encounter.disposition === "deceased"
@@ -134,9 +140,7 @@ export function DischargeProcessingPanel({ encounterId }: { encounterId: string 
 								<span className="text-muted-foreground">Death Classification</span>
 								<div className="mt-0.5">
 									<Badge variant="destructive">
-										{deathClass === "gross"
-											? "Gross Death Rate (≤48h)"
-											: "Net Death Rate (>48h)"}
+										{deathClass === "gross" ? "Gross Death Rate (≤48h)" : "Net Death Rate (>48h)"}
 									</Badge>
 								</div>
 							</div>
@@ -153,10 +157,7 @@ export function DischargeProcessingPanel({ encounterId }: { encounterId: string 
 						<CardTitle className="text-base">Discharge Checklist</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<DischargeChecklist
-							items={checklist.items}
-							encounterType={checklist.encounterType}
-						/>
+						<DischargeChecklist items={checklist.items} encounterType={checklist.encounterType} />
 					</CardContent>
 				</Card>
 			)}
@@ -180,8 +181,8 @@ export function DischargeProcessingPanel({ encounterId }: { encounterId: string 
 			</div>
 			{!canIssueGatePass && !gatePass && (
 				<p className="text-muted-foreground text-sm">
-					Gate pass is available once all clinical checklist items and all three
-					clearances are complete.
+					Gate pass is available once all clinical checklist items and all three clearances are
+					complete.
 				</p>
 			)}
 		</div>

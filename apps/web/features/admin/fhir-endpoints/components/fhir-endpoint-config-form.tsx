@@ -3,17 +3,33 @@
 import { useState } from "react"
 import { ChevronDown, ChevronRight } from "lucide-react"
 
+import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
-import { Badge } from "@/core/components/ui/badge"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 
 const FHIR_RESOURCES = [
-	"Patient", "Encounter", "Observation", "Condition", "AllergyIntolerance",
-	"MedicationRequest", "MedicationAdministration", "DiagnosticReport",
-	"ServiceRequest", "NutritionOrder", "ImagingStudy", "Practitioner", "Location",
+	"Patient",
+	"Encounter",
+	"Observation",
+	"Condition",
+	"AllergyIntolerance",
+	"MedicationRequest",
+	"MedicationAdministration",
+	"DiagnosticReport",
+	"ServiceRequest",
+	"NutritionOrder",
+	"ImagingStudy",
+	"Practitioner",
+	"Location",
 ]
 
 interface EndpointConfig {
@@ -85,10 +101,18 @@ export function FhirEndpointConfigForm() {
 	return (
 		<form onSubmit={handleSubmit} className="space-y-4">
 			<Card>
-				<CardHeader className="pb-2 flex flex-row items-center justify-between">
+				<CardHeader className="flex flex-row items-center justify-between pb-2">
 					<CardTitle className="text-sm">Endpoint</CardTitle>
-					<button type="button" onClick={() => toggleSection("endpoint")} className="text-muted-foreground hover:text-foreground">
-						{openSections.endpoint ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+					<button
+						type="button"
+						onClick={() => toggleSection("endpoint")}
+						className="text-muted-foreground hover:text-foreground"
+					>
+						{openSections.endpoint ? (
+							<ChevronDown className="size-4" />
+						) : (
+							<ChevronRight className="size-4" />
+						)}
 					</button>
 				</CardHeader>
 				{openSections.endpoint && (
@@ -114,10 +138,12 @@ export function FhirEndpointConfigForm() {
 								{testStatus === "testing" ? "Testing..." : "Test Connection"}
 							</Button>
 							{testStatus === "success" && testLatency !== null && (
-								<span className="text-xs text-emerald-600 self-center">Connected · {testLatency}ms</span>
+								<span className="self-center text-xs text-emerald-600">
+									Connected · {testLatency}ms
+								</span>
 							)}
 							{testStatus === "error" && (
-								<span className="text-xs text-destructive self-center">{testError}</span>
+								<span className="text-destructive self-center text-xs">{testError}</span>
 							)}
 						</div>
 					</CardContent>
@@ -125,10 +151,18 @@ export function FhirEndpointConfigForm() {
 			</Card>
 
 			<Card>
-				<CardHeader className="pb-2 flex flex-row items-center justify-between">
+				<CardHeader className="flex flex-row items-center justify-between pb-2">
 					<CardTitle className="text-sm">Authentication</CardTitle>
-					<button type="button" onClick={() => toggleSection("authentication")} className="text-muted-foreground hover:text-foreground">
-						{openSections.authentication ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+					<button
+						type="button"
+						onClick={() => toggleSection("authentication")}
+						className="text-muted-foreground hover:text-foreground"
+					>
+						{openSections.authentication ? (
+							<ChevronDown className="size-4" />
+						) : (
+							<ChevronRight className="size-4" />
+						)}
 					</button>
 				</CardHeader>
 				{openSections.authentication && (
@@ -137,9 +171,16 @@ export function FhirEndpointConfigForm() {
 							<Label>Auth Method</Label>
 							<Select
 								value={config.authMethod}
-								onValueChange={v => setConfig(c => ({ ...c, authMethod: (v ?? "none") as EndpointConfig["authMethod"] }))}
+								onValueChange={v =>
+									setConfig(c => ({
+										...c,
+										authMethod: (v ?? "none") as EndpointConfig["authMethod"],
+									}))
+								}
 							>
-								<SelectTrigger><SelectValue /></SelectTrigger>
+								<SelectTrigger>
+									<SelectValue />
+								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="none">None</SelectItem>
 									<SelectItem value="bearer">Bearer Token</SelectItem>
@@ -184,9 +225,19 @@ export function FhirEndpointConfigForm() {
 									{config.selectedResources.length} selected
 								</Badge>
 							)}
-							<Button type="button" variant="ghost" size="sm" onClick={selectAll}>Select all</Button>
-							<button type="button" onClick={() => toggleSection("resources")} className="text-muted-foreground hover:text-foreground">
-								{openSections.resources ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+							<Button type="button" variant="ghost" size="sm" onClick={selectAll}>
+								Select all
+							</Button>
+							<button
+								type="button"
+								onClick={() => toggleSection("resources")}
+								className="text-muted-foreground hover:text-foreground"
+							>
+								{openSections.resources ? (
+									<ChevronDown className="size-4" />
+								) : (
+									<ChevronRight className="size-4" />
+								)}
 							</button>
 						</div>
 					</div>
@@ -200,14 +251,14 @@ export function FhirEndpointConfigForm() {
 							className="h-8 text-sm"
 						/>
 						<div className="flex flex-wrap gap-2">
-							{FHIR_RESOURCES.filter(r =>
-								!resourceSearch || r.toLowerCase().includes(resourceSearch.toLowerCase())
+							{FHIR_RESOURCES.filter(
+								r => !resourceSearch || r.toLowerCase().includes(resourceSearch.toLowerCase())
 							).map(r => (
 								<button
 									key={r}
 									type="button"
 									onClick={() => toggleResource(r)}
-									className={`rounded-full px-3 py-0.5 text-xs border transition-colors ${
+									className={`rounded-full border px-3 py-0.5 text-xs transition-colors ${
 										config.selectedResources.includes(r)
 											? "bg-primary text-primary-foreground border-primary"
 											: "bg-background text-foreground border-border hover:bg-muted"
@@ -222,10 +273,18 @@ export function FhirEndpointConfigForm() {
 			</Card>
 
 			<Card>
-				<CardHeader className="pb-2 flex flex-row items-center justify-between">
+				<CardHeader className="flex flex-row items-center justify-between pb-2">
 					<CardTitle className="text-sm">Schedule</CardTitle>
-					<button type="button" onClick={() => toggleSection("schedule")} className="text-muted-foreground hover:text-foreground">
-						{openSections.schedule ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+					<button
+						type="button"
+						onClick={() => toggleSection("schedule")}
+						className="text-muted-foreground hover:text-foreground"
+					>
+						{openSections.schedule ? (
+							<ChevronDown className="size-4" />
+						) : (
+							<ChevronRight className="size-4" />
+						)}
 					</button>
 				</CardHeader>
 				{openSections.schedule && (
@@ -237,7 +296,7 @@ export function FhirEndpointConfigForm() {
 							onChange={e => setConfig(c => ({ ...c, cronSchedule: e.target.value }))}
 							className="font-mono"
 						/>
-						<p className="text-xs text-muted-foreground">e.g. 0 2 * * * = daily at 2:00 AM</p>
+						<p className="text-muted-foreground text-xs">e.g. 0 2 * * * = daily at 2:00 AM</p>
 					</CardContent>
 				)}
 			</Card>

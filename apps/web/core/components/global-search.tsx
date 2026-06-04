@@ -1,15 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-
+import Link from "next/link"
 import { Search01FreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { useQuery } from "@tanstack/react-query"
-import Link from "next/link"
 
 import { cn } from "@/core/lib/utils"
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { orpc } from "@/services/orpc/client"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog"
@@ -55,7 +54,7 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
 			},
 			enabled: !!facilityId && debouncedQuery.length >= 2,
 			staleTime: 30_000,
-		}),
+		})
 	)
 
 	// Keyboard shortcut Cmd/Ctrl+K
@@ -90,7 +89,7 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
 				onClick={() => setOpen(true)}
 				className={cn(
 					"text-muted-foreground h-9 w-full justify-start gap-2 text-sm font-normal md:w-64 lg:w-80",
-					className,
+					className
 				)}
 				aria-label="Open global search"
 			>
@@ -108,7 +107,7 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
 						<div className="relative">
 							<HugeiconsIcon
 								icon={Search01FreeIcons}
-								className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2"
+								className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
 							/>
 							<Input
 								ref={inputRef}
@@ -143,7 +142,7 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
 										<Link
 											href={`/patients/${patient.id}`}
 											onClick={() => setOpen(false)}
-											className="flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-accent"
+											className="hover:bg-accent flex items-center gap-3 px-4 py-3 text-sm transition-colors"
 										>
 											<div className="bg-primary/10 flex size-9 shrink-0 items-center justify-center rounded-full">
 												<span className="text-primary text-xs font-semibold">
@@ -152,11 +151,11 @@ export function GlobalSearch({ className }: GlobalSearchProps) {
 												</span>
 											</div>
 											<div className="min-w-0 flex-1">
-												<p className="truncate font-medium text-foreground">
+												<p className="text-foreground truncate font-medium">
 													{formatPatientName(
 														patient.firstName,
 														patient.middleName,
-														patient.lastName,
+														patient.lastName
 													)}
 												</p>
 												<p className="text-muted-foreground text-xs">

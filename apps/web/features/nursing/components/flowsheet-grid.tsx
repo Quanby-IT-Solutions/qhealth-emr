@@ -69,9 +69,7 @@ export function FlowsheetGrid({ encounterId, facilityId }: FlowsheetGridProps) {
 	const toleranceMs = (intervalHours * 60 * 60 * 1000) / 2
 
 	if (flowsheets.isLoading) {
-		return (
-			<div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
-		)
+		return <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
 	}
 
 	if (!entries.length) {
@@ -132,24 +130,12 @@ export function FlowsheetGrid({ encounterId, facilityId }: FlowsheetGridProps) {
 							const sample = entries.find(e => e.parameterName === paramName)
 							return (
 								<tr key={paramName} className={idx % 2 === 0 ? "" : "bg-muted/20"}>
-									<td className="sticky left-0 bg-inherit px-3 py-2 font-medium">
-										{paramName}
-									</td>
-									<td className="text-muted-foreground px-3 py-2">
-										{sample?.unit ?? "—"}
-									</td>
+									<td className="sticky left-0 bg-inherit px-3 py-2 font-medium">{paramName}</td>
+									<td className="text-muted-foreground px-3 py-2">{sample?.unit ?? "—"}</td>
 									{timeColumns.map(col => {
-										const entry = findClosestEntry(
-											entries,
-											paramName,
-											col,
-											toleranceMs
-										)
+										const entry = findClosestEntry(entries, paramName, col, toleranceMs)
 										return (
-											<td
-												key={col.getTime()}
-												className="px-3 py-2 text-center"
-											>
+											<td key={col.getTime()} className="px-3 py-2 text-center">
 												{entry ? (
 													<Badge variant="outline" className="font-mono">
 														{entry.parameterValue}

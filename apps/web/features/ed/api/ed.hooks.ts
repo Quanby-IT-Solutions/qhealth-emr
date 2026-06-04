@@ -2,8 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { env } from "@/env"
 import { orpc } from "@/services/orpc/client"
+import { env } from "@/env"
 
 // ============================================================================
 // ED Queue
@@ -95,8 +95,7 @@ export function useCreatePreEncounterMutation() {
 
 	return useMutation(
 		orpc.ed.createPreEncounter.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
 		})
 	)
 }
@@ -106,8 +105,7 @@ export function useUpdatePreEncounterMutation() {
 
 	return useMutation(
 		orpc.ed.updatePreEncounter.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
 		})
 	)
 }
@@ -139,8 +137,7 @@ export function useMergePreEncounterMutation() {
 
 	return useMutation(
 		orpc.ed.merge.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
 		})
 	)
 }
@@ -154,8 +151,7 @@ export function useUpdateQueueStatusMutation() {
 
 	return useMutation(
 		orpc.ed.updateQueueStatus.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
 		})
 	)
 }
@@ -169,8 +165,7 @@ export function useEdDispositionMutation() {
 
 	return useMutation(
 		orpc.ed.dispose.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
 		})
 	)
 }
@@ -197,8 +192,7 @@ export function useCreateInboundTriageMutation() {
 
 	return useMutation(
 		orpc.ed.createInboundTriage.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
 		})
 	)
 }
@@ -208,8 +202,7 @@ export function useMarkInboundArrivedMutation() {
 
 	return useMutation(
 		orpc.ed.markInboundArrived.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
 		})
 	)
 }
@@ -219,8 +212,7 @@ export function useCancelInboundTriageMutation() {
 
 	return useMutation(
 		orpc.ed.cancelInboundTriage.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.ed.key() }),
 		})
 	)
 }

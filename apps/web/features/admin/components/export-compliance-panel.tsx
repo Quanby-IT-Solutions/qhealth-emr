@@ -3,11 +3,11 @@
 import Link from "next/link"
 import {
 	AlertCircleFreeIcons,
-	ArrowLeft01FreeIcons,
-	DatabaseExportFreeIcons,
-	CheckmarkCircle01FreeIcons,
-	Cancel01FreeIcons,
 	AlertDiamondFreeIcons,
+	ArrowLeft01FreeIcons,
+	Cancel01FreeIcons,
+	CheckmarkCircle01FreeIcons,
+	DatabaseExportFreeIcons,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 
@@ -25,13 +25,15 @@ import {
 	TableRow,
 } from "@/core/components/ui/table"
 import { cn } from "@/core/lib/utils"
-
 import { useExportComplianceQuery } from "@/features/admin/api/admin-dashboard.hooks"
 
 // ── Status Badge ──────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
-	const map: Record<string, { label: string; className: string; icon: typeof CheckmarkCircle01FreeIcons }> = {
+	const map: Record<
+		string,
+		{ label: string; className: string; icon: typeof CheckmarkCircle01FreeIcons }
+	> = {
 		completed: {
 			label: "Completed",
 			className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
@@ -50,7 +52,7 @@ function StatusBadge({ status }: { status: string }) {
 	}
 	const cfg = map[status] ?? { label: status, className: "", icon: CheckmarkCircle01FreeIcons }
 	return (
-		<Badge className={cn("text-[10px] px-1.5 gap-1 font-medium", cfg.className)}>
+		<Badge className={cn("gap-1 px-1.5 text-[10px] font-medium", cfg.className)}>
 			<HugeiconsIcon icon={cfg.icon} className="size-3" />
 			{cfg.label}
 		</Badge>
@@ -62,13 +64,13 @@ function StatusBadge({ status }: { status: string }) {
 function ConsentGateBadge({ gated }: { gated: boolean }) {
 	if (gated) {
 		return (
-			<Badge className="text-[10px] px-1.5 gap-1 font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+			<Badge className="gap-1 bg-blue-100 px-1.5 text-[10px] font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
 				Gated
 			</Badge>
 		)
 	}
 	return (
-		<Badge className="text-[10px] px-1.5 font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+		<Badge className="bg-gray-100 px-1.5 text-[10px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
 			Not gated
 		</Badge>
 	)
@@ -80,9 +82,7 @@ function ConsentBadge({ gated, outcome }: { gated: boolean; outcome: string | nu
 	// AD-008: highlight bypass on a gated export — highest privacy concern
 	if (gated && outcome === "bypassed") {
 		return (
-			<span className="text-xs font-semibold text-yellow-700 dark:text-yellow-400">
-				bypassed ⚠
-			</span>
+			<span className="text-xs font-semibold text-yellow-700 dark:text-yellow-400">bypassed ⚠</span>
 		)
 	}
 	if (!outcome) return <span className="text-muted-foreground text-xs">N/A</span>
@@ -117,10 +117,10 @@ export function ExportCompliancePanel() {
 			</div>
 
 			<div className="flex items-center gap-3">
-				<HugeiconsIcon icon={DatabaseExportFreeIcons} className="size-6 text-muted-foreground" />
+				<HugeiconsIcon icon={DatabaseExportFreeIcons} className="text-muted-foreground size-6" />
 				<div>
 					<h1 className="text-xl font-semibold">Data Export Compliance Audit</h1>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Consent-gated data export log — evidence for DOH, PhilHealth, and DPA compliance reviews
 					</p>
 				</div>
@@ -147,22 +147,22 @@ export function ExportCompliancePanel() {
 					<div className="grid grid-cols-3 gap-4">
 						<Card>
 							<CardContent className="pt-4">
-								<p className="text-xs text-muted-foreground">Total exports</p>
+								<p className="text-muted-foreground text-xs">Total exports</p>
 								<p className="text-2xl font-bold tabular-nums">{data.total}</p>
 							</CardContent>
 						</Card>
 						<Card>
 							<CardContent className="pt-4">
-							<p className="text-xs text-muted-foreground">Consent-gated exports</p>
-							<p className="text-2xl font-bold tabular-nums text-blue-600">
-								{data.items.filter(i => i.consentGated).length}
+								<p className="text-muted-foreground text-xs">Consent-gated exports</p>
+								<p className="text-2xl font-bold text-blue-600 tabular-nums">
+									{data.items.filter(i => i.consentGated).length}
 								</p>
 							</CardContent>
 						</Card>
 						<Card>
 							<CardContent className="pt-4">
-								<p className="text-xs text-muted-foreground">Rejected / failed</p>
-								<p className="text-2xl font-bold tabular-nums text-red-600">
+								<p className="text-muted-foreground text-xs">Rejected / failed</p>
+								<p className="text-2xl font-bold text-red-600 tabular-nums">
 									{data.items.filter(i => i.status === "rejected" || i.status === "failed").length}
 								</p>
 							</CardContent>
@@ -172,12 +172,15 @@ export function ExportCompliancePanel() {
 					{/* Compliance explanation */}
 					<Card>
 						<CardHeader className="pb-2">
-							<CardTitle className="text-sm font-medium">Audit Trail — Most Recent 50 Exports</CardTitle>
-							<p className="text-xs text-muted-foreground">
-								Every patient data export is logged here with the consent outcome, transmission scope,
-								and rejection rationale. Regulators (DOH, PhilHealth, NPC) may request this log as
-								evidence of Data Privacy Act compliance. Exports with <strong>bypassed</strong> consent
-								must have a documented clinical or legal justification.
+							<CardTitle className="text-sm font-medium">
+								Audit Trail — Most Recent 50 Exports
+							</CardTitle>
+							<p className="text-muted-foreground text-xs">
+								Every patient data export is logged here with the consent outcome, transmission
+								scope, and rejection rationale. Regulators (DOH, PhilHealth, NPC) may request this
+								log as evidence of Data Privacy Act compliance. Exports with{" "}
+								<strong>bypassed</strong> consent must have a documented clinical or legal
+								justification.
 							</p>
 						</CardHeader>
 						<CardContent className="p-0">
@@ -201,42 +204,45 @@ export function ExportCompliancePanel() {
 								<TableBody>
 									{data.items.length === 0 && (
 										<TableRow>
-											<TableCell colSpan={12} className="text-center py-8 text-muted-foreground text-sm">
+											<TableCell
+												colSpan={12}
+												className="text-muted-foreground py-8 text-center text-sm"
+											>
 												No data exports recorded yet.
 											</TableCell>
 										</TableRow>
 									)}
 									{data.items.map(row => (
 										<TableRow key={row.id}>
-											<TableCell className="pl-4 text-xs tabular-nums text-muted-foreground whitespace-nowrap">
+											<TableCell className="text-muted-foreground pl-4 text-xs whitespace-nowrap tabular-nums">
 												{row.exportedAt
 													? new Date(row.exportedAt).toLocaleString("en-PH", {
 															dateStyle: "short",
 															timeStyle: "short",
-													  })
+														})
 													: "—"}
 											</TableCell>
 											<TableCell className="text-xs capitalize">
 												{row.entityType?.replaceAll("_", " ") ?? "—"}
 											</TableCell>
-											<TableCell className="text-xs font-mono text-muted-foreground max-w-[120px] truncate">
+											<TableCell className="text-muted-foreground max-w-[120px] truncate font-mono text-xs">
 												{row.actor ?? "—"}
 											</TableCell>
-											<TableCell className="text-xs font-mono text-muted-foreground max-w-[120px] truncate">
+											<TableCell className="text-muted-foreground max-w-[120px] truncate font-mono text-xs">
 												{row.actorStaffId ? (
 													<span title={row.actorStaffId}>{row.actorStaffId.slice(0, 8)}…</span>
 												) : (
 													<span className="text-muted-foreground">—</span>
 												)}
 											</TableCell>
-											<TableCell className="text-xs font-mono text-muted-foreground max-w-[120px] truncate">
+											<TableCell className="text-muted-foreground max-w-[120px] truncate font-mono text-xs">
 												{row.entityId ? (
 													<span title={row.entityId}>{row.entityId.slice(0, 8)}…</span>
 												) : (
 													<span className="text-muted-foreground">—</span>
 												)}
 											</TableCell>
-											<TableCell className="text-xs font-mono text-muted-foreground">
+											<TableCell className="text-muted-foreground font-mono text-xs">
 												{row.ipAddress ?? <span className="text-muted-foreground">—</span>}
 											</TableCell>
 											<TableCell className="text-xs">
@@ -257,9 +263,11 @@ export function ExportCompliancePanel() {
 											<TableCell>
 												<StatusBadge status={row.status} />
 											</TableCell>
-											<TableCell className="text-xs text-muted-foreground max-w-[160px]">
+											<TableCell className="text-muted-foreground max-w-[160px] text-xs">
 												{row.rejectionReason ? (
-													<span className="text-red-600 dark:text-red-400">{row.rejectionReason}</span>
+													<span className="text-red-600 dark:text-red-400">
+														{row.rejectionReason}
+													</span>
 												) : (
 													<span>—</span>
 												)}

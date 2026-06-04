@@ -357,10 +357,7 @@ function ParticipantVideoTile({
 			>
 				<span className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white shadow-sm backdrop-blur-md">
 					{isMicMuted && (
-						<MicOff
-							className="size-3 shrink-0 text-rose-300"
-							aria-label="Microphone muted"
-						/>
+						<MicOff className="size-3 shrink-0 text-rose-300" aria-label="Microphone muted" />
 					)}
 					<span className="truncate">
 						{displayName}
@@ -554,7 +551,7 @@ function ConsultationTimer() {
 			data-testid="consultation-timer"
 			data-state={state}
 			aria-label={
-				state === "active" ? `Consultation time ${elapsed}` : label ?? "Consultation timer"
+				state === "active" ? `Consultation time ${elapsed}` : (label ?? "Consultation timer")
 			}
 			className={cn(
 				"absolute top-3 left-3 z-30 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-white shadow-sm backdrop-blur-md sm:top-4 sm:left-4",
@@ -797,19 +794,13 @@ function FloatingControlDock({
 									<p className="text-xs font-medium tracking-wider text-zinc-500 uppercase">
 										Microphone
 									</p>
-									<MediaDeviceSelect
-										kind="audioinput"
-										className={deviceSelectClassName}
-									/>
+									<MediaDeviceSelect kind="audioinput" className={deviceSelectClassName} />
 								</div>
 								<div className="space-y-2">
 									<p className="text-xs font-medium tracking-wider text-zinc-500 uppercase">
 										Camera
 									</p>
-									<MediaDeviceSelect
-										kind="videoinput"
-										className={deviceSelectClassName}
-									/>
+									<MediaDeviceSelect kind="videoinput" className={deviceSelectClassName} />
 								</div>
 							</div>
 						</motion.div>
@@ -937,8 +928,7 @@ function FloatingControlDock({
 						</div>
 						<AlertDialogTitle>End this video call?</AlertDialogTitle>
 						<AlertDialogDescription>
-							The video room will disconnect for you and the session can be joined again if
-							needed.
+							The video room will disconnect for you and the session can be joined again if needed.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -1075,10 +1065,7 @@ function ChatPanel({ open, onClose, messages, send, isSending }: ChatPanelProps)
 					</button>
 				</header>
 
-				<div
-					data-testid="chat-message-list"
-					className="flex-1 space-y-3 overflow-y-auto px-4 py-3"
-				>
+				<div data-testid="chat-message-list" className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
 					{messages.length === 0 ? (
 						<div className="text-muted-foreground flex h-full flex-col items-center justify-center text-center text-xs">
 							<MessageSquare className="text-muted-foreground/70 mb-2 size-6" />
@@ -1102,10 +1089,7 @@ function ChatPanel({ open, onClose, messages, send, isSending }: ChatPanelProps)
 							return (
 								<div
 									key={`${message.timestamp}-${index}`}
-									className={cn(
-										"flex flex-col gap-1",
-										isLocal ? "items-end" : "items-start"
-									)}
+									className={cn("flex flex-col gap-1", isLocal ? "items-end" : "items-start")}
 								>
 									{showSenderHeader && (
 										<div
@@ -1118,14 +1102,12 @@ function ChatPanel({ open, onClose, messages, send, isSending }: ChatPanelProps)
 												{isLocal ? "You" : sender}
 											</span>
 											<span aria-hidden="true">·</span>
-											<span className="tabular-nums">
-												{formatChatTimestamp(message.timestamp)}
-											</span>
+											<span className="tabular-nums">{formatChatTimestamp(message.timestamp)}</span>
 										</div>
 									)}
 									<div
 										className={cn(
-											"max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words shadow-sm",
+											"max-w-[85%] rounded-2xl px-3 py-2 text-sm break-words whitespace-pre-wrap shadow-sm",
 											isLocal
 												? "bg-primary text-primary-foreground rounded-br-sm"
 												: "bg-muted text-foreground rounded-bl-sm"
@@ -1550,10 +1532,7 @@ function WaitingRoomStage({
 
 	return (
 		<>
-			<WaitingRoomOverlay
-				patientName={waitingRoom.patientName}
-				inviteUrl={waitingRoom.inviteUrl}
-			/>
+			<WaitingRoomOverlay patientName={waitingRoom.patientName} inviteUrl={waitingRoom.inviteUrl} />
 			{localTile && (
 				<FloatingSelfView
 					key={`waiting-pip-${cameraTileKey(localTile)}`}
@@ -1594,9 +1573,7 @@ function VideoConferenceLayout({ fullViewport, waitingRoom }: VideoConferenceLay
 		}
 	}, [chatOpen, chatMessages.length])
 
-	const unreadChatCount = chatOpen
-		? 0
-		: Math.max(0, chatMessages.length - lastSeenChatCount)
+	const unreadChatCount = chatOpen ? 0 : Math.max(0, chatMessages.length - lastSeenChatCount)
 
 	const toggleChat = useCallback(() => setChatOpen(open => !open), [])
 	const closeChat = useCallback(() => setChatOpen(false), [])
@@ -1639,7 +1616,7 @@ function VideoConferenceLayout({ fullViewport, waitingRoom }: VideoConferenceLay
 		>
 			<div
 				className={cn(
-					"flex flex-1 min-h-0 flex-row",
+					"flex min-h-0 flex-1 flex-row",
 					fullViewport ? "h-full" : "min-h-[560px] sm:min-h-[640px]"
 				)}
 			>

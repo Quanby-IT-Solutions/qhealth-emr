@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-
 import { Search01FreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 
@@ -32,7 +31,12 @@ interface RvsCodePickerProps {
 const RVS_CODES: RvsCode[] = [
 	// Surgical
 	{ code: "47.0", description: "Appendectomy", category: "surgical", rvu: 12.5 },
-	{ code: "53.0", description: "Inguinal hernia repair (unilateral)", category: "surgical", rvu: 10.0 },
+	{
+		code: "53.0",
+		description: "Inguinal hernia repair (unilateral)",
+		category: "surgical",
+		rvu: 10.0,
+	},
 	{ code: "39.0", description: "Cholecystectomy (open)", category: "surgical", rvu: 14.0 },
 	{ code: "39.1", description: "Laparoscopic cholecystectomy", category: "surgical", rvu: 13.0 },
 	{ code: "80.0", description: "Caesarean section", category: "ob-gyn", rvu: 18.0 },
@@ -66,9 +70,7 @@ function searchCodes(query: string, cat: string): RvsCode[] {
 	return RVS_CODES.filter(item => {
 		const matchCat = cat === "all" || item.category === cat
 		const matchQuery =
-			!q ||
-			item.code.toLowerCase().includes(q) ||
-			item.description.toLowerCase().includes(q)
+			!q || item.code.toLowerCase().includes(q) || item.description.toLowerCase().includes(q)
 		return matchCat && matchQuery
 	}).slice(0, 12)
 }
@@ -123,9 +125,9 @@ export function RvsCodePicker({
 				<Select
 					value={selectedCategory}
 					onValueChange={v => {
-							setSelectedCategory(v ?? "all")
-							setOpen(true)
-						}}
+						setSelectedCategory(v ?? "all")
+						setOpen(true)
+					}}
 					disabled={disabled}
 				>
 					<SelectTrigger className="w-44 shrink-0">
@@ -142,7 +144,7 @@ export function RvsCodePicker({
 				<div className="relative flex-1">
 					<HugeiconsIcon
 						icon={Search01FreeIcons}
-						className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2"
+						className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
 					/>
 					<Input
 						value={query}
@@ -163,11 +165,11 @@ export function RvsCodePicker({
 			</div>
 			{value && !open && (
 				<p className="text-muted-foreground mt-1 text-xs">
-					Selected: <span className="font-mono font-semibold text-foreground">{value}</span>
+					Selected: <span className="text-foreground font-mono font-semibold">{value}</span>
 				</p>
 			)}
 			{open && (
-				<div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border bg-popover shadow-md">
+				<div className="bg-popover absolute z-50 mt-1 w-full overflow-hidden rounded-md border shadow-md">
 					{loading ? (
 						<div className="space-y-1 p-2">
 							<Skeleton className="h-8 w-full" />
@@ -184,20 +186,18 @@ export function RvsCodePicker({
 									role="option"
 									aria-selected={item.code === value}
 									className={cn(
-										"flex cursor-pointer items-start justify-between gap-2 px-3 py-2 text-sm hover:bg-accent",
-										item.code === value && "bg-accent",
+										"hover:bg-accent flex cursor-pointer items-start justify-between gap-2 px-3 py-2 text-sm",
+										item.code === value && "bg-accent"
 									)}
 									onMouseDown={() => handleSelect(item)}
 								>
 									<div className="flex items-start gap-2">
-										<span className="mt-0.5 shrink-0 font-mono text-xs font-semibold text-primary">
+										<span className="text-primary mt-0.5 shrink-0 font-mono text-xs font-semibold">
 											{item.code}
 										</span>
 										<span className="text-foreground">{item.description}</span>
 									</div>
-									<span className="text-muted-foreground shrink-0 text-xs">
-										{item.rvu} RVU
-									</span>
+									<span className="text-muted-foreground shrink-0 text-xs">{item.rvu} RVU</span>
 								</li>
 							))}
 						</ul>

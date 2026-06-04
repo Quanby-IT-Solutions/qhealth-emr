@@ -1,18 +1,13 @@
 "use client"
 
 import { useState } from "react"
-
 import { Shield } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent } from "@/core/components/ui/card"
 
-import {
-	type ConsentType,
-	CONSENT_TEMPLATES,
-	ConsentCapture,
-} from "./consent-capture"
+import { CONSENT_TEMPLATES, ConsentCapture, type ConsentType } from "./consent-capture"
 
 // ============================================================================
 // Consent Library
@@ -33,11 +28,7 @@ const CONSENT_GROUPS: Array<{
 	},
 	{
 		label: "Clinical Procedures",
-		types: [
-			"procedure_consent",
-			"surgery_anesthesia",
-			"blood_transfusion",
-		],
+		types: ["procedure_consent", "surgery_anesthesia", "blood_transfusion"],
 	},
 	{
 		label: "Specialized",
@@ -64,7 +55,7 @@ export function ConsentLibrary({ patientName, onConsentSaved }: ConsentLibraryPr
 					consentType={selected}
 					patientName={patientName}
 					onComplete={() => {
-						setCompleted((prev) => [...new Set([...prev, selected])])
+						setCompleted(prev => [...new Set([...prev, selected])])
 						onConsentSaved?.(selected)
 						setSelected(null)
 					}}
@@ -77,37 +68,35 @@ export function ConsentLibrary({ patientName, onConsentSaved }: ConsentLibraryPr
 	return (
 		<div className="space-y-6">
 			<div>
-				<h3 className="font-semibold flex items-center gap-2">
+				<h3 className="flex items-center gap-2 font-semibold">
 					<Shield className="size-4" />
 					Consent Library
 				</h3>
-				<p className="text-sm text-muted-foreground mt-0.5">
+				<p className="text-muted-foreground mt-0.5 text-sm">
 					Select a consent form to capture the patient's or proxy's electronic signature.
 				</p>
 			</div>
 
-			{CONSENT_GROUPS.map((group) => (
+			{CONSENT_GROUPS.map(group => (
 				<div key={group.label}>
-					<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+					<p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
 						{group.label}
 					</p>
 					<div className="space-y-2">
-						{group.types.map((type) => {
+						{group.types.map(type => {
 							const template = CONSENT_TEMPLATES[type]
 							const isDone = completed.includes(type)
 							return (
 								<Card
 									key={type}
-									className={`cursor-pointer transition-colors hover:bg-muted/50 ${isDone ? "opacity-60" : ""}`}
+									className={`hover:bg-muted/50 cursor-pointer transition-colors ${isDone ? "opacity-60" : ""}`}
 									onClick={() => setSelected(type)}
 								>
-									<CardContent className="flex items-center justify-between py-3 px-4">
+									<CardContent className="flex items-center justify-between px-4 py-3">
 										<div>
 											<p className="text-sm font-medium">{template.title}</p>
 											{template.requiresWitness && (
-												<p className="text-xs text-muted-foreground">
-													Witness signature required
-												</p>
+												<p className="text-muted-foreground text-xs">Witness signature required</p>
 											)}
 										</div>
 										{isDone ? (

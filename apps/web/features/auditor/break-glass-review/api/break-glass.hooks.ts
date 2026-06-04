@@ -59,10 +59,11 @@ export function useApproveMutation() {
 
 	return useMutation(
 		orpc.auditor.breakGlass.reviewApprove.mutationOptions({
-			onSuccess: () => Promise.all([
-				queryClient.invalidateQueries({ queryKey: orpc.auditor.breakGlass.inboxList.key() }),
-				queryClient.invalidateQueries({ queryKey: orpc.auditor.breakGlass.eventGet.key() }),
-			]),
+			onSuccess: () =>
+				Promise.all([
+					queryClient.invalidateQueries({ queryKey: orpc.auditor.breakGlass.inboxList.key() }),
+					queryClient.invalidateQueries({ queryKey: orpc.auditor.breakGlass.eventGet.key() }),
+				]),
 		})
 	)
 }
@@ -72,10 +73,11 @@ export function useFlagMutation() {
 
 	return useMutation(
 		orpc.auditor.breakGlass.reviewFlag.mutationOptions({
-			onSuccess: () => Promise.all([
-				queryClient.invalidateQueries({ queryKey: orpc.auditor.breakGlass.inboxList.key() }),
-				queryClient.invalidateQueries({ queryKey: orpc.auditor.breakGlass.eventGet.key() }),
-			]),
+			onSuccess: () =>
+				Promise.all([
+					queryClient.invalidateQueries({ queryKey: orpc.auditor.breakGlass.inboxList.key() }),
+					queryClient.invalidateQueries({ queryKey: orpc.auditor.breakGlass.eventGet.key() }),
+				]),
 		})
 	)
 }
@@ -85,10 +87,11 @@ export function useAddNoteMutation() {
 
 	return useMutation(
 		orpc.auditor.breakGlass.reviewAddNote.mutationOptions({
-			onSuccess: () => Promise.all([
-				queryClient.invalidateQueries({ queryKey: orpc.auditor.breakGlass.inboxList.key() }),
-				queryClient.invalidateQueries({ queryKey: orpc.auditor.breakGlass.eventGet.key() }),
-			]),
+			onSuccess: () =>
+				Promise.all([
+					queryClient.invalidateQueries({ queryKey: orpc.auditor.breakGlass.inboxList.key() }),
+					queryClient.invalidateQueries({ queryKey: orpc.auditor.breakGlass.eventGet.key() }),
+				]),
 		})
 	)
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -22,21 +22,33 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/core/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { Textarea } from "@/core/components/ui/textarea"
-
-import { EmptyState, ErrorState, SkeletonRows } from "@/features/admin/components/state-views"
 import { FilterBar, FilterField } from "@/features/admin/components/filter-bar"
+import { EmptyState, ErrorState, SkeletonRows } from "@/features/admin/components/state-views"
 import { TableToolbar } from "@/features/admin/components/table-toolbar"
 import { useWardsQuery } from "@/features/beds/api/beds.hooks"
-import { useConfirmHaiMutation, useDismissHaiMutation, useHaiQuery, useReclassifyHaiMutation } from "../api/hai.hooks"
+
+import {
+	useConfirmHaiMutation,
+	useDismissHaiMutation,
+	useHaiQuery,
+	useReclassifyHaiMutation,
+} from "../api/hai.hooks"
 
 interface HaiWorklistPageProps {
 	facilityId: string
 }
 
 const TYPES = ["clabsi", "cauti", "vap", "ssi", "cdiff"] as const
-type HaiType = typeof TYPES[number]
+type HaiType = (typeof TYPES)[number]
 
 export function HaiWorklistPage({ facilityId }: HaiWorklistPageProps) {
 	const router = useRouter()
@@ -101,7 +113,9 @@ export function HaiWorklistPage({ facilityId }: HaiWorklistPageProps) {
 						<SelectContent>
 							<SelectItem value="all">All types</SelectItem>
 							{TYPES.map(t => (
-								<SelectItem key={t} value={t} className="uppercase">{t}</SelectItem>
+								<SelectItem key={t} value={t} className="uppercase">
+									{t}
+								</SelectItem>
 							))}
 						</SelectContent>
 					</Select>
@@ -114,16 +128,30 @@ export function HaiWorklistPage({ facilityId }: HaiWorklistPageProps) {
 						<SelectContent>
 							<SelectItem value="all">All wards</SelectItem>
 							{(wards ?? []).map(w => (
-								<SelectItem key={w.id} value={w.id} className="text-xs">{w.name}</SelectItem>
+								<SelectItem key={w.id} value={w.id} className="text-xs">
+									{w.name}
+								</SelectItem>
 							))}
 						</SelectContent>
 					</Select>
 				</FilterField>
 				<FilterField label="From" htmlFor="hf-f">
-					<Input id="hf-f" type="date" value={dateFrom} onChange={e => updateParam("from", e.target.value)} className="h-8 w-36 text-xs" />
+					<Input
+						id="hf-f"
+						type="date"
+						value={dateFrom}
+						onChange={e => updateParam("from", e.target.value)}
+						className="h-8 w-36 text-xs"
+					/>
 				</FilterField>
 				<FilterField label="To" htmlFor="ht-t">
-					<Input id="ht-t" type="date" value={dateTo} onChange={e => updateParam("to", e.target.value)} className="h-8 w-36 text-xs" />
+					<Input
+						id="ht-t"
+						type="date"
+						value={dateTo}
+						onChange={e => updateParam("to", e.target.value)}
+						className="h-8 w-36 text-xs"
+					/>
 				</FilterField>
 			</FilterBar>
 
@@ -153,18 +181,34 @@ export function HaiWorklistPage({ facilityId }: HaiWorklistPageProps) {
 								<TableCell>
 									<div className="space-y-0.5">
 										<p className="text-sm font-medium">{t.patientName}</p>
-										<p className="text-xs text-muted-foreground">{t.wardName ?? "Ward pending"}</p>
+										<p className="text-muted-foreground text-xs">{t.wardName ?? "Ward pending"}</p>
 									</div>
 								</TableCell>
 								<TableCell className="font-mono text-xs">{t.encounterId.slice(0, 8)}…</TableCell>
-								<TableCell><Badge variant="outline" className="text-[10px] uppercase">{t.haiType}</Badge></TableCell>
-								<TableCell className="text-xs">{t.taggedByNurse ?? "Nurse record pending"}</TableCell>
-								<TableCell className="text-xs">{new Date(t.detectedAt).toLocaleDateString("en-PH")}</TableCell>
-								<TableCell className="font-mono text-xs">{t.linkedIcd10Code ?? "Not linked"}</TableCell>
+								<TableCell>
+									<Badge variant="outline" className="text-[10px] uppercase">
+										{t.haiType}
+									</Badge>
+								</TableCell>
+								<TableCell className="text-xs">
+									{t.taggedByNurse ?? "Nurse record pending"}
+								</TableCell>
+								<TableCell className="text-xs">
+									{new Date(t.detectedAt).toLocaleDateString("en-PH")}
+								</TableCell>
+								<TableCell className="font-mono text-xs">
+									{t.linkedIcd10Code ?? "Not linked"}
+								</TableCell>
 								<TableCell>
 									<Badge
-										variant={t.status === "confirmed" ? "default" : t.status === "pending" ? "outline" : "secondary"}
-										className="capitalize text-[10px]"
+										variant={
+											t.status === "confirmed"
+												? "default"
+												: t.status === "pending"
+													? "outline"
+													: "secondary"
+										}
+										className="text-[10px] capitalize"
 									>
 										{t.status}
 									</Badge>
@@ -210,19 +254,21 @@ export function HaiWorklistPage({ facilityId }: HaiWorklistPageProps) {
 						<DialogDescription>Compare original vs new tag side-by-side.</DialogDescription>
 					</DialogHeader>
 					<div className="grid grid-cols-2 gap-3">
-						<div className="rounded-md border bg-muted/30 p-3">
-							<p className="text-xs text-muted-foreground">Original</p>
+						<div className="bg-muted/30 rounded-md border p-3">
+							<p className="text-muted-foreground text-xs">Original</p>
 							<p className="font-mono text-sm uppercase">{reclassPrev}</p>
 						</div>
 						<div className="rounded-md border p-3">
-							<p className="text-xs text-muted-foreground">New</p>
+							<p className="text-muted-foreground text-xs">New</p>
 							<Select value={reclassNew} onValueChange={v => setReclassNew(v as HaiType)}>
 								<SelectTrigger className="mt-1 h-8 text-xs">
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
 									{TYPES.map(t => (
-										<SelectItem key={t} value={t} className="uppercase">{t}</SelectItem>
+										<SelectItem key={t} value={t} className="uppercase">
+											{t}
+										</SelectItem>
 									))}
 								</SelectContent>
 							</Select>
@@ -230,10 +276,17 @@ export function HaiWorklistPage({ facilityId }: HaiWorklistPageProps) {
 					</div>
 					<div className="space-y-1">
 						<Label htmlFor="rcl-reason">Reason</Label>
-						<Textarea id="rcl-reason" value={reclassReason} onChange={e => setReclassReason(e.target.value)} rows={3} />
+						<Textarea
+							id="rcl-reason"
+							value={reclassReason}
+							onChange={e => setReclassReason(e.target.value)}
+							rows={3}
+						/>
 					</div>
 					<DialogFooter>
-						<Button variant="outline" onClick={() => setReclassOpen(null)}>Cancel</Button>
+						<Button variant="outline" onClick={() => setReclassOpen(null)}>
+							Cancel
+						</Button>
 						<Button
 							disabled={!reclassReason.trim()}
 							onClick={() =>
@@ -257,10 +310,17 @@ export function HaiWorklistPage({ facilityId }: HaiWorklistPageProps) {
 					</DialogHeader>
 					<div className="space-y-1">
 						<Label htmlFor="dis-reason">Reason</Label>
-						<Textarea id="dis-reason" value={dismissReason} onChange={e => setDismissReason(e.target.value)} rows={3} />
+						<Textarea
+							id="dis-reason"
+							value={dismissReason}
+							onChange={e => setDismissReason(e.target.value)}
+							rows={3}
+						/>
 					</div>
 					<DialogFooter>
-						<Button variant="outline" onClick={() => setDismissOpen(null)}>Cancel</Button>
+						<Button variant="outline" onClick={() => setDismissOpen(null)}>
+							Cancel
+						</Button>
 						<Button
 							variant="destructive"
 							disabled={!dismissReason.trim()}

@@ -12,15 +12,21 @@ interface TableToolbarProps {
 	className?: string
 }
 
-export function TableToolbar({ title, description, actions, filters, className }: TableToolbarProps) {
+export function TableToolbar({
+	title,
+	description,
+	actions,
+	filters,
+	className,
+}: TableToolbarProps) {
 	return (
-		<div className={cn("flex flex-col gap-3 border-b bg-muted/30 px-3 py-2", className)}>
+		<div className={cn("bg-muted/30 flex flex-col gap-3 border-b px-3 py-2", className)}>
 			{(title || actions) && (
 				<div className="flex items-center justify-between gap-3">
 					{title && (
 						<div>
 							<h2 className="text-sm font-semibold">{title}</h2>
-							{description && <p className="text-xs text-muted-foreground">{description}</p>}
+							{description && <p className="text-muted-foreground text-xs">{description}</p>}
 						</div>
 					)}
 					{actions && <div className="flex items-center gap-2">{actions}</div>}

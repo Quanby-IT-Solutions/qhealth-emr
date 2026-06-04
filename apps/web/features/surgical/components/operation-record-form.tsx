@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { createPortal } from "react-dom"
 import { Info, Loader2, Lock, Save, Search, Signature, X } from "lucide-react"
+import { createPortal } from "react-dom"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -325,8 +325,8 @@ export function OperationRecordForm({
 	const fieldsDisabled = isSigned || !canEdit || save.isPending || sign.isPending
 	const timeOrderInvalid = Boolean(
 		form.incisionDatetime &&
-			form.closureDatetime &&
-			new Date(form.closureDatetime) < new Date(form.incisionDatetime)
+		form.closureDatetime &&
+		new Date(form.closureDatetime) < new Date(form.incisionDatetime)
 	)
 	const canSubmit = Boolean(
 		form.preOpDiagnosis.trim() &&
@@ -412,7 +412,10 @@ export function OperationRecordForm({
 			{!canEdit && !canSign && (
 				<div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
 					<Info className="mt-0.5 size-4 shrink-0" />
-					<p>You have view-only access to this record. The Operation Record is authored and signed by the assigned surgeon.</p>
+					<p>
+						You have view-only access to this record. The Operation Record is authored and signed by
+						the assigned surgeon.
+					</p>
 				</div>
 			)}
 			<Card>

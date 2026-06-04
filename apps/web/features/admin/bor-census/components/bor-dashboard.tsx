@@ -2,14 +2,28 @@
 
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import {
+	Area,
+	AreaChart,
+	CartesianGrid,
+	ResponsiveContainer,
+	Tooltip,
+	XAxis,
+	YAxis,
+} from "recharts"
 
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Skeleton } from "@/core/components/ui/skeleton"
-import { KpiTile } from "@/features/admin/components/kpi-tile"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
+import { KpiTile } from "@/features/admin/components/kpi-tile"
 
 import { useBorDashboardQuery } from "../api/bor.hooks"
 import { ExportModal } from "./export-modal"
@@ -64,11 +78,10 @@ function BorGauge({ pct }: { pct: number }) {
 				/>
 			</svg>
 			<span className={`text-3xl font-bold tabular-nums ${color}`}>{pct.toFixed(1)}%</span>
-			<span className="text-xs text-muted-foreground">Bed Occupancy Rate</span>
+			<span className="text-muted-foreground text-xs">Bed Occupancy Rate</span>
 		</div>
 	)
 }
-
 
 export function BorDashboard() {
 	const router = useRouter()
@@ -81,7 +94,7 @@ export function BorDashboard() {
 
 	function setParam(key: string, value: string) {
 		const params = new URLSearchParams(searchParams.toString())
-		if (value === "all" || value === "7d" && key === "range") {
+		if (value === "all" || (value === "7d" && key === "range")) {
 			params.delete(key)
 		} else {
 			params.set(key, value)
@@ -91,32 +104,30 @@ export function BorDashboard() {
 
 	const { data, isLoading, isError } = useBorDashboardQuery(facilityId ?? "", !!facilityId)
 
-	if (!facilityId) return <p className="text-sm text-muted-foreground">No facility selected.</p>
+	if (!facilityId) return <p className="text-muted-foreground text-sm">No facility selected.</p>
 	if (isLoading) return <Skeleton className="h-64 w-full" />
-	if (isError) return <p className="text-sm text-destructive">Failed to load BOR data.</p>
+	if (isError) return <p className="text-destructive text-sm">Failed to load BOR data.</p>
 
 	if (!data) {
 		return (
 			<div className="flex flex-col items-center justify-center py-20 text-center">
 				<p className="text-muted-foreground">No BOR data available for the selected filters.</p>
-				<p className="text-muted-foreground text-xs mt-1">Try adjusting the date range or ward selection.</p>
+				<p className="text-muted-foreground mt-1 text-xs">
+					Try adjusting the date range or ward selection.
+				</p>
 			</div>
 		)
 	}
 
 	const o = data.overall
 	const trendData = buildPlaceholderTrend(trendRange, o.borPercentage)
-	const displayedWards = wardFilter === "all"
-		? data.byWard
-		: data.byWard.filter(w => w.wardId === wardFilter)
+	const displayedWards =
+		wardFilter === "all" ? data.byWard : data.byWard.filter(w => w.wardId === wardFilter)
 
 	return (
 		<div className="space-y-6">
 			<div className="flex flex-wrap items-center gap-3">
-				<Select
-					value={wardFilter}
-					onValueChange={v => setParam("ward", v ?? "all")}
-				>
+				<Select value={wardFilter} onValueChange={v => setParam("ward", v ?? "all")}>
 					<SelectTrigger className="w-44">
 						<SelectValue />
 					</SelectTrigger>
@@ -179,7 +190,13 @@ export function BorDashboard() {
 							</defs>
 							<CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
 							<XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-							<YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
+							<YAxis
+								domain={[0, 100]}
+								tick={{ fontSize: 10 }}
+								tickLine={false}
+								axisLine={false}
+								tickFormatter={v => `${v}%`}
+							/>
 							<Tooltip formatter={(value: number) => [`${value.toFixed(1)}%`, "BOR"]} />
 							<Area
 								type="monotone"
@@ -191,7 +208,7 @@ export function BorDashboard() {
 							/>
 						</AreaChart>
 					</ResponsiveContainer>
-					<p className="text-xs text-muted-foreground mt-1">
+					<p className="text-muted-foreground mt-1 text-xs">
 						Trend data will reflect live midnight snapshots once ADM-BE-06 is active.
 					</p>
 				</CardContent>
@@ -207,9 +224,13 @@ export function BorDashboard() {
 							{displayedWards.map(ward => (
 								<div key={ward.wardId} className="flex items-center justify-between text-sm">
 									<span className="font-medium">{ward.wardName}</span>
-									<div className="flex items-center gap-4 text-muted-foreground">
-										<span>{ward.occupiedBeds}/{ward.totalBeds}</span>
-										<span className={`font-medium ${ward.borPercentage > 95 ? "text-red-600" : ward.borPercentage > 85 ? "text-amber-500" : "text-emerald-600"}`}>
+									<div className="text-muted-foreground flex items-center gap-4">
+										<span>
+											{ward.occupiedBeds}/{ward.totalBeds}
+										</span>
+										<span
+											className={`font-medium ${ward.borPercentage > 95 ? "text-red-600" : ward.borPercentage > 85 ? "text-amber-500" : "text-emerald-600"}`}
+										>
 											{ward.borPercentage.toFixed(1)}%
 										</span>
 									</div>

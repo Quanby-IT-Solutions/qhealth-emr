@@ -1,15 +1,25 @@
 "use client"
 
 import { useState } from "react"
-
 import Link from "next/link"
 import { useParams } from "next/navigation"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/core/components/ui/collapsible"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/core/components/ui/collapsible"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/core/components/ui/dialog"
 import { Label } from "@/core/components/ui/label"
 import { Textarea } from "@/core/components/ui/textarea"
 import {
@@ -17,9 +27,12 @@ import {
 	useBreakGlassEventQuery,
 	useBreakGlassHistoryByClinician,
 } from "@/features/auditor/break-glass-review/api/break-glass.hooks"
-import { formatDateTime, STATUS_COLORS } from "@/features/auditor/break-glass-review/lib/break-glass.utils"
 import { AddNoteDrawer } from "@/features/auditor/break-glass-review/components/add-note-drawer"
 import { InvestigationFlagDrawer } from "@/features/auditor/break-glass-review/components/investigation-flag-drawer"
+import {
+	formatDateTime,
+	STATUS_COLORS,
+} from "@/features/auditor/break-glass-review/lib/break-glass.utils"
 
 export default function BreakGlassReportPage() {
 	const { eventId } = useParams<{ eventId: string }>()
@@ -54,13 +67,18 @@ export default function BreakGlassReportPage() {
 	}
 
 	if (isLoading) {
-		return <p className="p-4 text-muted-foreground">Loading break-glass event...</p>
+		return <p className="text-muted-foreground p-4">Loading break-glass event...</p>
 	}
 
 	if (error || !event) {
 		return (
 			<div className="space-y-4">
-				<Button variant="outline" size="sm" nativeButton={false} render={<Link href="/auditor/break-glass" />}>
+				<Button
+					variant="outline"
+					size="sm"
+					nativeButton={false}
+					render={<Link href="/auditor/break-glass" />}
+				>
 					← Back to Inbox
 				</Button>
 				<p className="text-destructive">Break-glass event not found or failed to load.</p>
@@ -75,36 +93,30 @@ export default function BreakGlassReportPage() {
 		<div className="space-y-4">
 			<div className="flex items-center justify-between">
 				<div className="flex items-center gap-3">
-					<Button variant="outline" size="sm" nativeButton={false} render={<Link href="/auditor/break-glass" />}>
+					<Button
+						variant="outline"
+						size="sm"
+						nativeButton={false}
+						render={<Link href="/auditor/break-glass" />}
+					>
 						← Back
 					</Button>
 					<div>
 						<h1 className="text-xl font-bold">Break-Glass Event Report</h1>
-						<p className="font-mono text-xs text-muted-foreground">{event.id}</p>
+						<p className="text-muted-foreground font-mono text-xs">{event.id}</p>
 					</div>
 				</div>
 				{/* Reviewer action panel */}
 				<div className="flex items-center gap-2">
 					{isPending && (
-						<Button
-							size="sm"
-							onClick={() => setApproveOpen(true)}
-						>
+						<Button size="sm" onClick={() => setApproveOpen(true)}>
 							Approve
 						</Button>
 					)}
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => setFlagDrawer(true)}
-					>
+					<Button variant="outline" size="sm" onClick={() => setFlagDrawer(true)}>
 						Flag for Investigation
 					</Button>
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={() => setNoteDrawer(true)}
-					>
+					<Button variant="ghost" size="sm" onClick={() => setNoteDrawer(true)}>
 						Add Note
 					</Button>
 				</div>
@@ -122,31 +134,45 @@ export default function BreakGlassReportPage() {
 				</CardHeader>
 				<CardContent className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
 					<div>
-						<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Clinician Staff ID</p>
+						<p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+							Clinician Staff ID
+						</p>
 						<p className="font-mono">{event.clinicianStaffId}</p>
 					</div>
 					<div>
-						<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Patient ID</p>
+						<p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+							Patient ID
+						</p>
 						<p className="font-mono">{event.patientId}</p>
 					</div>
 					<div>
-						<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reason Category</p>
+						<p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+							Reason Category
+						</p>
 						<p className="capitalize">{event.reasonCategory.replace(/_/g, " ")}</p>
 					</div>
 					<div className="col-span-2 md:col-span-3">
-						<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justification</p>
+						<p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+							Justification
+						</p>
 						<p>{event.justification}</p>
 					</div>
 					<div>
-						<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Access Granted</p>
+						<p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+							Access Granted
+						</p>
 						<p>{formatDateTime(event.accessGrantedAt)}</p>
 					</div>
 					<div>
-						<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Access Expires</p>
+						<p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+							Access Expires
+						</p>
 						<p>{formatDateTime(event.accessExpiresAt)}</p>
 					</div>
 					<div>
-						<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Requested</p>
+						<p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+							Requested
+						</p>
 						<p>{formatDateTime(event.createdAt)}</p>
 					</div>
 				</CardContent>
@@ -163,12 +189,12 @@ export default function BreakGlassReportPage() {
 							<ol className="space-y-2">
 								{(event.recordsAccessed as Array<Record<string, unknown>>).map((r, idx) => (
 									<li key={idx} className="flex items-start gap-3 text-sm">
-										<span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+										<span className="bg-muted text-muted-foreground mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
 											{idx + 1}
 										</span>
 										<div className="min-w-0 flex-1">
 											{r.timestamp != null && (
-												<p className="text-xs text-muted-foreground">{String(r.timestamp)}</p>
+												<p className="text-muted-foreground text-xs">{String(r.timestamp)}</p>
 											)}
 											<p className="font-mono text-xs break-all">
 												{r.resourceId != null ? String(r.resourceId) : JSON.stringify(r)}
@@ -179,7 +205,7 @@ export default function BreakGlassReportPage() {
 								))}
 							</ol>
 						) : (
-							<pre className="max-h-60 overflow-auto rounded border bg-muted p-3 text-xs">
+							<pre className="bg-muted max-h-60 overflow-auto rounded border p-3 text-xs">
 								{JSON.stringify(event.recordsAccessed, null, 2)}
 							</pre>
 						)}
@@ -195,16 +221,22 @@ export default function BreakGlassReportPage() {
 					</CardHeader>
 					<CardContent className="grid grid-cols-2 gap-4 text-sm">
 						<div>
-							<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reviewed By</p>
+							<p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+								Reviewed By
+							</p>
 							<p className="font-mono">{event.reviewedByStaffId}</p>
 						</div>
 						<div>
-							<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reviewed At</p>
+							<p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+								Reviewed At
+							</p>
 							<p>{formatDateTime(event.reviewedAt)}</p>
 						</div>
 						{event.reviewNotes && (
 							<div className="col-span-2">
-								<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Notes</p>
+								<p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+									Notes
+								</p>
 								<p>{event.reviewNotes}</p>
 							</div>
 						)}
@@ -217,26 +249,30 @@ export default function BreakGlassReportPage() {
 				<Card>
 					<CardHeader>
 						<Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
-							<CollapsibleTrigger className="flex w-full items-center justify-between text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+							<CollapsibleTrigger className="focus-visible:ring-ring flex w-full items-center justify-between text-left focus-visible:ring-2 focus-visible:outline-none">
 								<CardTitle>
 									Same-Clinician History
 									<Badge variant="secondary" className="ml-2">
 										{history.total}
 									</Badge>
 								</CardTitle>
-								<span className="text-xs text-muted-foreground">{historyOpen ? "Collapse" : "Expand"}</span>
+								<span className="text-muted-foreground text-xs">
+									{historyOpen ? "Collapse" : "Expand"}
+								</span>
 							</CollapsibleTrigger>
 							<CollapsibleContent>
 								<CardContent className="pt-4">
 									{otherHistory.length === 0 ? (
-										<p className="text-sm text-muted-foreground">No other break-glass events for this clinician.</p>
+										<p className="text-muted-foreground text-sm">
+											No other break-glass events for this clinician.
+										</p>
 									) : (
 										<ol className="space-y-2">
 											{otherHistory.slice(0, 5).map(e => (
 												<li key={e.id} className="flex items-center justify-between text-xs">
 													<div>
 														<span className="font-medium">{formatDateTime(e.createdAt)}</span>
-														<span className="ml-2 capitalize text-muted-foreground">
+														<span className="text-muted-foreground ml-2 capitalize">
 															{e.reasonCategory.replace(/_/g, " ")}
 														</span>
 													</div>
@@ -269,12 +305,22 @@ export default function BreakGlassReportPage() {
 			)}
 
 			{/* Approve dialog */}
-			<Dialog open={approveOpen} onOpenChange={open => { if (!open) { setApproveOpen(false); setApproveReason(""); setApproveError(null) } }}>
+			<Dialog
+				open={approveOpen}
+				onOpenChange={open => {
+					if (!open) {
+						setApproveOpen(false)
+						setApproveReason("")
+						setApproveError(null)
+					}
+				}}
+			>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>Approve Break-Glass Access</DialogTitle>
 						<DialogDescription>
-							Confirm this emergency access was appropriate. A reason is required (min 10 characters).
+							Confirm this emergency access was appropriate. A reason is required (min 10
+							characters).
 						</DialogDescription>
 					</DialogHeader>
 					<div className="space-y-4 py-2">
@@ -290,7 +336,9 @@ export default function BreakGlassReportPage() {
 								rows={3}
 							/>
 							{approveReason.length > 0 && approveReason.length < 10 && (
-								<p className="text-xs text-destructive">{10 - approveReason.length} more character(s) required</p>
+								<p className="text-destructive text-xs">
+									{10 - approveReason.length} more character(s) required
+								</p>
 							)}
 						</div>
 						{approveError && (
@@ -300,7 +348,15 @@ export default function BreakGlassReportPage() {
 						)}
 					</div>
 					<DialogFooter>
-						<Button variant="outline" onClick={() => { setApproveOpen(false); setApproveReason(""); setApproveError(null) }} disabled={approveMutation.isPending}>
+						<Button
+							variant="outline"
+							onClick={() => {
+								setApproveOpen(false)
+								setApproveReason("")
+								setApproveError(null)
+							}}
+							disabled={approveMutation.isPending}
+						>
 							Cancel
 						</Button>
 						<Button
@@ -319,11 +375,7 @@ export default function BreakGlassReportPage() {
 				eventId={eventId}
 				onClose={() => setFlagDrawer(false)}
 			/>
-			<AddNoteDrawer
-				open={noteDrawer}
-				eventId={eventId}
-				onClose={() => setNoteDrawer(false)}
-			/>
+			<AddNoteDrawer open={noteDrawer} eventId={eventId} onClose={() => setNoteDrawer(false)} />
 		</div>
 	)
 }

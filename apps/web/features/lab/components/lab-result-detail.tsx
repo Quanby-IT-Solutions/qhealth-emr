@@ -1,12 +1,7 @@
 "use client"
 
 import { Badge } from "@/core/components/ui/badge"
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/core/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
 import { Separator } from "@/core/components/ui/separator"
 import { type LabOrder } from "@/features/lab/api/lab.hooks"
 
@@ -50,8 +45,8 @@ export function LabResultDetail({ order, open, onOpenChange }: LabResultDetailPr
 		.join(" - ")
 	const criticalItems: CriticalValueItem[] =
 		results?.items
-			.filter((item) => item.isCritical)
-			.map((item) => ({
+			.filter(item => item.isCritical)
+			.map(item => ({
 				testName: item.testName,
 				value: item.value,
 				unit: item.unit,
@@ -76,9 +71,7 @@ export function LabResultDetail({ order, open, onOpenChange }: LabResultDetailPr
 					</div>
 					<div>
 						<span className="text-muted-foreground">Test / Panel</span>
-						<p className="font-medium">
-							{order.panelName ?? order.testName}
-						</p>
+						<p className="font-medium">{order.panelName ?? order.testName}</p>
 					</div>
 					<div>
 						<span className="text-muted-foreground">Ordered By</span>
@@ -94,9 +87,7 @@ export function LabResultDetail({ order, open, onOpenChange }: LabResultDetailPr
 					</div>
 					<div>
 						<span className="text-muted-foreground">Collection Time</span>
-						<p className="font-medium">
-							{formatDateTime(order.collectionDatetime)}
-						</p>
+						<p className="font-medium">{formatDateTime(order.collectionDatetime)}</p>
 					</div>
 					<div>
 						<span className="text-muted-foreground">Clinical Indication</span>
@@ -114,23 +105,19 @@ export function LabResultDetail({ order, open, onOpenChange }: LabResultDetailPr
 							</div>
 							<div>
 								<span className="text-muted-foreground">Reported At</span>
-								<p className="font-medium">
-									{formatDateTime(results.reportedAt)}
-								</p>
+								<p className="font-medium">{formatDateTime(results.reportedAt)}</p>
 							</div>
 						</>
 					)}
 				</div>
 
 				{/* Critical Value Alert */}
-				{criticalItems.length > 0 && (
-					<CriticalValueAlert items={criticalItems} />
-				)}
+				{criticalItems.length > 0 && <CriticalValueAlert items={criticalItems} />}
 
 				{/* Results */}
 				{results && results.items.length > 0 ? (
 					<div className="space-y-2">
-						<p className="text-sm font-medium text-muted-foreground">
+						<p className="text-muted-foreground text-sm font-medium">
 							Results ({results.items.length})
 						</p>
 						{results.items.map((item, i) => (
@@ -138,10 +125,8 @@ export function LabResultDetail({ order, open, onOpenChange }: LabResultDetailPr
 						))}
 					</div>
 				) : (
-					<p className="py-6 text-center text-sm text-muted-foreground">
-						{order.status === "completed"
-							? "No structured results available."
-							: "Results pending."}
+					<p className="text-muted-foreground py-6 text-center text-sm">
+						{order.status === "completed" ? "No structured results available." : "Results pending."}
 					</p>
 				)}
 
@@ -150,9 +135,7 @@ export function LabResultDetail({ order, open, onOpenChange }: LabResultDetailPr
 					<>
 						<Separator />
 						<div className="text-sm">
-							<span className="font-medium text-muted-foreground">
-								Lab Comments:
-							</span>
+							<span className="text-muted-foreground font-medium">Lab Comments:</span>
 							<p className="mt-1">{results.comments}</p>
 						</div>
 					</>

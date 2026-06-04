@@ -9,8 +9,9 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-
 import { ErrorState, SkeletonRows } from "@/features/admin/components/state-views"
+
+import { useMedicalRecordsRequestQuery } from "../api/medical-records.hooks"
 import {
 	useAttachIdentityProofMutation,
 	useAttachPhysicianSignatureMutation,
@@ -18,7 +19,6 @@ import {
 	useMarkRecordsPaymentClearedMutation,
 	useReleaseRecordsMutation,
 } from "../api/records.hooks"
-import { useMedicalRecordsRequestQuery } from "../api/medical-records.hooks"
 
 interface ReleaseWorkflowPageProps {
 	requestId: string
@@ -55,15 +55,28 @@ export function ReleaseWorkflowPage({ requestId }: ReleaseWorkflowPageProps) {
 	const payDone = !!r.paidAt
 	const released = r.status === "completed"
 
-	const releaseDisabled = !dpaDone || !idDone || !payDone || released || !recipient.trim() || !docTypes.trim() || !contentHashes.trim()
+	const releaseDisabled =
+		!dpaDone ||
+		!idDone ||
+		!payDone ||
+		released ||
+		!recipient.trim() ||
+		!docTypes.trim() ||
+		!contentHashes.trim()
 
 	const onRelease = () =>
 		relMut(
 			{
 				requestId,
 				recipient,
-				documentTypes: docTypes.split(",").map(s => s.trim()).filter(Boolean),
-				contentHashes: contentHashes.split(",").map(s => s.trim()).filter(Boolean),
+				documentTypes: docTypes
+					.split(",")
+					.map(s => s.trim())
+					.filter(Boolean),
+				contentHashes: contentHashes
+					.split(",")
+					.map(s => s.trim())
+					.filter(Boolean),
 			},
 			{
 				onSuccess: () => router.push(`/him/records-audit?req=${requestId}`),
@@ -71,10 +84,12 @@ export function ReleaseWorkflowPage({ requestId }: ReleaseWorkflowPageProps) {
 		)
 
 	return (
-		<div className="space-y-3 p-4 max-w-2xl">
-			<Button variant="ghost" size="sm" onClick={() => router.back()} className="-ml-2">← Back</Button>
+		<div className="max-w-2xl space-y-3 p-4">
+			<Button variant="ghost" size="sm" onClick={() => router.back()} className="-ml-2">
+				← Back
+			</Button>
 			<h1 className="text-lg font-semibold">Release Workflow</h1>
-			<p className="text-xs text-muted-foreground">Request {requestId}</p>
+			<p className="text-muted-foreground text-xs">Request {requestId}</p>
 
 			<Step n={1} title="DPA Consent" done={dpaDone}>
 				<div className="space-y-2">
@@ -93,18 +108,35 @@ export function ReleaseWorkflowPage({ requestId }: ReleaseWorkflowPageProps) {
 					>
 						{dpaDone ? "Captured" : dpaP ? "Submitting…" : "Capture"}
 					</Button>
-					{dpaE && <p className="text-xs text-destructive">{(dpaE as Error).message}</p>}
+					{dpaE && <p className="text-destructive text-xs">{(dpaE as Error).message}</p>}
 				</div>
 			</Step>
 
 			<Step n={2} title="Identity Proof" done={idDone}>
 				<div className="space-y-2">
 					<Label htmlFor="id-uri">Document URI</Label>
-					<Input id="id-uri" value={idUri} onChange={e => setIdUri(e.target.value)} placeholder="https://signed.url/id.png" disabled={idDone} />
+					<Input
+						id="id-uri"
+						value={idUri}
+						onChange={e => setIdUri(e.target.value)}
+						placeholder="https://signed.url/id.png"
+						disabled={idDone}
+					/>
 					<Label htmlFor="id-type">Type</Label>
-					<Input id="id-type" value={idType} onChange={e => setIdType(e.target.value)} disabled={idDone} />
+					<Input
+						id="id-type"
+						value={idType}
+						onChange={e => setIdType(e.target.value)}
+						disabled={idDone}
+					/>
 					<Label htmlFor="id-hash">Content hash</Label>
-					<Input id="id-hash" value={idHash} onChange={e => setIdHash(e.target.value)} placeholder="sha256:…" disabled={idDone} />
+					<Input
+						id="id-hash"
+						value={idHash}
+						onChange={e => setIdHash(e.target.value)}
+						placeholder="sha256:…"
+						disabled={idDone}
+					/>
 					<Button
 						size="sm"
 						disabled={idDone || !idUri.trim() || !idHash.trim() || idP}
@@ -114,7 +146,7 @@ export function ReleaseWorkflowPage({ requestId }: ReleaseWorkflowPageProps) {
 					>
 						{idDone ? "Verified" : idP ? "Submitting…" : "Attach"}
 					</Button>
-					{idE && <p className="text-xs text-destructive">{(idE as Error).message}</p>}
+					{idE && <p className="text-destructive text-xs">{(idE as Error).message}</p>}
 				</div>
 			</Step>
 
@@ -142,9 +174,14 @@ export function ReleaseWorkflowPage({ requestId }: ReleaseWorkflowPageProps) {
 							setPhysSigUri(URL.createObjectURL(file))
 						}}
 					/>
-					{pdfError && <p className="text-xs text-destructive">{pdfError}</p>}
+					{pdfError && <p className="text-destructive text-xs">{pdfError}</p>}
 					<Label htmlFor="ps-hash">Content hash (sha256)</Label>
-					<Input id="ps-hash" value={physSigHash} onChange={e => setPhysSigHash(e.target.value)} placeholder="sha256:…" />
+					<Input
+						id="ps-hash"
+						value={physSigHash}
+						onChange={e => setPhysSigHash(e.target.value)}
+						placeholder="sha256:…"
+					/>
 					<Button
 						size="sm"
 						variant="outline"
@@ -159,7 +196,12 @@ export function ReleaseWorkflowPage({ requestId }: ReleaseWorkflowPageProps) {
 			<Step n={4} title="Payment Cleared" done={payDone}>
 				<div className="space-y-2">
 					<Label htmlFor="inv-id">Invoice ID</Label>
-					<Input id="inv-id" value={invoiceId} onChange={e => setInvoiceId(e.target.value)} disabled={payDone} />
+					<Input
+						id="inv-id"
+						value={invoiceId}
+						onChange={e => setInvoiceId(e.target.value)}
+						disabled={payDone}
+					/>
 					<Button
 						size="sm"
 						disabled={payDone || !invoiceId.trim() || payP}
@@ -173,11 +215,28 @@ export function ReleaseWorkflowPage({ requestId }: ReleaseWorkflowPageProps) {
 			<Step n={5} title="Release" done={released}>
 				<div className="space-y-2">
 					<Label htmlFor="rec">Recipient</Label>
-					<Input id="rec" value={recipient} onChange={e => setRecipient(e.target.value)} placeholder="Patient or authorized agent" disabled={released} />
+					<Input
+						id="rec"
+						value={recipient}
+						onChange={e => setRecipient(e.target.value)}
+						placeholder="Patient or authorized agent"
+						disabled={released}
+					/>
 					<Label htmlFor="doc-types">Document types (comma-separated)</Label>
-					<Input id="doc-types" value={docTypes} onChange={e => setDocTypes(e.target.value)} disabled={released} />
+					<Input
+						id="doc-types"
+						value={docTypes}
+						onChange={e => setDocTypes(e.target.value)}
+						disabled={released}
+					/>
 					<Label htmlFor="hashes">Content hashes (comma-separated)</Label>
-					<Input id="hashes" value={contentHashes} onChange={e => setContentHashes(e.target.value)} placeholder="sha256:abc…, sha256:def…" disabled={released} />
+					<Input
+						id="hashes"
+						value={contentHashes}
+						onChange={e => setContentHashes(e.target.value)}
+						placeholder="sha256:abc…, sha256:def…"
+						disabled={released}
+					/>
 					{releaseDisabled && !released && (
 						<Alert>
 							<AlertDescription>
@@ -188,23 +247,37 @@ export function ReleaseWorkflowPage({ requestId }: ReleaseWorkflowPageProps) {
 					<Button onClick={onRelease} disabled={releaseDisabled || relP}>
 						{released ? "Released" : relP ? "Releasing…" : "Release Records"}
 					</Button>
-					{relE && <p className="text-xs text-destructive">{(relE as Error).message}</p>}
+					{relE && <p className="text-destructive text-xs">{(relE as Error).message}</p>}
 				</div>
 			</Step>
 		</div>
 	)
 }
 
-function Step({ n, title, done, children }: { n: number; title: string; done?: boolean; children: React.ReactNode }) {
+function Step({
+	n,
+	title,
+	done,
+	children,
+}: {
+	n: number
+	title: string
+	done?: boolean
+	children: React.ReactNode
+}) {
 	return (
 		<Card>
 			<CardHeader className="pb-2">
-				<CardTitle className="text-sm flex items-center gap-2">
+				<CardTitle className="flex items-center gap-2 text-sm">
 					<Badge variant={done ? "default" : "outline"} className="text-[10px]">
 						Step {n}
 					</Badge>
 					<span>{title}</span>
-					{done && <Badge variant="default" className="ml-auto text-[10px]">✓</Badge>}
+					{done && (
+						<Badge variant="default" className="ml-auto text-[10px]">
+							✓
+						</Badge>
+					)}
 				</CardTitle>
 			</CardHeader>
 			<CardContent>{children}</CardContent>

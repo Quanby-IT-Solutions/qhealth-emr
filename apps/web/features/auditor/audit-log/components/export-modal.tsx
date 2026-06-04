@@ -5,11 +5,22 @@ import { useState } from "react"
 import type { AuditorEventListFilter } from "@repo/contracts"
 
 import { Button } from "@/core/components/ui/button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
-
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { useAuditLogExportMutation } from "@/features/auditor/audit-log/api/audit-log.hooks"
 
 interface ExportModalProps {
@@ -69,11 +80,7 @@ export function ExportModal({ open, onClose, facilityId, currentFilters }: Expor
 					<div className="grid grid-cols-2 gap-3">
 						<div className="space-y-1">
 							<Label>From</Label>
-							<Input
-								type="date"
-								value={startDate}
-								onChange={e => setStartDate(e.target.value)}
-							/>
+							<Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
 						</div>
 						<div className="space-y-1">
 							<Label>To</Label>
@@ -82,8 +89,8 @@ export function ExportModal({ open, onClose, facilityId, currentFilters }: Expor
 					</div>
 
 					{/* Filter snapshot */}
-					<div className="rounded-md border bg-muted/40 p-3 text-xs">
-						<p className="mb-1 font-semibold text-muted-foreground">Active filters included</p>
+					<div className="bg-muted/40 rounded-md border p-3 text-xs">
+						<p className="text-muted-foreground mb-1 font-semibold">Active filters included</p>
 						{currentFilters.userId && <p>User: {currentFilters.userId}</p>}
 						{currentFilters.action && <p>Action: {currentFilters.action}</p>}
 						{currentFilters.severity && <p>Severity: {currentFilters.severity}</p>}

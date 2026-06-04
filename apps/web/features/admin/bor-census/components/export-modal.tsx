@@ -62,7 +62,13 @@ export function ExportModal({ open, onOpenChange, defaultTitle = "BOR Report" }:
 	}
 
 	return (
-		<Dialog open={open} onOpenChange={open => { if (!open) reset(); onOpenChange(open) }}>
+		<Dialog
+			open={open}
+			onOpenChange={open => {
+				if (!open) reset()
+				onOpenChange(open)
+			}}
+		>
 			<DialogContent className="max-w-sm">
 				<DialogHeader>
 					<DialogTitle>Export {defaultTitle}</DialogTitle>
@@ -72,7 +78,12 @@ export function ExportModal({ open, onOpenChange, defaultTitle = "BOR Report" }:
 				<div className="space-y-4 py-2">
 					<div className="space-y-1.5">
 						<Label>Format</Label>
-						<Select value={format} onValueChange={v => { if (v) setFormat(v as "csv" | "pdf") }}>
+						<Select
+							value={format}
+							onValueChange={v => {
+								if (v) setFormat(v as "csv" | "pdf")
+							}}
+						>
 							<SelectTrigger>
 								<SelectValue />
 							</SelectTrigger>
@@ -92,7 +103,7 @@ export function ExportModal({ open, onOpenChange, defaultTitle = "BOR Report" }:
 								onChange={e => setDateFrom(e.target.value)}
 								className="w-full"
 							/>
-							<span className="shrink-0 text-sm text-muted-foreground">to</span>
+							<span className="text-muted-foreground shrink-0 text-sm">to</span>
 							<Input
 								type="date"
 								value={dateTo}
@@ -104,7 +115,12 @@ export function ExportModal({ open, onOpenChange, defaultTitle = "BOR Report" }:
 
 					<div className="space-y-1.5">
 						<Label>Ward scope</Label>
-						<Select value={ward} onValueChange={v => { if (v) setWard(v) }}>
+						<Select
+							value={ward}
+							onValueChange={v => {
+								if (v) setWard(v)
+							}}
+						>
 							<SelectTrigger>
 								<SelectValue />
 							</SelectTrigger>

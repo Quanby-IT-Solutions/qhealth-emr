@@ -1,6 +1,7 @@
 "use client"
 
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
+
 import { BreakGlassInbox } from "./break-glass-inbox"
 
 export function BreakGlassInboxPageClient() {

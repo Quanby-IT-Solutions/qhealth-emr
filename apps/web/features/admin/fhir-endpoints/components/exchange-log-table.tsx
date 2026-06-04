@@ -5,9 +5,22 @@ import { useState } from "react"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Input } from "@/core/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Skeleton } from "@/core/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 
 // Placeholder data until ADM-BE-07 is implemented
 interface ExchangeLogEntry {
@@ -33,7 +46,8 @@ export function ExchangeLogTable() {
 	const [page, setPage] = useState(1)
 
 	const filtered = MOCK_LOG.filter(e => {
-		if (resourceFilter && !e.resourceType.toLowerCase().includes(resourceFilter.toLowerCase())) return false
+		if (resourceFilter && !e.resourceType.toLowerCase().includes(resourceFilter.toLowerCase()))
+			return false
 		if (statusFilter !== "all" && e.status !== statusFilter) return false
 		if (dateFrom && e.occurredAt < dateFrom) return false
 		if (dateTo && e.occurredAt > `${dateTo}T23:59:59`) return false
@@ -52,8 +66,13 @@ export function ExchangeLogTable() {
 					onChange={e => setResourceFilter(e.target.value)}
 					className="max-w-xs"
 				/>
-				<Select value={statusFilter} onValueChange={v => setStatusFilter((v ?? "all") as typeof statusFilter)}>
-					<SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+				<Select
+					value={statusFilter}
+					onValueChange={v => setStatusFilter((v ?? "all") as typeof statusFilter)}
+				>
+					<SelectTrigger className="w-36">
+						<SelectValue />
+					</SelectTrigger>
 					<SelectContent>
 						<SelectItem value="all">All statuses</SelectItem>
 						<SelectItem value="success">Success</SelectItem>
@@ -64,26 +83,35 @@ export function ExchangeLogTable() {
 				<Input
 					type="date"
 					value={dateFrom}
-					onChange={e => { setDateFrom(e.target.value); setPage(1) }}
+					onChange={e => {
+						setDateFrom(e.target.value)
+						setPage(1)
+					}}
 					className="w-40"
 					aria-label="From date"
 				/>
 				<Input
 					type="date"
 					value={dateTo}
-					onChange={e => { setDateTo(e.target.value); setPage(1) }}
+					onChange={e => {
+						setDateTo(e.target.value)
+						setPage(1)
+					}}
 					className="w-40"
 					aria-label="To date"
 				/>
 			</div>
 
 			{filtered.length === 0 ? (
-				<p className="text-sm text-muted-foreground py-8 text-center">No exchange log entries yet.</p>
+				<p className="text-muted-foreground py-8 text-center text-sm">
+					No exchange log entries yet.
+				</p>
 			) : (
 				<>
 					{filtered.length > PAGE_SIZE && (
-						<p className="text-xs text-muted-foreground">
-							Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} entries
+						<p className="text-muted-foreground text-xs">
+							Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of{" "}
+							{filtered.length} entries
 						</p>
 					)}
 					<Table>
@@ -104,16 +132,28 @@ export function ExchangeLogTable() {
 									<TableCell className="font-medium">{entry.resourceType}</TableCell>
 									<TableCell>{entry.direction}</TableCell>
 									<TableCell>
-										<Badge variant={entry.status === "success" ? "default" : entry.status === "error" ? "destructive" : "secondary"}>
+										<Badge
+											variant={
+												entry.status === "success"
+													? "default"
+													: entry.status === "error"
+														? "destructive"
+														: "secondary"
+											}
+										>
 											{entry.status}
 										</Badge>
 									</TableCell>
 									<TableCell className="text-right">{entry.recordCount}</TableCell>
 									<TableCell className="text-right">{entry.durationMs}ms</TableCell>
-									<TableCell className="text-xs text-muted-foreground">{entry.occurredAt}</TableCell>
+									<TableCell className="text-muted-foreground text-xs">
+										{entry.occurredAt}
+									</TableCell>
 									<TableCell>
 										{entry.status === "error" && (
-											<Button variant="ghost" size="sm">Retry</Button>
+											<Button variant="ghost" size="sm">
+												Retry
+											</Button>
 										)}
 									</TableCell>
 								</TableRow>
@@ -122,10 +162,26 @@ export function ExchangeLogTable() {
 					</Table>
 					{totalPages > 1 && (
 						<div className="flex items-center justify-between pt-2">
-							<p className="text-xs text-muted-foreground">Page {page} of {totalPages}</p>
+							<p className="text-muted-foreground text-xs">
+								Page {page} of {totalPages}
+							</p>
 							<div className="flex gap-2">
-								<Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
-								<Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={page <= 1}
+									onClick={() => setPage(p => p - 1)}
+								>
+									Previous
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={page >= totalPages}
+									onClick={() => setPage(p => p + 1)}
+								>
+									Next
+								</Button>
 							</div>
 						</div>
 					)}

@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo } from "react"
-
 import { AlertTriangle, CheckCircle, Clock } from "lucide-react"
 
 // ============================================================================
@@ -111,7 +110,7 @@ export function NbsTimeline({
 							: overdue
 								? `⚠ Overdue — ${elapsedH.toFixed(1)}h since birth, specimen not yet collected`
 								: beforeWindow
-									? `Awaiting window — ${formatHours((WINDOW_OPEN_H * 60 * 60 * 1000) - (Date.now() - new Date(birthDatetime).getTime()))} until 24h window opens`
+									? `Awaiting window — ${formatHours(WINDOW_OPEN_H * 60 * 60 * 1000 - (Date.now() - new Date(birthDatetime).getTime()))} until 24h window opens`
 									: `Past optimal window — ${elapsedH.toFixed(1)}h since birth`}
 					</span>
 				</div>
@@ -134,7 +133,7 @@ export function NbsTimeline({
 
 			{/* Timeline bar */}
 			<div className="space-y-1">
-				<div className="relative h-5 rounded-full bg-muted overflow-hidden">
+				<div className="bg-muted relative h-5 overflow-hidden rounded-full">
 					{/* 24–48h window highlight */}
 					<div
 						className="absolute inset-y-0 bg-green-200 dark:bg-green-900/50"
@@ -147,29 +146,19 @@ export function NbsTimeline({
 					<div
 						className={[
 							"absolute inset-y-0 left-0 rounded-full opacity-70 transition-all",
-							overdue
-								? "bg-red-500"
-								: inWindow
-									? "bg-green-500"
-									: "bg-amber-400",
+							overdue ? "bg-red-500" : inWindow ? "bg-green-500" : "bg-amber-400",
 						].join(" ")}
 						style={{ width: `${progressPct}%` }}
 					/>
 				</div>
 
 				{/* Labels */}
-				<div className="relative h-4 text-[10px] text-muted-foreground">
+				<div className="text-muted-foreground relative h-4 text-[10px]">
 					<span className="absolute left-0">Birth</span>
-					<span
-						className="absolute -translate-x-1/2"
-						style={{ left: `${windowStartPct}%` }}
-					>
+					<span className="absolute -translate-x-1/2" style={{ left: `${windowStartPct}%` }}>
 						24h
 					</span>
-					<span
-						className="absolute -translate-x-1/2"
-						style={{ left: `${windowEndPct}%` }}
-					>
+					<span className="absolute -translate-x-1/2" style={{ left: `${windowEndPct}%` }}>
 						48h
 					</span>
 					<span className="absolute right-0">72h</span>
@@ -177,9 +166,9 @@ export function NbsTimeline({
 			</div>
 
 			{/* Milestone dots */}
-			<div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+			<div className="text-muted-foreground flex flex-wrap gap-4 text-xs">
 				<div className="flex items-center gap-1.5">
-					<div className="size-2 rounded-full bg-foreground" />
+					<div className="bg-foreground size-2 rounded-full" />
 					<span>Birth: {formatAbsoluteDate(birthDatetime)}</span>
 				</div>
 				{specimenCollectedAt && (

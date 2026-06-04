@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-
 import { AlertCircle, CheckCircle, RotateCcw } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -116,9 +115,7 @@ export function SignatureCanvas({ label, onCapture, onClear, disabled }: Signatu
 		lastPosRef.current = getPos(e)
 	}
 
-	const draw = (
-		e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
-	) => {
+	const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
 		if (disabled) return
 		e.preventDefault()
 		if (!isDrawingRef.current) return
@@ -185,7 +182,7 @@ export function SignatureCanvas({ label, onCapture, onClear, disabled }: Signatu
 				{!disabled && (
 					<button
 						type="button"
-						className="absolute right-2 top-2 rounded p-1 text-muted-foreground hover:bg-muted"
+						className="text-muted-foreground hover:bg-muted absolute top-2 right-2 rounded p-1"
 						onClick={clearCanvas}
 						aria-label="Clear signature"
 					>
@@ -193,7 +190,7 @@ export function SignatureCanvas({ label, onCapture, onClear, disabled }: Signatu
 					</button>
 				)}
 			</div>
-			<p className="text-xs text-muted-foreground">Sign above using mouse or touch</p>
+			<p className="text-muted-foreground text-xs">Sign above using mouse or touch</p>
 		</div>
 	)
 }
@@ -244,9 +241,9 @@ export function ConsentCapture({
 		return (
 			<Card>
 				<CardContent className="flex flex-col items-center justify-center py-10 text-center">
-					<CheckCircle className="size-12 text-green-500 mb-3" />
+					<CheckCircle className="mb-3 size-12 text-green-500" />
 					<p className="font-semibold">Consent Captured</p>
-					<p className="text-sm text-muted-foreground mt-1">
+					<p className="text-muted-foreground mt-1 text-sm">
 						{template.title} has been signed and archived.
 					</p>
 				</CardContent>
@@ -260,25 +257,21 @@ export function ConsentCapture({
 			<div className="flex items-center justify-between">
 				<div>
 					<h3 className="font-semibold">{template.title}</h3>
-					{patientName && (
-						<p className="text-sm text-muted-foreground">Patient: {patientName}</p>
-					)}
+					{patientName && <p className="text-muted-foreground text-sm">Patient: {patientName}</p>}
 				</div>
-				{template.requiresWitness && (
-					<Badge variant="secondary">Witness Required</Badge>
-				)}
+				{template.requiresWitness && <Badge variant="secondary">Witness Required</Badge>}
 			</div>
 
 			{/* Consent Text */}
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+					<CardTitle className="text-muted-foreground text-sm font-medium tracking-wide uppercase">
 						Consent Statement
 					</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<p className="text-sm leading-relaxed">{template.text}</p>
-					<p className="text-xs text-muted-foreground mt-4">
+					<p className="text-muted-foreground mt-4 text-xs">
 						Date &amp; Time: {new Date().toLocaleString("en-PH")}
 					</p>
 				</CardContent>

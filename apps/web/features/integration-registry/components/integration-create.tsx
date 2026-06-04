@@ -1,16 +1,20 @@
 "use client"
 
 import { useState } from "react"
-
 import { useRouter } from "next/navigation"
-
 import { Save } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 import {
 	useCreateIntegrationMutation,
@@ -62,7 +66,17 @@ export function IntegrationCreate() {
 
 		const created = await createMutation.mutateAsync({
 			name: name.trim(),
-			kind: kind as "fhir" | "hai" | "philhealth" | "erp" | "lis" | "pacs" | "telemedicine" | "nhdr" | "pidsr" | "custom",
+			kind: kind as
+				| "fhir"
+				| "hai"
+				| "philhealth"
+				| "erp"
+				| "lis"
+				| "pacs"
+				| "telemedicine"
+				| "nhdr"
+				| "pidsr"
+				| "custom",
 			endpointUrl: endpointUrl.trim(),
 			webhookUrl: webhookUrl.trim() || null,
 			credentialsRef: credentialsRef || null,
@@ -87,9 +101,7 @@ export function IntegrationCreate() {
 						onChange={e => setName(e.target.value)}
 						placeholder="e.g. NHDR FHIR"
 					/>
-					{errors.name && (
-						<p className="text-destructive text-xs">{errors.name}</p>
-					)}
+					{errors.name && <p className="text-destructive text-xs">{errors.name}</p>}
 				</div>
 
 				<div className="space-y-1.5">
@@ -117,13 +129,13 @@ export function IntegrationCreate() {
 						onChange={e => setEndpointUrl(e.target.value)}
 						placeholder="https://api.example.gov.ph/fhir"
 					/>
-					{errors.endpointUrl && (
-						<p className="text-destructive text-xs">{errors.endpointUrl}</p>
-					)}
+					{errors.endpointUrl && <p className="text-destructive text-xs">{errors.endpointUrl}</p>}
 				</div>
 
 				<div className="space-y-1.5">
-					<Label htmlFor="webhookUrl">Webhook URL <span className="text-muted-foreground">(optional)</span></Label>
+					<Label htmlFor="webhookUrl">
+						Webhook URL <span className="text-muted-foreground">(optional)</span>
+					</Label>
 					<Input
 						id="webhookUrl"
 						value={webhookUrl}
@@ -164,10 +176,7 @@ export function IntegrationCreate() {
 				</div>
 
 				<div className="flex justify-end gap-2">
-					<Button
-						variant="outline"
-						onClick={() => router.push("/admin/integration-registry")}
-					>
+					<Button variant="outline" onClick={() => router.push("/admin/integration-registry")}>
 						Cancel
 					</Button>
 					<Button onClick={handleCreate} disabled={createMutation.isPending}>

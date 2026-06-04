@@ -3,11 +3,22 @@
 import { useState } from "react"
 
 import { Button } from "@/core/components/ui/button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
-
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { useAuditLogExportMutation } from "@/features/auditor/audit-log/api/audit-log.hooks"
 
 interface BreakGlassExportModalProps {
@@ -82,18 +93,15 @@ export function BreakGlassExportModal({ open, onClose, facilityId }: BreakGlassE
 						</div>
 					</div>
 
-					<div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
-						Export includes all break-glass access events and reviewer decisions. File is hashed (sha256) and stored for authenticity verification per DPA requirements.
+					<div className="bg-muted/40 text-muted-foreground rounded-md border p-3 text-xs">
+						Export includes all break-glass access events and reviewer decisions. File is hashed
+						(sha256) and stored for authenticity verification per DPA requirements.
 					</div>
 
 					{downloadUrl && (
 						<div className="rounded-md border bg-green-50 p-3 text-sm dark:bg-green-900/20">
 							<p className="mb-1 font-semibold text-green-800 dark:text-green-300">Export ready</p>
-							<a
-								href={downloadUrl}
-								className="font-mono text-xs underline"
-								download
-							>
+							<a href={downloadUrl} className="font-mono text-xs underline" download>
 								{downloadUrl}
 							</a>
 						</div>

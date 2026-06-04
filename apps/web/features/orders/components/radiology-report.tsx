@@ -82,9 +82,7 @@ export function RadiologyReport({
 			!!structured?.recommendations ||
 			!!structured?.attachments?.length)
 	const hasReport = !!report || hasStructuredReport
-	const diagnosis = [indicationIcd10Code, indicationIcd10Display]
-		.filter(Boolean)
-		.join(" - ")
+	const diagnosis = [indicationIcd10Code, indicationIcd10Display].filter(Boolean).join(" - ")
 
 	if (!hasReport) {
 		return (

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -46,7 +46,11 @@ export function KonsultaTrackerPage({ facilityId }: KonsultaTrackerPageProps) {
 	const searchParams = useSearchParams()
 
 	const page = Number(searchParams.get("page") ?? "1")
-	const filterStatus = (searchParams.get("status") ?? "all") as "all" | "active" | "exhausted" | "inactive"
+	const filterStatus = (searchParams.get("status") ?? "all") as
+		| "all"
+		| "active"
+		| "exhausted"
+		| "inactive"
 	const filterFrom = searchParams.get("from") ?? ""
 	const filterTo = searchParams.get("to") ?? ""
 
@@ -89,9 +93,11 @@ export function KonsultaTrackerPage({ facilityId }: KonsultaTrackerPageProps) {
 			<h1 className="text-lg font-semibold">Konsulta Capitation Tracker</h1>
 
 			{/* URL-synced filter bar */}
-			<div className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-3">
+			<div className="bg-muted/30 flex flex-wrap items-end gap-3 rounded-md border p-3">
 				<div className="flex flex-col gap-1">
-					<Label htmlFor="filter-status" className="text-xs">Member Status</Label>
+					<Label htmlFor="filter-status" className="text-xs">
+						Member Status
+					</Label>
 					<Select value={filterStatus} onValueChange={v => updateParam("status", v ?? "all")}>
 						<SelectTrigger id="filter-status" className="h-8 w-40 text-xs">
 							<SelectValue />
@@ -107,7 +113,9 @@ export function KonsultaTrackerPage({ facilityId }: KonsultaTrackerPageProps) {
 				</div>
 
 				<div className="flex flex-col gap-1">
-					<Label htmlFor="filter-from" className="text-xs">Period From</Label>
+					<Label htmlFor="filter-from" className="text-xs">
+						Period From
+					</Label>
 					<Input
 						id="filter-from"
 						type="date"
@@ -118,7 +126,9 @@ export function KonsultaTrackerPage({ facilityId }: KonsultaTrackerPageProps) {
 				</div>
 
 				<div className="flex flex-col gap-1">
-					<Label htmlFor="filter-to" className="text-xs">Period To</Label>
+					<Label htmlFor="filter-to" className="text-xs">
+						Period To
+					</Label>
 					<Input
 						id="filter-to"
 						type="date"
@@ -136,21 +146,25 @@ export function KonsultaTrackerPage({ facilityId }: KonsultaTrackerPageProps) {
 				<CardContent>
 					{isLoading && (
 						<div className="space-y-2 py-2">
-							{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
+							{[...Array(5)].map((_, i) => (
+								<Skeleton key={i} className="h-9 w-full" />
+							))}
 						</div>
 					)}
 					{!isLoading && rows.length === 0 && (
-						<p className="text-sm text-muted-foreground py-4 text-center">No patients match the current filters.</p>
+						<p className="text-muted-foreground py-4 text-center text-sm">
+							No patients match the current filters.
+						</p>
 					)}
 					{rows.length > 0 && (
 						<table className="w-full text-sm">
 							<thead>
-								<tr className="border-b text-left text-xs text-muted-foreground">
-									<th className="pb-1 pr-4">Patient</th>
-									<th className="pb-1 pr-4">PIN</th>
-									<th className="pb-1 pr-4">FPE Date</th>
-									<th className="pb-1 pr-4">Last Follow-up</th>
-									<th className="pb-1 pr-4">Labs</th>
+								<tr className="text-muted-foreground border-b text-left text-xs">
+									<th className="pr-4 pb-1">Patient</th>
+									<th className="pr-4 pb-1">PIN</th>
+									<th className="pr-4 pb-1">FPE Date</th>
+									<th className="pr-4 pb-1">Last Follow-up</th>
+									<th className="pr-4 pb-1">Labs</th>
 									<th className="pb-1">Tag</th>
 								</tr>
 							</thead>
@@ -161,14 +175,16 @@ export function KonsultaTrackerPage({ facilityId }: KonsultaTrackerPageProps) {
 										<>
 											<tr
 												key={row.patientId}
-												className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
+												className="hover:bg-muted/30 cursor-pointer border-b transition-colors last:border-0"
 												onClick={() => setExpandedPatientId(isExpanded ? null : row.patientId)}
 												aria-expanded={isExpanded}
 											>
 												<td className="py-1.5 pr-4 font-medium">{row.patientName}</td>
 												<td className="py-1.5 pr-4 font-mono text-xs">{row.memberPin ?? "—"}</td>
-												<td className="py-1.5 pr-4 tabular-nums text-xs">{row.fpeDate ?? "—"}</td>
-												<td className="py-1.5 pr-4 tabular-nums text-xs">{row.lastFollowUp ?? "—"}</td>
+												<td className="py-1.5 pr-4 text-xs tabular-nums">{row.fpeDate ?? "—"}</td>
+												<td className="py-1.5 pr-4 text-xs tabular-nums">
+													{row.lastFollowUp ?? "—"}
+												</td>
 												<td className="py-1.5 pr-4 tabular-nums">{row.labsCount}</td>
 												<td className="py-1.5">
 													<Badge variant={TAG_VARIANT[row.capitationTag] ?? "outline"}>
@@ -178,7 +194,7 @@ export function KonsultaTrackerPage({ facilityId }: KonsultaTrackerPageProps) {
 											</tr>
 											{isExpanded && (
 												<tr key={`${row.patientId}-timeline`} className="border-b">
-													<td colSpan={6} className="py-2 px-1">
+													<td colSpan={6} className="px-1 py-2">
 														<ActivityTimeline patientId={row.patientId} facilityId={facilityId} />
 													</td>
 												</tr>
@@ -192,14 +208,11 @@ export function KonsultaTrackerPage({ facilityId }: KonsultaTrackerPageProps) {
 				</CardContent>
 			</Card>
 
-			<div className="flex items-center gap-2 justify-end text-sm">
-				<span className="text-muted-foreground text-xs">Page {page} of {totalPages}</span>
-				<Button
-					variant="outline"
-					size="sm"
-					onClick={() => setPage(page - 1)}
-					disabled={page <= 1}
-				>
+			<div className="flex items-center justify-end gap-2 text-sm">
+				<span className="text-muted-foreground text-xs">
+					Page {page} of {totalPages}
+				</span>
+				<Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
 					Previous
 				</Button>
 				<Button

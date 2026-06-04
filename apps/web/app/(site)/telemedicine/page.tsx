@@ -14,12 +14,14 @@ export default function TelemedicinePage() {
 	const { data: profile, isLoading } = useMyProfile()
 	const permSet = useMemo(() => {
 		const permissions = profile?.activeRole?.permissions ?? []
-		return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+		return new Set(
+			permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+		)
 	}, [profile?.activeRole?.permissions])
 
 	if (isLoading) {
 		return (
-			<div className="flex items-center justify-center gap-2 p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center gap-2 p-8">
 				<Loader2 className="size-4 animate-spin" />
 				Loading telemedicine...
 			</div>
@@ -28,7 +30,7 @@ export default function TelemedicinePage() {
 
 	if (!can(permSet, "telemedicine", "view")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access telemedicine.
 			</div>
 		)

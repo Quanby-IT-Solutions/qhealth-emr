@@ -127,18 +127,14 @@ function StepIcon({ status }: { status: DisplayStatus }) {
 		case "Completed":
 			return <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-600 dark:text-green-400" />
 		case "Blocked":
-			return <Lock className="mt-0.5 size-4 shrink-0 text-destructive" />
+			return <Lock className="text-destructive mt-0.5 size-4 shrink-0" />
 		default:
 			return <Clock className="text-muted-foreground mt-0.5 size-4 shrink-0" />
 	}
 }
 
 function ConnectorLine({ completed }: { completed: boolean }) {
-	return (
-		<div
-			className={`mx-[7px] h-4 w-0.5 ${completed ? "bg-green-500" : "bg-border"}`}
-		/>
-	)
+	return <div className={`mx-[7px] h-4 w-0.5 ${completed ? "bg-green-500" : "bg-border"}`} />
 }
 
 export function DischargeChecklist({ items, encounterType }: DischargeChecklistProps) {
@@ -187,14 +183,11 @@ export function DischargeChecklist({ items, encounterType }: DischargeChecklistP
 								{subItems.length > 0 && (
 									<div className="mt-1.5 space-y-1 pl-0">
 										{subItems.map(item => (
-											<div
-												key={item.key}
-												className="flex items-center gap-1.5 text-xs"
-											>
+											<div key={item.key} className="flex items-center gap-1.5 text-xs">
 												{item.status === "complete" ? (
 													<Circle className="size-2 fill-green-500 text-green-500" />
 												) : item.status === "not_applicable" ? (
-													<Circle className="size-2 fill-muted text-muted" />
+													<Circle className="fill-muted text-muted size-2" />
 												) : (
 													<Circle className="text-muted-foreground size-2" />
 												)}
@@ -215,8 +208,7 @@ export function DischargeChecklist({ items, encounterType }: DischargeChecklistP
 								{/* Gate Pass special message */}
 								{step.id === "gate_pass" && status === "Blocked" && (
 									<p className="mt-1 text-xs text-red-600 dark:text-red-400">
-										All discharge checklist items must be completed before Gate Pass is
-										issued.
+										All discharge checklist items must be completed before Gate Pass is issued.
 									</p>
 								)}
 							</div>

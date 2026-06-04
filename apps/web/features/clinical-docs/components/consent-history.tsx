@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { FileText } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -19,8 +18,8 @@ import {
 	usePatientConsentsQuery,
 	type ConsentRecord,
 } from "@/features/clinical-docs/api/clinical-docs.hooks"
-import { DpaConsentModal } from "@/features/clinical-docs/components/dpa-consent-modal"
 import { ConsentRevocation } from "@/features/clinical-docs/components/consent-revocation"
+import { DpaConsentModal } from "@/features/clinical-docs/components/dpa-consent-modal"
 
 function formatDateTime(dateStr: string | null | undefined) {
 	if (!dateStr) return "--"
@@ -92,7 +91,7 @@ export function ConsentHistory({
 			<Card className="overflow-hidden">
 				<CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<div className="flex items-center gap-2">
-						<FileText className="size-4 text-muted-foreground" />
+						<FileText className="text-muted-foreground size-4" />
 						<CardTitle>Consent History</CardTitle>
 					</div>
 					{currentEncounterId && canManageConsents && (
@@ -103,9 +102,9 @@ export function ConsentHistory({
 				</CardHeader>
 				<CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
 					{isLoading ? (
-						<div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>
+						<div className="text-muted-foreground py-8 text-center text-sm">Loading...</div>
 					) : consents.length === 0 ? (
-						<div className="py-8 text-center text-sm text-muted-foreground">
+						<div className="text-muted-foreground py-8 text-center text-sm">
 							No consent records found for this patient.
 						</div>
 					) : (
@@ -193,7 +192,9 @@ export function ConsentHistory({
 												</TableCell>
 												<TableCell className="min-w-36 text-sm whitespace-normal">
 													{consent.revokedAt ? (
-														<span className="text-red-600">{formatDateTime(consent.revokedAt)}</span>
+														<span className="text-red-600">
+															{formatDateTime(consent.revokedAt)}
+														</span>
 													) : (
 														"--"
 													)}

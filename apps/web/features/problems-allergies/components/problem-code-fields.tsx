@@ -117,7 +117,9 @@ export function ProblemCodeFields({
 				<div className="flex items-end justify-between gap-3">
 					<div className="space-y-1">
 						<Label>ICD-10 Code</Label>
-						<p className="text-muted-foreground text-xs">Select one ICD-10 code for this problem.</p>
+						<p className="text-muted-foreground text-xs">
+							Select one ICD-10 code for this problem.
+						</p>
 					</div>
 					{value.icd10Code && (
 						<span className="text-muted-foreground shrink-0 text-xs">Selected</span>
@@ -163,7 +165,7 @@ export function ProblemCodeFields({
 											key={result.id}
 											type="button"
 											disabled={disabled}
-											className="hover:bg-muted focus:bg-muted disabled:text-muted-foreground disabled:hover:bg-transparent block w-full rounded-sm px-3 py-2 text-left outline-hidden disabled:cursor-not-allowed disabled:opacity-70"
+											className="hover:bg-muted focus:bg-muted disabled:text-muted-foreground block w-full rounded-sm px-3 py-2 text-left outline-hidden disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-transparent"
 											onMouseDown={event => event.preventDefault()}
 											onClick={() => selectIcd10(result)}
 										>
@@ -173,7 +175,9 @@ export function ProblemCodeFields({
 											</span>
 											<span className="block">{result.description}</span>
 											{result.category && (
-												<span className="text-muted-foreground block text-xs">{result.category}</span>
+												<span className="text-muted-foreground block text-xs">
+													{result.category}
+												</span>
 											)}
 										</button>
 									)
@@ -207,7 +211,9 @@ export function ProblemCodeFields({
 				<div className="flex items-end justify-between gap-3">
 					<div className="space-y-1">
 						<Label>SNOMED CT Code</Label>
-						<p className="text-muted-foreground text-xs">Select one SNOMED CT concept for this problem.</p>
+						<p className="text-muted-foreground text-xs">
+							Select one SNOMED CT concept for this problem.
+						</p>
 					</div>
 					{value.snomedCode && (
 						<span className="text-muted-foreground shrink-0 text-xs">Selected</span>
@@ -253,7 +259,7 @@ export function ProblemCodeFields({
 											key={result.id}
 											type="button"
 											disabled={disabled}
-											className="hover:bg-muted focus:bg-muted disabled:text-muted-foreground disabled:hover:bg-transparent block w-full rounded-sm px-3 py-2 text-left outline-hidden disabled:cursor-not-allowed disabled:opacity-70"
+											className="hover:bg-muted focus:bg-muted disabled:text-muted-foreground block w-full rounded-sm px-3 py-2 text-left outline-hidden disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-transparent"
 											onMouseDown={event => event.preventDefault()}
 											onClick={() => selectSnomed(result)}
 										>

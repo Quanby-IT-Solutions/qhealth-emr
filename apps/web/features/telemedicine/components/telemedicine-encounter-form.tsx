@@ -20,9 +20,9 @@ import { Separator } from "@/core/components/ui/separator"
 import { useEncounterListQuery } from "@/features/encounters/api/encounters.hooks"
 import { usePatientSummaryQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
 import {
+	useCreateEncounterMutation,
 	type CreateEncounterInput,
 	type EncounterType,
-	useCreateEncounterMutation,
 } from "@/features/telemedicine/api/telemedicine.hooks"
 
 // ============================================================================
@@ -266,7 +266,7 @@ function ChartSnapshot({ patientId }: { patientId: string }) {
 	return (
 		<div className="grid gap-3 md:grid-cols-2">
 			<div className="rounded-lg border p-3">
-				<p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+				<p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
 					Active Problems
 				</p>
 				{isLoading ? (
@@ -287,7 +287,7 @@ function ChartSnapshot({ patientId }: { patientId: string }) {
 				)}
 			</div>
 			<div className="rounded-lg border p-3">
-				<p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+				<p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
 					Active Allergies
 				</p>
 				{isLoading ? (
@@ -324,7 +324,9 @@ export function TelemedicineEncounterForm({
 	initialLinkedEncounterId,
 	onEncounterCreated,
 }: TelemedicineEncounterFormProps) {
-	const [form, setForm] = useState<EncounterFormState>(() => buildInitialForm(initialLinkedEncounterId))
+	const [form, setForm] = useState<EncounterFormState>(() =>
+		buildInitialForm(initialLinkedEncounterId)
+	)
 	const [submitted, setSubmitted] = useState(false)
 	const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 	const [submitError, setSubmitError] = useState<string | null>(null)
@@ -337,8 +339,9 @@ export function TelemedicineEncounterForm({
 		{ enabled: Boolean(facilityId && patientId) }
 	)
 	const linkableEncounters =
-		linkedEncounterQuery.data?.data.filter(encounter => encounter.encounterType !== "telemedicine") ??
-		[]
+		linkedEncounterQuery.data?.data.filter(
+			encounter => encounter.encounterType !== "telemedicine"
+		) ?? []
 	const detectedFollowUp = Boolean(initialLinkedEncounterId)
 	const followUpDisabled =
 		!detectedFollowUp && (linkedEncounterQuery.isLoading || linkableEncounters.length === 0)
@@ -360,8 +363,11 @@ export function TelemedicineEncounterForm({
 	}
 
 	function inputClass(field: FieldKey, extra = ""): string {
-		const base = "border-input bg-background w-full rounded-md border px-3 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:outline-none"
-		const errorCls = fieldErrors[field] ? "border-destructive focus-visible:ring-destructive/30" : ""
+		const base =
+			"border-input bg-background w-full rounded-md border px-3 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:outline-none"
+		const errorCls = fieldErrors[field]
+			? "border-destructive focus-visible:ring-destructive/30"
+			: ""
 		return [base, errorCls, extra].filter(Boolean).join(" ")
 	}
 
@@ -531,9 +537,7 @@ export function TelemedicineEncounterForm({
 													</div>
 													<div className="text-muted-foreground mt-1 grid gap-1 text-xs sm:grid-cols-3">
 														<span>Status: {formatEncounterType(encounter.status)}</span>
-														<span>
-															Attending: {encounter.attendingStaffName || "Unassigned"}
-														</span>
+														<span>Attending: {encounter.attendingStaffName || "Unassigned"}</span>
 														<span>{encounter.chiefComplaint || "No chief complaint"}</span>
 													</div>
 												</button>
@@ -622,7 +626,7 @@ export function TelemedicineEncounterForm({
 									<div className="flex items-baseline justify-between gap-2">
 										<label
 											htmlFor={key}
-											className="text-muted-foreground text-xs font-medium uppercase tracking-wide"
+											className="text-muted-foreground text-xs font-medium tracking-wide uppercase"
 										>
 											{label}
 										</label>

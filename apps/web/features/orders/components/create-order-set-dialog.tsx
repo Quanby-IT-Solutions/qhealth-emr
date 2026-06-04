@@ -186,7 +186,10 @@ export function CreateOrderSetDialog({
 									className="flex flex-col gap-2 rounded-lg border px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
 								>
 									<div className="flex min-w-0 items-center gap-2">
-										<Badge variant={order.type === "lab" ? "secondary" : "outline"} className="shrink-0">
+										<Badge
+											variant={order.type === "lab" ? "secondary" : "outline"}
+											className="shrink-0"
+										>
 											{order.type === "lab" ? "Lab" : "Imaging"}
 										</Badge>
 										<div className="min-w-0">
@@ -219,7 +222,7 @@ export function CreateOrderSetDialog({
 				</div>
 
 				{submitError ? (
-					<div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+					<div className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
 						{submitError}
 					</div>
 				) : null}

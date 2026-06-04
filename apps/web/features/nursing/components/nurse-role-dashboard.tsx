@@ -1,8 +1,7 @@
 "use client"
 
-import Link from "next/link"
 import { useMemo } from "react"
-
+import Link from "next/link"
 import {
 	AlertTriangle,
 	ClipboardCheck,
@@ -17,7 +16,6 @@ import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-
 import { useHaiTagsQuery, useVitalsQuery } from "@/features/nursing/api/nursing.hooks"
 
 const DASHBOARD_VITALS_LIMIT = 50
@@ -110,7 +108,7 @@ export function NurseRoleDashboard() {
 			<div className="space-y-4">
 				<div>
 					<h1 className="text-2xl font-semibold">Nurse Shift Dashboard</h1>
-					<p className="text-sm text-muted-foreground">Loading dashboard...</p>
+					<p className="text-muted-foreground text-sm">Loading dashboard...</p>
 				</div>
 			</div>
 		)
@@ -121,10 +119,10 @@ export function NurseRoleDashboard() {
 			<div className="space-y-4">
 				<div>
 					<h1 className="text-2xl font-semibold">Nurse Shift Dashboard</h1>
-					<p className="text-sm text-muted-foreground">Viewing as Nurse</p>
+					<p className="text-muted-foreground text-sm">Viewing as Nurse</p>
 				</div>
 				<Card>
-					<CardContent className="py-8 text-center text-sm text-muted-foreground">
+					<CardContent className="text-muted-foreground py-8 text-center text-sm">
 						No facility assignment found for this account.
 					</CardContent>
 				</Card>
@@ -137,7 +135,7 @@ export function NurseRoleDashboard() {
 			<div className="flex items-center justify-between gap-3">
 				<div>
 					<h1 className="text-2xl font-semibold">Nurse Shift Dashboard</h1>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Role-level overview for this shift. Open the Nursing module for full clinical workflows.
 					</p>
 				</div>
@@ -194,9 +192,9 @@ export function NurseRoleDashboard() {
 					</CardHeader>
 					<CardContent>
 						{vitals.isLoading ? (
-							<p className="py-8 text-center text-sm text-muted-foreground">Loading alerts...</p>
+							<p className="text-muted-foreground py-8 text-center text-sm">Loading alerts...</p>
 						) : immediateEscalations.length === 0 ? (
-							<p className="py-8 text-center text-sm text-muted-foreground">
+							<p className="text-muted-foreground py-8 text-center text-sm">
 								No immediate escalations. Continue routine monitoring.
 							</p>
 						) : (
@@ -210,8 +208,9 @@ export function NurseRoleDashboard() {
 											<p className="truncate text-sm font-medium">
 												Encounter {item.encounterId ?? "-"}
 											</p>
-											<p className="truncate text-xs text-muted-foreground">
-												BP {item.bpSystolic ?? "-"}/{item.bpDiastolic ?? "-"} · HR {item.heartRate ?? "-"} · SpO2 {item.spo2 ?? "-"}%
+											<p className="text-muted-foreground truncate text-xs">
+												BP {item.bpSystolic ?? "-"}/{item.bpDiastolic ?? "-"} · HR{" "}
+												{item.heartRate ?? "-"} · SpO2 {item.spo2 ?? "-"}%
 												{` · ${formatDateTime(item.recordedAt)}`}
 											</p>
 										</div>
@@ -250,14 +249,17 @@ export function NurseRoleDashboard() {
 				</CardHeader>
 				<CardContent>
 					{recentVitals.length === 0 ? (
-						<p className="text-sm text-muted-foreground">No recent vitals recorded.</p>
+						<p className="text-muted-foreground text-sm">No recent vitals recorded.</p>
 					) : (
 						<div className="space-y-2">
 							{recentVitals.map(item => (
-								<div key={item.id} className="flex items-center justify-between rounded-md border px-3 py-2">
+								<div
+									key={item.id}
+									className="flex items-center justify-between rounded-md border px-3 py-2"
+								>
 									<div>
 										<p className="text-sm font-medium">Encounter {item.encounterId ?? "-"}</p>
-										<p className="text-xs text-muted-foreground">
+										<p className="text-muted-foreground text-xs">
 											{formatDateTime(item.recordedAt)} · NEWS {item.newsScore ?? "-"}
 										</p>
 									</div>

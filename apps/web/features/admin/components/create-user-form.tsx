@@ -1,19 +1,20 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "@tanstack/react-form"
-import { z } from "zod"
 import { toast } from "sonner"
+import { z } from "zod"
 
 import { Button } from "@/core/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useCreateUserMutation, useListRolesQuery } from "@/features/admin/api/admin.hooks"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+
 import { MultiStepWizard } from "./multi-step-wizard"
 import { PermissionMatrix } from "./permission-matrix"
-import { useState } from "react"
 
 const STEPS = ["Profile", "Role", "Permissions"]
 
@@ -119,7 +120,10 @@ export function CreateUserForm() {
 				steps={STEPS}
 				currentStep={step}
 				onNext={handleNext}
-				onBack={() => { setStep(s => Math.max(0, s - 1)); setSubmitError(null) }}
+				onBack={() => {
+					setStep(s => Math.max(0, s - 1))
+					setSubmitError(null)
+				}}
 				isNextDisabled={step === 1 && !roleForm.state.values.selectedRoleId}
 				isSubmitting={createUserMutation.isPending}
 				submitLabel="Create User"
@@ -144,7 +148,9 @@ export function CreateUserForm() {
 												onBlur={field.handleBlur}
 											/>
 											{field.state.meta.errors?.map((e, i) => (
-												<p key={i} className="text-xs text-destructive">{String(e)}</p>
+												<p key={i} className="text-destructive text-xs">
+													{String(e)}
+												</p>
 											))}
 										</div>
 									)}
@@ -180,7 +186,9 @@ export function CreateUserForm() {
 											onBlur={field.handleBlur}
 										/>
 										{field.state.meta.errors?.map((e, i) => (
-											<p key={i} className="text-xs text-destructive">{String(e)}</p>
+											<p key={i} className="text-destructive text-xs">
+												{String(e)}
+											</p>
 										))}
 									</div>
 								)}
@@ -202,7 +210,9 @@ export function CreateUserForm() {
 											minLength={8}
 										/>
 										{field.state.meta.errors?.map((e, i) => (
-											<p key={i} className="text-xs text-destructive">{String(e)}</p>
+											<p key={i} className="text-destructive text-xs">
+												{String(e)}
+											</p>
 										))}
 										<p className="text-muted-foreground text-xs">Minimum 8 characters</p>
 									</div>
@@ -217,7 +227,8 @@ export function CreateUserForm() {
 								Select the role for this user at{" "}
 								<span className="text-foreground font-medium">
 									{profile?.staffProfiles[0]?.facility?.name ?? "this facility"}
-								</span>.
+								</span>
+								.
 							</p>
 							<div className="grid gap-2">
 								{rolesData?.map(role => (
@@ -246,8 +257,9 @@ export function CreateUserForm() {
 
 					{step === 2 && (
 						<div className="space-y-3">
-							<p className="text-sm text-muted-foreground">
-								Review and adjust permissions for the selected role. Changes here are saved to the role and affect all users assigned to it.
+							<p className="text-muted-foreground text-sm">
+								Review and adjust permissions for the selected role. Changes here are saved to the
+								role and affect all users assigned to it.
 							</p>
 							<PermissionMatrix />
 						</div>
@@ -256,30 +268,38 @@ export function CreateUserForm() {
 			</MultiStepWizard>
 
 			{/* Activation confirmation modal */}
-			<Dialog open={showConfirm} onOpenChange={open => { if (!open) router.push("/admin/users") }}>
+			<Dialog
+				open={showConfirm}
+				onOpenChange={open => {
+					if (!open) router.push("/admin/users")
+				}}
+			>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>User Created</DialogTitle>
 					</DialogHeader>
 					<div className="space-y-3 text-sm">
 						<p>
-							The account for <span className="font-semibold">{profileForm.state.values.email}</span> has been created.
+							The account for{" "}
+							<span className="font-semibold">{profileForm.state.values.email}</span> has been
+							created.
 						</p>
 						<p className="text-muted-foreground">
-							An activation link has been queued. The user can sign in with the temporary
-							password you set once the account is active.
+							An activation link has been queued. The user can sign in with the temporary password
+							you set once the account is active.
 						</p>
 					</div>
 					<div className="flex justify-end gap-2 pt-2">
 						<Button
 							variant="outline"
-							onClick={() => { setShowConfirm(false); router.push("/admin/users/new") }}
+							onClick={() => {
+								setShowConfirm(false)
+								router.push("/admin/users/new")
+							}}
 						>
 							Create Another
 						</Button>
-						<Button onClick={() => router.push(`/admin/users/${createdUserId}`)}>
-							View User
-						</Button>
+						<Button onClick={() => router.push(`/admin/users/${createdUserId}`)}>View User</Button>
 					</div>
 				</DialogContent>
 			</Dialog>

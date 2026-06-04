@@ -46,22 +46,20 @@ export function SourceNoteDrawer({ open, onClose, sources, sectionLabel }: Sourc
 	return (
 		<>
 			{/* Backdrop */}
-			<div
-				className="fixed inset-0 z-40 bg-black/20"
-				onClick={onClose}
-				aria-hidden
-			/>
+			<div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} aria-hidden />
 
 			{/* Drawer */}
 			<aside
 				role="dialog"
 				aria-label={`Source notes for ${sectionLabel}`}
 				aria-modal
-				className="fixed right-0 top-0 z-50 h-full w-80 bg-background shadow-xl flex flex-col"
+				className="bg-background fixed top-0 right-0 z-50 flex h-full w-80 flex-col shadow-xl"
 			>
-				<div className="flex items-center justify-between px-4 py-3 border-b">
+				<div className="flex items-center justify-between border-b px-4 py-3">
 					<div>
-						<p className="text-xs text-muted-foreground uppercase tracking-wide">Auto-Extraction Sources</p>
+						<p className="text-muted-foreground text-xs tracking-wide uppercase">
+							Auto-Extraction Sources
+						</p>
 						<h2 className="text-sm font-semibold">{sectionLabel}</h2>
 					</div>
 					<Button
@@ -75,27 +73,28 @@ export function SourceNoteDrawer({ open, onClose, sources, sectionLabel }: Sourc
 					</Button>
 				</div>
 
-				<div className="flex-1 overflow-y-auto p-4 space-y-3">
+				<div className="flex-1 space-y-3 overflow-y-auto p-4">
 					{sources.length === 0 && (
-						<p className="text-sm text-muted-foreground text-center py-8">
+						<p className="text-muted-foreground py-8 text-center text-sm">
 							No auto-extracted sources for this section.
 						</p>
 					)}
 
 					{sources.map(s => (
-						<div key={s.field} className="rounded-md border bg-muted/30 p-3 space-y-1.5">
+						<div key={s.field} className="bg-muted/30 space-y-1.5 rounded-md border p-3">
 							<div className="flex items-center justify-between gap-2">
 								<span className="text-xs font-medium">{s.label}</span>
-								<Badge variant="outline" className="text-[10px] h-4 px-1">
+								<Badge variant="outline" className="h-4 px-1 text-[10px]">
 									{SOURCE_LABEL[s.source] ?? s.source}
 								</Badge>
 							</div>
 							{s.value !== null && (
-								<p className="text-xs text-muted-foreground font-mono break-all">{s.value}</p>
+								<p className="text-muted-foreground font-mono text-xs break-all">{s.value}</p>
 							)}
 							<Separator className="my-1" />
-							<p className="text-[10px] text-muted-foreground">
-								Pulled automatically from <strong>{SOURCE_LABEL[s.source] ?? s.source}</strong>. Edit in source system to change.
+							<p className="text-muted-foreground text-[10px]">
+								Pulled automatically from <strong>{SOURCE_LABEL[s.source] ?? s.source}</strong>.
+								Edit in source system to change.
 							</p>
 						</div>
 					))}

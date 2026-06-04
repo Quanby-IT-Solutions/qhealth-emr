@@ -8,21 +8,19 @@ export default function NutritionPage() {
 	const { encounterId, patientId, facilityId } = useChartContext()
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	const permSet = new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	const permSet = new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 
 	if (!permSet.has("nutrition:view")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access nutrition assessments.
 			</div>
 		)
 	}
 
 	return (
-		<NutritionTab
-			encounterId={encounterId}
-			patientId={patientId}
-			facilityId={facilityId ?? ""}
-		/>
+		<NutritionTab encounterId={encounterId} patientId={patientId} facilityId={facilityId ?? ""} />
 	)
 }

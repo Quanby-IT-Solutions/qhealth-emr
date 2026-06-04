@@ -101,7 +101,7 @@ function AncillaryOrderInner({ orderId }: { orderId: string }) {
 
 			<div>
 				<h1 className="text-xl font-semibold">Coverage Application</h1>
-				<p className="font-mono text-xs text-muted-foreground">Order: {orderId}</p>
+				<p className="text-muted-foreground font-mono text-xs">Order: {orderId}</p>
 			</div>
 
 			<Card>
@@ -113,7 +113,9 @@ function AncillaryOrderInner({ orderId }: { orderId: string }) {
 						<div
 							key={opt.type}
 							className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
-								selectedCoverage.includes(opt.type) ? "border-primary bg-primary/5" : "hover:bg-accent"
+								selectedCoverage.includes(opt.type)
+									? "border-primary bg-primary/5"
+									: "hover:bg-accent"
 							}`}
 							onClick={() => toggleCoverage(opt.type)}
 						>
@@ -121,7 +123,7 @@ function AncillaryOrderInner({ orderId }: { orderId: string }) {
 								className={`flex size-4 items-center justify-center rounded border-2 ${selectedCoverage.includes(opt.type) ? "border-primary bg-primary" : "border-muted-foreground"}`}
 							>
 								{selectedCoverage.includes(opt.type) && (
-									<span className="text-[10px] font-bold text-primary-foreground">✓</span>
+									<span className="text-primary-foreground text-[10px] font-bold">✓</span>
 								)}
 							</div>
 							<span className="text-sm font-medium">{opt.label}</span>
@@ -133,13 +135,13 @@ function AncillaryOrderInner({ orderId }: { orderId: string }) {
 			{showOverride && (
 				<Card className="border-destructive/50">
 					<CardHeader>
-						<CardTitle className="flex items-center gap-2 text-base text-destructive">
+						<CardTitle className="text-destructive flex items-center gap-2 text-base">
 							<ShieldAlert className="size-4" />
 							Override (No Coverage)
 						</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-3">
-						<p className="text-sm text-muted-foreground">
+						<p className="text-muted-foreground text-sm">
 							Clearing without coverage requires a reason. This action will be audited.
 						</p>
 						<div className="space-y-1.5">
@@ -157,7 +159,7 @@ function AncillaryOrderInner({ orderId }: { orderId: string }) {
 			)}
 
 			{mutationError && (
-				<p className="text-xs text-destructive">{(mutationError as Error).message}</p>
+				<p className="text-destructive text-xs">{(mutationError as Error).message}</p>
 			)}
 
 			<div className="flex gap-2">

@@ -24,7 +24,7 @@ export default function CriticalResultsPage() {
 
 	if (!can(permSet, "laboratory", "view") || !roleNameMatches(roleName, LAB_TECH_ROLE_NAMES)) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access critical results.
 			</div>
 		)

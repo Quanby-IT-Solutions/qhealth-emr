@@ -8,10 +8,26 @@ import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
-
-import { useAuditLogDetailQuery, useAuditLogExportMutation, useAuditLogsQuery } from "@/features/audit/api/audit.hooks"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
+import {
+	useAuditLogDetailQuery,
+	useAuditLogExportMutation,
+	useAuditLogsQuery,
+} from "@/features/audit/api/audit.hooks"
 
 const ACTION_COLORS: Record<string, string> = {
 	create: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
@@ -28,7 +44,11 @@ interface AuditLogTableProps {
 	initialEntityId?: string
 }
 
-export function AuditLogTable({ facilityId, initialEntityType, initialEntityId }: AuditLogTableProps) {
+export function AuditLogTable({
+	facilityId,
+	initialEntityType,
+	initialEntityId,
+}: AuditLogTableProps) {
 	const [filters, setFilters] = useState<AuditLogFilter>({
 		facilityId,
 		startDate: undefined,
@@ -175,26 +195,20 @@ export function AuditLogTable({ facilityId, initialEntityType, initialEntityId }
 							{data?.data.map(log => (
 								<Fragment key={log.id}>
 									<TableRow
-
-										className="cursor-pointer hover:bg-muted/50"
+										className="hover:bg-muted/50 cursor-pointer"
 										onClick={() => handleRowClick(log.id)}
 									>
 										<TableCell className="text-xs">
 											{new Date(log.createdAt as unknown as string).toLocaleString()}
 										</TableCell>
-										<TableCell className="max-w-32 truncate text-xs">
-											{log.userId}
-										</TableCell>
+										<TableCell className="max-w-32 truncate text-xs">{log.userId}</TableCell>
 										<TableCell>
-											<Badge
-												variant="secondary"
-												className={ACTION_COLORS[log.action] ?? ""}
-											>
+											<Badge variant="secondary" className={ACTION_COLORS[log.action] ?? ""}>
 												{log.action}
 											</Badge>
 										</TableCell>
 										<TableCell className="text-xs">{log.entityType}</TableCell>
-										<TableCell className="max-w-24 truncate text-xs font-mono">
+										<TableCell className="max-w-24 truncate font-mono text-xs">
 											{log.entityId}
 										</TableCell>
 										<TableCell className="text-xs">{log.ipAddress ?? "—"}</TableCell>
@@ -205,12 +219,12 @@ export function AuditLogTable({ facilityId, initialEntityType, initialEntityId }
 										<TableRow key={`${log.id}-detail`}>
 											<TableCell colSpan={6} className="bg-muted/30 p-4">
 												{detailLoading ? (
-													<p className="text-sm text-muted-foreground">Loading detail...</p>
+													<p className="text-muted-foreground text-sm">Loading detail...</p>
 												) : detail ? (
 													<div className="grid grid-cols-2 gap-4">
 														<div>
 															<h4 className="mb-2 text-sm font-semibold">Before State</h4>
-															<pre className="max-h-60 overflow-auto rounded bg-muted p-2 text-xs">
+															<pre className="bg-muted max-h-60 overflow-auto rounded p-2 text-xs">
 																{detail.beforeState
 																	? JSON.stringify(detail.beforeState, null, 2)
 																	: "—"}
@@ -218,7 +232,7 @@ export function AuditLogTable({ facilityId, initialEntityType, initialEntityId }
 														</div>
 														<div>
 															<h4 className="mb-2 text-sm font-semibold">After State</h4>
-															<pre className="max-h-60 overflow-auto rounded bg-muted p-2 text-xs">
+															<pre className="bg-muted max-h-60 overflow-auto rounded p-2 text-xs">
 																{detail.afterState
 																	? JSON.stringify(detail.afterState, null, 2)
 																	: "—"}
@@ -234,7 +248,7 @@ export function AuditLogTable({ facilityId, initialEntityType, initialEntityId }
 
 							{data?.data.length === 0 && (
 								<TableRow>
-									<TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+									<TableCell colSpan={6} className="text-muted-foreground py-8 text-center">
 										No audit logs found.
 									</TableCell>
 								</TableRow>
@@ -246,7 +260,7 @@ export function AuditLogTable({ facilityId, initialEntityType, initialEntityId }
 				{/* Pagination */}
 				{data && data.totalPages > 1 && (
 					<div className="mt-4 flex items-center justify-between">
-						<p className="text-sm text-muted-foreground">
+						<p className="text-muted-foreground text-sm">
 							Page {data.page} of {data.totalPages} ({data.total} total)
 						</p>
 						<div className="flex gap-2">

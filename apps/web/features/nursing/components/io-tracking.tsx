@@ -5,12 +5,7 @@ import { useState } from "react"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/core/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import {
@@ -103,14 +98,10 @@ export function IoTracking({ encounterId, facilityId, readOnly }: IoTrackingProp
 				</Card>
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-muted-foreground text-sm font-medium">
-							Net Balance
-						</CardTitle>
+						<CardTitle className="text-muted-foreground text-sm font-medium">Net Balance</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<p
-							className={`text-2xl font-bold ${net >= 0 ? "text-green-600" : "text-red-600"}`}
-						>
+						<p className={`text-2xl font-bold ${net >= 0 ? "text-green-600" : "text-red-600"}`}>
 							{net >= 0 ? "+" : ""}
 							{net} mL
 						</p>
@@ -139,34 +130,18 @@ export function IoTracking({ encounterId, facilityId, readOnly }: IoTrackingProp
 						</div>
 						<div>
 							<Label htmlFor="route">Route</Label>
-							<Input
-								id="route"
-								name="route"
-								placeholder="e.g. IV, PO, Foley, NG"
-								required
-							/>
+							<Input id="route" name="route" placeholder="e.g. IV, PO, Foley, NG" required />
 						</div>
 						<div>
 							<Label htmlFor="amountMl">Amount (mL)</Label>
-							<Input
-								id="amountMl"
-								name="amountMl"
-								type="number"
-								min="0"
-								step="1"
-								required
-							/>
+							<Input id="amountMl" name="amountMl" type="number" min="0" step="1" required />
 						</div>
 						<div>
 							<Label htmlFor="description">Description</Label>
 							<Input id="description" name="description" placeholder="Optional" />
 						</div>
 						<div className="flex justify-end gap-2 pt-2">
-							<Button
-								type="button"
-								variant="outline"
-								onClick={() => setCreateOpen(false)}
-							>
+							<Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
 								Cancel
 							</Button>
 							<Button type="submit" disabled={createIo.isPending}>
@@ -190,9 +165,7 @@ export function IoTracking({ encounterId, facilityId, readOnly }: IoTrackingProp
 			{ioEntries.isLoading ? (
 				<div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
 			) : !ioEntries.data?.data?.length ? (
-				<div className="text-muted-foreground py-8 text-center text-sm">
-					No I/O entries yet.
-				</div>
+				<div className="text-muted-foreground py-8 text-center text-sm">No I/O entries yet.</div>
 			) : (
 				<div className="overflow-auto rounded-md border">
 					<Table>
@@ -212,17 +185,13 @@ export function IoTracking({ encounterId, facilityId, readOnly }: IoTrackingProp
 										{formatDateTime(io.recordedAt)}
 									</TableCell>
 									<TableCell>
-										<Badge
-											variant={io.ioType === "intake" ? "default" : "secondary"}
-										>
+										<Badge variant={io.ioType === "intake" ? "default" : "secondary"}>
 											{io.ioType}
 										</Badge>
 									</TableCell>
 									<TableCell>{io.route}</TableCell>
 									<TableCell>{io.amountMl}</TableCell>
-									<TableCell className="max-w-[200px] truncate">
-										{io.description ?? "—"}
-									</TableCell>
+									<TableCell className="max-w-[200px] truncate">{io.description ?? "—"}</TableCell>
 								</TableRow>
 							))}
 						</TableBody>

@@ -12,10 +12,6 @@ export default function EsoaPage({ params }: { params: Promise<{ encounterId: st
 	if (!facilityId) return null
 
 	return (
-		<EsoaPageComponent
-			encounterId={encounterId}
-			facilityId={facilityId}
-			patientId={patientId}
-		/>
+		<EsoaPageComponent encounterId={encounterId} facilityId={facilityId} patientId={patientId} />
 	)
 }

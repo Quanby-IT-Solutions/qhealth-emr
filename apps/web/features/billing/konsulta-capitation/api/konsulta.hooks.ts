@@ -60,8 +60,7 @@ export function useRecordKonsultaEventMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		billingOrpc.recordKonsultaEvent.mutationOptions({
-			onSuccess: () =>
-				qc.invalidateQueries({ queryKey: billingOrpc.listKonsultaActivities.key() }),
+			onSuccess: () => qc.invalidateQueries({ queryKey: billingOrpc.listKonsultaActivities.key() }),
 		})
 	)
 }

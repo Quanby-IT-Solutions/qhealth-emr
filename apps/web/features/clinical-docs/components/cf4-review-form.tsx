@@ -198,11 +198,11 @@ export function CF4ReviewForm({
 			{/* Header */}
 			<div className="flex items-center justify-between">
 				<div>
-					<h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+					<h3 className="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
 						PhilHealth CF4 — Claim Form
 					</h3>
-					<p className="text-base font-medium mt-0.5">{patientName}</p>
-					<p className="text-xs text-muted-foreground">Encounter: {encounterId}</p>
+					<p className="mt-0.5 text-base font-medium">{patientName}</p>
+					<p className="text-muted-foreground text-xs">Encounter: {encounterId}</p>
 				</div>
 				<Badge variant="secondary">Auto-extracted — Review before submitting</Badge>
 			</div>
@@ -213,7 +213,10 @@ export function CF4ReviewForm({
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 				<div className="space-y-1.5">
 					<Label>Claim Type *</Label>
-					<Select value={data.claimType} onValueChange={v => set("claimType", v as CF4Data["claimType"])}>
+					<Select
+						value={data.claimType}
+						onValueChange={v => set("claimType", v as CF4Data["claimType"])}
+					>
 						<SelectTrigger>
 							<SelectValue />
 						</SelectTrigger>
@@ -229,7 +232,10 @@ export function CF4ReviewForm({
 
 				<div className="space-y-1.5">
 					<Label>Facility Level *</Label>
-					<Select value={data.facilityLevel} onValueChange={v => set("facilityLevel", v as CF4Data["facilityLevel"])}>
+					<Select
+						value={data.facilityLevel}
+						onValueChange={v => set("facilityLevel", v as CF4Data["facilityLevel"])}
+					>
 						<SelectTrigger>
 							<SelectValue />
 						</SelectTrigger>
@@ -245,7 +251,10 @@ export function CF4ReviewForm({
 
 				<div className="space-y-1.5">
 					<Label>Room Type</Label>
-					<Select value={data.roomType} onValueChange={v => set("roomType", v as CF4Data["roomType"])}>
+					<Select
+						value={data.roomType}
+						onValueChange={v => set("roomType", v as CF4Data["roomType"])}
+					>
 						<SelectTrigger>
 							<SelectValue />
 						</SelectTrigger>
@@ -282,7 +291,10 @@ export function CF4ReviewForm({
 
 				<div className="space-y-1.5">
 					<Label>Discharge Status</Label>
-					<Select value={data.dischargeStatus} onValueChange={v => set("dischargeStatus", v as CF4Data["dischargeStatus"])}>
+					<Select
+						value={data.dischargeStatus}
+						onValueChange={v => set("dischargeStatus", v as CF4Data["dischargeStatus"])}
+					>
 						<SelectTrigger>
 							<SelectValue />
 						</SelectTrigger>
@@ -335,7 +347,7 @@ export function CF4ReviewForm({
 					)}
 				</div>
 				{data.secondaryDiagnoses.map((diag, i) => (
-					<div key={i} className="grid grid-cols-[1fr_2fr_auto] gap-3 items-end">
+					<div key={i} className="grid grid-cols-[1fr_2fr_auto] items-end gap-3">
 						<div className="space-y-1.5">
 							<Label className="text-xs">ICD-10 Code</Label>
 							<Input
@@ -430,9 +442,9 @@ export function CF4ReviewForm({
 				</div>
 
 				{/* Total */}
-				<div className="flex items-center justify-end gap-3 rounded-md bg-muted/50 px-4 py-2 mt-2">
+				<div className="bg-muted/50 mt-2 flex items-center justify-end gap-3 rounded-md px-4 py-2">
 					<span className="text-sm font-medium">Total Charges:</span>
-					<span className="font-mono font-semibold text-base">
+					<span className="font-mono text-base font-semibold">
 						{toPhpAmount(String(totalCharges(data)))}
 					</span>
 				</div>
@@ -445,11 +457,7 @@ export function CF4ReviewForm({
 				<Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
 					Cancel
 				</Button>
-				<Button
-					type="button"
-					disabled={!isValid || isSubmitting}
-					onClick={() => onSubmit(data)}
-				>
+				<Button type="button" disabled={!isValid || isSubmitting} onClick={() => onSubmit(data)}>
 					{isSubmitting ? "Submitting…" : "Submit CF4"}
 				</Button>
 			</div>

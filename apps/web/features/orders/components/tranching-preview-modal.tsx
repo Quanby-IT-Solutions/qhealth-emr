@@ -163,7 +163,7 @@ export function TranchingPreviewModal({
 									<TableCell className="px-3 text-center">
 										<span className="text-destructive font-semibold">YES</span>
 									</TableCell>
-									<TableCell className="text-muted-foreground whitespace-normal px-3 text-xs leading-relaxed">
+									<TableCell className="text-muted-foreground px-3 text-xs leading-relaxed whitespace-normal">
 										{row.dispensingInstructions}
 									</TableCell>
 								</TableRow>

@@ -349,7 +349,9 @@ export class LabService {
 	}
 
 	/** Attach patient name/MRN to raw cross-match rows (replaces the patients join). */
-	private async assembleRows(rawRows: Array<Record<string, unknown>>): Promise<CrossMatchListRow[]> {
+	private async assembleRows(
+		rawRows: Array<Record<string, unknown>>
+	): Promise<CrossMatchListRow[]> {
 		if (rawRows.length === 0) return []
 
 		const patientIds = [...new Set(rawRows.map(r => r.patient_id as string))]
@@ -429,9 +431,7 @@ export class LabService {
 				.select("cross_match_request_id, blood_unit_id")
 				.in("cross_match_request_id", requestIds)
 		)
-		const unitIds = [
-			...new Set(assignments.map((a: { blood_unit_id: string }) => a.blood_unit_id)),
-		]
+		const unitIds = [...new Set(assignments.map((a: { blood_unit_id: string }) => a.blood_unit_id))]
 		if (unitIds.length === 0) return new Map()
 
 		const units = unwrapMany(await supabase.from("blood_units").select("*").in("id", unitIds))

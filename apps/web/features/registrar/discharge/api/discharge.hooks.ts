@@ -18,8 +18,7 @@ export function useConfirmPharmacyClearanceMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.discharge.confirmPharmacyClearance.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.discharge.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.discharge.key() }),
 		})
 	)
 }
@@ -28,8 +27,7 @@ export function useConfirmNursingClearanceMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.discharge.confirmNursingClearance.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.discharge.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.discharge.key() }),
 		})
 	)
 }
@@ -38,8 +36,7 @@ export function useConfirmBillingSignOffMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.discharge.confirmBillingSignOff.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.discharge.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.discharge.key() }),
 		})
 	)
 }

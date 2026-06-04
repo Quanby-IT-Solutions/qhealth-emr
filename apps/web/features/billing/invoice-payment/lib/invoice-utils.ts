@@ -3,7 +3,13 @@ export function computeInvoiceTotals(params: {
 	discountAmount?: number
 	philhealthCoverage?: number
 	vatAmount?: number
-}): { subtotal: number; discountAmount: number; philhealthCoverage: number; vatAmount: number; total: number } {
+}): {
+	subtotal: number
+	discountAmount: number
+	philhealthCoverage: number
+	vatAmount: number
+	total: number
+} {
 	const { subtotal, discountAmount = 0, philhealthCoverage = 0, vatAmount = 0 } = params
 	const total = Math.max(0, subtotal - discountAmount - philhealthCoverage + vatAmount)
 	return { subtotal, discountAmount, philhealthCoverage, vatAmount, total }

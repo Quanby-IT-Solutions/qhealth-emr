@@ -13,10 +13,7 @@ export interface DevicePreviewState {
 	permissionError: string | null
 }
 
-export function useDevicePreview(
-	videoEnabled: boolean,
-	audioEnabled: boolean
-): DevicePreviewState {
+export function useDevicePreview(videoEnabled: boolean, audioEnabled: boolean): DevicePreviewState {
 	const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([])
 	const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([])
 	const [videoDeviceId, setVideoDeviceId] = useState<string | undefined>(undefined)
@@ -55,16 +52,8 @@ export function useDevicePreview(
 		}
 
 		const constraints: MediaStreamConstraints = {
-			video: videoEnabled
-				? videoDeviceId
-					? { deviceId: { exact: videoDeviceId } }
-					: true
-				: false,
-			audio: audioEnabled
-				? audioDeviceId
-					? { deviceId: { exact: audioDeviceId } }
-					: true
-				: false,
+			video: videoEnabled ? (videoDeviceId ? { deviceId: { exact: videoDeviceId } } : true) : false,
+			audio: audioEnabled ? (audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true) : false,
 		}
 
 		navigator.mediaDevices
@@ -87,7 +76,8 @@ export function useDevicePreview(
 			})
 			.catch((err: unknown) => {
 				if (cancelled) return
-				const message = err instanceof Error ? err.message : "Unable to access camera or microphone."
+				const message =
+					err instanceof Error ? err.message : "Unable to access camera or microphone."
 				setPermissionError(message)
 			})
 

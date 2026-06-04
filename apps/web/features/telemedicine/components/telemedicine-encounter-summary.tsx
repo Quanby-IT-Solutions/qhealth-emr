@@ -27,23 +27,25 @@ function Field({ label, value }: { label: string; value?: string | null }) {
 function NoteBlock({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="rounded-lg border p-3">
-			<p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+			<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 				{label}
 			</p>
-			<p className="whitespace-pre-wrap text-sm">{value || "-"}</p>
+			<p className="text-sm whitespace-pre-wrap">{value || "-"}</p>
 		</div>
 	)
 }
 
 function ChartSnapshot({ patientId }: { patientId: string }) {
-	const { data: summary, isLoading } = usePatientSummaryQuery(patientId, { enabled: Boolean(patientId) })
+	const { data: summary, isLoading } = usePatientSummaryQuery(patientId, {
+		enabled: Boolean(patientId),
+	})
 	const activeProblems = summary?.activeProblems ?? []
 	const activeAllergies = summary?.activeAllergies ?? []
 
 	return (
 		<div className="grid gap-3 md:grid-cols-2">
 			<div className="rounded-lg border p-3">
-				<p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+				<p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
 					Active Problems
 				</p>
 				{isLoading ? (
@@ -64,7 +66,7 @@ function ChartSnapshot({ patientId }: { patientId: string }) {
 				)}
 			</div>
 			<div className="rounded-lg border p-3">
-				<p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+				<p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
 					Active Allergies
 				</p>
 				{isLoading ? (
@@ -134,7 +136,7 @@ export function TelemedicineEncounterSummary({
 
 						{encounter.encounterType === "linked" && (
 							<div className="border-primary/30 bg-primary/5 rounded-md border p-3">
-								<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+								<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 									Linked In-Person Visit
 								</p>
 								<p className="text-sm font-medium">

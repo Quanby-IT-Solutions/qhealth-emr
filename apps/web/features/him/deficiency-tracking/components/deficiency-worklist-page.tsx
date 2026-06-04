@@ -1,11 +1,17 @@
 "use client"
 
 import { useCallback, useMemo, useState } from "react"
-import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import {
 	Select,
@@ -14,13 +20,24 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/core/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { cn } from "@/core/lib/utils"
-
-import { EmptyState, ErrorState, SkeletonRows } from "@/features/admin/components/state-views"
 import { FilterBar, FilterField } from "@/features/admin/components/filter-bar"
+import { EmptyState, ErrorState, SkeletonRows } from "@/features/admin/components/state-views"
 import { TableToolbar } from "@/features/admin/components/table-toolbar"
-import { useDeficienciesQuery, useNotifyDeficiencyMutation, useScanDeficienciesMutation } from "../api/deficiencies.hooks"
+
+import {
+	useDeficienciesQuery,
+	useNotifyDeficiencyMutation,
+	useScanDeficienciesMutation,
+} from "../api/deficiencies.hooks"
 
 interface DeficiencyWorklistPageProps {
 	facilityId: string
@@ -94,11 +111,11 @@ function DeficiencyAgingChart({ items }: { items: Array<{ ageDays: number }> }) 
 				<div className="grid gap-3 sm:grid-cols-4">
 					{buckets.map(bucket => (
 						<div key={bucket.label} className="space-y-2">
-							<div className="flex items-center justify-between text-xs text-muted-foreground">
+							<div className="text-muted-foreground flex items-center justify-between text-xs">
 								<span>{bucket.label}</span>
 								<span>{bucket.value}</span>
 							</div>
-							<div className="flex h-28 items-end rounded-md border bg-muted/20 p-2">
+							<div className="bg-muted/20 flex h-28 items-end rounded-md border p-2">
 								<div
 									className={cn("w-full rounded-sm transition-all", bucket.tone)}
 									style={{ height: `${Math.max(8, (bucket.value / maxValue) * 100)}%` }}
@@ -119,13 +136,32 @@ export function DeficiencyWorklistPage({ facilityId }: DeficiencyWorklistPagePro
 	const [_busy, setBusy] = useState(false)
 	void _busy
 
-	const filterType = (searchParams.get("type") ?? "all") as "all" | "missing_discharge_summary" | "missing_signature" | "undocumented_procedure"
-	const filterStatus = (searchParams.get("status") ?? "open") as "all" | "open" | "notified" | "resolved" | "dismissed"
-	const filterAge = (searchParams.get("age") ?? "all") as "all" | "lt_7" | "d7_14" | "d14_30" | "gt_30"
+	const filterType = (searchParams.get("type") ?? "all") as
+		| "all"
+		| "missing_discharge_summary"
+		| "missing_signature"
+		| "undocumented_procedure"
+	const filterStatus = (searchParams.get("status") ?? "open") as
+		| "all"
+		| "open"
+		| "notified"
+		| "resolved"
+		| "dismissed"
+	const filterAge = (searchParams.get("age") ?? "all") as
+		| "all"
+		| "lt_7"
+		| "d7_14"
+		| "d14_30"
+		| "gt_30"
 	const filterOwner = searchParams.get("owner") ?? ""
 	const page = Number(searchParams.get("page") ?? "1")
 	const limit = Number(searchParams.get("limit") ?? "25")
-	const sortBy = (searchParams.get("sortBy") ?? "dischargeDatetime") as "dischargeDatetime" | "ageDays" | "status" | "deficiencyType" | "patientName"
+	const sortBy = (searchParams.get("sortBy") ?? "dischargeDatetime") as
+		| "dischargeDatetime"
+		| "ageDays"
+		| "status"
+		| "deficiencyType"
+		| "patientName"
 	const sortDirection = (searchParams.get("sortDirection") ?? "desc") as "asc" | "desc"
 
 	const { data, isLoading, isError, refetch, error } = useDeficienciesQuery({
@@ -243,7 +279,7 @@ export function DeficiencyWorklistPage({ facilityId }: DeficiencyWorklistPagePro
 					</Select>
 				</FilterField>
 				<FilterField label="Direction" htmlFor="sort-direction-f">
-					<Select value={sortDirection} onValueChange={v => updateParam("sortDirection", v ?? "") }>
+					<Select value={sortDirection} onValueChange={v => updateParam("sortDirection", v ?? "")}>
 						<SelectTrigger id="sort-direction-f" className="h-8 w-28 text-xs">
 							<SelectValue />
 						</SelectTrigger>
@@ -260,7 +296,10 @@ export function DeficiencyWorklistPage({ facilityId }: DeficiencyWorklistPagePro
 			{isLoading && <SkeletonRows count={6} />}
 			{isError && <ErrorState error={error} retry={refetch} />}
 			{data && worklistItems.length === 0 && !isLoading && (
-				<EmptyState title="No deficiencies match your filters" description="Try adjusting filters or run a scan." />
+				<EmptyState
+					title="No deficiencies match your filters"
+					description="Try adjusting filters or run a scan."
+				/>
 			)}
 
 			{data && worklistItems.length > 0 && (
@@ -281,21 +320,27 @@ export function DeficiencyWorklistPage({ facilityId }: DeficiencyWorklistPagePro
 						{worklistItems.map(d => (
 							<TableRow
 								key={d.id}
-								className="cursor-pointer hover:bg-muted/40"
+								className="hover:bg-muted/40 cursor-pointer"
 								onClick={() => router.push(`/him/deficiencies/${d.id}`)}
 							>
 								<TableCell>
 									<div className="space-y-0.5">
 										<p className="text-sm font-medium">{d.patientName}</p>
-										<p className="text-xs text-muted-foreground">MRN {d.patientMrn}</p>
+										<p className="text-muted-foreground text-xs">MRN {d.patientMrn}</p>
 									</div>
 								</TableCell>
 								<TableCell className="font-mono text-xs">{d.encounterId.slice(0, 8)}…</TableCell>
-								<TableCell className="text-xs text-muted-foreground">
-									{d.dischargeDatetime ? new Date(d.dischargeDatetime).toLocaleDateString("en-PH") : "Pending"}
+								<TableCell className="text-muted-foreground text-xs">
+									{d.dischargeDatetime
+										? new Date(d.dischargeDatetime).toLocaleDateString("en-PH")
+										: "Pending"}
 								</TableCell>
-								<TableCell className="text-xs capitalize">{normalizeDeficiencyLabel(d.deficiencyType)}</TableCell>
-								<TableCell className="text-xs text-muted-foreground">{d.ownerDisplayName ?? "Unassigned"}</TableCell>
+								<TableCell className="text-xs capitalize">
+									{normalizeDeficiencyLabel(d.deficiencyType)}
+								</TableCell>
+								<TableCell className="text-muted-foreground text-xs">
+									{d.ownerDisplayName ?? "Unassigned"}
+								</TableCell>
 								<TableCell>{ageBadge(d.ageDays)}</TableCell>
 								<TableCell>
 									<Badge
@@ -306,7 +351,7 @@ export function DeficiencyWorklistPage({ facilityId }: DeficiencyWorklistPagePro
 													? "default"
 													: "secondary"
 										}
-										className="capitalize text-[10px]"
+										className="text-[10px] capitalize"
 									>
 										{d.status}
 									</Badge>
@@ -333,7 +378,7 @@ export function DeficiencyWorklistPage({ facilityId }: DeficiencyWorklistPagePro
 			)}
 
 			<div className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
-				<div className="flex items-center gap-2 text-sm text-muted-foreground">
+				<div className="text-muted-foreground flex items-center gap-2 text-sm">
 					<span>
 						Page {page} of {totalPages}
 					</span>
@@ -341,7 +386,10 @@ export function DeficiencyWorklistPage({ facilityId }: DeficiencyWorklistPagePro
 					<span>{data?.total ?? 0} total cases</span>
 				</div>
 				<div className="flex items-center gap-2">
-					<Select value={String(limit)} onValueChange={value => updateParam("limit", value ?? String(limit))}>
+					<Select
+						value={String(limit)}
+						onValueChange={value => updateParam("limit", value ?? String(limit))}
+					>
 						<SelectTrigger className="h-8 w-24 text-xs">
 							<SelectValue />
 						</SelectTrigger>
@@ -351,10 +399,20 @@ export function DeficiencyWorklistPage({ facilityId }: DeficiencyWorklistPagePro
 							<SelectItem value="50">50 / page</SelectItem>
 						</SelectContent>
 					</Select>
-					<Button variant="outline" size="sm" onClick={() => updateParam("page", String(Math.max(1, page - 1)), false)} disabled={page <= 1}>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => updateParam("page", String(Math.max(1, page - 1)), false)}
+						disabled={page <= 1}
+					>
 						Previous
 					</Button>
-					<Button variant="outline" size="sm" onClick={() => updateParam("page", String(Math.min(totalPages, page + 1)), false)} disabled={page >= totalPages}>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => updateParam("page", String(Math.min(totalPages, page + 1)), false)}
+						disabled={page >= totalPages}
+					>
 						Next
 					</Button>
 				</div>

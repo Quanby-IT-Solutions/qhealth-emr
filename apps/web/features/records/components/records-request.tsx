@@ -197,9 +197,16 @@ function RequestForm({
 			<div className="grid grid-cols-2 gap-4">
 				<div className="space-y-2">
 					<Label>Record Type</Label>
-					<Select value={data.recordType} onValueChange={val => { if (val) onChange({ recordType: val }) }}>
+					<Select
+						value={data.recordType}
+						onValueChange={val => {
+							if (val) onChange({ recordType: val })
+						}}
+					>
 						<SelectTrigger>
-							<SelectValue>{RECORD_TYPE_LABELS[data.recordType] ?? "Select record type"}</SelectValue>
+							<SelectValue>
+								{RECORD_TYPE_LABELS[data.recordType] ?? "Select record type"}
+							</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							{Object.entries(RECORD_TYPE_LABELS).map(([val, label]) => (
@@ -212,7 +219,12 @@ function RequestForm({
 				</div>
 				<div className="space-y-2">
 					<Label>Purpose</Label>
-					<Select value={data.purpose} onValueChange={val => { if (val) onChange({ purpose: val }) }}>
+					<Select
+						value={data.purpose}
+						onValueChange={val => {
+							if (val) onChange({ purpose: val })
+						}}
+					>
 						<SelectTrigger>
 							<SelectValue>{data.purpose || "Select purpose"}</SelectValue>
 						</SelectTrigger>
@@ -238,7 +250,12 @@ function RequestForm({
 				</div>
 				<div className="space-y-2">
 					<Label>Relationship to Patient</Label>
-					<Select value={data.relationship} onValueChange={val => { if (val) onChange({ relationship: val }) }}>
+					<Select
+						value={data.relationship}
+						onValueChange={val => {
+							if (val) onChange({ relationship: val })
+						}}
+					>
 						<SelectTrigger>
 							<SelectValue>{data.relationship || "Select relationship"}</SelectValue>
 						</SelectTrigger>
@@ -271,12 +288,12 @@ function PaymentForm({
 	return (
 		<div className="space-y-4">
 			{baseFee > 0 && (
-				<div className="rounded-lg border bg-muted/40 p-4">
+				<div className="bg-muted/40 rounded-lg border p-4">
 					<p className="text-sm font-medium">
 						{RECORD_TYPE_LABELS[requestData.recordType] ?? "Record type"}
 					</p>
 					<p className="text-2xl font-bold">₱ {baseFee.toLocaleString("en-PH")}</p>
-					<p className="text-xs text-muted-foreground">Standard fee per Republic Act 10173</p>
+					<p className="text-muted-foreground text-xs">Standard fee per Republic Act 10173</p>
 				</div>
 			)}
 			<div className="grid grid-cols-2 gap-4">
@@ -292,7 +309,12 @@ function PaymentForm({
 				</div>
 				<div className="space-y-2">
 					<Label>Payment Method</Label>
-					<Select value={data.method} onValueChange={val => { if (val) onChange({ method: val }) }}>
+					<Select
+						value={data.method}
+						onValueChange={val => {
+							if (val) onChange({ method: val })
+						}}
+					>
 						<SelectTrigger>
 							<SelectValue>{data.method || "Select method"}</SelectValue>
 						</SelectTrigger>
@@ -465,7 +487,7 @@ export function RecordsRequest() {
 			<div className="flex flex-wrap items-start justify-between gap-3">
 				<div>
 					<h1 className="text-2xl font-bold">Medical Records Request</h1>
-					<p className="text-sm text-muted-foreground">Request No: {requestNo}</p>
+					<p className="text-muted-foreground text-sm">Request No: {requestNo}</p>
 				</div>
 				<Badge variant={isAllComplete ? "default" : "secondary"}>
 					{isAllComplete ? "Released" : `Step ${currentIdx + 1} of ${REQUEST_STEPS.length}`}
@@ -494,9 +516,7 @@ export function RecordsRequest() {
 						<div className="flex items-center justify-between">
 							<div>
 								<CardTitle>{currentStepDef.label}</CardTitle>
-								<p className="mt-1 text-sm text-muted-foreground">
-									{currentStepDef.description}
-								</p>
+								<p className="text-muted-foreground mt-1 text-sm">{currentStepDef.description}</p>
 							</div>
 							<Badge variant="outline" className="text-xs">
 								<Clock className="mr-1 size-3" />
@@ -506,10 +526,7 @@ export function RecordsRequest() {
 					</CardHeader>
 					<CardContent className="space-y-4">
 						{currentStep === "request" && (
-							<RequestForm
-								data={formData.request}
-								onChange={d => handleDataChange<"request">(d)}
-							/>
+							<RequestForm data={formData.request} onChange={d => handleDataChange<"request">(d)} />
 						)}
 						{currentStep === "payment" && (
 							<PaymentForm
@@ -525,10 +542,7 @@ export function RecordsRequest() {
 							/>
 						)}
 						{currentStep === "release" && (
-							<ReleaseForm
-								data={formData.release}
-								onChange={d => handleDataChange<"release">(d)}
-							/>
+							<ReleaseForm data={formData.release} onChange={d => handleDataChange<"release">(d)} />
 						)}
 
 						<Separator />
@@ -561,7 +575,7 @@ export function RecordsRequest() {
 								<FileText className="size-7 text-green-600 dark:text-green-400" />
 							</div>
 							<p className="text-lg font-semibold">Records Released</p>
-							<p className="text-sm text-muted-foreground">
+							<p className="text-muted-foreground text-sm">
 								Request {requestNo} has been fully processed and released.
 							</p>
 						</div>
@@ -588,7 +602,7 @@ export function RecordsRequest() {
 							{REQUEST_STEPS.map(step => (
 								<tr key={step.id} className="border-b">
 									<td className="p-3 font-medium">{step.label}</td>
-									<td className="p-3 text-muted-foreground">{step.slaSlaTargetDays}d</td>
+									<td className="text-muted-foreground p-3">{step.slaSlaTargetDays}d</td>
 									<td className="p-3">
 										{stepStatuses[step.id] === "completed" ? (
 											<Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
@@ -602,7 +616,7 @@ export function RecordsRequest() {
 											</Badge>
 										)}
 									</td>
-									<td className="p-3 text-xs text-muted-foreground">
+									<td className="text-muted-foreground p-3 text-xs">
 										{completedAt[step.id]
 											? new Date(completedAt[step.id]!).toLocaleDateString("en-PH")
 											: "—"}

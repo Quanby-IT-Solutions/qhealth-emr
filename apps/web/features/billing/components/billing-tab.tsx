@@ -32,21 +32,20 @@ import {
 } from "@/core/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { Textarea } from "@/core/components/ui/textarea"
-
 import {
-	useChargesQuery,
+	useBillingStatusQuery,
 	useChargeMasterQuery,
+	useChargesQuery,
+	useCheckEligibilityMutation,
 	useCreateChargeMutation,
-	useUpdateChargeMutation,
 	useDeleteChargeMutation,
-	useInvoicesQuery,
-	useInvoiceQuery,
-	useGenerateInvoiceMutation,
 	useFinalizeInvoiceMutation,
+	useGenerateInvoiceMutation,
+	useInvoiceQuery,
+	useInvoicesQuery,
 	usePaymentsQuery,
 	useRecordPaymentMutation,
-	useCheckEligibilityMutation,
-	useBillingStatusQuery,
+	useUpdateChargeMutation,
 } from "@/features/billing/api/billing.hooks"
 import { Cf4Preview } from "@/features/billing/components/cf4-preview"
 import { Cf5Drg } from "@/features/billing/components/cf5-drg"
@@ -116,7 +115,11 @@ export function BillingTab({ encounterId, facilityId, patientId }: BillingTabPro
 function ChargesPanel({ encounterId, facilityId }: { encounterId: string; facilityId: string }) {
 	const [addOpen, setAddOpen] = useState(false)
 	const [search, setSearch] = useState("")
-	const [selectedItem, setSelectedItem] = useState<{ id: string; description: string; unitPrice: string } | null>(null)
+	const [selectedItem, setSelectedItem] = useState<{
+		id: string
+		description: string
+		unitPrice: string
+	} | null>(null)
 	const [quantity, setQuantity] = useState("1")
 	const [manualDesc, setManualDesc] = useState("")
 	const [manualPrice, setManualPrice] = useState("")
@@ -133,22 +136,38 @@ function ChargesPanel({ encounterId, facilityId }: { encounterId: string; facili
 
 	function handleAddCharge() {
 		if (selectedItem) {
-			createCharge.mutate({
-				facilityId,
-				encounterId,
-				chargeMasterItemId: selectedItem.id,
-				description: selectedItem.description,
-				quantity: Number(quantity),
-				unitPrice: Number(selectedItem.unitPrice),
-			}, { onSuccess: () => { setAddOpen(false); resetForm() } })
+			createCharge.mutate(
+				{
+					facilityId,
+					encounterId,
+					chargeMasterItemId: selectedItem.id,
+					description: selectedItem.description,
+					quantity: Number(quantity),
+					unitPrice: Number(selectedItem.unitPrice),
+				},
+				{
+					onSuccess: () => {
+						setAddOpen(false)
+						resetForm()
+					},
+				}
+			)
 		} else if (manualDesc && manualPrice) {
-			createCharge.mutate({
-				facilityId,
-				encounterId,
-				description: manualDesc,
-				quantity: Number(quantity),
-				unitPrice: Number(manualPrice),
-			}, { onSuccess: () => { setAddOpen(false); resetForm() } })
+			createCharge.mutate(
+				{
+					facilityId,
+					encounterId,
+					description: manualDesc,
+					quantity: Number(quantity),
+					unitPrice: Number(manualPrice),
+				},
+				{
+					onSuccess: () => {
+						setAddOpen(false)
+						resetForm()
+					},
+				}
+			)
 		}
 	}
 
@@ -165,11 +184,13 @@ function ChargesPanel({ encounterId, facilityId }: { encounterId: string; facili
 			<CardHeader className="flex flex-row items-center justify-between">
 				<div>
 					<CardTitle>Charges</CardTitle>
-					<p className="text-sm text-muted-foreground mt-1">
+					<p className="text-muted-foreground mt-1 text-sm">
 						Total: ₱{totalCharges.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
 					</p>
 				</div>
-				<Button size="sm" onClick={() => setAddOpen(true)}>Add Charge</Button>
+				<Button size="sm" onClick={() => setAddOpen(true)}>
+					Add Charge
+				</Button>
 				<Dialog open={addOpen} onOpenChange={setAddOpen}>
 					<DialogContent className="max-w-lg">
 						<DialogHeader>
@@ -181,46 +202,84 @@ function ChargesPanel({ encounterId, facilityId }: { encounterId: string; facili
 								<Label>Search Charge Master</Label>
 								<Input
 									value={search}
-									onChange={e => { setSearch(e.target.value); setSelectedItem(null) }}
+									onChange={e => {
+										setSearch(e.target.value)
+										setSelectedItem(null)
+									}}
 									placeholder="Search by code or description..."
 								/>
-								{chargeMasterQuery.data?.items && chargeMasterQuery.data.items.length > 0 && search && !selectedItem && (
-									<div className="border rounded-md mt-1 max-h-40 overflow-y-auto">
-										{chargeMasterQuery.data.items.map(item => (
-											<button
-												key={item.id}
-												className="w-full text-left px-3 py-2 text-sm hover:bg-muted"
-												onClick={() => {
-													setSelectedItem({ id: item.id, description: item.description, unitPrice: item.unitPrice })
-													setSearch(item.description)
-												}}
-											>
-												<span className="font-medium">{item.itemCode}</span> — {item.description} (₱{Number(item.unitPrice).toFixed(2)})
-											</button>
-										))}
-									</div>
-								)}
+								{chargeMasterQuery.data?.items &&
+									chargeMasterQuery.data.items.length > 0 &&
+									search &&
+									!selectedItem && (
+										<div className="mt-1 max-h-40 overflow-y-auto rounded-md border">
+											{chargeMasterQuery.data.items.map(item => (
+												<button
+													key={item.id}
+													className="hover:bg-muted w-full px-3 py-2 text-left text-sm"
+													onClick={() => {
+														setSelectedItem({
+															id: item.id,
+															description: item.description,
+															unitPrice: item.unitPrice,
+														})
+														setSearch(item.description)
+													}}
+												>
+													<span className="font-medium">{item.itemCode}</span> — {item.description}{" "}
+													(₱{Number(item.unitPrice).toFixed(2)})
+												</button>
+											))}
+										</div>
+									)}
 							</div>
 							{!selectedItem && (
 								<>
 									<div>
 										<Label>Or Manual Description</Label>
-										<Input value={manualDesc} onChange={e => setManualDesc(e.target.value)} placeholder="Service description" />
+										<Input
+											value={manualDesc}
+											onChange={e => setManualDesc(e.target.value)}
+											placeholder="Service description"
+										/>
 									</div>
 									<div>
 										<Label>Unit Price (₱)</Label>
-										<Input type="number" value={manualPrice} onChange={e => setManualPrice(e.target.value)} placeholder="0.00" />
+										<Input
+											type="number"
+											value={manualPrice}
+											onChange={e => setManualPrice(e.target.value)}
+											placeholder="0.00"
+										/>
 									</div>
 								</>
 							)}
 							<div>
 								<Label>Quantity</Label>
-								<Input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} min={1} />
+								<Input
+									type="number"
+									value={quantity}
+									onChange={e => setQuantity(e.target.value)}
+									min={1}
+								/>
 							</div>
 						</div>
 						<DialogFooter>
-							<Button variant="outline" onClick={() => { setAddOpen(false); resetForm() }}>Cancel</Button>
-							<Button onClick={handleAddCharge} disabled={createCharge.isPending || (!selectedItem && (!manualDesc || !manualPrice))}>
+							<Button
+								variant="outline"
+								onClick={() => {
+									setAddOpen(false)
+									resetForm()
+								}}
+							>
+								Cancel
+							</Button>
+							<Button
+								onClick={handleAddCharge}
+								disabled={
+									createCharge.isPending || (!selectedItem && (!manualDesc || !manualPrice))
+								}
+							>
 								{createCharge.isPending ? "Adding..." : "Add"}
 							</Button>
 						</DialogFooter>
@@ -229,9 +288,9 @@ function ChargesPanel({ encounterId, facilityId }: { encounterId: string; facili
 			</CardHeader>
 			<CardContent className="p-0">
 				{chargesQuery.isLoading ? (
-					<p className="p-4 text-sm text-muted-foreground">Loading charges...</p>
+					<p className="text-muted-foreground p-4 text-sm">Loading charges...</p>
 				) : chargeList.length === 0 ? (
-					<p className="p-4 text-sm text-muted-foreground">No charges found.</p>
+					<p className="text-muted-foreground p-4 text-sm">No charges found.</p>
 				) : (
 					<Table>
 						<TableHeader>
@@ -254,8 +313,12 @@ function ChargesPanel({ encounterId, facilityId }: { encounterId: string; facili
 										</Badge>
 									</TableCell>
 									<TableCell className="text-right">{charge.quantity}</TableCell>
-									<TableCell className="text-right">₱{Number(charge.unitPrice).toFixed(2)}</TableCell>
-									<TableCell className="text-right font-medium">₱{Number(charge.totalAmount).toFixed(2)}</TableCell>
+									<TableCell className="text-right">
+										₱{Number(charge.unitPrice).toFixed(2)}
+									</TableCell>
+									<TableCell className="text-right font-medium">
+										₱{Number(charge.totalAmount).toFixed(2)}
+									</TableCell>
 									<TableCell>
 										{charge.sourceType === "manual" && (
 											<Button
@@ -321,15 +384,25 @@ function InvoicesPanel({
 
 	function handleRecordPayment() {
 		if (!selectedInvoiceId || !payAmount) return
-		recordPayment.mutate({
-			facilityId,
-			invoiceId: selectedInvoiceId,
-			amount: Number(payAmount),
-			paymentMethod: payMethod,
-			referenceNumber: payRef || undefined,
-			paymentDate: new Date().toISOString().split("T")[0]!,
-			notes: payNotes || undefined,
-		}, { onSuccess: () => { setPayOpen(false); setPayAmount(""); setPayRef(""); setPayNotes("") } })
+		recordPayment.mutate(
+			{
+				facilityId,
+				invoiceId: selectedInvoiceId,
+				amount: Number(payAmount),
+				paymentMethod: payMethod,
+				referenceNumber: payRef || undefined,
+				paymentDate: new Date().toISOString().split("T")[0]!,
+				notes: payNotes || undefined,
+			},
+			{
+				onSuccess: () => {
+					setPayOpen(false)
+					setPayAmount("")
+					setPayRef("")
+					setPayNotes("")
+				},
+			}
+		)
 	}
 
 	const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -364,9 +437,11 @@ function InvoicesPanel({
 				</CardHeader>
 				<CardContent className="p-0">
 					{invoicesQuery.isLoading ? (
-						<p className="p-4 text-sm text-muted-foreground">Loading invoices...</p>
+						<p className="text-muted-foreground p-4 text-sm">Loading invoices...</p>
 					) : invoiceList.length === 0 ? (
-						<p className="p-4 text-sm text-muted-foreground">No invoices yet. Generate one from the charges.</p>
+						<p className="text-muted-foreground p-4 text-sm">
+							No invoices yet. Generate one from the charges.
+						</p>
 					) : (
 						<Table>
 							<TableHeader>
@@ -381,26 +456,46 @@ function InvoicesPanel({
 							</TableHeader>
 							<TableBody>
 								{invoiceList.map(inv => (
-									<TableRow key={inv.id} className={selectedInvoiceId === inv.id ? "bg-muted/50" : ""}>
+									<TableRow
+										key={inv.id}
+										className={selectedInvoiceId === inv.id ? "bg-muted/50" : ""}
+									>
 										<TableCell>
-											<button className="text-blue-600 underline text-sm" onClick={() => setSelectedInvoiceId(inv.id)}>
+											<button
+												className="text-sm text-blue-600 underline"
+												onClick={() => setSelectedInvoiceId(inv.id)}
+											>
 												{inv.invoiceNumber}
 											</button>
 										</TableCell>
 										<TableCell className="text-right">₱{Number(inv.subtotal).toFixed(2)}</TableCell>
-										<TableCell className="text-right">₱{Number(inv.philhealthCoverage).toFixed(2)}</TableCell>
-										<TableCell className="text-right font-medium">₱{Number(inv.patientResponsibility).toFixed(2)}</TableCell>
+										<TableCell className="text-right">
+											₱{Number(inv.philhealthCoverage).toFixed(2)}
+										</TableCell>
+										<TableCell className="text-right font-medium">
+											₱{Number(inv.patientResponsibility).toFixed(2)}
+										</TableCell>
 										<TableCell>
 											<Badge variant={statusColors[inv.status] ?? "secondary"}>{inv.status}</Badge>
 										</TableCell>
 										<TableCell className="flex gap-1">
 											{inv.status === "draft" && (
-												<Button size="sm" variant="outline" onClick={() => finalizeInvoice.mutate(inv.id)}>
+												<Button
+													size="sm"
+													variant="outline"
+													onClick={() => finalizeInvoice.mutate(inv.id)}
+												>
 													Finalize
 												</Button>
 											)}
 											{(inv.status === "finalized" || inv.status === "partially_paid") && (
-												<Button size="sm" onClick={() => { setSelectedInvoiceId(inv.id); setPayOpen(true) }}>
+												<Button
+													size="sm"
+													onClick={() => {
+														setSelectedInvoiceId(inv.id)
+														setPayOpen(true)
+													}}
+												>
 													Record Payment
 												</Button>
 											)}
@@ -435,14 +530,18 @@ function InvoicesPanel({
 										<TableRow key={li.id}>
 											<TableCell>{li.description}</TableCell>
 											<TableCell className="text-right">{li.quantity}</TableCell>
-											<TableCell className="text-right">₱{Number(li.unitPrice).toFixed(2)}</TableCell>
-											<TableCell className="text-right font-medium">₱{Number(li.totalAmount).toFixed(2)}</TableCell>
+											<TableCell className="text-right">
+												₱{Number(li.unitPrice).toFixed(2)}
+											</TableCell>
+											<TableCell className="text-right font-medium">
+												₱{Number(li.totalAmount).toFixed(2)}
+											</TableCell>
 										</TableRow>
 									))}
 								</TableBody>
 							</Table>
 						) : (
-							<p className="p-4 text-sm text-muted-foreground">No line items.</p>
+							<p className="text-muted-foreground p-4 text-sm">No line items.</p>
 						)}
 					</CardContent>
 				</Card>
@@ -472,7 +571,9 @@ function InvoicesPanel({
 											<Badge variant="outline">{p.paymentMethod.replace("_", " ")}</Badge>
 										</TableCell>
 										<TableCell>{p.referenceNumber ?? "—"}</TableCell>
-										<TableCell className="text-right font-medium">₱{Number(p.amount).toFixed(2)}</TableCell>
+										<TableCell className="text-right font-medium">
+											₱{Number(p.amount).toFixed(2)}
+										</TableCell>
 									</TableRow>
 								))}
 							</TableBody>
@@ -491,11 +592,21 @@ function InvoicesPanel({
 					<div className="space-y-4">
 						<div>
 							<Label>Amount (₱)</Label>
-							<Input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} placeholder="0.00" />
+							<Input
+								type="number"
+								value={payAmount}
+								onChange={e => setPayAmount(e.target.value)}
+								placeholder="0.00"
+							/>
 						</div>
 						<div>
 							<Label>Payment Method</Label>
-							<Select value={payMethod} onValueChange={(v) => { if (v) setPayMethod(v) }}>
+							<Select
+								value={payMethod}
+								onValueChange={v => {
+									if (v) setPayMethod(v)
+								}}
+							>
 								<SelectTrigger>
 									<SelectValue />
 								</SelectTrigger>
@@ -512,15 +623,25 @@ function InvoicesPanel({
 						</div>
 						<div>
 							<Label>Reference Number</Label>
-							<Input value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="Optional" />
+							<Input
+								value={payRef}
+								onChange={e => setPayRef(e.target.value)}
+								placeholder="Optional"
+							/>
 						</div>
 						<div>
 							<Label>Notes</Label>
-							<Textarea value={payNotes} onChange={e => setPayNotes(e.target.value)} placeholder="Optional" />
+							<Textarea
+								value={payNotes}
+								onChange={e => setPayNotes(e.target.value)}
+								placeholder="Optional"
+							/>
 						</div>
 					</div>
 					<DialogFooter>
-						<Button variant="outline" onClick={() => setPayOpen(false)}>Cancel</Button>
+						<Button variant="outline" onClick={() => setPayOpen(false)}>
+							Cancel
+						</Button>
 						<Button onClick={handleRecordPayment} disabled={recordPayment.isPending || !payAmount}>
 							{recordPayment.isPending ? "Recording..." : "Record"}
 						</Button>
@@ -535,13 +656,7 @@ function InvoicesPanel({
 // Eligibility Panel — Flow 9.5
 // ============================================================================
 
-function EligibilityPanel({
-	facilityId,
-	patientId,
-}: {
-	facilityId: string
-	patientId: string
-}) {
+function EligibilityPanel({ facilityId, patientId }: { facilityId: string; patientId: string }) {
 	const [memberId, setMemberId] = useState("")
 	const [result, setResult] = useState<{
 		isEligible: boolean
@@ -554,9 +669,12 @@ function EligibilityPanel({
 
 	function handleCheck() {
 		if (!memberId) return
-		checkEligibility.mutate({ facilityId, patientId, philhealthMemberId: memberId }, {
-			onSuccess: data => setResult(data.result),
-		})
+		checkEligibility.mutate(
+			{ facilityId, patientId, philhealthMemberId: memberId },
+			{
+				onSuccess: data => setResult(data.result),
+			}
+		)
 	}
 
 	return (
@@ -565,28 +683,39 @@ function EligibilityPanel({
 				<CardTitle>PhilHealth Eligibility Check (CEWS)</CardTitle>
 			</CardHeader>
 			<CardContent>
-				<div className="space-y-4 max-w-md">
+				<div className="max-w-md space-y-4">
 					<div>
 						<Label>PhilHealth Member ID</Label>
-						<Input value={memberId} onChange={e => setMemberId(e.target.value)} placeholder="Enter member ID" />
+						<Input
+							value={memberId}
+							onChange={e => setMemberId(e.target.value)}
+							placeholder="Enter member ID"
+						/>
 					</div>
 					<Button onClick={handleCheck} disabled={checkEligibility.isPending || !memberId}>
 						{checkEligibility.isPending ? "Checking..." : "Verify Eligibility"}
 					</Button>
 
 					{result && (
-						<div className={`rounded-md border p-4 ${result.isEligible ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
-							<div className="flex items-center gap-2 mb-2">
+						<div
+							className={`rounded-md border p-4 ${result.isEligible ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}
+						>
+							<div className="mb-2 flex items-center gap-2">
 								<Badge variant={result.isEligible ? "default" : "destructive"}>
 									{result.isEligible ? "Eligible" : "Not Eligible"}
 								</Badge>
 							</div>
 							<p className="text-sm">{result.message}</p>
 							{result.benefitType && (
-								<p className="text-sm mt-1"><strong>Benefit Type:</strong> {result.benefitType}</p>
+								<p className="mt-1 text-sm">
+									<strong>Benefit Type:</strong> {result.benefitType}
+								</p>
 							)}
 							{result.remainingCoverage !== null && (
-								<p className="text-sm mt-1"><strong>Remaining Coverage:</strong> ₱{result.remainingCoverage.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</p>
+								<p className="mt-1 text-sm">
+									<strong>Remaining Coverage:</strong> ₱
+									{result.remainingCoverage.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+								</p>
 							)}
 						</div>
 					)}

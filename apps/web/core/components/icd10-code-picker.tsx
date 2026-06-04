@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-
 import { Search01FreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 
@@ -52,9 +51,7 @@ function searchCodes(query: string): Icd10Result[] {
 	const q = query.trim().toLowerCase()
 	if (!q) return []
 	return COMMON_ICD10_CODES.filter(
-		item =>
-			item.code.toLowerCase().includes(q) ||
-			item.description.toLowerCase().includes(q),
+		item => item.code.toLowerCase().includes(q) || item.description.toLowerCase().includes(q)
 	).slice(0, 10)
 }
 
@@ -111,7 +108,7 @@ export function Icd10CodePicker({
 			<div className="relative">
 				<HugeiconsIcon
 					icon={Search01FreeIcons}
-					className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2"
+					className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
 				/>
 				<Input
 					value={query}
@@ -131,11 +128,11 @@ export function Icd10CodePicker({
 			</div>
 			{value && !open && (
 				<p className="text-muted-foreground mt-1 text-xs">
-					Selected: <span className="font-mono font-semibold text-foreground">{value}</span>
+					Selected: <span className="text-foreground font-mono font-semibold">{value}</span>
 				</p>
 			)}
-			{open && (query.length > 0) && (
-				<div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border bg-popover shadow-md">
+			{open && query.length > 0 && (
+				<div className="bg-popover absolute z-50 mt-1 w-full overflow-hidden rounded-md border shadow-md">
 					{loading ? (
 						<div className="space-y-1 p-2">
 							<Skeleton className="h-8 w-full" />
@@ -152,12 +149,12 @@ export function Icd10CodePicker({
 									role="option"
 									aria-selected={item.code === value}
 									className={cn(
-										"flex cursor-pointer items-start gap-2 px-3 py-2 text-sm hover:bg-accent",
-										item.code === value && "bg-accent",
+										"hover:bg-accent flex cursor-pointer items-start gap-2 px-3 py-2 text-sm",
+										item.code === value && "bg-accent"
 									)}
 									onMouseDown={() => handleSelect(item)}
 								>
-									<span className="mt-0.5 shrink-0 font-mono text-xs font-semibold text-primary">
+									<span className="text-primary mt-0.5 shrink-0 font-mono text-xs font-semibold">
 										{item.code}
 									</span>
 									<span className="text-foreground">{item.description}</span>

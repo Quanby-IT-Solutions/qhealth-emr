@@ -20,11 +20,11 @@ export function AncillaryClearanceClient() {
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-xl font-semibold">Ancillary Service Clearance</h1>
-					<p className="text-sm text-muted-foreground">Story 12.11 · Flow L11</p>
+					<p className="text-muted-foreground text-sm">Story 12.11 · Flow L11</p>
 				</div>
 				<div className="flex items-center gap-2">
 					{dataUpdatedAt > 0 && (
-						<p className="text-xs text-muted-foreground">
+						<p className="text-muted-foreground text-xs">
 							Last refreshed: {new Date(dataUpdatedAt).toLocaleTimeString()}
 						</p>
 					)}
@@ -45,7 +45,7 @@ export function AncillaryClearanceClient() {
 
 			{error && (
 				<Card>
-					<CardContent className="py-8 text-center text-sm text-destructive">
+					<CardContent className="text-destructive py-8 text-center text-sm">
 						Failed to load queue. Please try again.
 					</CardContent>
 				</Card>
@@ -53,7 +53,7 @@ export function AncillaryClearanceClient() {
 
 			{!isLoading && !error && (!orders || orders.length === 0) && (
 				<Card>
-					<CardContent className="py-8 text-center text-sm text-muted-foreground">
+					<CardContent className="text-muted-foreground py-8 text-center text-sm">
 						No orders awaiting clearance.
 					</CardContent>
 				</Card>
@@ -81,7 +81,9 @@ export function AncillaryClearanceClient() {
 										</span>
 									</div>
 								</div>
-								<Link href={`/msw/ancillary-clearance/${order.orderId}?encounterId=${order.encounterId}`}>
+								<Link
+									href={`/msw/ancillary-clearance/${order.orderId}?encounterId=${order.encounterId}`}
+								>
 									<Button size="sm" className="gap-1.5">
 										<ShieldCheck className="size-4" />
 										Review

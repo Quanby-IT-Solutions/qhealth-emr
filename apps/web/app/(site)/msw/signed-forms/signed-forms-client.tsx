@@ -50,14 +50,12 @@ function SignedFormRow({ sig }: { sig: AnnexSig }) {
 		<Card>
 			<CardHeader className="flex flex-row items-center justify-between py-3">
 				<div className="flex items-center gap-3">
-					<FileText className="size-5 shrink-0 text-muted-foreground" />
+					<FileText className="text-muted-foreground size-5 shrink-0" />
 					<div>
 						<p className="text-sm font-medium">
 							Annex {sig.annexType} — Encounter {sig.encounterId.slice(0, 8)}
 						</p>
-						<p className="text-xs text-muted-foreground">
-							{formatDate(sig.signedAt)}
-						</p>
+						<p className="text-muted-foreground text-xs">{formatDate(sig.signedAt)}</p>
 					</div>
 				</div>
 				<div className="flex items-center gap-2">
@@ -86,7 +84,7 @@ export function SignedFormsClient() {
 	const { data, isLoading } = useAnnexSignatureListQuery({})
 	const signatures = data ?? []
 
-	const filtered = signatures.filter((s) => {
+	const filtered = signatures.filter(s => {
 		if (typeFilter !== "all" && s.annexType !== typeFilter) return false
 		if (dateFrom) {
 			if (new Date(s.signedAt) < new Date(dateFrom)) return false
@@ -107,23 +105,20 @@ export function SignedFormsClient() {
 		<div className="space-y-4">
 			<div>
 				<h1 className="text-xl font-semibold">Signed Annex Forms Archive</h1>
-				<p className="text-sm text-muted-foreground">Story 12.9 · Flow L9</p>
+				<p className="text-muted-foreground text-sm">Story 12.9 · Flow L9</p>
 			</div>
 
 			<div className="flex flex-wrap gap-3">
 				<div className="relative min-w-[200px] flex-1">
-					<Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+					<Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
 					<Input
 						placeholder="Search by encounter ID…"
 						value={search}
-						onChange={(e) => setSearch(e.target.value)}
+						onChange={e => setSearch(e.target.value)}
 						className="pl-9"
 					/>
 				</div>
-				<Select
-					value={typeFilter}
-					onValueChange={(v) => setTypeFilter(v as AnnexTypeFilter)}
-				>
+				<Select value={typeFilter} onValueChange={v => setTypeFilter(v as AnnexTypeFilter)}>
 					<SelectTrigger className="w-[160px]">
 						<SelectValue />
 					</SelectTrigger>
@@ -136,21 +131,21 @@ export function SignedFormsClient() {
 			</div>
 			<div className="flex flex-wrap gap-3">
 				<div className="space-y-1">
-					<Label className="text-xs text-muted-foreground">Date From</Label>
+					<Label className="text-muted-foreground text-xs">Date From</Label>
 					<Input
 						type="date"
 						className="w-[160px]"
 						value={dateFrom}
-						onChange={(e) => setDateFrom(e.target.value)}
+						onChange={e => setDateFrom(e.target.value)}
 					/>
 				</div>
 				<div className="space-y-1">
-					<Label className="text-xs text-muted-foreground">Date To</Label>
+					<Label className="text-muted-foreground text-xs">Date To</Label>
 					<Input
 						type="date"
 						className="w-[160px]"
 						value={dateTo}
-						onChange={(e) => setDateTo(e.target.value)}
+						onChange={e => setDateTo(e.target.value)}
 					/>
 				</div>
 				{(dateFrom || dateTo) && (
@@ -158,7 +153,10 @@ export function SignedFormsClient() {
 						<Button
 							variant="ghost"
 							size="sm"
-							onClick={() => { setDateFrom(""); setDateTo("") }}
+							onClick={() => {
+								setDateFrom("")
+								setDateTo("")
+							}}
 						>
 							Clear dates
 						</Button>
@@ -168,13 +166,13 @@ export function SignedFormsClient() {
 
 			{isLoading ? (
 				<Card>
-					<CardContent className="py-8 text-center text-sm text-muted-foreground">
+					<CardContent className="text-muted-foreground py-8 text-center text-sm">
 						Loading signed forms…
 					</CardContent>
 				</Card>
 			) : filtered.length === 0 ? (
 				<Card>
-					<CardContent className="py-8 text-center text-sm text-muted-foreground">
+					<CardContent className="text-muted-foreground py-8 text-center text-sm">
 						{signatures.length === 0
 							? "No signed forms found. Capture a signature from an encounter's Annex page."
 							: "No forms match the current filters."}
@@ -182,13 +180,13 @@ export function SignedFormsClient() {
 				</Card>
 			) : (
 				<div className="space-y-2">
-					{filtered.map((sig) => (
+					{filtered.map(sig => (
 						<SignedFormRow key={sig.id} sig={sig} />
 					))}
 				</div>
 			)}
 
-			<div className="pt-2 text-xs text-muted-foreground">
+			<div className="text-muted-foreground pt-2 text-xs">
 				{filtered.length} form{filtered.length !== 1 ? "s" : ""} shown
 				{typeFilter !== "all" && ` · Annex ${typeFilter} filter active`}
 			</div>

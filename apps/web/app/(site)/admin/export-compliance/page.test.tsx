@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+
 import AdminExportCompliancePage from "./page"
 
 vi.mock("@/features/app-shell/api/rbac.hooks", () => ({
@@ -10,8 +12,6 @@ vi.mock("@/features/app-shell/api/rbac.hooks", () => ({
 vi.mock("@/features/admin/components/export-compliance-panel", () => ({
 	ExportCompliancePanel: () => <div data-testid="export-compliance-panel" />,
 }))
-
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 function mockProfile(permissions: { module: string; action: string }[]) {
 	vi.mocked(useMyProfile).mockReturnValue({

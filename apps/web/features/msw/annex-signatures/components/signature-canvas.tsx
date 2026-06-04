@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-
 import { RotateCcw } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -12,11 +11,7 @@ interface SignatureCanvasProps {
 	disabled?: boolean
 }
 
-export function SignatureCanvas({
-	label = "Signature",
-	onChange,
-	disabled,
-}: SignatureCanvasProps) {
+export function SignatureCanvas({ label = "Signature", onChange, disabled }: SignatureCanvasProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const isDrawingRef = useRef(false)
 	const lastPosRef = useRef<{ x: number; y: number } | null>(null)
@@ -53,9 +48,7 @@ export function SignatureCanvas({
 		lastPosRef.current = getPos(e)
 	}
 
-	const draw = (
-		e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
-	) => {
+	const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
 		if (disabled) return
 		e.preventDefault()
 		if (!isDrawingRef.current) return
@@ -129,12 +122,12 @@ export function SignatureCanvas({
 					onTouchMove={draw}
 					onTouchEnd={stopDrawing}
 				/>
-				<div className="pointer-events-none absolute bottom-2 left-0 right-0 flex justify-center">
+				<div className="pointer-events-none absolute right-0 bottom-2 left-0 flex justify-center">
 					<div className="h-px w-3/4 border-b border-dashed border-gray-300" />
 				</div>
 				{disabled && (
 					<div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-						<span className="text-xs text-muted-foreground">Signature locked</span>
+						<span className="text-muted-foreground text-xs">Signature locked</span>
 					</div>
 				)}
 			</div>

@@ -52,9 +52,7 @@ export function PhilHealthEligibilityIndicator({
 	}
 
 	const config = STATUS_CONFIG[status]
-	const label = memberType
-		? `PhilHealth · ${memberType}`
-		: config.label
+	const label = memberType ? `PhilHealth · ${memberType}` : config.label
 
 	return (
 		<TooltipProvider>
@@ -69,9 +67,7 @@ export function PhilHealthEligibilityIndicator({
 				</TooltipTrigger>
 				<TooltipContent side="top" className="max-w-xs text-xs">
 					<p>{config.description}</p>
-					{memberPin && (
-						<p className="mt-1 font-mono font-semibold">PIN: {memberPin}</p>
-					)}
+					{memberPin && <p className="mt-1 font-mono font-semibold">PIN: {memberPin}</p>}
 				</TooltipContent>
 			</Tooltip>
 		</TooltipProvider>

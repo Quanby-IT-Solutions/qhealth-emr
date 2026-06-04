@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+
 import AdminCivilRegistryPage from "./page"
 
 vi.mock("@/features/app-shell/api/rbac.hooks", () => ({
@@ -10,8 +12,6 @@ vi.mock("@/features/app-shell/api/rbac.hooks", () => ({
 vi.mock("@/features/admin/components/civil-registry-panel", () => ({
 	CivilRegistryPanel: () => <div data-testid="civil-registry-panel" />,
 }))
-
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 function mockProfile(permissions: { module: string; action: string }[]) {
 	vi.mocked(useMyProfile).mockReturnValue({
@@ -23,7 +23,9 @@ describe("AdminCivilRegistryPage – permission gates (ADMIN-002)", () => {
 	it("denies access when civil_registry:view is absent", () => {
 		mockProfile([{ module: "admin", action: "view" }])
 		render(<AdminCivilRegistryPage />)
-		expect(screen.getByText(/you do not have permission to access civil registry/i)).toBeInTheDocument()
+		expect(
+			screen.getByText(/you do not have permission to access civil registry/i)
+		).toBeInTheDocument()
 		expect(screen.queryByTestId("civil-registry-panel")).toBeNull()
 	})
 
@@ -45,6 +47,8 @@ describe("AdminCivilRegistryPage – permission gates (ADMIN-002)", () => {
 	it("denies access when profile has no permissions at all", () => {
 		mockProfile([])
 		render(<AdminCivilRegistryPage />)
-		expect(screen.getByText(/you do not have permission to access civil registry/i)).toBeInTheDocument()
+		expect(
+			screen.getByText(/you do not have permission to access civil registry/i)
+		).toBeInTheDocument()
 	})
 })

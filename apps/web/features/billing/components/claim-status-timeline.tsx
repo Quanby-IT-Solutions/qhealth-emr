@@ -62,7 +62,7 @@ export function ClaimStatusTimeline({
 					const ts = timestamps[step.status]
 
 					return (
-						<li key={step.status} className="flex flex-1 flex-col items-center min-w-[80px]">
+						<li key={step.status} className="flex min-w-[80px] flex-1 flex-col items-center">
 							<div className="flex w-full items-center">
 								{/* Left connector */}
 								<div
@@ -92,11 +92,7 @@ export function ClaimStatusTimeline({
 								<div
 									className={cn(
 										"h-0.5 flex-1",
-										idx === STEPS.length - 1
-											? "invisible"
-											: isCompleted
-												? "bg-primary"
-												: "bg-muted"
+										idx === STEPS.length - 1 ? "invisible" : isCompleted ? "bg-primary" : "bg-muted"
 									)}
 									aria-hidden
 								/>
@@ -106,7 +102,7 @@ export function ClaimStatusTimeline({
 							<div className="mt-1 flex flex-col items-center gap-0.5 px-1 text-center">
 								<span
 									className={cn(
-										"text-xs font-medium leading-tight",
+										"text-xs leading-tight font-medium",
 										isActive
 											? "text-foreground"
 											: isCompleted
@@ -122,7 +118,7 @@ export function ClaimStatusTimeline({
 									)}
 								</span>
 								{ts && (
-									<span className="text-[10px] text-muted-foreground">{formatTimestamp(ts)}</span>
+									<span className="text-muted-foreground text-[10px]">{formatTimestamp(ts)}</span>
 								)}
 							</div>
 						</li>

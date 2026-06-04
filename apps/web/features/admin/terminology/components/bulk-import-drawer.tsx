@@ -119,17 +119,13 @@ export function BulkImportDrawer({
 						<Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
 							{fileName ?? "Choose CSV or JSON file"}
 						</Button>
-						{parseError && (
-							<p className="mt-1 text-xs text-destructive">{parseError}</p>
-						)}
+						{parseError && <p className="text-destructive mt-1 text-xs">{parseError}</p>}
 					</div>
 					{errors.length > 0 && (
 						<div className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-3">
-							<p className="text-sm font-medium text-destructive">
-								Row errors ({errors.length}):
-							</p>
+							<p className="text-destructive text-sm font-medium">Row errors ({errors.length}):</p>
 							{errors.map(e => (
-								<p key={e.row} className="text-xs text-destructive">
+								<p key={e.row} className="text-destructive text-xs">
 									Row {e.row}: {e.message}
 								</p>
 							))}

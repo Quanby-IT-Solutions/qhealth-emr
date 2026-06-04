@@ -9,7 +9,9 @@ import { SlaDashboard } from "@/features/sla/components/sla-dashboard"
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -21,7 +23,7 @@ export default function AdminSlaPage() {
 
 	if (!can(permSet, "admin", "view")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access SLA configuration.
 			</div>
 		)
@@ -31,7 +33,7 @@ export default function AdminSlaPage() {
 		<div className="space-y-6 p-6">
 			<div>
 				<h1 className="text-2xl font-bold">SLA Management</h1>
-				<p className="text-sm text-muted-foreground">
+				<p className="text-muted-foreground text-sm">
 					Configure service-level targets, monitor active work items, and review compliance reports.
 				</p>
 			</div>

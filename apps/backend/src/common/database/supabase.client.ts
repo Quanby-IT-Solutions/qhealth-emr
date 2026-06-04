@@ -65,7 +65,10 @@ export function unwrap<T>(result: { data: T; error: { message: string } | null }
  * Unwraps a multi-row PostgREST result. On success PostgREST returns an array
  * (never null), so this throws on error and coalesces null to an empty array.
  */
-export function unwrapMany<T>(result: { data: T[] | null; error: { message: string } | null }): T[] {
+export function unwrapMany<T>(result: {
+	data: T[] | null
+	error: { message: string } | null
+}): T[] {
 	if (result.error) {
 		throw new Error(result.error.message)
 	}

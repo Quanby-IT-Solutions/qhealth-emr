@@ -18,7 +18,6 @@ import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Separator } from "@/core/components/ui/separator"
-import { env } from "@/env"
 import {
 	useEncounterAbstractsQuery,
 	useGenerateAbstractMutation,
@@ -26,6 +25,7 @@ import {
 	useSignAbstractMutation,
 	type TeleAbstract,
 } from "@/features/telemedicine/api/telemedicine.hooks"
+import { env } from "@/env"
 
 function escapeHtml(value: string | null | undefined): string {
 	return (value ?? "")
@@ -256,8 +256,8 @@ function AbstractPreview({ abstract }: { abstract: TeleAbstract }) {
 
 			{/* Sent notice */}
 			{abstract.status === "sent" && abstract.sentToEmail && (
-				<div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
-					<p className="text-xs font-medium text-primary">
+				<div className="border-primary/30 bg-primary/10 rounded-lg border p-3">
+					<p className="text-primary text-xs font-medium">
 						Sent to: {abstract.sentToEmail}
 						{abstract.sentAt && ` on ${new Date(abstract.sentAt).toLocaleString("en-PH")}`}
 					</p>
@@ -388,7 +388,7 @@ export function TeleAbstractPage({
 	if (isLoading) {
 		return (
 			<Card>
-				<CardContent className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+				<CardContent className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
 					<Loader2 className="size-4 animate-spin" />
 					Loading abstract...
 				</CardContent>
@@ -441,7 +441,9 @@ export function TeleAbstractPage({
 						</div>
 
 						{error && (
-							<p className="text-destructive rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">{error}</p>
+							<p className="text-destructive border-destructive/30 bg-destructive/10 rounded-md border px-3 py-2 text-sm">
+								{error}
+							</p>
 						)}
 
 						<Button
@@ -469,7 +471,9 @@ export function TeleAbstractPage({
 						</div>
 
 						{error && (
-							<p className="text-destructive rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">{error}</p>
+							<p className="text-destructive border-destructive/30 bg-destructive/10 rounded-md border px-3 py-2 text-sm">
+								{error}
+							</p>
 						)}
 
 						{/* Actions */}
@@ -526,7 +530,7 @@ export function TeleAbstractPage({
 							)}
 
 							{abstract.status === "sent" && (
-								<span className="flex items-center gap-1.5 text-sm text-success">
+								<span className="text-success flex items-center gap-1.5 text-sm">
 									<CheckCircle2 className="size-4" />
 									Sent to patient
 								</span>

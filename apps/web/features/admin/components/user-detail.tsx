@@ -7,18 +7,18 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
-	useGetStaffUserQuery,
+	useAddUserRoleMutation,
 	useGetLicenseStatusQuery,
+	useGetStaffUserQuery,
+	useListRolesQuery,
+	useReEnableUserMutation,
+	useRemoveStaffFacilityMutation,
+	useRemoveUserRoleMutation,
 	useResetPasswordMutation,
 	useUpdateStaffMutation,
-	useReEnableUserMutation,
-	useAddUserRoleMutation,
-	useRemoveUserRoleMutation,
-	useRemoveStaffFacilityMutation,
-	useListRolesQuery,
 } from "@/features/admin/api/admin.hooks"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 interface UserDetailProps {
 	userId: string
@@ -27,9 +27,17 @@ interface UserDetailProps {
 function licenseStatusBadge(status: string) {
 	switch (status) {
 		case "valid":
-			return <Badge variant="outline" className="border-green-600 text-green-600">Valid</Badge>
+			return (
+				<Badge variant="outline" className="border-green-600 text-green-600">
+					Valid
+				</Badge>
+			)
 		case "expiring_soon":
-			return <Badge variant="outline" className="border-yellow-600 text-yellow-600">Expiring Soon</Badge>
+			return (
+				<Badge variant="outline" className="border-yellow-600 text-yellow-600">
+					Expiring Soon
+				</Badge>
+			)
 		case "expired":
 			return <Badge variant="destructive">Expired</Badge>
 		default:
@@ -50,7 +58,8 @@ export function UserDetail({ userId }: UserDetailProps) {
 
 	const { data: rolesData } = useListRolesQuery(activeFacilityId)
 
-	const activeProfile = staffUser?.staffProfiles.find(p => p.isActive) ?? staffUser?.staffProfiles[0]
+	const activeProfile =
+		staffUser?.staffProfiles.find(p => p.isActive) ?? staffUser?.staffProfiles[0]
 	const { data: licenseStatus } = useGetLicenseStatusQuery(activeProfile?.id ?? "")
 
 	const [editDepartment, setEditDepartment] = useState("")
@@ -92,7 +101,12 @@ export function UserDetail({ userId }: UserDetailProps) {
 	}
 
 	const handleRemoveFacility = (staffProfileId: string) => {
-		if (!confirm("Remove this facility membership? The user must retain at least one active membership.")) return
+		if (
+			!confirm(
+				"Remove this facility membership? The user must retain at least one active membership."
+			)
+		)
+			return
 		removeStaffFacilityMutation.mutate({ staffProfileId })
 	}
 
@@ -174,10 +188,7 @@ export function UserDetail({ userId }: UserDetailProps) {
 								onChange={e => setEditEmployeeNumber(e.target.value)}
 							/>
 						</div>
-						<Button
-							onClick={handleSaveProfile}
-							disabled={updateStaffMutation.isPending}
-						>
+						<Button onClick={handleSaveProfile} disabled={updateStaffMutation.isPending}>
 							Save
 						</Button>
 					</CardContent>
@@ -191,7 +202,10 @@ export function UserDetail({ userId }: UserDetailProps) {
 				</CardHeader>
 				<CardContent className="space-y-3">
 					{staffUser.staffProfiles.map(p => (
-						<div key={p.id} className="flex items-center justify-between rounded-md border px-3 py-2">
+						<div
+							key={p.id}
+							className="flex items-center justify-between rounded-md border px-3 py-2"
+						>
 							<div className="space-y-0.5">
 								<p className="text-sm font-medium">
 									{p.facilityId}
@@ -233,12 +247,15 @@ export function UserDetail({ userId }: UserDetailProps) {
 					<CardContent className="space-y-3">
 						<div className="flex flex-wrap gap-2">
 							{activeProfile.roles.map(r => (
-								<div key={r.id} className="flex items-center gap-1 rounded-full border px-3 py-1 text-sm">
+								<div
+									key={r.id}
+									className="flex items-center gap-1 rounded-full border px-3 py-1 text-sm"
+								>
 									{r.name}
 									{r.isPrimary && <span className="text-muted-foreground text-xs">(primary)</span>}
 									<button
 										type="button"
-										className="ml-1 text-muted-foreground hover:text-destructive"
+										className="text-muted-foreground hover:text-destructive ml-1"
 										onClick={() => handleRemoveRole(activeProfile.id, r.id)}
 										disabled={removeUserRoleMutation.isPending}
 									>
@@ -248,7 +265,7 @@ export function UserDetail({ userId }: UserDetailProps) {
 							))}
 						</div>
 						<div>
-							<p className="text-muted-foreground text-xs mb-1">Add role</p>
+							<p className="text-muted-foreground mb-1 text-xs">Add role</p>
 							<div className="flex flex-wrap gap-2">
 								{rolesData
 									?.filter(r => !activeProfile.roles.some(ar => ar.id === r.id))
@@ -256,7 +273,7 @@ export function UserDetail({ userId }: UserDetailProps) {
 										<button
 											key={role.id}
 											type="button"
-											className="rounded-full border border-dashed px-3 py-1 text-xs hover:bg-muted"
+											className="hover:bg-muted rounded-full border border-dashed px-3 py-1 text-xs"
 											onClick={() => handleAddRole(activeProfile.id, role.id)}
 											disabled={addUserRoleMutation.isPending}
 										>
@@ -302,7 +319,7 @@ export function UserDetail({ userId }: UserDetailProps) {
 						Send a password reset email to {staffUser.user.email}.
 					</p>
 					{resetEmailSent && (
-						<p className="text-green-600 text-sm mb-2">
+						<p className="mb-2 text-sm text-green-600">
 							Reset email sent. {resetCooldown && "You can resend in 60 seconds."}
 						</p>
 					)}
@@ -311,7 +328,11 @@ export function UserDetail({ userId }: UserDetailProps) {
 						onClick={handleResetPassword}
 						disabled={resetPasswordMutation.isPending || resetCooldown}
 					>
-						{resetCooldown ? "Resend in 60s" : resetEmailSent ? "Resend Reset Email" : "Send Reset Email"}
+						{resetCooldown
+							? "Resend in 60s"
+							: resetEmailSent
+								? "Resend Reset Email"
+								: "Send Reset Email"}
 					</Button>
 				</CardContent>
 			</Card>

@@ -3,23 +3,23 @@
 import { useState } from "react"
 
 import {
+	useAdminCatalogSearchQuery,
+	useCatalogVersionsQuery,
+	useCodeSetUploadsQuery,
+	useCreateCatalogEntryMutation,
+	useCreateDeprecationMutation,
+	useDeleteCatalogEntryMutation,
+	useDeleteDeprecationMutation,
+	useDeprecatedMappingsQuery,
 	useIcd10SearchQuery,
 	useLoincSearchQuery,
-	useRxnormSearchQuery,
-	useRvsSearchQuery,
-	useSnomedCtSearchQuery,
-	useCodeSetUploadsQuery,
-	useRecordCatalogUploadMutation,
-	useDeprecatedMappingsQuery,
-	useCreateDeprecationMutation,
-	useDeleteDeprecationMutation,
-	useSetCodeActiveMutation,
-	useAdminCatalogSearchQuery,
-	useCreateCatalogEntryMutation,
-	useUpdateCatalogEntryMutation,
-	useDeleteCatalogEntryMutation,
-	useCatalogVersionsQuery,
 	usePublishCatalogVersionMutation,
+	useRecordCatalogUploadMutation,
+	useRvsSearchQuery,
+	useRxnormSearchQuery,
+	useSetCodeActiveMutation,
+	useSnomedCtSearchQuery,
+	useUpdateCatalogEntryMutation,
 	type CatalogType,
 } from "@/features/formulary/api/formulary.hooks"
 
@@ -59,9 +59,7 @@ export function CodeSetBrowser({ canEdit = false }: CodeSetBrowserProps) {
 							setSearch("")
 						}}
 						className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-							activeTab === tab
-								? "bg-primary text-primary-foreground"
-								: "hover:bg-muted"
+							activeTab === tab ? "bg-primary text-primary-foreground" : "hover:bg-muted"
 						}`}
 					>
 						{CODE_SET_LABELS[tab]}
@@ -70,36 +68,26 @@ export function CodeSetBrowser({ canEdit = false }: CodeSetBrowserProps) {
 			</div>
 
 			{activeTab !== "admin" && (
-			<input
-				type="text"
-				placeholder={`Search ${CODE_SET_LABELS[activeTab]} codes...`}
-				value={search}
-				onChange={e => {
-					setSearch(e.target.value)
-					setPage(1)
-				}}
-				className="border-input bg-background ring-offset-background flex h-10 w-full max-w-sm rounded-md border px-3 py-2 text-sm"
-			/>
-		)}
+				<input
+					type="text"
+					placeholder={`Search ${CODE_SET_LABELS[activeTab]} codes...`}
+					value={search}
+					onChange={e => {
+						setSearch(e.target.value)
+						setPage(1)
+					}}
+					className="border-input bg-background ring-offset-background flex h-10 w-full max-w-sm rounded-md border px-3 py-2 text-sm"
+				/>
+			)}
 
-			{activeTab === "icd10" && (
-				<Icd10Table search={search} page={page} onPageChange={setPage} />
-			)}
-			{activeTab === "loinc" && (
-				<LoincTable search={search} page={page} onPageChange={setPage} />
-			)}
-			{activeTab === "rxnorm" && (
-				<RxnormTable search={search} page={page} onPageChange={setPage} />
-			)}
-			{activeTab === "rvs" && (
-				<RvsTable search={search} page={page} onPageChange={setPage} />
-			)}
+			{activeTab === "icd10" && <Icd10Table search={search} page={page} onPageChange={setPage} />}
+			{activeTab === "loinc" && <LoincTable search={search} page={page} onPageChange={setPage} />}
+			{activeTab === "rxnorm" && <RxnormTable search={search} page={page} onPageChange={setPage} />}
+			{activeTab === "rvs" && <RvsTable search={search} page={page} onPageChange={setPage} />}
 			{activeTab === "snomedCt" && (
 				<SnomedCtTable search={search} page={page} onPageChange={setPage} />
 			)}
-			{activeTab === "admin" && canEdit && (
-				<CodeSetAdminPanel canEdit={canEdit} />
-			)}
+			{activeTab === "admin" && canEdit && <CodeSetAdminPanel canEdit={canEdit} />}
 		</div>
 	)
 }
@@ -161,7 +149,12 @@ function Icd10Table({
 		limit: 20,
 	})
 
-	const result = data as { data: { id: string; code: string; description: string; category: string | null }[]; totalPages: number } | undefined
+	const result = data as
+		| {
+				data: { id: string; code: string; description: string; category: string | null }[]
+				totalPages: number
+		  }
+		| undefined
 
 	if (isLoading) return <p className="text-muted-foreground">Loading...</p>
 	if (!result?.data.length) return <p className="text-muted-foreground">No ICD-10 codes found.</p>
@@ -182,7 +175,7 @@ function Icd10Table({
 							<tr key={code.id} className="border-b">
 								<td className="p-3 font-mono">{code.code}</td>
 								<td className="p-3">{code.description}</td>
-								<td className="p-3 text-muted-foreground">{code.category ?? "—"}</td>
+								<td className="text-muted-foreground p-3">{code.category ?? "—"}</td>
 							</tr>
 						))}
 					</tbody>
@@ -212,7 +205,18 @@ function LoincTable({
 		limit: 20,
 	})
 
-	const result = data as { data: { id: string; loincNum: string; longCommonName: string | null; component: string | null; system: string | null }[]; totalPages: number } | undefined
+	const result = data as
+		| {
+				data: {
+					id: string
+					loincNum: string
+					longCommonName: string | null
+					component: string | null
+					system: string | null
+				}[]
+				totalPages: number
+		  }
+		| undefined
 
 	if (isLoading) return <p className="text-muted-foreground">Loading...</p>
 	if (!result?.data.length) return <p className="text-muted-foreground">No LOINC codes found.</p>
@@ -235,7 +239,7 @@ function LoincTable({
 								<td className="p-3 font-mono">{code.loincNum}</td>
 								<td className="p-3">{code.longCommonName ?? "—"}</td>
 								<td className="p-3">{code.component ?? "—"}</td>
-								<td className="p-3 text-muted-foreground">{code.system ?? "—"}</td>
+								<td className="text-muted-foreground p-3">{code.system ?? "—"}</td>
 							</tr>
 						))}
 					</tbody>
@@ -265,7 +269,12 @@ function RxnormTable({
 		limit: 20,
 	})
 
-	const result = data as { data: { id: string; rxcui: string; name: string; tty: string | null }[]; totalPages: number } | undefined
+	const result = data as
+		| {
+				data: { id: string; rxcui: string; name: string; tty: string | null }[]
+				totalPages: number
+		  }
+		| undefined
 
 	if (isLoading) return <p className="text-muted-foreground">Loading...</p>
 	if (!result?.data.length) return <p className="text-muted-foreground">No RxNorm codes found.</p>
@@ -286,7 +295,7 @@ function RxnormTable({
 							<tr key={code.id} className="border-b">
 								<td className="p-3 font-mono">{code.rxcui}</td>
 								<td className="p-3">{code.name}</td>
-								<td className="p-3 text-muted-foreground">{code.tty ?? "—"}</td>
+								<td className="text-muted-foreground p-3">{code.tty ?? "—"}</td>
 							</tr>
 						))}
 					</tbody>
@@ -316,7 +325,18 @@ function RvsTable({
 		limit: 20,
 	})
 
-	const result = data as { data: { id: string; rvsCode: string; procedureName: string; category: string | null; rvsValue: string | null }[]; totalPages: number } | undefined
+	const result = data as
+		| {
+				data: {
+					id: string
+					rvsCode: string
+					procedureName: string
+					category: string | null
+					rvsValue: string | null
+				}[]
+				totalPages: number
+		  }
+		| undefined
 
 	if (isLoading) return <p className="text-muted-foreground">Loading...</p>
 	if (!result?.data.length) return <p className="text-muted-foreground">No RVS codes found.</p>
@@ -338,7 +358,7 @@ function RvsTable({
 							<tr key={code.id} className="border-b">
 								<td className="p-3 font-mono">{code.rvsCode}</td>
 								<td className="p-3">{code.procedureName}</td>
-								<td className="p-3 text-muted-foreground">{code.category ?? "—"}</td>
+								<td className="text-muted-foreground p-3">{code.category ?? "—"}</td>
 								<td className="p-3">{code.rvsValue ?? "—"}</td>
 							</tr>
 						))}
@@ -369,16 +389,18 @@ function SnomedCtTable({
 		limit: 20,
 	})
 
-	const result = data as {
-		data: {
-			id: string
-			conceptId: string
-			fsn: string
-			preferredTerm: string
-			semanticTag: string | null
-		}[]
-		totalPages: number
-	} | undefined
+	const result = data as
+		| {
+				data: {
+					id: string
+					conceptId: string
+					fsn: string
+					preferredTerm: string
+					semanticTag: string | null
+				}[]
+				totalPages: number
+		  }
+		| undefined
 
 	if (isLoading) return <p className="text-muted-foreground">Loading...</p>
 	if (!result?.data.length)
@@ -401,8 +423,8 @@ function SnomedCtTable({
 							<tr key={code.id} className="border-b">
 								<td className="p-3 font-mono">{code.conceptId}</td>
 								<td className="p-3">{code.preferredTerm}</td>
-								<td className="p-3 text-muted-foreground">{code.semanticTag ?? "—"}</td>
-								<td className="p-3 text-muted-foreground">{code.fsn}</td>
+								<td className="text-muted-foreground p-3">{code.semanticTag ?? "—"}</td>
+								<td className="text-muted-foreground p-3">{code.fsn}</td>
 							</tr>
 						))}
 					</tbody>
@@ -446,8 +468,20 @@ function CatalogUploadHistorySection({ canEdit }: { canEdit: boolean }) {
 	function handleRecord(e: React.FormEvent) {
 		e.preventDefault()
 		recordMutation.mutate(
-			{ catalogType: formCatalogType, version: version || undefined, entryCount: Number(entryCount), notes: notes || undefined },
-			{ onSuccess: () => { setShowForm(false); setVersion(""); setEntryCount(""); setNotes("") } }
+			{
+				catalogType: formCatalogType,
+				version: version || undefined,
+				entryCount: Number(entryCount),
+				notes: notes || undefined,
+			},
+			{
+				onSuccess: () => {
+					setShowForm(false)
+					setVersion("")
+					setEntryCount("")
+					setNotes("")
+				},
+			}
 		)
 	}
 
@@ -476,7 +510,9 @@ function CatalogUploadHistorySection({ canEdit }: { canEdit: boolean }) {
 								className="border-input bg-background mt-1 flex h-10 w-full rounded-md border px-3 py-2 text-sm"
 							>
 								{["icd10", "loinc", "rxnorm", "rvs", "snomed_ct"].map(t => (
-									<option key={t} value={t}>{t}</option>
+									<option key={t} value={t}>
+										{t}
+									</option>
 								))}
 							</select>
 						</div>
@@ -530,7 +566,9 @@ function CatalogUploadHistorySection({ canEdit }: { canEdit: boolean }) {
 				>
 					<option value="">All catalogs</option>
 					{["icd10", "loinc", "rxnorm", "rvs", "snomed_ct"].map(t => (
-						<option key={t} value={t}>{t}</option>
+						<option key={t} value={t}>
+							{t}
+						</option>
 					))}
 				</select>
 			</div>
@@ -561,8 +599,10 @@ function CatalogUploadHistorySection({ canEdit }: { canEdit: boolean }) {
 											{u.status}
 										</span>
 									</td>
-									<td className="p-3 text-muted-foreground">{u.notes ?? "—"}</td>
-									<td className="p-3 text-muted-foreground">{new Date(u.createdAt).toLocaleString()}</td>
+									<td className="text-muted-foreground p-3">{u.notes ?? "—"}</td>
+									<td className="text-muted-foreground p-3">
+										{new Date(u.createdAt).toLocaleString()}
+									</td>
 								</tr>
 							))}
 						</tbody>
@@ -604,8 +644,20 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 	function handleCreate(e: React.FormEvent) {
 		e.preventDefault()
 		createMutation.mutate(
-			{ catalogType: formCatalogType, fromCode, toCode: toCode || undefined, notes: notes || undefined },
-			{ onSuccess: () => { setShowForm(false); setFromCode(""); setToCode(""); setNotes("") } }
+			{
+				catalogType: formCatalogType,
+				fromCode,
+				toCode: toCode || undefined,
+				notes: notes || undefined,
+			},
+			{
+				onSuccess: () => {
+					setShowForm(false)
+					setFromCode("")
+					setToCode("")
+					setNotes("")
+				},
+			}
 		)
 	}
 
@@ -615,7 +667,11 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 
 	function handleToggle(e: React.FormEvent) {
 		e.preventDefault()
-		setCodeActiveMutation.mutate({ codeId: toggleCodeId, catalogType: toggleCatalogType, isActive: toggleActive })
+		setCodeActiveMutation.mutate({
+			codeId: toggleCodeId,
+			catalogType: toggleCatalogType,
+			isActive: toggleActive,
+		})
 	}
 
 	return (
@@ -644,7 +700,9 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 									className="border-input bg-background mt-1 flex h-10 w-full rounded-md border px-3 py-2 text-sm"
 								>
 									{["icd10", "loinc", "rxnorm", "rvs", "snomed_ct"].map(t => (
-										<option key={t} value={t}>{t}</option>
+										<option key={t} value={t}>
+											{t}
+										</option>
 									))}
 								</select>
 							</div>
@@ -697,7 +755,9 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 				>
 					<option value="">All catalogs</option>
 					{["icd10", "loinc", "rxnorm", "rvs", "snomed_ct"].map(t => (
-						<option key={t} value={t}>{t}</option>
+						<option key={t} value={t}>
+							{t}
+						</option>
 					))}
 				</select>
 
@@ -722,9 +782,11 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 										<td className="p-3 font-mono">{m.catalogType}</td>
 										<td className="p-3 font-mono">{m.fromCode}</td>
 										<td className="p-3 font-mono">{m.toCode ?? "—"}</td>
-										<td className="p-3 text-muted-foreground">{m.notes ?? "—"}</td>
+										<td className="text-muted-foreground p-3">{m.notes ?? "—"}</td>
 										<td className="p-3">
-											<span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${m.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+											<span
+												className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${m.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
+											>
 												{m.isActive ? "Active" : "Inactive"}
 											</span>
 										</td>
@@ -733,7 +795,7 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 												<button
 													onClick={() => deleteMutation.mutate({ id: m.id })}
 													disabled={deleteMutation.isPending}
-													className="text-destructive hover:underline text-sm"
+													className="text-destructive text-sm hover:underline"
 												>
 													Delete
 												</button>
@@ -749,8 +811,10 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 
 			<div className="space-y-3 rounded-md border p-4">
 				<h4 className="text-sm font-semibold">Toggle Code Active/Inactive</h4>
-				<p className="text-muted-foreground text-xs">Use the code&rsquo;s UUID from the catalog to activate or deactivate it.</p>
-				<form onSubmit={handleToggle} className="flex flex-wrap gap-3 items-end">
+				<p className="text-muted-foreground text-xs">
+					Use the code&rsquo;s UUID from the catalog to activate or deactivate it.
+				</p>
+				<form onSubmit={handleToggle} className="flex flex-wrap items-end gap-3">
 					<div>
 						<label className="text-xs font-medium">Catalog</label>
 						<select
@@ -759,11 +823,13 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 							className="border-input bg-background mt-1 flex h-9 rounded-md border px-3 text-sm"
 						>
 							{["icd10", "loinc", "rxnorm", "rvs", "snomed_ct"].map(t => (
-								<option key={t} value={t}>{t}</option>
+								<option key={t} value={t}>
+									{t}
+								</option>
 							))}
 						</select>
 					</div>
-					<div className="flex-1 min-w-[200px]">
+					<div className="min-w-[200px] flex-1">
 						<label className="text-xs font-medium">Code UUID *</label>
 						<input
 							type="text"
@@ -799,7 +865,9 @@ function DeprecatedCodeMappingsSection({ canEdit }: { canEdit: boolean }) {
 					<p className="text-sm text-green-700">Code updated successfully.</p>
 				)}
 				{setCodeActiveMutation.isError && (
-					<p className="text-destructive text-sm">{(setCodeActiveMutation.error as Error)?.message}</p>
+					<p className="text-destructive text-sm">
+						{(setCodeActiveMutation.error as Error)?.message}
+					</p>
 				)}
 			</div>
 		</section>
@@ -868,14 +936,18 @@ function CatalogEntryEditorSection({ canEdit }: { canEdit: boolean }) {
 	const handleSearch = (v: string) => {
 		setSearch(v)
 		clearTimeout((handleSearch as { _t?: ReturnType<typeof setTimeout> })._t)
-		;(handleSearch as { _t?: ReturnType<typeof setTimeout> })._t = setTimeout(() => setDebouncedSearch(v), 400)
+		;(handleSearch as { _t?: ReturnType<typeof setTimeout> })._t = setTimeout(
+			() => setDebouncedSearch(v),
+			400
+		)
 	}
 
 	const { data, isLoading } = useAdminCatalogSearchQuery(
 		{ catalogType, search: debouncedSearch || undefined },
 		{ enabled: true }
 	)
-	const entries = ((data as { data?: CatalogEntryRow[] } | undefined)?.data ?? []) as CatalogEntryRow[]
+	const entries = ((data as { data?: CatalogEntryRow[] } | undefined)?.data ??
+		[]) as CatalogEntryRow[]
 
 	const createMutation = useCreateCatalogEntryMutation()
 	const updateMutation = useUpdateCatalogEntryMutation()
@@ -896,7 +968,9 @@ function CatalogEntryEditorSection({ canEdit }: { canEdit: boolean }) {
 					className="rounded-md border px-3 py-2 text-sm"
 				>
 					{CATALOG_TYPE_OPTIONS.map(o => (
-						<option key={o.value} value={o.value}>{o.label}</option>
+						<option key={o.value} value={o.value}>
+							{o.label}
+						</option>
 					))}
 				</select>
 				<input
@@ -908,7 +982,10 @@ function CatalogEntryEditorSection({ canEdit }: { canEdit: boolean }) {
 				/>
 				{canEdit && (
 					<button
-						onClick={() => { setShowAddForm(v => !v); setEditingEntry(null) }}
+						onClick={() => {
+							setShowAddForm(v => !v)
+							setEditingEntry(null)
+						}}
 						className="rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
 					>
 						+ Add Entry
@@ -920,8 +997,10 @@ function CatalogEntryEditorSection({ canEdit }: { canEdit: boolean }) {
 			{canEdit && showAddForm && (
 				<CatalogEntryAddForm
 					catalogType={catalogType}
-					onSubmit={async (values) => {
-						await createMutation.mutateAsync(values as Parameters<typeof createMutation.mutateAsync>[0])
+					onSubmit={async values => {
+						await createMutation.mutateAsync(
+							values as Parameters<typeof createMutation.mutateAsync>[0]
+						)
 						setShowAddForm(false)
 					}}
 					isSubmitting={createMutation.isPending}
@@ -933,8 +1012,10 @@ function CatalogEntryEditorSection({ canEdit }: { canEdit: boolean }) {
 			{canEdit && editingEntry && (
 				<CatalogEntryEditForm
 					entry={editingEntry}
-					onSubmit={async (values) => {
-						await updateMutation.mutateAsync(values as Parameters<typeof updateMutation.mutateAsync>[0])
+					onSubmit={async values => {
+						await updateMutation.mutateAsync(
+							values as Parameters<typeof updateMutation.mutateAsync>[0]
+						)
 						setEditingEntry(null)
 					}}
 					onCancel={() => setEditingEntry(null)}
@@ -959,11 +1040,13 @@ function CatalogEntryEditorSection({ canEdit }: { canEdit: boolean }) {
 							</tr>
 						</thead>
 						<tbody>
-							{entries.map((entry) => (
+							{entries.map(entry => (
 								<tr key={entry.id} className="border-t">
 									<td className="p-2">{getEntryLabel(entry)}</td>
 									<td className="p-2">
-										<span className={`rounded px-2 py-0.5 text-xs font-medium ${entry.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
+										<span
+											className={`rounded px-2 py-0.5 text-xs font-medium ${entry.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
+										>
 											{entry.isActive ? "Active" : "Inactive"}
 										</span>
 									</td>
@@ -971,7 +1054,10 @@ function CatalogEntryEditorSection({ canEdit }: { canEdit: boolean }) {
 										<td className="p-2">
 											<div className="flex gap-2">
 												<button
-													onClick={() => { setEditingEntry(entry); setShowAddForm(false) }}
+													onClick={() => {
+														setEditingEntry(entry)
+														setShowAddForm(false)
+													}}
 													className="text-primary text-xs underline"
 												>
 													Edit
@@ -979,7 +1065,10 @@ function CatalogEntryEditorSection({ canEdit }: { canEdit: boolean }) {
 												<button
 													onClick={() => {
 														if (confirm("Delete this entry? This cannot be undone.")) {
-															deleteMutation.mutate({ id: entry.id, catalogType: entry.catalogType as CatalogTypeKey })
+															deleteMutation.mutate({
+																id: entry.id,
+																catalogType: entry.catalogType as CatalogTypeKey,
+															})
 														}
 													}}
 													className="text-destructive text-xs underline"
@@ -1020,7 +1109,10 @@ function CatalogEntryAddForm({
 
 	const textField = (key: string, label: string, required = false) => (
 		<div key={key} className="flex flex-col gap-1">
-			<label className="text-xs font-medium">{label}{required && " *"}</label>
+			<label className="text-xs font-medium">
+				{label}
+				{required && " *"}
+			</label>
 			<input
 				type="text"
 				value={fields[key] ?? ""}
@@ -1032,22 +1124,59 @@ function CatalogEntryAddForm({
 	)
 
 	const fieldsByType: Record<CatalogTypeKey, React.ReactNode> = {
-		icd10: <>{textField("code", "Code", true)}{textField("description", "Description", true)}{textField("category", "Category")}</>,
-		loinc: <>{textField("loincNum", "LOINC Num", true)}{textField("longCommonName", "Long Common Name")}{textField("component", "Component")}{textField("property", "Property")}</>,
-		rxnorm: <>{textField("rxcui", "RXCUI", true)}{textField("name", "Name", true)}{textField("tty", "TTY")}</>,
-		rvs: <>{textField("rvsCode", "RVS Code", true)}{textField("procedureName", "Procedure Name", true)}{textField("category", "Category")}{textField("rvsValue", "RVS Value")}</>,
-		snomed_ct: <>{textField("conceptId", "Concept ID", true)}{textField("fsn", "FSN", true)}{textField("preferredTerm", "Preferred Term", true)}{textField("semanticTag", "Semantic Tag")}</>,
+		icd10: (
+			<>
+				{textField("code", "Code", true)}
+				{textField("description", "Description", true)}
+				{textField("category", "Category")}
+			</>
+		),
+		loinc: (
+			<>
+				{textField("loincNum", "LOINC Num", true)}
+				{textField("longCommonName", "Long Common Name")}
+				{textField("component", "Component")}
+				{textField("property", "Property")}
+			</>
+		),
+		rxnorm: (
+			<>
+				{textField("rxcui", "RXCUI", true)}
+				{textField("name", "Name", true)}
+				{textField("tty", "TTY")}
+			</>
+		),
+		rvs: (
+			<>
+				{textField("rvsCode", "RVS Code", true)}
+				{textField("procedureName", "Procedure Name", true)}
+				{textField("category", "Category")}
+				{textField("rvsValue", "RVS Value")}
+			</>
+		),
+		snomed_ct: (
+			<>
+				{textField("conceptId", "Concept ID", true)}
+				{textField("fsn", "FSN", true)}
+				{textField("preferredTerm", "Preferred Term", true)}
+				{textField("semanticTag", "Semantic Tag")}
+			</>
+		),
 	}
 
 	return (
-		<form onSubmit={handleSubmit} className="mb-4 rounded-md border bg-muted/20 p-4">
-			<p className="mb-3 text-sm font-semibold">Add New {CATALOG_TYPE_OPTIONS.find(o => o.value === catalogType)?.label} Entry</p>
-			<div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-				{fieldsByType[catalogType]}
-			</div>
+		<form onSubmit={handleSubmit} className="bg-muted/20 mb-4 rounded-md border p-4">
+			<p className="mb-3 text-sm font-semibold">
+				Add New {CATALOG_TYPE_OPTIONS.find(o => o.value === catalogType)?.label} Entry
+			</p>
+			<div className="grid grid-cols-2 gap-3 md:grid-cols-3">{fieldsByType[catalogType]}</div>
 			{error && <p className="text-destructive mt-2 text-sm">{error}</p>}
 			<div className="mt-3 flex gap-2">
-				<button type="submit" disabled={isSubmitting} className="rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">
+				<button
+					type="submit"
+					disabled={isSubmitting}
+					className="rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+				>
 					{isSubmitting ? "Saving…" : "Save Entry"}
 				</button>
 			</div>
@@ -1088,28 +1217,43 @@ function CatalogEntryEditForm({
 		<form onSubmit={handleSubmit} className="mb-4 rounded-md border bg-blue-50 p-4">
 			<p className="mb-3 text-sm font-semibold">Edit Entry: {getEntryLabel(entry)}</p>
 			<div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-				{["description", "longCommonName", "name", "procedureName", "fsn", "preferredTerm"].map(k => (
-					<div key={k} className="flex flex-col gap-1">
-						<label className="text-xs font-medium capitalize">{k}</label>
-						<input
-							type="text"
-							value={(fields[k] as string) ?? ""}
-							onChange={e => set(k, e.target.value)}
-							className="rounded-md border px-2 py-1 text-sm"
-						/>
-					</div>
-				))}
+				{["description", "longCommonName", "name", "procedureName", "fsn", "preferredTerm"].map(
+					k => (
+						<div key={k} className="flex flex-col gap-1">
+							<label className="text-xs font-medium capitalize">{k}</label>
+							<input
+								type="text"
+								value={(fields[k] as string) ?? ""}
+								onChange={e => set(k, e.target.value)}
+								className="rounded-md border px-2 py-1 text-sm"
+							/>
+						</div>
+					)
+				)}
 				<div className="flex items-center gap-2">
-					<input type="checkbox" id="isActiveEdit" checked={Boolean(fields["isActive"])} onChange={e => set("isActive", e.target.checked)} />
-					<label htmlFor="isActiveEdit" className="text-sm">Active</label>
+					<input
+						type="checkbox"
+						id="isActiveEdit"
+						checked={Boolean(fields["isActive"])}
+						onChange={e => set("isActive", e.target.checked)}
+					/>
+					<label htmlFor="isActiveEdit" className="text-sm">
+						Active
+					</label>
 				</div>
 			</div>
 			{error && <p className="text-destructive mt-2 text-sm">{error}</p>}
 			<div className="mt-3 flex gap-2">
-				<button type="submit" disabled={isSubmitting} className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+				<button
+					type="submit"
+					disabled={isSubmitting}
+					className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+				>
 					{isSubmitting ? "Saving…" : "Save Changes"}
 				</button>
-				<button type="button" onClick={onCancel} className="rounded-md border px-3 py-1.5 text-sm">Cancel</button>
+				<button type="button" onClick={onCancel} className="rounded-md border px-3 py-1.5 text-sm">
+					Cancel
+				</button>
 			</div>
 		</form>
 	)
@@ -1136,13 +1280,19 @@ function PublishVersionSection({ canEdit }: { canEdit: boolean }) {
 
 	const publishMutation = usePublishCatalogVersionMutation()
 	const { data } = useCatalogVersionsQuery({ catalogType, limit: 10 })
-	const versions = ((data as { data?: CatalogVersionRow[] } | undefined)?.data ?? []) as CatalogVersionRow[]
+	const versions = ((data as { data?: CatalogVersionRow[] } | undefined)?.data ??
+		[]) as CatalogVersionRow[]
 
 	const handlePublish = (e: React.FormEvent) => {
 		e.preventDefault()
 		publishMutation.mutate(
 			{ catalogType, versionTag, notes: notes || undefined },
-			{ onSuccess: () => { setVersionTag(""); setNotes("") } }
+			{
+				onSuccess: () => {
+					setVersionTag("")
+					setNotes("")
+				},
+			}
 		)
 	}
 
@@ -1160,7 +1310,9 @@ function PublishVersionSection({ canEdit }: { canEdit: boolean }) {
 							className="rounded-md border px-3 py-2 text-sm"
 						>
 							{CATALOG_TYPE_OPTIONS.map(o => (
-								<option key={o.value} value={o.value}>{o.label}</option>
+								<option key={o.value} value={o.value}>
+									{o.label}
+								</option>
 							))}
 						</select>
 					</div>
@@ -1188,18 +1340,26 @@ function PublishVersionSection({ canEdit }: { canEdit: boolean }) {
 						<button
 							type="submit"
 							disabled={publishMutation.isPending || !versionTag}
-							className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
+							className="bg-primary hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
 						>
 							{publishMutation.isPending ? "Publishing…" : "Publish Version"}
 						</button>
 					</div>
-					{publishMutation.isSuccess && <p className="text-sm text-green-700 md:col-span-2">Version published.</p>}
-					{publishMutation.isError && <p className="text-destructive text-sm md:col-span-2">{(publishMutation.error as Error)?.message}</p>}
+					{publishMutation.isSuccess && (
+						<p className="text-sm text-green-700 md:col-span-2">Version published.</p>
+					)}
+					{publishMutation.isError && (
+						<p className="text-destructive text-sm md:col-span-2">
+							{(publishMutation.error as Error)?.message}
+						</p>
+					)}
 				</form>
 			)}
 
 			{/* Version history */}
-			<h4 className="mb-2 text-sm font-medium">Recent Versions — {CATALOG_TYPE_OPTIONS.find(o => o.value === catalogType)?.label}</h4>
+			<h4 className="mb-2 text-sm font-medium">
+				Recent Versions — {CATALOG_TYPE_OPTIONS.find(o => o.value === catalogType)?.label}
+			</h4>
 			{versions.length === 0 ? (
 				<p className="text-muted-foreground text-sm">No versions published yet.</p>
 			) : (
@@ -1218,7 +1378,7 @@ function PublishVersionSection({ canEdit }: { canEdit: boolean }) {
 								<td className="p-2 font-mono">{v.versionTag}</td>
 								<td className="p-2">{new Date(v.publishedAt).toLocaleString()}</td>
 								<td className="p-2">{v.entryCount.toLocaleString()}</td>
-								<td className="p-2 text-muted-foreground">{v.notes ?? "—"}</td>
+								<td className="text-muted-foreground p-2">{v.notes ?? "—"}</td>
 							</tr>
 						))}
 					</tbody>

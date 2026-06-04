@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
-import { useNursingSync } from "@/features/nursing/lib/use-nursing-sync"
 import { SyncStatus } from "@/features/nursing/components/sync-status"
+import { useNursingSync } from "@/features/nursing/lib/use-nursing-sync"
 
 export default function NursingSyncPage() {
 	const router = useRouter()
@@ -29,10 +29,10 @@ export default function NursingSyncPage() {
 				</Button>
 
 				<div>
-				<h1 className="text-2xl font-semibold">Offline Synchronization</h1>
-				<p className="text-sm text-muted-foreground">
-					Manage documentation queued while the system was offline.
-				</p>
+					<h1 className="text-2xl font-semibold">Offline Synchronization</h1>
+					<p className="text-muted-foreground text-sm">
+						Manage documentation queued while the system was offline.
+					</p>
 				</div>
 			</div>
 

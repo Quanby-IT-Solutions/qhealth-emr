@@ -612,8 +612,12 @@ function PrescriptionPreview({
 			{/* Dispensing instructions */}
 			{rx.dispensingInstructions && (
 				<div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-					<p className="text-xs font-medium text-amber-700 dark:text-amber-300">Dispensing Instructions:</p>
-					<p className="text-xs text-amber-700 dark:text-amber-300/90">{rx.dispensingInstructions}</p>
+					<p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+						Dispensing Instructions:
+					</p>
+					<p className="text-xs text-amber-700 dark:text-amber-300/90">
+						{rx.dispensingInstructions}
+					</p>
 				</div>
 			)}
 
@@ -880,7 +884,9 @@ export function EPrescriptionCard({
 						</div>
 
 						{error && (
-							<p className="text-destructive rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">{error}</p>
+							<p className="text-destructive border-destructive/30 bg-destructive/10 rounded-md border px-3 py-2 text-sm">
+								{error}
+							</p>
 						)}
 
 						<div className="flex justify-end gap-3">
@@ -903,7 +909,7 @@ export function EPrescriptionCard({
 						</div>
 					</form>
 				) : isLoading ? (
-					<div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+					<div className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
 						<Loader2 className="size-4 animate-spin" />
 						Loading prescriptions...
 					</div>

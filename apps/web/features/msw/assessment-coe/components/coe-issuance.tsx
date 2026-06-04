@@ -93,191 +93,193 @@ export function CoeIssuance({ evaluationId, encounterId }: CoeIssuanceProps) {
 
 	return (
 		<>
-		<AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-			<AlertDialogContent>
-				<AlertDialogHeader>
-					<AlertDialogTitle>Confirm CoE Issuance</AlertDialogTitle>
-					<AlertDialogDescription>
-						Issue a <strong>{TYPE_LABELS[coeType]}</strong> Certificate of Eligibility
-						{amount ? ` for ₱${Number(amount).toLocaleString()}` : ""}? This will be attached to
-						the encounter and applied to the billing record.
-					</AlertDialogDescription>
-				</AlertDialogHeader>
-				<AlertDialogFooter>
-					<AlertDialogCancel disabled={issueMutation.isPending}>Cancel</AlertDialogCancel>
-					<AlertDialogAction onClick={doIssue} disabled={issueMutation.isPending}>
-						{issueMutation.isPending ? "Issuing…" : "Sign and Issue"}
-					</AlertDialogAction>
-				</AlertDialogFooter>
-			</AlertDialogContent>
-		</AlertDialog>
-		<Card>
-			<CardHeader className="flex flex-row items-start justify-between">
-				<div>
-					<CardTitle className="text-base">Certificate of Eligibility (CoE)</CardTitle>
-					<p className="mt-0.5 text-sm text-muted-foreground">
-						Issue CoEs for Malasakit, Z-Benefits, or Indigent assistance.
-					</p>
-				</div>
-				{!showForm && (
-					<Button
-						type="button"
-						size="sm"
-						variant="outline"
-						className="shrink-0"
-						onClick={() => setShowForm(true)}
-					>
-						Issue CoE
-					</Button>
-				)}
-			</CardHeader>
+			<AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Confirm CoE Issuance</AlertDialogTitle>
+						<AlertDialogDescription>
+							Issue a <strong>{TYPE_LABELS[coeType]}</strong> Certificate of Eligibility
+							{amount ? ` for ₱${Number(amount).toLocaleString()}` : ""}? This will be attached to
+							the encounter and applied to the billing record.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={issueMutation.isPending}>Cancel</AlertDialogCancel>
+						<AlertDialogAction onClick={doIssue} disabled={issueMutation.isPending}>
+							{issueMutation.isPending ? "Issuing…" : "Sign and Issue"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+			<Card>
+				<CardHeader className="flex flex-row items-start justify-between">
+					<div>
+						<CardTitle className="text-base">Certificate of Eligibility (CoE)</CardTitle>
+						<p className="text-muted-foreground mt-0.5 text-sm">
+							Issue CoEs for Malasakit, Z-Benefits, or Indigent assistance.
+						</p>
+					</div>
+					{!showForm && (
+						<Button
+							type="button"
+							size="sm"
+							variant="outline"
+							className="shrink-0"
+							onClick={() => setShowForm(true)}
+						>
+							Issue CoE
+						</Button>
+					)}
+				</CardHeader>
 
-			<CardContent className="space-y-4">
-				{showForm && (
-					<form onSubmit={handleIssue} className="space-y-4 rounded-lg border bg-muted/30 p-4">
-						<p className="text-sm font-medium">New Certificate of Eligibility</p>
+				<CardContent className="space-y-4">
+					{showForm && (
+						<form onSubmit={handleIssue} className="bg-muted/30 space-y-4 rounded-lg border p-4">
+							<p className="text-sm font-medium">New Certificate of Eligibility</p>
 
-						<div className="space-y-1.5">
-							<Label>Type</Label>
-							<Select value={coeType} onValueChange={v => setCoeType(v as CoeType)}>
-								<SelectTrigger>
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{(Object.entries(TYPE_LABELS) as [CoeType, string][]).map(([v, l]) => (
-										<SelectItem key={v} value={v}>{l}</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
-
-						<div className="space-y-1.5">
-							<Label htmlFor="coeAmount">Approved Amount (&#8369;) — optional</Label>
-							<Input
-								id="coeAmount"
-								type="number"
-								min={0}
-								placeholder="e.g. 5000"
-								value={amount}
-								onChange={e => setAmount(e.target.value)}
-							/>
-						</div>
-
-						{issueMutation.isError && (
-							<div className="flex items-center gap-2 text-sm text-destructive">
-								<AlertCircle className="size-4 shrink-0" />
-								<span>{(issueMutation.error as Error).message}</span>
+							<div className="space-y-1.5">
+								<Label>Type</Label>
+								<Select value={coeType} onValueChange={v => setCoeType(v as CoeType)}>
+									<SelectTrigger>
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{(Object.entries(TYPE_LABELS) as [CoeType, string][]).map(([v, l]) => (
+											<SelectItem key={v} value={v}>
+												{l}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
 							</div>
-						)}
 
-						<div className="flex gap-2">
-							<Button type="submit" disabled={issueMutation.isPending}>
-								{issueMutation.isPending ? "Issuing…" : "Sign and Issue"}
-							</Button>
-							<Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
-								Cancel
-							</Button>
-						</div>
-					</form>
-				)}
+							<div className="space-y-1.5">
+								<Label htmlFor="coeAmount">Approved Amount (&#8369;) — optional</Label>
+								<Input
+									id="coeAmount"
+									type="number"
+									min={0}
+									placeholder="e.g. 5000"
+									value={amount}
+									onChange={e => setAmount(e.target.value)}
+								/>
+							</div>
 
-				{isLoading ? (
-					<p className="py-4 text-center text-sm text-muted-foreground">Loading…</p>
-				) : active.length === 0 ? (
-					<p className="py-4 text-center text-sm text-muted-foreground">
-						No CoEs issued for this evaluation.
-					</p>
-				) : (
-					<div className="space-y-3">
-						{active.map(cert => (
-							<div key={cert.id} className="rounded-lg border p-4 space-y-2">
-								<div className="flex items-start justify-between gap-3">
-									<div>
-										<p className="text-sm font-medium">{TYPE_LABELS[cert.type]}</p>
-										{cert.amountApproved != null && (
-											<p className="text-xs text-muted-foreground">
-												Amount: &#8369;{cert.amountApproved.toLocaleString()}
+							{issueMutation.isError && (
+								<div className="text-destructive flex items-center gap-2 text-sm">
+									<AlertCircle className="size-4 shrink-0" />
+									<span>{(issueMutation.error as Error).message}</span>
+								</div>
+							)}
+
+							<div className="flex gap-2">
+								<Button type="submit" disabled={issueMutation.isPending}>
+									{issueMutation.isPending ? "Issuing…" : "Sign and Issue"}
+								</Button>
+								<Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
+									Cancel
+								</Button>
+							</div>
+						</form>
+					)}
+
+					{isLoading ? (
+						<p className="text-muted-foreground py-4 text-center text-sm">Loading…</p>
+					) : active.length === 0 ? (
+						<p className="text-muted-foreground py-4 text-center text-sm">
+							No CoEs issued for this evaluation.
+						</p>
+					) : (
+						<div className="space-y-3">
+							{active.map(cert => (
+								<div key={cert.id} className="space-y-2 rounded-lg border p-4">
+									<div className="flex items-start justify-between gap-3">
+										<div>
+											<p className="text-sm font-medium">{TYPE_LABELS[cert.type]}</p>
+											{cert.amountApproved != null && (
+												<p className="text-muted-foreground text-xs">
+													Amount: &#8369;{cert.amountApproved.toLocaleString()}
+												</p>
+											)}
+											<p className="text-muted-foreground text-xs">
+												{cert.signedAt
+													? new Date(cert.signedAt).toLocaleDateString(undefined, {
+															day: "numeric",
+															month: "short",
+															year: "numeric",
+														})
+													: ""}
 											</p>
+										</div>
+										{cert.pdfUri && (
+											<a
+												href={cert.pdfUri}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="text-primary text-xs underline"
+											>
+												View PDF
+											</a>
 										)}
-										<p className="text-xs text-muted-foreground">
-											{cert.signedAt
-												? new Date(cert.signedAt).toLocaleDateString(undefined, {
-														day: "numeric",
-														month: "short",
-														year: "numeric",
-													})
-												: ""}
-										</p>
 									</div>
-									{cert.pdfUri && (
-										<a
-											href={cert.pdfUri}
-											target="_blank"
-											rel="noopener noreferrer"
-											className="text-xs text-primary underline"
+
+									{revokeTarget === cert.id ? (
+										<div className="space-y-2">
+											<Textarea
+												rows={2}
+												placeholder="Reason for revocation (required)"
+												value={revokeReason}
+												onChange={e => setRevokeReason(e.target.value)}
+											/>
+											{revokeMutation.isError && (
+												<p className="text-destructive text-xs">
+													{(revokeMutation.error as Error).message}
+												</p>
+											)}
+											<div className="flex gap-2">
+												<Button
+													type="button"
+													size="sm"
+													variant="destructive"
+													disabled={!revokeReason.trim() || revokeMutation.isPending}
+													onClick={() => handleRevoke(cert.id)}
+												>
+													{revokeMutation.isPending ? "Revoking…" : "Confirm Revoke"}
+												</Button>
+												<Button
+													type="button"
+													size="sm"
+													variant="ghost"
+													onClick={() => setRevokeTarget(null)}
+												>
+													Cancel
+												</Button>
+											</div>
+										</div>
+									) : (
+										<Button
+											type="button"
+											size="sm"
+											variant="ghost"
+											className="text-destructive hover:text-destructive"
+											onClick={() => setRevokeTarget(cert.id)}
 										>
-											View PDF
-										</a>
+											Revoke
+										</Button>
+									)}
+
+									{revokeMutation.isSuccess && revokeTarget === null && (
+										<div className="flex items-center gap-1.5 text-xs text-green-600">
+											<CheckCircle className="size-3.5" />
+											Revoked
+										</div>
 									)}
 								</div>
-
-								{revokeTarget === cert.id ? (
-									<div className="space-y-2">
-										<Textarea
-											rows={2}
-											placeholder="Reason for revocation (required)"
-											value={revokeReason}
-											onChange={e => setRevokeReason(e.target.value)}
-										/>
-										{revokeMutation.isError && (
-											<p className="text-xs text-destructive">
-												{(revokeMutation.error as Error).message}
-											</p>
-										)}
-										<div className="flex gap-2">
-											<Button
-												type="button"
-												size="sm"
-												variant="destructive"
-												disabled={!revokeReason.trim() || revokeMutation.isPending}
-												onClick={() => handleRevoke(cert.id)}
-											>
-												{revokeMutation.isPending ? "Revoking…" : "Confirm Revoke"}
-											</Button>
-											<Button
-												type="button"
-												size="sm"
-												variant="ghost"
-												onClick={() => setRevokeTarget(null)}
-											>
-												Cancel
-											</Button>
-										</div>
-									</div>
-								) : (
-									<Button
-										type="button"
-										size="sm"
-										variant="ghost"
-										className="text-destructive hover:text-destructive"
-										onClick={() => setRevokeTarget(cert.id)}
-									>
-										Revoke
-									</Button>
-								)}
-
-								{revokeMutation.isSuccess && revokeTarget === null && (
-									<div className="flex items-center gap-1.5 text-xs text-green-600">
-										<CheckCircle className="size-3.5" />
-										Revoked
-									</div>
-								)}
-							</div>
-						))}
-					</div>
-				)}
-			</CardContent>
-		</Card>
+							))}
+						</div>
+					)}
+				</CardContent>
+			</Card>
 		</>
 	)
 }

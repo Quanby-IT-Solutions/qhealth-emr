@@ -71,9 +71,11 @@ export function TerminologyManagementPage() {
 					<CardHeader className="pb-2">
 						<div className="flex items-start justify-between">
 							<CardTitle className="text-base">{system.name}</CardTitle>
-							<span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">v{system.version}</span>
+							<span className="text-muted-foreground bg-muted rounded-full px-2 py-0.5 text-xs">
+								v{system.version}
+							</span>
 						</div>
-						<p className="text-xs text-muted-foreground">{system.description}</p>
+						<p className="text-muted-foreground text-xs">{system.description}</p>
 					</CardHeader>
 					<CardContent className="space-y-3">
 						<div className="grid grid-cols-2 gap-2 text-sm">
@@ -86,7 +88,7 @@ export function TerminologyManagementPage() {
 								<p className="font-medium">{system.deprecatedCodes.toLocaleString()}</p>
 							</div>
 						</div>
-						<p className="text-xs text-muted-foreground">Last updated: {system.lastUpdated}</p>
+						<p className="text-muted-foreground text-xs">Last updated: {system.lastUpdated}</p>
 						<Button
 							variant="outline"
 							size="sm"

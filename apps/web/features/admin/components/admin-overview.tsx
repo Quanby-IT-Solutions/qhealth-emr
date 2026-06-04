@@ -3,7 +3,13 @@
 import Link from "next/link"
 
 import { Badge } from "@/core/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/core/components/ui/card"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 const ADMIN_AREAS = [
@@ -41,7 +47,8 @@ const ADMIN_AREAS = [
 			},
 			{
 				title: "Facility Profile",
-				description: "Official facility identity used in reports, exports, and external submissions.",
+				description:
+					"Official facility identity used in reports, exports, and external submissions.",
 				href: "/admin/facility-profile",
 				status: "New",
 			},
@@ -53,7 +60,8 @@ const ADMIN_AREAS = [
 			},
 			{
 				title: "Offline Operations",
-				description: "Offline cache readiness, job history, and continuity status for disconnected operations.",
+				description:
+					"Offline cache readiness, job history, and continuity status for disconnected operations.",
 				href: "/admin/offline",
 				status: "New",
 			},
@@ -91,7 +99,8 @@ const ADMIN_AREAS = [
 			},
 			{
 				title: "Configuration History",
-				description: "Audit trail of all configuration changes for governance forensics and compliance review.",
+				description:
+					"Audit trail of all configuration changes for governance forensics and compliance review.",
 				href: "/admin/config-history",
 				status: "New",
 			},
@@ -102,7 +111,9 @@ const ADMIN_AREAS = [
 export function AdminOverview() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	const permSet = new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	const permSet = new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 
 	const areas = ADMIN_AREAS.map(area => ({
 		...area,
@@ -118,14 +129,14 @@ export function AdminOverview() {
 				<h1 className="text-2xl font-semibold">Administration</h1>
 				<p className="text-muted-foreground max-w-3xl text-sm">
 					The administrator workspace is organized around access governance, platform control,
-					clinical configuration, and interoperability oversight. System administrators can
-					manage configuration without gaining clinical authoring responsibilities.
+					clinical configuration, and interoperability oversight. System administrators can manage
+					configuration without gaining clinical authoring responsibilities.
 				</p>
 			</div>
 
 			<div className="grid gap-4 lg:grid-cols-2">
-			{areas.map(area => (
-					<Card key={area.title} className="h-full border-border/70">
+				{areas.map(area => (
+					<Card key={area.title} className="border-border/70 h-full">
 						<CardHeader className="space-y-2">
 							<div className="flex items-center justify-between gap-3">
 								<CardTitle className="text-lg">{area.title}</CardTitle>
@@ -138,16 +149,18 @@ export function AdminOverview() {
 								<Link
 									key={page.href}
 									href={page.href}
-									className="group block rounded-lg border border-border/70 px-4 py-3 transition-colors hover:bg-muted/50"
+									className="group border-border/70 hover:bg-muted/50 block rounded-lg border px-4 py-3 transition-colors"
 								>
 									<div className="flex items-start justify-between gap-3">
 										<div className="space-y-1">
-											<p className="text-sm font-medium group-hover:text-foreground">
+											<p className="group-hover:text-foreground text-sm font-medium">
 												{page.title}
 											</p>
 											<p className="text-muted-foreground text-sm">{page.description}</p>
 										</div>
-										{"status" in page && page.status ? <Badge>{page.status as string}</Badge> : null}
+										{"status" in page && page.status ? (
+											<Badge>{page.status as string}</Badge>
+										) : null}
 									</div>
 								</Link>
 							))}

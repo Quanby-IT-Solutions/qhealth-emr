@@ -10,8 +10,8 @@ import {
 	useUpdateNoteMutation,
 } from "@/features/clinical-docs/api/clinical-docs.hooks"
 
-import { FpeTemplate, EMPTY_FPE_DATA, type FpeData } from "./fpe-template"
 import { FpeReviewStep } from "./fpe-review-step"
+import { EMPTY_FPE_DATA, FpeTemplate, type FpeData } from "./fpe-template"
 import { getFpeValidation } from "./fpe-validation"
 
 interface FpeEditorFlowProps {
@@ -21,12 +21,7 @@ interface FpeEditorFlowProps {
 	onDone: () => void
 }
 
-export function FpeEditorFlow({
-	encounterId,
-	facilityId,
-	onBack,
-	onDone,
-}: FpeEditorFlowProps) {
+export function FpeEditorFlow({ encounterId, facilityId, onBack, onDone }: FpeEditorFlowProps) {
 	const [step, setStep] = useState<"fill" | "review">("fill")
 	const [fpeData, setFpeData] = useState<FpeData>({ ...EMPTY_FPE_DATA })
 	const [noteId, setNoteId] = useState<string | null>(null)
@@ -105,7 +100,7 @@ export function FpeEditorFlow({
 							<Badge variant="secondary">PhilHealth</Badge>
 						</div>
 						{lastSavedAt && (
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								{hasLocalChanges ? "Unsaved changes" : "Saved"}{" "}
 								{new Date(lastSavedAt).toLocaleTimeString("en-PH", {
 									hour: "2-digit",
@@ -117,20 +112,11 @@ export function FpeEditorFlow({
 				</div>
 
 				<div className="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={!canSave}
-						onClick={handleSave}
-					>
-						<Save className="size-3.5 mr-1.5" />
+					<Button variant="outline" size="sm" disabled={!canSave} onClick={handleSave}>
+						<Save className="mr-1.5 size-3.5" />
 						{isSaving ? "Saving..." : hasSavedDraft ? "Save Draft Changes" : "Save Draft"}
 					</Button>
-					<Button
-						size="sm"
-						disabled={!canReview}
-						onClick={() => setStep("review")}
-					>
+					<Button size="sm" disabled={!canReview} onClick={() => setStep("review")}>
 						Review &amp; Submit -&gt;
 					</Button>
 				</div>
@@ -139,9 +125,8 @@ export function FpeEditorFlow({
 			<FpeTemplate value={fpeData} onChange={handleChange} validation={validation} />
 
 			{!validation.canReview && (
-				<div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-					Fix these fields before Review &amp; Submit:{" "}
-					{validation.allBlockingMessages.join(", ")}
+				<div className="border-destructive/40 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">
+					Fix these fields before Review &amp; Submit: {validation.allBlockingMessages.join(", ")}
 				</div>
 			)}
 
@@ -152,7 +137,7 @@ export function FpeEditorFlow({
 			)}
 
 			{!noteId && (
-				<p className="text-xs text-muted-foreground text-center pb-4">
+				<p className="text-muted-foreground pb-4 text-center text-xs">
 					Save a draft first to enable Review &amp; Submit
 				</p>
 			)}

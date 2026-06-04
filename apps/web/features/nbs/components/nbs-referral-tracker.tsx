@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { AlertCircle, CheckCircle, ExternalLink, Plus } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -17,24 +16,20 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
-
 import {
-	type CreateNbsReferralInput,
-	type NbsReferralStatus,
-	type UpdateNbsReferralInput,
 	useCreateNbsReferralMutation,
 	useNbsReferralsQuery,
 	useUpdateNbsReferralMutation,
+	type CreateNbsReferralInput,
+	type NbsReferralStatus,
+	type UpdateNbsReferralInput,
 } from "@/features/nbs/api/nbs.hooks"
 
 // ============================================================================
 // Status config
 // ============================================================================
 
-const STATUS_CONFIG: Record<
-	NbsReferralStatus,
-	{ label: string; className: string }
-> = {
+const STATUS_CONFIG: Record<NbsReferralStatus, { label: string; className: string }> = {
 	pending: {
 		label: "Pending",
 		className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
@@ -68,9 +63,7 @@ function NewReferralForm({ nbsId, encounterId, patientId, onDone }: NewReferralF
 	const mutation = useCreateNbsReferralMutation()
 	const [referredCondition, setReferredCondition] = useState("")
 	const [referralFacility, setReferralFacility] = useState("")
-	const [referralDatetime, setReferralDatetime] = useState(
-		new Date().toISOString().slice(0, 16)
-	)
+	const [referralDatetime, setReferralDatetime] = useState(new Date().toISOString().slice(0, 16))
 	const [referralNotes, setReferralNotes] = useState("")
 
 	const handleSubmit = (e: React.FormEvent) => {
@@ -88,7 +81,7 @@ function NewReferralForm({ nbsId, encounterId, patientId, onDone }: NewReferralF
 	}
 
 	return (
-		<form onSubmit={handleSubmit} className="space-y-3 rounded-md border bg-muted/30 p-4">
+		<form onSubmit={handleSubmit} className="bg-muted/30 space-y-3 rounded-md border p-4">
 			<p className="text-sm font-medium">New Referral</p>
 			<div className="grid gap-3 sm:grid-cols-2">
 				<div className="space-y-1.5">
@@ -99,7 +92,7 @@ function NewReferralForm({ nbsId, encounterId, patientId, onDone }: NewReferralF
 						id="referredCondition"
 						placeholder="e.g. Congenital Hypothyroidism (CH)"
 						value={referredCondition}
-						onChange={(e) => setReferredCondition(e.target.value)}
+						onChange={e => setReferredCondition(e.target.value)}
 						required
 					/>
 				</div>
@@ -111,7 +104,7 @@ function NewReferralForm({ nbsId, encounterId, patientId, onDone }: NewReferralF
 						id="referralFacility"
 						placeholder="Facility name"
 						value={referralFacility}
-						onChange={(e) => setReferralFacility(e.target.value)}
+						onChange={e => setReferralFacility(e.target.value)}
 						required
 					/>
 				</div>
@@ -123,7 +116,7 @@ function NewReferralForm({ nbsId, encounterId, patientId, onDone }: NewReferralF
 						id="referralDatetime"
 						type="datetime-local"
 						value={referralDatetime}
-						onChange={(e) => setReferralDatetime(e.target.value)}
+						onChange={e => setReferralDatetime(e.target.value)}
 						required
 					/>
 				</div>
@@ -135,11 +128,11 @@ function NewReferralForm({ nbsId, encounterId, patientId, onDone }: NewReferralF
 					rows={2}
 					placeholder="Additional referral notes…"
 					value={referralNotes}
-					onChange={(e) => setReferralNotes(e.target.value)}
+					onChange={e => setReferralNotes(e.target.value)}
 				/>
 			</div>
 			{mutation.isError && (
-				<div className="flex items-center gap-2 text-sm text-destructive">
+				<div className="text-destructive flex items-center gap-2 text-sm">
 					<AlertCircle className="size-4 shrink-0" />
 					<span>Failed to save referral.</span>
 				</div>
@@ -197,11 +190,11 @@ function ReferralRow({
 	}
 
 	return (
-		<div className="rounded-md border bg-card p-3 space-y-2">
+		<div className="bg-card space-y-2 rounded-md border p-3">
 			<div className="flex items-start justify-between gap-2">
 				<div className="space-y-0.5">
 					<p className="text-sm font-medium">{referral.referredCondition}</p>
-					<p className="text-xs text-muted-foreground flex items-center gap-1">
+					<p className="text-muted-foreground flex items-center gap-1 text-xs">
 						<ExternalLink className="size-3" />
 						{referral.referralFacility}
 					</p>
@@ -209,7 +202,7 @@ function ReferralRow({
 				<Badge className={cfg.className}>{cfg.label}</Badge>
 			</div>
 			<div className="flex items-center justify-between gap-2">
-				<p className="text-xs text-muted-foreground">
+				<p className="text-muted-foreground text-xs">
 					{new Date(referral.referralDatetime).toLocaleString(undefined, {
 						month: "short",
 						day: "numeric",
@@ -232,9 +225,7 @@ function ReferralRow({
 				)}
 			</div>
 			{referral.referralNotes && (
-				<p className="text-xs text-muted-foreground border-t pt-2">
-					{referral.referralNotes}
-				</p>
+				<p className="text-muted-foreground border-t pt-2 text-xs">{referral.referralNotes}</p>
 			)}
 		</div>
 	)
@@ -263,7 +254,7 @@ export function NbsReferralTracker({ nbsId, encounterId, patientId }: NbsReferra
 						type="button"
 						size="sm"
 						variant="outline"
-						className="gap-1.5 h-7 text-xs"
+						className="h-7 gap-1.5 text-xs"
 						onClick={() => setShowForm(true)}
 					>
 						<Plus className="size-3.5" />
@@ -282,23 +273,21 @@ export function NbsReferralTracker({ nbsId, encounterId, patientId }: NbsReferra
 				)}
 
 				{isLoading ? (
-					<p className="text-sm text-muted-foreground">Loading referrals…</p>
+					<p className="text-muted-foreground text-sm">Loading referrals…</p>
 				) : referrals.length === 0 ? (
-					<p className="text-sm text-muted-foreground text-center py-4">
+					<p className="text-muted-foreground py-4 text-center text-sm">
 						No referrals yet. Referrals are created when NBS results are positive/borderline.
 					</p>
 				) : (
 					<div className="space-y-2">
-						{referrals.map((r) => (
+						{referrals.map(r => (
 							<ReferralRow key={r.id} referral={r} />
 						))}
 					</div>
 				)}
 
-				{referrals.some(
-					(r) => r.referralStatus === "completed"
-				) && (
-					<div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 pt-1">
+				{referrals.some(r => r.referralStatus === "completed") && (
+					<div className="flex items-center gap-2 pt-1 text-sm text-green-600 dark:text-green-400">
 						<CheckCircle className="size-4 shrink-0" />
 						<span>All completed referrals have been followed up.</span>
 					</div>

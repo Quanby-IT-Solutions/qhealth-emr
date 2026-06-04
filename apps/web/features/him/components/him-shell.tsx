@@ -1,14 +1,12 @@
 "use client"
 
 import type { ReactNode } from "react"
-
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 import { Badge } from "@/core/components/ui/badge"
 import { cn } from "@/core/lib/utils"
 import { useHimQueueCounts } from "@/features/him/lib/him-queue-badges"
-
 
 export function HimShell({ children, roleName }: { children: ReactNode; roleName?: string }) {
 	const pathname = usePathname()
@@ -18,7 +16,11 @@ export function HimShell({ children, roleName }: { children: ReactNode; roleName
 		{ label: "Dashboard", href: "/him", count: null as number | null },
 		{ label: "Deficiencies", href: "/him/deficiencies", count: counts.openDeficiencies },
 		{ label: "Coding", href: "/him/coding/lookup", count: counts.pendingCoding },
-		{ label: "Records Requests", href: "/him/records-requests", count: counts.pendingRecordsRequests },
+		{
+			label: "Records Requests",
+			href: "/him/records-requests",
+			count: counts.pendingRecordsRequests,
+		},
 		{ label: "HAI", href: "/him/hai", count: counts.pendingHaiReview },
 	]
 
@@ -44,15 +46,15 @@ export function HimShell({ children, roleName }: { children: ReactNode; roleName
 							key={item.href}
 							href={item.href}
 							className={cn(
-								"flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+								"flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
 								active
 									? "border-primary text-foreground"
-									: "border-transparent text-muted-foreground hover:text-foreground"
+									: "text-muted-foreground hover:text-foreground border-transparent"
 							)}
 						>
 							{item.label}
 							{item.count !== null && item.count > 0 && (
-								<Badge variant={active ? "default" : "secondary"} className="text-[10px] px-1.5">
+								<Badge variant={active ? "default" : "secondary"} className="px-1.5 text-[10px]">
 									{item.count > 99 ? "99+" : item.count}
 								</Badge>
 							)}

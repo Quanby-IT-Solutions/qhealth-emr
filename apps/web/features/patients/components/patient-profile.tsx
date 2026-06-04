@@ -161,13 +161,13 @@ function StatCell({
 				<p
 					className={
 						monospace
-							? "break-all font-mono text-sm font-medium"
-							: "break-words text-sm font-medium"
+							? "font-mono text-sm font-medium break-all"
+							: "text-sm font-medium break-words"
 					}
 				>
 					{value}
 				</p>
-				{hint && <p className="text-muted-foreground break-words text-xs">{hint}</p>}
+				{hint && <p className="text-muted-foreground text-xs break-words">{hint}</p>}
 			</div>
 		</div>
 	)
@@ -190,7 +190,7 @@ function DetailItem({
 				<Icon className="size-3.5 shrink-0" />
 				<span className="min-w-0 truncate">{label}</span>
 			</dt>
-			<dd className={monospace ? "break-all font-mono text-sm" : "break-words text-sm"}>{value}</dd>
+			<dd className={monospace ? "font-mono text-sm break-all" : "text-sm break-words"}>{value}</dd>
 		</div>
 	)
 }
@@ -423,10 +423,10 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 					</Button>
 				</div>
 
-				<section className="mb-5 rounded-lg border border-border/60 bg-card px-4 py-4 shadow-sm sm:px-5">
+				<section className="border-border/60 bg-card mb-5 rounded-lg border px-4 py-4 shadow-sm sm:px-5">
 					<div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 						<div className="flex min-w-0 items-start gap-4">
-							<div className="bg-secondary text-muted-foreground flex size-12 shrink-0 items-center justify-center rounded-lg border border-border/60">
+							<div className="bg-secondary text-muted-foreground border-border/60 flex size-12 shrink-0 items-center justify-center rounded-lg border">
 								<UserRound className="size-5" />
 							</div>
 							<div className="min-w-0 space-y-2">
@@ -434,7 +434,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 									Patient
 								</p>
 								<div className="space-y-2">
-									<h1 className="break-words text-2xl font-semibold tracking-tight">
+									<h1 className="text-2xl font-semibold tracking-tight break-words">
 										{patientName}
 									</h1>
 									<div className="flex flex-wrap items-center gap-2">
@@ -473,20 +473,20 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 				</section>
 
 				{activeBreakGlass ? (
-					<Card className="mb-5 overflow-hidden border-orange-500/30 bg-card shadow-sm">
+					<Card className="bg-card mb-5 overflow-hidden border-orange-500/30 shadow-sm">
 						<CardContent className="flex flex-col gap-4 border-l-4 border-orange-500 p-4 sm:flex-row sm:items-center sm:justify-between">
 							<div className="flex min-w-0 items-start gap-3">
 								<div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-orange-500/10 text-orange-300">
 									<ShieldAlert className="size-4" />
 								</div>
 								<div className="min-w-0 space-y-1">
-									<p className="text-sm font-medium text-foreground">
+									<p className="text-foreground text-sm font-medium">
 										Temporary Break-Glass Access Active
 									</p>
-									<p className="text-sm text-muted-foreground">
+									<p className="text-muted-foreground text-sm">
 										Access is temporary and expires automatically.
 									</p>
-									<p className="text-xs text-muted-foreground">
+									<p className="text-muted-foreground text-xs">
 										Expires at {formatDateTime(activeBreakGlass.accessExpiresAt)}
 									</p>
 								</div>
@@ -588,7 +588,7 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 													<Badge variant="secondary">{encounterTypeLabel(enc.encounterType)}</Badge>
 													<Badge variant={encounterStatusVariant(enc.status)}>{enc.status}</Badge>
 												</div>
-												<p className="break-words text-sm font-medium">
+												<p className="text-sm font-medium break-words">
 													{enc.chiefComplaint ?? "No chief complaint recorded."}
 												</p>
 											</div>

@@ -1,10 +1,10 @@
 # Auditor Module — Route Map
 
-| Route | Page | Story | Flow | Wireframe Page |
-|-------|------|-------|------|----------------|
-| `/auditor/audit-log` | Audit Log Dashboard | Story 1.6 — Audit Trail Review | Flow A6 | Audit Log Dashboard |
-| `/auditor/audit-log/[eventId]` | Audit Event Detail | Story 1.6 — Audit Trail Review | Flow A6 | Audit Detail Page |
-| `/auditor/break-glass` | Break-Glass Inbox | Story 1.6 — Audit Trail Review (break-glass branch) | Flow A6 (break-glass section) | Break-Glass Inbox |
+| Route                            | Page                     | Story                                               | Flow                                             | Wireframe Page                |
+| -------------------------------- | ------------------------ | --------------------------------------------------- | ------------------------------------------------ | ----------------------------- |
+| `/auditor/audit-log`             | Audit Log Dashboard      | Story 1.6 — Audit Trail Review                      | Flow A6                                          | Audit Log Dashboard           |
+| `/auditor/audit-log/[eventId]`   | Audit Event Detail       | Story 1.6 — Audit Trail Review                      | Flow A6                                          | Audit Detail Page             |
+| `/auditor/break-glass`           | Break-Glass Inbox        | Story 1.6 — Audit Trail Review (break-glass branch) | Flow A6 (break-glass section)                    | Break-Glass Inbox             |
 | `/auditor/break-glass/[eventId]` | Break-Glass Audit Report | Story 1.6 — Audit Trail Review (break-glass branch) | Flow A6 (break-glass section), Flow A5 (context) | Break-Glass Audit Report Page |
 
 ## Feature Structure

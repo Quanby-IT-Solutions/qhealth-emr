@@ -3,15 +3,19 @@
 import { useState } from "react"
 import { toast } from "sonner"
 
+import { StatusBadge } from "@/core/components/status-badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Skeleton } from "@/core/components/ui/skeleton"
-import { StatusBadge } from "@/core/components/status-badge"
 import type { StatusVariant } from "@/core/styles/status-tokens"
 
-import { useGetClinicianLicensesQuery, useMarkPendingMutation, useVerifyLicenseMutation } from "../api/licenses.hooks"
+import {
+	useGetClinicianLicensesQuery,
+	useMarkPendingMutation,
+	useVerifyLicenseMutation,
+} from "../api/licenses.hooks"
 import { AddLicenseDrawer } from "./add-license-drawer"
 
 function getBadgeVariant(status: string | null | undefined): StatusVariant {
@@ -33,16 +37,19 @@ export function LicenseVerificationPage({ staffProfileId }: LicenseVerificationP
 	const [addOpen, setAddOpen] = useState(false)
 
 	if (isLoading) return <Skeleton className="h-64 w-full" />
-	if (isError || !data) return <p className="text-sm text-destructive">Failed to load license data.</p>
+	if (isError || !data)
+		return <p className="text-destructive text-sm">Failed to load license data.</p>
 
 	return (
 		<div className="space-y-6">
 			<div className="flex items-start justify-between">
 				<div>
 					<h2 className="text-xl font-semibold">{data.staffName}</h2>
-					<p className="text-sm text-muted-foreground">Staff Profile ID: {staffProfileId}</p>
+					<p className="text-muted-foreground text-sm">Staff Profile ID: {staffProfileId}</p>
 					{data.daysUntilNextExpiry !== null && (
-						<p className={`text-sm ${data.daysUntilNextExpiry <= 30 ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
+						<p
+							className={`text-sm ${data.daysUntilNextExpiry <= 30 ? "font-medium text-amber-600" : "text-muted-foreground"}`}
+						>
 							Next expiry in {data.daysUntilNextExpiry} days
 						</p>
 					)}
@@ -51,7 +58,7 @@ export function LicenseVerificationPage({ staffProfileId }: LicenseVerificationP
 			</div>
 
 			{data.licenses.length === 0 && (
-				<p className="text-sm text-muted-foreground py-8 text-center">No licenses on record.</p>
+				<p className="text-muted-foreground py-8 text-center text-sm">No licenses on record.</p>
 			)}
 
 			<div className="grid gap-4 lg:grid-cols-2">
@@ -64,23 +71,41 @@ export function LicenseVerificationPage({ staffProfileId }: LicenseVerificationP
 							</div>
 						</CardHeader>
 						<CardContent className="space-y-3">
-							<div className="text-sm space-y-1">
-								<p><span className="text-muted-foreground">Number:</span> {license.licenseNumber}</p>
-								{license.issueDate && <p><span className="text-muted-foreground">Issued:</span> {license.issueDate}</p>}
-								{license.expiryDate && <p><span className="text-muted-foreground">Expires:</span> {license.expiryDate}</p>}
+							<div className="space-y-1 text-sm">
+								<p>
+									<span className="text-muted-foreground">Number:</span> {license.licenseNumber}
+								</p>
+								{license.issueDate && (
+									<p>
+										<span className="text-muted-foreground">Issued:</span> {license.issueDate}
+									</p>
+								)}
+								{license.expiryDate && (
+									<p>
+										<span className="text-muted-foreground">Expires:</span> {license.expiryDate}
+									</p>
+								)}
 								{license.verifiedAt && (
-									<p><span className="text-muted-foreground">Verified at:</span> {new Date(license.verifiedAt).toLocaleDateString()}</p>
+									<p>
+										<span className="text-muted-foreground">Verified at:</span>{" "}
+										{new Date(license.verifiedAt).toLocaleDateString()}
+									</p>
 								)}
 							</div>
 
 							{license.documentUri && (
-								<div className="border rounded overflow-hidden h-48">
+								<div className="h-48 overflow-hidden rounded border">
 									<object
 										data={license.documentUri}
 										type="application/pdf"
-										className="w-full h-full"
+										className="h-full w-full"
 									>
-										<a href={license.documentUri} target="_blank" rel="noreferrer" className="text-xs text-primary underline">
+										<a
+											href={license.documentUri}
+											target="_blank"
+											rel="noreferrer"
+											className="text-primary text-xs underline"
+										>
 											View document
 										</a>
 									</object>
@@ -89,12 +114,16 @@ export function LicenseVerificationPage({ staffProfileId }: LicenseVerificationP
 
 							{license.status !== "verified" && (
 								<div className="space-y-2 pt-1">
-									<Label htmlFor={`proof-${license.id}`} className="text-xs">Verification Proof (optional)</Label>
+									<Label htmlFor={`proof-${license.id}`} className="text-xs">
+										Verification Proof (optional)
+									</Label>
 									<Input
 										id={`proof-${license.id}`}
 										placeholder="Registry reference or note"
 										value={proofInputs[license.id] ?? ""}
-										onChange={e => setProofInputs(prev => ({ ...prev, [license.id]: e.target.value }))}
+										onChange={e =>
+											setProofInputs(prev => ({ ...prev, [license.id]: e.target.value }))
+										}
 									/>
 									<Button
 										size="sm"
@@ -115,7 +144,15 @@ export function LicenseVerificationPage({ staffProfileId }: LicenseVerificationP
 								<Button
 									size="sm"
 									variant="outline"
-									onClick={() => markPendingMutation.mutate({ id: license.id }, { onSuccess: () => toast("Marked as pending review."), onError: () => toast.error("Failed to update status.") })}
+									onClick={() =>
+										markPendingMutation.mutate(
+											{ id: license.id },
+											{
+												onSuccess: () => toast("Marked as pending review."),
+												onError: () => toast.error("Failed to update status."),
+											}
+										)
+									}
 									disabled={markPendingMutation.isPending}
 								>
 									Mark Pending Review

@@ -251,10 +251,7 @@ export function AnesthesiaRecordForm({
 		const missingFields: string[] = []
 		const hasCompleteVital = form.intraopVitals.some(
 			vital =>
-				isClockTime(vital.time) &&
-				isBloodPressure(vital.bp) &&
-				vital.hr > 0 &&
-				vital.spo2 > 0
+				isClockTime(vital.time) && isBloodPressure(vital.bp) && vital.hr > 0 && vital.spo2 > 0
 		)
 
 		if (!form.anesthesiaType) missingFields.push("anesthesia type")
@@ -740,7 +737,9 @@ export function AnesthesiaRecordForm({
 											<TableCell>
 												<Input
 													value={a.time ?? ""}
-													onChange={e => updateMaintenance(i, "time", clockTimeInput(e.target.value))}
+													onChange={e =>
+														updateMaintenance(i, "time", clockTimeInput(e.target.value))
+													}
 													placeholder="HH:MM"
 													inputMode="numeric"
 													pattern="[0-9:]*"
@@ -957,8 +956,8 @@ export function AnesthesiaRecordForm({
 									<span className="border-border bg-background text-muted-foreground inline-flex h-7 cursor-not-allowed items-center justify-center gap-1 rounded-[min(var(--radius-md),12px)] border px-2.5 text-[0.8rem] font-medium opacity-50" />
 								}
 							>
-									<Monitor className="mr-1.5 size-3.5" />
-									Connect Monitor
+								<Monitor className="mr-1.5 size-3.5" />
+								Connect Monitor
 							</TooltipTrigger>
 							<TooltipContent side="bottom">
 								Bedside monitor integration is not yet available in this environment

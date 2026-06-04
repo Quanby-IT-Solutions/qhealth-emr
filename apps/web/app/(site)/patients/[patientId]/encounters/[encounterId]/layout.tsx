@@ -252,7 +252,8 @@ export default function EncounterChartLayout({
 		can(permSet, "adt", "edit")
 			? [{ label: "Transfer Patient", href: `${base}/transfer`, show: true }]
 			: []),
-		...((visibleEncounter?.status === "active" || visibleEncounter?.status === "pending_discharge") &&
+		...((visibleEncounter?.status === "active" ||
+			visibleEncounter?.status === "pending_discharge") &&
 		(can(permSet, "adt", "edit") || can(permSet, "clinical_docs", "sign"))
 			? [
 					{

@@ -69,7 +69,7 @@ export function PatientHeaderAlerts({
 			input: { patientId },
 			enabled: !!patientId,
 			staleTime: 60_000,
-		}),
+		})
 	)
 
 	const allergies = data?.allergies ?? []
@@ -100,9 +100,9 @@ export function PatientHeaderAlerts({
 		<TooltipProvider>
 			<div
 				className={cn(
-					"flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2",
+					"bg-muted/40 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2",
 					hasSevere && "border-red-300 bg-red-50/60",
-					className,
+					className
 				)}
 				role="alert"
 				aria-label="Patient alert strip"
@@ -115,13 +115,10 @@ export function PatientHeaderAlerts({
 						const config = SEVERITY_CONFIG[allergy.severity]
 						return (
 							<Tooltip key={allergy.id}>
-							<TooltipTrigger>
+								<TooltipTrigger>
 									<Badge
 										variant="outline"
-										className={cn(
-											"cursor-default gap-1 text-xs font-medium",
-											config.className,
-										)}
+										className={cn("cursor-default gap-1 text-xs font-medium", config.className)}
 									>
 										<HugeiconsIcon icon={Alert01FreeIcons} className="size-3" />
 										{allergy.allergenName}
@@ -155,7 +152,7 @@ export function PatientHeaderAlerts({
 						<TooltipTrigger>
 							<Badge
 								variant="outline"
-								className="cursor-default gap-1 bg-gray-100 text-xs font-medium text-gray-600 border-gray-300"
+								className="cursor-default gap-1 border-gray-300 bg-gray-100 text-xs font-medium text-gray-600"
 							>
 								<HugeiconsIcon icon={MedicalFileFreeIcons} className="size-3" />
 								DPA Not Obtained
@@ -170,7 +167,7 @@ export function PatientHeaderAlerts({
 				{dpaConsent === true && (
 					<Badge
 						variant="outline"
-						className="cursor-default gap-1 bg-green-50 text-xs font-medium text-green-700 border-green-200"
+						className="cursor-default gap-1 border-green-200 bg-green-50 text-xs font-medium text-green-700"
 					>
 						<HugeiconsIcon icon={MedicalFileFreeIcons} className="size-3" />
 						DPA Obtained
@@ -185,7 +182,7 @@ export function PatientHeaderAlerts({
 								variant="outline"
 								className={cn(
 									"cursor-default gap-1 text-xs font-medium",
-									NBS_STATUS_CONFIG[nbsStatus].className,
+									NBS_STATUS_CONFIG[nbsStatus].className
 								)}
 							>
 								<HugeiconsIcon icon={TestTubeFreeIcons} className="size-3" />

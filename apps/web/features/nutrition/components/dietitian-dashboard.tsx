@@ -1,8 +1,7 @@
 "use client"
 
-import Link from "next/link"
 import { useMemo } from "react"
-
+import Link from "next/link"
 import {
 	AlertTriangle,
 	ArrowUpRight,
@@ -17,10 +16,9 @@ import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-
 import {
-	type WorklistAssessment,
 	useNutritionWorklistQuery,
+	type WorklistAssessment,
 } from "@/features/nutrition/api/nutrition.hooks"
 
 type WorklistAssessmentWithOptionalAssessedAt = WorklistAssessment & {
@@ -128,19 +126,14 @@ export function DietitianDashboard() {
 				const planDelta = planRank[aPlan] - planRank[bPlan]
 				if (planDelta !== 0) return planDelta
 
-				return (
-					new Date(assessmentTime(b)).getTime() - new Date(assessmentTime(a)).getTime()
-				)
+				return new Date(assessmentTime(b)).getTime() - new Date(assessmentTime(a)).getTime()
 			})
 			.slice(0, 8)
 	}, [items])
 
 	const recentItems = useMemo(() => {
 		return [...items]
-			.sort(
-				(a, b) =>
-					new Date(assessmentTime(b)).getTime() - new Date(assessmentTime(a)).getTime()
-			)
+			.sort((a, b) => new Date(assessmentTime(b)).getTime() - new Date(assessmentTime(a)).getTime())
 			.slice(0, 6)
 	}, [items])
 
@@ -149,7 +142,7 @@ export function DietitianDashboard() {
 			<div className="space-y-6">
 				<div>
 					<h1 className="text-2xl font-semibold">Dietitian Dashboard</h1>
-					<p className="text-sm text-muted-foreground">Loading dashboard...</p>
+					<p className="text-muted-foreground text-sm">Loading dashboard...</p>
 				</div>
 			</div>
 		)
@@ -160,10 +153,10 @@ export function DietitianDashboard() {
 			<div className="space-y-6">
 				<div>
 					<h1 className="text-2xl font-semibold">Dietitian Dashboard</h1>
-					<p className="text-sm text-muted-foreground">Viewing as Clinical Dietitian</p>
+					<p className="text-muted-foreground text-sm">Viewing as Clinical Dietitian</p>
 				</div>
 				<Card>
-					<CardContent className="py-8 text-center text-sm text-muted-foreground">
+					<CardContent className="text-muted-foreground py-8 text-center text-sm">
 						No facility assignment found for this account.
 					</CardContent>
 				</Card>
@@ -176,7 +169,7 @@ export function DietitianDashboard() {
 			<div className="flex items-center justify-between gap-3">
 				<div>
 					<h1 className="text-2xl font-semibold">Dietitian Dashboard</h1>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Shift overview and nutrition priorities before entering full charting workflow
 					</p>
 				</div>
@@ -228,9 +221,9 @@ export function DietitianDashboard() {
 					</CardHeader>
 					<CardContent>
 						{worklist.isLoading ? (
-							<p className="py-8 text-center text-sm text-muted-foreground">Loading cases...</p>
+							<p className="text-muted-foreground py-8 text-center text-sm">Loading cases...</p>
 						) : priorityItems.length === 0 ? (
-							<p className="py-8 text-center text-sm text-muted-foreground">
+							<p className="text-muted-foreground py-8 text-center text-sm">
 								No nutrition assessments available for this facility.
 							</p>
 						) : (
@@ -250,7 +243,7 @@ export function DietitianDashboard() {
 												<p className="truncate text-sm font-medium">
 													{item.patientName ?? "Unknown patient"}
 												</p>
-												<p className="truncate text-xs text-muted-foreground">
+												<p className="text-muted-foreground truncate text-xs">
 													MRN {item.patientMrn ?? "-"}
 													{item.ward ? ` · ${item.ward}` : ""}
 													{` · ${formatTime(assessmentTime(item))}`}
@@ -281,17 +274,17 @@ export function DietitianDashboard() {
 					</CardHeader>
 					<CardContent>
 						{recentItems.length === 0 ? (
-							<p className="text-sm text-muted-foreground">No recent activity yet.</p>
+							<p className="text-muted-foreground text-sm">No recent activity yet.</p>
 						) : (
 							<div className="space-y-3">
 								{recentItems.map(item => (
 									<div key={item.id} className="rounded-md border px-3 py-2">
 										<p className="text-sm font-medium">{item.patientName ?? "Unknown patient"}</p>
-										<p className="mt-0.5 text-xs text-muted-foreground">
+										<p className="text-muted-foreground mt-0.5 text-xs">
 											{item.screeningTool.toUpperCase()} · Score {item.screeningScore}
 										</p>
 										<div className="mt-1 flex items-center justify-between">
-											<div className="flex items-center gap-1 text-xs text-muted-foreground">
+											<div className="text-muted-foreground flex items-center gap-1 text-xs">
 												<Clock3 className="size-3" />
 												{formatTime(assessmentTime(item))}
 											</div>

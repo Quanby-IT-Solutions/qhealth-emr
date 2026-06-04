@@ -139,7 +139,10 @@ function FormSection({
 	)
 }
 
-export function PatientRegistrationForm({ mode = "triage-linked", onBack }: PatientRegistrationFormProps) {
+export function PatientRegistrationForm({
+	mode = "triage-linked",
+	onBack,
+}: PatientRegistrationFormProps) {
 	const router = useRouter()
 	const searchParams = useSearchParams()
 	const pendingTriageId = searchParams.get("pendingTriageId") ?? ""

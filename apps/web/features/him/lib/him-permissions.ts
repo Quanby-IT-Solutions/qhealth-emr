@@ -19,7 +19,9 @@ const HIM_ACCESS_PERMISSIONS = [
 ] as const
 
 export function hasHimAccess(permissions: HimPermission[]) {
-	const permissionSet = new Set(permissions.map(permission => `${permission.module}:${permission.action}`))
+	const permissionSet = new Set(
+		permissions.map(permission => `${permission.module}:${permission.action}`)
+	)
 
 	return HIM_ACCESS_PERMISSIONS.some(permission => permissionSet.has(permission))
 }

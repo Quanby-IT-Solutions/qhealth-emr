@@ -1,12 +1,15 @@
 "use client"
 
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+
 import { UsersTable } from "./users-table"
 
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 export function UsersPageClient() {
@@ -14,7 +17,7 @@ export function UsersPageClient() {
 
 	if (!permSet.has("admin:view")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access user management.
 			</div>
 		)

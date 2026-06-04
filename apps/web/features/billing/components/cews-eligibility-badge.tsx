@@ -3,7 +3,12 @@
 import { AlertCircle, CheckCircle2, HelpCircle, Loader2 } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/core/components/ui/tooltip"
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/core/components/ui/tooltip"
 
 import { useCewsEligibilityQuery } from "../api/billing.hooks"
 
@@ -28,7 +33,7 @@ export function CewsEligibilityBadge({ patientId }: CewsEligibilityBadgeProps) {
 
 	if (isError || !data) {
 		return (
-			<Badge variant="outline" className="gap-1 text-muted-foreground">
+			<Badge variant="outline" className="text-muted-foreground gap-1">
 				<HelpCircle className="size-3" />
 				CEWS
 			</Badge>
@@ -37,7 +42,7 @@ export function CewsEligibilityBadge({ patientId }: CewsEligibilityBadgeProps) {
 
 	if (data.isEligible === null) {
 		return (
-			<Badge variant="outline" className="gap-1 text-muted-foreground">
+			<Badge variant="outline" className="text-muted-foreground gap-1">
 				<HelpCircle className="size-3" />
 				No Eligibility Check
 			</Badge>
@@ -51,15 +56,13 @@ export function CewsEligibilityBadge({ patientId }: CewsEligibilityBadgeProps) {
 		data.remainingCoverage !== null
 			? `Remaining: ₱${data.remainingCoverage.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
 			: null,
-		data.lastCheckedAt
-			? `Checked: ${new Date(data.lastCheckedAt).toLocaleString("en-PH")}`
-			: null,
+		data.lastCheckedAt ? `Checked: ${new Date(data.lastCheckedAt).toLocaleString("en-PH")}` : null,
 	]
 		.filter(Boolean)
 		.join(" · ")
 
 	const badge = eligible ? (
-		<Badge variant="default" className="gap-1 bg-green-600 hover:bg-green-700 text-white">
+		<Badge variant="default" className="gap-1 bg-green-600 text-white hover:bg-green-700">
 			<CheckCircle2 className="size-3" />
 			PhilHealth Eligible
 		</Badge>

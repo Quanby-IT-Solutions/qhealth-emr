@@ -242,10 +242,7 @@ function NewCrossMatchForm({
 
 			<div className="space-y-2">
 				<Label>Urgency</Label>
-				<Select
-					value={urgency}
-					onValueChange={v => setUrgency(v as CrossMatchRequest["urgency"])}
-				>
+				<Select value={urgency} onValueChange={v => setUrgency(v as CrossMatchRequest["urgency"])}>
 					<SelectTrigger>
 						<SelectValue />
 					</SelectTrigger>
@@ -308,7 +305,7 @@ function CrossMatchRequestCards({
 				const unitBarcodes = req.bloodUnits.map(unit => unit.unitBarcode).join(", ")
 
 				return (
-					<div key={req.id} className="rounded-md border bg-background p-4">
+					<div key={req.id} className="bg-background rounded-md border p-4">
 						<div className="flex flex-wrap items-start justify-between gap-3">
 							<div className="min-w-0 space-y-1">
 								<div className="flex flex-wrap items-center gap-2">

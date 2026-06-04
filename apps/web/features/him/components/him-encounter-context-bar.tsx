@@ -22,11 +22,11 @@ export function HimEncounterContextBar({ encounterId, className }: HimEncounterC
 	if (isLoading) {
 		return (
 			<div
-				className={cn("sticky top-0 z-10 border-b bg-background px-4 py-2", className)}
+				className={cn("bg-background sticky top-0 z-10 border-b px-4 py-2", className)}
 				aria-busy="true"
 				aria-label="Loading encounter context"
 			>
-				<div className="h-5 w-72 animate-pulse rounded bg-muted" />
+				<div className="bg-muted h-5 w-72 animate-pulse rounded" />
 			</div>
 		)
 	}
@@ -36,14 +36,14 @@ export function HimEncounterContextBar({ encounterId, className }: HimEncounterC
 	return (
 		<div
 			className={cn(
-				"sticky top-0 z-10 border-b bg-background/95 px-4 py-2 backdrop-blur-sm",
+				"bg-background/95 sticky top-0 z-10 border-b px-4 py-2 backdrop-blur-sm",
 				className
 			)}
 			aria-label="Encounter context"
 		>
 			<div className="flex flex-wrap items-center gap-x-4 gap-y-1">
 				<span className="text-sm font-semibold">{encounter.patientName}</span>
-				<span className="text-xs text-muted-foreground">MRN: {encounter.patientMrn}</span>
+				<span className="text-muted-foreground text-xs">MRN: {encounter.patientMrn}</span>
 				<Badge variant="outline" className="text-xs capitalize">
 					{encounter.encounterType}
 				</Badge>
@@ -54,7 +54,7 @@ export function HimEncounterContextBar({ encounterId, className }: HimEncounterC
 					{encounter.status}
 				</Badge>
 				{encounter.wardName && (
-					<span className="text-xs text-muted-foreground">
+					<span className="text-muted-foreground text-xs">
 						{encounter.wardName}
 						{encounter.bedNumber ? ` / Bed ${encounter.bedNumber}` : ""}
 					</span>

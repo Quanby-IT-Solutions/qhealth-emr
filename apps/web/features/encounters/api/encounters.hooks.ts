@@ -2,8 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { env } from "@/env"
 import { orpc } from "@/services/orpc/client"
+import { env } from "@/env"
 
 function shouldRetryDetailQuery(error: unknown, failureCount: number) {
 	const candidate = error as { status?: number } | null
@@ -184,15 +184,12 @@ export function useDeathReportTriggerMutation() {
 	const queryClient = useQueryClient()
 	return useMutation({
 		mutationFn: async (data: DeathReportTriggerInput) => {
-			const res = await fetch(
-				`${env.NEXT_PUBLIC_API_BASE_URL}/v1/death-reporting/trigger`,
-				{
-					method: "POST",
-					credentials: "include",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(data),
-				}
-			)
+			const res = await fetch(`${env.NEXT_PUBLIC_API_BASE_URL}/v1/death-reporting/trigger`, {
+				method: "POST",
+				credentials: "include",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(data),
+			})
 			if (!res.ok) throw new Error(`HTTP ${res.status}`)
 			return res.json() as Promise<DeathReportTriggerResponse>
 		},

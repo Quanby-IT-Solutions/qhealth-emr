@@ -1,7 +1,9 @@
 "use client"
 
+import { useCallback, useState } from "react"
 import Link from "next/link"
-import { useState, useCallback } from "react"
+
+import type { SlaEvent, SlaKpiTile } from "@repo/contracts"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -22,19 +24,10 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/core/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import {
-	type SlaStatus,
-	type SlaWorkflowType,
-	WORKFLOW_LABELS,
-} from "@/features/sla/api/sla.hooks"
-import { useSlaEventsOrpcQuery, useSlaDashboardQuery } from "@/features/sla/api/sla-orpc.hooks"
-import type { SlaEvent, SlaKpiTile } from "@repo/contracts"
+import { useSlaDashboardQuery, useSlaEventsOrpcQuery } from "@/features/sla/api/sla-orpc.hooks"
+import { WORKFLOW_LABELS, type SlaStatus, type SlaWorkflowType } from "@/features/sla/api/sla.hooks"
 
 // ============================================================================
 // Helpers
@@ -73,7 +66,9 @@ const MONITORING_STEP_LABELS: Record<string, string> = {
 
 function formatCurrentStep(step: string | null | undefined): string {
 	if (!step) return "—"
-	return MONITORING_STEP_LABELS[step] ?? step.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+	return (
+		MONITORING_STEP_LABELS[step] ?? step.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+	)
 }
 
 function formatDateTime(val: Date | string | null | undefined): string {
@@ -117,7 +112,15 @@ function SlaStatusBadge({ status }: { status: SlaStatus }) {
 // Progress Bar
 // ============================================================================
 
-function SlaProgressBar({ elapsed, target, status }: { elapsed: number; target: number; status: SlaStatus }) {
+function SlaProgressBar({
+	elapsed,
+	target,
+	status,
+}: {
+	elapsed: number
+	target: number
+	status: SlaStatus
+}) {
 	const pct = getSlaProgressPct(elapsed, target)
 	const colorClass =
 		status === "exceeded"
@@ -128,13 +131,13 @@ function SlaProgressBar({ elapsed, target, status }: { elapsed: number; target: 
 
 	return (
 		<div className="flex items-center gap-2">
-			<div className="relative h-2 w-24 overflow-hidden rounded-full bg-muted">
+			<div className="bg-muted relative h-2 w-24 overflow-hidden rounded-full">
 				<div
 					className={`absolute inset-y-0 left-0 rounded-full transition-all ${colorClass}`}
 					style={{ width: `${pct}%` }}
 				/>
 			</div>
-			<span className="w-10 text-right text-xs text-muted-foreground">{pct}%</span>
+			<span className="text-muted-foreground w-10 text-right text-xs">{pct}%</span>
 		</div>
 	)
 }
@@ -154,25 +157,25 @@ function SummaryCards({ events }: { events: SlaEvent[] }) {
 			<Card>
 				<CardContent className="pt-4">
 					<p className="text-2xl font-bold">{total}</p>
-					<p className="text-sm text-muted-foreground">Total Active</p>
+					<p className="text-muted-foreground text-sm">Total Active</p>
 				</CardContent>
 			</Card>
 			<Card>
 				<CardContent className="pt-4">
 					<p className="text-2xl font-bold text-green-600">{onTime}</p>
-					<p className="text-sm text-muted-foreground">On Time</p>
+					<p className="text-muted-foreground text-sm">On Time</p>
 				</CardContent>
 			</Card>
 			<Card>
 				<CardContent className="pt-4">
 					<p className="text-2xl font-bold text-amber-600">{approaching}</p>
-					<p className="text-sm text-muted-foreground">Approaching</p>
+					<p className="text-muted-foreground text-sm">Approaching</p>
 				</CardContent>
 			</Card>
 			<Card>
 				<CardContent className="pt-4">
 					<p className="text-2xl font-bold text-red-600">{exceeded}</p>
-					<p className="text-sm text-muted-foreground">Exceeded</p>
+					<p className="text-muted-foreground text-sm">Exceeded</p>
 				</CardContent>
 			</Card>
 		</div>
@@ -187,7 +190,7 @@ function FlowKpiTiles({ tiles }: { tiles: SlaKpiTile[] }) {
 	if (tiles.length === 0) return null
 	return (
 		<div>
-			<p className="text-sm font-medium mb-2 text-muted-foreground">ARTA Flows (30-day window)</p>
+			<p className="text-muted-foreground mb-2 text-sm font-medium">ARTA Flows (30-day window)</p>
 			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
 				{tiles.map(tile => {
 					const colorClass =
@@ -199,17 +202,19 @@ function FlowKpiTiles({ tiles }: { tiles: SlaKpiTile[] }) {
 					return (
 						<Card key={tile.workflowType}>
 							<CardContent className="pt-4 pb-3">
-								<p className="text-xs font-medium text-muted-foreground truncate">{tile.workflowLabel}</p>
+								<p className="text-muted-foreground truncate text-xs font-medium">
+									{tile.workflowLabel}
+								</p>
 								<p className={`text-2xl font-bold tabular-nums ${colorClass}`}>
 									{tile.withinSLAPct.toFixed(0)}%
 								</p>
-								<div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+								<div className="text-muted-foreground mt-1 flex items-center gap-3 text-xs">
 									<span>{tile.totalCases} cases</span>
 									{tile.breachCount > 0 && (
 										<span className="text-red-500">{tile.breachCount} breaches</span>
 									)}
 								</div>
-								<p className="mt-0.5 text-xs text-muted-foreground">
+								<p className="text-muted-foreground mt-0.5 text-xs">
 									Avg TAT: {tile.avgTatMinutes}m
 								</p>
 							</CardContent>
@@ -263,23 +268,18 @@ export function SlaDashboard() {
 			<div className="flex flex-wrap items-center justify-between gap-4">
 				<div>
 					<h1 className="text-2xl font-bold">SLA Tracking Dashboard</h1>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Active work items across all workflows — auto-refreshes every 30s
 					</p>
 				</div>
 				<div className="flex items-center gap-2">
 					{!isPaused && (
-						<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+						<div className="text-muted-foreground flex items-center gap-1.5 text-xs">
 							<span className="inline-block size-2 animate-pulse rounded-full bg-green-500" />
 							Live
 						</div>
 					)}
-					<Button
-						size="sm"
-						variant="outline"
-						onClick={() => refetch()}
-						disabled={isFetching}
-					>
+					<Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
 						Refresh
 					</Button>
 					<Button
@@ -291,7 +291,7 @@ export function SlaDashboard() {
 					</Button>
 					<Link
 						href="/admin/sla"
-						className="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 h-9 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+						className="border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex h-9 items-center justify-center rounded-md border px-3 text-sm font-medium"
 					>
 						Compliance Report
 					</Link>
@@ -326,12 +326,11 @@ export function SlaDashboard() {
 					</SelectTrigger>
 					<SelectContent>
 						<SelectItem value="all">All Workflows</SelectItem>
-						{(Object.keys(WORKFLOW_LABELS) as SlaWorkflowType[])
-							.map(wt => (
-								<SelectItem key={wt} value={wt}>
-									{WORKFLOW_LABELS[wt]}
-								</SelectItem>
-							))}
+						{(Object.keys(WORKFLOW_LABELS) as SlaWorkflowType[]).map(wt => (
+							<SelectItem key={wt} value={wt}>
+								{WORKFLOW_LABELS[wt]}
+							</SelectItem>
+						))}
 					</SelectContent>
 				</Select>
 			</div>
@@ -343,7 +342,7 @@ export function SlaDashboard() {
 				</CardHeader>
 				<CardContent className="p-0">
 					{error && (
-						<div className="p-6 text-sm text-destructive">
+						<div className="text-destructive p-6 text-sm">
 							Failed to load SLA events. The SLA module may not be enabled on this server.
 						</div>
 					)}
@@ -351,8 +350,8 @@ export function SlaDashboard() {
 						<Table>
 							<TableHeader>
 								<TableRow>
-								<TableHead>Workflow</TableHead>
-								<TableHead>Current Step</TableHead>
+									<TableHead>Workflow</TableHead>
+									<TableHead>Current Step</TableHead>
 									<TableHead>Started</TableHead>
 									<TableHead>Elapsed</TableHead>
 									<TableHead>Target</TableHead>
@@ -364,15 +363,15 @@ export function SlaDashboard() {
 							<TableBody>
 								{isLoading && (
 									<TableRow>
-								<TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-									Loading…
-								</TableCell>
-							</TableRow>
-							)}
+										<TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
+											Loading…
+										</TableCell>
+									</TableRow>
+								)}
 
-							{!isLoading && events.length === 0 && (
-								<TableRow>
-									<TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+								{!isLoading && events.length === 0 && (
+									<TableRow>
+										<TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
 											No SLA events found for the selected filters.
 										</TableCell>
 									</TableRow>
@@ -383,23 +382,27 @@ export function SlaDashboard() {
 										key={event.id}
 										className={event.status === "exceeded" ? "bg-red-50/50 dark:bg-red-900/10" : ""}
 									>
-
 										<TableCell className="text-xs">
-											<div className="font-medium text-foreground">{WORKFLOW_LABELS[event.workflowType]}</div>
+											<div className="text-foreground font-medium">
+												{WORKFLOW_LABELS[event.workflowType]}
+											</div>
 											{event.notes && (
-												<div className="mt-0.5 max-w-48 truncate text-muted-foreground" title={event.notes}>
+												<div
+													className="text-muted-foreground mt-0.5 max-w-48 truncate"
+													title={event.notes}
+												>
 													{event.notes}
 												</div>
 											)}
 										</TableCell>
-										<TableCell className="text-xs text-muted-foreground">
+										<TableCell className="text-muted-foreground text-xs">
 											{formatCurrentStep(event.currentStep)}
 										</TableCell>
 										<TableCell className="text-xs">{formatDateTime(event.startedAt)}</TableCell>
 										<TableCell className="text-sm font-medium">
 											{formatMinutes(event.elapsedMinutes)}
 										</TableCell>
-										<TableCell className="text-xs text-muted-foreground">
+										<TableCell className="text-muted-foreground text-xs">
 											{formatMinutes(event.targetMinutes)}
 										</TableCell>
 										<TableCell>
@@ -425,7 +428,7 @@ export function SlaDashboard() {
 										</TableCell>
 										<TableCell className="text-xs">
 											{event.escalatedAt ? (
-												<Badge variant="outline" className="text-orange-600 border-orange-300">
+												<Badge variant="outline" className="border-orange-300 text-orange-600">
 													Escalated
 												</Badge>
 											) : (
@@ -440,7 +443,7 @@ export function SlaDashboard() {
 
 					{data && data.totalPages > 1 && (
 						<div className="flex items-center justify-between p-4">
-							<p className="text-sm text-muted-foreground">
+							<p className="text-muted-foreground text-sm">
 								Page {data.page} of {data.totalPages} ({data.total} events)
 							</p>
 							<div className="flex gap-2">

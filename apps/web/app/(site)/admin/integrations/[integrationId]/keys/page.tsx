@@ -10,7 +10,9 @@ export default async function IntegrationKeysPage({ params }: Props) {
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-2xl font-semibold">API Key Management</h1>
-				<p className="text-sm text-muted-foreground mt-1">Generate, rotate, and revoke API keys for this integration.</p>
+				<p className="text-muted-foreground mt-1 text-sm">
+					Generate, rotate, and revoke API keys for this integration.
+				</p>
 			</div>
 			<ApiKeyManagementPage integrationId={integrationId} />
 		</div>

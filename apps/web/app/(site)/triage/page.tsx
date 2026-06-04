@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Activity, Clock, ListFilter, Search, Stethoscope, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 
 import {
 	AlertDialog,
@@ -49,7 +50,6 @@ import { useCancelPreEncounterMutation, useEdQueueQuery } from "@/features/ed/ap
 import { TraumaAliasBadge } from "@/features/ed/components/trauma-alias-badge"
 import { TriageForm } from "@/features/ed/components/triage-form"
 import { acuityColor, acuityLabel } from "@/features/ed/lib/acuity-utils"
-import { toast } from "sonner"
 
 const ACUITY_COLUMNS = [1, 2, 3, 4, 5] as const
 
@@ -460,8 +460,8 @@ export default function TriageDashboardPage() {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Remove trauma alias?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This will remove {removeTarget?.traumaAlias ?? "this trauma alias"} from the
-							triage queue. It can only be done before the alias is merged.
+							This will remove {removeTarget?.traumaAlias ?? "this trauma alias"} from the triage
+							queue. It can only be done before the alias is merged.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

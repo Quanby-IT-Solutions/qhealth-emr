@@ -30,11 +30,11 @@ import {
 import { cn } from "@/core/lib/utils"
 import {
 	formatAppointmentStatusLabel,
+	useJoinPatientLiveKitRoomMutation,
+	usePatientInvitePreviewQuery,
 	type AppointmentStatus,
 	type LiveKitTokenResponse,
 	type PatientInvitePreview,
-	useJoinPatientLiveKitRoomMutation,
-	usePatientInvitePreviewQuery,
 } from "@/features/telemedicine/api/telemedicine.hooks"
 import {
 	CameraPreview,
@@ -167,7 +167,7 @@ function PreviewField({
 }) {
 	return (
 		<div className="border-border bg-muted/40 rounded-xl border p-3">
-			<p className="text-muted-foreground mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider">
+			<p className="text-muted-foreground mb-1 flex items-center gap-1.5 text-[10px] font-medium tracking-wider uppercase">
 				<Icon className="size-3" aria-hidden="true" />
 				{label}
 			</p>
@@ -201,9 +201,7 @@ function JoinWindowBanner({ state }: { state: JoinWindowState }) {
 				</span>
 				<div className="text-sm">
 					<p className="text-success font-medium">Room is open</p>
-					<p className="text-success/80 text-xs">
-						Your clinician is ready. Verify below to join.
-					</p>
+					<p className="text-success/80 text-xs">Your clinician is ready. Verify below to join.</p>
 				</div>
 			</div>
 		)
@@ -257,9 +255,7 @@ function PatientLiveKitConferenceShell({
 	onDisconnected,
 	rejoinCount,
 }: PatientLiveKitConferenceShellProps) {
-	const statusLabel = preview
-		? formatAppointmentStatusLabel(preview.appointmentStatus)
-		: null
+	const statusLabel = preview ? formatAppointmentStatusLabel(preview.appointmentStatus) : null
 	const statusBadgeClass = preview ? getStatusBadgeClass(preview.appointmentStatus) : ""
 	const headerSummary = preview
 		? `${preview.clinicianName} · ${formatDate(preview.scheduledDate)} · ${preview.scheduledTime}`
@@ -296,9 +292,7 @@ function PatientLiveKitConferenceShell({
 				</div>
 				<div className="flex shrink-0 items-center gap-2">
 					<Dialog>
-						<DialogTrigger
-							className="border-border bg-muted text-foreground hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-2"
-						>
+						<DialogTrigger className="border-border bg-muted text-foreground hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-2">
 							<Info className="size-3.5" />
 							<span className="hidden sm:inline">Details</span>
 						</DialogTrigger>
@@ -415,9 +409,7 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 
 	const preview = previewQuery.data
 	const joinWindowState: JoinWindowState | null = preview ? getJoinWindowState(preview) : null
-	const canSubmit = Boolean(
-		preview && joinWindowState?.kind === "open" && !joinRoom.data
-	)
+	const canSubmit = Boolean(preview && joinWindowState?.kind === "open" && !joinRoom.data)
 	const todayInputDate = getTodayInputDate()
 
 	async function handleJoin(e: React.FormEvent) {
@@ -525,16 +517,8 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 										label="Time"
 										value={`${preview.scheduledTime} (${preview.durationMinutes} min)`}
 									/>
-									<PreviewField
-										icon={User}
-										label="Clinician"
-										value={preview.clinicianName}
-									/>
-									<PreviewField
-										icon={Hospital}
-										label="Facility"
-										value={preview.facilityName}
-									/>
+									<PreviewField icon={User} label="Clinician" value={preview.clinicianName} />
+									<PreviewField icon={Hospital} label="Facility" value={preview.facilityName} />
 									<PreviewField
 										icon={ShieldCheck}
 										label="Status"
@@ -572,196 +556,192 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 						noValidate
 						className="border-border bg-card grid h-full max-h-160 w-full max-w-5xl grid-cols-1 overflow-hidden rounded-3xl border shadow-2xl lg:grid-cols-[1.2fr_1fr]"
 					>
-					{/* LEFT — camera + devices */}
-					<section className="bg-muted/30 border-border flex min-h-0 flex-col gap-4 overflow-y-auto border-b p-4 sm:p-6 lg:border-r lg:border-b-0">
-						<p className="text-muted-foreground text-[10px] font-medium tracking-widest uppercase">
-							Set up your camera &amp; microphone
-						</p>
+						{/* LEFT — camera + devices */}
+						<section className="bg-muted/30 border-border flex min-h-0 flex-col gap-4 overflow-y-auto border-b p-4 sm:p-6 lg:border-r lg:border-b-0">
+							<p className="text-muted-foreground text-[10px] font-medium tracking-widest uppercase">
+								Set up your camera &amp; microphone
+							</p>
 
-						<div className="flex min-h-0 flex-1 items-center justify-center">
-							<CameraPreview
-								stream={devicePreview.stream}
+							<div className="flex min-h-0 flex-1 items-center justify-center">
+								<CameraPreview
+									stream={devicePreview.stream}
+									videoEnabled={choices.videoEnabled}
+									displayName={
+										preview.clinicianName ? `Joining ${preview.clinicianName}` : "Patient"
+									}
+									className="border-border w-full max-w-2xl rounded-2xl border shadow-none ring-0"
+								/>
+							</div>
+
+							<div className="flex items-center justify-center gap-6">
+								<div className="flex flex-col items-center gap-1.5">
+									<button
+										type="button"
+										aria-pressed={choices.audioEnabled}
+										aria-label={choices.audioEnabled ? "Mute microphone" : "Unmute microphone"}
+										onClick={() =>
+											setChoices(prev => ({
+												...prev,
+												audioEnabled: !prev.audioEnabled,
+											}))
+										}
+										className={cn(
+											"focus-visible:ring-ring focus-visible:ring-offset-background flex size-12 items-center justify-center rounded-full border transition-all hover:scale-105 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95",
+											choices.audioEnabled
+												? "border-border bg-card text-success"
+												: "border-destructive/30 bg-destructive/10 text-destructive"
+										)}
+									>
+										{choices.audioEnabled ? (
+											<Mic className="size-5" />
+										) : (
+											<MicOff className="size-5" />
+										)}
+									</button>
+									<span className="text-muted-foreground text-xs">Mic</span>
+								</div>
+								<div className="flex flex-col items-center gap-1.5">
+									<button
+										type="button"
+										aria-pressed={choices.videoEnabled}
+										aria-label={choices.videoEnabled ? "Turn camera off" : "Turn camera on"}
+										onClick={() =>
+											setChoices(prev => ({
+												...prev,
+												videoEnabled: !prev.videoEnabled,
+											}))
+										}
+										className={cn(
+											"focus-visible:ring-ring focus-visible:ring-offset-background flex size-12 items-center justify-center rounded-full border transition-all hover:scale-105 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95",
+											choices.videoEnabled
+												? "border-border bg-card text-success"
+												: "border-destructive/30 bg-destructive/10 text-destructive"
+										)}
+									>
+										{choices.videoEnabled ? (
+											<Video className="size-5" />
+										) : (
+											<VideoOff className="size-5" />
+										)}
+									</button>
+									<span className="text-muted-foreground text-xs">Camera</span>
+								</div>
+							</div>
+
+							<DeviceSelectors
+								dark
 								videoEnabled={choices.videoEnabled}
-								displayName={
-									preview.clinicianName ? `Joining ${preview.clinicianName}` : "Patient"
-								}
-								className="border-border w-full max-w-2xl rounded-2xl border shadow-none ring-0"
+								audioEnabled={choices.audioEnabled}
+								videoDevices={devicePreview.videoDevices}
+								audioDevices={devicePreview.audioDevices}
+								videoDeviceId={devicePreview.videoDeviceId}
+								audioDeviceId={devicePreview.audioDeviceId}
+								onVideoDeviceChange={devicePreview.setVideoDeviceId}
+								onAudioDeviceChange={devicePreview.setAudioDeviceId}
 							/>
-						</div>
 
-						<div className="flex items-center justify-center gap-6">
-							<div className="flex flex-col items-center gap-1.5">
-								<button
-									type="button"
-									aria-pressed={choices.audioEnabled}
-									aria-label={
-										choices.audioEnabled ? "Mute microphone" : "Unmute microphone"
-									}
-									onClick={() =>
-										setChoices(prev => ({
-											...prev,
-											audioEnabled: !prev.audioEnabled,
-										}))
-									}
-									className={cn(
-										"focus-visible:ring-ring focus-visible:ring-offset-background flex size-12 items-center justify-center rounded-full border transition-all hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
-										choices.audioEnabled
-											? "border-border bg-card text-success"
-											: "border-destructive/30 bg-destructive/10 text-destructive"
-									)}
-								>
-									{choices.audioEnabled ? (
-										<Mic className="size-5" />
-									) : (
-										<MicOff className="size-5" />
-									)}
-								</button>
-								<span className="text-muted-foreground text-xs">Mic</span>
-							</div>
-							<div className="flex flex-col items-center gap-1.5">
-								<button
-									type="button"
-									aria-pressed={choices.videoEnabled}
-									aria-label={
-										choices.videoEnabled ? "Turn camera off" : "Turn camera on"
-									}
-									onClick={() =>
-										setChoices(prev => ({
-											...prev,
-											videoEnabled: !prev.videoEnabled,
-										}))
-									}
-									className={cn(
-										"focus-visible:ring-ring focus-visible:ring-offset-background flex size-12 items-center justify-center rounded-full border transition-all hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
-										choices.videoEnabled
-											? "border-border bg-card text-success"
-											: "border-destructive/30 bg-destructive/10 text-destructive"
-									)}
-								>
-									{choices.videoEnabled ? (
-										<Video className="size-5" />
-									) : (
-										<VideoOff className="size-5" />
-									)}
-								</button>
-								<span className="text-muted-foreground text-xs">Camera</span>
-							</div>
-						</div>
-
-						<DeviceSelectors
-							dark
-							videoEnabled={choices.videoEnabled}
-							audioEnabled={choices.audioEnabled}
-							videoDevices={devicePreview.videoDevices}
-							audioDevices={devicePreview.audioDevices}
-							videoDeviceId={devicePreview.videoDeviceId}
-							audioDeviceId={devicePreview.audioDeviceId}
-							onVideoDeviceChange={devicePreview.setVideoDeviceId}
-							onAudioDeviceChange={devicePreview.setAudioDeviceId}
-						/>
-
-						{devicePreview.permissionError && (
-							<p className="text-destructive text-xs" role="alert">
-								{devicePreview.permissionError}
-							</p>
-						)}
-					</section>
-
-					{/* RIGHT — verify identity */}
-					<section className="bg-card flex min-h-0 flex-col overflow-y-auto p-4 sm:p-6 lg:p-8">
-						<div className="mb-4 flex items-center gap-2">
-							<ShieldCheck className="text-primary size-5" aria-hidden="true" />
-							<h2 className="text-foreground text-base font-semibold">
-								{hasDisconnected ? "Verify and Join Again" : "Verify Your Identity"}
-							</h2>
-						</div>
-
-						{joinWindowState && (
-							<div className="mb-4">
-								<JoinWindowBanner state={joinWindowState} />
-							</div>
-						)}
-
-						<div className="space-y-3">
-							<div className="space-y-1.5">
-								<label
-									htmlFor="dateOfBirth"
-									className="text-muted-foreground text-xs font-medium tracking-wider uppercase"
-								>
-									Date of Birth
-								</label>
-								<input
-									id="dateOfBirth"
-									type="date"
-									className={inputBaseClass}
-									value={dateOfBirth}
-									max={todayInputDate}
-									onChange={e => setDateOfBirth(e.target.value)}
-									disabled={!canSubmit || joinRoom.isPending}
-									aria-describedby="verify-help"
-								/>
-							</div>
-
-							<div
-								className="text-muted-foreground/80 flex items-center gap-3 text-[10px] font-medium tracking-widest uppercase"
-								aria-hidden="true"
-							>
-								<span className="bg-border h-px flex-1" />
-								<span>Or</span>
-								<span className="bg-border h-px flex-1" />
-							</div>
-
-							<div className="space-y-1.5">
-								<label
-									htmlFor="mrn"
-									className="text-muted-foreground text-xs font-medium tracking-wider uppercase"
-								>
-									MRN
-								</label>
-								<input
-									id="mrn"
-									className={inputBaseClass}
-									value={mrn}
-									onChange={e => setMrn(e.target.value)}
-									disabled={!canSubmit || joinRoom.isPending}
-									autoComplete="off"
-									aria-describedby="verify-help"
-								/>
-							</div>
-
-							<p id="verify-help" className="text-muted-foreground text-xs">
-								Either field is enough to verify your visit.
-							</p>
-						</div>
-
-						{(formError || joinRoom.error) && (
-							<div
-								role="alert"
-								className="border-destructive/30 bg-destructive/10 text-destructive mt-4 rounded-xl border px-4 py-3 text-sm"
-							>
-								{formError ?? joinRoom.error?.message ?? "Unable to join this visit."}
-							</div>
-						)}
-
-						<button
-							type="submit"
-							disabled={!canSubmit || joinRoom.isPending}
-							aria-label={hasDisconnected ? "Join Again" : "Join Video Room"}
-							className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring focus-visible:ring-offset-background mt-auto flex h-12 w-full items-center justify-center gap-2 rounded-full text-base font-semibold shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
-						>
-							{joinRoom.isPending ? (
-								<>
-									<Loader2 className="size-4 animate-spin" />
-									Verifying...
-								</>
-							) : (
-								<>
-									<Video className="size-4" />
-									{hasDisconnected ? "Join Again" : "Join Video Room"}
-								</>
+							{devicePreview.permissionError && (
+								<p className="text-destructive text-xs" role="alert">
+									{devicePreview.permissionError}
+								</p>
 							)}
-						</button>
-					</section>
+						</section>
+
+						{/* RIGHT — verify identity */}
+						<section className="bg-card flex min-h-0 flex-col overflow-y-auto p-4 sm:p-6 lg:p-8">
+							<div className="mb-4 flex items-center gap-2">
+								<ShieldCheck className="text-primary size-5" aria-hidden="true" />
+								<h2 className="text-foreground text-base font-semibold">
+									{hasDisconnected ? "Verify and Join Again" : "Verify Your Identity"}
+								</h2>
+							</div>
+
+							{joinWindowState && (
+								<div className="mb-4">
+									<JoinWindowBanner state={joinWindowState} />
+								</div>
+							)}
+
+							<div className="space-y-3">
+								<div className="space-y-1.5">
+									<label
+										htmlFor="dateOfBirth"
+										className="text-muted-foreground text-xs font-medium tracking-wider uppercase"
+									>
+										Date of Birth
+									</label>
+									<input
+										id="dateOfBirth"
+										type="date"
+										className={inputBaseClass}
+										value={dateOfBirth}
+										max={todayInputDate}
+										onChange={e => setDateOfBirth(e.target.value)}
+										disabled={!canSubmit || joinRoom.isPending}
+										aria-describedby="verify-help"
+									/>
+								</div>
+
+								<div
+									className="text-muted-foreground/80 flex items-center gap-3 text-[10px] font-medium tracking-widest uppercase"
+									aria-hidden="true"
+								>
+									<span className="bg-border h-px flex-1" />
+									<span>Or</span>
+									<span className="bg-border h-px flex-1" />
+								</div>
+
+								<div className="space-y-1.5">
+									<label
+										htmlFor="mrn"
+										className="text-muted-foreground text-xs font-medium tracking-wider uppercase"
+									>
+										MRN
+									</label>
+									<input
+										id="mrn"
+										className={inputBaseClass}
+										value={mrn}
+										onChange={e => setMrn(e.target.value)}
+										disabled={!canSubmit || joinRoom.isPending}
+										autoComplete="off"
+										aria-describedby="verify-help"
+									/>
+								</div>
+
+								<p id="verify-help" className="text-muted-foreground text-xs">
+									Either field is enough to verify your visit.
+								</p>
+							</div>
+
+							{(formError || joinRoom.error) && (
+								<div
+									role="alert"
+									className="border-destructive/30 bg-destructive/10 text-destructive mt-4 rounded-xl border px-4 py-3 text-sm"
+								>
+									{formError ?? joinRoom.error?.message ?? "Unable to join this visit."}
+								</div>
+							)}
+
+							<button
+								type="submit"
+								disabled={!canSubmit || joinRoom.isPending}
+								aria-label={hasDisconnected ? "Join Again" : "Join Video Room"}
+								className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring focus-visible:ring-offset-background mt-auto flex h-12 w-full items-center justify-center gap-2 rounded-full text-base font-semibold shadow-lg transition-all hover:scale-[1.01] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+							>
+								{joinRoom.isPending ? (
+									<>
+										<Loader2 className="size-4 animate-spin" />
+										Verifying...
+									</>
+								) : (
+									<>
+										<Video className="size-4" />
+										{hasDisconnected ? "Join Again" : "Join Video Room"}
+									</>
+								)}
+							</button>
+						</section>
 					</form>
 				) : null}
 			</div>

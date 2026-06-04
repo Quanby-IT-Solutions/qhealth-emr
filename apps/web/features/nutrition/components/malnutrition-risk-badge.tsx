@@ -1,5 +1,4 @@
 import { cn } from "@/core/lib/utils"
-
 import type { MalnutritionRisk } from "@/features/nutrition/api/nutrition.hooks"
 
 interface MalnutritionRiskBadgeProps {

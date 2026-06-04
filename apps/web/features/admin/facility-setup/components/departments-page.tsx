@@ -5,13 +5,20 @@ import { useState } from "react"
 import { Button } from "@/core/components/ui/button"
 import { Input } from "@/core/components/ui/input"
 import { Skeleton } from "@/core/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import {
 	useDeleteDepartmentMutation,
 	useListDepartmentsQuery,
 	useUpsertDepartmentMutation,
 } from "@/features/admin/facility-setup/api/departments.hooks"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 export function DepartmentsPage() {
 	const { data: profile } = useMyProfile()
@@ -62,9 +69,7 @@ export function DepartmentsPage() {
 			{isLoading && <Skeleton className="h-48 w-full" />}
 
 			{!isLoading && (!departments || departments.length === 0) && (
-				<p className="text-sm text-muted-foreground py-8 text-center">
-					No departments configured.
-				</p>
+				<p className="text-muted-foreground py-8 text-center text-sm">No departments configured.</p>
 			)}
 
 			{departments && departments.length > 0 && (

@@ -6,12 +6,12 @@ import { ArrowRight01FreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { WifiOff } from "lucide-react"
 
+import { Logo } from "@/core/components/logo"
 import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@/core/components/ui/collapsible"
-import { Logo } from "@/core/components/logo"
 import {
 	Sidebar,
 	SidebarContent,
@@ -28,13 +28,13 @@ import {
 } from "@/core/components/ui/sidebar"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { NAV_ICONS } from "@/features/app-shell/lib/nav-icons"
-import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 import {
-	type AdminNavGroup,
 	filterNavItems,
 	PRIMARY_NAV_ITEMS,
 	SECONDARY_NAV_ITEMS,
+	type AdminNavGroup,
 } from "@/features/app-shell/lib/navigation"
+import { useOfflineSync } from "@/features/offline-cache/lib/use-offline-sync"
 
 import { UserMenu } from "./user-menu"
 
@@ -111,19 +111,22 @@ export function AppSidebar() {
 									</SidebarMenuItem>
 								)
 							})}
-							{!isOnline && permissions.some(permission => permission.module === "patients" && permission.action === "view") && (
-								<SidebarMenuItem key="primary-offline-cache">
-									<SidebarMenuButton
-										isActive={pathname === "/patients/offline"}
-										tooltip="Offline Cache"
-									>
-										<Link href="/patients/offline" className="flex items-center gap-2">
-											<WifiOff className="size-4" />
-											<span>Offline Cache</span>
-										</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							)}
+							{!isOnline &&
+								permissions.some(
+									permission => permission.module === "patients" && permission.action === "view"
+								) && (
+									<SidebarMenuItem key="primary-offline-cache">
+										<SidebarMenuButton
+											isActive={pathname === "/patients/offline"}
+											tooltip="Offline Cache"
+										>
+											<Link href="/patients/offline" className="flex items-center gap-2">
+												<WifiOff className="size-4" />
+												<span>Offline Cache</span>
+											</Link>
+										</SidebarMenuButton>
+									</SidebarMenuItem>
+								)}
 						</SidebarMenu>
 					</SidebarGroupContent>
 				</SidebarGroup>
@@ -194,7 +197,10 @@ export function AppSidebar() {
 														return (
 															<SidebarMenuItem key={`admin-${item.href}`}>
 																<SidebarMenuButton isActive={isActive} tooltip={item.title}>
-																	<Link href={item.href as never} className="flex items-center gap-2">
+																	<Link
+																		href={item.href as never}
+																		className="flex items-center gap-2"
+																	>
 																		<HugeiconsIcon icon={Icon} className="size-4" />
 																		<span>{item.title}</span>
 																	</Link>

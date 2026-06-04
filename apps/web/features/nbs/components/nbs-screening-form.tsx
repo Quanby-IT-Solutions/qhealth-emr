@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { differenceInHours, format } from "date-fns"
 import { AlertCircle, CheckCircle, Clock, Pencil } from "lucide-react"
 
@@ -18,16 +17,20 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/core/components/ui/tooltip"
-
 import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/core/components/ui/tooltip"
+import {
+	useCreateNbsScreeningMutation,
+	useUpdateNbsScreeningMutation,
 	type CreateNbsScreeningInput,
 	type NbsScreening,
 	type NbsSpecimenType,
 	type NbsStatus,
 	type UpdateNbsScreeningInput,
-	useCreateNbsScreeningMutation,
-	useUpdateNbsScreeningMutation,
 } from "@/features/nbs/api/nbs.hooks"
 
 // ============================================================================
@@ -49,8 +52,7 @@ const RESULT_BADGE: Record<ResultValue, { label: string; className: string }> = 
 	},
 	borderline: {
 		label: "Borderline",
-		className:
-			"bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+		className: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
 	},
 	positive: {
 		label: "Positive",
@@ -84,8 +86,8 @@ interface ResultsState {
 
 function ResultsPanel({ screening }: { screening: NbsScreening }) {
 	return (
-		<div className="rounded-md border bg-muted/30 p-3 space-y-2">
-			<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+		<div className="bg-muted/30 space-y-2 rounded-md border p-3">
+			<p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
 				NBS Panel Results
 			</p>
 			<div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -96,7 +98,7 @@ function ResultsPanel({ screening }: { screening: NbsScreening }) {
 					return (
 						<div key={key} className="flex items-center gap-2">
 							<Badge className={cfg.className}>{cfg.label}</Badge>
-							<span className="text-xs text-muted-foreground" title={full}>
+							<span className="text-muted-foreground text-xs" title={full}>
 								{label}
 							</span>
 						</div>
@@ -104,8 +106,8 @@ function ResultsPanel({ screening }: { screening: NbsScreening }) {
 				})}
 			</div>
 			{screening.result_overall && (
-				<div className="flex items-center gap-2 border-t pt-2 mt-1">
-					<span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+				<div className="mt-1 flex items-center gap-2 border-t pt-2">
+					<span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 						Overall:
 					</span>
 					<Badge
@@ -117,8 +119,7 @@ function ResultsPanel({ screening }: { screening: NbsScreening }) {
 									: "bg-red-100 text-red-800"
 						}
 					>
-						{screening.result_overall.charAt(0).toUpperCase() +
-							screening.result_overall.slice(1)}
+						{screening.result_overall.charAt(0).toUpperCase() + screening.result_overall.slice(1)}
 					</Badge>
 				</div>
 			)}
@@ -160,14 +161,10 @@ export function NbsScreeningForm({
 			: ""
 	)
 	const [specimenSentAt, setSpecimenSentAt] = useState(
-		existing?.specimenSentAt
-			? new Date(existing.specimenSentAt).toISOString().slice(0, 16)
-			: ""
+		existing?.specimenSentAt ? new Date(existing.specimenSentAt).toISOString().slice(0, 16) : ""
 	)
 	const [resultReceivedAt, setResultReceivedAt] = useState(
-		existing?.resultReceivedAt
-			? new Date(existing.resultReceivedAt).toISOString().slice(0, 16)
-			: ""
+		existing?.resultReceivedAt ? new Date(existing.resultReceivedAt).toISOString().slice(0, 16) : ""
 	)
 
 	// Result entry
@@ -179,9 +176,9 @@ export function NbsScreeningForm({
 		result_pku: existing?.result_pku ?? "",
 		result_msud: existing?.result_msud ?? "",
 	})
-	const [resultOverall, setResultOverall] = useState<
-		"normal" | "abnormal" | "borderline" | ""
-	>(existing?.result_overall ?? "")
+	const [resultOverall, setResultOverall] = useState<"normal" | "abnormal" | "borderline" | "">(
+		existing?.result_overall ?? ""
+	)
 
 	const [status, setStatus] = useState<NbsStatus>(existing?.status ?? "pending")
 	const [notes, setNotes] = useState(existing?.notes ?? "")
@@ -198,7 +195,7 @@ export function NbsScreeningForm({
 	const isLate = hoursFromBirth !== null && hoursFromBirth > 48
 
 	const updateResult = (key: ConditionKey, val: string) =>
-		setResults((prev) => ({ ...prev, [key]: val as ResultValue | "" }))
+		setResults(prev => ({ ...prev, [key]: val as ResultValue | "" }))
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault()
@@ -225,12 +222,8 @@ export function NbsScreeningForm({
 				specimenCollectedAt: specimenCollectedAt
 					? new Date(specimenCollectedAt).toISOString()
 					: undefined,
-				specimenSentAt: specimenSentAt
-					? new Date(specimenSentAt).toISOString()
-					: undefined,
-				resultReceivedAt: resultReceivedAt
-					? new Date(resultReceivedAt).toISOString()
-					: undefined,
+				specimenSentAt: specimenSentAt ? new Date(specimenSentAt).toISOString() : undefined,
+				resultReceivedAt: resultReceivedAt ? new Date(resultReceivedAt).toISOString() : undefined,
 				status,
 				result_ch: (results.result_ch || undefined) as ResultValue | undefined,
 				result_cah: (results.result_cah || undefined) as ResultValue | undefined,
@@ -268,23 +261,21 @@ export function NbsScreeningForm({
 				</CardHeader>
 				<CardContent className="grid gap-4 sm:grid-cols-2">
 					<div>
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Specimen Type
 						</p>
 						<p className="text-sm">
-							{existing.specimenType
-								? SPECIMEN_TYPE_LABELS[existing.specimenType]
-								: "—"}
+							{existing.specimenType ? SPECIMEN_TYPE_LABELS[existing.specimenType] : "—"}
 						</p>
 					</div>
 					<div>
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Barcode
 						</p>
 						<p className="font-mono text-sm">{existing.specimenBarcode ?? "—"}</p>
 					</div>
 					<div>
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Collected At
 						</p>
 						<p className="text-sm">
@@ -292,24 +283,25 @@ export function NbsScreeningForm({
 								? new Date(existing.specimenCollectedAt).toLocaleString()
 								: "—"}
 							{existing.specimenCollectedAt && (
-								<Badge variant="outline" className={`ml-2 text-[10px] px-1.5 py-0 ${isIdealWindow ? "text-green-600 border-green-200" : isTooEarly ? "text-amber-600 border-amber-200" : "text-red-600 border-red-200"}`}>
+								<Badge
+									variant="outline"
+									className={`ml-2 px-1.5 py-0 text-[10px] ${isIdealWindow ? "border-green-200 text-green-600" : isTooEarly ? "border-amber-200 text-amber-600" : "border-red-200 text-red-600"}`}
+								>
 									{hoursFromBirth}h
 								</Badge>
 							)}
 						</p>
 					</div>
 					<div>
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Sent At
 						</p>
 						<p className="text-sm">
-							{existing.specimenSentAt
-								? new Date(existing.specimenSentAt).toLocaleString()
-								: "—"}
+							{existing.specimenSentAt ? new Date(existing.specimenSentAt).toLocaleString() : "—"}
 						</p>
 					</div>
 					<div>
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Results Received
 						</p>
 						<p className="text-sm">
@@ -318,21 +310,17 @@ export function NbsScreeningForm({
 								: "—"}
 						</p>
 					</div>
-					{(existing.result_ch ||
-						existing.result_cah ||
-						existing.result_g6pd) && (
+					{(existing.result_ch || existing.result_cah || existing.result_g6pd) && (
 						<div className="sm:col-span-2">
 							<ResultsPanel screening={existing} />
 						</div>
 					)}
 					{existing.notes && (
 						<div className="sm:col-span-2">
-							<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+							<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 								Notes
 							</p>
-							<p className="text-sm whitespace-pre-wrap text-muted-foreground">
-								{existing.notes}
-							</p>
+							<p className="text-muted-foreground text-sm whitespace-pre-wrap">{existing.notes}</p>
 						</div>
 					)}
 				</CardContent>
@@ -357,7 +345,7 @@ export function NbsScreeningForm({
 				<CardContent className="space-y-5">
 					{/* Specimen */}
 					<div>
-						<p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+						<p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
 							Specimen
 						</p>
 						<div className="grid gap-4 sm:grid-cols-2">
@@ -365,7 +353,7 @@ export function NbsScreeningForm({
 								<Label htmlFor="specimenType">Specimen Type</Label>
 								<Select
 									value={specimenType}
-									onValueChange={(v) => setSpecimenType(v as NbsSpecimenType | "")}
+									onValueChange={v => setSpecimenType(v as NbsSpecimenType | "")}
 								>
 									<SelectTrigger id="specimenType">
 										<SelectValue>
@@ -389,7 +377,7 @@ export function NbsScreeningForm({
 									id="specimenBarcode"
 									placeholder="Scan or type barcode"
 									value={specimenBarcode}
-									onChange={(e) => setSpecimenBarcode(e.target.value)}
+									onChange={e => setSpecimenBarcode(e.target.value)}
 								/>
 							</div>
 							<div className="space-y-1.5">
@@ -399,19 +387,33 @@ export function NbsScreeningForm({
 										<TooltipProvider>
 											<Tooltip>
 												<TooltipTrigger>
-													<div className="flex items-center gap-1 cursor-help">
-														<Clock className={`h-3 w-3 ${isIdealWindow ? "text-green-500" : isTooEarly ? "text-amber-500" : "text-red-500"}`} />
-														<span className={`text-[10px] font-bold ${isIdealWindow ? "text-green-600" : isTooEarly ? "text-amber-600" : "text-red-600"}`}>
+													<div className="flex cursor-help items-center gap-1">
+														<Clock
+															className={`h-3 w-3 ${isIdealWindow ? "text-green-500" : isTooEarly ? "text-amber-500" : "text-red-500"}`}
+														/>
+														<span
+															className={`text-[10px] font-bold ${isIdealWindow ? "text-green-600" : isTooEarly ? "text-amber-600" : "text-red-600"}`}
+														>
 															{hoursFromBirth}h from birth
 														</span>
 													</div>
 												</TooltipTrigger>
-												<TooltipContent side="top" className="text-[11px] max-w-50">
+												<TooltipContent side="top" className="max-w-50 text-[11px]">
 													<p>Birth: {format(new Date(birthDatetime), "MMM dd, HH:mm")}</p>
 													<hr className="my-1" />
-													{isIdealWindow && <p className="text-green-600">Perfect! Within the 24-48h window.</p>}
-													{isTooEarly && <p className="text-amber-600">Screening before 24h of life may result in false negatives.</p>}
-													{isLate && <p className="text-red-600">Late screening. Ideal window is 24-48h of life.</p>}
+													{isIdealWindow && (
+														<p className="text-green-600">Perfect! Within the 24-48h window.</p>
+													)}
+													{isTooEarly && (
+														<p className="text-amber-600">
+															Screening before 24h of life may result in false negatives.
+														</p>
+													)}
+													{isLate && (
+														<p className="text-red-600">
+															Late screening. Ideal window is 24-48h of life.
+														</p>
+													)}
 												</TooltipContent>
 											</Tooltip>
 										</TooltipProvider>
@@ -421,17 +423,17 @@ export function NbsScreeningForm({
 									id="specimenCollectedAt"
 									type="datetime-local"
 									className={
-										isTooEarly 
-											? "border-amber-400 focus-visible:ring-amber-500" 
-											: isLate 
-												? "border-red-400 focus-visible:ring-red-500" 
+										isTooEarly
+											? "border-amber-400 focus-visible:ring-amber-500"
+											: isLate
+												? "border-red-400 focus-visible:ring-red-500"
 												: ""
 									}
 									value={specimenCollectedAt}
-									onChange={(e) => setSpecimenCollectedAt(e.target.value)}
+									onChange={e => setSpecimenCollectedAt(e.target.value)}
 								/>
 								{isTooEarly && (
-									<p className="text-[10px] text-amber-600 font-medium">
+									<p className="text-[10px] font-medium text-amber-600">
 										Warning: Collecting before 24 hours (Currently {hoursFromBirth}h).
 									</p>
 								)}
@@ -443,7 +445,7 @@ export function NbsScreeningForm({
 										id="specimenSentAt"
 										type="datetime-local"
 										value={specimenSentAt}
-										onChange={(e) => setSpecimenSentAt(e.target.value)}
+										onChange={e => setSpecimenSentAt(e.target.value)}
 									/>
 								</div>
 							)}
@@ -453,22 +455,16 @@ export function NbsScreeningForm({
 					{/* Results entry (update only) */}
 					{existing && (
 						<div>
-							<p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+							<p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
 								Panel Results
 							</p>
 							<div className="grid gap-3 sm:grid-cols-2">
 								{NBS_CONDITIONS.map(({ key, label, full }) => (
 									<div key={key} className="space-y-1.5">
 										<Label htmlFor={key} title={full}>
-											{label}{" "}
-											<span className="font-normal text-muted-foreground">
-												({full})
-											</span>
+											{label} <span className="text-muted-foreground font-normal">({full})</span>
 										</Label>
-										<Select
-											value={results[key]}
-											onValueChange={(v) => updateResult(key, v ?? "")}
-										>
+										<Select value={results[key]} onValueChange={v => updateResult(key, v ?? "")}>
 											<SelectTrigger id={key}>
 												<SelectValue>{results[key] || "—"}</SelectValue>
 											</SelectTrigger>
@@ -484,10 +480,8 @@ export function NbsScreeningForm({
 									<Label htmlFor="resultOverall">Overall Result</Label>
 									<Select
 										value={resultOverall}
-										onValueChange={(v) =>
-											setResultOverall(
-												v as "normal" | "abnormal" | "borderline" | ""
-											)
+										onValueChange={v =>
+											setResultOverall(v as "normal" | "abnormal" | "borderline" | "")
 										}
 									>
 										<SelectTrigger id="resultOverall">
@@ -509,15 +503,12 @@ export function NbsScreeningForm({
 										id="resultReceivedAt"
 										type="datetime-local"
 										value={resultReceivedAt}
-										onChange={(e) => setResultReceivedAt(e.target.value)}
+										onChange={e => setResultReceivedAt(e.target.value)}
 									/>
 								</div>
 								<div className="space-y-1.5">
 									<Label htmlFor="screeningStatus">Status</Label>
-									<Select
-										value={status}
-										onValueChange={(v) => setStatus(v as NbsStatus)}
-									>
+									<Select value={status} onValueChange={v => setStatus(v as NbsStatus)}>
 										<SelectTrigger id="screeningStatus">
 											<SelectValue />
 										</SelectTrigger>
@@ -542,12 +533,12 @@ export function NbsScreeningForm({
 							rows={2}
 							placeholder="Additional notes on specimen collection or results…"
 							value={notes}
-							onChange={(e) => setNotes(e.target.value)}
+							onChange={e => setNotes(e.target.value)}
 						/>
 					</div>
 
 					{isError && (
-						<div className="flex items-center gap-2 text-sm text-destructive">
+						<div className="text-destructive flex items-center gap-2 text-sm">
 							<AlertCircle className="size-4 shrink-0" />
 							<span>Failed to save. Please try again.</span>
 						</div>

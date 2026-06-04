@@ -1,8 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query"
 
-import { createQueryClient } from "@/services/tanstack-query/query-client"
 import { prepareServerOrpc, serverOrpc } from "@/services/orpc/orpc-server"
-
+import { createQueryClient } from "@/services/tanstack-query/query-client"
 import { CodeLookupPage } from "@/features/him/icd10-coding/components/code-lookup-page"
 
 export default async function HimCodingLookupPage() {

@@ -27,15 +27,11 @@ export function NewsScoreBadge({ score, riskLevel, showScore = true }: NewsScore
 	}
 
 	if (riskLevel === "medium") {
-		return (
-			<Badge className="bg-orange-500 text-white hover:bg-orange-600">{label}</Badge>
-		)
+		return <Badge className="bg-orange-500 text-white hover:bg-orange-600">{label}</Badge>
 	}
 
 	// low
-	return (
-		<Badge className="bg-green-600 text-white hover:bg-green-700">{label}</Badge>
-	)
+	return <Badge className="bg-green-600 text-white hover:bg-green-700">{label}</Badge>
 }
 
 export function computeNewsScore(params: {
@@ -103,8 +99,7 @@ export function computeNewsScore(params: {
 		total += 3
 	}
 
-	const riskLevel: "low" | "medium" | "high" =
-		total <= 4 ? "low" : total <= 6 ? "medium" : "high"
+	const riskLevel: "low" | "medium" | "high" = total <= 4 ? "low" : total <= 6 ? "medium" : "high"
 
 	return { score: total, riskLevel }
 }

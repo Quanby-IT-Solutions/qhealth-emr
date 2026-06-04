@@ -1,17 +1,13 @@
 "use client"
 
 import { useState } from "react"
-
-import {
-	CheckmarkCircle01FreeIcons,
-	Notification03FreeIcons,
-} from "@hugeicons/core-free-icons"
+import { CheckmarkCircle01FreeIcons, Notification03FreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { cn } from "@/core/lib/utils"
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { orpc } from "@/services/orpc/client"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 import { Button } from "./ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
@@ -43,7 +39,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
 			input: { facilityId, page: 1, limit: 20 },
 			enabled: !!facilityId && open,
 			staleTime: 15_000,
-		}),
+		})
 	)
 
 	const { data: countData } = useQuery(
@@ -52,7 +48,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
 			enabled: !!facilityId,
 			refetchInterval: 30_000,
 			staleTime: 10_000,
-		}),
+		})
 	)
 
 	const markReadMutation = useMutation(
@@ -60,7 +56,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
 			onSuccess: () => {
 				void queryClient.invalidateQueries({ queryKey: orpc.notification.key() })
 			},
-		}),
+		})
 	)
 
 	const markAllReadMutation = useMutation(
@@ -68,7 +64,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
 			onSuccess: () => {
 				void queryClient.invalidateQueries({ queryKey: orpc.notification.key() })
 			},
-		}),
+		})
 	)
 
 	const unreadCount = countData?.count ?? 0
@@ -77,22 +73,22 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger
-					id="notification-center-trigger"
-					render={
-						<button
-							type="button"
-							className={cn("relative inline-flex items-center justify-center rounded-md", className)}
-							aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : "Notifications"}
-						/>
-					}
-				>
-					<HugeiconsIcon icon={Notification03FreeIcons} className="size-4" />
-					{unreadCount > 0 && (
-						<span className="bg-destructive text-destructive-foreground absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full text-[10px] font-medium">
-							{unreadCount > 99 ? "99+" : unreadCount}
-						</span>
-					)}
-				</PopoverTrigger>
+				id="notification-center-trigger"
+				render={
+					<button
+						type="button"
+						className={cn("relative inline-flex items-center justify-center rounded-md", className)}
+						aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : "Notifications"}
+					/>
+				}
+			>
+				<HugeiconsIcon icon={Notification03FreeIcons} className="size-4" />
+				{unreadCount > 0 && (
+					<span className="bg-destructive text-destructive-foreground absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[10px] font-medium">
+						{unreadCount > 99 ? "99+" : unreadCount}
+					</span>
+				)}
+			</PopoverTrigger>
 			<PopoverContent className="w-80 p-0" align="end">
 				<div className="flex items-center justify-between border-b px-4 py-3">
 					<h3 className="text-sm font-semibold">Notifications</h3>
@@ -130,22 +126,20 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
 								<li
 									key={n.id}
 									className={cn(
-										"group flex items-start gap-3 px-4 py-3 text-sm transition-colors hover:bg-accent",
-										!n.isRead && "bg-muted/40",
+										"group hover:bg-accent flex items-start gap-3 px-4 py-3 text-sm transition-colors",
+										!n.isRead && "bg-muted/40"
 									)}
 								>
 									<div className="min-w-0 flex-1">
 										<p
 											className={cn(
 												"truncate font-medium",
-												n.isRead && "font-normal text-muted-foreground",
+												n.isRead && "text-muted-foreground font-normal"
 											)}
 										>
 											{n.title}
 										</p>
-										<p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
-											{n.body}
-										</p>
+										<p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{n.body}</p>
 										<p className="text-muted-foreground/70 mt-1 text-[11px]">
 											{timeAgo(new Date(n.createdAt))}
 										</p>
@@ -158,7 +152,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
 										>
 											<HugeiconsIcon
 												icon={CheckmarkCircle01FreeIcons}
-												className="size-4 text-primary"
+												className="text-primary size-4"
 											/>
 										</button>
 									)}

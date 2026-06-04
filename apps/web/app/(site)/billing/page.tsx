@@ -5,17 +5,23 @@ import { format } from "date-fns"
 import { DollarSign } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
+import { Button } from "@/core/components/ui/button"
 import { Card, CardContent } from "@/core/components/ui/card"
 import { Label } from "@/core/components/ui/label"
 import { Switch } from "@/core/components/ui/switch"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
-import { Button } from "@/core/components/ui/button"
-
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { TableToolbar } from "@/features/admin/components/table-toolbar"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { EmptyState, ErrorState, SkeletonRows } from "@/features/admin/components/state-views"
-import { OecbTagIndicator } from "@/features/ed/components/oecb-tag-indicator"
+import { TableToolbar } from "@/features/admin/components/table-toolbar"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useUnbilledEncountersQuery } from "@/features/billing/api/billing.hooks"
+import { OecbTagIndicator } from "@/features/ed/components/oecb-tag-indicator"
 
 const BILLING_GRANULAR_READ_PERMS = [
 	"billing.charges:read",
@@ -32,7 +38,9 @@ const BILLING_GRANULAR_READ_PERMS = [
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function canAccessBilling(permSet: Set<string>) {
@@ -59,7 +67,7 @@ export default function BillingPage() {
 
 	if (!canAccessBilling(permSet)) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access billing.
 			</div>
 		)
@@ -91,7 +99,7 @@ export default function BillingPage() {
 									setPage(1)
 								}}
 							/>
-							<Label htmlFor="oecb-filter" className="text-sm font-normal cursor-pointer">
+							<Label htmlFor="oecb-filter" className="cursor-pointer text-sm font-normal">
 								OECB only
 							</Label>
 						</div>
@@ -135,15 +143,12 @@ export default function BillingPage() {
 											<TableCell className="font-medium">{enc.patientName}</TableCell>
 											<TableCell className="text-muted-foreground text-sm">{enc.mrn}</TableCell>
 											<TableCell>
-												<Badge variant="outline" className="capitalize text-xs">
+												<Badge variant="outline" className="text-xs capitalize">
 													{enc.encounterType}
 												</Badge>
 											</TableCell>
 											<TableCell>
-												<OecbTagIndicator
-													oecbEligible={enc.oecbEligible}
-													hideWhenIneligible
-												/>
+												<OecbTagIndicator oecbEligible={enc.oecbEligible} hideWhenIneligible />
 											</TableCell>
 											<TableCell className="text-sm">
 												{format(new Date(enc.admittedAt), "MMM d, yyyy")}
@@ -151,7 +156,7 @@ export default function BillingPage() {
 											<TableCell className="text-right text-sm">
 												₱{enc.totalCharges.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
 											</TableCell>
-											<TableCell className="text-right text-sm text-muted-foreground">
+											<TableCell className="text-muted-foreground text-right text-sm">
 												{enc.chargeCount}
 											</TableCell>
 										</TableRow>
@@ -161,7 +166,7 @@ export default function BillingPage() {
 
 							{totalPages > 1 && (
 								<div className="flex items-center justify-between border-t px-4 py-3">
-									<p className="text-xs text-muted-foreground">
+									<p className="text-muted-foreground text-xs">
 										Page {page} of {totalPages} · {data?.total ?? 0} total
 									</p>
 									<div className="flex gap-2">

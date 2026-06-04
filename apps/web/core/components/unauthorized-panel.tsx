@@ -12,14 +12,14 @@ export function UnauthorizedPanel({
 	description = "You do not have permission to view this area.",
 }: UnauthorizedPanelProps) {
 	return (
-		<div className="flex min-h-[16rem] items-center justify-center rounded-xl border border-dashed bg-muted/20 p-8">
+		<div className="bg-muted/20 flex min-h-[16rem] items-center justify-center rounded-xl border border-dashed p-8">
 			<div className="flex max-w-md flex-col items-center gap-3 text-center">
-				<div className="rounded-full border bg-background p-3 text-amber-600">
+				<div className="bg-background rounded-full border p-3 text-amber-600">
 					<ShieldAlert className="size-6" aria-hidden />
 				</div>
 				<div className="space-y-1">
 					<h2 className="text-lg font-semibold">{title}</h2>
-					<p className="text-sm text-muted-foreground">{description}</p>
+					<p className="text-muted-foreground text-sm">{description}</p>
 				</div>
 			</div>
 		</div>

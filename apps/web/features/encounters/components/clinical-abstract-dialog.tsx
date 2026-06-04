@@ -92,14 +92,14 @@ function openPrintWindow(data: PrintData): void {
 		data.signedNotes.length > 0
 			? data.signedNotes
 					.map(
-						(note) => `
+						note => `
       <div class="note-block">
         <div class="note-header">
           <strong>${noteTypeLabel(note.noteType)}</strong>
           <span class="note-meta"> — ${note.authorName} · Signed ${note.signedAt}</span>
         </div>
         <div class="note-content">${note.content.replace(/\n/g, "<br>")}</div>
-      </div>`,
+      </div>`
 					)
 					.join("")
 			: '<p class="empty">No signed clinical notes recorded.</p>'
@@ -108,8 +108,8 @@ function openPrintWindow(data: PrintData): void {
 		data.activeProblems.length > 0
 			? `<ol>${data.activeProblems
 					.map(
-						(p) =>
-							`<li>${p.icd10Code ? `<span class="icd">${p.icd10Code}</span> ` : ""}${p.description}</li>`,
+						p =>
+							`<li>${p.icd10Code ? `<span class="icd">${p.icd10Code}</span> ` : ""}${p.description}</li>`
 					)
 					.join("")}</ol>`
 			: '<p class="empty">No active problems recorded.</p>'
@@ -231,32 +231,34 @@ export function ClinicalAbstractDialog({
 
 	const isLoading = encounterLoading || notesLoading || summaryLoading
 
-	const signedNotes = (notesData?.data ?? []).filter((n) => n.status === "signed")
+	const signedNotes = (notesData?.data ?? []).filter(n => n.status === "signed")
 	const activeProblems = summary?.activeProblems ?? []
 
 	function handlePrint() {
 		if (!encounter) return
 
-		const age = encounter.patientDateOfBirth
-			? calculateAge(encounter.patientDateOfBirth)
-			: null
+		const age = encounter.patientDateOfBirth ? calculateAge(encounter.patientDateOfBirth) : null
 
 		openPrintWindow({
 			patientName: encounter.patientName,
 			patientMrn: encounter.patientMrn,
 			patientAge: age,
 			patientSex:
-				encounter.patientSex === "male" ? "Male" : encounter.patientSex === "female" ? "Female" : "Other",
+				encounter.patientSex === "male"
+					? "Male"
+					: encounter.patientSex === "female"
+						? "Female"
+						: "Other",
 			encounterType: encounterTypeLabel(encounter.encounterType),
 			encounterDate: formatDateTime(encounter.admissionDatetime),
 			queueNumber: encounter.queueNumber,
 			chiefComplaint: encounter.chiefComplaint,
 			attendingPhysician: encounter.attendingStaffName ?? encounter.admittingStaffName,
-			activeProblems: activeProblems.map((p) => ({
+			activeProblems: activeProblems.map(p => ({
 				icd10Code: p.icd10Code,
 				description: p.description,
 			})),
-			signedNotes: signedNotes.map((n) => ({
+			signedNotes: signedNotes.map(n => ({
 				noteType: n.noteType,
 				authorName: n.authorStaffName ?? "Unknown",
 				signedAt: formatDateTime(n.signedAt),
@@ -268,17 +270,15 @@ export function ClinicalAbstractDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+			<DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
 				<DialogHeader>
 					<DialogTitle>Clinical Abstract</DialogTitle>
-					<DialogDescription>
-						Print-ready summary of this outpatient encounter.
-					</DialogDescription>
+					<DialogDescription>Print-ready summary of this outpatient encounter.</DialogDescription>
 				</DialogHeader>
 
 				{isLoading ? (
 					<div className="flex h-32 items-center justify-center">
-						<Loader2 className="size-5 animate-spin text-muted-foreground" />
+						<Loader2 className="text-muted-foreground size-5 animate-spin" />
 					</div>
 				) : !encounter ? (
 					<div className="text-muted-foreground py-8 text-center text-sm">
@@ -287,17 +287,17 @@ export function ClinicalAbstractDialog({
 				) : (
 					<div className="space-y-4 py-2">
 						{/* Patient & Encounter Summary */}
-						<div className="rounded-md border p-4 space-y-3">
+						<div className="space-y-3 rounded-md border p-4">
 							<div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
 								<div>
-									<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+									<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 										Patient
 									</p>
 									<p className="font-semibold">{encounter.patientName}</p>
 									<p className="text-muted-foreground">MRN: {encounter.patientMrn}</p>
 								</div>
 								<div>
-									<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+									<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 										Encounter
 									</p>
 									<p>{encounterTypeLabel(encounter.encounterType)}</p>
@@ -309,20 +309,16 @@ export function ClinicalAbstractDialog({
 									)}
 								</div>
 								<div>
-									<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+									<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 										Chief Complaint
 									</p>
 									<p>{encounter.chiefComplaint ?? "—"}</p>
 								</div>
 								<div>
-									<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+									<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 										Attending Physician
 									</p>
-									<p>
-										{encounter.attendingStaffName ??
-											encounter.admittingStaffName ??
-											"—"}
-									</p>
+									<p>{encounter.attendingStaffName ?? encounter.admittingStaffName ?? "—"}</p>
 								</div>
 							</div>
 						</div>
@@ -331,21 +327,17 @@ export function ClinicalAbstractDialog({
 
 						{/* Diagnoses */}
 						<div>
-							<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+							<p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
 								Active Diagnoses / Problems
 							</p>
 							{activeProblems.length === 0 ? (
-								<p className="text-muted-foreground text-sm italic">
-									No active problems recorded.
-								</p>
+								<p className="text-muted-foreground text-sm italic">No active problems recorded.</p>
 							) : (
-								<ol className="list-decimal list-inside space-y-1 text-sm">
-									{activeProblems.map((p) => (
+								<ol className="list-inside list-decimal space-y-1 text-sm">
+									{activeProblems.map(p => (
 										<li key={p.id}>
 											{p.icd10Code && (
-												<span className="text-muted-foreground mr-1">
-													{p.icd10Code}
-												</span>
+												<span className="text-muted-foreground mr-1">{p.icd10Code}</span>
 											)}
 											{p.description}
 										</li>
@@ -358,28 +350,25 @@ export function ClinicalAbstractDialog({
 
 						{/* Signed Notes */}
 						<div>
-							<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+							<p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
 								Signed Clinical Notes ({signedNotes.length})
 							</p>
 							{signedNotes.length === 0 ? (
 								<p className="text-muted-foreground text-sm italic">
-									No signed clinical notes. Sign at least one note before printing the
-									Clinical Abstract.
+									No signed clinical notes. Sign at least one note before printing the Clinical
+									Abstract.
 								</p>
 							) : (
 								<div className="space-y-3">
-									{signedNotes.map((note) => (
+									{signedNotes.map(note => (
 										<div key={note.id} className="rounded-md border p-3 text-sm">
-											<div className="flex items-center justify-between mb-1">
-												<span className="font-medium">
-													{noteTypeLabel(note.noteType)}
-												</span>
+											<div className="mb-1 flex items-center justify-between">
+												<span className="font-medium">{noteTypeLabel(note.noteType)}</span>
 												<span className="text-muted-foreground text-xs">
-													{note.authorStaffName ?? "Unknown"} ·{" "}
-													{formatDateTime(note.signedAt)}
+													{note.authorStaffName ?? "Unknown"} · {formatDateTime(note.signedAt)}
 												</span>
 											</div>
-											<div className="text-muted-foreground text-xs whitespace-pre-wrap line-clamp-4">
+											<div className="text-muted-foreground line-clamp-4 text-xs whitespace-pre-wrap">
 												{note.content}
 											</div>
 										</div>
@@ -390,16 +379,13 @@ export function ClinicalAbstractDialog({
 
 						{/* Print CTA */}
 						<div className="flex justify-end pt-2">
-							<Button
-								onClick={handlePrint}
-								disabled={signedNotes.length === 0}
-							>
+							<Button onClick={handlePrint} disabled={signedNotes.length === 0}>
 								<Printer className="mr-1.5 size-4" />
 								Print Clinical Abstract
 							</Button>
 						</div>
 						{signedNotes.length === 0 && (
-							<p className="text-muted-foreground text-xs text-right">
+							<p className="text-muted-foreground text-right text-xs">
 								Print is disabled — sign a clinical note first.
 							</p>
 						)}

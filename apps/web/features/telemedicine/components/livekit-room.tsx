@@ -579,8 +579,8 @@ export function LiveKitSetupBanner() {
 			<AlertTitle>Video conferencing not yet configured</AlertTitle>
 			<AlertDescription className="text-amber-900/90 dark:text-amber-100/90">
 				<p>
-					Video conferencing credentials have not been set up on this server yet. An
-					administrator needs to enable the integration before video sessions can be started.
+					Video conferencing credentials have not been set up on this server yet. An administrator
+					needs to enable the integration before video sessions can be started.
 				</p>
 				<p className="mt-2 text-xs">
 					Contact your system administrator to complete video service setup.
@@ -615,9 +615,7 @@ export function LiveKitErrorCard({
 						<strong>{friendlyJoinWindow.startTime}</strong> to{" "}
 						<strong>{friendlyJoinWindow.endTime}</strong>, {friendlyJoinWindow.timezoneLabel}.
 					</p>
-					<p className="text-xs">
-						Please come back during that time window, then check again.
-					</p>
+					<p className="text-xs">Please come back during that time window, then check again.</p>
 					{onRetry && (
 						<Button type="button" variant="outline" size="sm" onClick={onRetry}>
 							<RefreshCw className="size-3.5" />
@@ -753,8 +751,7 @@ function LiveKitVideoRoomSession({
 	const choices = joinState.appointmentId === activeAppointmentId ? joinState.choices : null
 	const hasDisconnected =
 		joinState.appointmentId === activeAppointmentId ? joinState.hasDisconnected : false
-	const sessionCount =
-		joinState.appointmentId === activeAppointmentId ? joinState.sessionCount : 0
+	const sessionCount = joinState.appointmentId === activeAppointmentId ? joinState.sessionCount : 0
 
 	function handleRetry() {
 		if (activeAppointmentId && choices) {
@@ -770,8 +767,7 @@ function LiveKitVideoRoomSession({
 			appointmentId: activeAppointmentId,
 			choices: nextChoices,
 			hasDisconnected: false,
-			sessionCount:
-				(prev.appointmentId === activeAppointmentId ? prev.sessionCount : 0) + 1,
+			sessionCount: (prev.appointmentId === activeAppointmentId ? prev.sessionCount : 0) + 1,
 		}))
 		mutate(activeAppointmentId)
 	}
@@ -809,12 +805,12 @@ function LiveKitVideoRoomSession({
 		<div
 			className={cn(
 				"flex flex-col items-center gap-2 text-center",
-				fullViewport ? "flex-1 justify-center text-muted-foreground" : "py-10"
+				fullViewport ? "text-muted-foreground flex-1 justify-center" : "py-10"
 			)}
 		>
-			<Video className={cn("size-8 text-muted-foreground")} />
+			<Video className={cn("text-muted-foreground size-8")} />
 			<p className="text-sm font-medium">No appointment selected</p>
-			<p className={cn("text-xs text-muted-foreground")}>
+			<p className={cn("text-muted-foreground text-xs")}>
 				Select an appointment to start the video session.
 			</p>
 		</div>

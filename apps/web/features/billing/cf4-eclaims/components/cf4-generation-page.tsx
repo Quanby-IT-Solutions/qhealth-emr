@@ -11,10 +11,10 @@ import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Skeleton } from "@/core/components/ui/skeleton"
 import { Textarea } from "@/core/components/ui/textarea"
-
 import { EncounterContextBar } from "@/features/billing/components/encounter-context-bar"
 import { XmlPreviewPane } from "@/features/billing/components/xml-preview-pane"
-import { useGenerateCf4Mutation, useCf4XmlQuery, useFinalizeCf4Mutation } from "../api/cf4.hooks"
+
+import { useCf4XmlQuery, useFinalizeCf4Mutation, useGenerateCf4Mutation } from "../api/cf4.hooks"
 import { CF4_SECTIONS } from "../lib/cf4-sections"
 import { SourceNoteDrawer } from "./source-note-drawer"
 
@@ -26,17 +26,37 @@ interface Cf4GenerationPageProps {
 }
 
 /** Multi-line text fields — rendered as <Textarea> instead of <Input> */
-const MULTILINE_FIELDS = new Set(["chiefComplaint", "briefHistory", "managementPlan", "procedures", "secondaryDiagnoses"])
+const MULTILINE_FIELDS = new Set([
+	"chiefComplaint",
+	"briefHistory",
+	"managementPlan",
+	"procedures",
+	"secondaryDiagnoses",
+])
 
-export function Cf4GenerationPage({ encounterId, facilityId, patientId, existingCf4Id }: Cf4GenerationPageProps) {
+export function Cf4GenerationPage({
+	encounterId,
+	facilityId,
+	patientId,
+	existingCf4Id,
+}: Cf4GenerationPageProps) {
 	const [cf4Id, setCf4Id] = useState(existingCf4Id ?? "")
 	const [drawerSection, setDrawerSection] = useState<string | null>(null)
 	/** Local overrides applied on top of auto-extracted data */
 	const [overrides, setOverrides] = useState<Record<string, string>>({})
 
-	const { mutate: generateCf4, isPending: generating, data: preview, error: generateError } = useGenerateCf4Mutation()
+	const {
+		mutate: generateCf4,
+		isPending: generating,
+		data: preview,
+		error: generateError,
+	} = useGenerateCf4Mutation()
 	const { data: xmlData, isLoading: xmlLoading } = useCf4XmlQuery(cf4Id)
-	const { mutate: finalizeCf4, isPending: finalizing, error: finalizeError } = useFinalizeCf4Mutation()
+	const {
+		mutate: finalizeCf4,
+		isPending: finalizing,
+		error: finalizeError,
+	} = useFinalizeCf4Mutation()
 
 	const missingFields = preview?.missingFields ?? []
 	const baseExtracted = preview?.extractedData ?? null
@@ -45,13 +65,14 @@ export function Cf4GenerationPage({ encounterId, facilityId, patientId, existing
 		...((baseExtracted as Record<string, unknown> | null) ?? {}),
 		...Object.fromEntries(Object.entries(overrides).filter(([, v]) => v.trim() !== "")),
 	}
-	const hasValidationIssues = missingFields.filter(f => !(f in overrides && overrides[f]?.trim())).length > 0
+	const hasValidationIssues =
+		missingFields.filter(f => !(f in overrides && overrides[f]?.trim())).length > 0
 
 	const handleGenerate = useCallback(() => {
 		generateCf4(
 			{ facilityId, encounterId, patientId },
 			{
-				onSuccess: (data) => {
+				onSuccess: data => {
 					setCf4Id(data.cf4.id)
 				},
 			}
@@ -64,34 +85,30 @@ export function Cf4GenerationPage({ encounterId, facilityId, patientId, existing
 	}, [finalizeCf4, cf4Id])
 
 	const activeSection = drawerSection
-		? CF4_SECTIONS.find(s => s.key === drawerSection) ?? null
+		? (CF4_SECTIONS.find(s => s.key === drawerSection) ?? null)
 		: null
 
-	const drawerSources = activeSection?.fields
-		.filter(f => f.key in extractedData)
-		.map(f => ({
-			field: f.key,
-			label: f.label,
-			source: f.source ?? "encounter",
-			value: String(extractedData[f.key] ?? ""),
-		})) ?? []
+	const drawerSources =
+		activeSection?.fields
+			.filter(f => f.key in extractedData)
+			.map(f => ({
+				field: f.key,
+				label: f.label,
+				source: f.source ?? "encounter",
+				value: String(extractedData[f.key] ?? ""),
+			})) ?? []
 
 	return (
 		<div className="space-y-4">
 			<EncounterContextBar />
 
-			<div className="px-4 grid gap-4 lg:grid-cols-2">
+			<div className="grid gap-4 px-4 lg:grid-cols-2">
 				{/* Left pane: editable form */}
 				<div className="space-y-4">
 					<div className="flex items-center justify-between">
 						<h1 className="text-lg font-semibold">CF4 Generation</h1>
 						<div className="flex gap-2">
-							<Button
-								onClick={handleGenerate}
-								disabled={generating}
-								variant="outline"
-								size="sm"
-							>
+							<Button onClick={handleGenerate} disabled={generating} variant="outline" size="sm">
 								{generating ? "Generating..." : cf4Id ? "Re-generate" : "Generate CF4"}
 							</Button>
 							{cf4Id && (
@@ -114,17 +131,15 @@ export function Cf4GenerationPage({ encounterId, facilityId, patientId, existing
 
 					{cf4Id && (
 						<div className="flex items-center gap-2">
-							<Badge
-								variant={hasValidationIssues ? "destructive" : "default"}
-								className="text-xs"
-							>
+							<Badge variant={hasValidationIssues ? "destructive" : "default"} className="text-xs">
 								{hasValidationIssues
 									? `Missing fields (${missingFields.length})`
 									: "Ready to submit"}
 							</Badge>
 							{hasValidationIssues && (
-								<span className="text-xs text-muted-foreground">
-									{missingFields.slice(0, 3).join(", ")}{missingFields.length > 3 ? ` +${missingFields.length - 3} more` : ""}
+								<span className="text-muted-foreground text-xs">
+									{missingFields.slice(0, 3).join(", ")}
+									{missingFields.length > 3 ? ` +${missingFields.length - 3} more` : ""}
 								</span>
 							)}
 						</div>
@@ -133,10 +148,13 @@ export function Cf4GenerationPage({ encounterId, facilityId, patientId, existing
 					{CF4_SECTIONS.map(section => {
 						const isComplete = section.fields
 							.filter(f => f.required)
-							.every(f => f.key in extractedData && String(extractedData[f.key] ?? "").trim() !== "")
+							.every(
+								f => f.key in extractedData && String(extractedData[f.key] ?? "").trim() !== ""
+							)
 
 						const autoCount = section.fields.filter(
-							f => f.key in extractedData && f.source && f.source !== "manual" && !(f.key in overrides)
+							f =>
+								f.key in extractedData && f.source && f.source !== "manual" && !(f.key in overrides)
 						).length
 
 						return (
@@ -146,7 +164,7 @@ export function Cf4GenerationPage({ encounterId, facilityId, patientId, existing
 										<div className="flex items-center gap-2">
 											<CardTitle className="text-sm">{section.label}</CardTitle>
 											{autoCount > 0 && (
-												<Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+												<Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
 													{autoCount} auto
 												</Badge>
 											)}
@@ -174,7 +192,8 @@ export function Cf4GenerationPage({ encounterId, facilityId, patientId, existing
 								<CardContent className="space-y-3">
 									{section.fields.map(field => {
 										const autoValue = (baseExtracted as Record<string, unknown> | null)?.[field.key]
-										const currentValue = overrides[field.key] ?? (autoValue !== undefined ? String(autoValue) : "")
+										const currentValue =
+											overrides[field.key] ?? (autoValue !== undefined ? String(autoValue) : "")
 										const isAutoFilled = autoValue !== undefined && !(field.key in overrides)
 										const isMultiline = MULTILINE_FIELDS.has(field.key)
 										return (
@@ -187,7 +206,10 @@ export function Cf4GenerationPage({ encounterId, facilityId, patientId, existing
 														<span className="text-destructive text-[10px]">*</span>
 													)}
 													{isAutoFilled && (
-														<Badge variant="outline" className="text-[10px] h-3.5 px-1 py-0 ml-auto">
+														<Badge
+															variant="outline"
+															className="ml-auto h-3.5 px-1 py-0 text-[10px]"
+														>
 															auto
 														</Badge>
 													)}
@@ -196,8 +218,14 @@ export function Cf4GenerationPage({ encounterId, facilityId, patientId, existing
 													<Textarea
 														id={`cf4-${field.key}`}
 														value={currentValue}
-														onChange={e => setOverrides(prev => ({ ...prev, [field.key]: e.target.value }))}
-														placeholder={isAutoFilled ? "Auto-filled — edit to override" : `Enter ${field.label.toLowerCase()}`}
+														onChange={e =>
+															setOverrides(prev => ({ ...prev, [field.key]: e.target.value }))
+														}
+														placeholder={
+															isAutoFilled
+																? "Auto-filled — edit to override"
+																: `Enter ${field.label.toLowerCase()}`
+														}
 														className="min-h-[80px] text-sm"
 														aria-label={field.label}
 													/>
@@ -205,9 +233,15 @@ export function Cf4GenerationPage({ encounterId, facilityId, patientId, existing
 													<Input
 														id={`cf4-${field.key}`}
 														value={currentValue}
-														onChange={e => setOverrides(prev => ({ ...prev, [field.key]: e.target.value }))}
-														placeholder={isAutoFilled ? "Auto-filled — edit to override" : `Enter ${field.label.toLowerCase()}`}
-														className="text-sm h-8"
+														onChange={e =>
+															setOverrides(prev => ({ ...prev, [field.key]: e.target.value }))
+														}
+														placeholder={
+															isAutoFilled
+																? "Auto-filled — edit to override"
+																: `Enter ${field.label.toLowerCase()}`
+														}
+														className="h-8 text-sm"
 														aria-label={field.label}
 													/>
 												)}
@@ -232,7 +266,7 @@ export function Cf4GenerationPage({ encounterId, facilityId, patientId, existing
 						/>
 					)}
 					{!cf4Id && !generating && (
-						<div className="rounded-md border border-dashed flex items-center justify-center min-h-[200px] text-sm text-muted-foreground">
+						<div className="text-muted-foreground flex min-h-[200px] items-center justify-center rounded-md border border-dashed text-sm">
 							Generate CF4 to see XML preview
 						</div>
 					)}

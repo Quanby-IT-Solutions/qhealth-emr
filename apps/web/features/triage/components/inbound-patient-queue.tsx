@@ -1,19 +1,19 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { PhoneCall, Video } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { PhoneCall, Video } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import { acuityColor, acuityLabel } from "@/features/ed/lib/acuity-utils"
 import {
 	useCancelInboundTriageMutation,
 	useInboundTriageListQuery,
 	useMarkInboundArrivedMutation,
 } from "@/features/ed/api/ed.hooks"
+import { acuityColor, acuityLabel } from "@/features/ed/lib/acuity-utils"
 
 interface InboundPatientQueueProps {
 	facilityId: string
@@ -32,9 +32,7 @@ function EtaCountdown({ etaAt }: { etaAt: string | Date }) {
 		return () => clearInterval(id)
 	}, [etaAt])
 
-	return (
-		<span className="font-medium">{remaining === 0 ? "Arriving now" : `${remaining}m`}</span>
-	)
+	return <span className="font-medium">{remaining === 0 ? "Arriving now" : `${remaining}m`}</span>
 }
 
 export function InboundPatientQueue({ facilityId, canEdit }: InboundPatientQueueProps) {
@@ -84,7 +82,7 @@ export function InboundPatientQueue({ facilityId, canEdit }: InboundPatientQueue
 							equipment?: string[]
 						}
 						return (
-							<div key={patient.id} className="rounded-md border p-3 space-y-2">
+							<div key={patient.id} className="space-y-2 rounded-md border p-3">
 								<div className="flex items-start justify-between gap-3">
 									<div className="min-w-0 flex-1">
 										<div className="flex items-center gap-2">
@@ -108,22 +106,30 @@ export function InboundPatientQueue({ facilityId, canEdit }: InboundPatientQueue
 									{acuityLabel(patient.provisionalAcuityLevel)}
 								</p>
 
-								{(resourceNeeds.bed || resourceNeeds.codeTeam || (resourceNeeds.equipment?.length ?? 0) > 0) && (
+								{(resourceNeeds.bed ||
+									resourceNeeds.codeTeam ||
+									(resourceNeeds.equipment?.length ?? 0) > 0) && (
 									<div className="flex flex-wrap gap-1">
 										{resourceNeeds.bed && (
-											<Badge variant="outline" className="text-xs">Bed ready</Badge>
+											<Badge variant="outline" className="text-xs">
+												Bed ready
+											</Badge>
 										)}
 										{resourceNeeds.codeTeam && (
-											<Badge variant="outline" className="text-xs">Code team</Badge>
+											<Badge variant="outline" className="text-xs">
+												Code team
+											</Badge>
 										)}
 										{resourceNeeds.equipment?.map(eq => (
-											<Badge key={eq} variant="outline" className="text-xs">{eq}</Badge>
+											<Badge key={eq} variant="outline" className="text-xs">
+												{eq}
+											</Badge>
 										))}
 									</div>
 								)}
 
 								{patient.assessmentNotes && (
-									<p className="text-muted-foreground text-xs line-clamp-2">
+									<p className="text-muted-foreground line-clamp-2 text-xs">
 										{patient.assessmentNotes}
 									</p>
 								)}

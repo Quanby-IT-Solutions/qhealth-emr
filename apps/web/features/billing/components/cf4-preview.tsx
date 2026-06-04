@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { AlertTriangle, CheckCircle2, FileCheck, Loader2, Send } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -9,13 +8,10 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Textarea } from "@/core/components/ui/textarea"
 import { Separator } from "@/core/components/ui/separator"
+import { Textarea } from "@/core/components/ui/textarea"
 
-import {
-	useGenerateCf4Mutation,
-	useFinalizeCf4Mutation,
-} from "../api/billing.hooks"
+import { useFinalizeCf4Mutation, useGenerateCf4Mutation } from "../api/billing.hooks"
 
 interface Cf4PreviewProps {
 	encounterId: string
@@ -53,7 +49,7 @@ export function Cf4Preview({ encounterId, facilityId, patientId }: Cf4PreviewPro
 		generateCf4.mutate(
 			{ facilityId, encounterId, patientId },
 			{
-				onSuccess: (data) => {
+				onSuccess: data => {
 					setPreview(data)
 					setChiefComplaint(data.extractedData.chiefComplaint ?? "")
 					setBriefHistory(data.extractedData.briefHistory ?? "")
@@ -129,10 +125,7 @@ export function Cf4Preview({ encounterId, facilityId, patientId }: Cf4PreviewPro
 					)}
 				</div>
 				<div className="flex gap-2">
-					<Button
-						onClick={handleFinalize}
-						disabled={finalizeCf4.isPending}
-					>
+					<Button onClick={handleFinalize} disabled={finalizeCf4.isPending}>
 						{finalizeCf4.isPending ? (
 							<Loader2 className="mr-1.5 size-4 animate-spin" />
 						) : (
@@ -157,7 +150,7 @@ export function Cf4Preview({ encounterId, facilityId, patientId }: Cf4PreviewPro
 							Missing required fields:
 						</p>
 						<ul className="mt-1 list-inside list-disc text-sm text-red-700">
-							{preview.missingFields.map((f) => (
+							{preview.missingFields.map(f => (
 								<li key={f}>{f}</li>
 							))}
 						</ul>
@@ -167,47 +160,38 @@ export function Cf4Preview({ encounterId, facilityId, patientId }: Cf4PreviewPro
 				{/* Editable clinical fields */}
 				<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
 					<div className="space-y-1">
-						<Label
-							htmlFor="cf4-cc"
-							className={!chiefComplaint ? "text-red-600" : ""}
-						>
+						<Label htmlFor="cf4-cc" className={!chiefComplaint ? "text-red-600" : ""}>
 							Chief Complaint *
 						</Label>
 						<Textarea
 							id="cf4-cc"
 							rows={2}
 							value={chiefComplaint}
-							onChange={(e) => setChiefComplaint(e.target.value)}
+							onChange={e => setChiefComplaint(e.target.value)}
 							placeholder="Enter or edit chief complaint…"
 						/>
 					</div>
 					<div className="space-y-1">
-						<Label
-							htmlFor="cf4-bh"
-							className={!briefHistory ? "text-red-600" : ""}
-						>
+						<Label htmlFor="cf4-bh" className={!briefHistory ? "text-red-600" : ""}>
 							Brief History *
 						</Label>
 						<Textarea
 							id="cf4-bh"
 							rows={2}
 							value={briefHistory}
-							onChange={(e) => setBriefHistory(e.target.value)}
+							onChange={e => setBriefHistory(e.target.value)}
 							placeholder="Enter or edit brief history…"
 						/>
 					</div>
 					<div className="space-y-1 md:col-span-2">
-						<Label
-							htmlFor="cf4-mp"
-							className={!managementPlan ? "text-red-600" : ""}
-						>
+						<Label htmlFor="cf4-mp" className={!managementPlan ? "text-red-600" : ""}>
 							Management Plan *
 						</Label>
 						<Textarea
 							id="cf4-mp"
 							rows={2}
 							value={managementPlan}
-							onChange={(e) => setManagementPlan(e.target.value)}
+							onChange={e => setManagementPlan(e.target.value)}
 							placeholder="Enter or edit management plan…"
 						/>
 					</div>
@@ -217,7 +201,7 @@ export function Cf4Preview({ encounterId, facilityId, patientId }: Cf4PreviewPro
 
 				{/* Vital signs (read-only from EHR) */}
 				<div>
-					<p className="mb-2 text-sm font-medium text-muted-foreground">
+					<p className="text-muted-foreground mb-2 text-sm font-medium">
 						Vital Signs (auto-extracted)
 					</p>
 					{preview.extractedData.vitalSigns ? (
@@ -237,7 +221,7 @@ export function Cf4Preview({ encounterId, facilityId, patientId }: Cf4PreviewPro
 
 				{/* Diagnoses (read-only) */}
 				<div>
-					<p className="mb-2 text-sm font-medium text-muted-foreground">
+					<p className="text-muted-foreground mb-2 text-sm font-medium">
 						Diagnoses / ICD-10 Codes (auto-extracted)
 					</p>
 					{preview.extractedData.diagnoses.length > 0 ? (
@@ -260,7 +244,7 @@ export function Cf4Preview({ encounterId, facilityId, patientId }: Cf4PreviewPro
 
 				{/* Procedures (read-only) */}
 				<div>
-					<p className="mb-2 text-sm font-medium text-muted-foreground">
+					<p className="text-muted-foreground mb-2 text-sm font-medium">
 						Procedures / RVS Codes (auto-extracted)
 					</p>
 					{preview.extractedData.procedures.length > 0 ? (

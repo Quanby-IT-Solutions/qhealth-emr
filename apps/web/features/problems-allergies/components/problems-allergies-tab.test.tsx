@@ -162,7 +162,9 @@ describe("ProblemsAllergiesTab", () => {
 	})
 
 	it("renders problem description and ICD-10 code in the row", () => {
-		mockProblemsWith([buildProblem({ description: "Hypertension", icd10Code: "I10", status: "active" })])
+		mockProblemsWith([
+			buildProblem({ description: "Hypertension", icd10Code: "I10", status: "active" }),
+		])
 		render(<ProblemsAllergiesTab patientId="patient-1" facilityId="facility-1" canWrite />)
 		expect(screen.getAllByText("Hypertension").length).toBeGreaterThan(0)
 		expect(screen.getAllByText("I10").length).toBeGreaterThan(0)
@@ -296,8 +298,8 @@ describe("ProblemsAllergiesTab", () => {
 		mockUseProblemsQuery.mockClear()
 		await selectProblemStatus(user, /resolved/i)
 
-		const calledWithResolved = mockUseProblemsQuery.mock.calls.some(call =>
-			call[0]?.status === "resolved"
+		const calledWithResolved = mockUseProblemsQuery.mock.calls.some(
+			call => call[0]?.status === "resolved"
 		)
 		expect(calledWithResolved).toBe(true)
 	})

@@ -2,12 +2,11 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-
 import { CheckCircle2 } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
+import { SyncConflict, type ConflictRecord } from "@/features/nursing/components/sync-conflict"
 import { useNursingSync } from "@/features/nursing/lib/use-nursing-sync"
-import { type ConflictRecord, SyncConflict } from "@/features/nursing/components/sync-conflict"
 
 export default function NursingConflictPage() {
 	const router = useRouter()
@@ -15,7 +14,7 @@ export default function NursingConflictPage() {
 	const [allResolved, setAllResolved] = useState(false)
 
 	// Map IndexedDB ConflictEntry → SyncConflict ConflictRecord shape
-	const conflictRecords: ConflictRecord[] = conflicts.map((c) => ({
+	const conflictRecords: ConflictRecord[] = conflicts.map(c => ({
 		id: c.id,
 		recordType: c.recordType,
 		description: c.description,
@@ -26,7 +25,7 @@ export default function NursingConflictPage() {
 
 	async function handleAllResolved() {
 		// Persist each conflict resolution (remove from store)
-		await Promise.all(conflicts.map((c) => resolveConflict(c.id)))
+		await Promise.all(conflicts.map(c => resolveConflict(c.id)))
 		setAllResolved(true)
 	}
 
@@ -37,11 +36,9 @@ export default function NursingConflictPage() {
 					<CheckCircle2 className="size-10 text-green-600" />
 				</div>
 				<h1 className="mt-4 text-2xl font-semibold">
-					{conflictRecords.length === 0 && !allResolved
-						? "No Conflicts"
-						: "Conflicts Resolved"}
+					{conflictRecords.length === 0 && !allResolved ? "No Conflicts" : "Conflicts Resolved"}
 				</h1>
-				<p className="mt-2 text-muted-foreground">
+				<p className="text-muted-foreground mt-2">
 					{conflictRecords.length === 0 && !allResolved
 						? "There are no pending sync conflicts."
 						: "All documentation has been synchronized with the master record."}
@@ -57,16 +54,13 @@ export default function NursingConflictPage() {
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-2xl font-semibold">Conflict Resolution</h1>
-				<p className="text-sm text-muted-foreground">
+				<p className="text-muted-foreground text-sm">
 					A data conflict was detected during synchronization. Please choose which version to keep.
 				</p>
 			</div>
 
 			<div className="w-full">
-				<SyncConflict
-					conflicts={conflictRecords}
-					onAllResolved={() => void handleAllResolved()}
-				/>
+				<SyncConflict conflicts={conflictRecords} onAllResolved={() => void handleAllResolved()} />
 			</div>
 		</div>
 	)

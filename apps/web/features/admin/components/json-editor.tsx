@@ -5,15 +5,22 @@ import { useCallback, useMemo, useState } from "react"
 import { cn } from "@/core/lib/utils"
 
 interface JsonEditorProps {
-	value: unknown
-	onChange?: (next: unknown) => void
-	readOnly?: boolean
-	rows?: number
-	className?: string
+	"value": unknown
+	"onChange"?: (next: unknown) => void
+	"readOnly"?: boolean
+	"rows"?: number
+	"className"?: string
 	"aria-label"?: string
 }
 
-export function JsonEditor({ value, onChange, readOnly = false, rows = 12, className, ...props }: JsonEditorProps) {
+export function JsonEditor({
+	value,
+	onChange,
+	readOnly = false,
+	rows = 12,
+	className,
+	...props
+}: JsonEditorProps) {
 	const initial = useMemo(() => safeStringify(value), [value])
 	const [draft, setDraft] = useState(initial)
 	const [error, setError] = useState<string | null>(null)
@@ -42,15 +49,15 @@ export function JsonEditor({ value, onChange, readOnly = false, rows = 12, class
 				rows={rows}
 				spellCheck={false}
 				className={cn(
-					"w-full resize-y rounded-md border bg-muted/30 p-2 font-mono text-xs",
-					"focus:outline-none focus:ring-1 focus:ring-ring",
+					"bg-muted/30 w-full resize-y rounded-md border p-2 font-mono text-xs",
+					"focus:ring-ring focus:ring-1 focus:outline-none",
 					readOnly && "cursor-default opacity-90"
 				)}
 				aria-invalid={!!error}
 				aria-label={props["aria-label"] ?? "JSON editor"}
 			/>
 			{error && (
-				<p className="text-xs text-destructive" role="alert">
+				<p className="text-destructive text-xs" role="alert">
 					{error}
 				</p>
 			)}

@@ -14,7 +14,6 @@ import { buttonVariants } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Skeleton } from "@/core/components/ui/skeleton"
 import { cn } from "@/core/lib/utils"
-
 import { useHimOpsQuery } from "@/features/admin/api/admin-dashboard.hooks"
 
 // ── Metric Row ────────────────────────────────────────────────────────────────
@@ -31,21 +30,21 @@ function MetricRow({
 	isIssue?: boolean
 }) {
 	return (
-		<div className="flex items-start justify-between gap-4 py-3 border-b last:border-0">
+		<div className="flex items-start justify-between gap-4 border-b py-3 last:border-0">
 			<div className="min-w-0 flex-1">
 				<div className="flex items-center gap-2">
 					<span className="text-sm font-medium">{label}</span>
 					{isIssue && (
-						<Badge className="text-[10px] px-1.5 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
+						<Badge className="bg-yellow-100 px-1.5 text-[10px] text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
 							Action needed
 						</Badge>
 					)}
 				</div>
-				<p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+				<p className="text-muted-foreground mt-0.5 text-xs">{description}</p>
 			</div>
 			<span
 				className={cn(
-					"text-2xl font-bold tabular-nums flex-shrink-0",
+					"flex-shrink-0 text-2xl font-bold tabular-nums",
 					isIssue ? "text-yellow-600 dark:text-yellow-400" : "text-foreground"
 				)}
 			>
@@ -74,11 +73,12 @@ export function HimOpsPanel() {
 			</div>
 
 			<div className="flex items-center gap-3">
-				<HugeiconsIcon icon={FileEditFreeIcons} className="size-6 text-muted-foreground" />
+				<HugeiconsIcon icon={FileEditFreeIcons} className="text-muted-foreground size-6" />
 				<div>
 					<h1 className="text-xl font-semibold">HIM Operations Oversight</h1>
-					<p className="text-sm text-muted-foreground">
-						Pending discharge summaries, ICD-10 coding backlogs, and medical records release requests
+					<p className="text-muted-foreground text-sm">
+						Pending discharge summaries, ICD-10 coding backlogs, and medical records release
+						requests
 					</p>
 				</div>
 			</div>
@@ -105,7 +105,7 @@ export function HimOpsPanel() {
 					<Card>
 						<CardHeader className="pb-2">
 							<CardTitle className="text-sm font-medium">Discharge Documentation</CardTitle>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								Completed encounters still requiring discharge summaries or ICD-10 coding.
 							</p>
 						</CardHeader>
@@ -123,10 +123,10 @@ export function HimOpsPanel() {
 								isIssue={data.pendingCodingCount > 0}
 							/>
 							<div className="pt-3">
-								<p className="text-xs text-muted-foreground">
-									<strong>Action:</strong> Assign coding officers to review each discharged encounter
-									and assign ICD-10 codes using the ICD-10-CM/PCS code set. Finalize all draft
-									discharge summaries before end-of-month billing cycle.
+								<p className="text-muted-foreground text-xs">
+									<strong>Action:</strong> Assign coding officers to review each discharged
+									encounter and assign ICD-10 codes using the ICD-10-CM/PCS code set. Finalize all
+									draft discharge summaries before end-of-month billing cycle.
 								</p>
 							</div>
 						</CardContent>
@@ -136,8 +136,9 @@ export function HimOpsPanel() {
 					<Card>
 						<CardHeader className="pb-2">
 							<CardTitle className="text-sm font-medium">Medical Records Release</CardTitle>
-							<p className="text-xs text-muted-foreground">
-								Pending requests for records release, discharge summary copies, and medical certificates.
+							<p className="text-muted-foreground text-xs">
+								Pending requests for records release, discharge summary copies, and medical
+								certificates.
 							</p>
 						</CardHeader>
 						<CardContent>
@@ -154,9 +155,10 @@ export function HimOpsPanel() {
 								isIssue={data.pendingMedCertCount > 3}
 							/>
 							<div className="pt-3">
-								<p className="text-xs text-muted-foreground">
-									<strong>Action:</strong> Medical records officer should process pending requests within
-									the facility&apos;s SLA window. Delays in records release may trigger ARTA complaints.
+								<p className="text-muted-foreground text-xs">
+									<strong>Action:</strong> Medical records officer should process pending requests
+									within the facility&apos;s SLA window. Delays in records release may trigger ARTA
+									complaints.
 								</p>
 							</div>
 						</CardContent>

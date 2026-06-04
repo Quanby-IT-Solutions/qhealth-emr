@@ -7,7 +7,9 @@ export default function FacilityWardsPage() {
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-2xl font-semibold">Wards & Beds</h1>
-				<p className="text-sm text-muted-foreground mt-1">View and manage wards, rooms, and bed statuses.</p>
+				<p className="text-muted-foreground mt-1 text-sm">
+					View and manage wards, rooms, and bed statuses.
+				</p>
 			</div>
 			<WardsPage />
 		</div>

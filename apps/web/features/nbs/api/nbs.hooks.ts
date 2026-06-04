@@ -19,9 +19,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 	return res.json() as Promise<T>
 }
 
-function buildQueryString(
-	params: Record<string, string | number | boolean | undefined>
-): string {
+function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
 	if (entries.length === 0) return ""
 	return `?${entries
@@ -219,9 +217,7 @@ export function useNbsScreeningQuery(encounterId: string) {
 	return useQuery({
 		queryKey: nbsKeys.screening(encounterId),
 		queryFn: () =>
-			fetchJson<NbsScreening | null>(
-				`${API_BASE}/encounters/${encounterId}/screening`
-			),
+			fetchJson<NbsScreening | null>(`${API_BASE}/encounters/${encounterId}/screening`),
 		enabled: Boolean(encounterId),
 	})
 }
@@ -250,7 +246,7 @@ export function useUpdateNbsScreeningMutation() {
 				method: "PATCH",
 				body: JSON.stringify(body),
 			}),
-		onSuccess: (data) => {
+		onSuccess: data => {
 			void queryClient.invalidateQueries({
 				queryKey: nbsKeys.screening(data.encounterId),
 			})
@@ -265,8 +261,7 @@ export function useUpdateNbsScreeningMutation() {
 export function useNbsConsentQuery(nbsId: string) {
 	return useQuery({
 		queryKey: nbsKeys.consent(nbsId),
-		queryFn: () =>
-			fetchJson<NbsConsent | null>(`${API_BASE}/screenings/${nbsId}/consent`),
+		queryFn: () => fetchJson<NbsConsent | null>(`${API_BASE}/screenings/${nbsId}/consent`),
 		enabled: Boolean(nbsId),
 	})
 }
@@ -279,7 +274,7 @@ export function useCreateNbsConsentMutation() {
 				method: "POST",
 				body: JSON.stringify(input),
 			}),
-		onSuccess: (data) => {
+		onSuccess: data => {
 			void queryClient.invalidateQueries({
 				queryKey: nbsKeys.consent(data.nbsId),
 			})
@@ -294,8 +289,7 @@ export function useCreateNbsConsentMutation() {
 export function useNbsReferralsQuery(nbsId: string) {
 	return useQuery({
 		queryKey: nbsKeys.referrals(nbsId),
-		queryFn: () =>
-			fetchJson<NbsReferral[]>(`${API_BASE}/screenings/${nbsId}/referrals`),
+		queryFn: () => fetchJson<NbsReferral[]>(`${API_BASE}/screenings/${nbsId}/referrals`),
 		enabled: Boolean(nbsId),
 	})
 }
@@ -308,7 +302,7 @@ export function useCreateNbsReferralMutation() {
 				method: "POST",
 				body: JSON.stringify(input),
 			}),
-		onSuccess: (data) => {
+		onSuccess: data => {
 			void queryClient.invalidateQueries({
 				queryKey: nbsKeys.referrals(data.nbsId),
 			})
@@ -324,7 +318,7 @@ export function useUpdateNbsReferralMutation() {
 				method: "PATCH",
 				body: JSON.stringify(body),
 			}),
-		onSuccess: (data) => {
+		onSuccess: data => {
 			void queryClient.invalidateQueries({
 				queryKey: nbsKeys.referrals(data.nbsId),
 			})

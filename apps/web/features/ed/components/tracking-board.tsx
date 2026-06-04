@@ -72,12 +72,15 @@ export function TrackingBoard({ items }: TrackingBoardProps) {
 								</Card>
 							) : (
 								columnItems.map(item => (
-									<Card key={`${item.type}-${item.id}`} className={`hover:shadow-md transition-shadow ${acuityBorderColor(item.acuityLevel)}`}>
+									<Card
+										key={`${item.type}-${item.id}`}
+										className={`transition-shadow hover:shadow-md ${acuityBorderColor(item.acuityLevel)}`}
+									>
 										<CardContent className="space-y-1 p-3">
 											<div className="flex items-center justify-between">
 												<span className="text-sm font-medium">
 													{item.type === "pre_encounter"
-														? item.traumaAlias ?? "Unknown"
+														? (item.traumaAlias ?? "Unknown")
 														: item.patientName}
 												</span>
 												{item.acuityLevel && (
@@ -88,9 +91,7 @@ export function TrackingBoard({ items }: TrackingBoardProps) {
 											</div>
 
 											{item.patientMrn && (
-												<p className="text-muted-foreground text-xs">
-													MRN: {item.patientMrn}
-												</p>
+												<p className="text-muted-foreground text-xs">MRN: {item.patientMrn}</p>
 											)}
 
 											{item.chiefComplaint && (
@@ -101,22 +102,18 @@ export function TrackingBoard({ items }: TrackingBoardProps) {
 
 											<div className="text-muted-foreground flex items-center justify-between text-xs">
 												<span>{item.waitMinutes}m wait</span>
-												{item.bedNumber && (
-													<span>Bed: {item.bedNumber}</span>
-												)}
+												{item.bedNumber && <span>Bed: {item.bedNumber}</span>}
 											</div>
 
 											{item.assignedProvider && (
-												<p className="text-xs">
-													Provider: {item.assignedProvider}
-												</p>
+												<p className="text-xs">Provider: {item.assignedProvider}</p>
 											)}
 
 											{item.type === "pre_encounter" && (
-													<TraumaAliasBadge
-														alias={item.traumaAlias ?? item.id}
-														acuityLevel={item.acuityLevel}
-													/>
+												<TraumaAliasBadge
+													alias={item.traumaAlias ?? item.id}
+													acuityLevel={item.acuityLevel}
+												/>
 											)}
 
 											{item.type === "encounter" && (

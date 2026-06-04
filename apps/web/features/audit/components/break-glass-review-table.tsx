@@ -1,25 +1,43 @@
 "use client"
 
 import { useCallback, useState } from "react"
-
 import { ChevronDown, ChevronRight } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
-import { Skeleton } from "@/core/components/ui/skeleton"
-
 import {
-	type BreakGlassEvent,
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
+import { Skeleton } from "@/core/components/ui/skeleton"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
+import {
 	useBreakGlassEventsQuery,
 	useBreakGlassExportMutation,
 	useBreakGlassPatternsQuery,
 	useReviewBreakGlassMutation,
+	type BreakGlassEvent,
 } from "@/features/audit/api/audit.hooks"
 
 const STATUS_COLORS: Record<string, string> = {
@@ -50,50 +68,69 @@ function formatDateTime(val: unknown): string {
 
 function AccessLogDetail({ event }: { event: BreakGlassEvent }) {
 	return (
-		<div className="grid grid-cols-2 gap-x-6 gap-y-2 px-4 py-3 text-xs bg-muted/40">
+		<div className="bg-muted/40 grid grid-cols-2 gap-x-6 gap-y-2 px-4 py-3 text-xs">
 			<div>
-				<span className="font-semibold text-muted-foreground uppercase tracking-wide">Access Granted</span>
+				<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+					Access Granted
+				</span>
 				<p className="mt-0.5">{formatDateTime(event.accessGrantedAt)}</p>
 			</div>
 			<div>
-				<span className="font-semibold text-muted-foreground uppercase tracking-wide">Access Expires</span>
+				<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+					Access Expires
+				</span>
 				<p className="mt-0.5">
 					{formatDateTime(event.accessExpiresAt)}
-					{event.accessExpiresAt && new Date(event.accessExpiresAt as unknown as string) < new Date() && (
-						<Badge variant="secondary" className="ml-2 text-[10px]">Expired</Badge>
-					)}
+					{event.accessExpiresAt &&
+						new Date(event.accessExpiresAt as unknown as string) < new Date() && (
+							<Badge variant="secondary" className="ml-2 text-[10px]">
+								Expired
+							</Badge>
+						)}
 				</p>
 			</div>
 			<div>
-				<span className="font-semibold text-muted-foreground uppercase tracking-wide">Clinician Staff ID</span>
+				<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+					Clinician Staff ID
+				</span>
 				<p className="mt-0.5 font-mono break-all">{event.clinicianStaffId}</p>
 			</div>
 			<div>
-				<span className="font-semibold text-muted-foreground uppercase tracking-wide">Patient ID</span>
+				<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+					Patient ID
+				</span>
 				<p className="mt-0.5 font-mono break-all">{event.patientId}</p>
 			</div>
 			{event.reviewedByStaffId && (
 				<div>
-					<span className="font-semibold text-muted-foreground uppercase tracking-wide">Reviewed By</span>
+					<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+						Reviewed By
+					</span>
 					<p className="mt-0.5 font-mono break-all">{event.reviewedByStaffId}</p>
 				</div>
 			)}
 			{event.reviewedAt && (
 				<div>
-					<span className="font-semibold text-muted-foreground uppercase tracking-wide">Reviewed At</span>
+					<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+						Reviewed At
+					</span>
 					<p className="mt-0.5">{formatDateTime(event.reviewedAt)}</p>
 				</div>
 			)}
 			{event.reviewNotes && (
 				<div className="col-span-2">
-					<span className="font-semibold text-muted-foreground uppercase tracking-wide">Review Notes</span>
+					<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+						Review Notes
+					</span>
 					<p className="mt-0.5">{event.reviewNotes}</p>
 				</div>
 			)}
 			{event.recordsAccessed != null && (
 				<div className="col-span-2">
-					<span className="font-semibold text-muted-foreground uppercase tracking-wide">Records Accessed</span>
-					<pre className="mt-0.5 max-h-32 overflow-y-auto rounded bg-muted p-2 text-[11px]">
+					<span className="text-muted-foreground font-semibold tracking-wide uppercase">
+						Records Accessed
+					</span>
+					<pre className="bg-muted mt-0.5 max-h-32 overflow-y-auto rounded p-2 text-[11px]">
 						{JSON.stringify(event.recordsAccessed, null, 2)}
 					</pre>
 				</div>
@@ -125,28 +162,48 @@ function PatternsPanel({ facilityId, days }: { facilityId: string; days: number 
 	if (!data) return null
 
 	return (
-		<div className="rounded-md border bg-muted/30 p-4 space-y-4">
+		<div className="bg-muted/30 space-y-4 rounded-md border p-4">
 			<div className="flex items-center justify-between">
 				<h3 className="text-sm font-semibold">Pattern Analysis ({days}d window)</h3>
-				<div className="flex gap-3 text-xs text-muted-foreground">
-					<span>Total: <strong>{data.totalEventsInWindow}</strong></span>
-					<span>Pending: <strong className={data.pendingReviewCount > 0 ? "text-yellow-600" : ""}>{data.pendingReviewCount}</strong></span>
-					<span>Flagged: <strong className={data.flaggedCount > 0 ? "text-destructive" : ""}>{data.flaggedCount}</strong></span>
+				<div className="text-muted-foreground flex gap-3 text-xs">
+					<span>
+						Total: <strong>{data.totalEventsInWindow}</strong>
+					</span>
+					<span>
+						Pending:{" "}
+						<strong className={data.pendingReviewCount > 0 ? "text-yellow-600" : ""}>
+							{data.pendingReviewCount}
+						</strong>
+					</span>
+					<span>
+						Flagged:{" "}
+						<strong className={data.flaggedCount > 0 ? "text-destructive" : ""}>
+							{data.flaggedCount}
+						</strong>
+					</span>
 				</div>
 			</div>
 
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<div>
-					<p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+					<p className="text-muted-foreground mb-2 text-[11px] font-semibold tracking-wide uppercase">
 						Top Repeat Requesters
 					</p>
 					{data.topRepeatRequesters.length === 0 ? (
-						<p className="text-xs text-muted-foreground italic">No repeated access in this period</p>
+						<p className="text-muted-foreground text-xs italic">
+							No repeated access in this period
+						</p>
 					) : (
 						<ul className="space-y-1.5">
 							{data.topRepeatRequesters.slice(0, 5).map(r => (
-								<li key={r.clinicianStaffId} className="flex items-start justify-between gap-2 text-xs">
-									<span className="font-mono text-[10px] truncate max-w-[140px]" title={r.clinicianStaffId}>
+								<li
+									key={r.clinicianStaffId}
+									className="flex items-start justify-between gap-2 text-xs"
+								>
+									<span
+										className="max-w-[140px] truncate font-mono text-[10px]"
+										title={r.clinicianStaffId}
+									>
 										{r.clinicianStaffId.slice(0, 8)}…
 									</span>
 									<div className="flex gap-1.5 text-[10px]">
@@ -163,21 +220,28 @@ function PatternsPanel({ facilityId, days }: { facilityId: string; days: number 
 				</div>
 
 				<div>
-					<p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+					<p className="text-muted-foreground mb-2 text-[11px] font-semibold tracking-wide uppercase">
 						Most Accessed Patients
 					</p>
 					{data.topRepeatPatients.length === 0 ? (
-						<p className="text-xs text-muted-foreground italic">No repeated access in this period</p>
+						<p className="text-muted-foreground text-xs italic">
+							No repeated access in this period
+						</p>
 					) : (
 						<ul className="space-y-1.5">
 							{data.topRepeatPatients.slice(0, 5).map(p => (
 								<li key={p.patientId} className="flex items-start justify-between gap-2 text-xs">
-									<span className="font-mono text-[10px] truncate max-w-[140px]" title={p.patientId}>
+									<span
+										className="max-w-[140px] truncate font-mono text-[10px]"
+										title={p.patientId}
+									>
 										{p.patientId.slice(0, 8)}…
 									</span>
 									<div className="flex gap-1.5 text-[10px]">
 										<span>{p.eventCount} accesses</span>
-										<span className="text-muted-foreground">· {p.distinctClinicians} clinician(s)</span>
+										<span className="text-muted-foreground">
+											· {p.distinctClinicians} clinician(s)
+										</span>
 										{p.flaggedCount > 0 && (
 											<span className="text-destructive">· {p.flaggedCount} flagged</span>
 										)}
@@ -199,7 +263,11 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 	const [showPatterns, setShowPatterns] = useState(false)
 	const [patternsDays, setPatternsDays] = useState(30)
 	const [page, setPage] = useState(1)
-	const { data, isLoading: loading, error } = useBreakGlassEventsQuery({
+	const {
+		data,
+		isLoading: loading,
+		error,
+	} = useBreakGlassEventsQuery({
 		facilityId,
 		reviewStatus: statusFilter === "all" ? undefined : statusFilter,
 		dateFrom: dateFrom || undefined,
@@ -237,7 +305,8 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 			},
 			{
 				onSuccess: () => setReviewDialog({ open: false, eventId: "", clinicianStaffId: "" }),
-				onError: err => setReviewError(err instanceof Error ? err.message : "Failed to submit review"),
+				onError: err =>
+					setReviewError(err instanceof Error ? err.message : "Failed to submit review"),
 			}
 		)
 	}, [reviewMutation, reviewDialog.eventId, reviewStatus, reviewNotes])
@@ -267,7 +336,10 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 									onClick={() =>
 										exportMutation.mutate({
 											facilityId,
-											reviewStatus: statusFilter === "all" ? undefined : (statusFilter as "pending" | "appropriate" | "flagged"),
+											reviewStatus:
+												statusFilter === "all"
+													? undefined
+													: (statusFilter as "pending" | "appropriate" | "flagged"),
 											dateFrom: dateFrom || undefined,
 											dateTo: dateTo || undefined,
 										})
@@ -288,7 +360,7 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 						{showPatterns && (
 							<div className="mb-1">
 								<div className="mb-2 flex items-center gap-2">
-									<span className="text-xs text-muted-foreground">Analysis window:</span>
+									<span className="text-muted-foreground text-xs">Analysis window:</span>
 									{[7, 14, 30, 60, 90].map(d => (
 										<button
 											key={d}
@@ -326,18 +398,24 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 								<Label className="text-xs">From</Label>
 								<Input
 									type="date"
-									className="w-36 text-xs h-9"
+									className="h-9 w-36 text-xs"
 									value={dateFrom}
-									onChange={e => { setDateFrom(e.target.value); setPage(1) }}
+									onChange={e => {
+										setDateFrom(e.target.value)
+										setPage(1)
+									}}
 								/>
 							</div>
 							<div className="flex flex-col gap-1">
 								<Label className="text-xs">To</Label>
 								<Input
 									type="date"
-									className="w-36 text-xs h-9"
+									className="h-9 w-36 text-xs"
 									value={dateTo}
-									onChange={e => { setDateTo(e.target.value); setPage(1) }}
+									onChange={e => {
+										setDateTo(e.target.value)
+										setPage(1)
+									}}
 								/>
 							</div>
 							{(dateFrom || dateTo) && (
@@ -345,7 +423,11 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 									variant="ghost"
 									size="sm"
 									className="text-xs"
-									onClick={() => { setDateFrom(""); setDateTo(""); setPage(1) }}
+									onClick={() => {
+										setDateFrom("")
+										setDateTo("")
+										setPage(1)
+									}}
 								>
 									Clear dates
 								</Button>
@@ -377,7 +459,7 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 							<TableBody>
 								{loading && !data && (
 									<TableRow>
-										<TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+										<TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
 											Loading...
 										</TableCell>
 									</TableRow>
@@ -387,10 +469,10 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 									<>
 										<TableRow
 											key={event.id}
-											className="cursor-pointer hover:bg-muted/50"
+											className="hover:bg-muted/50 cursor-pointer"
 											onClick={() => toggleExpand(event.id)}
 										>
-											<TableCell className="w-8 text-muted-foreground">
+											<TableCell className="text-muted-foreground w-8">
 												{expandedId === event.id ? (
 													<ChevronDown className="size-4" />
 												) : (
@@ -403,9 +485,7 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 											<TableCell className="max-w-28 truncate text-xs">
 												{event.clinicianStaffId}
 											</TableCell>
-											<TableCell className="max-w-28 truncate text-xs">
-												{event.patientId}
-											</TableCell>
+											<TableCell className="max-w-28 truncate text-xs">{event.patientId}</TableCell>
 											<TableCell className="text-xs capitalize">
 												{event.reasonCategory.replace(/_/g, " ")}
 											</TableCell>
@@ -448,7 +528,7 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 
 								{data?.data.length === 0 && (
 									<TableRow>
-										<TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+										<TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
 											No break-glass events found.
 										</TableCell>
 									</TableRow>
@@ -459,7 +539,7 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 
 					{data && data.totalPages > 1 && (
 						<div className="mt-4 flex items-center justify-between">
-							<p className="text-sm text-muted-foreground">
+							<p className="text-muted-foreground text-sm">
 								Page {data.page} of {data.totalPages} ({data.total} total)
 							</p>
 							<div className="flex gap-2">
@@ -496,14 +576,20 @@ export function BreakGlassReviewTable({ facilityId }: BreakGlassReviewTableProps
 					<DialogHeader>
 						<DialogTitle>Review Break-Glass Event</DialogTitle>
 						<DialogDescription>
-							Review this emergency override access and mark it as appropriate or flagged for follow-up.
+							Review this emergency override access and mark it as appropriate or flagged for
+							follow-up.
 						</DialogDescription>
 					</DialogHeader>
 
 					<div className="space-y-4 py-2">
 						<div className="space-y-2">
 							<Label>Review Decision</Label>
-							<Select value={reviewStatus} onValueChange={v => { if (v) setReviewStatus(v as "appropriate" | "flagged") }}>
+							<Select
+								value={reviewStatus}
+								onValueChange={v => {
+									if (v) setReviewStatus(v as "appropriate" | "flagged")
+								}}
+							>
 								<SelectTrigger>
 									<SelectValue />
 								</SelectTrigger>

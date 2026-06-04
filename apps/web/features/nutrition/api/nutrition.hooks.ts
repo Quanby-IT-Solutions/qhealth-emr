@@ -19,9 +19,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 	return res.json() as Promise<T>
 }
 
-function buildQueryString(
-	params: Record<string, string | number | boolean | undefined>
-): string {
+function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
 	if (entries.length === 0) return ""
 	return `?${entries
@@ -138,15 +136,11 @@ export interface DietOrderListResponse {
 
 export const nutritionKeys = {
 	all: ["nutrition"] as const,
-	assessments: (encounterId: string) =>
-		[...nutritionKeys.all, "assessments", encounterId] as const,
+	assessments: (encounterId: string) => [...nutritionKeys.all, "assessments", encounterId] as const,
 	assessment: (id: string) => [...nutritionKeys.all, "assessment", id] as const,
-	mealPlan: (encounterId: string) =>
-		[...nutritionKeys.all, "meal-plan", encounterId] as const,
-	dietOrders: (encounterId: string) =>
-		[...nutritionKeys.all, "diet-orders", encounterId] as const,
-	worklist: (facilityId: string) =>
-		[...nutritionKeys.all, "worklist", facilityId] as const,
+	mealPlan: (encounterId: string) => [...nutritionKeys.all, "meal-plan", encounterId] as const,
+	dietOrders: (encounterId: string) => [...nutritionKeys.all, "diet-orders", encounterId] as const,
+	worklist: (facilityId: string) => [...nutritionKeys.all, "worklist", facilityId] as const,
 }
 
 // ============================================================================
@@ -187,7 +181,7 @@ export function useCreateNutritionAssessmentMutation() {
 				method: "POST",
 				body: JSON.stringify(input),
 			}),
-		onSuccess: (data) => {
+		onSuccess: data => {
 			void qc.invalidateQueries({
 				queryKey: nutritionKeys.assessments(data.encounterId),
 			})
@@ -221,7 +215,7 @@ export function useSaveMealPlanMutation() {
 					body: JSON.stringify(input),
 				}
 			),
-		onSuccess: (data) => {
+		onSuccess: data => {
 			void qc.invalidateQueries({
 				queryKey: nutritionKeys.mealPlan(data.encounterId),
 			})
@@ -278,12 +272,14 @@ export function useNutritionWorklistQuery(
 export function useCreateDietOrderMutation() {
 	const qc = useQueryClient()
 	return useMutation({
-		mutationFn: (input: Omit<DietOrder, "id" | "orderedBy" | "orderedByName" | "orderedAt" | "status">) =>
+		mutationFn: (
+			input: Omit<DietOrder, "id" | "orderedBy" | "orderedByName" | "orderedAt" | "status">
+		) =>
 			fetchJson<DietOrder>(`${API_BASE}/diet-orders`, {
 				method: "POST",
 				body: JSON.stringify(input),
 			}),
-		onSuccess: (data) => {
+		onSuccess: data => {
 			void qc.invalidateQueries({
 				queryKey: nutritionKeys.dietOrders(data.encounterId),
 			})
@@ -299,7 +295,7 @@ export function useDiscontinueDietOrderMutation() {
 				method: "POST",
 				body: JSON.stringify({}),
 			}),
-		onSuccess: (data) => {
+		onSuccess: data => {
 			void qc.invalidateQueries({
 				queryKey: nutritionKeys.dietOrders(data.encounterId),
 			})
@@ -320,7 +316,12 @@ export interface ScreeningScoreResult {
 }
 
 export type ScreeningScoreInput =
-	| { tool: "nrs_2002"; nutritionalImpairmentScore: number; severityOfDiseaseScore: number; age: number }
+	| {
+			tool: "nrs_2002"
+			nutritionalImpairmentScore: number
+			severityOfDiseaseScore: number
+			age: number
+	  }
 	| { tool: "must"; bmiScore: number; weightLossScore: number; acuteDiseaseEffect: number }
 	| { tool: "sga"; rating: "A" | "B" | "C" }
 

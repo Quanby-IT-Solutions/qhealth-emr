@@ -24,9 +24,9 @@ import {
 	TableRow,
 } from "@/core/components/ui/table"
 import {
-	useSurveillanceFlagsQuery,
 	usePidsrCasesQuery,
 	useSubmitPidsrCaseMutation,
+	useSurveillanceFlagsQuery,
 } from "@/features/reporting/api/reporting.hooks"
 import { PidsrCaseDetail } from "@/features/reporting/components/pidsr-case-detail"
 
@@ -40,10 +40,8 @@ function formatDate(d: string | null | undefined) {
 }
 
 function categoryBadge(cat: string | null | undefined) {
-	if (cat === "category_1")
-		return <Badge variant="destructive">Cat 1 — Immediate</Badge>
-	if (cat === "category_2")
-		return <Badge variant="outline">Cat 2 — Weekly</Badge>
+	if (cat === "category_1") return <Badge variant="destructive">Cat 1 — Immediate</Badge>
+	if (cat === "category_2") return <Badge variant="outline">Cat 2 — Weekly</Badge>
 	return <Badge variant="secondary">—</Badge>
 }
 
@@ -64,10 +62,22 @@ function Cat1Countdown({ createdAt }: { createdAt: string }) {
 	const info = useCountdown(createdAt)
 	if (!info) return null
 	if (info.hoursLeft <= 0)
-		return <Badge variant="destructive" className="text-xs">Overdue</Badge>
+		return (
+			<Badge variant="destructive" className="text-xs">
+				Overdue
+			</Badge>
+		)
 	if (info.isUrgent)
-		return <Badge variant="destructive" className="text-xs">{info.hoursLeft}h left</Badge>
-	return <Badge variant="outline" className="text-xs">{info.hoursLeft}h left</Badge>
+		return (
+			<Badge variant="destructive" className="text-xs">
+				{info.hoursLeft}h left
+			</Badge>
+		)
+	return (
+		<Badge variant="outline" className="text-xs">
+			{info.hoursLeft}h left
+		</Badge>
+	)
 }
 
 interface PidsrDashboardProps {
@@ -96,26 +106,42 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 		router.replace(`?${params.toString()}`, { scroll: false })
 	}
 
-	function setTab(value: "flags" | "cases") { updateParam("tab", value === "flags" ? "" : value) }
-	function setFlagPage(fn: (p: number) => number) { updateParam("flagPage", String(fn(flagPage))) }
-	function setCasePage(fn: (p: number) => number) { updateParam("casePage", String(fn(casePage))) }
-	function setReviewFilter(v: string) { updateParam("reviewed", v) }
-	function setCategoryFilter(v: string) { updateParam("category", v) }
-	function setCaseStatusFilter(v: string) { updateParam("status", v) }
+	function setTab(value: "flags" | "cases") {
+		updateParam("tab", value === "flags" ? "" : value)
+	}
+	function setFlagPage(fn: (p: number) => number) {
+		updateParam("flagPage", String(fn(flagPage)))
+	}
+	function setCasePage(fn: (p: number) => number) {
+		updateParam("casePage", String(fn(casePage)))
+	}
+	function setReviewFilter(v: string) {
+		updateParam("reviewed", v)
+	}
+	function setCategoryFilter(v: string) {
+		updateParam("category", v)
+	}
+	function setCaseStatusFilter(v: string) {
+		updateParam("status", v)
+	}
 
 	const flagsQuery = useSurveillanceFlagsQuery({
 		facilityId,
 		page: flagPage,
 		limit: 20,
 		isReviewed: reviewFilter === "all" ? undefined : reviewFilter === "true",
-		category: categoryFilter === "all" ? undefined : (categoryFilter as "category_1" | "category_2"),
+		category:
+			categoryFilter === "all" ? undefined : (categoryFilter as "category_1" | "category_2"),
 	})
 
 	const casesQuery = usePidsrCasesQuery({
 		facilityId,
 		page: casePage,
 		limit: 20,
-		reportStatus: caseStatusFilter === "all" ? undefined : (caseStatusFilter as "draft" | "submitted" | "rejected" | "blocked"),
+		reportStatus:
+			caseStatusFilter === "all"
+				? undefined
+				: (caseStatusFilter as "draft" | "submitted" | "rejected" | "blocked"),
 	})
 
 	const submitMut = useSubmitPidsrCaseMutation()
@@ -124,7 +150,7 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 	const cases = casesQuery.data?.cases ?? []
 
 	// Count unreviewed cat1 flags for alert
-	const unreviewed = flags.filter((f) => !f.isReviewed && f.category === "category_1").length
+	const unreviewed = flags.filter(f => !f.isReviewed && f.category === "category_1").length
 
 	return (
 		<div className="space-y-4">
@@ -133,8 +159,8 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 				<div className="flex items-center gap-3 rounded-md border border-red-300 bg-red-50 px-4 py-3">
 					<Badge variant="destructive">Alert</Badge>
 					<span className="text-sm font-medium text-red-800">
-						{unreviewed} Category 1 surveillance flag{unreviewed > 1 ? "s" : ""} require
-						immediate review and reporting.
+						{unreviewed} Category 1 surveillance flag{unreviewed > 1 ? "s" : ""} require immediate
+						review and reporting.
 					</span>
 				</div>
 			)}
@@ -175,7 +201,7 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 							<div className="flex gap-2">
 								<Select
 									value={reviewFilter}
-									onValueChange={(v) => {
+									onValueChange={v => {
 										if (v) setReviewFilter(v)
 									}}
 								>
@@ -190,7 +216,7 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 								</Select>
 								<Select
 									value={categoryFilter}
-									onValueChange={(v) => {
+									onValueChange={v => {
 										if (v) setCategoryFilter(v)
 									}}
 								>
@@ -225,7 +251,7 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{flags.map((flag) => (
+										{flags.map(flag => (
 											<TableRow key={flag.id}>
 												<TableCell>
 													<div className="font-medium">{flag.patientName ?? "—"}</div>
@@ -248,13 +274,13 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 															{flag.flagType === "icd10_match" ? "ICD-10" : "Keyword"}
 														</Badge>
 														{flag.triggeredBy && (
-															<span className="text-xs text-muted-foreground font-mono">{flag.triggeredBy}</span>
+															<span className="text-muted-foreground font-mono text-xs">
+																{flag.triggeredBy}
+															</span>
 														)}
 													</div>
 												</TableCell>
-												<TableCell className="text-sm">
-													{formatDate(flag.createdAt)}
-												</TableCell>
+												<TableCell className="text-sm">{formatDate(flag.createdAt)}</TableCell>
 												<TableCell>
 													{flag.isReviewed ? (
 														<Badge variant="default">Reviewed</Badge>
@@ -272,7 +298,7 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 											size="sm"
 											variant="outline"
 											disabled={flagPage <= 1}
-											onClick={() => setFlagPage((p) => p - 1)}
+											onClick={() => setFlagPage(p => p - 1)}
 										>
 											Previous
 										</Button>
@@ -283,7 +309,7 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 											size="sm"
 											variant="outline"
 											disabled={flagPage >= (flagsQuery.data?.totalPages ?? 1)}
-											onClick={() => setFlagPage((p) => p + 1)}
+											onClick={() => setFlagPage(p => p + 1)}
 										>
 											Next
 										</Button>
@@ -302,7 +328,7 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 							<CardTitle>PIDSR Cases</CardTitle>
 							<Select
 								value={caseStatusFilter}
-								onValueChange={(v) => {
+								onValueChange={v => {
 									if (v) setCaseStatusFilter(v)
 								}}
 							>
@@ -336,13 +362,11 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{cases.map((c) => (
+										{cases.map(c => (
 											<TableRow key={c.id}>
 												<TableCell>
 													<div className="font-medium">{c.patientName ?? "—"}</div>
-													<div className="text-muted-foreground text-xs">
-														{c.patientMrn ?? ""}
-													</div>
+													<div className="text-muted-foreground text-xs">{c.patientMrn ?? ""}</div>
 												</TableCell>
 												<TableCell>
 													<div>{c.diseaseName}</div>
@@ -371,7 +395,7 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 														<Link
 															href={`/surveillance/pidsr/${c.id}`}
 															title="Open submission page"
-															className="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+															className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex items-center justify-center rounded-md p-1"
 														>
 															<ExternalLink className="size-3.5" />
 														</Link>
@@ -396,7 +420,7 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 											size="sm"
 											variant="outline"
 											disabled={casePage <= 1}
-											onClick={() => setCasePage((p) => p - 1)}
+											onClick={() => setCasePage(p => p - 1)}
 										>
 											Previous
 										</Button>
@@ -407,7 +431,7 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 											size="sm"
 											variant="outline"
 											disabled={casePage >= (casesQuery.data?.totalPages ?? 1)}
-											onClick={() => setCasePage((p) => p + 1)}
+											onClick={() => setCasePage(p => p + 1)}
 										>
 											Next
 										</Button>
@@ -420,10 +444,7 @@ export function PidsrDashboard({ facilityId }: PidsrDashboardProps) {
 			)}
 
 			{selectedCaseId && (
-				<PidsrCaseDetail
-					caseId={selectedCaseId}
-					onClose={() => setSelectedCaseId(null)}
-				/>
+				<PidsrCaseDetail caseId={selectedCaseId} onClose={() => setSelectedCaseId(null)} />
 			)}
 		</div>
 	)

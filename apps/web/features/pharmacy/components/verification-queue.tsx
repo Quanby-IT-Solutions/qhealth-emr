@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { AlertTriangle, ChevronRight, Filter, RefreshCw, Search, ShieldAlert } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -9,24 +8,40 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 import {
+	usePharmacyQueueQuery,
 	type OrderPriority,
 	type PharmacyQueueItem,
 	type QueueStatus,
-	usePharmacyQueueQuery,
 } from "../api/pharmacy.hooks"
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function priorityBadge(priority: OrderPriority) {
-	if (priority === "stat")
-		return <Badge variant="destructive">STAT</Badge>
+	if (priority === "stat") return <Badge variant="destructive">STAT</Badge>
 	if (priority === "urgent")
-		return <Badge variant="secondary" className="border-amber-400 text-amber-700">Urgent</Badge>
+		return (
+			<Badge variant="secondary" className="border-amber-400 text-amber-700">
+				Urgent
+			</Badge>
+		)
 	return <Badge variant="outline">Routine</Badge>
 }
 
@@ -76,10 +91,7 @@ function QueueRow({ item, onReview }: QueueRowProps) {
 	const waitMinutes = minutesSince(item.receivedAt)
 
 	return (
-		<TableRow
-			className="cursor-pointer hover:bg-muted/50"
-			onClick={() => onReview(item.id)}
-		>
+		<TableRow className="hover:bg-muted/50 cursor-pointer" onClick={() => onReview(item.id)}>
 			<TableCell>
 				<div>
 					<p className="font-medium">{item.patientName}</p>
@@ -92,9 +104,7 @@ function QueueRow({ item, onReview }: QueueRowProps) {
 			<TableCell>
 				<div>
 					<p className="text-sm font-medium">{item.genericName}</p>
-					{item.brandName && (
-						<p className="text-muted-foreground text-xs">({item.brandName})</p>
-					)}
+					{item.brandName && <p className="text-muted-foreground text-xs">({item.brandName})</p>}
 					<p className="text-muted-foreground text-xs">
 						{item.dose} {item.doseUnit} · {item.route} · {item.frequency}
 					</p>
@@ -116,9 +126,7 @@ function QueueRow({ item, onReview }: QueueRowProps) {
 							{item.alertCount} alert{item.alertCount > 1 ? "s" : ""}
 						</span>
 					)}
-					{item.alertCount === 0 && (
-						<span className="text-muted-foreground text-xs">None</span>
-					)}
+					{item.alertCount === 0 && <span className="text-muted-foreground text-xs">None</span>}
 				</div>
 			</TableCell>
 			<TableCell>
@@ -130,11 +138,11 @@ function QueueRow({ item, onReview }: QueueRowProps) {
 				<div>
 					<p className="text-xs">{formatTime(item.receivedAt)}</p>
 					{waitMinutes >= 60 && (
-						<p className="text-xs text-amber-600">{Math.floor(waitMinutes / 60)}h {waitMinutes % 60}m wait</p>
+						<p className="text-xs text-amber-600">
+							{Math.floor(waitMinutes / 60)}h {waitMinutes % 60}m wait
+						</p>
 					)}
-					{waitMinutes < 60 && (
-						<p className="text-muted-foreground text-xs">{waitMinutes}m ago</p>
-					)}
+					{waitMinutes < 60 && <p className="text-muted-foreground text-xs">{waitMinutes}m ago</p>}
 				</div>
 			</TableCell>
 			{item.isControlledSubstance && (
@@ -149,7 +157,7 @@ function QueueRow({ item, onReview }: QueueRowProps) {
 				<Button
 					size="sm"
 					variant="ghost"
-					onClick={(e) => {
+					onClick={e => {
 						e.stopPropagation()
 						onReview(item.id)
 					}}
@@ -203,13 +211,13 @@ export function VerificationQueue({ onSelectOrder }: VerificationQueueProps) {
 							Search patient or drug
 						</Label>
 						<div className="relative">
-							<Search className="text-muted-foreground absolute left-2.5 top-2.5 size-4" />
+							<Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
 							<Input
 								id="qSearch"
 								className="pl-8"
 								placeholder="Name, MRN, or drug name…"
 								value={search}
-								onChange={(e) => setSearch(e.target.value)}
+								onChange={e => setSearch(e.target.value)}
 							/>
 						</div>
 					</div>
@@ -218,7 +226,7 @@ export function VerificationQueue({ onSelectOrder }: VerificationQueueProps) {
 						<Label className="mb-1 block text-sm">Status</Label>
 						<Select
 							value={statusFilter}
-							onValueChange={(v) => setStatusFilter(v as QueueStatus | "all")}
+							onValueChange={v => setStatusFilter(v as QueueStatus | "all")}
 						>
 							<SelectTrigger className="w-40">
 								<SelectValue />
@@ -237,7 +245,7 @@ export function VerificationQueue({ onSelectOrder }: VerificationQueueProps) {
 						<Label className="mb-1 block text-sm">Priority</Label>
 						<Select
 							value={priorityFilter}
-							onValueChange={(v) => setPriorityFilter(v as OrderPriority | "all")}
+							onValueChange={v => setPriorityFilter(v as OrderPriority | "all")}
 						>
 							<SelectTrigger className="w-32">
 								<SelectValue />
@@ -257,7 +265,7 @@ export function VerificationQueue({ onSelectOrder }: VerificationQueueProps) {
 							<input
 								type="checkbox"
 								checked={csOnly}
-								onChange={(e) => setCsOnly(e.target.checked)}
+								onChange={e => setCsOnly(e.target.checked)}
 								className="accent-primary"
 							/>
 							Controlled only
@@ -279,20 +287,17 @@ export function VerificationQueue({ onSelectOrder }: VerificationQueueProps) {
 
 			{/* Stats strip */}
 			<div className="flex flex-wrap gap-3">
-				{(["stat", "urgent", "routine"] as const).map((p) => {
-					const count = items.filter((i) => i.priority === p).length
+				{(["stat", "urgent", "routine"] as const).map(p => {
+					const count = items.filter(i => i.priority === p).length
 					if (count === 0) return null
 					return (
 						<div key={p} className="text-sm">
-							{priorityBadge(p)}{" "}
-							<span className="font-medium">{count}</span>
+							{priorityBadge(p)} <span className="font-medium">{count}</span>
 						</div>
 					)
 				})}
 				{queue.data && (
-					<p className="text-muted-foreground text-sm">
-						Total: {queue.data.total} orders
-					</p>
+					<p className="text-muted-foreground text-sm">Total: {queue.data.total} orders</p>
 				)}
 			</div>
 
@@ -326,7 +331,7 @@ export function VerificationQueue({ onSelectOrder }: VerificationQueueProps) {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{sorted.map((item) => (
+								{sorted.map(item => (
 									<QueueRow key={item.id} item={item} onReview={onSelectOrder} />
 								))}
 							</TableBody>

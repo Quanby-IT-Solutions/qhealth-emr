@@ -20,7 +20,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
-import { useHaiReportQuery, useHaiCasesQuery } from "@/features/reporting/api/reporting.hooks"
+import { useHaiCasesQuery, useHaiReportQuery } from "@/features/reporting/api/reporting.hooks"
 
 function formatDate(d: string | null | undefined) {
 	if (!d) return "—"
@@ -93,7 +93,7 @@ export function HaiReport({ facilityId }: HaiReportProps) {
 						<div className="flex gap-2">
 							<Select
 								value={String(year)}
-								onValueChange={(v) => {
+								onValueChange={v => {
 									if (v) setYear(Number(v))
 								}}
 							>
@@ -101,7 +101,7 @@ export function HaiReport({ facilityId }: HaiReportProps) {
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{[currentYear, currentYear - 1, currentYear - 2].map((y) => (
+									{[currentYear, currentYear - 1, currentYear - 2].map(y => (
 										<SelectItem key={y} value={String(y)}>
 											{y}
 										</SelectItem>
@@ -110,7 +110,7 @@ export function HaiReport({ facilityId }: HaiReportProps) {
 							</Select>
 							<Select
 								value={month}
-								onValueChange={(v) => {
+								onValueChange={v => {
 									if (v) setMonth(v)
 								}}
 							>
@@ -118,7 +118,7 @@ export function HaiReport({ facilityId }: HaiReportProps) {
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{months.map((m) => (
+									{months.map(m => (
 										<SelectItem key={m.value} value={m.value}>
 											{m.label}
 										</SelectItem>
@@ -175,12 +175,10 @@ export function HaiReport({ facilityId }: HaiReportProps) {
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{report.byType.map((h) => (
+										{report.byType.map(h => (
 											<TableRow
 												key={h.haiType}
-												className={
-													selectedType === h.haiType ? "bg-muted/50" : ""
-												}
+												className={selectedType === h.haiType ? "bg-muted/50" : ""}
 											>
 												<TableCell>
 													<div className="font-medium uppercase">{h.haiType}</div>
@@ -193,7 +191,7 @@ export function HaiReport({ facilityId }: HaiReportProps) {
 												<TableCell className="text-right">
 													{h.trend.length > 0 ? (
 														<span className="text-muted-foreground text-xs">
-															{h.trend.map((t) => t.count).join(" → ")}
+															{h.trend.map(t => t.count).join(" → ")}
 														</span>
 													) : (
 														<span className="text-muted-foreground text-xs">—</span>
@@ -204,9 +202,7 @@ export function HaiReport({ facilityId }: HaiReportProps) {
 														size="sm"
 														variant={selectedType === h.haiType ? "default" : "ghost"}
 														onClick={() => {
-															setSelectedType(
-																selectedType === h.haiType ? null : h.haiType
-															)
+															setSelectedType(selectedType === h.haiType ? null : h.haiType)
 															setCasePage(1)
 														}}
 													>
@@ -222,38 +218,39 @@ export function HaiReport({ facilityId }: HaiReportProps) {
 					</Card>
 
 					{/* Trend table for selected type */}
-					{selectedType && (() => {
-						const typeData = report.byType.find((h) => h.haiType === selectedType)
-						return typeData && typeData.trend.length > 0 ? (
-							<Card>
-								<CardHeader>
-									<CardTitle>
-										{HAI_LABELS[selectedType] ?? selectedType.toUpperCase()} — Trend
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									<Table>
-										<TableHeader>
-											<TableRow>
-												<TableHead>Period</TableHead>
-												<TableHead className="text-right">Cases</TableHead>
-												<TableHead className="text-right">Rate</TableHead>
-											</TableRow>
-										</TableHeader>
-										<TableBody>
-											{typeData.trend.map((t) => (
-												<TableRow key={t.period}>
-													<TableCell>{t.period}</TableCell>
-													<TableCell className="text-right">{t.count}</TableCell>
-													<TableCell className="text-right">{t.rate.toFixed(2)}</TableCell>
+					{selectedType &&
+						(() => {
+							const typeData = report.byType.find(h => h.haiType === selectedType)
+							return typeData && typeData.trend.length > 0 ? (
+								<Card>
+									<CardHeader>
+										<CardTitle>
+											{HAI_LABELS[selectedType] ?? selectedType.toUpperCase()} — Trend
+										</CardTitle>
+									</CardHeader>
+									<CardContent>
+										<Table>
+											<TableHeader>
+												<TableRow>
+													<TableHead>Period</TableHead>
+													<TableHead className="text-right">Cases</TableHead>
+													<TableHead className="text-right">Rate</TableHead>
 												</TableRow>
-											))}
-										</TableBody>
-									</Table>
-								</CardContent>
-							</Card>
-						) : null
-					})()}
+											</TableHeader>
+											<TableBody>
+												{typeData.trend.map(t => (
+													<TableRow key={t.period}>
+														<TableCell>{t.period}</TableCell>
+														<TableCell className="text-right">{t.count}</TableCell>
+														<TableCell className="text-right">{t.rate.toFixed(2)}</TableCell>
+													</TableRow>
+												))}
+											</TableBody>
+										</Table>
+									</CardContent>
+								</Card>
+							) : null
+						})()}
 
 					{/* Cases list for selected type */}
 					{selectedType && (
@@ -281,13 +278,11 @@ export function HaiReport({ facilityId }: HaiReportProps) {
 												</TableRow>
 											</TableHeader>
 											<TableBody>
-												{casesQuery.data.cases.map((c) => (
+												{casesQuery.data.cases.map(c => (
 													<TableRow key={c.encounterId}>
 														<TableCell>
 															<div className="font-medium">{c.patientName}</div>
-															<div className="text-muted-foreground text-xs">
-																{c.patientMrn}
-															</div>
+															<div className="text-muted-foreground text-xs">{c.patientMrn}</div>
 														</TableCell>
 														<TableCell>
 															<Badge variant="secondary" className="uppercase">
@@ -307,7 +302,7 @@ export function HaiReport({ facilityId }: HaiReportProps) {
 													size="sm"
 													variant="outline"
 													disabled={casePage <= 1}
-													onClick={() => setCasePage((p) => p - 1)}
+													onClick={() => setCasePage(p => p - 1)}
 												>
 													Previous
 												</Button>
@@ -318,7 +313,7 @@ export function HaiReport({ facilityId }: HaiReportProps) {
 													size="sm"
 													variant="outline"
 													disabled={casePage >= casesQuery.data.totalPages}
-													onClick={() => setCasePage((p) => p + 1)}
+													onClick={() => setCasePage(p => p + 1)}
 												>
 													Next
 												</Button>

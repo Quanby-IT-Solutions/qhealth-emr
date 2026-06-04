@@ -3,8 +3,8 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { FpeEditorFlow } from "./fpe-editor-flow"
-import { getFpeValidation } from "./fpe-validation"
 import { EMPTY_FPE_DATA } from "./fpe-template"
+import { getFpeValidation } from "./fpe-validation"
 
 const mockUseCreateNoteMutation = vi.fn()
 const mockUseUpdateNoteMutation = vi.fn()
@@ -72,12 +72,7 @@ describe("FpeEditorFlow", () => {
 		const user = userEvent.setup()
 
 		render(
-			<FpeEditorFlow
-				encounterId="enc-1"
-				facilityId="fac-1"
-				onBack={vi.fn()}
-				onDone={vi.fn()}
-			/>
+			<FpeEditorFlow encounterId="enc-1" facilityId="fac-1" onBack={vi.fn()} onDone={vi.fn()} />
 		)
 
 		expect(screen.getByRole("button", { name: /save draft/i })).toBeDisabled()
@@ -143,12 +138,7 @@ describe("FpeEditorFlow", () => {
 
 	it("sanitizes FPE numeric, ICD-10, and clinical text inputs while typing", async () => {
 		render(
-			<FpeEditorFlow
-				encounterId="enc-1"
-				facilityId="fac-1"
-				onBack={vi.fn()}
-				onDone={vi.fn()}
-			/>
+			<FpeEditorFlow encounterId="enc-1" facilityId="fac-1" onBack={vi.fn()} onDone={vi.fn()} />
 		)
 
 		fireEvent.change(screen.getByPlaceholderText(/icd-10 code/i), {

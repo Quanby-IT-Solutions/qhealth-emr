@@ -5,7 +5,13 @@ import { ArrowRight01FreeIcons } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 
 import { Badge } from "@/core/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/core/components/ui/card"
 import { useHimQueueCounts } from "@/features/him/lib/him-queue-badges"
 
 export function HimDashboardPage() {
@@ -41,8 +47,9 @@ export function HimDashboardPage() {
 		<div className="space-y-6">
 			<div className="space-y-2">
 				<h1 className="text-2xl font-semibold tracking-tight">HIM Coder Console</h1>
-				<p className="text-sm text-muted-foreground">
-					Architecture landing page for deficiency tracking, coding, records issuance, and HAI reconciliation.
+				<p className="text-muted-foreground text-sm">
+					Architecture landing page for deficiency tracking, coding, records issuance, and HAI
+					reconciliation.
 				</p>
 			</div>
 
@@ -59,7 +66,10 @@ export function HimDashboardPage() {
 							</div>
 						</CardHeader>
 						<CardContent>
-							<Link href={card.href} className="inline-flex items-center gap-2 text-sm font-medium text-primary">
+							<Link
+								href={card.href}
+								className="text-primary inline-flex items-center gap-2 text-sm font-medium"
+							>
 								Open queue
 								<HugeiconsIcon icon={ArrowRight01FreeIcons} className="size-4" />
 							</Link>

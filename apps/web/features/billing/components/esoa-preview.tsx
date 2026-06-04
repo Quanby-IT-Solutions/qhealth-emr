@@ -1,18 +1,21 @@
 "use client"
 
-import { Loader2, Printer, Receipt, FileCheck } from "lucide-react"
+import { FileCheck, Loader2, Printer, Receipt } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Separator } from "@/core/components/ui/separator"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
-
 import {
-	useFinalizeSoaMutation,
-	useGenerateSoaMutation,
-	useSoaQuery,
-} from "../api/billing.hooks"
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
+
+import { useFinalizeSoaMutation, useGenerateSoaMutation, useSoaQuery } from "../api/billing.hooks"
 
 interface EsoaPreviewProps {
 	encounterId: string
@@ -49,7 +52,7 @@ export function EsoaPreview({ encounterId, facilityId, patientId }: EsoaPreviewP
 		return (
 			<Card>
 				<CardContent className="flex h-32 items-center justify-center">
-					<Loader2 className="size-5 animate-spin text-muted-foreground" />
+					<Loader2 className="text-muted-foreground size-5 animate-spin" />
 				</CardContent>
 			</Card>
 		)
@@ -97,9 +100,7 @@ export function EsoaPreview({ encounterId, facilityId, patientId }: EsoaPreviewP
 			<CardHeader className="flex flex-row items-center justify-between print:hidden">
 				<div className="flex items-center gap-2">
 					<CardTitle>eSOA — {soa.soaNumber}</CardTitle>
-					<Badge variant={soa.status === "final" ? "default" : "secondary"}>
-						{soa.status}
-					</Badge>
+					<Badge variant={soa.status === "final" ? "default" : "secondary"}>{soa.status}</Badge>
 				</div>
 				<div className="flex gap-2">
 					{soa.status === "draft" && (
@@ -148,9 +149,7 @@ export function EsoaPreview({ encounterId, facilityId, patientId }: EsoaPreviewP
 				{/* Charges by category */}
 				{Object.entries(grouped).map(([category, lines]) => (
 					<div key={category}>
-						<p className="mb-2 text-sm font-medium">
-							{CATEGORY_LABELS[category] ?? category}
-						</p>
+						<p className="mb-2 text-sm font-medium">{CATEGORY_LABELS[category] ?? category}</p>
 						<Table>
 							<TableHeader>
 								<TableRow>
@@ -161,7 +160,7 @@ export function EsoaPreview({ encounterId, facilityId, patientId }: EsoaPreviewP
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{lines.map((line) => (
+								{lines.map(line => (
 									<TableRow key={line.id}>
 										<TableCell className="text-sm">{line.description}</TableCell>
 										<TableCell className="text-right text-sm">{line.quantity}</TableCell>

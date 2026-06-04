@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { CheckCircle2, Loader2, Scale, Search } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -10,15 +9,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Separator } from "@/core/components/ui/separator"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 
 import {
-	type Cf5Assignment,
-	type DrgCode,
 	useApproveCf5Mutation,
 	useAssignDrgMutation,
 	useCf5AssignmentQuery,
 	useDrgSearchQuery,
+	type Cf5Assignment,
+	type DrgCode,
 } from "../api/billing.hooks"
 
 interface Cf5DrgProps {
@@ -36,10 +42,10 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 
 function Cf5Summary({ assignment }: { assignment: Cf5Assignment }) {
 	return (
-		<div className="rounded-md border p-4 space-y-3">
+		<div className="space-y-3 rounded-md border p-4">
 			<div className="flex items-center justify-between">
 				<div>
-					<p className="text-sm font-medium text-muted-foreground">DRG Code</p>
+					<p className="text-muted-foreground text-sm font-medium">DRG Code</p>
 					<p className="font-mono text-lg font-semibold">{assignment.drgCode}</p>
 				</div>
 				<Badge variant={STATUS_VARIANT[assignment.status] ?? "secondary"}>
@@ -54,7 +60,7 @@ function Cf5Summary({ assignment }: { assignment: Cf5Assignment }) {
 				</div>
 				<div>
 					<p className="text-muted-foreground">MDRG</p>
-					<p className="font-medium font-mono">{assignment.mdrg}</p>
+					<p className="font-mono font-medium">{assignment.mdrg}</p>
 				</div>
 				<div>
 					<p className="text-muted-foreground">DRG Weight</p>
@@ -62,26 +68,22 @@ function Cf5Summary({ assignment }: { assignment: Cf5Assignment }) {
 				</div>
 				<div>
 					<p className="text-muted-foreground">Computed Rate</p>
-					<p className="font-medium">₱{assignment.computedRate.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</p>
+					<p className="font-medium">
+						₱{assignment.computedRate.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+					</p>
 				</div>
 			</div>
 			{assignment.approvedBy && (
-				<p className="text-xs text-muted-foreground">
+				<p className="text-muted-foreground text-xs">
 					Approved by {assignment.approvedBy} on{" "}
-					{assignment.approvedAt
-						? new Date(assignment.approvedAt).toLocaleString("en-PH")
-						: "—"}
+					{assignment.approvedAt ? new Date(assignment.approvedAt).toLocaleString("en-PH") : "—"}
 				</p>
 			)}
 		</div>
 	)
 }
 
-function DrgPicker({
-	onSelect,
-}: {
-	onSelect: (drg: DrgCode) => void
-}) {
+function DrgPicker({ onSelect }: { onSelect: (drg: DrgCode) => void }) {
 	const [search, setSearch] = useState("")
 	const { data: results, isLoading } = useDrgSearchQuery(search)
 
@@ -89,15 +91,15 @@ function DrgPicker({
 		<div className="space-y-2">
 			<Label>Search DRG Code</Label>
 			<div className="relative">
-				<Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+				<Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
 				<Input
 					className="pl-9"
 					placeholder="Search by code or description (min 2 chars)…"
 					value={search}
-					onChange={(e) => setSearch(e.target.value)}
+					onChange={e => setSearch(e.target.value)}
 				/>
 			</div>
-			{isLoading && <p className="text-sm text-muted-foreground">Searching…</p>}
+			{isLoading && <p className="text-muted-foreground text-sm">Searching…</p>}
 			{results && results.length > 0 && (
 				<div className="max-h-60 overflow-y-auto rounded-md border">
 					<Table>
@@ -112,14 +114,12 @@ function DrgPicker({
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{results.map((drg) => (
+							{results.map(drg => (
 								<TableRow key={drg.code}>
 									<TableCell className="font-mono font-medium">{drg.code}</TableCell>
 									<TableCell className="text-sm">{drg.description}</TableCell>
 									<TableCell className="font-mono text-sm">{drg.mdrg}</TableCell>
-									<TableCell className="text-right text-sm">
-										{drg.weight.toFixed(3)}
-									</TableCell>
+									<TableCell className="text-right text-sm">{drg.weight.toFixed(3)}</TableCell>
 									<TableCell className="text-right text-sm">
 										₱{drg.baseRate.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
 									</TableCell>
@@ -142,7 +142,7 @@ function DrgPicker({
 				</div>
 			)}
 			{results && results.length === 0 && search.length >= 2 && (
-				<p className="text-sm text-muted-foreground">No DRG codes found.</p>
+				<p className="text-muted-foreground text-sm">No DRG codes found.</p>
 			)}
 		</div>
 	)
@@ -175,9 +175,7 @@ export function Cf5Drg({ encounterId, facilityId, patientId }: Cf5DrgProps) {
 				</p>
 			</CardHeader>
 			<CardContent className="space-y-4">
-				{isLoading && (
-					<p className="text-muted-foreground text-sm">Loading DRG assignment…</p>
-				)}
+				{isLoading && <p className="text-muted-foreground text-sm">Loading DRG assignment…</p>}
 
 				{!isLoading && assignment && (
 					<>
@@ -205,7 +203,7 @@ export function Cf5Drg({ encounterId, facilityId, patientId }: Cf5DrgProps) {
 						<DrgPicker onSelect={setSelectedDrg} />
 
 						{selectedDrg && (
-							<div className="rounded-md border bg-muted/50 p-4 space-y-2">
+							<div className="bg-muted/50 space-y-2 rounded-md border p-4">
 								<p className="text-sm font-medium">Selected DRG</p>
 								<div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
 									<div>
@@ -222,15 +220,14 @@ export function Cf5Drg({ encounterId, facilityId, patientId }: Cf5DrgProps) {
 									</div>
 									<div>
 										<span className="text-muted-foreground">Base Rate: </span>
-										<span>₱{selectedDrg.baseRate.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
+										<span>
+											₱{selectedDrg.baseRate.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+										</span>
 									</div>
 								</div>
 								<p className="text-sm">{selectedDrg.description}</p>
 								<div className="flex gap-2 pt-1">
-									<Button
-										onClick={handleAssign}
-										disabled={assignDrg.isPending}
-									>
+									<Button onClick={handleAssign} disabled={assignDrg.isPending}>
 										{assignDrg.isPending ? (
 											<Loader2 className="mr-1.5 size-4 animate-spin" />
 										) : null}

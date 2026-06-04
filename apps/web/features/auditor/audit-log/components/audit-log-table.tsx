@@ -1,9 +1,7 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react"
-
 import { useRouter, useSearchParams } from "next/navigation"
-
 import { useVirtualizer } from "@tanstack/react-virtual"
 
 import type { AuditorEventListFilter } from "@repo/contracts"
@@ -12,10 +10,23 @@ import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
-
-import { useAuditLogDetailQuery, useAuditLogsQuery } from "@/features/auditor/audit-log/api/audit-log.hooks"
-import { ACTION_COLORS, formatDateTime, OUTCOME_COLORS, SEVERITY_COLORS } from "@/features/auditor/audit-log/lib/audit-log.utils"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
+import {
+	useAuditLogDetailQuery,
+	useAuditLogsQuery,
+} from "@/features/auditor/audit-log/api/audit-log.hooks"
+import {
+	ACTION_COLORS,
+	formatDateTime,
+	OUTCOME_COLORS,
+	SEVERITY_COLORS,
+} from "@/features/auditor/audit-log/lib/audit-log.utils"
 
 import { ExportModal } from "./export-modal"
 
@@ -24,7 +35,16 @@ interface AuditLogTableProps {
 }
 
 const COL_WIDTHS = ["160px", "160px", "100px", "90px", "160px", "160px", "90px", "120px"]
-const COL_HEADERS = ["Timestamp", "User", "Action", "Severity", "Resource Type", "Resource ID", "Outcome", "IP"]
+const COL_HEADERS = [
+	"Timestamp",
+	"User",
+	"Action",
+	"Severity",
+	"Resource Type",
+	"Resource ID",
+	"Outcome",
+	"IP",
+]
 
 export function AuditLogTable({ facilityId }: AuditLogTableProps) {
 	const router = useRouter()
@@ -148,7 +168,9 @@ export function AuditLogTable({ facilityId }: AuditLogTableProps) {
 							onValueChange={v =>
 								setFilters(prev => ({
 									...prev,
-									severity: (!v || v === "all" ? undefined : v) as AuditorEventListFilter["severity"],
+									severity: (!v || v === "all"
+										? undefined
+										: v) as AuditorEventListFilter["severity"],
 									page: 1,
 								}))
 							}
@@ -186,7 +208,11 @@ export function AuditLogTable({ facilityId }: AuditLogTableProps) {
 							placeholder="Resource Type"
 							value={filters.resourceType ?? ""}
 							onChange={e =>
-								setFilters(prev => ({ ...prev, resourceType: e.target.value || undefined, page: 1 }))
+								setFilters(prev => ({
+									...prev,
+									resourceType: e.target.value || undefined,
+									page: 1,
+								}))
 							}
 						/>
 						<Button
@@ -220,7 +246,7 @@ export function AuditLogTable({ facilityId }: AuditLogTableProps) {
 					{/* Virtualized table */}
 					<div className="rounded-md border">
 						{/* Fixed header */}
-						<div className="flex border-b bg-muted/50 text-xs font-medium text-muted-foreground">
+						<div className="bg-muted/50 text-muted-foreground flex border-b text-xs font-medium">
 							{COL_HEADERS.map((h, i) => (
 								<div
 									key={h}
@@ -233,19 +259,23 @@ export function AuditLogTable({ facilityId }: AuditLogTableProps) {
 						</div>
 
 						{/* Scrollable body */}
-						<div ref={scrollRef} className="overflow-auto" style={{ height: rows.length === 0 ? "auto" : "600px" }}>
+						<div
+							ref={scrollRef}
+							className="overflow-auto"
+							style={{ height: rows.length === 0 ? "auto" : "600px" }}
+						>
 							{loading && !data && (
-								<div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>
+								<div className="text-muted-foreground py-8 text-center text-sm">Loading...</div>
 							)}
 
 							{data?.data.length === 0 && (
-								<div className="py-8 text-center text-sm text-muted-foreground">No audit logs found.</div>
+								<div className="text-muted-foreground py-8 text-center text-sm">
+									No audit logs found.
+								</div>
 							)}
 
 							{rows.length > 0 && (
-								<div
-									style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: "relative" }}
-								>
+								<div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: "relative" }}>
 									{rowVirtualizer.getVirtualItems().map(virtualRow => {
 										const log = rows[virtualRow.index]!
 										const isExpanded = expandedRow === log.id
@@ -264,58 +294,99 @@ export function AuditLogTable({ facilityId }: AuditLogTableProps) {
 												>
 													{/* Main row */}
 													<div
-														className="flex cursor-pointer items-center border-b text-xs hover:bg-muted/50"
+														className="hover:bg-muted/50 flex cursor-pointer items-center border-b text-xs"
 														onClick={() => handleRowClick(log.id)}
 													>
-														<div className="shrink-0 px-4 py-2.5" style={{ width: COL_WIDTHS[0], minWidth: COL_WIDTHS[0] }}>
+														<div
+															className="shrink-0 px-4 py-2.5"
+															style={{ width: COL_WIDTHS[0], minWidth: COL_WIDTHS[0] }}
+														>
 															{formatDateTime(log.createdAt)}
 														</div>
-														<div className="shrink-0 truncate px-4 py-2.5" style={{ width: COL_WIDTHS[1], minWidth: COL_WIDTHS[1] }}>
+														<div
+															className="shrink-0 truncate px-4 py-2.5"
+															style={{ width: COL_WIDTHS[1], minWidth: COL_WIDTHS[1] }}
+														>
 															{log.userId}
 														</div>
-														<div className="shrink-0 px-4 py-2.5" style={{ width: COL_WIDTHS[2], minWidth: COL_WIDTHS[2] }}>
-															<Badge variant="secondary" className={ACTION_COLORS[log.action] ?? ""}>
+														<div
+															className="shrink-0 px-4 py-2.5"
+															style={{ width: COL_WIDTHS[2], minWidth: COL_WIDTHS[2] }}
+														>
+															<Badge
+																variant="secondary"
+																className={ACTION_COLORS[log.action] ?? ""}
+															>
 																{log.action}
 															</Badge>
 														</div>
-														<div className="shrink-0 px-4 py-2.5" style={{ width: COL_WIDTHS[3], minWidth: COL_WIDTHS[3] }}>
-															<Badge variant="secondary" className={SEVERITY_COLORS[log.severity ?? "info"] ?? ""}>
+														<div
+															className="shrink-0 px-4 py-2.5"
+															style={{ width: COL_WIDTHS[3], minWidth: COL_WIDTHS[3] }}
+														>
+															<Badge
+																variant="secondary"
+																className={SEVERITY_COLORS[log.severity ?? "info"] ?? ""}
+															>
 																{log.severity ?? "info"}
 															</Badge>
 														</div>
-														<div className="shrink-0 px-4 py-2.5" style={{ width: COL_WIDTHS[4], minWidth: COL_WIDTHS[4] }}>
+														<div
+															className="shrink-0 px-4 py-2.5"
+															style={{ width: COL_WIDTHS[4], minWidth: COL_WIDTHS[4] }}
+														>
 															{log.entityType}
 														</div>
-														<div className="shrink-0 truncate px-4 py-2.5 font-mono" style={{ width: COL_WIDTHS[5], minWidth: COL_WIDTHS[5] }}>
+														<div
+															className="shrink-0 truncate px-4 py-2.5 font-mono"
+															style={{ width: COL_WIDTHS[5], minWidth: COL_WIDTHS[5] }}
+														>
 															{log.entityId}
 														</div>
-														<div className="shrink-0 px-4 py-2.5" style={{ width: COL_WIDTHS[6], minWidth: COL_WIDTHS[6] }}>
-															<Badge variant="secondary" className={OUTCOME_COLORS[log.outcome ?? "success"] ?? ""}>
+														<div
+															className="shrink-0 px-4 py-2.5"
+															style={{ width: COL_WIDTHS[6], minWidth: COL_WIDTHS[6] }}
+														>
+															<Badge
+																variant="secondary"
+																className={OUTCOME_COLORS[log.outcome ?? "success"] ?? ""}
+															>
 																{log.outcome ?? "success"}
 															</Badge>
 														</div>
-														<div className="shrink-0 px-4 py-2.5 font-mono" style={{ width: COL_WIDTHS[7], minWidth: COL_WIDTHS[7] }}>
+														<div
+															className="shrink-0 px-4 py-2.5 font-mono"
+															style={{ width: COL_WIDTHS[7], minWidth: COL_WIDTHS[7] }}
+														>
 															{log.ipAddress ?? "—"}
 														</div>
 													</div>
 
 													{/* Expanded detail */}
 													{isExpanded && (
-														<div className="border-b bg-muted/30 px-4 py-3">
+														<div className="bg-muted/30 border-b px-4 py-3">
 															{detailLoading ? (
-																<p className="text-sm text-muted-foreground">Loading detail...</p>
+																<p className="text-muted-foreground text-sm">Loading detail...</p>
 															) : detail ? (
 																<div className="grid grid-cols-2 gap-4">
 																	<div>
-																		<h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Before</h4>
+																		<h4 className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
+																			Before
+																		</h4>
 																		<pre className="max-h-40 overflow-auto rounded bg-red-50 p-2 text-xs dark:bg-red-900/20">
-																			{detail.beforeState ? JSON.stringify(detail.beforeState, null, 2) : "—"}
+																			{detail.beforeState
+																				? JSON.stringify(detail.beforeState, null, 2)
+																				: "—"}
 																		</pre>
 																	</div>
 																	<div>
-																		<h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">After</h4>
+																		<h4 className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
+																			After
+																		</h4>
 																		<pre className="max-h-40 overflow-auto rounded bg-green-50 p-2 text-xs dark:bg-green-900/20">
-																			{detail.afterState ? JSON.stringify(detail.afterState, null, 2) : "—"}
+																			{detail.afterState
+																				? JSON.stringify(detail.afterState, null, 2)
+																				: "—"}
 																		</pre>
 																	</div>
 																</div>
@@ -333,7 +404,7 @@ export function AuditLogTable({ facilityId }: AuditLogTableProps) {
 
 					{data && data.totalPages > 1 && (
 						<div className="mt-4 flex items-center justify-between">
-							<p className="text-sm text-muted-foreground">
+							<p className="text-muted-foreground text-sm">
 								Page {data.page} of {data.totalPages} ({data.total} total)
 							</p>
 							<div className="flex gap-2">

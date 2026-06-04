@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { format } from "date-fns"
 import { FileText } from "lucide-react"
 
@@ -15,7 +14,9 @@ import { NoteViewDialog } from "@/features/clinical-docs/components/note-view-di
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -23,7 +24,10 @@ function can(permSet: Set<string>, module: string, action: string) {
 }
 
 function getNotePreview(content: string) {
-	const plain = content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+	const plain = content
+		.replace(/<[^>]+>/g, " ")
+		.replace(/\s+/g, " ")
+		.trim()
 	if (!plain) return "No note content available."
 	return plain.length > 180 ? `${plain.slice(0, 180)}...` : plain
 }
@@ -36,7 +40,7 @@ export default function ClinicalDocsPage() {
 
 	if (!can(permSet, "clinical_docs", "view")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access clinical documents.
 			</div>
 		)
@@ -53,13 +57,13 @@ export default function ClinicalDocsPage() {
 
 			{notesQuery.isLoading ? (
 				<Card>
-					<CardContent className="py-12 text-center text-sm text-muted-foreground">
+					<CardContent className="text-muted-foreground py-12 text-center text-sm">
 						Loading clinical documents...
 					</CardContent>
 				</Card>
 			) : notesQuery.isError ? (
 				<Card>
-					<CardContent className="py-12 text-center text-sm text-destructive">
+					<CardContent className="text-destructive py-12 text-center text-sm">
 						Unable to load clinical documents.
 					</CardContent>
 				</Card>
@@ -99,15 +103,11 @@ export default function ClinicalDocsPage() {
 									</Button>
 								</div>
 								<div className="space-y-1">
-									<p className="text-sm font-medium">
-										{note.templateName ?? "Clinical Note"}
-									</p>
+									<p className="text-sm font-medium">{note.templateName ?? "Clinical Note"}</p>
 									{note.patientName && (
 										<p className="text-muted-foreground text-xs">Patient: {note.patientName}</p>
 									)}
-									<p className="text-muted-foreground text-sm">
-										{getNotePreview(note.content)}
-									</p>
+									<p className="text-muted-foreground text-sm">{getNotePreview(note.content)}</p>
 								</div>
 							</CardContent>
 						</Card>

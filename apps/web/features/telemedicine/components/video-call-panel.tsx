@@ -46,15 +46,12 @@ import { Separator } from "@/core/components/ui/separator"
 import {
 	formatAppointmentStatusLabel,
 	getPatientInviteUrl,
-	type TelemedicineAppointment,
 	useAppointmentQuery,
 	useRegeneratePatientInviteMutation,
 	useRevokePatientInviteMutation,
+	type TelemedicineAppointment,
 } from "@/features/telemedicine/api/telemedicine.hooks"
-import {
-	formatJoinWindowRange,
-	getJoinWindowState,
-} from "@/features/telemedicine/lib/join-window"
+import { formatJoinWindowRange, getJoinWindowState } from "@/features/telemedicine/lib/join-window"
 import { getVideoLaunchPath } from "@/features/telemedicine/lib/video-links"
 
 // ============================================================================
@@ -185,7 +182,7 @@ function CopyButton({
 		>
 			{isCopied ? (
 				<>
-					<Check className="size-3.5 text-success" />
+					<Check className="text-success size-3.5" />
 					Copied
 				</>
 			) : (
@@ -300,13 +297,14 @@ function VideoCallContent({
 		}
 	}
 
-	const mailtoHref = patientEmail && canSharePatientInvite && patientInviteUrl
-		? `mailto:${encodeURIComponent(patientEmail)}?subject=${encodeURIComponent(
-				"Your telemedicine consultation link"
-			)}&body=${encodeURIComponent(
-				`Hello ${currentAppt.patientName},\n\nPlease use this secure link to join your scheduled video consultation:\n\n${patientInviteUrl}\n\nYou will need your date of birth or MRN to verify your identity.\n\nThank you.`
-			)}`
-		: null
+	const mailtoHref =
+		patientEmail && canSharePatientInvite && patientInviteUrl
+			? `mailto:${encodeURIComponent(patientEmail)}?subject=${encodeURIComponent(
+					"Your telemedicine consultation link"
+				)}&body=${encodeURIComponent(
+					`Hello ${currentAppt.patientName},\n\nPlease use this secure link to join your scheduled video consultation:\n\n${patientInviteUrl}\n\nYou will need your date of birth or MRN to verify your identity.\n\nThank you.`
+				)}`
+			: null
 
 	return (
 		<div className="space-y-4">
@@ -347,7 +345,11 @@ function VideoCallContent({
 			<div className="flex flex-wrap gap-2">
 				{joinWindowState.kind === "open" ? (
 					<Button asChild className="rounded-full">
-						<Link href={getVideoLaunchPath(currentAppt.id)} target="_blank" rel="noopener noreferrer">
+						<Link
+							href={getVideoLaunchPath(currentAppt.id)}
+							target="_blank"
+							rel="noopener noreferrer"
+						>
 							<Video className="size-4" />
 							Open Clinician Room
 							<ExternalLink className="size-3.5" />
@@ -439,9 +441,9 @@ function VideoCallContent({
 				)}
 
 				{patientInviteUrl ? (
-					<div className="rounded-2xl border border-border/60 bg-white p-3">
+					<div className="border-border/60 rounded-2xl border bg-white p-3">
 						<div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-							<span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+							<span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 								Patient Join Link
 							</span>
 							<CopyButton
@@ -454,7 +456,7 @@ function VideoCallContent({
 								disabledMessage="Regenerate the expired invite before sharing."
 							/>
 						</div>
-						<p className="text-primary break-all text-sm underline underline-offset-2">
+						<p className="text-primary text-sm break-all underline underline-offset-2">
 							{patientInviteUrl}
 						</p>
 						{expiryState.tone === "danger" && (
@@ -489,14 +491,16 @@ function VideoCallContent({
 						</div>
 					</div>
 				) : (
-					<div className="text-muted-foreground rounded-2xl border border-border/60 p-3 text-sm">
+					<div className="text-muted-foreground border-border/60 rounded-2xl border p-3 text-sm">
 						<p>No invite has been generated yet.</p>
-						<p className="text-xs">Click <strong>Generate</strong> when you are ready to share access with the patient.</p>
+						<p className="text-xs">
+							Click <strong>Generate</strong> when you are ready to share access with the patient.
+						</p>
 					</div>
 				)}
 
 				<div className="grid gap-3 text-sm md:grid-cols-3">
-					<div className="rounded-2xl border border-border/60 p-3">
+					<div className="border-border/60 rounded-2xl border p-3">
 						<p className="text-muted-foreground mb-1 text-xs">Expires</p>
 						<p className="font-medium">{formatDateTime(currentAppt.patientInviteExpiresAt)}</p>
 						{expiryState.tone !== "neutral" && (
@@ -512,11 +516,11 @@ function VideoCallContent({
 							</Badge>
 						)}
 					</div>
-					<div className="rounded-2xl border border-border/60 p-3">
+					<div className="border-border/60 rounded-2xl border p-3">
 						<p className="text-muted-foreground mb-1 text-xs">Last Used</p>
 						<p className="font-medium">{formatDateTime(currentAppt.patientInviteLastUsedAt)}</p>
 					</div>
-					<div className="rounded-2xl border border-border/60 p-3">
+					<div className="border-border/60 rounded-2xl border p-3">
 						<p className="text-muted-foreground mb-1 text-xs">Patient Joined</p>
 						<p className="font-medium">{formatDateTime(currentAppt.patientJoinedAt)}</p>
 						{patientJoined && (
@@ -549,9 +553,7 @@ function VideoCallContent({
 								<Info className="text-primary size-4" />
 								Appointment Details
 							</DialogTitle>
-							<DialogDescription>
-								{currentAppt.patientName} video consultation
-							</DialogDescription>
+							<DialogDescription>{currentAppt.patientName} video consultation</DialogDescription>
 						</DialogHeader>
 						<div className="grid gap-3 sm:grid-cols-2">
 							<div>
@@ -605,8 +607,8 @@ function VideoCallContent({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Revoke patient invite?</AlertDialogTitle>
 						<AlertDialogDescription>
-							The patient will no longer be able to join with the current secure link. If they
-							still need access, you&apos;ll need to generate a fresh invite and share it again.
+							The patient will no longer be able to join with the current secure link. If they still
+							need access, you&apos;ll need to generate a fresh invite and share it again.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -636,9 +638,12 @@ export function VideoCallPanel({
 	onPatientInviteTokenChange,
 }: VideoCallPanelProps) {
 	const shouldFetch = !appointment && Boolean(appointmentId)
-	const { data: fetched, isLoading, error, refetch } = useAppointmentQuery(
-		shouldFetch ? (appointmentId ?? "") : ""
-	)
+	const {
+		data: fetched,
+		isLoading,
+		error,
+		refetch,
+	} = useAppointmentQuery(shouldFetch ? (appointmentId ?? "") : "")
 	const appt = appointment ?? fetched
 
 	return (

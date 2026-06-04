@@ -5,15 +5,28 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Input } from "@/core/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Skeleton } from "@/core/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import {
 	useDeactivateStaffMutation,
 	useListRolesQuery,
 	useListStaffQuery,
 } from "@/features/admin/api/admin.hooks"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 function UsersTableSkeletonRows() {
 	return (
@@ -55,7 +68,7 @@ export function UsersTable() {
 
 	function setParam(key: string, value: string) {
 		const params = new URLSearchParams(searchParams.toString())
-		if (value === "" || value === "all" || value === "1" && key === "page") {
+		if (value === "" || value === "all" || (value === "1" && key === "page")) {
 			params.delete(key)
 		} else {
 			params.set(key, value)
@@ -80,13 +93,12 @@ export function UsersTable() {
 	const totalPages = data ? Math.ceil(data.total / limit) : 1
 
 	// Client-side role filter (backend listStaff doesn't filter by role yet)
-	const filteredData = roleFilter === "all"
-		? data?.data
-		: data?.data.filter(user =>
-			user.staffProfiles.some(p =>
-				p.roles.some(r => r.id === roleFilter)
-			)
-		)
+	const filteredData =
+		roleFilter === "all"
+			? data?.data
+			: data?.data.filter(user =>
+					user.staffProfiles.some(p => p.roles.some(r => r.id === roleFilter))
+				)
 
 	return (
 		<div className="space-y-4">
@@ -97,10 +109,7 @@ export function UsersTable() {
 					onChange={e => setParam("search", e.target.value)}
 					className="max-w-xs"
 				/>
-				<Select
-					value={statusFilter}
-					onValueChange={v => setParam("status", v ?? "all")}
-				>
+				<Select value={statusFilter} onValueChange={v => setParam("status", v ?? "all")}>
 					<SelectTrigger className="w-36">
 						<SelectValue />
 					</SelectTrigger>
@@ -110,10 +119,7 @@ export function UsersTable() {
 						<SelectItem value="inactive">Inactive</SelectItem>
 					</SelectContent>
 				</Select>
-				<Select
-					value={roleFilter}
-					onValueChange={v => setParam("role", v ?? "all")}
-				>
+				<Select value={roleFilter} onValueChange={v => setParam("role", v ?? "all")}>
 					<SelectTrigger className="w-44">
 						<SelectValue />
 					</SelectTrigger>
@@ -187,9 +193,7 @@ export function UsersTable() {
 													variant="ghost"
 													size="sm"
 													className="text-destructive"
-													onClick={() =>
-														deactivateMutation.mutate({ id: activeProfile.id })
-													}
+													onClick={() => deactivateMutation.mutate({ id: activeProfile.id })}
 													disabled={deactivateMutation.isPending}
 												>
 													Deactivate

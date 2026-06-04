@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { ExternalLink, ShieldAlert } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -37,12 +36,7 @@ export function PacsLink({ orderId: _orderId, pacsUrl, modality, bodyPart }: Pac
 
 	return (
 		<>
-			<Button
-				variant="outline"
-				size="sm"
-				onClick={() => setConfirmOpen(true)}
-				className="gap-1.5"
-			>
+			<Button variant="outline" size="sm" onClick={() => setConfirmOpen(true)} className="gap-1.5">
 				<ExternalLink className="size-3.5" />
 				View in PACS
 			</Button>
@@ -59,8 +53,8 @@ export function PacsLink({ orderId: _orderId, pacsUrl, modality, bodyPart }: Pac
 							<strong>
 								{modality} — {bodyPart}
 							</strong>
-							. This will open in a new browser tab. Ensure you are on a secure,
-							authorized workstation before proceeding.
+							. This will open in a new browser tab. Ensure you are on a secure, authorized
+							workstation before proceeding.
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>

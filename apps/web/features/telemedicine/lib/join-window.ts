@@ -10,7 +10,10 @@ export type JoinWindowState =
 	| { kind: "closed"; startsAt: Date; endsAt: Date }
 	| { kind: "unavailable"; startsAt: Date | null; endsAt: Date | null }
 
-export function parseTelemedicineDateTime(scheduledDate: string, scheduledTime: string): Date | null {
+export function parseTelemedicineDateTime(
+	scheduledDate: string,
+	scheduledTime: string
+): Date | null {
 	const dateParts = scheduledDate.split("-").map(Number)
 	const timeParts = scheduledTime.split(":").map(Number)
 	const [year = NaN, month = NaN, day = NaN] = dateParts
@@ -25,13 +28,13 @@ export function parseTelemedicineDateTime(scheduledDate: string, scheduledTime: 
 		return null
 	}
 
-	const value = new Date(
-		Date.UTC(year, month - 1, day, hour, minute - PH_OFFSET_MINUTES, second)
-	)
+	const value = new Date(Date.UTC(year, month - 1, day, hour, minute - PH_OFFSET_MINUTES, second))
 	return Number.isNaN(value.getTime()) ? null : value
 }
 
-export function getAppointmentJoinWindow(appt: Pick<TelemedicineAppointment, "scheduledDate" | "scheduledTime" | "durationMinutes">) {
+export function getAppointmentJoinWindow(
+	appt: Pick<TelemedicineAppointment, "scheduledDate" | "scheduledTime" | "durationMinutes">
+) {
 	const scheduledAt = parseTelemedicineDateTime(appt.scheduledDate, appt.scheduledTime)
 	if (!scheduledAt) return { startsAt: null, endsAt: null }
 	return {
@@ -41,7 +44,10 @@ export function getAppointmentJoinWindow(appt: Pick<TelemedicineAppointment, "sc
 }
 
 export function getJoinWindowState(
-	appt: Pick<TelemedicineAppointment, "scheduledDate" | "scheduledTime" | "durationMinutes" | "status">,
+	appt: Pick<
+		TelemedicineAppointment,
+		"scheduledDate" | "scheduledTime" | "durationMinutes" | "status"
+	>,
 	now = new Date()
 ): JoinWindowState {
 	const { startsAt, endsAt } = getAppointmentJoinWindow(appt)

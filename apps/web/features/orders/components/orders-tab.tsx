@@ -957,7 +957,10 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 									</div>
 									<div className={filterFieldClassName}>
 										<label className={filterLabelClassName}>Status</label>
-										<Select value={allStatusFilter} onValueChange={v => setAllStatusFilter(v ?? "")}>
+										<Select
+											value={allStatusFilter}
+											onValueChange={v => setAllStatusFilter(v ?? "")}
+										>
 											<SelectTrigger className={filterControlClassName}>
 												<SelectValue>
 													{allStatusFilter === "all"
@@ -1196,7 +1199,10 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 									</div>
 									<div className={filterFieldClassName}>
 										<label className={filterLabelClassName}>Status</label>
-										<Select value={labStatusFilter} onValueChange={v => setLabStatusFilter(v ?? "")}>
+										<Select
+											value={labStatusFilter}
+											onValueChange={v => setLabStatusFilter(v ?? "")}
+										>
 											<SelectTrigger className={filterControlClassName}>
 												<SelectValue>
 													{labStatusFilter === "all"

@@ -4,10 +4,14 @@ import { useEffect, useRef, useState } from "react"
 
 import { Button } from "@/core/components/ui/button"
 import { Skeleton } from "@/core/components/ui/skeleton"
-
 import { EncounterContextBar } from "@/features/billing/components/encounter-context-bar"
 import { ReceiptTemplate } from "@/features/billing/components/receipt-template"
-import { useIssueReceiptMutation, useInvoicesQuery, useListPaymentsQuery } from "../api/invoices.hooks"
+
+import {
+	useInvoicesQuery,
+	useIssueReceiptMutation,
+	useListPaymentsQuery,
+} from "../api/invoices.hooks"
 import { paymentMethodLabel } from "../lib/invoice-utils"
 
 interface ReceiptPageProps {
@@ -18,12 +22,21 @@ interface ReceiptPageProps {
 	facilityName: string
 }
 
-export function ReceiptPage({ encounterId, facilityId, patientName, patientMrn, facilityName }: ReceiptPageProps) {
+export function ReceiptPage({
+	encounterId,
+	facilityId,
+	patientName,
+	patientMrn,
+	facilityName,
+}: ReceiptPageProps) {
 	const printRef = useRef<HTMLDivElement>(null)
 	const [officialReceiptNumber, setOfficialReceiptNumber] = useState<string | null>(null)
 	const [receiptIssued, setReceiptIssued] = useState(false)
 
-	const { data: invoicesData, isLoading: invoicesLoading } = useInvoicesQuery(encounterId, facilityId)
+	const { data: invoicesData, isLoading: invoicesLoading } = useInvoicesQuery(
+		encounterId,
+		facilityId
+	)
 	const invoice = invoicesData?.invoices?.[0] ?? null
 
 	const { data: paymentsData, isLoading: paymentsLoading } = useListPaymentsQuery(
@@ -42,7 +55,7 @@ export function ReceiptPage({ encounterId, facilityId, patientName, patientMrn, 
 			issueReceipt(
 				{ paymentId: latestPayment.id },
 				{
-					onSuccess: (result) => {
+					onSuccess: result => {
 						setOfficialReceiptNumber(result.receiptNumber)
 					},
 				}
@@ -57,7 +70,7 @@ export function ReceiptPage({ encounterId, facilityId, patientName, patientMrn, 
 		return (
 			<div className="space-y-4 px-4">
 				<EncounterContextBar />
-				<Skeleton className="h-96 w-full max-w-md mx-auto" />
+				<Skeleton className="mx-auto h-96 w-full max-w-md" />
 			</div>
 		)
 	}
@@ -66,7 +79,7 @@ export function ReceiptPage({ encounterId, facilityId, patientName, patientMrn, 
 		return (
 			<div className="space-y-4 px-4">
 				<EncounterContextBar />
-				<p className="text-sm text-muted-foreground text-center py-8">
+				<p className="text-muted-foreground py-8 text-center text-sm">
 					No payment found. Please complete payment first.
 				</p>
 			</div>
@@ -74,8 +87,17 @@ export function ReceiptPage({ encounterId, facilityId, patientName, patientMrn, 
 	}
 
 	const lineItems = (
-		(invoice as typeof invoice & { lineItems?: Array<{ id: string; description: string; quantity: string; unitPrice: string; totalAmount: string }> })
-			.lineItems ?? []
+		(
+			invoice as typeof invoice & {
+				lineItems?: Array<{
+					id: string
+					description: string
+					quantity: string
+					unitPrice: string
+					totalAmount: string
+				}>
+			}
+		).lineItems ?? []
 	).map(item => ({
 		description: item.description,
 		quantity: Number(item.quantity),
@@ -102,8 +124,8 @@ export function ReceiptPage({ encounterId, facilityId, patientName, patientMrn, 
 		<div className="space-y-4">
 			<EncounterContextBar />
 
-			<div className="px-4 space-y-4">
-				<div className="flex items-center justify-between no-print">
+			<div className="space-y-4 px-4">
+				<div className="no-print flex items-center justify-between">
 					<h1 className="text-lg font-semibold">Official Receipt</h1>
 					<Button onClick={handlePrint} variant="outline" size="sm" aria-label="Print receipt">
 						Print
@@ -114,7 +136,11 @@ export function ReceiptPage({ encounterId, facilityId, patientName, patientMrn, 
 					ref={printRef}
 					facilityName={facilityName}
 					receiptNumber={receiptNumber}
-					issuedAt={latestPayment.createdAt instanceof Date ? latestPayment.createdAt.toISOString() : String(latestPayment.createdAt)}
+					issuedAt={
+						latestPayment.createdAt instanceof Date
+							? latestPayment.createdAt.toISOString()
+							: String(latestPayment.createdAt)
+					}
 					patientName={patientName}
 					patientMrn={patientMrn}
 					encounterId={encounterId}

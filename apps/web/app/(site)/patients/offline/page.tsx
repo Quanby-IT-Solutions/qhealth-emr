@@ -74,7 +74,7 @@ export default function OfflinePatientCachePage() {
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<div className="relative">
-						<Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+						<Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
 						<Input
 							data-element-id="offline-search"
 							value={search}

@@ -31,11 +31,18 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/core/components/ui/sheet"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { Textarea } from "@/core/components/ui/textarea"
-
 import { ErrorState, SkeletonRows } from "@/features/admin/components/state-views"
 import { HimEncounterContextBar } from "@/features/him/components/him-encounter-context-bar"
+
 import {
 	useAmendCodesMutation,
 	useEncounterCodesQuery,
@@ -95,11 +102,18 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 	const [amendReason, setAmendReason] = useState("")
 
 	const isSigned = !!data?.signedAt
-	const documentedDiagnoses = useMemo(() => data?.documentedDiagnoses ?? [], [data?.documentedDiagnoses])
+	const documentedDiagnoses = useMemo(
+		() => data?.documentedDiagnoses ?? [],
+		[data?.documentedDiagnoses]
+	)
 	const versionHistory = data?.versionHistory ?? []
-	const diagnosisMap = useMemo(() => new Map(documentedDiagnoses.map(diagnosis => [diagnosis.id, diagnosis])), [documentedDiagnoses])
-	const activeSource = activeSourceId ? diagnosisMap.get(activeSourceId) ?? null : null
-	const savedBlockingViolations = validation?.violations.filter(violation => violation.path !== "ahsr") ?? []
+	const diagnosisMap = useMemo(
+		() => new Map(documentedDiagnoses.map(diagnosis => [diagnosis.id, diagnosis])),
+		[documentedDiagnoses]
+	)
+	const activeSource = activeSourceId ? (diagnosisMap.get(activeSourceId) ?? null) : null
+	const savedBlockingViolations =
+		validation?.violations.filter(violation => violation.path !== "ahsr") ?? []
 	const ahsrViolations = validation?.violations.filter(violation => violation.path === "ahsr") ?? []
 	const codedRows = editorRows.filter(row => row.code.trim().length > 0)
 	const primaryCount = codedRows.filter(row => row.isPrimary).length
@@ -144,26 +158,33 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 		params.delete("addCode")
 		params.delete("addDisplay")
 		params.delete("targetRow")
-		router.replace(params.size > 0 ? `${pathname}?${params.toString()}` : pathname, { scroll: false })
+		router.replace(params.size > 0 ? `${pathname}?${params.toString()}` : pathname, {
+			scroll: false,
+		})
 	}, [pathname, router, searchParams])
 
 	const handleAddRow = useCallback((diagnosisId?: string) => {
 		setEditorRows(prev => [...prev, createEditorRow({ linkedDiagnosisRef: diagnosisId ?? "" })])
 	}, [])
 
-	const handleLookupSelection = useCallback((selection: { code: string; display: string }) => {
-		setEditorRows(prev => {
-			if (!activeLookupRowId) {
-				return [...prev, createEditorRow({ code: selection.code, display: selection.display })]
-			}
+	const handleLookupSelection = useCallback(
+		(selection: { code: string; display: string }) => {
+			setEditorRows(prev => {
+				if (!activeLookupRowId) {
+					return [...prev, createEditorRow({ code: selection.code, display: selection.display })]
+				}
 
-			return prev.map(row =>
-				row.clientId === activeLookupRowId ? { ...row, code: selection.code, display: selection.display } : row
-			)
-		})
-		setLookupOpen(false)
-		setActiveLookupRowId(null)
-	}, [activeLookupRowId])
+				return prev.map(row =>
+					row.clientId === activeLookupRowId
+						? { ...row, code: selection.code, display: selection.display }
+						: row
+				)
+			})
+			setLookupOpen(false)
+			setActiveLookupRowId(null)
+		},
+		[activeLookupRowId]
+	)
 
 	const handleSave = useCallback(() => {
 		upsert({
@@ -189,10 +210,14 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 				<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 					<div>
 						<h1 className="text-lg font-semibold">ICD-10 Coding Workspace</h1>
-						<p className="text-xs text-muted-foreground">Encounter {encounterId}</p>
+						<p className="text-muted-foreground text-xs">Encounter {encounterId}</p>
 					</div>
 					<div className="flex items-center gap-2">
-						{isSigned ? <Badge>Signed v{data?.currentVersion ?? 1}</Badge> : <Badge variant="secondary">Draft v{data?.currentVersion ?? 1}</Badge>}
+						{isSigned ? (
+							<Badge>Signed v{data?.currentVersion ?? 1}</Badge>
+						) : (
+							<Badge variant="secondary">Draft v{data?.currentVersion ?? 1}</Badge>
+						)}
 					</div>
 				</div>
 
@@ -202,7 +227,9 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 						<AlertDescription>
 							<ul className="ml-4 list-disc space-y-1 text-xs">
 								{savedBlockingViolations.map(violation => (
-									<li key={`${violation.path}-${violation.code ?? violation.message}`}>{violation.message}</li>
+									<li key={`${violation.path}-${violation.code ?? violation.message}`}>
+										{violation.message}
+									</li>
 								))}
 							</ul>
 						</AlertDescription>
@@ -224,7 +251,9 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 							</CardHeader>
 							<CardContent className="space-y-3">
 								{documentedDiagnoses.length === 0 ? (
-									<p className="text-sm text-muted-foreground">No finalized diagnoses were found in signed notes or the problem list.</p>
+									<p className="text-muted-foreground text-sm">
+										No finalized diagnoses were found in signed notes or the problem list.
+									</p>
 								) : (
 									documentedDiagnoses.map(diagnosis => (
 										<div key={diagnosis.id} className="rounded-lg border p-3">
@@ -234,13 +263,20 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 														<p className="text-sm font-medium">{diagnosis.diagnosis}</p>
 														{diagnosis.isPrimary && <Badge className="text-[10px]">Primary</Badge>}
 													</div>
-													<p className="text-xs text-muted-foreground">
+													<p className="text-muted-foreground text-xs">
 														{diagnosis.sourceLabel}
 														{diagnosis.icdCode ? ` • Suggested ${diagnosis.icdCode}` : ""}
 													</p>
-													{diagnosis.noteExcerpt && <p className="text-xs text-muted-foreground">{diagnosis.noteExcerpt}</p>}
+													{diagnosis.noteExcerpt && (
+														<p className="text-muted-foreground text-xs">{diagnosis.noteExcerpt}</p>
+													)}
 												</div>
-												<Button variant="outline" size="sm" onClick={() => handleAddRow(diagnosis.id)} disabled={isSigned}>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => handleAddRow(diagnosis.id)}
+													disabled={isSigned}
+												>
 													Create row
 												</Button>
 											</div>
@@ -257,20 +293,33 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 							<CardContent className="space-y-3">
 								<div className="rounded-lg border border-dashed p-3 text-sm">
 									<p className="font-medium">Current workspace</p>
-									<p className="text-xs text-muted-foreground">Version {data?.currentVersion ?? 1} {isSigned ? "is locked for billing." : "is editable until signed."}</p>
+									<p className="text-muted-foreground text-xs">
+										Version {data?.currentVersion ?? 1}{" "}
+										{isSigned ? "is locked for billing." : "is editable until signed."}
+									</p>
 								</div>
 								{versionHistory.length === 0 ? (
-									<p className="text-sm text-muted-foreground">No prior signed versions yet.</p>
+									<p className="text-muted-foreground text-sm">No prior signed versions yet.</p>
 								) : (
 									versionHistory.map(version => (
 										<div key={version.id} className="rounded-lg border p-3 text-sm">
 											<div className="flex items-center justify-between gap-3">
 												<p className="font-medium">Version {version.version}</p>
-												<Badge variant="outline">{version.replacedAt ? "Superseded" : "Signed"}</Badge>
+												<Badge variant="outline">
+													{version.replacedAt ? "Superseded" : "Signed"}
+												</Badge>
 											</div>
-											<p className="mt-1 text-xs text-muted-foreground">Created {formatTimestamp(version.createdAt)}</p>
-											{version.replacedAt && <p className="text-xs text-muted-foreground">Replaced {formatTimestamp(version.replacedAt)}</p>}
-											{version.amendmentReason && <p className="mt-2 text-xs">Reason: {version.amendmentReason}</p>}
+											<p className="text-muted-foreground mt-1 text-xs">
+												Created {formatTimestamp(version.createdAt)}
+											</p>
+											{version.replacedAt && (
+												<p className="text-muted-foreground text-xs">
+													Replaced {formatTimestamp(version.replacedAt)}
+												</p>
+											)}
+											{version.amendmentReason && (
+												<p className="mt-2 text-xs">Reason: {version.amendmentReason}</p>
+											)}
 										</div>
 									))
 								)}
@@ -283,18 +332,55 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 							<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 								<div>
 									<CardTitle className="text-base">Assigned Codes</CardTitle>
-									<p className="text-xs text-muted-foreground">Primary slot is single. Secondary codes can be multiple.</p>
+									<p className="text-muted-foreground text-xs">
+										Primary slot is single. Secondary codes can be multiple.
+									</p>
 								</div>
 								<div className="flex flex-wrap items-center gap-2">
-									<Button variant="outline" size="sm" onClick={() => handleAddRow()} disabled={isSigned}>+ Add row</Button>
-									<Button variant="outline" size="sm" onClick={() => { setActiveLookupRowId(null); setLookupOpen(true) }} disabled={isSigned}>Lookup code</Button>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => handleAddRow()}
+										disabled={isSigned}
+									>
+										+ Add row
+									</Button>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => {
+											setActiveLookupRowId(null)
+											setLookupOpen(true)
+										}}
+										disabled={isSigned}
+									>
+										Lookup code
+									</Button>
 									{!isSigned ? (
 										<>
-											<Button size="sm" onClick={handleSave} disabled={saving || editorRows.length === 0}>{saving ? "Saving…" : "Save"}</Button>
-											<Button onClick={() => sign({ encounterId })} disabled={signing || codedRows.length === 0 || primaryCount !== 1 || savedBlockingViolations.length > 0}>{signing ? "Signing…" : "Sign Coding"}</Button>
+											<Button
+												size="sm"
+												onClick={handleSave}
+												disabled={saving || editorRows.length === 0}
+											>
+												{saving ? "Saving…" : "Save"}
+											</Button>
+											<Button
+												onClick={() => sign({ encounterId })}
+												disabled={
+													signing ||
+													codedRows.length === 0 ||
+													primaryCount !== 1 ||
+													savedBlockingViolations.length > 0
+												}
+											>
+												{signing ? "Signing…" : "Sign Coding"}
+											</Button>
 										</>
 									) : (
-										<Button size="sm" variant="outline" onClick={() => setAmendOpen(true)}>Amend</Button>
+										<Button size="sm" variant="outline" onClick={() => setAmendOpen(true)}>
+											Amend
+										</Button>
 									)}
 								</div>
 							</div>
@@ -314,46 +400,168 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 								<TableBody>
 									{editorRows.length === 0 && (
 										<TableRow>
-											<TableCell colSpan={6} className="py-8 text-center text-xs text-muted-foreground">No code rows yet. Start from a documented diagnosis or add a blank row.</TableCell>
+											<TableCell
+												colSpan={6}
+												className="text-muted-foreground py-8 text-center text-xs"
+											>
+												No code rows yet. Start from a documented diagnosis or add a blank row.
+											</TableCell>
 										</TableRow>
 									)}
 									{editorRows.map(row => {
-										const linkedDiagnosis = row.linkedDiagnosisRef ? diagnosisMap.get(row.linkedDiagnosisRef) ?? null : null
+										const linkedDiagnosis = row.linkedDiagnosisRef
+											? (diagnosisMap.get(row.linkedDiagnosisRef) ?? null)
+											: null
 
 										return (
 											<TableRow key={row.clientId}>
 												<TableCell>
 													<div className="space-y-2">
-														<Badge variant={row.isPrimary ? "default" : "secondary"}>{row.isPrimary ? "Primary" : "Secondary"}</Badge>
-														{!isSigned && <Button variant="ghost" size="sm" onClick={() => setEditorRows(prev => prev.map(item => ({ ...item, isPrimary: item.clientId === row.clientId })))}>Make primary</Button>}
+														<Badge variant={row.isPrimary ? "default" : "secondary"}>
+															{row.isPrimary ? "Primary" : "Secondary"}
+														</Badge>
+														{!isSigned && (
+															<Button
+																variant="ghost"
+																size="sm"
+																onClick={() =>
+																	setEditorRows(prev =>
+																		prev.map(item => ({
+																			...item,
+																			isPrimary: item.clientId === row.clientId,
+																		}))
+																	)
+																}
+															>
+																Make primary
+															</Button>
+														)}
 													</div>
 												</TableCell>
 												<TableCell>
 													<div className="space-y-2">
-														<Input value={row.code} onChange={event => setEditorRows(prev => prev.map(item => item.clientId === row.clientId ? { ...item, code: event.target.value } : item))} placeholder="J18.9" className="font-mono text-xs" disabled={isSigned} />
-														{!isSigned && <Button variant="ghost" size="sm" onClick={() => { setActiveLookupRowId(row.clientId); setLookupOpen(true) }}>Lookup</Button>}
+														<Input
+															value={row.code}
+															onChange={event =>
+																setEditorRows(prev =>
+																	prev.map(item =>
+																		item.clientId === row.clientId
+																			? { ...item, code: event.target.value }
+																			: item
+																	)
+																)
+															}
+															placeholder="J18.9"
+															className="font-mono text-xs"
+															disabled={isSigned}
+														/>
+														{!isSigned && (
+															<Button
+																variant="ghost"
+																size="sm"
+																onClick={() => {
+																	setActiveLookupRowId(row.clientId)
+																	setLookupOpen(true)
+																}}
+															>
+																Lookup
+															</Button>
+														)}
 													</div>
 												</TableCell>
 												<TableCell>
-													<Input value={row.display} onChange={event => setEditorRows(prev => prev.map(item => item.clientId === row.clientId ? { ...item, display: event.target.value } : item))} placeholder="Search or confirm code description" className="text-xs" disabled={isSigned} />
+													<Input
+														value={row.display}
+														onChange={event =>
+															setEditorRows(prev =>
+																prev.map(item =>
+																	item.clientId === row.clientId
+																		? { ...item, display: event.target.value }
+																		: item
+																)
+															)
+														}
+														placeholder="Search or confirm code description"
+														className="text-xs"
+														disabled={isSigned}
+													/>
 												</TableCell>
 												<TableCell>
 													<div className="space-y-2">
-														<Select value={row.linkedDiagnosisRef || "none"} onValueChange={value => setEditorRows(prev => prev.map(item => item.clientId === row.clientId ? { ...item, linkedDiagnosisRef: !value || value === "none" ? "" : value } : item))} disabled={isSigned}>
-															<SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
+														<Select
+															value={row.linkedDiagnosisRef || "none"}
+															onValueChange={value =>
+																setEditorRows(prev =>
+																	prev.map(item =>
+																		item.clientId === row.clientId
+																			? {
+																					...item,
+																					linkedDiagnosisRef:
+																						!value || value === "none" ? "" : value,
+																				}
+																			: item
+																	)
+																)
+															}
+															disabled={isSigned}
+														>
+															<SelectTrigger className="text-xs">
+																<SelectValue />
+															</SelectTrigger>
 															<SelectContent>
 																<SelectItem value="none">Add explanatory note instead</SelectItem>
-																{documentedDiagnoses.map(diagnosis => <SelectItem key={diagnosis.id} value={diagnosis.id}>{diagnosis.diagnosis}</SelectItem>)}
+																{documentedDiagnoses.map(diagnosis => (
+																	<SelectItem key={diagnosis.id} value={diagnosis.id}>
+																		{diagnosis.diagnosis}
+																	</SelectItem>
+																))}
 															</SelectContent>
 														</Select>
-														{linkedDiagnosis && <Button variant="ghost" size="sm" onClick={() => { setActiveSourceId(linkedDiagnosis.id); setSourceDrawerOpen(true) }}>View source</Button>}
+														{linkedDiagnosis && (
+															<Button
+																variant="ghost"
+																size="sm"
+																onClick={() => {
+																	setActiveSourceId(linkedDiagnosis.id)
+																	setSourceDrawerOpen(true)
+																}}
+															>
+																View source
+															</Button>
+														)}
 													</div>
 												</TableCell>
 												<TableCell>
-													<Textarea value={row.notes} onChange={event => setEditorRows(prev => prev.map(item => item.clientId === row.clientId ? { ...item, notes: event.target.value } : item))} placeholder="Explain the coding decision when no direct source diagnosis is linked" className="min-h-20 text-xs" disabled={isSigned} />
+													<Textarea
+														value={row.notes}
+														onChange={event =>
+															setEditorRows(prev =>
+																prev.map(item =>
+																	item.clientId === row.clientId
+																		? { ...item, notes: event.target.value }
+																		: item
+																)
+															)
+														}
+														placeholder="Explain the coding decision when no direct source diagnosis is linked"
+														className="min-h-20 text-xs"
+														disabled={isSigned}
+													/>
 												</TableCell>
 												<TableCell className="text-right">
-													{!isSigned && <Button variant="ghost" size="sm" onClick={() => setEditorRows(prev => prev.filter(item => item.clientId !== row.clientId))}>Remove</Button>}
+													{!isSigned && (
+														<Button
+															variant="ghost"
+															size="sm"
+															onClick={() =>
+																setEditorRows(prev =>
+																	prev.filter(item => item.clientId !== row.clientId)
+																)
+															}
+														>
+															Remove
+														</Button>
+													)}
 												</TableCell>
 											</TableRow>
 										)
@@ -361,7 +569,11 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 								</TableBody>
 							</Table>
 
-							{signError && <p className="text-xs text-destructive" role="alert">{(signError as Error).message}</p>}
+							{signError && (
+								<p className="text-destructive text-xs" role="alert">
+									{(signError as Error).message}
+								</p>
+							)}
 						</CardContent>
 					</Card>
 				</div>
@@ -370,17 +582,47 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 					<DialogContent>
 						<DialogHeader>
 							<DialogTitle>Amend Signed Coding</DialogTitle>
-							<DialogDescription>Create a new coding version and preserve the prior audit trail.</DialogDescription>
+							<DialogDescription>
+								Create a new coding version and preserve the prior audit trail.
+							</DialogDescription>
 						</DialogHeader>
 						<div className="space-y-2">
 							<Label htmlFor="amend-reason">Reason</Label>
-							<Textarea id="amend-reason" value={amendReason} onChange={event => setAmendReason(event.target.value)} rows={3} placeholder="Coder noted a diagnosis change after chart review…" />
+							<Textarea
+								id="amend-reason"
+								value={amendReason}
+								onChange={event => setAmendReason(event.target.value)}
+								rows={3}
+								placeholder="Coder noted a diagnosis change after chart review…"
+							/>
 						</div>
 						<DialogFooter>
-							<Button variant="outline" onClick={() => setAmendOpen(false)}>Cancel</Button>
+							<Button variant="outline" onClick={() => setAmendOpen(false)}>
+								Cancel
+							</Button>
 							<Button
 								disabled={!amendReason.trim() || amending}
-								onClick={() => amend({ encounterId, reason: amendReason, codes: codedRows.map(row => ({ code: row.code, display: row.display || undefined, isPrimary: row.isPrimary, linkedDiagnosisRef: row.linkedDiagnosisRef || undefined, notes: row.notes || undefined })) }, { onSuccess: () => { setAmendReason(""); setAmendOpen(false) } })}
+								onClick={() =>
+									amend(
+										{
+											encounterId,
+											reason: amendReason,
+											codes: codedRows.map(row => ({
+												code: row.code,
+												display: row.display || undefined,
+												isPrimary: row.isPrimary,
+												linkedDiagnosisRef: row.linkedDiagnosisRef || undefined,
+												notes: row.notes || undefined,
+											})),
+										},
+										{
+											onSuccess: () => {
+												setAmendReason("")
+												setAmendOpen(false)
+											},
+										}
+									)
+								}
 							>
 								{amending ? "Creating version…" : "Confirm Amend"}
 							</Button>
@@ -388,11 +630,19 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 					</DialogContent>
 				</Dialog>
 
-				<Sheet open={lookupOpen} onOpenChange={open => { setLookupOpen(open); if (!open) setActiveLookupRowId(null) }}>
+				<Sheet
+					open={lookupOpen}
+					onOpenChange={open => {
+						setLookupOpen(open)
+						if (!open) setActiveLookupRowId(null)
+					}}
+				>
 					<SheetContent side="right" className="w-full sm:max-w-3xl">
 						<SheetHeader>
 							<SheetTitle>ICD-10 Code Lookup</SheetTitle>
-							<SheetDescription>Search by code prefix or term. Deprecated codes must be replaced before signing.</SheetDescription>
+							<SheetDescription>
+								Search by code prefix or term. Deprecated codes must be replaced before signing.
+							</SheetDescription>
 						</SheetHeader>
 						<div className="mt-4">
 							<CodeLookupPage onSelectCode={handleLookupSelection} />
@@ -404,7 +654,9 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 					<SheetContent side="right" className="w-full sm:max-w-xl">
 						<SheetHeader>
 							<SheetTitle>{activeSource?.sourceLabel ?? "Source detail"}</SheetTitle>
-							<SheetDescription>{activeSource?.noteType ?? activeSource?.sourceType ?? "Linked diagnosis source"}</SheetDescription>
+							<SheetDescription>
+								{activeSource?.noteType ?? activeSource?.sourceType ?? "Linked diagnosis source"}
+							</SheetDescription>
 						</SheetHeader>
 						{activeSource && (
 							<div className="mt-4 space-y-4 text-sm">
@@ -420,7 +672,9 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 								)}
 								<div>
 									<p className="font-medium">Source excerpt</p>
-									<p className="whitespace-pre-wrap text-muted-foreground">{activeSource.noteExcerpt ?? "No source excerpt available."}</p>
+									<p className="text-muted-foreground whitespace-pre-wrap">
+										{activeSource.noteExcerpt ?? "No source excerpt available."}
+									</p>
 								</div>
 							</div>
 						)}

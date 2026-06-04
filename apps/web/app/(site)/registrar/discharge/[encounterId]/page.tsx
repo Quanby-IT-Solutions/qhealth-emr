@@ -1,7 +1,7 @@
 "use client"
 
-import Link from "next/link"
 import { use } from "react"
+import Link from "next/link"
 
 import { Button } from "@/core/components/ui/button"
 import { DischargeProcessingPanel } from "@/features/registrar/discharge/components/discharge-processing-panel"

@@ -43,8 +43,7 @@ export function useCreateMalasakitCaseMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		mswOrpc.malasakit.create.mutationOptions({
-			onSuccess: () =>
-				qc.invalidateQueries({ queryKey: mswOrpc.malasakit.list.key() }),
+			onSuccess: () => qc.invalidateQueries({ queryKey: mswOrpc.malasakit.list.key() }),
 		})
 	)
 }
@@ -67,8 +66,7 @@ export function useReconcileMalasakitMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		mswOrpc.malasakit.reconcile.mutationOptions({
-			onSuccess: () =>
-				qc.invalidateQueries({ queryKey: mswOrpc.malasakit.list.key() }),
+			onSuccess: () => qc.invalidateQueries({ queryKey: mswOrpc.malasakit.list.key() }),
 		})
 	)
 }

@@ -187,7 +187,7 @@ function AppointmentRow({
 				"flex items-start gap-4 rounded-lg border p-3 transition-colors",
 				isSelected
 					? "border-primary bg-primary/5"
-					: "border-transparent hover:border-muted hover:bg-muted/30",
+					: "hover:border-muted hover:bg-muted/30 border-transparent",
 			].join(" ")}
 		>
 			<div
@@ -214,7 +214,7 @@ function AppointmentRow({
 						</Badge>
 					)}
 					{startingSoon && !isCompleted && !isCancelled && (
-						<Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-xs">
+						<Badge className="border-amber-500/30 bg-amber-500/15 text-xs text-amber-700 dark:text-amber-300">
 							{startsInMin !== null && startsInMin <= 0
 								? `Started ${Math.abs(startsInMin)}m ago`
 								: `Starts in ${startsInMin}m`}
@@ -226,11 +226,13 @@ function AppointmentRow({
 						</Badge>
 					)}
 					{joinWindowState.kind === "upcoming" && joinWindowState.startsAt && !isCompleted && (
-						<Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-xs">
+						<Badge className="border-amber-500/30 bg-amber-500/15 text-xs text-amber-700 dark:text-amber-300">
 							Opens {formatJoinTime(joinWindowState.startsAt)}
 						</Badge>
 					)}
-					{isSelected && <Badge className="bg-primary text-primary-foreground text-xs">Selected</Badge>}
+					{isSelected && (
+						<Badge className="bg-primary text-primary-foreground text-xs">Selected</Badge>
+					)}
 				</div>
 				<div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
 					<span className="flex items-center gap-1">
@@ -252,23 +254,16 @@ function AppointmentRow({
 					<p className="text-muted-foreground line-clamp-2 text-xs italic">{appt.notes}</p>
 				)}
 				{joinWindowText && (
-					<p className="text-muted-foreground text-xs">
-						Video access: {joinWindowText}
-					</p>
+					<p className="text-muted-foreground text-xs">Video access: {joinWindowText}</p>
 				)}
 				{blocksNewEncounter && (
 					<p className="text-destructive text-xs">
-						Video window has passed. Mark as no-show or reschedule if the consultation did not happen.
+						Video window has passed. Mark as no-show or reschedule if the consultation did not
+						happen.
 					</p>
 				)}
 			</div>
-			<Button
-				type="button"
-				size="sm"
-				variant={ctaVariant}
-				onClick={onSelect}
-				className="shrink-0"
-			>
+			<Button type="button" size="sm" variant={ctaVariant} onClick={onSelect} className="shrink-0">
 				{ctaLabel}
 				<ArrowRight className="ml-1.5 size-3.5" />
 			</Button>
@@ -361,16 +356,14 @@ export function PhysicianAppointmentList({
 							onClick={() => void refetch()}
 							disabled={isFetching || profileMissing}
 						>
-							{isFetching ? (
-								<Loader2 className="mr-1.5 size-3.5 animate-spin" />
-							) : null}
+							{isFetching ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : null}
 							Refresh
 						</Button>
 					</div>
 					{hasAssigned && (
 						<div className="flex flex-col gap-2 sm:flex-row">
 							<div className="relative flex-1">
-								<Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+								<Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
 								<Input
 									value={search}
 									onChange={e => setSearch(e.target.value)}
@@ -378,10 +371,7 @@ export function PhysicianAppointmentList({
 									className="pl-9"
 								/>
 							</div>
-							<Select
-								value={statusFilter}
-								onValueChange={v => setStatusFilter(v as StatusFilter)}
-							>
+							<Select value={statusFilter} onValueChange={v => setStatusFilter(v as StatusFilter)}>
 								<SelectTrigger className="sm:w-48">
 									<SelectValue>
 										{STATUS_FILTERS.find(o => o.value === statusFilter)?.label ?? "All statuses"}
@@ -404,8 +394,8 @@ export function PhysicianAppointmentList({
 							<AlertCircle className="text-muted-foreground size-8" />
 							<p className="text-sm font-medium">Staff profile unavailable</p>
 							<p className="text-muted-foreground max-w-md text-xs">
-								Your account is not linked to a facility staff profile, so we can&apos;t load assigned
-								telemedicine appointments. Contact your administrator.
+								Your account is not linked to a facility staff profile, so we can&apos;t load
+								assigned telemedicine appointments. Contact your administrator.
 							</p>
 						</div>
 					) : isLoading ? (
@@ -429,8 +419,8 @@ export function PhysicianAppointmentList({
 							<Calendar className="text-muted-foreground size-8" />
 							<p className="text-sm font-medium">No assigned appointments</p>
 							<p className="text-muted-foreground max-w-md text-xs">
-								You don&apos;t have any telemedicine consultations assigned to you yet. New appointments
-								will appear here once the scheduler books them with you.
+								You don&apos;t have any telemedicine consultations assigned to you yet. New
+								appointments will appear here once the scheduler books them with you.
 							</p>
 						</div>
 					) : !hasResults ? (
@@ -460,7 +450,7 @@ export function PhysicianAppointmentList({
 								return (
 									<section key={bucket} className="space-y-2">
 										<div className="flex items-center gap-2">
-											<h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+											<h4 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
 												{BUCKET_LABELS[bucket]}
 											</h4>
 											<Badge variant="outline" className="text-xs">

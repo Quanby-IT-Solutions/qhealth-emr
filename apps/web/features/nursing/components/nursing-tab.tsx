@@ -1,8 +1,7 @@
 "use client"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
-
-import { NbsCard, isNewborn } from "@/features/nbs/components/nbs-card"
+import { isNewborn, NbsCard } from "@/features/nbs/components/nbs-card"
 
 import { FlowsheetGrid } from "./flowsheet-grid"
 import { HaiTagForm } from "./hai-tag-form"
@@ -26,7 +25,14 @@ interface NursingTabProps {
 	readOnly?: boolean
 }
 
-export function NursingTab({ encounterId, facilityId, patientId, patientDateOfBirth, patientName, readOnly }: NursingTabProps) {
+export function NursingTab({
+	encounterId,
+	facilityId,
+	patientId,
+	patientDateOfBirth,
+	patientName,
+	readOnly,
+}: NursingTabProps) {
 	return (
 		<Tabs defaultValue="vitals">
 			<TabsList variant="line">

@@ -227,9 +227,7 @@ export function useChargesQuery(params: {
 	return useQuery({
 		queryKey: billingKeys.charges(params),
 		queryFn: () =>
-			fetchJson<PaginatedResponse<Charge>>(
-				`${API_BASE}/charges${buildQueryString(params)}`
-			),
+			fetchJson<PaginatedResponse<Charge>>(`${API_BASE}/charges${buildQueryString(params)}`),
 	})
 }
 
@@ -290,9 +288,7 @@ export function useInvoicesQuery(params: {
 	return useQuery({
 		queryKey: billingKeys.invoices(params),
 		queryFn: () =>
-			fetchJson<PaginatedResponse<Invoice>>(
-				`${API_BASE}/invoices${buildQueryString(params)}`
-			),
+			fetchJson<PaginatedResponse<Invoice>>(`${API_BASE}/invoices${buildQueryString(params)}`),
 	})
 }
 
@@ -346,9 +342,7 @@ export function usePaymentsQuery(params: {
 	return useQuery({
 		queryKey: billingKeys.payments(params),
 		queryFn: () =>
-			fetchJson<PaginatedResponse<Payment>>(
-				`${API_BASE}/payments${buildQueryString(params)}`
-			),
+			fetchJson<PaginatedResponse<Payment>>(`${API_BASE}/payments${buildQueryString(params)}`),
 		enabled: !!params.invoiceId,
 	})
 }
@@ -388,11 +382,7 @@ export function useCf4Query(id: string) {
 export function useGenerateCf4Mutation() {
 	const queryClient = useQueryClient()
 	return useMutation({
-		mutationFn: (data: {
-			facilityId: string
-			encounterId: string
-			patientId: string
-		}) =>
+		mutationFn: (data: { facilityId: string; encounterId: string; patientId: string }) =>
 			fetchJson<Cf4Preview>(`${API_BASE}/cf4/generate`, {
 				method: "POST",
 				body: JSON.stringify(data),
@@ -420,11 +410,7 @@ export function useFinalizeCf4Mutation() {
 export function useCheckEligibilityMutation() {
 	const queryClient = useQueryClient()
 	return useMutation({
-		mutationFn: (data: {
-			facilityId: string
-			patientId: string
-			philhealthMemberId: string
-		}) =>
+		mutationFn: (data: { facilityId: string; patientId: string; philhealthMemberId: string }) =>
 			fetchJson<EligibilityResponse>(`${API_BASE}/eligibility/check`, {
 				method: "POST",
 				body: JSON.stringify(data),
@@ -441,9 +427,7 @@ export function useBillingStatusQuery(encounterId: string) {
 	return useQuery({
 		queryKey: billingKeys.billingStatus(encounterId),
 		queryFn: () =>
-			fetchJson<BillingStatus>(
-				`${API_BASE}/status${buildQueryString({ encounterId })}`
-			),
+			fetchJson<BillingStatus>(`${API_BASE}/status${buildQueryString({ encounterId })}`),
 		enabled: !!encounterId,
 	})
 }
@@ -509,8 +493,7 @@ export function useCf5AssignmentQuery(encounterId: string) {
 export function useDrgSearchQuery(search: string) {
 	return useQuery({
 		queryKey: [...billingKeys.all, "drg-search", search] as const,
-		queryFn: () =>
-			fetchJson<DrgCode[]>(`${API_BASE}/cf5/drg-codes${buildQueryString({ search })}`),
+		queryFn: () => fetchJson<DrgCode[]>(`${API_BASE}/cf5/drg-codes${buildQueryString({ search })}`),
 		enabled: search.length >= 2,
 	})
 }
@@ -580,9 +563,7 @@ export function useSoaQuery(encounterId: string) {
 	return useQuery({
 		queryKey: [...billingKeys.all, "soa", encounterId] as const,
 		queryFn: () =>
-			fetchJson<StatementOfAccount | null>(
-				`${API_BASE}/soa${buildQueryString({ encounterId })}`
-			),
+			fetchJson<StatementOfAccount | null>(`${API_BASE}/soa${buildQueryString({ encounterId })}`),
 		enabled: !!encounterId,
 	})
 }
@@ -629,7 +610,9 @@ export function useCewsEligibilityQuery(patientId: string) {
 	return useQuery({
 		queryKey: [...billingKeys.all, "cews", patientId] as const,
 		queryFn: () =>
-			fetchJson<CewsEligibility>(`${API_BASE}/eligibility/latest${buildQueryString({ patientId })}`),
+			fetchJson<CewsEligibility>(
+				`${API_BASE}/eligibility/latest${buildQueryString({ patientId })}`
+			),
 		enabled: !!patientId,
 	})
 }
@@ -659,9 +642,7 @@ export function useKonsultaBenefitQuery(params: { facilityId: string; patientId:
 	return useQuery({
 		queryKey: [...billingKeys.all, "konsulta", params] as const,
 		queryFn: () =>
-			fetchJson<KonsultaBenefit | null>(
-				`${API_BASE}/konsulta${buildQueryString(params)}`
-			),
+			fetchJson<KonsultaBenefit | null>(`${API_BASE}/konsulta${buildQueryString(params)}`),
 		enabled: !!params.patientId && !!params.facilityId,
 	})
 }
@@ -721,10 +702,7 @@ export interface MalasakitSummary {
 export function useMalasakitQuery(params: { facilityId: string; encounterId: string }) {
 	return useQuery({
 		queryKey: [...billingKeys.all, "malasakit", params] as const,
-		queryFn: () =>
-			fetchJson<MalasakitSummary>(
-				`${API_BASE}/malasakit${buildQueryString(params)}`
-			),
+		queryFn: () => fetchJson<MalasakitSummary>(`${API_BASE}/malasakit${buildQueryString(params)}`),
 		enabled: !!params.encounterId,
 	})
 }
@@ -752,10 +730,7 @@ export function useAddMalasakitMutation() {
 export function useUpdateMalasakitStatusMutation() {
 	const queryClient = useQueryClient()
 	return useMutation({
-		mutationFn: (data: {
-			id: string
-			status: "approved" | "disbursed" | "denied"
-		}) =>
+		mutationFn: (data: { id: string; status: "approved" | "disbursed" | "denied" }) =>
 			fetchJson<MalasakitAssistance>(`${API_BASE}/malasakit/${data.id}/status`, {
 				method: "PUT",
 				body: JSON.stringify({ status: data.status }),

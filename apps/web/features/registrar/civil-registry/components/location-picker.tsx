@@ -9,11 +9,11 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import {
-	type BirthLocation,
 	getBarangayOptions,
 	getMunicipalityOptions,
 	getProvinceOptions,
 	getRegionOptions,
+	type BirthLocation,
 } from "@/features/registrar/civil-registry/lib/philippines-locations"
 
 interface LocationPickerProps {

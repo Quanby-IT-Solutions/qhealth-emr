@@ -7,9 +7,22 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Skeleton } from "@/core/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { useConfigHistoryQuery } from "@/features/audit/api/audit.hooks"
 
@@ -66,7 +79,7 @@ export function ConfigHistoryPanel() {
 
 	if (!facilityId) {
 		return (
-			<div className="rounded-md bg-muted/50 p-6 text-center text-sm text-muted-foreground">
+			<div className="bg-muted/50 text-muted-foreground rounded-md p-6 text-center text-sm">
 				Select a facility to view configuration change history.
 			</div>
 		)
@@ -76,8 +89,9 @@ export function ConfigHistoryPanel() {
 		<div className="space-y-4">
 			<div>
 				<h1 className="text-2xl font-bold tracking-tight">Configuration Change History</h1>
-				<p className="text-sm text-muted-foreground mt-1">
-					Audit trail of all configuration changes. Use this log for governance forensics and compliance review.
+				<p className="text-muted-foreground mt-1 text-sm">
+					Audit trail of all configuration changes. Use this log for governance forensics and
+					compliance review.
 				</p>
 			</div>
 
@@ -91,7 +105,10 @@ export function ConfigHistoryPanel() {
 							<Label className="text-xs">Entity type</Label>
 							<Select
 								value={entityType}
-								onValueChange={v => { setEntityType(v ?? "all"); setPage(1) }}
+								onValueChange={v => {
+									setEntityType(v ?? "all")
+									setPage(1)
+								}}
 							>
 								<SelectTrigger className="w-44">
 									<SelectValue />
@@ -111,9 +128,12 @@ export function ConfigHistoryPanel() {
 							<Label className="text-xs">From</Label>
 							<Input
 								type="date"
-								className="w-36 text-xs h-9"
+								className="h-9 w-36 text-xs"
 								value={dateFrom}
-								onChange={e => { setDateFrom(e.target.value); setPage(1) }}
+								onChange={e => {
+									setDateFrom(e.target.value)
+									setPage(1)
+								}}
 							/>
 						</div>
 
@@ -121,9 +141,12 @@ export function ConfigHistoryPanel() {
 							<Label className="text-xs">To</Label>
 							<Input
 								type="date"
-								className="w-36 text-xs h-9"
+								className="h-9 w-36 text-xs"
 								value={dateTo}
-								onChange={e => { setDateTo(e.target.value); setPage(1) }}
+								onChange={e => {
+									setDateTo(e.target.value)
+									setPage(1)
+								}}
 							/>
 						</div>
 
@@ -178,14 +201,14 @@ export function ConfigHistoryPanel() {
 										<>
 											<TableRow
 												key={entry.id}
-												className="cursor-pointer hover:bg-muted/50"
-												onClick={() => setExpandedId(prev => prev === entry.id ? null : entry.id)}
+												className="hover:bg-muted/50 cursor-pointer"
+												onClick={() => setExpandedId(prev => (prev === entry.id ? null : entry.id))}
 											>
 												<TableCell className="text-xs whitespace-nowrap">
 													{formatDateTime(entry.at)}
 												</TableCell>
 												<TableCell className="text-xs">
-													<span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+													<span className="bg-muted rounded px-1.5 py-0.5 font-mono text-[10px]">
 														{entry.entityType}
 													</span>
 												</TableCell>
@@ -200,7 +223,10 @@ export function ConfigHistoryPanel() {
 												<TableCell className="max-w-64 truncate text-xs">
 													{entry.description}
 												</TableCell>
-												<TableCell className="font-mono text-[10px] truncate max-w-32" title={entry.actor}>
+												<TableCell
+													className="max-w-32 truncate font-mono text-[10px]"
+													title={entry.actor}
+												>
 													{entry.actor.slice(0, 12)}…
 												</TableCell>
 												<TableCell className="text-muted-foreground text-xs">
@@ -213,27 +239,27 @@ export function ConfigHistoryPanel() {
 													<TableCell colSpan={6} className="p-4">
 														<div className="grid grid-cols-2 gap-4 text-xs">
 															<div>
-																<p className="font-semibold text-muted-foreground uppercase tracking-wide text-[10px] mb-1">
+																<p className="text-muted-foreground mb-1 text-[10px] font-semibold tracking-wide uppercase">
 																	Before
 																</p>
 																{entry.beforeState != null ? (
-																	<pre className="max-h-40 overflow-y-auto rounded bg-muted p-2 text-[11px]">
+																	<pre className="bg-muted max-h-40 overflow-y-auto rounded p-2 text-[11px]">
 																		{JSON.stringify(entry.beforeState, null, 2)}
 																	</pre>
 																) : (
-																	<span className="italic text-muted-foreground">—</span>
+																	<span className="text-muted-foreground italic">—</span>
 																)}
 															</div>
 															<div>
-																<p className="font-semibold text-muted-foreground uppercase tracking-wide text-[10px] mb-1">
+																<p className="text-muted-foreground mb-1 text-[10px] font-semibold tracking-wide uppercase">
 																	After
 																</p>
 																{entry.afterState != null ? (
-																	<pre className="max-h-40 overflow-y-auto rounded bg-muted p-2 text-[11px]">
+																	<pre className="bg-muted max-h-40 overflow-y-auto rounded p-2 text-[11px]">
 																		{JSON.stringify(entry.afterState, null, 2)}
 																	</pre>
 																) : (
-																	<span className="italic text-muted-foreground">—</span>
+																	<span className="text-muted-foreground italic">—</span>
 																)}
 															</div>
 														</div>
@@ -245,7 +271,10 @@ export function ConfigHistoryPanel() {
 
 									{data?.data.length === 0 && (
 										<TableRow>
-											<TableCell colSpan={6} className="py-8 text-center text-muted-foreground text-sm">
+											<TableCell
+												colSpan={6}
+												className="text-muted-foreground py-8 text-center text-sm"
+											>
 												No configuration changes found for the selected filters.
 											</TableCell>
 										</TableRow>
@@ -257,7 +286,7 @@ export function ConfigHistoryPanel() {
 
 					{data && data.totalPages > 1 && (
 						<div className="mt-4 flex items-center justify-between">
-							<p className="text-sm text-muted-foreground">
+							<p className="text-muted-foreground text-sm">
 								Page {data.page} of {data.totalPages} ({data.total} total)
 							</p>
 							<div className="flex gap-2">

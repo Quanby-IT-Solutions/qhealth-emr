@@ -1,24 +1,17 @@
 "use client"
 
-import {
-	CheckCircle2,
-	Clock,
-	ExternalLink,
-	Loader2,
-	Send,
-	XCircle,
-} from "lucide-react"
+import { CheckCircle2, Clock, ExternalLink, Loader2, Send, XCircle } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import {
-	type FhirExport,
-	type NhdrSubmission,
-	type NhdrSubmissionStatus,
 	getNhdrStatusColor,
 	useNhdrSubmissionsQuery,
 	useSubmitToNhdrMutation,
+	type FhirExport,
+	type NhdrSubmission,
+	type NhdrSubmissionStatus,
 } from "@/features/fhir/api/fhir.hooks"
 
 // ============================================================================
@@ -84,14 +77,14 @@ function SubmissionTimelineItem({
 		<div className="flex gap-4">
 			{/* Timeline line */}
 			<div className="flex flex-col items-center">
-				<div className="flex size-8 shrink-0 items-center justify-center rounded-full border bg-background">
+				<div className="bg-background flex size-8 shrink-0 items-center justify-center rounded-full border">
 					<NhdrStatusIcon status={submission.status} />
 				</div>
-				{!isLast && <div className="mt-1 h-full w-px bg-border" />}
+				{!isLast && <div className="bg-border mt-1 h-full w-px" />}
 			</div>
 
 			{/* Content */}
-			<div className={`pb-6 flex-1 min-w-0 ${isLast ? "pb-0" : ""}`}>
+			<div className={`min-w-0 flex-1 pb-6 ${isLast ? "pb-0" : ""}`}>
 				<div className="flex flex-wrap items-start justify-between gap-2">
 					<div>
 						<div className="flex items-center gap-2">
@@ -101,12 +94,12 @@ function SubmissionTimelineItem({
 							<NhdrStatusBadge status={submission.status} />
 						</div>
 						{submission.acknowledgementId && (
-							<p className="mt-0.5 text-xs text-muted-foreground">
+							<p className="text-muted-foreground mt-0.5 text-xs">
 								Ack ID: <span className="font-mono">{submission.acknowledgementId}</span>
 							</p>
 						)}
 					</div>
-					<p className="text-xs text-muted-foreground">
+					<p className="text-muted-foreground text-xs">
 						{formatDate(submission.submittedAt ?? submission.submittedAt)}
 					</p>
 				</div>
@@ -123,7 +116,7 @@ function SubmissionTimelineItem({
 					</div>
 				)}
 
-				<p className="mt-1 text-xs text-muted-foreground">
+				<p className="text-muted-foreground mt-1 text-xs">
 					Submitted by {submission.submittedByName}
 				</p>
 			</div>
@@ -176,7 +169,7 @@ export function SubmissionTracker({ facilityId, pendingExport, canEdit }: Submis
 				<div className="flex items-center justify-between">
 					<div>
 						<CardTitle>NHDR Submission Tracker</CardTitle>
-						<p className="mt-1 text-sm text-muted-foreground">
+						<p className="text-muted-foreground mt-1 text-sm">
 							PhilHealth / DOH National Health Data Repository submission history
 						</p>
 					</div>
@@ -199,32 +192,32 @@ export function SubmissionTracker({ facilityId, pendingExport, canEdit }: Submis
 			</CardHeader>
 			<CardContent>
 				{/* Pending export call-to-action */}
-				{canEdit && pendingExport && pendingExport.status === "completed" && !pendingExport.nhdrSubmissionId && (
-					<div className="mb-6 flex items-center justify-between rounded-lg border bg-muted/40 p-4">
-						<div>
-							<p className="text-sm font-medium">Export ready for submission</p>
-							<p className="text-xs text-muted-foreground">
-								Export {pendingExport.id.slice(0, 8)}… ({pendingExport.exportedResources.toLocaleString()} resources)
-							</p>
+				{canEdit &&
+					pendingExport &&
+					pendingExport.status === "completed" &&
+					!pendingExport.nhdrSubmissionId && (
+						<div className="bg-muted/40 mb-6 flex items-center justify-between rounded-lg border p-4">
+							<div>
+								<p className="text-sm font-medium">Export ready for submission</p>
+								<p className="text-muted-foreground text-xs">
+									Export {pendingExport.id.slice(0, 8)}… (
+									{pendingExport.exportedResources.toLocaleString()} resources)
+								</p>
+							</div>
+							<SubmitNhdrButton exportId={pendingExport.id} facilityId={facilityId} />
 						</div>
-						<SubmitNhdrButton exportId={pendingExport.id} facilityId={facilityId} />
-					</div>
-				)}
+					)}
 
 				{isLoading && (
-					<div className="py-8 text-center text-sm text-muted-foreground">
-						Loading submissions…
-					</div>
+					<div className="text-muted-foreground py-8 text-center text-sm">Loading submissions…</div>
 				)}
 
 				{error && (
-					<div className="py-4 text-sm text-destructive">
-						Failed to load NHDR submissions.
-					</div>
+					<div className="text-destructive py-4 text-sm">Failed to load NHDR submissions.</div>
 				)}
 
 				{!isLoading && !error && (!submissions || submissions.length === 0) && (
-					<div className="py-8 text-center text-sm text-muted-foreground">
+					<div className="text-muted-foreground py-8 text-center text-sm">
 						No NHDR submissions yet.
 					</div>
 				)}

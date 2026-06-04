@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { Loader2 } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -77,8 +76,8 @@ export function CreateSurgicalCasePanel({
 			},
 			{
 				onSuccess,
-				onError: (err) => setError(err.message),
-			},
+				onError: err => setError(err.message),
+			}
 		)
 	}
 
@@ -99,7 +98,7 @@ export function CreateSurgicalCasePanel({
 					<Input
 						id="procedureName"
 						value={procedureName}
-						onChange={(e) => setProcedureName(e.target.value)}
+						onChange={e => setProcedureName(e.target.value)}
 						placeholder="e.g. Appendectomy"
 						disabled={isPending}
 					/>
@@ -118,7 +117,7 @@ export function CreateSurgicalCasePanel({
 							<SelectValue placeholder="Select type" />
 						</SelectTrigger>
 						<SelectContent>
-							{SURGICAL_TYPES.map((t) => (
+							{SURGICAL_TYPES.map(t => (
 								<SelectItem key={t.value} value={t.value}>
 									{t.label}
 								</SelectItem>
@@ -138,7 +137,7 @@ export function CreateSurgicalCasePanel({
 							<SelectValue placeholder={cliniciansLoading ? "Loading…" : "Select surgeon"} />
 						</SelectTrigger>
 						<SelectContent>
-							{clinicians.map((c) => (
+							{clinicians.map(c => (
 								<SelectItem key={c.id} value={c.id}>
 									{c.name}
 								</SelectItem>
@@ -153,7 +152,7 @@ export function CreateSurgicalCasePanel({
 						id="scheduledDatetime"
 						type="datetime-local"
 						value={scheduledDatetime}
-						onChange={(e) => setScheduledDatetime(e.target.value)}
+						onChange={e => setScheduledDatetime(e.target.value)}
 						disabled={isPending}
 					/>
 				</div>
@@ -163,7 +162,7 @@ export function CreateSurgicalCasePanel({
 					<Textarea
 						id="notes"
 						value={notes}
-						onChange={(e) => setNotes(e.target.value)}
+						onChange={e => setNotes(e.target.value)}
 						placeholder="Additional notes…"
 						rows={3}
 						disabled={isPending}

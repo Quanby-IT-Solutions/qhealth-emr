@@ -23,10 +23,7 @@ export function OecbTagIndicator({
 	if (!oecbEligible) {
 		if (hideWhenIneligible) return null
 		return (
-			<Badge
-				variant="outline"
-				className="gap-1 text-muted-foreground"
-			>
+			<Badge variant="outline" className="text-muted-foreground gap-1">
 				No OECB
 			</Badge>
 		)

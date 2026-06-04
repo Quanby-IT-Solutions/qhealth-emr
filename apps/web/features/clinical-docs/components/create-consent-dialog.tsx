@@ -75,7 +75,12 @@ export function CreateConsentDialog({
 				facilityId,
 				encounterId,
 				patientId,
-				consentType: consentType as "general" | "procedure" | "research" | "blood_transfusion" | "surgery",
+				consentType: consentType as
+					| "general"
+					| "procedure"
+					| "research"
+					| "blood_transfusion"
+					| "surgery",
 				signedByName: signedByName.trim(),
 				relationship: relationship as "self" | "parent" | "guardian" | "spouse" | "other",
 				content: content || undefined,
@@ -103,18 +108,14 @@ export function CreateConsentDialog({
 				<DialogHeader>
 					<DialogTitle>Capture Consent</DialogTitle>
 					<DialogDescription>
-						Record the patient or representative's consent for the selected
-						procedure or treatment.
+						Record the patient or representative's consent for the selected procedure or treatment.
 					</DialogDescription>
 				</DialogHeader>
 
 				<div className="space-y-4 py-4">
 					<div className="space-y-2">
 						<Label>Consent Type *</Label>
-						<Select
-							value={consentType}
-							onValueChange={v => setConsentType(v ?? "")}
-						>
+						<Select value={consentType} onValueChange={v => setConsentType(v ?? "")}>
 							<SelectTrigger>
 								<SelectValue />
 							</SelectTrigger>
@@ -139,10 +140,7 @@ export function CreateConsentDialog({
 
 					<div className="space-y-2">
 						<Label>Relationship to Patient</Label>
-						<Select
-							value={relationship}
-							onValueChange={v => setRelationship(v ?? "self")}
-						>
+						<Select value={relationship} onValueChange={v => setRelationship(v ?? "self")}>
 							<SelectTrigger>
 								<SelectValue />
 							</SelectTrigger>
@@ -177,10 +175,7 @@ export function CreateConsentDialog({
 					>
 						Cancel
 					</Button>
-					<Button
-						onClick={handleSubmit}
-						disabled={!isValid || createConsent.isPending}
-					>
+					<Button onClick={handleSubmit} disabled={!isValid || createConsent.isPending}>
 						{createConsent.isPending ? "Recording…" : "Record Consent"}
 					</Button>
 				</DialogFooter>

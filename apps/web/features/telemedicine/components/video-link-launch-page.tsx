@@ -234,9 +234,7 @@ export function VideoLinkLaunchPage({ appointmentId }: VideoLinkLaunchPageProps)
 				</div>
 				<div className="flex shrink-0 items-center gap-2">
 					<Dialog>
-						<DialogTrigger
-							className="border-border bg-muted text-foreground hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-2"
-						>
+						<DialogTrigger className="border-border bg-muted text-foreground hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors outline-none focus-visible:ring-2">
 							<Info className="size-3.5" />
 							<span className="hidden sm:inline">Details</span>
 						</DialogTrigger>
@@ -263,7 +261,11 @@ export function VideoLinkLaunchPage({ appointmentId }: VideoLinkLaunchPageProps)
 									<Field icon={User} label="Patient" value={appointment.patientName} />
 									<Field label="MRN" value={appointment.patientMrn} />
 									<Field icon={User} label="Clinician" value={appointment.clinicianName} />
-									<Field icon={Calendar} label="Date" value={formatDate(appointment.scheduledDate)} />
+									<Field
+										icon={Calendar}
+										label="Date"
+										value={formatDate(appointment.scheduledDate)}
+									/>
 									<Field icon={Clock} label="Time" value={formatTime(appointment.scheduledTime)} />
 									<Field label="Duration" value={`${appointment.durationMinutes} min`} />
 									<Field
@@ -339,7 +341,7 @@ export function VideoLinkLaunchPage({ appointmentId }: VideoLinkLaunchPageProps)
 								<Badge
 									variant="outline"
 									className={cn(
-										"pointer-events-auto border-border bg-card/80 text-[10px] font-medium tracking-wide uppercase backdrop-blur",
+										"border-border bg-card/80 pointer-events-auto text-[10px] font-medium tracking-wide uppercase backdrop-blur",
 										statusColor
 									)}
 								>

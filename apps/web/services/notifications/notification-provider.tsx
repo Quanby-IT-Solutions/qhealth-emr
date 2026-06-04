@@ -83,7 +83,7 @@ export function NotificationProvider({ children, staffId }: NotificationProvider
 			setConnected(true)
 		}
 
-		eventSource.onmessage = (event) => {
+		eventSource.onmessage = event => {
 			try {
 				const data = JSON.parse(event.data) as SseNotificationEvent
 				setUnreadCount(prev => prev + 1)

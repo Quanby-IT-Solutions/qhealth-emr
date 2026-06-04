@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback } from "react"
-import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import { Badge } from "@/core/components/ui/badge"
 import {
@@ -11,10 +11,16 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/core/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
-
-import { EmptyState, ErrorState, SkeletonRows } from "@/features/admin/components/state-views"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { FilterBar, FilterField } from "@/features/admin/components/filter-bar"
+import { EmptyState, ErrorState, SkeletonRows } from "@/features/admin/components/state-views"
 import { TableToolbar } from "@/features/admin/components/table-toolbar"
 
 import { useMedicalRecordsRequestsQuery } from "../api/medical-records.hooks"
@@ -34,7 +40,12 @@ export function RecordsRequestListPage({ facilityId }: RecordsRequestListPagePro
 	const router = useRouter()
 	const pathname = usePathname()
 	const searchParams = useSearchParams()
-	const filterStatus = (searchParams.get("status") ?? "all") as "all" | "pending" | "processing" | "completed" | "rejected"
+	const filterStatus = (searchParams.get("status") ?? "all") as
+		| "all"
+		| "pending"
+		| "processing"
+		| "completed"
+		| "rejected"
 
 	const { data, isLoading, isError, refetch, error } = useMedicalRecordsRequestsQuery({
 		facilityId,
@@ -78,7 +89,10 @@ export function RecordsRequestListPage({ facilityId }: RecordsRequestListPagePro
 			{isLoading && <SkeletonRows count={5} />}
 			{isError && <ErrorState error={error} retry={refetch} />}
 			{data && data.data.length === 0 && !isLoading && (
-				<EmptyState title="No records requests" description="Adjust filters or wait for new requests." />
+				<EmptyState
+					title="No records requests"
+					description="Adjust filters or wait for new requests."
+				/>
 			)}
 
 			{data && data.data.length > 0 && (
@@ -97,24 +111,36 @@ export function RecordsRequestListPage({ facilityId }: RecordsRequestListPagePro
 						{data.data.map(r => (
 							<TableRow
 								key={r.id}
-								className="cursor-pointer hover:bg-muted/40"
+								className="hover:bg-muted/40 cursor-pointer"
 								onClick={() => router.push(`/him/records-requests/${r.id}`)}
 							>
-								<TableCell className="text-xs">{new Date(r.createdAt).toLocaleDateString("en-PH")}</TableCell>
-								<TableCell className="text-xs capitalize">{r.requestType.replace(/_/g, " ")}</TableCell>
+								<TableCell className="text-xs">
+									{new Date(r.createdAt).toLocaleDateString("en-PH")}
+								</TableCell>
+								<TableCell className="text-xs capitalize">
+									{r.requestType.replace(/_/g, " ")}
+								</TableCell>
 								<TableCell className="text-xs">
 									{r.requestedByName}
 									{r.requestedByRelationship && (
-										<span className="ml-1 text-muted-foreground">({r.requestedByRelationship})</span>
+										<span className="text-muted-foreground ml-1">
+											({r.requestedByRelationship})
+										</span>
 									)}
 								</TableCell>
 								<TableCell>
-									<Badge variant={STATUS_VARIANT[r.status] ?? "outline"} className="text-[10px] capitalize">
+									<Badge
+										variant={STATUS_VARIANT[r.status] ?? "outline"}
+										className="text-[10px] capitalize"
+									>
 										{r.status}
 									</Badge>
 								</TableCell>
 								<TableCell>
-									<Badge variant={r.dpaConsentObtained ? "default" : "secondary"} className="text-[10px]">
+									<Badge
+										variant={r.dpaConsentObtained ? "default" : "secondary"}
+										className="text-[10px]"
+									>
 										{r.dpaConsentObtained ? "yes" : "no"}
 									</Badge>
 								</TableCell>

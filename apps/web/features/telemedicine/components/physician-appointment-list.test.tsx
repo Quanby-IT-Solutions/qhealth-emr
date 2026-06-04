@@ -7,7 +7,8 @@ import { PhysicianAppointmentList } from "./physician-appointment-list"
 const mockUseAppointmentsQuery = vi.fn()
 
 vi.mock("@/features/telemedicine/api/telemedicine.hooks", async importOriginal => {
-	const actual = await importOriginal<typeof import("@/features/telemedicine/api/telemedicine.hooks")>()
+	const actual =
+		await importOriginal<typeof import("@/features/telemedicine/api/telemedicine.hooks")>()
 	return {
 		...actual,
 		useAppointmentsQuery: (...args: unknown[]) => mockUseAppointmentsQuery(...args),

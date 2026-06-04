@@ -6,7 +6,13 @@ import { toast } from "sonner"
 import { Button } from "@/core/components/ui/button"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/core/components/ui/sheet"
 
 import { useAddLicenseMutation } from "../api/licenses.hooks"
@@ -79,7 +85,13 @@ export function AddLicenseDrawer({ open, onOpenChange, staffProfileId }: AddLice
 				onSuccess: () => {
 					toast.success("License added successfully.")
 					onOpenChange(false)
-					setForm({ staffProfileId: staffProfileId ?? "", licenseType: "", licenseNumber: "", issueDate: "", expiryDate: "" })
+					setForm({
+						staffProfileId: staffProfileId ?? "",
+						licenseType: "",
+						licenseNumber: "",
+						issueDate: "",
+						expiryDate: "",
+					})
 					setFileName("")
 					if (previewUrl) URL.revokeObjectURL(previewUrl)
 					setPreviewUrl(null)
@@ -98,7 +110,7 @@ export function AddLicenseDrawer({ open, onOpenChange, staffProfileId }: AddLice
 				<SheetHeader>
 					<SheetTitle>Add License</SheetTitle>
 				</SheetHeader>
-				<form onSubmit={handleSubmit} className="space-y-4 mt-4">
+				<form onSubmit={handleSubmit} className="mt-4 space-y-4">
 					{!staffProfileId && (
 						<div className="space-y-1">
 							<Label htmlFor="staffProfileId">Staff Profile ID</Label>
@@ -115,7 +127,9 @@ export function AddLicenseDrawer({ open, onOpenChange, staffProfileId }: AddLice
 						<Label htmlFor="licenseType">License Type</Label>
 						<Select
 							value={form.licenseType}
-							onValueChange={v => setForm(f => ({ ...f, licenseType: (v ?? "") as "PRC" | "PTR" | "S2" | "" }))}
+							onValueChange={v =>
+								setForm(f => ({ ...f, licenseType: (v ?? "") as "PRC" | "PTR" | "S2" | "" }))
+							}
 						>
 							<SelectTrigger id="licenseType">
 								<SelectValue />
@@ -166,19 +180,20 @@ export function AddLicenseDrawer({ open, onOpenChange, staffProfileId }: AddLice
 							accept=".pdf,.jpg,.jpeg,.png"
 							onChange={handleFileChange}
 						/>
-						{fileError && <p className="text-xs text-destructive">{fileError}</p>}
-						{fileName && <p className="text-xs text-muted-foreground">Selected: {fileName}</p>}
+						{fileError && <p className="text-destructive text-xs">{fileError}</p>}
+						{fileName && <p className="text-muted-foreground text-xs">Selected: {fileName}</p>}
 					</div>
 
 					{previewUrl && (
-						<div className="rounded border overflow-hidden">
+						<div className="overflow-hidden rounded border">
 							{previewType === "application/pdf" ? (
-								<object
-									data={previewUrl}
-									type="application/pdf"
-									className="w-full h-48"
-								>
-									<a href={previewUrl} target="_blank" rel="noreferrer" className="text-xs text-primary underline">
+								<object data={previewUrl} type="application/pdf" className="h-48 w-full">
+									<a
+										href={previewUrl}
+										target="_blank"
+										rel="noreferrer"
+										className="text-primary text-xs underline"
+									>
 										Open PDF
 									</a>
 								</object>
@@ -187,14 +202,17 @@ export function AddLicenseDrawer({ open, onOpenChange, staffProfileId }: AddLice
 								<img
 									src={previewUrl}
 									alt="Document preview"
-									className="w-full max-h-48 object-contain"
+									className="max-h-48 w-full object-contain"
 								/>
 							)}
 						</div>
 					)}
 
 					<div className="flex gap-2 pt-2">
-						<Button type="submit" disabled={addMutation.isPending || !form.licenseType || !!fileError}>
+						<Button
+							type="submit"
+							disabled={addMutation.isPending || !form.licenseType || !!fileError}
+						>
 							{addMutation.isPending ? "Saving..." : "Add License"}
 						</Button>
 						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

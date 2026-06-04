@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 
-import { Button } from "@/core/components/ui/button"
 import { Badge } from "@/core/components/ui/badge"
+import { Button } from "@/core/components/ui/button"
 import {
 	Dialog,
 	DialogContent,
@@ -13,9 +13,12 @@ import {
 } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
-import { useListCliniciansQuery, usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
 import { useMergePreEncounterMutation, useMergePreviewQuery } from "@/features/ed/api/ed.hooks"
 import { acuityColor, acuityLabel } from "@/features/ed/lib/acuity-utils"
+import {
+	useListCliniciansQuery,
+	usePatientSearchQuery,
+} from "@/features/patients/api/patients.hooks"
 
 interface MergeDialogProps {
 	preEncounterId: string
@@ -152,9 +155,7 @@ export function MergeDialog({
 													<span className="font-medium">
 														{patient.lastName}, {patient.firstName}
 													</span>
-													<span className="text-muted-foreground ml-2">
-														MRN: {patient.mrn}
-													</span>
+													<span className="text-muted-foreground ml-2">MRN: {patient.mrn}</span>
 												</div>
 												<span className="text-muted-foreground text-xs">
 													DOB: {patient.dateOfBirth}
@@ -170,9 +171,7 @@ export function MergeDialog({
 					{selectedPatientId && (
 						<>
 							{previewLoading ? (
-								<p className="text-muted-foreground py-4 text-center text-sm">
-									Loading preview…
-								</p>
+								<p className="text-muted-foreground py-4 text-center text-sm">Loading preview…</p>
 							) : preview ? (
 								<div className="space-y-4">
 									<div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
@@ -225,14 +224,12 @@ export function MergeDialog({
 									</div>
 
 									<div className="space-y-2">
-										<Label htmlFor="attendingStaffId">
-											Attending physician
-										</Label>
+										<Label htmlFor="attendingStaffId">Attending physician</Label>
 										<div className="relative">
 											<button
 												type="button"
 												id="attendingStaffId"
-												className="border-input bg-background text-foreground flex h-9 w-full items-center justify-between rounded-lg border px-3 text-left text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+												className="border-input bg-background text-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full items-center justify-between rounded-lg border px-3 text-left text-sm transition-colors outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
 												disabled={cliniciansLoading || clinicians.length === 0}
 												aria-haspopup="listbox"
 												aria-expanded={attendingPickerOpen}
@@ -272,9 +269,7 @@ export function MergeDialog({
 																>
 																	<span>
 																		{clinician.name}
-																		{clinician.department
-																			? ` - ${clinician.department}`
-																			: ""}
+																		{clinician.department ? ` - ${clinician.department}` : ""}
 																	</span>
 																	{active && <span className="text-xs">Selected</span>}
 																</button>
@@ -290,9 +285,7 @@ export function MergeDialog({
 									</div>
 
 									{merge.isError && (
-										<p className="text-destructive text-sm">
-											{merge.error.message}
-										</p>
+										<p className="text-destructive text-sm">{merge.error.message}</p>
 									)}
 								</div>
 							) : null}

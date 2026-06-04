@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { HandHeart, Loader2, Plus } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -25,14 +24,21 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { Textarea } from "@/core/components/ui/textarea"
 
 import {
-	type MalasakitSource,
 	useAddMalasakitMutation,
 	useMalasakitQuery,
 	useUpdateMalasakitStatusMutation,
+	type MalasakitSource,
 } from "../api/billing.hooks"
 
 interface MalasakitTrackerProps {
@@ -51,10 +57,7 @@ const SOURCE_LABELS: Record<MalasakitSource, string> = {
 	other: "Other",
 }
 
-const STATUS_VARIANT: Record<
-	string,
-	"default" | "secondary" | "destructive" | "outline"
-> = {
+const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
 	pending: "secondary",
 	approved: "outline",
 	disbursed: "default",
@@ -65,11 +68,7 @@ function formatPeso(value: number): string {
 	return `₱${value.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-export function MalasakitTracker({
-	encounterId,
-	facilityId,
-	patientId,
-}: MalasakitTrackerProps) {
+export function MalasakitTracker({ encounterId, facilityId, patientId }: MalasakitTrackerProps) {
 	const [addOpen, setAddOpen] = useState(false)
 	const [source, setSource] = useState<MalasakitSource>("hospital_fund")
 	const [amount, setAmount] = useState("")
@@ -126,14 +125,14 @@ export function MalasakitTracker({
 				<CardContent className="space-y-4">
 					{isLoading && (
 						<div className="flex h-20 items-center justify-center">
-							<Loader2 className="size-5 animate-spin text-muted-foreground" />
+							<Loader2 className="text-muted-foreground size-5 animate-spin" />
 						</div>
 					)}
 
 					{!isLoading && summary && (
 						<>
 							{/* Summary strip */}
-							<div className="grid grid-cols-3 gap-4 rounded-md bg-muted p-4 text-sm">
+							<div className="bg-muted grid grid-cols-3 gap-4 rounded-md p-4 text-sm">
 								<div className="text-center">
 									<p className="text-muted-foreground">Total Requested</p>
 									<p className="font-semibold">{formatPeso(summary.totalRequested)}</p>
@@ -168,7 +167,7 @@ export function MalasakitTracker({
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{summary.items.map((item) => (
+										{summary.items.map(item => (
 											<TableRow key={item.id}>
 												<TableCell className="text-sm font-medium">
 													{SOURCE_LABELS[item.source]}
@@ -176,18 +175,14 @@ export function MalasakitTracker({
 												<TableCell className="max-w-xs text-sm">
 													<p>{item.purpose}</p>
 													{item.notes && (
-														<p className="text-muted-foreground text-xs">
-															{item.notes}
-														</p>
+														<p className="text-muted-foreground text-xs">{item.notes}</p>
 													)}
 												</TableCell>
 												<TableCell className="text-right font-medium">
 													{formatPeso(item.amount)}
 												</TableCell>
 												<TableCell>
-													<Badge
-														variant={STATUS_VARIANT[item.status] ?? "secondary"}
-													>
+													<Badge variant={STATUS_VARIANT[item.status] ?? "secondary"}>
 														{item.status}
 													</Badge>
 												</TableCell>
@@ -255,7 +250,7 @@ export function MalasakitTracker({
 			{/* Add Assistance Dialog */}
 			<Dialog
 				open={addOpen}
-				onOpenChange={(open) => {
+				onOpenChange={open => {
 					setAddOpen(open)
 					if (!open) resetForm()
 				}}
@@ -272,7 +267,7 @@ export function MalasakitTracker({
 							<Label>Assistance Source</Label>
 							<Select
 								value={source}
-								onValueChange={(v) => {
+								onValueChange={v => {
 									if (v) setSource(v as MalasakitSource)
 								}}
 							>
@@ -280,7 +275,7 @@ export function MalasakitTracker({
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{(Object.keys(SOURCE_LABELS) as MalasakitSource[]).map((key) => (
+									{(Object.keys(SOURCE_LABELS) as MalasakitSource[]).map(key => (
 										<SelectItem key={key} value={key}>
 											{SOURCE_LABELS[key]}
 										</SelectItem>
@@ -295,7 +290,7 @@ export function MalasakitTracker({
 								min="0"
 								step="0.01"
 								value={amount}
-								onChange={(e) => setAmount(e.target.value)}
+								onChange={e => setAmount(e.target.value)}
 								placeholder="0.00"
 							/>
 						</div>
@@ -303,7 +298,7 @@ export function MalasakitTracker({
 							<Label>Purpose / Description</Label>
 							<Input
 								value={purpose}
-								onChange={(e) => setPurpose(e.target.value)}
+								onChange={e => setPurpose(e.target.value)}
 								placeholder="e.g. Partial coverage for laboratory fees"
 							/>
 						</div>
@@ -312,7 +307,7 @@ export function MalasakitTracker({
 							<Textarea
 								rows={2}
 								value={notes}
-								onChange={(e) => setNotes(e.target.value)}
+								onChange={e => setNotes(e.target.value)}
 								placeholder="Additional details…"
 							/>
 						</div>
@@ -321,13 +316,8 @@ export function MalasakitTracker({
 						<Button variant="outline" onClick={() => setAddOpen(false)}>
 							Cancel
 						</Button>
-						<Button
-							onClick={handleAdd}
-							disabled={addMutation.isPending || !amount || !purpose}
-						>
-							{addMutation.isPending ? (
-								<Loader2 className="mr-1.5 size-4 animate-spin" />
-							) : null}
+						<Button onClick={handleAdd} disabled={addMutation.isPending || !amount || !purpose}>
+							{addMutation.isPending ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : null}
 							Add Assistance
 						</Button>
 					</DialogFooter>

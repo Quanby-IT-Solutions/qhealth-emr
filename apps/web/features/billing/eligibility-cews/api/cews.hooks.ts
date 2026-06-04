@@ -12,8 +12,7 @@ export function useSaveCewsSnapshotMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		billingOrpc.saveCewsSnapshot.mutationOptions({
-			onSuccess: () =>
-				qc.invalidateQueries({ queryKey: billingOrpc.listCewsSnapshots.key() }),
+			onSuccess: () => qc.invalidateQueries({ queryKey: billingOrpc.listCewsSnapshots.key() }),
 		})
 	)
 }

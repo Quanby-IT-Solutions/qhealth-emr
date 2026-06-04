@@ -1,19 +1,19 @@
 "use client"
 
-import { Navbar } from "./navbar"
-import { HeroSection } from "./hero-section"
-import { RegulatorySection } from "./regulatory-section"
-import { ModulesSection } from "./modules-section"
-import { ReportingSection } from "./reporting-section"
-import { WorkflowSection } from "./workflow-section"
-import { InteropSection } from "./interop-section"
-import { TrustSection } from "./trust-section"
 import { ClosingSection } from "./closing-section"
 import { Footer } from "./footer"
+import { HeroSection } from "./hero-section"
+import { InteropSection } from "./interop-section"
+import { ModulesSection } from "./modules-section"
+import { Navbar } from "./navbar"
+import { RegulatorySection } from "./regulatory-section"
+import { ReportingSection } from "./reporting-section"
+import { TrustSection } from "./trust-section"
+import { WorkflowSection } from "./workflow-section"
 
 export function LandingPage() {
 	return (
-		<div className="flex min-h-screen flex-col font-sans antialiased bg-background">
+		<div className="bg-background flex min-h-screen flex-col font-sans antialiased">
 			<Navbar />
 			<main className="flex-1">
 				<HeroSection />

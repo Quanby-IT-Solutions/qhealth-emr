@@ -28,7 +28,10 @@ type CewsMembership = {
 	verifiedAt: Date
 }
 
-const STATUS_VARIANT: Record<CewsMembership["status"], "default" | "secondary" | "destructive" | "outline"> = {
+const STATUS_VARIANT: Record<
+	CewsMembership["status"],
+	"default" | "secondary" | "destructive" | "outline"
+> = {
 	active: "default",
 	lapsed: "destructive",
 	suspended: "destructive",
@@ -37,11 +40,15 @@ const STATUS_VARIANT: Record<CewsMembership["status"], "default" | "secondary" |
 
 const ERROR_MESSAGES: Record<string, string> = {
 	member_not_found: "Member not found. Verify the PIN and try again.",
-	service_unavailable: "PhilHealth CEWS is temporarily unavailable. Try again later or save a manual note.",
+	service_unavailable:
+		"PhilHealth CEWS is temporarily unavailable. Try again later or save a manual note.",
 	auth_failed: "Authentication with PhilHealth CEWS failed. Contact your system administrator.",
 }
 
-export function MembershipVerificationPage({ memberPin, encounterId }: MembershipVerificationPageProps) {
+export function MembershipVerificationPage({
+	memberPin,
+	encounterId,
+}: MembershipVerificationPageProps) {
 	const [result, setResult] = useState<CewsMembership | null>(null)
 	const [errorCode, setErrorCode] = useState<string | null>(null)
 	const [verifyCount, setVerifyCount] = useState(0)
@@ -77,18 +84,13 @@ export function MembershipVerificationPage({ memberPin, encounterId }: Membershi
 	}, [memberPin])
 
 	return (
-		<div className="px-4 space-y-4 max-w-lg">
+		<div className="max-w-lg space-y-4 px-4">
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-lg font-semibold">Membership Verification</h1>
-					<p className="text-sm text-muted-foreground font-mono">{formatPin(memberPin)}</p>
+					<p className="text-muted-foreground font-mono text-sm">{formatPin(memberPin)}</p>
 				</div>
-				<Button
-					onClick={doVerify}
-					disabled={isPending}
-					variant="outline"
-					size="sm"
-				>
+				<Button onClick={doVerify} disabled={isPending} variant="outline" size="sm">
 					{isPending ? "Verifying..." : verifyCount === 0 ? "Verify" : "Re-verify"}
 				</Button>
 			</div>
@@ -115,7 +117,7 @@ export function MembershipVerificationPage({ memberPin, encounterId }: Membershi
 							<div className="flex items-center justify-between">
 								<CardTitle className="text-sm">Member Details</CardTitle>
 								{verifyCount > 1 && (
-									<span className="text-[10px] text-muted-foreground">
+									<span className="text-muted-foreground text-[10px]">
 										Verification #{verifyCount}
 									</span>
 								)}
@@ -130,7 +132,7 @@ export function MembershipVerificationPage({ memberPin, encounterId }: Membershi
 								<span className="text-muted-foreground">PIN</span>
 								<span className="font-mono">{formatPin(result.memberPin)}</span>
 							</div>
-							<div className="flex justify-between items-center">
+							<div className="flex items-center justify-between">
 								<span className="text-muted-foreground">Status</span>
 								<Badge variant={STATUS_VARIANT[result.status]}>{result.status}</Badge>
 							</div>
@@ -138,12 +140,15 @@ export function MembershipVerificationPage({ memberPin, encounterId }: Membershi
 								<div className="flex justify-between">
 									<span className="text-muted-foreground">Benefit Balance</span>
 									<span className="tabular-nums">
-										₱{Number(result.benefitBalance).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+										₱
+										{Number(result.benefitBalance).toLocaleString("en-PH", {
+											minimumFractionDigits: 2,
+										})}
 									</span>
 								</div>
 							)}
 							<Separator />
-							<p className="text-[10px] text-muted-foreground">
+							<p className="text-muted-foreground text-[10px]">
 								Verified: {new Date(result.verifiedAt).toLocaleString("en-PH")}
 							</p>
 						</CardContent>
@@ -162,15 +167,17 @@ export function MembershipVerificationPage({ memberPin, encounterId }: Membershi
 							</CardHeader>
 							<CardContent>
 								{/* Count tile shown only on mobile */}
-								<div className="flex items-center justify-center rounded-md bg-muted p-3 sm:hidden">
-									<span className="text-sm font-medium">{result.dependents.length} dependent{result.dependents.length !== 1 ? "s" : ""}</span>
+								<div className="bg-muted flex items-center justify-center rounded-md p-3 sm:hidden">
+									<span className="text-sm font-medium">
+										{result.dependents.length} dependent{result.dependents.length !== 1 ? "s" : ""}
+									</span>
 								</div>
 								{/* Table hidden on mobile */}
 								<table className="hidden w-full text-sm sm:table">
 									<thead>
-										<tr className="border-b text-left text-xs text-muted-foreground">
-											<th className="pb-1 pr-4">Name</th>
-											<th className="pb-1 pr-4">Relationship</th>
+										<tr className="text-muted-foreground border-b text-left text-xs">
+											<th className="pr-4 pb-1">Name</th>
+											<th className="pr-4 pb-1">Relationship</th>
 											<th className="pb-1">PIN</th>
 										</tr>
 									</thead>

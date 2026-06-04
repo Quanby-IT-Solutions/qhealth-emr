@@ -6,7 +6,13 @@ import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
 
 interface BedOption {
@@ -37,8 +43,10 @@ function preferredWardType(encounterType: string): string | null {
 }
 
 function wardRuleExplanation(encounterType: string, wardType: string | null): string {
-	if (encounterType === "emergency" && wardType === "er") return "Best match: ER bed for emergency encounter"
-	if (encounterType === "inpatient" && wardType === "general") return "Best match: General ward for inpatient admission"
+	if (encounterType === "emergency" && wardType === "er")
+		return "Best match: ER bed for emergency encounter"
+	if (encounterType === "inpatient" && wardType === "general")
+		return "Best match: General ward for inpatient admission"
 	if (wardType === "icu") return "ICU bed available — confirm clinical need before assigning"
 	return "Available bed — no specific ward preference for this encounter type"
 }
@@ -68,13 +76,10 @@ export function BedSuggestionPanel({
 	}
 
 	const preferred = preferredWardType(encounterType)
-	const suggestedBed =
-		availableBeds.find(b => b.wardType === preferred) ?? availableBeds[0]
+	const suggestedBed = availableBeds.find(b => b.wardType === preferred) ?? availableBeds[0]
 
 	const isAccepted = selectedBedId === suggestedBed?.id && !overrideMode
-	const explanation = suggestedBed
-		? wardRuleExplanation(encounterType, suggestedBed.wardType)
-		: ""
+	const explanation = suggestedBed ? wardRuleExplanation(encounterType, suggestedBed.wardType) : ""
 	const selectedBed = availableBeds.find(bed => bed.id === selectedBedId)
 
 	const handleAccept = () => {
@@ -103,7 +108,9 @@ export function BedSuggestionPanel({
 								<p className="font-medium">
 									{suggestedBed.wardName} — Bed {suggestedBed.bedNumber}
 								</p>
-								<p className="text-muted-foreground text-xs capitalize">{suggestedBed.wardType} ward</p>
+								<p className="text-muted-foreground text-xs capitalize">
+									{suggestedBed.wardType} ward
+								</p>
 							</div>
 							<Badge className="capitalize">{suggestedBed.status}</Badge>
 						</div>
@@ -111,11 +118,7 @@ export function BedSuggestionPanel({
 						<p className="text-muted-foreground text-xs">{explanation}</p>
 
 						<div className="flex gap-2">
-							<Button
-								size="sm"
-								disabled={isAccepted}
-								onClick={handleAccept}
-							>
+							<Button size="sm" disabled={isAccepted} onClick={handleAccept}>
 								{isAccepted ? "Accepted" : "Accept Suggestion"}
 							</Button>
 							<Button

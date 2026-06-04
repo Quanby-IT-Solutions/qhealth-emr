@@ -36,15 +36,10 @@ function BenefitRow({ icon, label, used, allowed }: BenefitRowProps) {
 				</span>
 				<span className={isExhausted ? "font-medium text-red-600" : "font-medium"}>
 					{used} / {allowed}
-					{isExhausted && (
-						<AlertCircle className="ml-1 inline size-3.5 text-red-600" />
-					)}
+					{isExhausted && <AlertCircle className="ml-1 inline size-3.5 text-red-600" />}
 				</span>
 			</div>
-			<Progress
-				value={pct}
-				className={isExhausted ? "bg-red-100" : undefined}
-			/>
+			<Progress value={pct} className={isExhausted ? "bg-red-100" : undefined} />
 		</div>
 	)
 }
@@ -57,7 +52,7 @@ export function KonsultaTracker({ encounterId, facilityId, patientId }: Konsulta
 		return (
 			<Card>
 				<CardContent className="flex h-32 items-center justify-center">
-					<Loader2 className="size-5 animate-spin text-muted-foreground" />
+					<Loader2 className="text-muted-foreground size-5 animate-spin" />
 				</CardContent>
 			</Card>
 		)
@@ -70,9 +65,9 @@ export function KonsultaTracker({ encounterId, facilityId, patientId }: Konsulta
 					<CardTitle>Konsulta Capitation Benefit</CardTitle>
 				</CardHeader>
 				<CardContent>
-					<p className="text-sm text-muted-foreground">
-						No active Konsulta benefit found for this patient. Patient must be enrolled
-						in PhilHealth's Konsulta program with an accredited primary care facility.
+					<p className="text-muted-foreground text-sm">
+						No active Konsulta benefit found for this patient. Patient must be enrolled in
+						PhilHealth's Konsulta program with an accredited primary care facility.
 					</p>
 				</CardContent>
 			</Card>
@@ -92,8 +87,7 @@ export function KonsultaTracker({ encounterId, facilityId, patientId }: Konsulta
 				<div>
 					<CardTitle>Konsulta Capitation Benefit</CardTitle>
 					<p className="text-muted-foreground mt-1 text-sm">
-						Benefit period:{" "}
-						{new Date(benefit.benefitPeriodStart).toLocaleDateString("en-PH")} –{" "}
+						Benefit period: {new Date(benefit.benefitPeriodStart).toLocaleDateString("en-PH")} –{" "}
 						{new Date(benefit.benefitPeriodEnd).toLocaleDateString("en-PH")}
 					</p>
 				</div>
@@ -103,31 +97,30 @@ export function KonsultaTracker({ encounterId, facilityId, patientId }: Konsulta
 				</Badge>
 			</CardHeader>
 			<CardContent className="space-y-4">
-				<div className="text-sm text-muted-foreground">
+				<div className="text-muted-foreground text-sm">
 					PhilHealth Member ID:{" "}
-					<span className="font-medium text-foreground">{benefit.philhealthMemberId}</span>
+					<span className="text-foreground font-medium">{benefit.philhealthMemberId}</span>
 					{" · "}
-					Benefit Year:{" "}
-					<span className="font-medium text-foreground">{benefit.benefitYear}</span>
+					Benefit Year: <span className="text-foreground font-medium">{benefit.benefitYear}</span>
 				</div>
 
 				<Separator />
 
 				<div className="space-y-4">
 					<BenefitRow
-						icon={<Stethoscope className="size-4 text-muted-foreground" />}
+						icon={<Stethoscope className="text-muted-foreground size-4" />}
 						label="Consultations"
 						used={benefit.consultationsUsed}
 						allowed={benefit.consultationsAllowed}
 					/>
 					<BenefitRow
-						icon={<Pill className="size-4 text-muted-foreground" />}
+						icon={<Pill className="text-muted-foreground size-4" />}
 						label="Medications"
 						used={benefit.medicationsUsed}
 						allowed={benefit.medicationsAllowed}
 					/>
 					<BenefitRow
-						icon={<FlaskConical className="size-4 text-muted-foreground" />}
+						icon={<FlaskConical className="text-muted-foreground size-4" />}
 						label="Laboratory Packages"
 						used={benefit.labUsed}
 						allowed={benefit.labAllowed}

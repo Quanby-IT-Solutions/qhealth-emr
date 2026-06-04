@@ -33,7 +33,7 @@ export function AuditLogPanel({ entries, isLoading, className }: AuditLogPanelPr
 		return (
 			<div className={cn("space-y-2 p-3", className)} aria-busy>
 				{Array.from({ length: 4 }).map((_, i) => (
-					<div key={i} className="h-10 animate-pulse rounded bg-muted" />
+					<div key={i} className="bg-muted h-10 animate-pulse rounded" />
 				))}
 			</div>
 		)
@@ -41,29 +41,38 @@ export function AuditLogPanel({ entries, isLoading, className }: AuditLogPanelPr
 
 	if (entries.length === 0) {
 		return (
-			<p className={cn("py-8 text-center text-xs text-muted-foreground", className)}>
+			<p className={cn("text-muted-foreground py-8 text-center text-xs", className)}>
 				No audit entries.
 			</p>
 		)
 	}
 
 	return (
-		<ol className={cn("divide-y rounded-md border bg-card", className)} aria-label="Audit log">
+		<ol className={cn("bg-card divide-y rounded-md border", className)} aria-label="Audit log">
 			{entries.map(entry => (
 				<li key={entry.id} className="flex items-start gap-3 px-3 py-2 text-xs">
-					<Badge variant={ACTION_VARIANT[entry.action] ?? "outline"} className="capitalize text-[10px]">
+					<Badge
+						variant={ACTION_VARIANT[entry.action] ?? "outline"}
+						className="text-[10px] capitalize"
+					>
 						{entry.action}
 					</Badge>
-					<div className="flex-1 min-w-0">
+					<div className="min-w-0 flex-1">
 						<div className="flex items-baseline justify-between gap-2">
-							<span className="truncate font-medium">{entry.entityType}{entry.entityId ? ` · ${entry.entityId}` : ""}</span>
-							<time className="shrink-0 text-[10px] text-muted-foreground" dateTime={String(entry.occurredAt)}>
+							<span className="truncate font-medium">
+								{entry.entityType}
+								{entry.entityId ? ` · ${entry.entityId}` : ""}
+							</span>
+							<time
+								className="text-muted-foreground shrink-0 text-[10px]"
+								dateTime={String(entry.occurredAt)}
+							>
 								{new Date(entry.occurredAt).toLocaleString("en-PH")}
 							</time>
 						</div>
-						{entry.actor && <p className="text-[10px] text-muted-foreground">by {entry.actor}</p>}
+						{entry.actor && <p className="text-muted-foreground text-[10px]">by {entry.actor}</p>}
 						{entry.metadata && Object.keys(entry.metadata).length > 0 && (
-							<pre className="mt-1 max-h-24 overflow-auto rounded bg-muted/50 p-1 font-mono text-[10px]">
+							<pre className="bg-muted/50 mt-1 max-h-24 overflow-auto rounded p-1 font-mono text-[10px]">
 								{JSON.stringify(entry.metadata, null, 0)}
 							</pre>
 						)}

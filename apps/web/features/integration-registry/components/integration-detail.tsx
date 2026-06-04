@@ -1,9 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-
 import { useRouter } from "next/navigation"
-
 import { useQueryClient } from "@tanstack/react-query"
 import { Info, Save, Trash2, Wifi, X } from "lucide-react"
 
@@ -30,6 +28,7 @@ import {
 import { Skeleton } from "@/core/components/ui/skeleton"
 import { Switch } from "@/core/components/ui/switch"
 import { Textarea } from "@/core/components/ui/textarea"
+import { orpc } from "@/services/orpc/client"
 import {
 	useCredentialRefsQuery,
 	useDeleteIntegrationMutation,
@@ -37,7 +36,6 @@ import {
 	useTestConnectivityMutation,
 	useUpdateIntegrationMutation,
 } from "@/features/integration-registry/api/integration-registry.hooks"
-import { orpc } from "@/services/orpc/client"
 
 const KIND_LABELS: Record<string, string> = {
 	fhir: "FHIR",
@@ -53,7 +51,11 @@ const KIND_LABELS: Record<string, string> = {
 }
 
 /** Fields whose change requires disabling the integration before saving. */
-const CONNECTION_CRITICAL_FIELDS: Array<keyof DraftState> = ["endpointUrl", "credentialsRef", "kind"]
+const CONNECTION_CRITICAL_FIELDS: Array<keyof DraftState> = [
+	"endpointUrl",
+	"credentialsRef",
+	"kind",
+]
 
 const CREDENTIAL_STATUS_VARIANT: Record<
 	string,
@@ -148,11 +150,7 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 	}
 
 	if (error) {
-		return (
-			<div className="text-destructive text-sm">
-				Integration not found or failed to load.
-			</div>
-		)
+		return <div className="text-destructive text-sm">Integration not found or failed to load.</div>
 	}
 
 	const currentDraft = toDraft(integration as IntegrationData)
@@ -164,7 +162,8 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 	// If any connection-critical field changes on an enabled integration, the backend will
 	// reject the save. Detect this early to show a clear UX warning.
 	const connectionCriticalChanged = CONNECTION_CRITICAL_FIELDS.some(f => changedFields.includes(f))
-	const blockedByConnectionChange = connectionCriticalChanged && !!(integration as IntegrationData)?.enabled
+	const blockedByConnectionChange =
+		connectionCriticalChanged && !!(integration as IntegrationData)?.enabled
 
 	function patch<K extends keyof DraftState>(field: K, value: DraftState[K]) {
 		setDraft(prev => (prev ? { ...prev, [field]: value } : prev))
@@ -190,9 +189,7 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 			}
 		}
 
-		await updateMutation.mutateAsync(
-			payload as Parameters<typeof updateMutation.mutateAsync>[0]
-		)
+		await updateMutation.mutateAsync(payload as Parameters<typeof updateMutation.mutateAsync>[0])
 		setIsDirty(false)
 	}
 
@@ -225,8 +222,8 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 						</p>
 						<p className="text-blue-700 dark:text-blue-300">
 							This entry stores the connection endpoint and credential reference for{" "}
-							{draft.kind === "nhdr" ? "NHDR" : "FHIR"} only. For FHIR R4 bundle exports,
-							patient consent tracking, and NHDR submission management, go to{" "}
+							{draft.kind === "nhdr" ? "NHDR" : "FHIR"} only. For FHIR R4 bundle exports, patient
+							consent tracking, and NHDR submission management, go to{" "}
 							<a href="/admin/fhir" className="font-medium underline">
 								Admin → FHIR / NHDR
 							</a>
@@ -241,12 +238,12 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 				<div className="flex items-center justify-between rounded-md border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm dark:border-amber-700 dark:bg-amber-950">
 					<div className="flex flex-col gap-0.5">
 						<span className="text-amber-800 dark:text-amber-200">
-							{changedFields.length} unsaved{" "}
-							{changedFields.length === 1 ? "change" : "changes"}
+							{changedFields.length} unsaved {changedFields.length === 1 ? "change" : "changes"}
 						</span>
 						{blockedByConnectionChange && (
 							<span className="text-destructive text-xs">
-								Endpoint, credential, or kind cannot change on a live integration — disable it first, then re-test.
+								Endpoint, credential, or kind cannot change on a live integration — disable it
+								first, then re-test.
 							</span>
 						)}
 					</div>
@@ -287,10 +284,7 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 
 							<div className="space-y-1.5">
 								<Label htmlFor="kind">Kind</Label>
-								<Select
-									value={draft.kind}
-									onValueChange={v => patch("kind", v ?? "")}
-								>
+								<Select value={draft.kind} onValueChange={v => patch("kind", v ?? "")}>
 									<SelectTrigger id="kind">
 										<SelectValue />
 									</SelectTrigger>
@@ -314,42 +308,42 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 								/>
 							</div>
 
-						<div className="space-y-1.5">
-							<Label htmlFor="webhookUrl">Webhook URL <span className="text-muted-foreground">(optional)</span></Label>
-							<Input
-								id="webhookUrl"
-								value={draft.webhookUrl}
-								onChange={e => patch("webhookUrl", e.target.value)}
-								placeholder="https://your-system.example.ph/webhook"
-							/>
-						</div>
-
-						<div className="space-y-1.5">
-							<Label htmlFor="credentialsRef">Credential reference</Label>
-							<Select
-								value={draft.credentialsRef || "__none__"}
-								onValueChange={v =>
-									patch("credentialsRef", v === "__none__" ? "" : (v ?? ""))
-								}
-							>
-								<SelectTrigger id="credentialsRef">
-									<SelectValue placeholder="No credential" />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="__none__">No credential</SelectItem>
-									{credentialRefs.map(ref => (
-										<SelectItem key={ref} value={ref}>
-											{ref}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-							<div className="flex items-center gap-2 mt-1">
-								<Badge variant={credBadge.variant} className="text-xs">
-									{credBadge.label}
-								</Badge>
+							<div className="space-y-1.5">
+								<Label htmlFor="webhookUrl">
+									Webhook URL <span className="text-muted-foreground">(optional)</span>
+								</Label>
+								<Input
+									id="webhookUrl"
+									value={draft.webhookUrl}
+									onChange={e => patch("webhookUrl", e.target.value)}
+									placeholder="https://your-system.example.ph/webhook"
+								/>
 							</div>
-						</div>
+
+							<div className="space-y-1.5">
+								<Label htmlFor="credentialsRef">Credential reference</Label>
+								<Select
+									value={draft.credentialsRef || "__none__"}
+									onValueChange={v => patch("credentialsRef", v === "__none__" ? "" : (v ?? ""))}
+								>
+									<SelectTrigger id="credentialsRef">
+										<SelectValue placeholder="No credential" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="__none__">No credential</SelectItem>
+										{credentialRefs.map(ref => (
+											<SelectItem key={ref} value={ref}>
+												{ref}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<div className="mt-1 flex items-center gap-2">
+									<Badge variant={credBadge.variant} className="text-xs">
+										{credBadge.label}
+									</Badge>
+								</div>
+							</div>
 
 							<div className="space-y-1.5">
 								<div className="flex items-center gap-3">
@@ -362,30 +356,38 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 										{draft.enabled ? "Enabled" : "Disabled"}
 									</Label>
 								</div>
-								{draft.enabled && !integration?.enabled && (() => {
-									const WINDOW_MS = 10 * 60 * 1000
-									const testedAt = integration?.lastTestedAt ? new Date(integration.lastTestedAt) : null
-									const intKind = (integration as IntegrationData).kind
-									const kindRequiresActivation = intKind === "fhir" || intKind === "nhdr"
-									const isRecentOk =
-										integration?.lastTestStatus === "ok" &&
-										testedAt !== null &&
-										Date.now() - testedAt.getTime() < WINDOW_MS
-									const isActivationReady = isRecentOk && (integration as IntegrationData).lastTestReadinessLevel === "activation"
-									const isTransportReady = isRecentOk && (integration as IntegrationData).lastTestReadinessLevel === "transport"
-									const canEnable = kindRequiresActivation ? isActivationReady : (isActivationReady || isTransportReady)
-									if (!canEnable) {
-										const hint = kindRequiresActivation
-											? "An activation-grade connectivity test is required before enabling. Run the test from the connectivity panel on the right."
-											: (isTransportReady
-												? null // transport-ready: no blocking message — save will succeed
-												: "A successful connectivity test is required before enabling. Run the test from the connectivity panel on the right.")
-										return hint ? (
-											<p className="text-destructive text-xs">{hint}</p>
-										) : null
-									}
-									return null
-								})()}
+								{draft.enabled &&
+									!integration?.enabled &&
+									(() => {
+										const WINDOW_MS = 10 * 60 * 1000
+										const testedAt = integration?.lastTestedAt
+											? new Date(integration.lastTestedAt)
+											: null
+										const intKind = (integration as IntegrationData).kind
+										const kindRequiresActivation = intKind === "fhir" || intKind === "nhdr"
+										const isRecentOk =
+											integration?.lastTestStatus === "ok" &&
+											testedAt !== null &&
+											Date.now() - testedAt.getTime() < WINDOW_MS
+										const isActivationReady =
+											isRecentOk &&
+											(integration as IntegrationData).lastTestReadinessLevel === "activation"
+										const isTransportReady =
+											isRecentOk &&
+											(integration as IntegrationData).lastTestReadinessLevel === "transport"
+										const canEnable = kindRequiresActivation
+											? isActivationReady
+											: isActivationReady || isTransportReady
+										if (!canEnable) {
+											const hint = kindRequiresActivation
+												? "An activation-grade connectivity test is required before enabling. Run the test from the connectivity panel on the right."
+												: isTransportReady
+													? null // transport-ready: no blocking message — save will succeed
+													: "A successful connectivity test is required before enabling. Run the test from the connectivity panel on the right."
+											return hint ? <p className="text-destructive text-xs">{hint}</p> : null
+										}
+										return null
+									})()}
 							</div>
 
 							<div className="space-y-1.5">
@@ -404,16 +406,10 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 					{/* Danger zone */}
 					<Card className="border-destructive/30">
 						<CardHeader>
-							<CardTitle className="text-destructive text-sm font-semibold">
-								Danger zone
-							</CardTitle>
+							<CardTitle className="text-destructive text-sm font-semibold">Danger zone</CardTitle>
 						</CardHeader>
 						<CardContent>
-							<Button
-								variant="destructive"
-								size="sm"
-								onClick={() => setShowDeleteDialog(true)}
-							>
+							<Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
 								<Trash2 className="mr-1.5 size-4" />
 								Delete integration
 							</Button>
@@ -432,10 +428,10 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 								<span className="text-muted-foreground text-xs">Last sync:</span>
 								<span className="text-xs">
 									{integration?.lastSyncAt
-										? new Date(integration.lastSyncAt).toLocaleString(
-												"en-PH",
-												{ dateStyle: "medium", timeStyle: "short" }
-											)
+										? new Date(integration.lastSyncAt).toLocaleString("en-PH", {
+												dateStyle: "medium",
+												timeStyle: "short",
+											})
 										: "Never"}
 								</span>
 							</div>
@@ -471,15 +467,19 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 							{connectivityResult && (
 								<div className="space-y-2">
 									<div className="flex flex-wrap items-center gap-2">
-									{connectivityResult.readinessLevel === "activation" && connectivityResult.status === "ok" && (
-										<Badge variant="default" className="text-xs">
-											Activation-ready
-										</Badge>
-									)}
-									{(connectivityResult.readinessLevel === "transport" ||
-										(connectivityResult.readinessLevel === "activation" &&
-											connectivityResult.status === "error")) && (
-											<Badge variant="secondary" className="border-amber-400 text-xs text-amber-700 dark:text-amber-300">
+										{connectivityResult.readinessLevel === "activation" &&
+											connectivityResult.status === "ok" && (
+												<Badge variant="default" className="text-xs">
+													Activation-ready
+												</Badge>
+											)}
+										{(connectivityResult.readinessLevel === "transport" ||
+											(connectivityResult.readinessLevel === "activation" &&
+												connectivityResult.status === "error")) && (
+											<Badge
+												variant="secondary"
+												className="border-amber-400 text-xs text-amber-700 dark:text-amber-300"
+											>
 												Transport only
 											</Badge>
 										)}
@@ -502,7 +502,8 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 									<p className="text-muted-foreground text-xs">{connectivityResult.detail}</p>
 									{connectivityResult.readinessLevel === "transport" && (
 										<p className="text-xs text-amber-700 dark:text-amber-400">
-											Transport-only result — cannot activate until contract-level validation passes.
+											Transport-only result — cannot activate until contract-level validation
+											passes.
 										</p>
 									)}
 									{connectivityResult.checks.length > 0 && (
@@ -521,7 +522,7 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 														{check.status === "pass" ? "✓" : check.status === "fail" ? "✗" : "–"}
 													</span>
 													<span className="text-muted-foreground">
-														<span className="font-medium text-foreground">{check.name}</span>:{" "}
+														<span className="text-foreground font-medium">{check.name}</span>:{" "}
 														{check.detail}
 													</span>
 												</li>
@@ -541,10 +542,11 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 							<p className="text-muted-foreground text-xs">
 								Last updated{" "}
 								{integration?.updatedAt
-									? new Date(integration.updatedAt).toLocaleDateString(
-											"en-PH",
-											{ year: "numeric", month: "short", day: "numeric" }
-										)
+									? new Date(integration.updatedAt).toLocaleDateString("en-PH", {
+											year: "numeric",
+											month: "short",
+											day: "numeric",
+										})
 									: "—"}
 							</p>
 							<a
@@ -555,7 +557,6 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 							</a>
 						</CardContent>
 					</Card>
-
 				</div>
 			</div>
 
@@ -565,16 +566,12 @@ export function IntegrationDetail({ integrationId }: IntegrationDetailProps) {
 					<DialogHeader>
 						<DialogTitle>Delete integration?</DialogTitle>
 						<DialogDescription>
-							This will permanently delete{" "}
-							<strong>{integration?.name}</strong> and cannot be undone. The
-							deletion will be recorded in the audit log.
+							This will permanently delete <strong>{integration?.name}</strong> and cannot be
+							undone. The deletion will be recorded in the audit log.
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>
-						<Button
-							variant="outline"
-							onClick={() => setShowDeleteDialog(false)}
-						>
+						<Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
 							Cancel
 						</Button>
 						<Button

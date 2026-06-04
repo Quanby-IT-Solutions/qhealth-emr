@@ -6,14 +6,17 @@ import { Activity, AlertTriangle, BarChart3, TrendingUp } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { cn } from "@/core/lib/utils"
-
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useSurveillanceFlagsQuery } from "@/features/surveillance/pidsr/api/pidsr.hooks"
 
 function PidsrBadge() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId
-	const { data } = useSurveillanceFlagsQuery({ facilityId: facilityId ?? "", isReviewed: false, limit: 1 })
+	const { data } = useSurveillanceFlagsQuery({
+		facilityId: facilityId ?? "",
+		isReviewed: false,
+		limit: 1,
+	})
 	const count = data?.total ?? 0
 	if (!facilityId || count === 0) return null
 	return (
@@ -27,7 +30,12 @@ const NAV_ITEMS = [
 	{ href: "/surveillance", label: "Dashboard", icon: Activity, Badge: null },
 	{ href: "/surveillance/pidsr", label: "PIDSR Alerts", icon: AlertTriangle, Badge: PidsrBadge },
 	{ href: "/surveillance/ahsr", label: "AHSR", icon: BarChart3, Badge: null },
-	{ href: "/surveillance/mortality-morbidity", label: "Mortality & Morbidity", icon: TrendingUp, Badge: null },
+	{
+		href: "/surveillance/mortality-morbidity",
+		label: "Mortality & Morbidity",
+		icon: TrendingUp,
+		Badge: null,
+	},
 ]
 
 interface SurveillanceShellProps {
@@ -38,14 +46,14 @@ export function SurveillanceShell({ children }: SurveillanceShellProps) {
 	const pathname = usePathname()
 
 	return (
-		<div className="flex w-full min-h-[calc(100vh-8rem)] overflow-hidden rounded-xl border border-border bg-background shadow-sm">
-			<aside className="hidden w-60 shrink-0 border-r border-border bg-sidebar/30 lg:flex lg:flex-col">
-				<div className="border-b border-border bg-sidebar/50 px-4 py-4">
-					<p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+		<div className="border-border bg-background flex min-h-[calc(100vh-8rem)] w-full overflow-hidden rounded-xl border shadow-sm">
+			<aside className="border-border bg-sidebar/30 hidden w-60 shrink-0 border-r lg:flex lg:flex-col">
+				<div className="border-border bg-sidebar/50 border-b px-4 py-4">
+					<p className="text-muted-foreground text-[11px] font-bold tracking-widest uppercase">
 						Surveillance
 					</p>
 				</div>
-				<nav className="flex-1 space-y-1 p-3 custom-scrollbar overflow-y-auto">
+				<nav className="custom-scrollbar flex-1 space-y-1 overflow-y-auto p-3">
 					{NAV_ITEMS.map(({ href, label, icon: Icon, Badge: NavBadge }) => {
 						const isActive =
 							href === "/surveillance" ? pathname === href : pathname.startsWith(href)
@@ -54,13 +62,18 @@ export function SurveillanceShell({ children }: SurveillanceShellProps) {
 								key={href}
 								href={href}
 								className={cn(
-									"flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+									"focus-visible:ring-ring flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-all duration-200 outline-none focus-visible:ring-2",
 									isActive
-										? "bg-primary/10 font-semibold text-primary shadow-sm"
+										? "bg-primary/10 text-primary font-semibold shadow-sm"
 										: "text-muted-foreground hover:bg-accent/50 hover:text-foreground font-medium"
 								)}
 							>
-								<Icon className={cn("size-4 shrink-0 transition-colors", isActive ? "text-primary" : "opacity-70")} />
+								<Icon
+									className={cn(
+										"size-4 shrink-0 transition-colors",
+										isActive ? "text-primary" : "opacity-70"
+									)}
+								/>
 								<span className="flex-1 truncate">{label}</span>
 								{NavBadge && <NavBadge />}
 							</Link>
@@ -68,7 +81,7 @@ export function SurveillanceShell({ children }: SurveillanceShellProps) {
 					})}
 				</nav>
 			</aside>
-			<main className="flex-1 overflow-auto bg-background/50 p-6 md:p-8 custom-scrollbar">
+			<main className="bg-background/50 custom-scrollbar flex-1 overflow-auto p-6 md:p-8">
 				{children}
 			</main>
 		</div>

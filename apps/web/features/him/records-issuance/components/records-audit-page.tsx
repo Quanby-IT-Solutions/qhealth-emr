@@ -1,15 +1,22 @@
 "use client"
 
 import { useCallback } from "react"
-import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Input } from "@/core/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
-
-import { EmptyState, ErrorState, SkeletonRows } from "@/features/admin/components/state-views"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { FilterBar, FilterField } from "@/features/admin/components/filter-bar"
+import { EmptyState, ErrorState, SkeletonRows } from "@/features/admin/components/state-views"
 import { TableToolbar } from "@/features/admin/components/table-toolbar"
+
 import { useRecordsAuditQuery } from "../api/records.hooks"
 
 interface RecordsAuditPageProps {
@@ -53,16 +60,40 @@ export function RecordsAuditPage({ facilityId }: RecordsAuditPageProps) {
 
 			<FilterBar>
 				<FilterField label="From" htmlFor="from-f">
-					<Input id="from-f" type="date" value={dateFrom} onChange={e => updateParam("from", e.target.value)} className="h-8 w-36 text-xs" />
+					<Input
+						id="from-f"
+						type="date"
+						value={dateFrom}
+						onChange={e => updateParam("from", e.target.value)}
+						className="h-8 w-36 text-xs"
+					/>
 				</FilterField>
 				<FilterField label="To" htmlFor="to-f">
-					<Input id="to-f" type="date" value={dateTo} onChange={e => updateParam("to", e.target.value)} className="h-8 w-36 text-xs" />
+					<Input
+						id="to-f"
+						type="date"
+						value={dateTo}
+						onChange={e => updateParam("to", e.target.value)}
+						className="h-8 w-36 text-xs"
+					/>
 				</FilterField>
 				<FilterField label="Document Type" htmlFor="doc-f">
-					<Input id="doc-f" value={documentType} onChange={e => updateParam("doc", e.target.value)} placeholder="e.g. discharge_summary" className="h-8 w-44 text-xs" />
+					<Input
+						id="doc-f"
+						value={documentType}
+						onChange={e => updateParam("doc", e.target.value)}
+						placeholder="e.g. discharge_summary"
+						className="h-8 w-44 text-xs"
+					/>
 				</FilterField>
 				<FilterField label="Recipient" htmlFor="rcp-f">
-					<Input id="rcp-f" value={recipient} onChange={e => updateParam("rcp", e.target.value)} placeholder="Patient/agent name" className="h-8 w-48 text-xs" />
+					<Input
+						id="rcp-f"
+						value={recipient}
+						onChange={e => updateParam("rcp", e.target.value)}
+						placeholder="Patient/agent name"
+						className="h-8 w-48 text-xs"
+					/>
 				</FilterField>
 			</FilterBar>
 
@@ -86,7 +117,9 @@ export function RecordsAuditPage({ facilityId }: RecordsAuditPageProps) {
 					<TableBody>
 						{data.entries.map(entry => (
 							<TableRow key={entry.id}>
-								<TableCell className="text-xs">{new Date(entry.occurredAt).toLocaleString("en-PH")}</TableCell>
+								<TableCell className="text-xs">
+									{new Date(entry.occurredAt).toLocaleString("en-PH")}
+								</TableCell>
 								<TableCell>
 									<Badge variant="outline" className="text-[10px] capitalize">
 										{entry.action.replace(/_/g, " ")}
@@ -94,7 +127,9 @@ export function RecordsAuditPage({ facilityId }: RecordsAuditPageProps) {
 								</TableCell>
 								<TableCell className="text-xs">{entry.recipient ?? "—"}</TableCell>
 								<TableCell className="text-xs">{entry.documentTypes?.join(", ") ?? "—"}</TableCell>
-								<TableCell className="font-mono text-[10px]">{entry.actorStaffId?.slice(0, 8) ?? "—"}</TableCell>
+								<TableCell className="font-mono text-[10px]">
+									{entry.actorStaffId?.slice(0, 8) ?? "—"}
+								</TableCell>
 							</TableRow>
 						))}
 					</TableBody>

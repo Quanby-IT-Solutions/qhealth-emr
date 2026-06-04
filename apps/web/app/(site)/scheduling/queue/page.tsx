@@ -9,7 +9,9 @@ import { ClinicQueue } from "@/features/scheduling/components/clinic-queue"
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -28,7 +30,7 @@ export default function ClinicQueuePage() {
 
 	if (!can(permSet, "scheduling", "view")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access scheduling.
 			</div>
 		)
@@ -47,16 +49,10 @@ export default function ClinicQueuePage() {
 			<div className="flex items-start justify-between">
 				<div>
 					<h1 className="text-2xl font-bold">Clinic Queue</h1>
-					<p className="text-muted-foreground">
-						Real-time queue display for checked-in patients
-					</p>
+					<p className="text-muted-foreground">Real-time queue display for checked-in patients</p>
 				</div>
 				{currentStaffId && (
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => setShowAllClinics(v => !v)}
-					>
+					<Button variant="outline" size="sm" onClick={() => setShowAllClinics(v => !v)}>
 						{showAllClinics ? "My Clinic Only" : "Show All Clinics"}
 					</Button>
 				)}

@@ -76,9 +76,9 @@ export function NoteSigning({
 	return (
 		<div className="space-y-5">
 			{/* Signer identity block */}
-			<div className="rounded-lg border bg-card p-4 space-y-3">
+			<div className="bg-card space-y-3 rounded-lg border p-4">
 				<div className="flex items-center gap-2">
-					<ShieldCheck className="size-5 text-primary" />
+					<ShieldCheck className="text-primary size-5" />
 					<h4 className="text-sm font-semibold">Signing as</h4>
 				</div>
 
@@ -89,18 +89,12 @@ export function NoteSigning({
 				<div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
 					{/* PRC License */}
 					<div className="space-y-1">
-						<p className="text-muted-foreground text-xs uppercase tracking-wide">
-							PRC License No.
-						</p>
+						<p className="text-muted-foreground text-xs tracking-wide uppercase">PRC License No.</p>
 						{staffCredentials.prcLicenseNumber ? (
 							<div className="flex items-center gap-2">
-								<span className="font-mono font-medium">
-									{staffCredentials.prcLicenseNumber}
-								</span>
+								<span className="font-mono font-medium">{staffCredentials.prcLicenseNumber}</span>
 								{prcStatus === "valid" && (
-									<Badge className="bg-green-600 text-xs hover:bg-green-700">
-										Valid
-									</Badge>
+									<Badge className="bg-green-600 text-xs hover:bg-green-700">Valid</Badge>
 								)}
 								{prcStatus === "expiring" && (
 									<Badge variant="secondary" className="text-xs text-amber-600">
@@ -125,18 +119,12 @@ export function NoteSigning({
 
 					{/* PTR */}
 					<div className="space-y-1">
-						<p className="text-muted-foreground text-xs uppercase tracking-wide">
-							PTR No.
-						</p>
+						<p className="text-muted-foreground text-xs tracking-wide uppercase">PTR No.</p>
 						{staffCredentials.ptrNumber ? (
 							<div className="flex items-center gap-2">
-								<span className="font-mono font-medium">
-									{staffCredentials.ptrNumber}
-								</span>
+								<span className="font-mono font-medium">{staffCredentials.ptrNumber}</span>
 								{ptrStatus === "valid" && (
-									<Badge className="bg-green-600 text-xs hover:bg-green-700">
-										Valid
-									</Badge>
+									<Badge className="bg-green-600 text-xs hover:bg-green-700">Valid</Badge>
 								)}
 								{ptrStatus === "expiring" && (
 									<Badge variant="secondary" className="text-xs text-amber-600">
@@ -166,14 +154,11 @@ export function NoteSigning({
 				<div className="flex items-start gap-2">
 					<Lock className="mt-0.5 size-4 shrink-0 text-blue-600" />
 					<div className="space-y-1 text-sm text-blue-800 dark:text-blue-300">
-						<p className="font-medium">
-							You are digitally signing: {noteTypeLabel(noteType)}
-						</p>
+						<p className="font-medium">You are digitally signing: {noteTypeLabel(noteType)}</p>
 						<p>
-							Signing makes this note a permanent part of the medical record. It
-							cannot be edited after signing. Your identity, PRC License No., PTR
-							No., timestamp, and IP address will be recorded alongside this
-							signature.
+							Signing makes this note a permanent part of the medical record. It cannot be edited
+							after signing. Your identity, PRC License No., PTR No., timestamp, and IP address will
+							be recorded alongside this signature.
 						</p>
 					</div>
 				</div>
@@ -181,8 +166,9 @@ export function NoteSigning({
 
 			{/* Missing credentials warning */}
 			{(!staffCredentials.prcLicenseNumber || !staffCredentials.ptrNumber) && (
-				<p className="text-amber-600 dark:text-amber-400 text-sm">
-					⚠ Some credentials are missing from your profile. Contact HR to update your PRC and PTR details.
+				<p className="text-sm text-amber-600 dark:text-amber-400">
+					⚠ Some credentials are missing from your profile. Contact HR to update your PRC and PTR
+					details.
 				</p>
 			)}
 
@@ -192,20 +178,13 @@ export function NoteSigning({
 				<Button type="button" variant="outline" onClick={onCancel} disabled={signNote.isPending}>
 					Cancel
 				</Button>
-				<Button
-					type="button"
-					onClick={handleSign}
-					disabled={signNote.isPending}
-					className="gap-2"
-				>
+				<Button type="button" onClick={handleSign} disabled={signNote.isPending} className="gap-2">
 					<CheckCircle2 className="size-4" />
 					{signNote.isPending ? "Signing…" : "Sign Note"}
 				</Button>
 			</div>
 
-			{signNote.isError && (
-				<p className="text-destructive text-sm">{signNote.error.message}</p>
-			)}
+			{signNote.isError && <p className="text-destructive text-sm">{signNote.error.message}</p>}
 		</div>
 	)
 }

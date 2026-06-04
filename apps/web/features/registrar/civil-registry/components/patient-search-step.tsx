@@ -5,7 +5,13 @@ import { Search, UserRound } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Skeleton } from "@/core/components/ui/skeleton"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
@@ -74,12 +80,12 @@ export function PatientSearchStep({ onSelect, title }: PatientSearchStepProps) {
 
 			<CardContent className="space-y-3 pt-3">
 				<div className="relative">
-					<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+					<Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
 					<Input
 						placeholder="Search by name or MRN..."
 						value={search}
 						onChange={e => setSearch(e.target.value)}
-						className="h-9 rounded-xl border-border/60 bg-background pl-9"
+						className="border-border/60 bg-background h-9 rounded-xl pl-9"
 					/>
 				</div>
 
@@ -90,38 +96,40 @@ export function PatientSearchStep({ onSelect, title }: PatientSearchStepProps) {
 						))}
 					</div>
 				) : patients.length === 0 ? (
-					<div className="rounded-2xl border border-dashed border-border/60 bg-secondary/40 px-6 py-10 text-center text-sm text-muted-foreground">
-						{debouncedSearch ? `No patients match "${debouncedSearch}".` : "No active patients found."}
+					<div className="border-border/60 bg-secondary/40 text-muted-foreground rounded-2xl border border-dashed px-6 py-10 text-center text-sm">
+						{debouncedSearch
+							? `No patients match "${debouncedSearch}".`
+							: "No active patients found."}
 					</div>
 				) : (
 					<>
-						<p className="px-0.5 text-xs text-muted-foreground">
+						<p className="text-muted-foreground px-0.5 text-xs">
 							Showing {patients.length} {patients.length === 1 ? "patient" : "patients"}
 							{debouncedSearch && ` matching "${debouncedSearch}"`}
 							{isFetching && " - Updating..."}
 						</p>
-						<div className="max-h-[420px] overflow-y-auto rounded-2xl border border-border/60 bg-background divide-y divide-border/60">
+						<div className="border-border/60 bg-background divide-border/60 max-h-[420px] divide-y overflow-y-auto rounded-2xl border">
 							{patients.map(patient => {
 								const patientName = formatPatientName(patient)
 
 								return (
 									<div
 										key={patient.id}
-										className="flex flex-col gap-2 px-4 py-2.5 transition-colors hover:bg-secondary/30 md:flex-row md:items-center md:justify-between"
+										className="hover:bg-secondary/30 flex flex-col gap-2 px-4 py-2.5 transition-colors md:flex-row md:items-center md:justify-between"
 									>
 										<div className="min-w-0 space-y-1.5">
 											<div className="flex flex-wrap items-center gap-2">
-												<span className="text-sm font-semibold tracking-tight text-foreground">
+												<span className="text-foreground text-sm font-semibold tracking-tight">
 													{patientName}
 												</span>
 												<Badge
 													variant="secondary"
-													className="rounded-full border border-border/60 bg-secondary/60 px-2 py-0.5 font-mono text-[0.68rem] tracking-[0.14em] text-foreground"
+													className="border-border/60 bg-secondary/60 text-foreground rounded-full border px-2 py-0.5 font-mono text-[0.68rem] tracking-[0.14em]"
 												>
 													{patient.mrn}
 												</Badge>
 											</div>
-											<p className="text-xs text-muted-foreground">
+											<p className="text-muted-foreground text-xs">
 												DOB {formatDate(patient.dateOfBirth)}
 											</p>
 										</div>

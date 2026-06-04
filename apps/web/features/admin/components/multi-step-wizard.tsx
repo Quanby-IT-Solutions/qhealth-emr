@@ -2,8 +2,8 @@
 
 import type { ReactNode } from "react"
 
-import { cn } from "@/core/lib/utils"
 import { Button } from "@/core/components/ui/button"
+import { cn } from "@/core/lib/utils"
 
 interface MultiStepWizardProps {
 	steps: string[]
@@ -45,8 +45,10 @@ export function MultiStepWizard({
 									className={cn(
 										"flex size-6 items-center justify-center rounded-full text-xs font-semibold",
 										isDone && "bg-primary text-primary-foreground",
-										isActive && "border-primary border-2 text-primary",
-										!isDone && !isActive && "border-muted-foreground/30 border text-muted-foreground"
+										isActive && "border-primary text-primary border-2",
+										!isDone &&
+											!isActive &&
+											"border-muted-foreground/30 text-muted-foreground border"
 									)}
 								>
 									{isDone ? "✓" : i + 1}
@@ -62,10 +64,7 @@ export function MultiStepWizard({
 							</div>
 							{i < steps.length - 1 && (
 								<div
-									className={cn(
-										"h-px w-6 flex-1",
-										i < currentStep ? "bg-primary" : "bg-muted"
-									)}
+									className={cn("h-px w-6 flex-1", i < currentStep ? "bg-primary" : "bg-muted")}
 								/>
 							)}
 						</div>
@@ -78,12 +77,7 @@ export function MultiStepWizard({
 
 			{/* Navigation */}
 			<div className="flex items-center justify-between">
-				<Button
-					type="button"
-					variant="outline"
-					onClick={onBack}
-					disabled={isFirst}
-				>
+				<Button type="button" variant="outline" onClick={onBack} disabled={isFirst}>
 					Back
 				</Button>
 				<div className="flex items-center gap-2">
@@ -92,11 +86,7 @@ export function MultiStepWizard({
 							Skip
 						</Button>
 					)}
-					<Button
-						type="button"
-						onClick={onNext}
-						disabled={isNextDisabled || isSubmitting}
-					>
+					<Button type="button" onClick={onNext} disabled={isNextDisabled || isSubmitting}>
 						{isSubmitting ? "Saving..." : isLast ? submitLabel : "Next"}
 					</Button>
 				</div>

@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-
 import { ShieldCheck } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -17,7 +16,6 @@ import {
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { ScrollArea } from "@/core/components/ui/scroll-area"
-import { Separator } from "@/core/components/ui/separator"
 import {
 	Select,
 	SelectContent,
@@ -25,6 +23,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/core/components/ui/select"
+import { Separator } from "@/core/components/ui/separator"
 import { useCreateConsentMutation } from "@/features/clinical-docs/api/clinical-docs.hooks"
 
 // ============================================================================
@@ -63,7 +62,9 @@ function SignatureCanvas({ onCapture, onClear }: SignatureCanvasProps) {
 		}
 	}
 
-	const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+	const startDrawing = (
+		e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+	) => {
 		e.preventDefault()
 		isDrawingRef.current = true
 		lastPosRef.current = getPos(e)
@@ -187,10 +188,7 @@ export function DpaConsentModal({
 	}
 
 	const isValid =
-		!!signedByName.trim() &&
-		selectedPurposes.length > 0 &&
-		rightsAcknowledged &&
-		!!signatureDataUrl
+		!!signedByName.trim() && selectedPurposes.length > 0 && rightsAcknowledged && !!signatureDataUrl
 
 	function handleSubmit() {
 		if (!isValid) return
@@ -276,7 +274,7 @@ export function DpaConsentModal({
 						{/* Data Subject Rights */}
 						<div className="space-y-2">
 							<Label className="font-semibold">Rights of the Data Subject</Label>
-							<ul className="ml-4 list-disc space-y-1 text-sm text-muted-foreground">
+							<ul className="text-muted-foreground ml-4 list-disc space-y-1 text-sm">
 								<li>Right to be informed of how your data will be used</li>
 								<li>Right to access your personal data held by this facility</li>
 								<li>Right to correct inaccurate data</li>
@@ -326,9 +324,9 @@ export function DpaConsentModal({
 								onCheckedChange={v => setRightsAcknowledged(!!v)}
 							/>
 							<label htmlFor="rights-ack" className="cursor-pointer text-sm leading-snug">
-								I have read and understood the Privacy Notice and my rights as a data subject under RA
-								10173. I freely and voluntarily give my consent to the collection and processing of my
-								personal health information for the purposes selected above.
+								I have read and understood the Privacy Notice and my rights as a data subject under
+								RA 10173. I freely and voluntarily give my consent to the collection and processing
+								of my personal health information for the purposes selected above.
 							</label>
 						</div>
 
@@ -337,22 +335,24 @@ export function DpaConsentModal({
 							<Label>
 								Digital Signature <span className="text-red-500">*</span>
 							</Label>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								Sign in the box below using your mouse or touchscreen.
 							</p>
 							<SignatureCanvas
 								onCapture={dataUrl => setSignatureDataUrl(dataUrl)}
 								onClear={() => setSignatureDataUrl(null)}
 							/>
-							{signatureDataUrl && (
-								<p className="text-xs text-green-600">✓ Signature captured</p>
-							)}
+							{signatureDataUrl && <p className="text-xs text-green-600">✓ Signature captured</p>}
 						</div>
 					</div>
 				</ScrollArea>
 
 				<DialogFooter>
-					<Button variant="outline" onClick={() => onOpenChange(false)} disabled={createConsent.isPending}>
+					<Button
+						variant="outline"
+						onClick={() => onOpenChange(false)}
+						disabled={createConsent.isPending}
+					>
 						Cancel
 					</Button>
 					<Button onClick={handleSubmit} disabled={!isValid || createConsent.isPending}>

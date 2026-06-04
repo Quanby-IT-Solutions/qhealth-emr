@@ -5,25 +5,24 @@ import { Loader2 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useChartContext } from "@/features/encounters/context/chart-context"
-import { AnesthesiaRecordForm } from "@/features/surgical/components/anesthesia-record-form"
-import { CreateSurgicalCasePanel } from "@/features/surgical/components/create-surgical-case-panel"
-import { OperationRecordForm } from "@/features/surgical/components/operation-record-form"
-import { PreOpChecklist } from "@/features/surgical/components/pre-op-checklist"
-import { RvsCodeSelector } from "@/features/surgical/components/rvs-code-selector"
-
 import {
 	useAnesthesiaRecordQuery,
 	useOperationRecordQuery,
 	usePreOpChecklistQuery,
 	useSurgicalCaseListQuery,
 } from "@/features/surgical/api/surgical.hooks"
+import { AnesthesiaRecordForm } from "@/features/surgical/components/anesthesia-record-form"
+import { CreateSurgicalCasePanel } from "@/features/surgical/components/create-surgical-case-panel"
+import { OperationRecordForm } from "@/features/surgical/components/operation-record-form"
+import { PreOpChecklist } from "@/features/surgical/components/pre-op-checklist"
+import { RvsCodeSelector } from "@/features/surgical/components/rvs-code-selector"
 
 export default function SurgicalPage() {
 	const { encounterId, patientId, facilityId } = useChartContext()
 	const { data: profile } = useMyProfile()
 	const activeStaffProfile =
-		profile?.staffProfiles?.find((staffProfile) =>
-			staffProfile.roles?.some((role) => role.id === profile.activeRole?.id)
+		profile?.staffProfiles?.find(staffProfile =>
+			staffProfile.roles?.some(role => role.id === profile.activeRole?.id)
 		) ?? profile?.staffProfiles?.[0]
 	const staffId = activeStaffProfile?.id ?? ""
 	const activeFacilityId = facilityId || activeStaffProfile?.facilityId || ""
@@ -36,13 +35,13 @@ export default function SurgicalPage() {
 	const caseId = surgicalCase?.id ?? ""
 
 	const { data: opRecord, isLoading: opLoading } = useOperationRecordQuery(
-		caseId ? caseId : undefined,
+		caseId ? caseId : undefined
 	)
 	const { data: anesthesiaRecord, isLoading: anesthesiaLoading } = useAnesthesiaRecordQuery(
-		caseId ? caseId : undefined,
+		caseId ? caseId : undefined
 	)
 	const { data: preOpChecklist, isLoading: checklistLoading } = usePreOpChecklistQuery(
-		caseId ? caseId : undefined,
+		caseId ? caseId : undefined
 	)
 
 	const permSet = usePermissionSet()
@@ -93,12 +92,10 @@ export default function SurgicalPage() {
 		}
 		return (
 			<div className="p-8 text-center">
-				<p className="text-muted-foreground text-sm">
-					No surgical case linked to this encounter.
-				</p>
+				<p className="text-muted-foreground text-sm">No surgical case linked to this encounter.</p>
 				<p className="text-muted-foreground mt-1 text-xs">
-					A surgical case must be created from the Surgical module before records can be
-					entered here.
+					A surgical case must be created from the Surgical module before records can be entered
+					here.
 				</p>
 			</div>
 		)
@@ -113,7 +110,8 @@ export default function SurgicalPage() {
 					{surgicalCase.orSuite ?? "Unassigned OR"}
 					{surgicalCase.scheduledDatetime ? (
 						<>
-							{" "}&middot;{" "}
+							{" "}
+							&middot;{" "}
 							{new Date(surgicalCase.scheduledDatetime).toLocaleString("en-PH", {
 								month: "short",
 								day: "numeric",
@@ -191,7 +189,9 @@ export default function SurgicalPage() {
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {

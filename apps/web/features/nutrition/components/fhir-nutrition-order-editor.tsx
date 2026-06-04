@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { CheckCircle2, Code2, Loader2, Plus, Trash2 } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -25,10 +24,9 @@ import {
 } from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
-
 import {
-	type CreateMealPlanInput,
 	useSaveMealPlanMutation,
+	type CreateMealPlanInput,
 } from "@/features/nutrition/api/nutrition.hooks"
 
 // ============================================================================
@@ -152,11 +150,20 @@ function buildFhirNutritionOrder(input: FhirNutritionOrderInput) {
 									]
 								: undefined,
 						nutrient: [
-							{ modifier: { text: "Energy" }, amount: { value: input.caloricTarget, unit: "kcal/d" } },
-							{ modifier: { text: "Protein" }, amount: { value: input.proteinTarget, unit: "g/d" } },
-							{ modifier: { text: "Carbohydrate" }, amount: { value: input.carbTarget, unit: "g/d" } },
+							{
+								modifier: { text: "Energy" },
+								amount: { value: input.caloricTarget, unit: "kcal/d" },
+							},
+							{
+								modifier: { text: "Protein" },
+								amount: { value: input.proteinTarget, unit: "g/d" },
+							},
+							{
+								modifier: { text: "Carbohydrate" },
+								amount: { value: input.carbTarget, unit: "g/d" },
+							},
 							{ modifier: { text: "Fat" }, amount: { value: input.fatTarget, unit: "g/d" } },
-						].filter((n) => n.amount.value > 0),
+						].filter(n => n.amount.value > 0),
 						fluidConsistencyType: input.fluidRestriction
 							? [
 									{
@@ -180,7 +187,7 @@ function buildFhirNutritionOrder(input: FhirNutritionOrderInput) {
 				: undefined,
 		supplement:
 			input.supplements.length > 0
-				? input.supplements.map((s) => ({
+				? input.supplements.map(s => ({
 						type: { coding: [{ display: s }], text: s },
 					}))
 				: undefined,
@@ -207,11 +214,7 @@ function TagPicker({ label, options, selected, onChange, customPlaceholder }: Ta
 	const [custom, setCustom] = useState("")
 
 	function toggle(option: string) {
-		onChange(
-			selected.includes(option)
-				? selected.filter((s) => s !== option)
-				: [...selected, option]
-		)
+		onChange(selected.includes(option) ? selected.filter(s => s !== option) : [...selected, option])
 	}
 
 	function addCustom() {
@@ -228,7 +231,7 @@ function TagPicker({ label, options, selected, onChange, customPlaceholder }: Ta
 		<div className="space-y-2">
 			<Label className="text-xs font-medium">{label}</Label>
 			<div className="flex flex-wrap gap-2">
-				{options.map((opt) => (
+				{options.map(opt => (
 					<button
 						key={opt}
 						type="button"
@@ -243,16 +246,16 @@ function TagPicker({ label, options, selected, onChange, customPlaceholder }: Ta
 					</button>
 				))}
 			</div>
-			{selected.filter((s) => !options.includes(s)).length > 0 && (
-				<div className="flex flex-wrap gap-1.5 mt-1">
+			{selected.filter(s => !options.includes(s)).length > 0 && (
+				<div className="mt-1 flex flex-wrap gap-1.5">
 					{selected
-						.filter((s) => !options.includes(s))
-						.map((s) => (
+						.filter(s => !options.includes(s))
+						.map(s => (
 							<Badge key={s} variant="secondary" className="gap-1">
 								{s}
 								<button
 									type="button"
-									onClick={() => onChange(selected.filter((x) => x !== s))}
+									onClick={() => onChange(selected.filter(x => x !== s))}
 									aria-label="Remove"
 								>
 									<Trash2 className="size-2.5" />
@@ -262,12 +265,12 @@ function TagPicker({ label, options, selected, onChange, customPlaceholder }: Ta
 				</div>
 			)}
 			{customPlaceholder && (
-				<div className="flex gap-2 mt-1">
+				<div className="mt-1 flex gap-2">
 					<Input
 						placeholder={customPlaceholder}
 						value={custom}
-						onChange={(e) => setCustom(e.target.value)}
-						onKeyDown={(e) => e.key === "Enter" && addCustom()}
+						onChange={e => setCustom(e.target.value)}
+						onKeyDown={e => e.key === "Enter" && addCustom()}
 						className="h-7 text-xs"
 					/>
 					<Button type="button" variant="outline" size="sm" onClick={addCustom}>
@@ -362,9 +365,9 @@ export function FhirNutritionOrderEditor({
 		return (
 			<Card>
 				<CardContent className="flex flex-col items-center py-10 text-center">
-					<CheckCircle2 className="size-12 text-green-500 mb-3" />
+					<CheckCircle2 className="mb-3 size-12 text-green-500" />
 					<p className="font-semibold">NutritionOrder Saved</p>
-					<p className="text-sm text-muted-foreground mt-1">
+					<p className="text-muted-foreground mt-1 text-sm">
 						Diet order and meal plan have been saved.
 					</p>
 				</CardContent>
@@ -376,9 +379,9 @@ export function FhirNutritionOrderEditor({
 		<div className="space-y-6">
 			<div>
 				<h3 className="font-semibold">FHIR NutritionOrder</h3>
-				<p className="text-sm text-muted-foreground">
-					Configure diet type, feeding route, macronutrient targets, and supplements.
-					The order will be encoded as a FHIR R4 NutritionOrder resource.
+				<p className="text-muted-foreground text-sm">
+					Configure diet type, feeding route, macronutrient targets, and supplements. The order will
+					be encoded as a FHIR R4 NutritionOrder resource.
 				</p>
 			</div>
 
@@ -395,7 +398,7 @@ export function FhirNutritionOrderEditor({
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								{DIET_TYPES.map((d) => (
+								{DIET_TYPES.map(d => (
 									<SelectItem key={d.value} value={d.value}>
 										{d.label}
 									</SelectItem>
@@ -411,7 +414,7 @@ export function FhirNutritionOrderEditor({
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								{FEEDING_ROUTES.map((r) => (
+								{FEEDING_ROUTES.map(r => (
 									<SelectItem key={r.value} value={r.value}>
 										{r.label}
 									</SelectItem>
@@ -423,12 +426,15 @@ export function FhirNutritionOrderEditor({
 					{(feedingRoute === "oral" || feedingRoute === "mixed") && (
 						<div className="space-y-1">
 							<Label className="text-xs">Texture Modification (IDDSI)</Label>
-							<Select value={textureModification} onValueChange={v => setTextureModification(v ?? "")}>
+							<Select
+								value={textureModification}
+								onValueChange={v => setTextureModification(v ?? "")}
+							>
 								<SelectTrigger>
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{TEXTURE_MODIFICATIONS.map((t) => (
+									{TEXTURE_MODIFICATIONS.map(t => (
 										<SelectItem key={t} value={t}>
 											{t}
 										</SelectItem>
@@ -444,7 +450,7 @@ export function FhirNutritionOrderEditor({
 							<Input
 								placeholder="e.g., Nutren 1.0, Isocal, Peptamen…"
 								value={enteralFormula}
-								onChange={(e) => setEnteralFormula(e.target.value)}
+								onChange={e => setEnteralFormula(e.target.value)}
 							/>
 						</div>
 					)}
@@ -455,7 +461,7 @@ export function FhirNutritionOrderEditor({
 							<Input
 								placeholder="e.g., Kabiven Peripheral, Aminomel Energy…"
 								value={parenteralFormula}
-								onChange={(e) => setParenteralFormula(e.target.value)}
+								onChange={e => setParenteralFormula(e.target.value)}
 							/>
 						</div>
 					)}
@@ -481,7 +487,7 @@ export function FhirNutritionOrderEditor({
 								type="number"
 								min={0}
 								value={value}
-								onChange={(e) => onChange(Number(e.target.value))}
+								onChange={e => onChange(Number(e.target.value))}
 							/>
 						</div>
 					))}
@@ -498,9 +504,9 @@ export function FhirNutritionOrderEditor({
 						<Checkbox
 							id="fluid-restriction"
 							checked={fluidRestriction}
-							onCheckedChange={(v) => setFluidRestriction(!!v)}
+							onCheckedChange={v => setFluidRestriction(!!v)}
 						/>
-						<Label htmlFor="fluid-restriction" className="text-sm cursor-pointer">
+						<Label htmlFor="fluid-restriction" className="cursor-pointer text-sm">
 							Apply fluid restriction
 						</Label>
 					</div>
@@ -511,7 +517,7 @@ export function FhirNutritionOrderEditor({
 								type="number"
 								min={0}
 								value={fluidTarget}
-								onChange={(e) => setFluidTarget(Number(e.target.value))}
+								onChange={e => setFluidTarget(Number(e.target.value))}
 								className="w-40"
 							/>
 						</div>
@@ -561,7 +567,7 @@ export function FhirNutritionOrderEditor({
 						rows={3}
 						placeholder="Additional notes for kitchen or nursing staff, allergy warnings, timing preferences…"
 						value={specialInstructions}
-						onChange={(e) => setSpecialInstructions(e.target.value)}
+						onChange={e => setSpecialInstructions(e.target.value)}
 					/>
 				</CardContent>
 			</Card>
@@ -571,14 +577,14 @@ export function FhirNutritionOrderEditor({
 				<Button
 					variant="outline"
 					size="sm"
-					onClick={() => setShowFhirJson((v) => !v)}
+					onClick={() => setShowFhirJson(v => !v)}
 					className="mb-2"
 				>
 					<Code2 className="mr-1.5 size-3.5" />
 					{showFhirJson ? "Hide" : "Preview"} FHIR R4 JSON
 				</Button>
 				{showFhirJson && (
-					<pre className="rounded-md border bg-muted p-4 text-xs overflow-auto max-h-80">
+					<pre className="bg-muted max-h-80 overflow-auto rounded-md border p-4 text-xs">
 						{JSON.stringify(fhirJson, null, 2)}
 					</pre>
 				)}
@@ -588,10 +594,7 @@ export function FhirNutritionOrderEditor({
 
 			{/* Actions */}
 			<div className="flex justify-end">
-				<Button
-					onClick={handleSave}
-					disabled={saveMutation.isPending}
-				>
+				<Button onClick={handleSave} disabled={saveMutation.isPending}>
 					{saveMutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
 					Save NutritionOrder
 				</Button>

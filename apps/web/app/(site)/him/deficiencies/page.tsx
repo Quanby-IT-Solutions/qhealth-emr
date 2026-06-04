@@ -1,8 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query"
 
-import { createQueryClient } from "@/services/tanstack-query/query-client"
 import { himServerOrpc, prepareServerOrpc, serverOrpc } from "@/services/orpc/orpc-server"
-
+import { createQueryClient } from "@/services/tanstack-query/query-client"
 import { HimDeficienciesClient } from "@/features/him/deficiency-tracking/components/him-deficiencies-client"
 
 export default async function HimDeficienciesPage() {

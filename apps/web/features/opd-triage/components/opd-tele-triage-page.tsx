@@ -361,7 +361,8 @@ export function OpdTeleTriagePage() {
 	}
 
 	function handleArrived(id: string) {
-		if (!window.confirm("Mark this remote intake as arrived and create the OPD triage intake?")) return
+		if (!window.confirm("Mark this remote intake as arrived and create the OPD triage intake?"))
+			return
 		markArrived.mutate(
 			{ id },
 			{
@@ -376,9 +377,7 @@ export function OpdTeleTriagePage() {
 
 	function handleCancel(id: string, status: "cancelled" | "no_show") {
 		const confirmed = window.confirm(
-			status === "no_show"
-				? "Mark this remote intake as no-show?"
-				: "Cancel this remote intake?"
+			status === "no_show" ? "Mark this remote intake as no-show?" : "Cancel this remote intake?"
 		)
 		if (!confirmed) return
 		cancelRemote.mutate(
@@ -588,7 +587,9 @@ export function OpdTeleTriagePage() {
 									onChange={e => update("scheduledArrivalTime", e.target.value)}
 								/>
 								<FieldError
-									message={errors.scheduledArrivalTime ?? (!errors.etaMinutes ? errors.arrival : undefined)}
+									message={
+										errors.scheduledArrivalTime ?? (!errors.etaMinutes ? errors.arrival : undefined)
+									}
 								/>
 							</div>
 							{form.channelType === "video" && (

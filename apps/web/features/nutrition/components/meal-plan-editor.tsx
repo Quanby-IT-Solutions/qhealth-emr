@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { AlertCircle, CheckCircle, Pencil } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -16,11 +15,10 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
-
 import {
-	type CreateMealPlanInput,
 	useMealPlanQuery,
 	useSaveMealPlanMutation,
+	type CreateMealPlanInput,
 } from "@/features/nutrition/api/nutrition.hooks"
 
 // ============================================================================
@@ -102,13 +100,13 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 	const [form, setForm] = useState<FormState>(EMPTY_FORM)
 
 	const update = (field: keyof FormState, value: FormState[typeof field]) =>
-		setForm((prev) => ({ ...prev, [field]: value }))
+		setForm(prev => ({ ...prev, [field]: value }))
 
 	const toggleRestriction = (r: string) => {
-		setForm((prev) => ({
+		setForm(prev => ({
 			...prev,
 			restrictions: prev.restrictions.includes(r)
-				? prev.restrictions.filter((x) => x !== r)
+				? prev.restrictions.filter(x => x !== r)
 				: [...prev.restrictions, r],
 		}))
 	}
@@ -159,7 +157,7 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 	if (isLoading) {
 		return (
 			<Card>
-				<CardContent className="py-8 text-center text-sm text-muted-foreground">
+				<CardContent className="text-muted-foreground py-8 text-center text-sm">
 					Loading meal plan…
 				</CardContent>
 			</Card>
@@ -170,7 +168,7 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 	if (!assessment) {
 		return (
 			<Card>
-				<CardContent className="py-8 text-center text-sm text-muted-foreground">
+				<CardContent className="text-muted-foreground py-8 text-center text-sm">
 					Complete a nutrition assessment before creating a meal plan.
 				</CardContent>
 			</Card>
@@ -180,7 +178,8 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 	// ── Display mode (meal plan exists, not editing) ─────────────────────────
 	if (existingMealPlan && !editing) {
 		const dietLabel =
-			DIET_TYPES.find((d) => d.value === existingMealPlan.dietType)?.label ?? existingMealPlan.dietType
+			DIET_TYPES.find(d => d.value === existingMealPlan.dietType)?.label ??
+			existingMealPlan.dietType
 
 		return (
 			<Card>
@@ -199,38 +198,36 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 				</CardHeader>
 				<CardContent className="grid gap-4 sm:grid-cols-2">
 					<div>
-						<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Diet Type
 						</p>
 						<p className="text-sm font-medium">{dietLabel}</p>
 					</div>
 					<div>
-						<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Caloric Target
 						</p>
 						<p className="text-sm font-medium">{existingMealPlan.caloricTarget ?? "—"} kcal/day</p>
 					</div>
 					<div>
-						<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Macronutrient Goals
 						</p>
 						<p className="text-sm">
 							Protein: <span className="font-medium">{existingMealPlan.proteinTarget ?? "—"}g</span>
-							{" · "}Carbs: <span className="font-medium">{existingMealPlan.carbTarget ?? "—"}g</span>
+							{" · "}Carbs:{" "}
+							<span className="font-medium">{existingMealPlan.carbTarget ?? "—"}g</span>
 							{" · "}Fat: <span className="font-medium">{existingMealPlan.fatTarget ?? "—"}g</span>
 						</p>
 					</div>
 					{(existingMealPlan.restrictions ?? []).length > 0 && (
 						<div className="sm:col-span-2">
-							<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+							<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 								Dietary Restrictions
 							</p>
 							<div className="flex flex-wrap gap-1.5">
-								{(existingMealPlan.restrictions ?? []).map((r) => (
-									<span
-										key={r}
-										className="rounded-full border bg-muted px-2.5 py-0.5 text-xs"
-									>
+								{(existingMealPlan.restrictions ?? []).map(r => (
+									<span key={r} className="bg-muted rounded-full border px-2.5 py-0.5 text-xs">
 										{r}
 									</span>
 								))}
@@ -239,13 +236,15 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 					)}
 					{existingMealPlan.specialInstructions && (
 						<div className="sm:col-span-2">
-							<p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+							<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 								Special Instructions
 							</p>
-							<p className="text-sm text-muted-foreground">{existingMealPlan.specialInstructions}</p>
+							<p className="text-muted-foreground text-sm">
+								{existingMealPlan.specialInstructions}
+							</p>
 						</div>
 					)}
-					<div className="sm:col-span-2 text-xs text-muted-foreground border-t pt-3 mt-1">
+					<div className="text-muted-foreground mt-1 border-t pt-3 text-xs sm:col-span-2">
 						Last updated by {assessment.assessedByStaffName} ·{" "}
 						{new Date(assessment.updatedAt).toLocaleDateString(undefined, {
 							day: "numeric",
@@ -264,15 +263,10 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 			<Card>
 				<CardHeader className="flex flex-row items-start justify-between">
 					<CardTitle className="text-base">
-							{existingMealPlan ? "Edit Meal Plan" : "Create Meal Plan"}
+						{existingMealPlan ? "Edit Meal Plan" : "Create Meal Plan"}
 					</CardTitle>
 					{existingMealPlan && (
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							onClick={() => setEditing(false)}
-						>
+						<Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)}>
 							Cancel
 						</Button>
 					)}
@@ -281,12 +275,12 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 					{/* Diet type */}
 					<div className="space-y-1.5">
 						<Label htmlFor="dietType">Diet Type</Label>
-						<Select value={form.dietType} onValueChange={(v) => update("dietType", v ?? "")}>
+						<Select value={form.dietType} onValueChange={v => update("dietType", v ?? "")}>
 							<SelectTrigger id="dietType">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								{DIET_TYPES.map((d) => (
+								{DIET_TYPES.map(d => (
 									<SelectItem key={d.value} value={d.value}>
 										{d.label}
 									</SelectItem>
@@ -304,7 +298,7 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 							min={0}
 							placeholder="e.g. 2000"
 							value={form.caloricTarget}
-							onChange={(e) => update("caloricTarget", e.target.value)}
+							onChange={e => update("caloricTarget", e.target.value)}
 							required
 						/>
 					</div>
@@ -318,8 +312,8 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 								type="number"
 								min={0}
 								placeholder="e.g. 80"
-							value={form.proteinTarget}
-							onChange={(e) => update("proteinTarget", e.target.value)}
+								value={form.proteinTarget}
+								onChange={e => update("proteinTarget", e.target.value)}
 							/>
 						</div>
 						<div className="space-y-1.5">
@@ -329,8 +323,8 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 								type="number"
 								min={0}
 								placeholder="e.g. 250"
-						value={form.carbTarget}
-						onChange={(e) => update("carbTarget", e.target.value)}
+								value={form.carbTarget}
+								onChange={e => update("carbTarget", e.target.value)}
 								required
 							/>
 						</div>
@@ -341,8 +335,8 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 								type="number"
 								min={0}
 								placeholder="e.g. 65"
-						value={form.fatTarget}
-						onChange={(e) => update("fatTarget", e.target.value)}
+								value={form.fatTarget}
+								onChange={e => update("fatTarget", e.target.value)}
 								required
 							/>
 						</div>
@@ -352,7 +346,7 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 					<div className="space-y-2">
 						<Label>Dietary Restrictions</Label>
 						<div className="flex flex-wrap gap-2">
-							{RESTRICTION_OPTIONS.map((r) => {
+							{RESTRICTION_OPTIONS.map(r => {
 								const active = form.restrictions.includes(r)
 								return (
 									<button
@@ -380,12 +374,12 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 							placeholder="Add any relevant dietary guidance or clinical notes…"
 							rows={3}
 							value={form.specialInstructions}
-							onChange={(e) => update("specialInstructions", e.target.value)}
+							onChange={e => update("specialInstructions", e.target.value)}
 						/>
 					</div>
 
 					{saveMutation.isError && (
-						<div className="flex items-center gap-2 text-sm text-destructive">
+						<div className="text-destructive flex items-center gap-2 text-sm">
 							<AlertCircle className="size-4 shrink-0" />
 							<span>Failed to save meal plan. Please try again.</span>
 						</div>
@@ -402,7 +396,7 @@ export function MealPlanEditor({ encounterId, onSaved }: MealPlanEditorProps) {
 						<Button type="submit" disabled={saveMutation.isPending}>
 							{saveMutation.isPending ? "Saving…" : "Save Meal Plan"}
 						</Button>
-					{!existingMealPlan && (
+						{!existingMealPlan && (
 							<Button
 								type="button"
 								variant="ghost"

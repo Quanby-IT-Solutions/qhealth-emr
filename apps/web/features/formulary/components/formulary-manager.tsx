@@ -1,13 +1,23 @@
 "use client"
 
 import { useState } from "react"
-
-import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, Pencil, Plus, Search, Shield, Trash2 } from "lucide-react"
+import {
+	AlertTriangle,
+	ChevronLeft,
+	ChevronRight,
+	Loader2,
+	Pencil,
+	Plus,
+	Search,
+	Shield,
+	Trash2,
+} from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Checkbox } from "@/core/components/ui/checkbox"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import {
@@ -19,15 +29,15 @@ import {
 } from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
 import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/core/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { Textarea } from "@/core/components/ui/textarea"
-
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
 import {
 	useCreateFormularyItemMutation,
 	useDeleteFormularyItemMutation,
@@ -116,12 +126,12 @@ export function FormularyManager({
 			{/* Toolbar */}
 			<div className="flex flex-wrap items-center gap-3">
 				<div className="relative min-w-60 flex-1">
-					<Search className="text-muted-foreground absolute left-2.5 top-2.5 size-4" />
+					<Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
 					<Input
 						placeholder="Search formulary items..."
 						className="pl-9"
 						value={search}
-						onChange={(e) => {
+						onChange={e => {
 							setSearch(e.target.value)
 							setPage(1)
 						}}
@@ -164,10 +174,10 @@ export function FormularyManager({
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{items.data.map((item) => (
+								{items.data.map(item => (
 									<TableRow
 										key={item.id}
-										className="cursor-pointer hover:bg-muted/50"
+										className="hover:bg-muted/50 cursor-pointer"
 										onClick={() => canEdit && openEdit(item)}
 									>
 										<TableCell className="font-medium">{item.genericName}</TableCell>
@@ -207,9 +217,9 @@ export function FormularyManager({
 													{canEdit && (
 														<Tooltip>
 															<TooltipTrigger
-																className="focus-visible:ring-ring/50 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md p-0 text-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1"
+																className="focus-visible:ring-ring/50 hover:bg-accent hover:text-accent-foreground inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md p-0 text-sm transition-colors focus-visible:ring-1 focus-visible:outline-none"
 																aria-label="Edit"
-																onClick={(e) => {
+																onClick={e => {
 																	e.stopPropagation()
 																	openEdit(item)
 																}}
@@ -222,10 +232,10 @@ export function FormularyManager({
 													{canDelete && (
 														<Tooltip>
 															<TooltipTrigger
-																className="focus-visible:ring-ring/50 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md p-0 text-sm text-destructive transition-colors hover:bg-accent hover:text-destructive focus-visible:outline-none focus-visible:ring-1"
+																className="focus-visible:ring-ring/50 text-destructive hover:bg-accent hover:text-destructive inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md p-0 text-sm transition-colors focus-visible:ring-1 focus-visible:outline-none"
 																aria-label="Remove"
 																disabled={deleteMutation.isPending}
-																onClick={(e) => {
+																onClick={e => {
 																	e.stopPropagation()
 																	deleteMutation.mutate({ id: item.id })
 																}}
@@ -250,7 +260,7 @@ export function FormularyManager({
 							<Button
 								variant="outline"
 								size="sm"
-								onClick={() => setPage((p) => Math.max(1, p - 1))}
+								onClick={() => setPage(p => Math.max(1, p - 1))}
 								disabled={page === 1}
 							>
 								<ChevronLeft className="size-4" />
@@ -262,7 +272,7 @@ export function FormularyManager({
 							<Button
 								variant="outline"
 								size="sm"
-								onClick={() => setPage((p) => Math.min(items.totalPages, p + 1))}
+								onClick={() => setPage(p => Math.min(items.totalPages, p + 1))}
 								disabled={page === items.totalPages}
 							>
 								Next
@@ -274,13 +284,11 @@ export function FormularyManager({
 			</Card>
 
 			{/* Add / Edit Modal */}
-			<Dialog open={sheetMode !== null} onOpenChange={(open) => !open && closeSheet()}>
+			<Dialog open={sheetMode !== null} onOpenChange={open => !open && closeSheet()}>
 				<DialogContent size="lg" className="max-h-[90vh] overflow-y-auto">
 					<DialogHeader>
 						<DialogTitle>
-							{sheetMode === "add"
-								? "Add Drug to Formulary"
-								: `Edit — ${editingItem?.genericName}`}
+							{sheetMode === "add" ? "Add Drug to Formulary" : `Edit — ${editingItem?.genericName}`}
 						</DialogTitle>
 					</DialogHeader>
 					{sheetMode === "add" && (
@@ -357,7 +365,7 @@ function AdminEditForm({
 					<Input
 						id="doseForm"
 						value={doseForm}
-						onChange={(e) => setDoseForm(e.target.value)}
+						onChange={e => setDoseForm(e.target.value)}
 						required
 					/>
 				</div>
@@ -366,24 +374,19 @@ function AdminEditForm({
 					<Input
 						id="strength"
 						value={strength}
-						onChange={(e) => setStrength(e.target.value)}
+						onChange={e => setStrength(e.target.value)}
 						required
 					/>
 				</div>
 				<div className="space-y-1.5">
 					<Label htmlFor="route">Route</Label>
-					<Input
-						id="route"
-						value={route}
-						onChange={(e) => setRoute(e.target.value)}
-						required
-					/>
+					<Input id="route" value={route} onChange={e => setRoute(e.target.value)} required />
 				</div>
 				<div className="flex items-center gap-2 pt-6">
 					<Checkbox
 						id="isActive"
 						checked={isActive}
-						onCheckedChange={(v) => setIsActive(Boolean(v))}
+						onCheckedChange={v => setIsActive(Boolean(v))}
 					/>
 					<Label htmlFor="isActive">Active</Label>
 				</div>
@@ -392,12 +395,14 @@ function AdminEditForm({
 			{/* Clinical policy — read-only for admins */}
 			<Separator />
 			<div className="space-y-1.5 rounded-md border border-dashed p-3">
-				<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+				<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 					Clinical Policy (managed by Pharmacist)
 				</p>
 				<div className="flex flex-wrap gap-2">
 					{item.isHighAlert && (
-						<Badge variant="destructive" className="text-xs">High Alert</Badge>
+						<Badge variant="destructive" className="text-xs">
+							High Alert
+						</Badge>
 					)}
 					{item.isRestricted && (
 						<Badge variant="secondary" className="border-amber-400 text-xs text-amber-700">
@@ -425,8 +430,13 @@ function AdminEditForm({
 				</Button>
 				<Button type="submit" disabled={updateMutation.isPending}>
 					{updateMutation.isPending ? (
-						<><Loader2 className="mr-1.5 size-4 animate-spin" />Saving...</>
-					) : "Save Changes"}
+						<>
+							<Loader2 className="mr-1.5 size-4 animate-spin" />
+							Saving...
+						</>
+					) : (
+						"Save Changes"
+					)}
 				</Button>
 			</div>
 		</form>
@@ -473,98 +483,106 @@ function PharmacistEditForm({
 				{item.doseForm} {item.strength} · {item.route}
 			</p>
 
-		<div className="space-y-3">
-			{/* High Alert toggle card */}
-			<button
-				type="button"
-				onClick={() => setIsHighAlert(v => !v)}
-				className={`w-full rounded-lg border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-					isHighAlert
-						? "border-red-500 bg-red-500/10"
-						: "border-border bg-muted/30 hover:border-red-400 hover:bg-red-500/5"
-				}`}
-			>
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-2">
-						<AlertTriangle className={`size-4 ${isHighAlert ? "text-red-600" : "text-muted-foreground"}`} />
-						<span className={`text-sm font-semibold ${isHighAlert ? "text-red-700 dark:text-red-400" : "text-muted-foreground"}`}>
-							High Alert
-						</span>
-					</div>
-					<span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+			<div className="space-y-3">
+				{/* High Alert toggle card */}
+				<button
+					type="button"
+					onClick={() => setIsHighAlert(v => !v)}
+					className={`focus-visible:ring-ring w-full rounded-lg border-2 p-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none ${
 						isHighAlert
-							? "bg-red-600 text-white"
-							: "bg-muted text-muted-foreground"
-					}`}>
-						{isHighAlert ? "ON" : "OFF"}
-					</span>
-				</div>
-				<p className="mt-1 text-xs text-muted-foreground">
-					Requires double-check verification before dispensing.
-				</p>
-			</button>
-			{isHighAlert && (
-				<Textarea
-					value={highAlertNotes}
-					onChange={(e) => setHighAlertNotes(e.target.value)}
-					placeholder="High-alert notes (e.g. dosing thresholds, required double-checks)..."
-					rows={2}
-					className="border-red-300 focus-visible:ring-red-400"
-				/>
-			)}
-
-			{/* Restricted toggle card */}
-			<button
-				type="button"
-				onClick={() => setIsRestricted(v => !v)}
-				className={`w-full rounded-lg border-2 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-					isRestricted
-						? "border-amber-500 bg-amber-500/10"
-						: "border-border bg-muted/30 hover:border-amber-400 hover:bg-amber-500/5"
-				}`}
-			>
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-2">
-						<Shield className={`size-4 ${isRestricted ? "text-amber-600" : "text-muted-foreground"}`} />
-						<span className={`text-sm font-semibold ${isRestricted ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
-							Restricted
+							? "border-red-500 bg-red-500/10"
+							: "border-border bg-muted/30 hover:border-red-400 hover:bg-red-500/5"
+					}`}
+				>
+					<div className="flex items-center justify-between">
+						<div className="flex items-center gap-2">
+							<AlertTriangle
+								className={`size-4 ${isHighAlert ? "text-red-600" : "text-muted-foreground"}`}
+							/>
+							<span
+								className={`text-sm font-semibold ${isHighAlert ? "text-red-700 dark:text-red-400" : "text-muted-foreground"}`}
+							>
+								High Alert
+							</span>
+						</div>
+						<span
+							className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+								isHighAlert ? "bg-red-600 text-white" : "bg-muted text-muted-foreground"
+							}`}
+						>
+							{isHighAlert ? "ON" : "OFF"}
 						</span>
 					</div>
-					<span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+					<p className="text-muted-foreground mt-1 text-xs">
+						Requires double-check verification before dispensing.
+					</p>
+				</button>
+				{isHighAlert && (
+					<Textarea
+						value={highAlertNotes}
+						onChange={e => setHighAlertNotes(e.target.value)}
+						placeholder="High-alert notes (e.g. dosing thresholds, required double-checks)..."
+						rows={2}
+						className="border-red-300 focus-visible:ring-red-400"
+					/>
+				)}
+
+				{/* Restricted toggle card */}
+				<button
+					type="button"
+					onClick={() => setIsRestricted(v => !v)}
+					className={`focus-visible:ring-ring w-full rounded-lg border-2 p-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none ${
 						isRestricted
-							? "bg-amber-500 text-white"
-							: "bg-muted text-muted-foreground"
-					}`}>
-						{isRestricted ? "ON" : "OFF"}
-					</span>
+							? "border-amber-500 bg-amber-500/10"
+							: "border-border bg-muted/30 hover:border-amber-400 hover:bg-amber-500/5"
+					}`}
+				>
+					<div className="flex items-center justify-between">
+						<div className="flex items-center gap-2">
+							<Shield
+								className={`size-4 ${isRestricted ? "text-amber-600" : "text-muted-foreground"}`}
+							/>
+							<span
+								className={`text-sm font-semibold ${isRestricted ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}
+							>
+								Restricted
+							</span>
+						</div>
+						<span
+							className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+								isRestricted ? "bg-amber-500 text-white" : "bg-muted text-muted-foreground"
+							}`}
+						>
+							{isRestricted ? "ON" : "OFF"}
+						</span>
+					</div>
+					<p className="text-muted-foreground mt-1 text-xs">
+						Requires specialist authorisation before prescribing.
+					</p>
+				</button>
+				{isRestricted && (
+					<Textarea
+						value={restrictionNotes}
+						onChange={e => setRestrictionNotes(e.target.value)}
+						placeholder="Restriction notes (e.g. specialist authorisation required)..."
+						rows={2}
+						className="border-amber-300 focus-visible:ring-amber-400"
+					/>
+				)}
+
+				<Separator />
+
+				<div className="space-y-1.5">
+					<Label htmlFor="formularyNotes">Formulary Notes</Label>
+					<Textarea
+						id="formularyNotes"
+						value={formularyNotes}
+						onChange={e => setFormularyNotes(e.target.value)}
+						placeholder="General notes about this formulary entry..."
+						rows={3}
+					/>
 				</div>
-				<p className="mt-1 text-xs text-muted-foreground">
-					Requires specialist authorisation before prescribing.
-				</p>
-			</button>
-			{isRestricted && (
-				<Textarea
-					value={restrictionNotes}
-					onChange={(e) => setRestrictionNotes(e.target.value)}
-					placeholder="Restriction notes (e.g. specialist authorisation required)..."
-					rows={2}
-					className="border-amber-300 focus-visible:ring-amber-400"
-				/>
-			)}
-
-			<Separator />
-
-			<div className="space-y-1.5">
-				<Label htmlFor="formularyNotes">Formulary Notes</Label>
-				<Textarea
-					id="formularyNotes"
-					value={formularyNotes}
-					onChange={(e) => setFormularyNotes(e.target.value)}
-					placeholder="General notes about this formulary entry..."
-					rows={3}
-				/>
 			</div>
-		</div>
 
 			{updateMutation.isError && (
 				<p className="text-destructive text-sm">
@@ -578,8 +596,13 @@ function PharmacistEditForm({
 				</Button>
 				<Button type="submit" disabled={updateMutation.isPending}>
 					{updateMutation.isPending ? (
-						<><Loader2 className="mr-1.5 size-4 animate-spin" />Saving...</>
-					) : "Save Changes"}
+						<>
+							<Loader2 className="mr-1.5 size-4 animate-spin" />
+							Saving...
+						</>
+					) : (
+						"Save Changes"
+					)}
 				</Button>
 			</div>
 		</form>
@@ -609,8 +632,7 @@ function AddFormularyItemForm({
 	const { data: genericsData } = useDrugGenericsQuery({ isActive: true, limit: 100 })
 	const createMutation = useCreateFormularyItemMutation()
 
-	const generics =
-		(genericsData as { data: { id: string; genericName: string }[] })?.data ?? []
+	const generics = (genericsData as { data: { id: string; genericName: string }[] })?.data ?? []
 
 	function handleSubmit(e: React.FormEvent) {
 		e.preventDefault()
@@ -622,12 +644,12 @@ function AddFormularyItemForm({
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<div className="space-y-1.5 sm:col-span-2">
 					<Label htmlFor="drugGenericId">Drug Generic *</Label>
-					<Select value={drugGenericId} onValueChange={(v) => setDrugGenericId(v ?? "")} required>
+					<Select value={drugGenericId} onValueChange={v => setDrugGenericId(v ?? "")} required>
 						<SelectTrigger id="drugGenericId">
 							<SelectValue placeholder="Select a drug..." />
 						</SelectTrigger>
 						<SelectContent>
-							{generics.map((g) => (
+							{generics.map(g => (
 								<SelectItem key={g.id} value={g.id}>
 									{g.genericName}
 								</SelectItem>
@@ -641,7 +663,7 @@ function AddFormularyItemForm({
 					<Input
 						id="addDoseForm"
 						value={doseForm}
-						onChange={(e) => setDoseForm(e.target.value)}
+						onChange={e => setDoseForm(e.target.value)}
 						placeholder="e.g. Tablet, Capsule, Syrup"
 						required
 					/>
@@ -652,7 +674,7 @@ function AddFormularyItemForm({
 					<Input
 						id="addStrength"
 						value={strength}
-						onChange={(e) => setStrength(e.target.value)}
+						onChange={e => setStrength(e.target.value)}
 						placeholder="e.g. 500mg, 250mg/5ml"
 						required
 					/>
@@ -663,7 +685,7 @@ function AddFormularyItemForm({
 					<Input
 						id="addRoute"
 						value={route}
-						onChange={(e) => setRoute(e.target.value)}
+						onChange={e => setRoute(e.target.value)}
 						placeholder="e.g. Oral, IV, IM"
 						required
 					/>
@@ -682,8 +704,13 @@ function AddFormularyItemForm({
 				</Button>
 				<Button type="submit" disabled={createMutation.isPending}>
 					{createMutation.isPending ? (
-						<><Loader2 className="mr-1.5 size-4 animate-spin" />Adding...</>
-					) : "Add to Formulary"}
+						<>
+							<Loader2 className="mr-1.5 size-4 animate-spin" />
+							Adding...
+						</>
+					) : (
+						"Add to Formulary"
+					)}
 				</Button>
 			</div>
 		</form>

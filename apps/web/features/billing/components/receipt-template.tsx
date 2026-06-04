@@ -92,11 +92,11 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
 					aria-label="Payment receipt"
 				>
 					{/* Header */}
-					<div className="text-center space-y-1">
-						<p className="text-base font-bold uppercase tracking-wide">{facilityName}</p>
+					<div className="space-y-1 text-center">
+						<p className="text-base font-bold tracking-wide uppercase">{facilityName}</p>
 						{facilityAddress && <p className="text-xs">{facilityAddress}</p>}
 						{facilityTin && <p className="text-xs">TIN: {facilityTin}</p>}
-						<p className="text-xs font-semibold uppercase mt-2">Official Receipt</p>
+						<p className="mt-2 text-xs font-semibold uppercase">Official Receipt</p>
 					</div>
 
 					<hr className="border-dashed border-black/40" />
@@ -135,7 +135,7 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
 						</div>
 						<div className="flex justify-between">
 							<span>Encounter:</span>
-							<span className="truncate max-w-[140px]">{encounterId}</span>
+							<span className="max-w-[140px] truncate">{encounterId}</span>
 						</div>
 					</div>
 
@@ -216,13 +216,13 @@ export const ReceiptTemplate = forwardRef<HTMLDivElement, ReceiptTemplateProps>(
 					{/* Barcode placeholder (encounter ID) */}
 					<div className="text-center text-xs">
 						<p className="font-mono text-[10px] tracking-widest">{encounterId}</p>
-						<p className="mt-0.5 text-[9px] uppercase text-black/60">Encounter ID</p>
+						<p className="mt-0.5 text-[9px] text-black/60 uppercase">Encounter ID</p>
 					</div>
 
 					<hr className="border-dashed border-black/40" />
 
 					{/* Footer */}
-					<div className="text-center space-y-1 text-[10px] text-black/70">
+					<div className="space-y-1 text-center text-[10px] text-black/70">
 						<p>Cashier: {issuedBy}</p>
 						<p>This is your official receipt. Thank you.</p>
 					</div>

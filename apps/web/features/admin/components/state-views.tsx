@@ -16,12 +16,14 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
 	return (
-		<div className={cn("flex flex-col items-center justify-center gap-2 p-8 text-center", className)}>
+		<div
+			className={cn("flex flex-col items-center justify-center gap-2 p-8 text-center", className)}
+		>
 			<div className="text-muted-foreground" aria-hidden>
 				{icon ?? <Inbox className="size-10" />}
 			</div>
 			<p className="text-sm font-medium">{title}</p>
-			{description && <p className="max-w-sm text-xs text-muted-foreground">{description}</p>}
+			{description && <p className="text-muted-foreground max-w-sm text-xs">{description}</p>}
 			{action && <div className="mt-2">{action}</div>}
 		</div>
 	)
@@ -34,18 +36,26 @@ interface ErrorStateProps {
 	className?: string
 }
 
-export function ErrorState({ title = "Something went wrong", error, retry, className }: ErrorStateProps) {
+export function ErrorState({
+	title = "Something went wrong",
+	error,
+	retry,
+	className,
+}: ErrorStateProps) {
 	const message = error instanceof Error ? error.message : error ? String(error) : null
 	return (
-		<div className={cn("flex flex-col items-center justify-center gap-2 p-8 text-center", className)} role="alert">
-			<AlertCircle className="size-8 text-destructive" aria-hidden />
+		<div
+			className={cn("flex flex-col items-center justify-center gap-2 p-8 text-center", className)}
+			role="alert"
+		>
+			<AlertCircle className="text-destructive size-8" aria-hidden />
 			<p className="text-sm font-medium">{title}</p>
-			{message && <p className="max-w-sm text-xs text-muted-foreground">{message}</p>}
+			{message && <p className="text-muted-foreground max-w-sm text-xs">{message}</p>}
 			{retry && (
 				<button
 					type="button"
 					onClick={retry}
-					className="rounded-md border px-3 py-1 text-xs font-medium hover:bg-muted"
+					className="hover:bg-muted rounded-md border px-3 py-1 text-xs font-medium"
 				>
 					Retry
 				</button>

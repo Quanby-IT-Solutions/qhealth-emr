@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 
+import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
@@ -14,17 +15,16 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
-
-import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { EncounterContextBar } from "@/features/billing/components/encounter-context-bar"
 import { useInvoiceQuery } from "@/features/billing/invoice-payment/api/invoices.hooks"
+
 import {
+	useGenerateEsoaFromInvoiceMutation,
 	useGenerateEsoaMutation,
 	useGenerateSoaMutation,
-	useSoaQuery,
 	useListEsoaStatementsQuery,
 	useSendEsoaMutation,
-	useGenerateEsoaFromInvoiceMutation,
+	useSoaQuery,
 } from "../api/esoa.hooks"
 import { DeliveryActivityPanel } from "./delivery-activity-panel"
 
@@ -50,9 +50,12 @@ export function EsoaPage({ encounterId, facilityId, patientId, invoiceId }: Esoa
 	const { data: soa, isLoading } = useSoaQuery(encounterId)
 	const { mutate: generateSoa, isPending: isGeneratingSoa } = useGenerateSoaMutation()
 	const { mutate: generateEsoa, isPending: isGeneratingEsoa } = useGenerateEsoaMutation()
-	const { mutate: generateEsoaFromInvoice, isPending: isGeneratingFromInvoice } = useGenerateEsoaFromInvoiceMutation()
+	const { mutate: generateEsoaFromInvoice, isPending: isGeneratingFromInvoice } =
+		useGenerateEsoaFromInvoiceMutation()
 
-	const { data: esoaStatements, isLoading: statementsLoading } = useListEsoaStatementsQuery(invoiceId ?? "")
+	const { data: esoaStatements, isLoading: statementsLoading } = useListEsoaStatementsQuery(
+		invoiceId ?? ""
+	)
 	const { data: invoiceData } = useInvoiceQuery(invoiceId ?? "")
 
 	const invoiceTotal = Number(invoiceData?.totalAmount ?? 0)
@@ -65,14 +68,31 @@ export function EsoaPage({ encounterId, facilityId, patientId, invoiceId }: Esoa
 	const activeEsoaId = selectedEsoaId ?? latestStatement?.id ?? null
 
 	const deliveryRecords = statements
-		.filter((s: { id: string; sentAt: Date | string | null; sentVia: string | null; sentToRecipient: string | null; deliveryStatus: string | null }) => !!s.sentAt)
-		.map((s: { id: string; sentAt: Date | string | null; sentVia: string | null; sentToRecipient: string | null; deliveryStatus: string | null; version: number }) => ({
-			id: s.id,
-			channel: s.sentVia ?? "unknown",
-			recipient: s.sentToRecipient ?? null,
-			status: s.deliveryStatus ?? "sent",
-			sentAt: s.sentAt,
-		}))
+		.filter(
+			(s: {
+				id: string
+				sentAt: Date | string | null
+				sentVia: string | null
+				sentToRecipient: string | null
+				deliveryStatus: string | null
+			}) => !!s.sentAt
+		)
+		.map(
+			(s: {
+				id: string
+				sentAt: Date | string | null
+				sentVia: string | null
+				sentToRecipient: string | null
+				deliveryStatus: string | null
+				version: number
+			}) => ({
+				id: s.id,
+				channel: s.sentVia ?? "unknown",
+				recipient: s.sentToRecipient ?? null,
+				status: s.deliveryStatus ?? "sent",
+				sentAt: s.sentAt,
+			})
+		)
 
 	function handleGenerateSoa() {
 		generateSoa({ facilityId, encounterId, patientId })
@@ -84,11 +104,14 @@ export function EsoaPage({ encounterId, facilityId, patientId, invoiceId }: Esoa
 
 	function handleGenerateFromInvoice() {
 		if (!invoiceId) return
-		generateEsoaFromInvoice({ invoiceId }, {
-			onSuccess: (result) => {
-				setSelectedEsoaId(result.id)
-			},
-		})
+		generateEsoaFromInvoice(
+			{ invoiceId },
+			{
+				onSuccess: result => {
+					setSelectedEsoaId(result.id)
+				},
+			}
+		)
 	}
 
 	function handleSend() {
@@ -107,17 +130,17 @@ export function EsoaPage({ encounterId, facilityId, patientId, invoiceId }: Esoa
 				esoaGeneratedAt={latestStatement?.generatedAt ?? undefined}
 			/>
 
-			<div className="px-4 space-y-4 max-w-2xl">
+			<div className="max-w-2xl space-y-4 px-4">
 				<h1 className="text-lg font-semibold">Electronic Statement of Account</h1>
 
-				{isLoading && (
-					<p className="text-sm text-muted-foreground">Loading SOA...</p>
-				)}
+				{isLoading && <p className="text-muted-foreground text-sm">Loading SOA...</p>}
 
 				{!isLoading && !soa && (
 					<Card>
-						<CardContent className="pt-4 space-y-3">
-							<p className="text-sm text-muted-foreground">No Statement of Account generated yet.</p>
+						<CardContent className="space-y-3 pt-4">
+							<p className="text-muted-foreground text-sm">
+								No Statement of Account generated yet.
+							</p>
 							<Button onClick={handleGenerateSoa} disabled={isGeneratingSoa}>
 								{isGeneratingSoa ? "Generating SOA..." : "Generate SOA"}
 							</Button>
@@ -146,15 +169,22 @@ export function EsoaPage({ encounterId, facilityId, patientId, invoiceId }: Esoa
 								</div>
 								<div className="flex justify-between">
 									<span className="text-muted-foreground">Subtotal</span>
-									<span className="tabular-nums">â‚±{soa.subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
+									<span className="tabular-nums">
+										â‚±{soa.subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+									</span>
 								</div>
-								<div className="flex justify-between text-muted-foreground">
+								<div className="text-muted-foreground flex justify-between">
 									<span>PhilHealth Deduction</span>
-									<span className="tabular-nums">- â‚±{soa.philhealthDeduction.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
+									<span className="tabular-nums">
+										- â‚±
+										{soa.philhealthDeduction.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+									</span>
 								</div>
-								<div className="flex justify-between font-semibold border-t pt-1">
+								<div className="flex justify-between border-t pt-1 font-semibold">
 									<span>Net Amount</span>
-									<span className="tabular-nums">â‚±{soa.netAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
+									<span className="tabular-nums">
+										â‚±{soa.netAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+									</span>
 								</div>
 							</CardContent>
 						</Card>
@@ -162,19 +192,28 @@ export function EsoaPage({ encounterId, facilityId, patientId, invoiceId }: Esoa
 						{totalsDrift && (
 							<Alert variant="destructive">
 								<AlertDescription>
-									SOA net amount (₱{soaNet.toLocaleString("en-PH", { minimumFractionDigits: 2 })}) does not match
-									invoice total (₱{invoiceTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}). Regenerate
+									SOA net amount (₱{soaNet.toLocaleString("en-PH", { minimumFractionDigits: 2 })})
+									does not match invoice total (₱
+									{invoiceTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}). Regenerate
 									the invoice before generating eSOA.
 								</AlertDescription>
 							</Alert>
 						)}
 
-						<div className="flex gap-2 flex-wrap">
-							<Button onClick={handleGenerateEsoa} disabled={isGeneratingEsoa || totalsDrift} variant="outline">
+						<div className="flex flex-wrap gap-2">
+							<Button
+								onClick={handleGenerateEsoa}
+								disabled={isGeneratingEsoa || totalsDrift}
+								variant="outline"
+							>
 								{isGeneratingEsoa ? "Generating eSOA..." : "Generate eSOA (XML/PDF)"}
 							</Button>
 							{invoiceId && (
-								<Button onClick={handleGenerateFromInvoice} disabled={isGeneratingFromInvoice || totalsDrift} variant="outline">
+								<Button
+									onClick={handleGenerateFromInvoice}
+									disabled={isGeneratingFromInvoice || totalsDrift}
+									variant="outline"
+								>
 									{isGeneratingFromInvoice ? "Generating..." : "Generate from Invoice"}
 								</Button>
 							)}
@@ -189,27 +228,37 @@ export function EsoaPage({ encounterId, facilityId, patientId, invoiceId }: Esoa
 								<CardContent className="space-y-3">
 									{statements.length > 1 && (
 										<div className="space-y-1.5">
-											<Label htmlFor="esoa-version" className="text-xs">Version</Label>
-											<Select
-												value={activeEsoaId ?? ""}
-												onValueChange={v => setSelectedEsoaId(v)}
-											>
+											<Label htmlFor="esoa-version" className="text-xs">
+												Version
+											</Label>
+											<Select value={activeEsoaId ?? ""} onValueChange={v => setSelectedEsoaId(v)}>
 												<SelectTrigger id="esoa-version" className="h-8 text-xs">
 													<SelectValue />
 												</SelectTrigger>
 												<SelectContent>
-													{statements.map((s: { id: string; version: number; generatedAt: Date | string | null }) => (
-														<SelectItem key={s.id} value={s.id} className="text-xs">
-															v{s.version} â€” {s.generatedAt ? new Date(s.generatedAt).toLocaleDateString("en-PH") : "pending"}
-														</SelectItem>
-													))}
+													{statements.map(
+														(s: {
+															id: string
+															version: number
+															generatedAt: Date | string | null
+														}) => (
+															<SelectItem key={s.id} value={s.id} className="text-xs">
+																v{s.version} â€”{" "}
+																{s.generatedAt
+																	? new Date(s.generatedAt).toLocaleDateString("en-PH")
+																	: "pending"}
+															</SelectItem>
+														)
+													)}
 												</SelectContent>
 											</Select>
 										</div>
 									)}
 
 									<div className="space-y-1.5">
-										<Label htmlFor="send-channel" className="text-xs">Delivery Channel</Label>
+										<Label htmlFor="send-channel" className="text-xs">
+											Delivery Channel
+										</Label>
 										<Select
 											value={sendChannel}
 											onValueChange={v => setSendChannel(v as DeliveryChannel)}
@@ -242,11 +291,7 @@ export function EsoaPage({ encounterId, facilityId, patientId, invoiceId }: Esoa
 										</div>
 									)}
 
-									<Button
-										onClick={handleSend}
-										disabled={!activeEsoaId || isSending}
-										size="sm"
-									>
+									<Button onClick={handleSend} disabled={!activeEsoaId || isSending} size="sm">
 										{isSending ? "Sending..." : "Send eSOA"}
 									</Button>
 								</CardContent>
@@ -260,17 +305,12 @@ export function EsoaPage({ encounterId, facilityId, patientId, invoiceId }: Esoa
 									<CardTitle className="text-sm">Delivery Activity</CardTitle>
 								</CardHeader>
 								<CardContent>
-									<DeliveryActivityPanel
-										records={deliveryRecords}
-										isLoading={statementsLoading}
-									/>
+									<DeliveryActivityPanel records={deliveryRecords} isLoading={statementsLoading} />
 								</CardContent>
 							</Card>
 						)}
 
-						{!invoiceId && !statementsLoading && (
-							<Separator />
-						)}
+						{!invoiceId && !statementsLoading && <Separator />}
 					</>
 				)}
 			</div>

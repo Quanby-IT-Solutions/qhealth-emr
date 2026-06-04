@@ -1,7 +1,7 @@
 "use client"
 
+import { useCallback, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useState, useCallback } from "react"
 
 import { env } from "@/env"
 
@@ -20,9 +20,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 	return res.json() as Promise<T>
 }
 
-function buildQueryString(
-	params: Record<string, string | number | boolean | undefined>
-): string {
+function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
 	const entries = Object.entries(params).filter(([, v]) => v !== undefined)
 	if (entries.length === 0) return ""
 	return `?${entries
@@ -150,7 +148,8 @@ export interface UpdateSlaConfigInput extends Partial<CreateSlaConfigInput> {
 export const slaKeys = {
 	all: ["sla"] as const,
 	events: (facilityId: string) => [...slaKeys.all, "events", facilityId] as const,
-	eventsByEncounter: (encounterId: string) => [...slaKeys.all, "events", "encounter", encounterId] as const,
+	eventsByEncounter: (encounterId: string) =>
+		[...slaKeys.all, "events", "encounter", encounterId] as const,
 	configs: (facilityId: string) => [...slaKeys.all, "configs", facilityId] as const,
 	compliance: (facilityId: string, start: string, end: string) =>
 		[...slaKeys.all, "compliance", facilityId, start, end] as const,
@@ -169,7 +168,13 @@ export function useSlaEventsQuery(params: {
 	paused?: boolean
 }) {
 	return useQuery<SlaEventListResponse>({
-		queryKey: [...slaKeys.events(params.facilityId), params.status, params.workflowType, params.page, params.limit],
+		queryKey: [
+			...slaKeys.events(params.facilityId),
+			params.status,
+			params.workflowType,
+			params.page,
+			params.limit,
+		],
 		queryFn: () =>
 			fetchJson(
 				`${API_BASE}/events${buildQueryString({
@@ -188,8 +193,7 @@ export function useSlaEventsQuery(params: {
 export function useSlaEventsByEncounterQuery(encounterId: string | null) {
 	return useQuery<SlaEvent[]>({
 		queryKey: slaKeys.eventsByEncounter(encounterId ?? ""),
-		queryFn: () =>
-			fetchJson(`${API_BASE}/events/encounter/${encounterId}`),
+		queryFn: () => fetchJson(`${API_BASE}/events/encounter/${encounterId}`),
 		enabled: !!encounterId,
 	})
 }
@@ -201,8 +205,7 @@ export function useSlaEventsByEncounterQuery(encounterId: string | null) {
 export function useSlaConfigsQuery(facilityId: string) {
 	return useQuery<SlaConfigListResponse>({
 		queryKey: slaKeys.configs(facilityId),
-		queryFn: () =>
-			fetchJson(`${API_BASE}/configs${buildQueryString({ facilityId })}`),
+		queryFn: () => fetchJson(`${API_BASE}/configs${buildQueryString({ facilityId })}`),
 	})
 }
 
@@ -228,7 +231,7 @@ export function useUpdateSlaConfigMutation() {
 				method: "PATCH",
 				body: JSON.stringify(input),
 			}),
-		onSuccess: (data) => {
+		onSuccess: data => {
 			void queryClient.invalidateQueries({ queryKey: slaKeys.configs(data.facilityId) })
 		},
 	})
@@ -237,8 +240,7 @@ export function useUpdateSlaConfigMutation() {
 export function useDeleteSlaConfigMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<void, Error, { id: string; facilityId: string }>({
-		mutationFn: ({ id }) =>
-			fetchJson(`${API_BASE}/configs/${id}`, { method: "DELETE" }),
+		mutationFn: ({ id }) => fetchJson(`${API_BASE}/configs/${id}`, { method: "DELETE" }),
 		onSuccess: (_, variables) => {
 			void queryClient.invalidateQueries({ queryKey: slaKeys.configs(variables.facilityId) })
 		},
@@ -302,7 +304,11 @@ export const DEFAULT_SLA_TARGETS: Record<SlaWorkflowType, number> = {
 	certificate_issuance: 30, // 30 min per TOR Flow 7
 }
 
-export function getSlaStatus(elapsedMinutes: number, targetMinutes: number, warningPct = 80): SlaStatus {
+export function getSlaStatus(
+	elapsedMinutes: number,
+	targetMinutes: number,
+	warningPct = 80
+): SlaStatus {
 	const pct = (elapsedMinutes / targetMinutes) * 100
 	if (pct >= 100) return "exceeded"
 	if (pct >= warningPct) return "approaching"
@@ -398,8 +404,7 @@ export const slaStepKeys = {
 export function useSlaStepConfigsQuery(facilityId: string) {
 	return useQuery<SlaStepConfigListResponse>({
 		queryKey: slaStepKeys.list(facilityId),
-		queryFn: () =>
-			fetchJson(`${API_BASE}/step-configs${buildQueryString({ facilityId })}`),
+		queryFn: () => fetchJson(`${API_BASE}/step-configs${buildQueryString({ facilityId })}`),
 		enabled: !!facilityId,
 	})
 }
@@ -420,13 +425,17 @@ export function useCreateSlaStepConfigMutation() {
 
 export function useUpdateSlaStepConfigMutation() {
 	const queryClient = useQueryClient()
-	return useMutation<SlaStepConfig, Error, { id: string; facilityId: string } & UpdateSlaStepConfigInput>({
+	return useMutation<
+		SlaStepConfig,
+		Error,
+		{ id: string; facilityId: string } & UpdateSlaStepConfigInput
+	>({
 		mutationFn: ({ id, facilityId: _fid, ...input }) =>
 			fetchJson(`${API_BASE}/step-configs/${id}`, {
 				method: "PATCH",
 				body: JSON.stringify(input),
 			}),
-		onSuccess: (data) => {
+		onSuccess: data => {
 			void queryClient.invalidateQueries({ queryKey: slaStepKeys.list(data.facilityId) })
 		},
 	})
@@ -435,8 +444,7 @@ export function useUpdateSlaStepConfigMutation() {
 export function useDeleteSlaStepConfigMutation() {
 	const queryClient = useQueryClient()
 	return useMutation<void, Error, { id: string; facilityId: string }>({
-		mutationFn: ({ id }) =>
-			fetchJson(`${API_BASE}/step-configs/${id}`, { method: "DELETE" }),
+		mutationFn: ({ id }) => fetchJson(`${API_BASE}/step-configs/${id}`, { method: "DELETE" }),
 		onSuccess: (_, variables) => {
 			void queryClient.invalidateQueries({ queryKey: slaStepKeys.list(variables.facilityId) })
 		},

@@ -142,7 +142,9 @@ export function SurgicalCalendar({
 
 	const bookedCount = slots.filter(s => !!s.surgicalCaseId).length
 	const openSlotCount = visibleSuites.length * weekDays.length * TIME_SLOTS.length - bookedCount
-	const summaryLabel = readOnly ? `${bookedCount} assigned this week` : `${bookedCount} booked this week`
+	const summaryLabel = readOnly
+		? `${bookedCount} assigned this week`
+		: `${bookedCount} booked this week`
 
 	return (
 		<>

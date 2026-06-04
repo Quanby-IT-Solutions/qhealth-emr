@@ -95,7 +95,7 @@ export function GatePassCard({ gatePass }: { gatePass: GatePass }) {
 
 					<Separator />
 
-					<div className="flex justify-between items-center text-sm">
+					<div className="flex items-center justify-between text-sm">
 						<span className="text-muted-foreground">Disposition</span>
 						<Badge variant={gatePass.disposition === "deceased" ? "destructive" : "default"}>
 							{DISPOSITION_LABELS[gatePass.disposition] ?? gatePass.disposition}
@@ -103,7 +103,7 @@ export function GatePassCard({ gatePass }: { gatePass: GatePass }) {
 					</div>
 
 					{gatePass.deathClassification && (
-						<div className="flex justify-between items-center text-sm">
+						<div className="flex items-center justify-between text-sm">
 							<span className="text-muted-foreground">Death Classification</span>
 							<Badge variant="destructive">
 								{gatePass.deathClassification === "gross"
@@ -129,18 +129,13 @@ export function GatePassCard({ gatePass }: { gatePass: GatePass }) {
 				</CardContent>
 
 				<CardFooter className="no-print">
-					<Button
-						variant="outline"
-						className="w-full"
-						onClick={() => window.print()}
-					>
+					<Button variant="outline" className="w-full" onClick={() => window.print()}>
 						Print Gate Pass
 					</Button>
 				</CardFooter>
 			</Card>
 
 			<style
-
 				dangerouslySetInnerHTML={{
 					__html: `@media print{body>*:not(.gate-pass-print){display:none!important}.no-print{display:none!important}.gate-pass-print{box-shadow:none;border:1px solid #ccc}}`,
 				}}

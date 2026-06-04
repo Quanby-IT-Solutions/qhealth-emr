@@ -14,7 +14,8 @@ vi.mock("../api/surgical.hooks", () => ({
 	useRvsCodeSearchQuery: (...args: unknown[]) => mockUseRvsCodeSearchQuery(...args),
 	useSuggestRvsCodeMutation: (...args: unknown[]) => mockUseSuggestRvsCodeMutation(...args),
 	useUpdateRvsStatusMutation: (...args: unknown[]) => mockUseUpdateRvsStatusMutation(...args),
-	useRemoveRvsAssignmentMutation: (...args: unknown[]) => mockUseRemoveRvsAssignmentMutation(...args),
+	useRemoveRvsAssignmentMutation: (...args: unknown[]) =>
+		mockUseRemoveRvsAssignmentMutation(...args),
 }))
 
 describe("RvsCodeSelector", () => {
@@ -33,20 +34,20 @@ describe("RvsCodeSelector", () => {
 			data:
 				search.length >= 2
 					? {
-						data: [
-							{
-								id: "rvs-uuid-1",
-								code: "47562",
-								description: "Laparoscopic cholecystectomy",
-								baseValue: 42,
-								category: "surgery",
-							},
-						],
-						total: 1,
-						page: 1,
-						limit: 20,
-						totalPages: 1,
-					}
+							data: [
+								{
+									id: "rvs-uuid-1",
+									code: "47562",
+									description: "Laparoscopic cholecystectomy",
+									baseValue: 42,
+									category: "surgery",
+								},
+							],
+							total: 1,
+							page: 1,
+							limit: 20,
+							totalPages: 1,
+						}
 					: undefined,
 			isLoading: false,
 		}))

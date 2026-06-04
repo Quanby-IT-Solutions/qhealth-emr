@@ -13,7 +13,6 @@ import {
 	SheetTitle,
 } from "@/core/components/ui/sheet"
 import { Textarea } from "@/core/components/ui/textarea"
-
 import { useFlagMutation } from "@/features/auditor/break-glass-review/api/break-glass.hooks"
 
 interface InvestigationFlagDrawerProps {
@@ -61,7 +60,8 @@ export function InvestigationFlagDrawer({ open, eventId, onClose }: Investigatio
 				<div className="space-y-4 px-4 py-6">
 					<div className="space-y-2">
 						<Label htmlFor="flag-reason">
-							Investigation Reason <span className="text-muted-foreground">(min 10 characters)</span>
+							Investigation Reason{" "}
+							<span className="text-muted-foreground">(min 10 characters)</span>
 						</Label>
 						<Textarea
 							id="flag-reason"
@@ -71,7 +71,9 @@ export function InvestigationFlagDrawer({ open, eventId, onClose }: Investigatio
 							rows={5}
 						/>
 						{reason.length > 0 && reason.length < 10 && (
-							<p className="text-xs text-destructive">{10 - reason.length} more character(s) required</p>
+							<p className="text-destructive text-xs">
+								{10 - reason.length} more character(s) required
+							</p>
 						)}
 					</div>
 

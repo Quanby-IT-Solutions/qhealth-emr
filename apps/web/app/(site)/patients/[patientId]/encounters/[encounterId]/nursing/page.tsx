@@ -1,19 +1,15 @@
 "use client"
 
-import { NursingTab } from "@/features/nursing/components/nursing-tab"
-import { useChartContext } from "@/features/encounters/context/chart-context"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { useChartContext } from "@/features/encounters/context/chart-context"
+import { NursingTab } from "@/features/nursing/components/nursing-tab"
 
 export default function NursingPage() {
 	const { encounterId, patientId, facilityId, encounter } = useChartContext()
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	const canViewNursing = permissions.some(
-		p => p.module === "nursing" && p.action === "view"
-	)
-	const canWriteNursing = permissions.some(
-		p => p.module === "nursing" && p.action === "create"
-	)
+	const canViewNursing = permissions.some(p => p.module === "nursing" && p.action === "view")
+	const canWriteNursing = permissions.some(p => p.module === "nursing" && p.action === "create")
 	const isClinicalSigner = permissions.some(
 		p => p.module === "clinical_docs" && p.action === "sign"
 	)

@@ -26,7 +26,9 @@ import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -103,15 +105,14 @@ export const OPD_STEPS: OpdStep[] = [
 export function canRoleActOnOpdStep(
 	permSet: Set<string>,
 	activeRoleName: string | null | undefined,
-	step: OpdStep,
+	step: OpdStep
 ) {
 	const roleCanOwnStep =
 		activeRoleName === step.responsibleRole ||
 		(step.responsibleRole === "Physician" && activeRoleName === "Surgeon")
 
 	return (
-		roleCanOwnStep &&
-		can(permSet, step.requiredPermission.module, step.requiredPermission.action)
+		roleCanOwnStep && can(permSet, step.requiredPermission.module, step.requiredPermission.action)
 	)
 }
 
@@ -299,27 +300,58 @@ function VitalsForm({
 		<div className="grid grid-cols-3 gap-4">
 			<div className="space-y-2">
 				<Label>Blood Pressure (mmHg)</Label>
-				<Input placeholder="e.g. 120/80" value={fields[0] ?? ""} onChange={e => set(0, e.target.value)} />
+				<Input
+					placeholder="e.g. 120/80"
+					value={fields[0] ?? ""}
+					onChange={e => set(0, e.target.value)}
+				/>
 			</div>
 			<div className="space-y-2">
 				<Label>Heart Rate (bpm)</Label>
-				<Input type="number" placeholder="e.g. 72" value={fields[1] ?? ""} onChange={e => set(1, e.target.value)} />
+				<Input
+					type="number"
+					placeholder="e.g. 72"
+					value={fields[1] ?? ""}
+					onChange={e => set(1, e.target.value)}
+				/>
 			</div>
 			<div className="space-y-2">
 				<Label>Temperature (°C)</Label>
-				<Input type="number" step={0.1} placeholder="e.g. 37.0" value={fields[2] ?? ""} onChange={e => set(2, e.target.value)} />
+				<Input
+					type="number"
+					step={0.1}
+					placeholder="e.g. 37.0"
+					value={fields[2] ?? ""}
+					onChange={e => set(2, e.target.value)}
+				/>
 			</div>
 			<div className="space-y-2">
 				<Label>Respiratory Rate</Label>
-				<Input type="number" placeholder="breaths/min" value={fields[3] ?? ""} onChange={e => set(3, e.target.value)} />
+				<Input
+					type="number"
+					placeholder="breaths/min"
+					value={fields[3] ?? ""}
+					onChange={e => set(3, e.target.value)}
+				/>
 			</div>
 			<div className="space-y-2">
 				<Label>O₂ Saturation (%)</Label>
-				<Input type="number" placeholder="e.g. 98" value={fields[4] ?? ""} onChange={e => set(4, e.target.value)} />
+				<Input
+					type="number"
+					placeholder="e.g. 98"
+					value={fields[4] ?? ""}
+					onChange={e => set(4, e.target.value)}
+				/>
 			</div>
 			<div className="space-y-2">
 				<Label>Weight (kg)</Label>
-				<Input type="number" step={0.1} placeholder="e.g. 65.5" value={fields[5] ?? ""} onChange={e => set(5, e.target.value)} />
+				<Input
+					type="number"
+					step={0.1}
+					placeholder="e.g. 65.5"
+					value={fields[5] ?? ""}
+					onChange={e => set(5, e.target.value)}
+				/>
 			</div>
 		</div>
 	)
@@ -342,7 +374,11 @@ function ConsultationForm({
 		<div className="space-y-4">
 			<div className="space-y-2">
 				<Label>Assessment / Diagnosis</Label>
-				<Input placeholder="Primary diagnosis" value={fields[0] ?? ""} onChange={e => set(0, e.target.value)} />
+				<Input
+					placeholder="Primary diagnosis"
+					value={fields[0] ?? ""}
+					onChange={e => set(0, e.target.value)}
+				/>
 			</div>
 			<div className="space-y-2">
 				<Label>Clinical Notes</Label>
@@ -407,11 +443,7 @@ function DispositionForm({
 			</div>
 			<div className="space-y-2">
 				<Label>Follow-Up Date</Label>
-				<Input
-					type="date"
-					value={fields[2] ?? ""}
-					onChange={e => set(2, e.target.value)}
-				/>
+				<Input type="date" value={fields[2] ?? ""} onChange={e => set(2, e.target.value)} />
 			</div>
 		</div>
 	)
@@ -431,17 +463,18 @@ function StepReadOnlyView({ step, status }: { step: OpdStep; status: OpdStepStat
 						View Only — {step.responsibleRole} Required
 					</p>
 					<p className="text-sm text-yellow-700 dark:text-yellow-300">
-						This step must be completed by a {step.responsibleRole}. You can view the workflow progress but cannot make changes.
+						This step must be completed by a {step.responsibleRole}. You can view the workflow
+						progress but cannot make changes.
 					</p>
 				</div>
 			</div>
 			{status === "pending" && (
-				<p className="text-center text-muted-foreground">
+				<p className="text-muted-foreground text-center">
 					Waiting for previous step to complete...
 				</p>
 			)}
 			{status === "in_progress" && (
-				<p className="text-center text-muted-foreground">
+				<p className="text-muted-foreground text-center">
 					A {step.responsibleRole} needs to complete this step.
 				</p>
 			)}
@@ -523,9 +556,11 @@ export function OpdFlow({
 	const { data: profile } = useMyProfile()
 	const activeRoleName = profile?.activeRole?.name
 
-	const [currentStep, setCurrentStep] = useState<OpdStepId>(() => loadOpdState(patientId).currentStep)
+	const [currentStep, setCurrentStep] = useState<OpdStepId>(
+		() => loadOpdState(patientId).currentStep
+	)
 	const [stepStatuses, setStepStatuses] = useState<Record<OpdStepId, OpdStepStatus>>(
-		() => loadOpdState(patientId).stepStatuses,
+		() => loadOpdState(patientId).stepStatuses
 	)
 	const [stepData, setStepData] = useState<OpdFlowState>(() => loadOpdState(patientId).stepData)
 	const [startedAt] = useState<string>(() => loadOpdState(patientId).startedAt)
@@ -597,14 +632,10 @@ export function OpdFlow({
 			<div className="flex flex-wrap items-start justify-between gap-3">
 				<div>
 					<h1 className="text-2xl font-bold">OPD Consultation Flow</h1>
-					{patientName && (
-						<p className="text-sm text-muted-foreground">Patient: {patientName}</p>
-					)}
-					{encounterId && (
-						<p className="text-xs text-muted-foreground">Encounter: {encounterId}</p>
-					)}
+					{patientName && <p className="text-muted-foreground text-sm">Patient: {patientName}</p>}
+					{encounterId && <p className="text-muted-foreground text-xs">Encounter: {encounterId}</p>}
 				</div>
-				<div className="flex items-center gap-2 text-sm text-muted-foreground">
+				<div className="text-muted-foreground flex items-center gap-2 text-sm">
 					<Clock className="size-4" />
 					Elapsed: {elapsedMin}m
 					<Badge variant={isAllComplete ? "default" : "secondary"}>
@@ -613,7 +644,7 @@ export function OpdFlow({
 					<Button
 						variant="ghost"
 						size="sm"
-						className="ml-2 text-xs text-muted-foreground"
+						className="text-muted-foreground ml-2 text-xs"
 						onClick={handleReset}
 						title="Start a new OPD consultation"
 					>
@@ -646,12 +677,10 @@ export function OpdFlow({
 							<div>
 								<CardTitle className="flex items-center gap-2">
 									{currentStepDef.label}
-									{!canActOnCurrentStep && (
-										<Lock className="size-4 text-muted-foreground" />
-									)}
+									{!canActOnCurrentStep && <Lock className="text-muted-foreground size-4" />}
 								</CardTitle>
-								<p className="mt-1 text-sm text-muted-foreground">{currentStepDef.description}</p>
-								<p className="mt-0.5 text-xs text-muted-foreground">
+								<p className="text-muted-foreground mt-1 text-sm">{currentStepDef.description}</p>
+								<p className="text-muted-foreground mt-0.5 text-xs">
 									Responsible: {currentStepDef.responsibleRole}
 								</p>
 							</div>
@@ -719,7 +748,7 @@ export function OpdFlow({
 								<Check className="size-7 text-green-600 dark:text-green-400" />
 							</div>
 							<p className="text-lg font-semibold">OPD Consultation Complete</p>
-							<p className="text-sm text-muted-foreground">
+							<p className="text-muted-foreground text-sm">
 								All 5 steps completed. Total time: {elapsedMin}m
 							</p>
 						</div>
@@ -746,7 +775,7 @@ export function OpdFlow({
 							{OPD_STEPS.map(step => (
 								<tr key={step.id} className="border-b">
 									<td className="p-3 font-medium">{step.label}</td>
-									<td className="p-3 text-muted-foreground">{step.slaSlaTargetMinutes}m</td>
+									<td className="text-muted-foreground p-3">{step.slaSlaTargetMinutes}m</td>
 									<td className="p-3">
 										{stepStatuses[step.id] === "completed" ? (
 											<Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
@@ -760,7 +789,7 @@ export function OpdFlow({
 											</Badge>
 										)}
 									</td>
-									<td className="p-3 text-xs text-muted-foreground">
+									<td className="text-muted-foreground p-3 text-xs">
 										{stepData[step.id].completedAt
 											? new Date(stepData[step.id].completedAt!).toLocaleTimeString("en-PH")
 											: "—"}

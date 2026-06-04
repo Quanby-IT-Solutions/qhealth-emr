@@ -1,6 +1,6 @@
 "use client"
 
-import { forwardRef, type InputHTMLAttributes, useCallback, useState } from "react"
+import { forwardRef, useCallback, useState, type InputHTMLAttributes } from "react"
 
 import { cn } from "@/core/lib/utils"
 
@@ -15,7 +15,10 @@ function parseNumeric(raw: string): number {
 	return isNaN(parsed) ? 0 : parsed
 }
 
-interface MoneyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "onChange" | "value"> {
+interface MoneyInputProps extends Omit<
+	InputHTMLAttributes<HTMLInputElement>,
+	"onChange" | "value"
+> {
 	value: number
 	onChange: (value: number) => void
 	step?: number
@@ -41,15 +44,12 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
 			setDisplayValue(formatter.format(parsed))
 		}, [displayValue, onChange])
 
-		const handleChange = useCallback(
-			(e: React.ChangeEvent<HTMLInputElement>) => {
-				const raw = e.target.value
-				if (/^[0-9]*\.?[0-9]*$/.test(raw) || raw === "") {
-					setDisplayValue(raw)
-				}
-			},
-			[]
-		)
+		const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+			const raw = e.target.value
+			if (/^[0-9]*\.?[0-9]*$/.test(raw) || raw === "") {
+				setDisplayValue(raw)
+			}
+		}, [])
 
 		const handleKeyDown = useCallback(
 			(e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -70,7 +70,7 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
 
 		return (
 			<div className={cn("relative flex items-center", className)}>
-				<span className="absolute left-3 select-none text-sm text-muted-foreground" aria-hidden>
+				<span className="text-muted-foreground absolute left-3 text-sm select-none" aria-hidden>
 					{currencySymbol}
 				</span>
 				<input
@@ -85,9 +85,9 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
 					onKeyDown={handleKeyDown}
 					disabled={disabled}
 					className={cn(
-						"flex h-9 w-full rounded-md border border-input bg-transparent pl-7 pr-3 py-1 text-sm shadow-sm",
+						"border-input flex h-9 w-full rounded-md border bg-transparent py-1 pr-3 pl-7 text-sm shadow-sm",
 						"transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium",
-						"placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+						"placeholder:text-muted-foreground focus-visible:ring-ring focus-visible:ring-1 focus-visible:outline-none",
 						"disabled:cursor-not-allowed disabled:opacity-50",
 						"text-right tabular-nums"
 					)}

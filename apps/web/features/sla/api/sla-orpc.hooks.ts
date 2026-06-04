@@ -163,9 +163,11 @@ export function useUpdateSlaStepConfigOrpcMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.sla.updateStepConfig.mutationOptions({
-			onMutate: async (variables) => {
+			onMutate: async variables => {
 				await queryClient.cancelQueries({ queryKey: orpc.sla.listStepConfigs.key() })
-				const previousData = queryClient.getQueriesData({ queryKey: orpc.sla.listStepConfigs.key() })
+				const previousData = queryClient.getQueriesData({
+					queryKey: orpc.sla.listStepConfigs.key(),
+				})
 				queryClient.setQueriesData(
 					{ queryKey: orpc.sla.listStepConfigs.key() },
 					(old: { data?: Array<{ id: string; [key: string]: unknown }> } | undefined) => {

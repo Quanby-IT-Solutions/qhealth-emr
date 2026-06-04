@@ -88,9 +88,7 @@ function ensureRequiredSections(sections: TemplateSection[]) {
 }
 
 function initialStructuredData(sections: TemplateSection[]): StructuredData {
-	return Object.fromEntries(
-		sections.map(section => [section.key, section.defaultContent ?? ""])
-	)
+	return Object.fromEntries(sections.map(section => [section.key, section.defaultContent ?? ""]))
 }
 
 function sectionText(data: StructuredData, key: string) {
@@ -330,8 +328,8 @@ function Icd10DiagnosisField({
 			</CardHeader>
 			<CardContent className="space-y-2 overflow-visible">
 				<p className="text-muted-foreground text-xs">
-					Search by diagnosis words or ICD-10 code, for example pneumonia, hypertension,
-					diabetes, or J18.
+					Search by diagnosis words or ICD-10 code, for example pneumonia, hypertension, diabetes,
+					or J18.
 				</p>
 				<div className="relative z-30">
 					<Input
@@ -457,8 +455,8 @@ function DotPhrasesDialog({
 				<DialogHeader>
 					<DialogTitle>Dot Phrases</DialogTitle>
 					<DialogDescription>
-						Available commands that expand after typing the dot phrase followed by space,
-						comma, period, colon, or a new line.
+						Available commands that expand after typing the dot phrase followed by space, comma,
+						period, colon, or a new line.
 					</DialogDescription>
 				</DialogHeader>
 				<div className="divide-y rounded-md border">
@@ -634,13 +632,14 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 
 	const saveError = createNote.error?.message ?? updateNote.error?.message
 	const context = noteContext.data
-	const saveButtonLabel = isSaving || isDraftCreateLocked
-		? "Saving..."
-		: noteId
-			? hasLocalChanges
-				? "Save Changes"
-				: "Saved"
-			: "Save Draft"
+	const saveButtonLabel =
+		isSaving || isDraftCreateLocked
+			? "Saving..."
+			: noteId
+				? hasLocalChanges
+					? "Save Changes"
+					: "Saved"
+				: "Save Draft"
 	const saveStatus = saveError
 		? saveError
 		: isSaving || isDraftCreateLocked
@@ -753,7 +752,7 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 							<Card
 								className={
 									recordingKey === section.key
-										? "rounded-lg border-red-500 ring-2 ring-red-500/40 bg-red-50/40 transition-colors"
+										? "rounded-lg border-red-500 bg-red-50/40 ring-2 ring-red-500/40 transition-colors"
 										: "rounded-lg transition-colors"
 								}
 							>
@@ -796,7 +795,7 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 														}}
 														className={
 															recordingKey === section.key
-																? "text-red-500 animate-pulse"
+																? "animate-pulse text-red-500"
 																: undefined
 														}
 													/>
@@ -927,7 +926,7 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 														<Badge
 															key={diagnosis.code}
 															variant="secondary"
-															className="max-w-full justify-start gap-1.5 whitespace-normal text-left"
+															className="max-w-full justify-start gap-1.5 text-left whitespace-normal"
 														>
 															<span className="font-mono">{diagnosis.code}</span>
 															<span>- {diagnosis.description}</span>
@@ -935,7 +934,9 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 													))}
 												</div>
 											) : (
-												<p className="text-muted-foreground text-sm">No ICD-10 diagnoses selected.</p>
+												<p className="text-muted-foreground text-sm">
+													No ICD-10 diagnoses selected.
+												</p>
 											)}
 										</div>
 

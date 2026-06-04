@@ -18,7 +18,7 @@ export function HimRouteGuard({ children }: { children: ReactNode }) {
 
 	if (!allowed) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access HIM operations.
 			</div>
 		)

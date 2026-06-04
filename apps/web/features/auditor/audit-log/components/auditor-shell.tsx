@@ -1,7 +1,6 @@
 "use client"
 
 import type { ReactNode } from "react"
-
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -16,7 +15,9 @@ const SUB_NAV = [
 function useCanAudit() {
 	const { data: profile, isLoading } = useMyProfile()
 	const perms = profile?.activeRole?.permissions ?? []
-	const set = new Set(perms.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	const set = new Set(
+		perms.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 	return { allowed: set.has("audit:view"), loading: isLoading }
 }
 
@@ -28,7 +29,7 @@ export function AuditorShell({ children }: { children: ReactNode }) {
 
 	if (!allowed) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access the auditor module.
 			</div>
 		)
@@ -54,7 +55,7 @@ export function AuditorShell({ children }: { children: ReactNode }) {
 								"border-b-2 px-3 py-2 text-sm font-medium transition-colors",
 								active
 									? "border-primary text-foreground"
-									: "border-transparent text-muted-foreground hover:text-foreground"
+									: "text-muted-foreground hover:text-foreground border-transparent"
 							)}
 						>
 							{item.label}

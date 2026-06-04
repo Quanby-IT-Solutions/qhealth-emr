@@ -5,12 +5,7 @@ import { useState } from "react"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/core/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
 import { Label } from "@/core/components/ui/label"
 import { Separator } from "@/core/components/ui/separator"
 import {
@@ -83,142 +78,137 @@ export function ShiftHandoffForm({ encounterId, facilityId, readOnly }: ShiftHan
 	return (
 		<div className="space-y-4">
 			{/* Generate summary card — nurses only */}
-			{!readOnly && <Card>
-				<CardHeader className="flex flex-row items-center justify-between">
-					<CardTitle>Handoff Summary Generator</CardTitle>
-					<Button
-						size="sm"
-						variant="outline"
-						onClick={handleGenerate}
-						disabled={generateHandoff.isPending}
-					>
-						{generateHandoff.isPending ? "Generating…" : "Auto-Generate"}
-					</Button>
-				</CardHeader>
-				{generated && (
-					<CardContent className="space-y-3 text-sm">
-						<div>
-							<span className="font-medium">Active Problems: </span>
-							{generated.activeProblems.length > 0
-								? generated.activeProblems.map(p => p.description).join(", ")
-								: "None"}
-						</div>
-						<Separator />
-						<div>
-							<span className="font-medium">Current Medications: </span>
-							{generated.currentMedications.length > 0
-								? generated.currentMedications
-										.map(m => `${m.genericName} ${m.dose} ${m.frequency}`)
-										.join("; ")
-								: "None"}
-						</div>
-						<Separator />
-						<div className="flex items-center gap-2">
-							<span className="font-medium">NEWS Score:</span>
-							{generated.newsScore != null ? (
-								<NewsScoreBadge
-									score={generated.newsScore}
-									riskLevel={generated.newsRiskLevel}
-								/>
-							) : (
-								"N/A"
+			{!readOnly && (
+				<Card>
+					<CardHeader className="flex flex-row items-center justify-between">
+						<CardTitle>Handoff Summary Generator</CardTitle>
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={handleGenerate}
+							disabled={generateHandoff.isPending}
+						>
+							{generateHandoff.isPending ? "Generating…" : "Auto-Generate"}
+						</Button>
+					</CardHeader>
+					{generated && (
+						<CardContent className="space-y-3 text-sm">
+							<div>
+								<span className="font-medium">Active Problems: </span>
+								{generated.activeProblems.length > 0
+									? generated.activeProblems.map(p => p.description).join(", ")
+									: "None"}
+							</div>
+							<Separator />
+							<div>
+								<span className="font-medium">Current Medications: </span>
+								{generated.currentMedications.length > 0
+									? generated.currentMedications
+											.map(m => `${m.genericName} ${m.dose} ${m.frequency}`)
+											.join("; ")
+									: "None"}
+							</div>
+							<Separator />
+							<div className="flex items-center gap-2">
+								<span className="font-medium">NEWS Score:</span>
+								{generated.newsScore != null ? (
+									<NewsScoreBadge score={generated.newsScore} riskLevel={generated.newsRiskLevel} />
+								) : (
+									"N/A"
+								)}
+							</div>
+							{generated.ioBalance && (
+								<>
+									<Separator />
+									<div>
+										<span className="font-medium">24-hr Fluid Balance: </span>
+										Intake {generated.ioBalance.totalIntake} mL &bull; Output{" "}
+										{generated.ioBalance.totalOutput} mL &bull; Net{" "}
+										<span
+											className={
+												generated.ioBalance.netBalance >= 0 ? "text-green-600" : "text-red-600"
+											}
+										>
+											{generated.ioBalance.netBalance >= 0 ? "+" : ""}
+											{generated.ioBalance.netBalance} mL
+										</span>
+									</div>
+								</>
 							)}
-						</div>
-						{generated.ioBalance && (
-							<>
-								<Separator />
-								<div>
-									<span className="font-medium">24-hr Fluid Balance: </span>
-									Intake {generated.ioBalance.totalIntake} mL &bull; Output{" "}
-									{generated.ioBalance.totalOutput} mL &bull; Net{" "}
-									<span
-										className={
-											generated.ioBalance.netBalance >= 0
-												? "text-green-600"
-												: "text-red-600"
-										}
-									>
-										{generated.ioBalance.netBalance >= 0 ? "+" : ""}
-										{generated.ioBalance.netBalance} mL
-									</span>
-								</div>
-							</>
-						)}
-						<Separator />
-						<div>
-							<span className="font-medium">Pending Orders: </span>
-							{generated.pendingOrders}
-						</div>
-					</CardContent>
-				)}
-			</Card>}
+							<Separator />
+							<div>
+								<span className="font-medium">Pending Orders: </span>
+								{generated.pendingOrders}
+							</div>
+						</CardContent>
+					)}
+				</Card>
+			)}
 
 			{/* New handoff dialog — nurses only */}
-			{!readOnly && <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-				<DialogContent className="sm:max-w-lg">
-					<DialogHeader>
-						<DialogTitle>Create Shift Handoff</DialogTitle>
-					</DialogHeader>
-					<form onSubmit={handleCreate} className="grid gap-3">
-						{/* Pre-fill notes if generated */}
-						{generated && !notes && (
-							<div className="mb-2">
-								<Button
-									type="button"
-									size="sm"
-									variant="outline"
-									onClick={() => {
-										const lines: string[] = []
-										lines.push(
-											`Active Problems: ${generated.activeProblems.map(p => p.description).join(", ") || "None"}`
-										)
-										lines.push(
-											`Medications: ${generated.currentMedications.map(m => `${m.genericName} ${m.dose} ${m.frequency}`).join("; ") || "None"}`
-										)
-										if (generated.newsScore != null) {
+			{!readOnly && (
+				<Dialog open={createOpen} onOpenChange={setCreateOpen}>
+					<DialogContent className="sm:max-w-lg">
+						<DialogHeader>
+							<DialogTitle>Create Shift Handoff</DialogTitle>
+						</DialogHeader>
+						<form onSubmit={handleCreate} className="grid gap-3">
+							{/* Pre-fill notes if generated */}
+							{generated && !notes && (
+								<div className="mb-2">
+									<Button
+										type="button"
+										size="sm"
+										variant="outline"
+										onClick={() => {
+											const lines: string[] = []
 											lines.push(
-												`NEWS: ${generated.newsScore} (${generated.newsRiskLevel ?? ""})`
+												`Active Problems: ${generated.activeProblems.map(p => p.description).join(", ") || "None"}`
 											)
-										}
-										if (generated.ioBalance) {
-											const b = generated.ioBalance
 											lines.push(
-												`I/O Balance: Intake ${b.totalIntake}mL, Output ${b.totalOutput}mL, Net ${b.netBalance}mL`
+												`Medications: ${generated.currentMedications.map(m => `${m.genericName} ${m.dose} ${m.frequency}`).join("; ") || "None"}`
 											)
-										}
-										lines.push(`Pending Orders: ${generated.pendingOrders}`)
-										setNotes(lines.join("\n"))
-									}}
-								>
-									Copy generated summary
+											if (generated.newsScore != null) {
+												lines.push(
+													`NEWS: ${generated.newsScore} (${generated.newsRiskLevel ?? ""})`
+												)
+											}
+											if (generated.ioBalance) {
+												const b = generated.ioBalance
+												lines.push(
+													`I/O Balance: Intake ${b.totalIntake}mL, Output ${b.totalOutput}mL, Net ${b.netBalance}mL`
+												)
+											}
+											lines.push(`Pending Orders: ${generated.pendingOrders}`)
+											setNotes(lines.join("\n"))
+										}}
+									>
+										Copy generated summary
+									</Button>
+								</div>
+							)}
+							<div className="space-y-1.5">
+								<Label htmlFor="handoffNotes">Handoff Notes</Label>
+								<Textarea
+									id="handoffNotes"
+									rows={6}
+									value={notes}
+									onChange={e => setNotes(e.target.value)}
+									placeholder="Clinical summary for incoming nurse…"
+								/>
+							</div>
+							<div className="flex justify-end gap-2 pt-2">
+								<Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+									Cancel
+								</Button>
+								<Button type="submit" disabled={createHandoff.isPending}>
+									{createHandoff.isPending ? "Saving…" : "Create Handoff"}
 								</Button>
 							</div>
-						)}
-						<div className="space-y-1.5">
-							<Label htmlFor="handoffNotes">Handoff Notes</Label>
-							<Textarea
-								id="handoffNotes"
-								rows={6}
-								value={notes}
-								onChange={e => setNotes(e.target.value)}
-								placeholder="Clinical summary for incoming nurse…"
-							/>
-						</div>
-						<div className="flex justify-end gap-2 pt-2">
-							<Button
-								type="button"
-								variant="outline"
-								onClick={() => setCreateOpen(false)}
-							>
-								Cancel
-							</Button>
-							<Button type="submit" disabled={createHandoff.isPending}>
-								{createHandoff.isPending ? "Saving…" : "Create Handoff"}
-							</Button>
-						</div>
-					</form>
-				</DialogContent>
-			</Dialog>}
+						</form>
+					</DialogContent>
+				</Dialog>
+			)}
 
 			{/* Handoff history */}
 			<div className="flex items-center justify-between">
@@ -251,20 +241,14 @@ export function ShiftHandoffForm({ encounterId, facilityId, readOnly }: ShiftHan
 						<TableBody>
 							{handoffs.data.data.map(h => (
 								<TableRow key={h.id}>
-									<TableCell className="whitespace-nowrap">
-										{formatDateTime(h.createdAt)}
-									</TableCell>
+									<TableCell className="whitespace-nowrap">{formatDateTime(h.createdAt)}</TableCell>
 									<TableCell>
 										<Badge variant={h.status === "signed" ? "default" : "secondary"}>
 											{h.status}
 										</Badge>
 									</TableCell>
-									<TableCell className="max-w-[300px] truncate">
-										{h.handoffNotes || "—"}
-									</TableCell>
-									<TableCell className="whitespace-nowrap">
-										{formatDateTime(h.signedAt)}
-									</TableCell>
+									<TableCell className="max-w-[300px] truncate">{h.handoffNotes || "—"}</TableCell>
+									<TableCell className="whitespace-nowrap">{formatDateTime(h.signedAt)}</TableCell>
 									<TableCell>
 										{!readOnly && h.status === "draft" && (
 											<Button

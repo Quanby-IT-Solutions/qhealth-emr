@@ -9,7 +9,9 @@ import { NbsLogbook } from "@/features/nbs/components/nbs-logbook"
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -50,7 +52,7 @@ export default function NbsPage() {
 
 	if (!can(permSet, "nbs", "view")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access the newborn screening module.
 			</div>
 		)
@@ -60,7 +62,7 @@ export default function NbsPage() {
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-2xl font-semibold">Newborn Screening (NBS)</h1>
-				<p className="text-sm text-muted-foreground">
+				<p className="text-muted-foreground text-sm">
 					Specimen collection, panel results, consent documentation, and referral tracking
 				</p>
 			</div>
@@ -69,13 +71,13 @@ export default function NbsPage() {
 				{FEATURES.map(({ icon: Icon, title, description }) => (
 					<Card key={title}>
 						<CardHeader className="flex flex-row items-center gap-3 pb-2">
-							<div className="rounded-md bg-primary/10 p-2">
-								<Icon className="size-5 text-primary" />
+							<div className="bg-primary/10 rounded-md p-2">
+								<Icon className="text-primary size-5" />
 							</div>
 							<CardTitle className="text-sm font-medium">{title}</CardTitle>
 						</CardHeader>
 						<CardContent>
-							<p className="text-sm text-muted-foreground">{description}</p>
+							<p className="text-muted-foreground text-sm">{description}</p>
 						</CardContent>
 					</Card>
 				))}

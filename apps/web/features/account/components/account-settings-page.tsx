@@ -6,7 +6,13 @@ import { toast } from "sonner"
 
 import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Button } from "@/core/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import {
@@ -107,9 +113,7 @@ export function AccountSettingsPage() {
 			<Card>
 				<CardHeader>
 					<CardTitle className="text-base">Personal Profile</CardTitle>
-					<CardDescription>
-						Update how your name appears in the application.
-					</CardDescription>
+					<CardDescription>Update how your name appears in the application.</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<div className="space-y-2">

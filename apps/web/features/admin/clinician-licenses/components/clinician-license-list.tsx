@@ -3,12 +3,25 @@
 import { useState } from "react"
 import Link from "next/link"
 
+import { StatusBadge } from "@/core/components/status-badge"
 import { Button } from "@/core/components/ui/button"
 import { Input } from "@/core/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Skeleton } from "@/core/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
-import { StatusBadge } from "@/core/components/status-badge"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import type { StatusVariant } from "@/core/styles/status-tokens"
 
 import { useListCliniciansQuery } from "../api/licenses.hooks"
@@ -84,14 +97,17 @@ export function ClinicianLicenseList() {
 		limit: 20,
 	})
 
-	function getLicenseByType(licenses: Array<{ licenseType: LicenseType; status: LicenseStatus; expiryDate: string | null }>, type: LicenseType) {
+	function getLicenseByType(
+		licenses: Array<{ licenseType: LicenseType; status: LicenseStatus; expiryDate: string | null }>,
+		type: LicenseType
+	) {
 		return licenses.find(l => l.licenseType === type)
 	}
 
 	return (
 		<div className="space-y-4">
 			<div className="flex items-center justify-between gap-4">
-				<div className="flex items-center gap-2 flex-1 max-w-md">
+				<div className="flex max-w-md flex-1 items-center gap-2">
 					<Input
 						placeholder="Search clinician name..."
 						value={search}
@@ -121,16 +137,16 @@ export function ClinicianLicenseList() {
 				<Button onClick={() => setAddOpen(true)}>Add License</Button>
 			</div>
 
-			{isLoading && (
-				<ClinicianLicenseTableSkeleton />
-			)}
+			{isLoading && <ClinicianLicenseTableSkeleton />}
 
 			{isError && (
-				<p className="text-sm text-destructive py-8 text-center">Failed to load clinician licenses.</p>
+				<p className="text-destructive py-8 text-center text-sm">
+					Failed to load clinician licenses.
+				</p>
 			)}
 
 			{!isLoading && !isError && data?.data.length === 0 && (
-				<p className="text-sm text-muted-foreground py-8 text-center">No clinicians found.</p>
+				<p className="text-muted-foreground py-8 text-center text-sm">No clinicians found.</p>
 			)}
 
 			{!isLoading && !isError && data && data.data.length > 0 && (
@@ -149,7 +165,7 @@ export function ClinicianLicenseList() {
 										<TableCell className="font-medium">
 											{row.staffName}
 											{expiring && (
-												<span className="ml-2 text-xs text-amber-600 font-normal">
+												<span className="ml-2 text-xs font-normal text-amber-600">
 													Expires in {row.daysUntilNextExpiry}d
 												</span>
 											)}
@@ -177,7 +193,11 @@ export function ClinicianLicenseList() {
 										</TableCell>
 										<TableCell>
 											{row.daysUntilNextExpiry !== null ? (
-												<span className={row.daysUntilNextExpiry <= 30 ? "text-amber-600 font-medium" : ""}>
+												<span
+													className={
+														row.daysUntilNextExpiry <= 30 ? "font-medium text-amber-600" : ""
+													}
+												>
 													{row.daysUntilNextExpiry}d
 												</span>
 											) : (
@@ -200,10 +220,15 @@ export function ClinicianLicenseList() {
 						</TableBody>
 					</Table>
 
-					<div className="flex items-center justify-between text-sm text-muted-foreground">
+					<div className="text-muted-foreground flex items-center justify-between text-sm">
 						<span>{data.total} total</span>
 						<div className="flex gap-2">
-							<Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={page === 1}
+								onClick={() => setPage(p => p - 1)}
+							>
 								Previous
 							</Button>
 							<Button

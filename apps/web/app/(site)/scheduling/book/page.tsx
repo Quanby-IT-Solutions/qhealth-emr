@@ -6,7 +6,9 @@ import { AppointmentBooking } from "@/features/scheduling/components/appointment
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -20,7 +22,7 @@ export default function AppointmentBookingPage() {
 
 	if (!can(permSet, "scheduling", "view")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access scheduling.
 			</div>
 		)
@@ -38,9 +40,7 @@ export default function AppointmentBookingPage() {
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-2xl font-bold">Book Appointment</h1>
-				<p className="text-muted-foreground">
-					Search availability and book patient appointments
-				</p>
+				<p className="text-muted-foreground">Search availability and book patient appointments</p>
 			</div>
 			<AppointmentBooking facilityId={facilityId} />
 		</div>

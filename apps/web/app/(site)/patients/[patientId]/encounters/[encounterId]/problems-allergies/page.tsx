@@ -7,7 +7,9 @@ import { ProblemsAllergiesTab } from "@/features/problems-allergies/components/p
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 export default function ProblemsAllergiesPage() {
@@ -15,5 +17,7 @@ export default function ProblemsAllergiesPage() {
 	const permSet = usePermissionSet()
 	const canWrite = permSet.has("clinical_docs:sign")
 
-	return <ProblemsAllergiesTab patientId={patientId} facilityId={facilityId ?? ""} canWrite={canWrite} />
+	return (
+		<ProblemsAllergiesTab patientId={patientId} facilityId={facilityId ?? ""} canWrite={canWrite} />
+	)
 }

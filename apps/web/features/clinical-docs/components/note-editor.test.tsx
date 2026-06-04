@@ -156,12 +156,15 @@ describe("NoteEditor", () => {
 
 		expect(screen.getByRole("button", { name: /save changes/i })).toBeEnabled()
 
-		await waitFor(() => {
-			expect(updateMutate).toHaveBeenCalledWith(
-				expect.objectContaining({ id: "note-1" }),
-				expect.any(Object)
-			)
-		}, { timeout: 2500 })
+		await waitFor(
+			() => {
+				expect(updateMutate).toHaveBeenCalledWith(
+					expect.objectContaining({ id: "note-1" }),
+					expect.any(Object)
+				)
+			},
+			{ timeout: 2500 }
+		)
 		await waitFor(() => {
 			expect(screen.getByRole("button", { name: /^saved$/i })).toBeDisabled()
 		})

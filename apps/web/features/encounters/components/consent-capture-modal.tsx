@@ -198,9 +198,7 @@ export function ConsentCaptureModal({
 				</ScrollArea>
 
 				<DialogFooter className="flex-col gap-2 sm:flex-col">
-					{error ? (
-						<p className="text-destructive w-full text-sm">{error}</p>
-					) : null}
+					{error ? <p className="text-destructive w-full text-sm">{error}</p> : null}
 					<div className="flex w-full justify-end gap-2">
 						<Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
 							Cancel

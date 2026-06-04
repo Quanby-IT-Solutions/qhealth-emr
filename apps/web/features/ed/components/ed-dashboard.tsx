@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-
 import { useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -23,12 +23,11 @@ import {
 	TableRow,
 } from "@/core/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
+import { useNotifications } from "@/services/notifications/notification-provider"
+import { orpc } from "@/services/orpc/client"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useEdQueueQuery } from "@/features/ed/api/ed.hooks"
 import { acuityColor } from "@/features/ed/lib/acuity-utils"
-import { orpc } from "@/services/orpc/client"
-import { useNotifications } from "@/services/notifications/notification-provider"
-import { toast } from "sonner"
 
 import { DischargeInstructionsDialog } from "./discharge-instructions-dialog"
 import { DispositionForm } from "./disposition-form"
@@ -187,9 +186,7 @@ export function EdDashboard() {
 			<div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-muted-foreground text-sm font-medium">
-							Total
-						</CardTitle>
+						<CardTitle className="text-muted-foreground text-sm font-medium">Total</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<p className="text-2xl font-bold">{summary.total}</p>
@@ -197,9 +194,7 @@ export function EdDashboard() {
 				</Card>
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-muted-foreground text-sm font-medium">
-							Waiting
-						</CardTitle>
+						<CardTitle className="text-muted-foreground text-sm font-medium">Waiting</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<p className="text-2xl font-bold">{summary.waiting}</p>
@@ -207,9 +202,7 @@ export function EdDashboard() {
 				</Card>
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-muted-foreground text-sm font-medium">
-							Triage
-						</CardTitle>
+						<CardTitle className="text-muted-foreground text-sm font-medium">Triage</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<p className="text-2xl font-bold">{summary.triage}</p>
@@ -217,9 +210,7 @@ export function EdDashboard() {
 				</Card>
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-muted-foreground text-sm font-medium">
-							Being Seen
-						</CardTitle>
+						<CardTitle className="text-muted-foreground text-sm font-medium">Being Seen</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<p className="text-2xl font-bold">{summary.beingSeen}</p>
@@ -227,9 +218,7 @@ export function EdDashboard() {
 				</Card>
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-muted-foreground text-sm font-medium">
-							Acuity 1
-						</CardTitle>
+						<CardTitle className="text-muted-foreground text-sm font-medium">Acuity 1</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<p className="text-2xl font-bold text-red-600">{summary.acuity1}</p>
@@ -237,9 +226,7 @@ export function EdDashboard() {
 				</Card>
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-muted-foreground text-sm font-medium">
-							Acuity 2
-						</CardTitle>
+						<CardTitle className="text-muted-foreground text-sm font-medium">Acuity 2</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<p className="text-2xl font-bold text-orange-500">{summary.acuity2}</p>
@@ -293,7 +280,7 @@ export function EdDashboard() {
 													<div>
 														<p className="font-medium">
 															{item.type === "pre_encounter"
-																? item.traumaAlias ?? "Unknown"
+																? (item.traumaAlias ?? "Unknown")
 																: item.patientName}
 														</p>
 														{item.patientMrn && (
@@ -320,9 +307,7 @@ export function EdDashboard() {
 													</Badge>
 												</TableCell>
 												<TableCell>
-													{item.bedNumber
-														? `${item.wardName ?? ""} / ${item.bedNumber}`
-														: "—"}
+													{item.bedNumber ? `${item.wardName ?? ""} / ${item.bedNumber}` : "—"}
 												</TableCell>
 												<TableCell>
 													<div className="flex gap-1">

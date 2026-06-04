@@ -1,7 +1,6 @@
 "use client"
 
 import type { ReactNode } from "react"
-
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -32,7 +31,9 @@ const BILLING_GRANULAR_READ_PERMS = [
 function useCanBilling() {
 	const { data: profile, isLoading } = useMyProfile()
 	const perms = profile?.activeRole?.permissions ?? []
-	const set = new Set(perms.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	const set = new Set(
+		perms.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 	const roleName = profile?.activeRole?.name ?? ""
 	const hasLegacy = set.has("billing:view")
 	const hasGranular = BILLING_GRANULAR_READ_PERMS.some(p => set.has(p))
@@ -51,7 +52,7 @@ export function BillingShell({ children }: { children: ReactNode }) {
 
 	if (!allowed) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access the billing module.
 			</div>
 		)
@@ -81,10 +82,10 @@ export function BillingShell({ children }: { children: ReactNode }) {
 							key={item.href}
 							href={item.href}
 							className={cn(
-								"whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+								"border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
 								active
 									? "border-primary text-foreground"
-									: "border-transparent text-muted-foreground hover:text-foreground"
+									: "text-muted-foreground hover:text-foreground border-transparent"
 							)}
 						>
 							{item.label}

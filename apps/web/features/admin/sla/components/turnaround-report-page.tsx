@@ -26,11 +26,11 @@ interface TurnaroundReportPageProps {
 const WORKFLOW_LABELS: Record<string, string> = {
 	"opd-triage": "OPD Triage",
 	"lab-results": "Lab Results",
-	radiology: "Radiology",
-	admission: "Admission",
-	discharge: "Discharge",
-	emergency: "Emergency",
-	pharmacy: "Pharmacy Dispensing",
+	"radiology": "Radiology",
+	"admission": "Admission",
+	"discharge": "Discharge",
+	"emergency": "Emergency",
+	"pharmacy": "Pharmacy Dispensing",
 }
 
 export function TurnaroundReportPage({ workflowId }: TurnaroundReportPageProps) {
@@ -82,25 +82,20 @@ export function TurnaroundReportPage({ workflowId }: TurnaroundReportPageProps) 
 				<div className="flex items-center gap-3">
 					<button
 						type="button"
-						className="text-sm text-primary underline"
+						className="text-primary text-sm underline"
 						onClick={() => setShowCompare(v => !v)}
 					>
 						{showCompare ? "Hide comparison" : "Compare date ranges"}
 					</button>
 					{hasDateRange && (
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={handlePdfExport}
-							disabled={isExporting}
-						>
+						<Button variant="outline" size="sm" onClick={handlePdfExport} disabled={isExporting}>
 							{isExporting ? "Exporting..." : "Export PDF"}
 						</Button>
 					)}
 				</div>
 			</div>
 			{hasDateRange && (
-				<p className="text-xs text-muted-foreground">
+				<p className="text-muted-foreground text-xs">
 					{profile?.staffProfiles[0] && `Facility: ${profile.staffProfiles[0].facilityId} · `}
 					Period: {dateFrom} to {dateTo}
 				</p>
@@ -108,7 +103,7 @@ export function TurnaroundReportPage({ workflowId }: TurnaroundReportPageProps) 
 
 			<div className="flex flex-wrap gap-6">
 				<div className="space-y-1">
-					<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+					<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 						Primary period
 					</p>
 					<div className="flex items-center gap-2">
@@ -118,7 +113,7 @@ export function TurnaroundReportPage({ workflowId }: TurnaroundReportPageProps) 
 							onChange={e => setDateFrom(e.target.value)}
 							className="w-40"
 						/>
-						<span className="text-sm text-muted-foreground">to</span>
+						<span className="text-muted-foreground text-sm">to</span>
 						<Input
 							type="date"
 							value={dateTo}
@@ -129,7 +124,7 @@ export function TurnaroundReportPage({ workflowId }: TurnaroundReportPageProps) 
 				</div>
 				{showCompare && (
 					<div className="space-y-1">
-						<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+						<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 							Compare with
 						</p>
 						<div className="flex items-center gap-2">
@@ -139,7 +134,7 @@ export function TurnaroundReportPage({ workflowId }: TurnaroundReportPageProps) 
 								onChange={e => setCompareFrom(e.target.value)}
 								className="w-40"
 							/>
-							<span className="text-sm text-muted-foreground">to</span>
+							<span className="text-muted-foreground text-sm">to</span>
 							<Input
 								type="date"
 								value={compareTo}
@@ -152,7 +147,7 @@ export function TurnaroundReportPage({ workflowId }: TurnaroundReportPageProps) 
 			</div>
 
 			{!hasDateRange && (
-				<p className="py-4 text-center text-sm text-muted-foreground">
+				<p className="text-muted-foreground py-4 text-center text-sm">
 					Select a date range to load turnaround data.
 				</p>
 			)}
@@ -160,7 +155,7 @@ export function TurnaroundReportPage({ workflowId }: TurnaroundReportPageProps) 
 			{hasDateRange && isLoading && <Skeleton className="h-48 w-full" />}
 
 			{hasDateRange && !isLoading && rows.length === 0 && (
-				<p className="py-8 text-center text-sm text-muted-foreground">
+				<p className="text-muted-foreground py-8 text-center text-sm">
 					No turnaround data available for this period.
 				</p>
 			)}
@@ -170,7 +165,7 @@ export function TurnaroundReportPage({ workflowId }: TurnaroundReportPageProps) 
 					<div className="grid grid-cols-3 gap-3">
 						<Card>
 							<CardContent className="pt-4">
-								<p className="text-xs text-muted-foreground">Median TAT</p>
+								<p className="text-muted-foreground text-xs">Median TAT</p>
 								<p className="text-2xl font-semibold">
 									{(rows.reduce((s, r) => s + r.medianTAT, 0) / rows.length).toFixed(0)}m
 								</p>
@@ -178,7 +173,7 @@ export function TurnaroundReportPage({ workflowId }: TurnaroundReportPageProps) 
 						</Card>
 						<Card>
 							<CardContent className="pt-4">
-								<p className="text-xs text-muted-foreground">P95 TAT</p>
+								<p className="text-muted-foreground text-xs">P95 TAT</p>
 								<p className="text-2xl font-semibold">
 									{(rows.reduce((s, r) => s + r.p95TAT, 0) / rows.length).toFixed(0)}m
 								</p>
@@ -186,7 +181,7 @@ export function TurnaroundReportPage({ workflowId }: TurnaroundReportPageProps) 
 						</Card>
 						<Card>
 							<CardContent className="pt-4">
-								<p className="text-xs text-muted-foreground">Within SLA</p>
+								<p className="text-muted-foreground text-xs">Within SLA</p>
 								<p className="text-2xl font-semibold">
 									{(rows.reduce((s, r) => s + r.withinSLAPct, 0) / rows.length).toFixed(1)}%
 								</p>
@@ -225,9 +220,7 @@ export function TurnaroundReportPage({ workflowId }: TurnaroundReportPageProps) 
 
 					{compareRows.length > 0 && (
 						<div>
-							<p className="mb-2 text-sm font-medium text-muted-foreground">
-								Comparison period
-							</p>
+							<p className="text-muted-foreground mb-2 text-sm font-medium">Comparison period</p>
 							<Table>
 								<TableHeader>
 									<TableRow>
@@ -246,9 +239,7 @@ export function TurnaroundReportPage({ workflowId }: TurnaroundReportPageProps) 
 											<TableCell className="text-right">{row.cases}</TableCell>
 											<TableCell className="text-right">{row.medianTAT}m</TableCell>
 											<TableCell className="text-right">{row.p95TAT}m</TableCell>
-											<TableCell className="text-right">
-												{row.withinSLAPct.toFixed(1)}%
-											</TableCell>
+											<TableCell className="text-right">{row.withinSLAPct.toFixed(1)}%</TableCell>
 											<TableCell
 												className={`text-right ${row.breachCount > 0 ? "text-destructive" : ""}`}
 											>

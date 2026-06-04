@@ -30,8 +30,7 @@ export function useIssueCoeV2Mutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		mswOrpc.coe.issue.mutationOptions({
-			onSuccess: () =>
-				qc.invalidateQueries({ queryKey: mswOrpc.coe.list.key() }),
+			onSuccess: () => qc.invalidateQueries({ queryKey: mswOrpc.coe.list.key() }),
 		})
 	)
 }
@@ -40,8 +39,7 @@ export function useRevokeCoeMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		mswOrpc.coe.revoke.mutationOptions({
-			onSuccess: () =>
-				qc.invalidateQueries({ queryKey: mswOrpc.coe.list.key() }),
+			onSuccess: () => qc.invalidateQueries({ queryKey: mswOrpc.coe.list.key() }),
 		})
 	)
 }

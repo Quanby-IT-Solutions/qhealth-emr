@@ -6,12 +6,23 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Input } from "@/core/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { useDebounce } from "@/core/hooks/use-debounce"
-
 import { EmptyState, ErrorState } from "@/features/admin/components/state-views"
 import { TableToolbar } from "@/features/admin/components/table-toolbar"
-import { useIcd10LookupQuery, useTerminologyReplacementCodes, useTerminologySystemsQuery } from "../api/coding.hooks"
+
+import {
+	useIcd10LookupQuery,
+	useTerminologyReplacementCodes,
+	useTerminologySystemsQuery,
+} from "../api/coding.hooks"
 
 interface CodeLookupSelection {
 	code: string
@@ -35,7 +46,13 @@ export function CodeLookupPage({ onSelectCode }: CodeLookupPageProps) {
 	const icd10Configured = !!systems?.some(system => system.name.toLowerCase().includes("icd-10"))
 	const results = useMemo(() => data?.data ?? [], [data?.data])
 	const replacementIds = useMemo(
-		() => [...new Set(results.map(row => row.replacedByCodeId).filter((codeId): codeId is string => Boolean(codeId)))],
+		() => [
+			...new Set(
+				results
+					.map(row => row.replacedByCodeId)
+					.filter((codeId): codeId is string => Boolean(codeId))
+			),
+		],
 		[results]
 	)
 	const replacementQueries = useTerminologyReplacementCodes(replacementIds)
@@ -62,7 +79,7 @@ export function CodeLookupPage({ onSelectCode }: CodeLookupPageProps) {
 	}
 
 	return (
-		<div className="space-y-3 px-4 py-3 max-w-3xl">
+		<div className="max-w-3xl space-y-3 px-4 py-3">
 			<TableToolbar
 				title="ICD-10 Code Lookup"
 				description="Prefix search (e.g. I10) or full-text (e.g. hypertension)."
@@ -91,7 +108,7 @@ export function CodeLookupPage({ onSelectCode }: CodeLookupPageProps) {
 			{isError && <ErrorState error={error} retry={refetch} />}
 
 			{isLoading && debounced.trim().length >= 2 && (
-				<p className="text-sm text-muted-foreground">Searching terminology…</p>
+				<p className="text-muted-foreground text-sm">Searching terminology…</p>
 			)}
 
 			{debounced.trim() !== "" && results.length === 0 && (
@@ -109,44 +126,48 @@ export function CodeLookupPage({ onSelectCode }: CodeLookupPageProps) {
 					</TableHeader>
 					<TableBody>
 						{results.map(row => {
-							const replacement = row.replacedByCodeId ? replacementMap.get(row.replacedByCodeId) : undefined
+							const replacement = row.replacedByCodeId
+								? replacementMap.get(row.replacedByCodeId)
+								: undefined
 
 							return (
 								<TableRow key={row.code}>
-								<TableCell className="font-mono text-xs">
-									<span className={row.isDeprecated ? "line-through text-muted-foreground" : ""}>{row.code}</span>
-									{row.isDeprecated && (
-										<Badge variant="destructive" className="ml-2 text-[10px]">
-											deprecated
-										</Badge>
-									)}
-								</TableCell>
-								<TableCell className="text-xs">
-									{row.displayName}
+									<TableCell className="font-mono text-xs">
+										<span className={row.isDeprecated ? "text-muted-foreground line-through" : ""}>
+											{row.code}
+										</span>
+										{row.isDeprecated && (
+											<Badge variant="destructive" className="ml-2 text-[10px]">
+												deprecated
+											</Badge>
+										)}
+									</TableCell>
+									<TableCell className="text-xs">
+										{row.displayName}
 										{row.isDeprecated && replacement && (
-										<button
-											type="button"
-											onClick={() => {
-												if (replacement) {
-													handleAdd({ code: replacement.code, display: replacement.displayName })
-												}
-											}}
-											className="ml-2 text-[10px] text-primary underline"
-										>
+											<button
+												type="button"
+												onClick={() => {
+													if (replacement) {
+														handleAdd({ code: replacement.code, display: replacement.displayName })
+													}
+												}}
+												className="text-primary ml-2 text-[10px] underline"
+											>
 												Use {replacement.code} instead
-										</button>
-									)}
-								</TableCell>
-								<TableCell className="text-right">
-									<Button
-										size="sm"
-										variant="ghost"
-										onClick={() => handleAdd({ code: row.code, display: row.displayName })}
-										disabled={(!returnTo && !onSelectCode) || row.isDeprecated}
-									>
-										{onSelectCode ? "Use code" : "Add"}
-									</Button>
-								</TableCell>
+											</button>
+										)}
+									</TableCell>
+									<TableCell className="text-right">
+										<Button
+											size="sm"
+											variant="ghost"
+											onClick={() => handleAdd({ code: row.code, display: row.displayName })}
+											disabled={(!returnTo && !onSelectCode) || row.isDeprecated}
+										>
+											{onSelectCode ? "Use code" : "Add"}
+										</Button>
+									</TableCell>
 								</TableRow>
 							)
 						})}
@@ -155,7 +176,7 @@ export function CodeLookupPage({ onSelectCode }: CodeLookupPageProps) {
 			)}
 
 			{!returnTo && !onSelectCode && (
-				<p className="text-xs text-muted-foreground">
+				<p className="text-muted-foreground text-xs">
 					Open from an encounter coding page to add codes back into the editor.
 				</p>
 			)}

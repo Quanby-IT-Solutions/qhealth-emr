@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -14,12 +15,17 @@ import {
 	DialogTitle,
 } from "@/core/components/ui/dialog"
 import { Label } from "@/core/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useCreatePreEncounterMutation } from "@/features/ed/api/ed.hooks"
 import { acuityColor, acuityLabel } from "@/features/ed/lib/acuity-utils"
-import { toast } from "sonner"
 
 interface PreEncounterFormProps {
 	facilityId: string
@@ -76,8 +82,8 @@ export function PreEncounterForm({ facilityId, triageStaffId, onSuccess }: PreEn
 					<Card className="border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30">
 						<CardContent className="py-3">
 							<p className="text-sm font-medium text-red-700 dark:text-red-400">
-								Acuity {acuityLevel} — {acuityLabel(acuityLevel)}: Patient bypasses
-								standard registration. A Trauma Alias MRN will be auto-generated.
+								Acuity {acuityLevel} — {acuityLabel(acuityLevel)}: Patient bypasses standard
+								registration. A Trauma Alias MRN will be auto-generated.
 							</p>
 						</CardContent>
 					</Card>
@@ -109,7 +115,7 @@ export function PreEncounterForm({ facilityId, triageStaffId, onSuccess }: PreEn
 							<button
 								key={level}
 								type="button"
-								className={`rounded-md border py-2 text-sm font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+								className={`rounded-md border py-2 text-sm font-semibold transition-all focus:ring-2 focus:ring-offset-1 focus:outline-none ${
 									acuityLevel === level
 										? `${acuityColor(level)} ring-2 ring-offset-1`
 										: "border-border hover:bg-accent"
@@ -125,7 +131,10 @@ export function PreEncounterForm({ facilityId, triageStaffId, onSuccess }: PreEn
 						<Badge className={acuityColor(acuityLevel)}>{acuityLevel}</Badge>
 						<span className="text-muted-foreground text-sm">{acuityLabel(acuityLevel)}</span>
 						{acuityLevel <= 2 && (
-							<Badge variant="outline" className="ml-auto border-orange-400 text-orange-700 dark:text-orange-400">
+							<Badge
+								variant="outline"
+								className="ml-auto border-orange-400 text-orange-700 dark:text-orange-400"
+							>
 								Registration Bypass Eligible
 							</Badge>
 						)}
@@ -145,18 +154,12 @@ export function PreEncounterForm({ facilityId, triageStaffId, onSuccess }: PreEn
 					/>
 				</div>
 
-				<Button
-					type="submit"
-					className="w-full"
-					disabled={createPreEncounter.isPending}
-				>
+				<Button type="submit" className="w-full" disabled={createPreEncounter.isPending}>
 					Review Trauma Alias
 				</Button>
 
 				{createPreEncounter.isError && (
-					<p className="text-destructive text-sm">
-						{createPreEncounter.error.message}
-					</p>
+					<p className="text-destructive text-sm">{createPreEncounter.error.message}</p>
 				)}
 			</form>
 
@@ -184,9 +187,7 @@ export function PreEncounterForm({ facilityId, triageStaffId, onSuccess }: PreEn
 						</div>
 						<div className="mt-3">
 							<p className="text-muted-foreground text-xs">Chief Complaint</p>
-							<p className="mt-1 whitespace-pre-wrap">
-								{chiefComplaint.trim() || "Not provided"}
-							</p>
+							<p className="mt-1 whitespace-pre-wrap">{chiefComplaint.trim() || "Not provided"}</p>
 						</div>
 					</div>
 

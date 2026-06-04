@@ -26,13 +26,13 @@ import {
 } from "@/core/components/ui/table"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
-	type FhirExport,
-	type FhirExportStatus,
+	downloadBundleAsync,
 	formatExportStatusLabel,
 	getExportStatusColor,
-	downloadBundleAsync,
 	useExportListQuery,
 	useNhdrSystemStatusQuery,
+	type FhirExport,
+	type FhirExportStatus,
 } from "@/features/fhir/api/fhir.hooks"
 import { ExportConfigForm } from "@/features/fhir/components/export-config-form"
 import { SubmissionTracker } from "@/features/fhir/components/submission-tracker"
@@ -61,7 +61,11 @@ function ExportStatusBadge({ status }: { status: FhirExportStatus }) {
 		return <Badge variant="destructive">{label}</Badge>
 	}
 	if (status === "invalid") {
-		return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">{label}</Badge>
+		return (
+			<Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+				{label}
+			</Badge>
+		)
 	}
 	return <Badge className={colorClass}>{label}</Badge>
 }
@@ -91,8 +95,12 @@ function ExportStatusIcon({ status }: { status: FhirExportStatus }) {
 
 function StatsRow({ exports }: { exports: FhirExport[] }) {
 	const total = exports.length
-	const completed = exports.filter(e => e.status === "completed" || e.status === "accepted" || e.status === "submitted").length
-	const failed = exports.filter(e => e.status === "failed" || e.status === "rejected" || e.status === "invalid").length
+	const completed = exports.filter(
+		e => e.status === "completed" || e.status === "accepted" || e.status === "submitted"
+	).length
+	const failed = exports.filter(
+		e => e.status === "failed" || e.status === "rejected" || e.status === "invalid"
+	).length
 	const pending = exports.filter(e => e.status === "pending" || e.status === "processing").length
 
 	return (
@@ -100,25 +108,25 @@ function StatsRow({ exports }: { exports: FhirExport[] }) {
 			<Card>
 				<CardContent className="pt-4 pb-3">
 					<p className="text-2xl font-bold">{total}</p>
-					<p className="text-sm text-muted-foreground">Total Exports</p>
+					<p className="text-muted-foreground text-sm">Total Exports</p>
 				</CardContent>
 			</Card>
 			<Card>
 				<CardContent className="pt-4 pb-3">
 					<p className="text-2xl font-bold text-green-600">{completed}</p>
-					<p className="text-sm text-muted-foreground">Completed</p>
+					<p className="text-muted-foreground text-sm">Completed</p>
 				</CardContent>
 			</Card>
 			<Card>
 				<CardContent className="pt-4 pb-3">
 					<p className="text-2xl font-bold text-blue-600">{pending}</p>
-					<p className="text-sm text-muted-foreground">In Progress</p>
+					<p className="text-muted-foreground text-sm">In Progress</p>
 				</CardContent>
 			</Card>
 			<Card>
 				<CardContent className="pt-4 pb-3">
 					<p className="text-2xl font-bold text-red-600">{failed}</p>
-					<p className="text-sm text-muted-foreground">Failed</p>
+					<p className="text-muted-foreground text-sm">Failed</p>
 				</CardContent>
 			</Card>
 		</div>
@@ -163,7 +171,7 @@ function ExportHistoryTable({
 			</CardHeader>
 			<CardContent className="p-0">
 				{error && (
-					<div className="p-6 text-sm text-destructive">
+					<div className="text-destructive p-6 text-sm">
 						Failed to load export history. The FHIR module may not be enabled on this server.
 					</div>
 				)}
@@ -183,24 +191,21 @@ function ExportHistoryTable({
 					<TableBody>
 						{isLoading && (
 							<TableRow>
-								<TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+								<TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
 									Loading…
 								</TableCell>
 							</TableRow>
 						)}
 						{!isLoading && exports.length === 0 && (
 							<TableRow>
-								<TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+								<TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
 									No exports yet. Click "New Export" to get started.
 								</TableCell>
 							</TableRow>
 						)}
 						{exports.map(exp => (
-							<TableRow
-								key={exp.id}
-								className={selectedExportId === exp.id ? "bg-muted/60" : ""}
-							>
-								<TableCell className="font-mono text-xs text-muted-foreground">
+							<TableRow key={exp.id} className={selectedExportId === exp.id ? "bg-muted/60" : ""}>
+								<TableCell className="text-muted-foreground font-mono text-xs">
 									{exp.id.slice(0, 8)}…
 								</TableCell>
 								<TableCell className="text-xs">
@@ -209,12 +214,12 @@ function ExportHistoryTable({
 								<TableCell>
 									<div className="flex flex-wrap gap-1">
 										{exp.resourceTypes.slice(0, 3).map(rt => (
-											<Badge key={rt} variant="outline" className="text-xs px-1.5">
+											<Badge key={rt} variant="outline" className="px-1.5 text-xs">
 												{rt}
 											</Badge>
 										))}
 										{exp.resourceTypes.length > 3 && (
-											<Badge variant="outline" className="text-xs px-1.5">
+											<Badge variant="outline" className="px-1.5 text-xs">
 												+{exp.resourceTypes.length - 3}
 											</Badge>
 										)}
@@ -228,14 +233,23 @@ function ExportHistoryTable({
 											: "—"}
 								</TableCell>
 								<TableCell>
-									{(exp.status === "completed" || exp.status === "submitted" || exp.status === "accepted") && (
-										<Badge variant="outline" className="text-xs">Passed</Badge>
+									{(exp.status === "completed" ||
+										exp.status === "submitted" ||
+										exp.status === "accepted") && (
+										<Badge variant="outline" className="text-xs">
+											Passed
+										</Badge>
 									)}
 									{exp.status === "invalid" && (
-										<Badge className="bg-amber-100 text-amber-800 text-xs dark:bg-amber-900/30 dark:text-amber-300">Errors</Badge>
+										<Badge className="bg-amber-100 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+											Errors
+										</Badge>
 									)}
-									{(exp.status === "pending" || exp.status === "processing" || exp.status === "failed" || exp.status === "rejected") && (
-										<span className="text-xs text-muted-foreground">—</span>
+									{(exp.status === "pending" ||
+										exp.status === "processing" ||
+										exp.status === "failed" ||
+										exp.status === "rejected") && (
+										<span className="text-muted-foreground text-xs">—</span>
 									)}
 								</TableCell>
 								<TableCell>
@@ -247,19 +261,20 @@ function ExportHistoryTable({
 								<TableCell className="text-xs">{formatDate(exp.createdAt)}</TableCell>
 								<TableCell>
 									<div className="flex items-center gap-1">
-										{(exp.status === "completed" || exp.status === "invalid" || exp.status === "submitted" || exp.status === "accepted") && (
+										{(exp.status === "completed" ||
+											exp.status === "invalid" ||
+											exp.status === "submitted" ||
+											exp.status === "accepted") && (
 											<Button
 												variant="ghost"
 												size="sm"
 												className="h-7 text-xs"
-												onClick={() =>
-													onSelectExport(selectedExportId === exp.id ? null : exp.id)
-												}
+												onClick={() => onSelectExport(selectedExportId === exp.id ? null : exp.id)}
 											>
 												{selectedExportId === exp.id ? "Hide Report" : "Validation"}
 											</Button>
 										)}
-									{exp.exportUrl && canDownload && (
+										{exp.exportUrl && canDownload && (
 											<Button
 												variant="ghost"
 												size="sm"
@@ -267,9 +282,11 @@ function ExportHistoryTable({
 												disabled={downloadingId === exp.id}
 												onClick={() => onDownload(exp.id)}
 											>
-												{downloadingId === exp.id
-													? <Loader2 className="size-3.5 animate-spin" />
-													: <Download className="size-3.5" />}
+												{downloadingId === exp.id ? (
+													<Loader2 className="size-3.5 animate-spin" />
+												) : (
+													<Download className="size-3.5" />
+												)}
 											</Button>
 										)}
 									</div>
@@ -281,7 +298,7 @@ function ExportHistoryTable({
 
 				{totalPages > 1 && (
 					<div className="flex items-center justify-between p-4">
-						<p className="text-sm text-muted-foreground">
+						<p className="text-muted-foreground text-sm">
 							Page {page} of {totalPages}
 						</p>
 						<div className="flex gap-2">
@@ -329,7 +346,7 @@ function NhdrStatusPanel({ facilityId }: { facilityId: string }) {
 			<CardContent className="space-y-3">
 				<div className="flex flex-wrap items-center gap-3">
 					<div className="flex items-center gap-2">
-						<span className="text-sm text-muted-foreground">Mode:</span>
+						<span className="text-muted-foreground text-sm">Mode:</span>
 						<Badge
 							className={isLive ? "bg-blue-100 text-blue-800" : "bg-yellow-100 text-yellow-800"}
 						>
@@ -337,7 +354,7 @@ function NhdrStatusPanel({ facilityId }: { facilityId: string }) {
 						</Badge>
 					</div>
 					<div className="flex items-center gap-2">
-						<span className="text-sm text-muted-foreground">Configuration:</span>
+						<span className="text-muted-foreground text-sm">Configuration:</span>
 						{isReady ? (
 							<span className="flex items-center gap-1 text-sm text-green-700">
 								<CheckCircle2 className="size-4" /> Configured
@@ -350,11 +367,9 @@ function NhdrStatusPanel({ facilityId }: { facilityId: string }) {
 						)}
 					</div>
 				</div>
-				<p className="text-sm text-muted-foreground">{data.nhdrEndpointNote}</p>
+				<p className="text-muted-foreground text-sm">{data.nhdrEndpointNote}</p>
 				{data.nhdrBaseUrl && (
-					<p className="font-mono text-xs text-muted-foreground">
-						Endpoint: {data.nhdrBaseUrl}
-					</p>
+					<p className="text-muted-foreground font-mono text-xs">Endpoint: {data.nhdrBaseUrl}</p>
 				)}
 			</CardContent>
 		</Card>
@@ -384,9 +399,8 @@ export function FhirExportDashboard({ canEdit }: FhirExportDashboardProps) {
 	const selectedExport = exports.find(e => e.id === selectedExportId) ?? null
 
 	// Find the most recent completed-but-unsubmitted export to surface as CTA
-	const pendingSubmissionExport = exports.find(
-		e => e.status === "completed" && !e.nhdrSubmissionId,
-	) ?? null
+	const pendingSubmissionExport =
+		exports.find(e => e.status === "completed" && !e.nhdrSubmissionId) ?? null
 
 	void selectedExport
 
@@ -407,7 +421,7 @@ export function FhirExportDashboard({ canEdit }: FhirExportDashboardProps) {
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div>
 					<h1 className="text-2xl font-bold">FHIR Export Dashboard</h1>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						Export clinical data in FHIR R4 format for NHDR submission and interoperability
 					</p>
 				</div>
@@ -436,7 +450,9 @@ export function FhirExportDashboard({ canEdit }: FhirExportDashboardProps) {
 				totalPages={data?.totalPages ?? 1}
 				onPageChange={setPage}
 				downloadingId={downloadingId}
-				onDownload={exportId => { void handleDownload(exportId) }}
+				onDownload={exportId => {
+					void handleDownload(exportId)
+				}}
 				canDownload={canEdit}
 			/>
 
@@ -452,14 +468,14 @@ export function FhirExportDashboard({ canEdit }: FhirExportDashboardProps) {
 			)}
 
 			{/* NHDR Submission Tracker */}
-			<SubmissionTracker facilityId={facilityId} pendingExport={pendingSubmissionExport} canEdit={canEdit} />
+			<SubmissionTracker
+				facilityId={facilityId}
+				pendingExport={pendingSubmissionExport}
+				canEdit={canEdit}
+			/>
 
 			{/* Export Config Dialog */}
-			<ExportConfigForm
-				facilityId={facilityId}
-				open={configOpen}
-				onOpenChange={setConfigOpen}
-			/>
+			<ExportConfigForm facilityId={facilityId} open={configOpen} onOpenChange={setConfigOpen} />
 		</div>
 	)
 }

@@ -6,9 +6,9 @@ import { ArrowLeft, Lock } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Button } from "@/core/components/ui/button"
+import { useMswEvaluationQuery } from "@/features/msw/assessment-coe/api/assessment.hooks"
 import { CoeIssuance } from "@/features/msw/assessment-coe/components/coe-issuance"
 import { EncounterContextBar } from "@/features/msw/components/encounter-context-bar"
-import { useMswEvaluationQuery } from "@/features/msw/assessment-coe/api/assessment.hooks"
 
 interface CoePageProps {
 	params: Promise<{ encounterId: string }>
@@ -35,22 +35,17 @@ export default function CoePage({ params }: CoePageProps) {
 			</div>
 
 			<div>
-				<h1 className="text-xl font-semibold">
-					Certificate of Eligibility (CoE) Issuance
-				</h1>
-				<p className="text-sm text-muted-foreground">Story 12.8 · Flow L8</p>
+				<h1 className="text-xl font-semibold">Certificate of Eligibility (CoE) Issuance</h1>
+				<p className="text-muted-foreground text-sm">Story 12.8 · Flow L8</p>
 			</div>
 
 			{isLoading ? (
-				<p className="text-sm text-muted-foreground">Loading…</p>
+				<p className="text-muted-foreground text-sm">Loading…</p>
 			) : !evaluation ? (
 				<Alert>
 					<AlertDescription>
 						No assessment found for this encounter.{" "}
-						<Link
-							href={`/msw/encounters/${encounterId}/assessment`}
-							className="underline"
-						>
+						<Link href={`/msw/encounters/${encounterId}/assessment`} className="underline">
 							Complete the assessment first.
 						</Link>
 					</AlertDescription>
@@ -59,8 +54,8 @@ export default function CoePage({ params }: CoePageProps) {
 				<Alert>
 					<Lock className="size-4" />
 					<AlertDescription>
-						A CoE has already been issued and the form is locked. Revoke the existing CoE
-						to make changes.
+						A CoE has already been issued and the form is locked. Revoke the existing CoE to make
+						changes.
 					</AlertDescription>
 				</Alert>
 			) : (
@@ -69,19 +64,13 @@ export default function CoePage({ params }: CoePageProps) {
 						<Alert>
 							<AlertDescription>
 								An eligibility decision is required before issuing a CoE.{" "}
-								<Link
-									href={`/msw/encounters/${encounterId}/assessment`}
-									className="underline"
-								>
+								<Link href={`/msw/encounters/${encounterId}/assessment`} className="underline">
 									Set eligibility decision.
 								</Link>
 							</AlertDescription>
 						</Alert>
 					)}
-					<CoeIssuance
-						evaluationId={evaluation.id}
-						encounterId={encounterId}
-					/>
+					<CoeIssuance evaluationId={evaluation.id} encounterId={encounterId} />
 				</>
 			)}
 		</div>

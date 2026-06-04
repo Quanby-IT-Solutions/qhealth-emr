@@ -1,13 +1,11 @@
 "use client"
 
 import { useState } from "react"
-
 import { Baby, FileSignature, FlaskConical, ShieldCheck } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
-
 import {
 	useCreateNbsScreeningMutation,
 	useNbsConsentQuery,
@@ -22,10 +20,7 @@ import { NbsTimeline } from "@/features/nbs/components/nbs-timeline"
 // Helpers
 // ============================================================================
 
-const STATUS_CONFIG: Record<
-	string,
-	{ label: string; className: string }
-> = {
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 	pending: {
 		label: "Pending",
 		className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
@@ -142,9 +137,7 @@ function NbsCardInner({
 							<Baby className="size-4 text-blue-600 dark:text-blue-400" />
 						</div>
 						<CardTitle className="text-sm">Newborn Screening (NBS)</CardTitle>
-						{statusCfg && (
-							<Badge className={statusCfg.className}>{statusCfg.label}</Badge>
-						)}
+						{statusCfg && <Badge className={statusCfg.className}>{statusCfg.label}</Badge>}
 					</div>
 					<div className="flex gap-1.5">
 						{screening && (!readOnly || consent) && (
@@ -153,15 +146,15 @@ function NbsCardInner({
 									type="button"
 									variant="ghost"
 									size="sm"
-									className="gap-1.5 h-7 text-xs"
+									className="h-7 gap-1.5 text-xs"
 									onClick={() => setConsentOpen(true)}
 								>
 									<FileSignature className="size-3.5" />
 									{consent ? "View Consent" : "Consent"}
 								</Button>
 								{consent && (
-									<Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 text-[10px]">
-										<ShieldCheck className="size-3 mr-1" />
+									<Badge className="bg-green-100 text-[10px] text-green-800 dark:bg-green-900/30 dark:text-green-300">
+										<ShieldCheck className="mr-1 size-3" />
 										{consent.consentType === "waiver" ? "Waived" : "Consented"}
 									</Badge>
 								)}
@@ -172,7 +165,7 @@ function NbsCardInner({
 							variant="ghost"
 							size="sm"
 							className="h-7 text-xs"
-							onClick={() => setExpanded((v) => !v)}
+							onClick={() => setExpanded(v => !v)}
 						>
 							{expanded ? "Collapse" : "Expand"}
 						</Button>
@@ -182,7 +175,7 @@ function NbsCardInner({
 				<CardContent className="space-y-4">
 					{/* Timeline — always visible */}
 					{isLoading ? (
-						<p className="text-sm text-muted-foreground">Loading…</p>
+						<p className="text-muted-foreground text-sm">Loading…</p>
 					) : (
 						<NbsTimeline
 							birthDatetime={patientDateOfBirth}
@@ -203,16 +196,14 @@ function NbsCardInner({
 								onClick={handleInitiate}
 							>
 								<FlaskConical className="size-4" />
-								{createScreeningMutation.isPending
-									? "Initiating…"
-									: "Initiate NBS Screening"}
+								{createScreeningMutation.isPending ? "Initiating…" : "Initiate NBS Screening"}
 							</Button>
 						</div>
 					)}
 
 					{/* Expanded content */}
 					{expanded && screening && (
-						<div className="space-y-4 mt-2">
+						<div className="mt-2 space-y-4">
 							<NbsScreeningForm
 								encounterId={encounterId}
 								patientId={patientId}
@@ -225,11 +216,7 @@ function NbsCardInner({
 							{(screening.status === "positive" ||
 								screening.result_overall === "abnormal" ||
 								screening.result_overall === "borderline") && (
-								<NbsReferralTracker
-									nbsId={nbsId}
-									encounterId={encounterId}
-									patientId={patientId}
-								/>
+								<NbsReferralTracker nbsId={nbsId} encounterId={encounterId} patientId={patientId} />
 							)}
 						</div>
 					)}

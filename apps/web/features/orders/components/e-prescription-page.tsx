@@ -1,8 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { toast } from "sonner"
-
 import {
 	AlertTriangle,
 	CheckCircle2,
@@ -14,6 +12,7 @@ import {
 	ShieldCheck,
 	X,
 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/core/components/ui/alert"
 import { Badge } from "@/core/components/ui/badge"
@@ -112,9 +111,7 @@ function isReadyForPrescriptionTranche(order: {
 	const hasParentOrder = order.parentOrderId !== null && order.parentOrderId !== undefined
 	const hasTrancheNumber = order.pdeaTrancheNumber !== null && order.pdeaTrancheNumber !== undefined
 	const isMultiTrancheParent =
-		!hasParentOrder &&
-		!hasTrancheNumber &&
-		(order.pdeaTrancheTotal ?? 0) > 1
+		!hasParentOrder && !hasTrancheNumber && (order.pdeaTrancheTotal ?? 0) > 1
 	if (isMultiTrancheParent) return false
 
 	if (!hasTrancheNumber) return true
@@ -124,7 +121,9 @@ function isReadyForPrescriptionTranche(order: {
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -178,7 +177,10 @@ function LicenseBadge({
 			</Badge>
 		)
 	return (
-		<Badge variant="outline" className="gap-1 border-green-300 bg-green-50 text-green-800 dark:border-green-700 dark:bg-green-900/20 dark:text-green-800">
+		<Badge
+			variant="outline"
+			className="gap-1 border-green-300 bg-green-50 text-green-800 dark:border-green-700 dark:bg-green-900/20 dark:text-green-800"
+		>
 			<ShieldCheck className="size-3" />
 			{label} {number}
 		</Badge>
@@ -221,7 +223,9 @@ function PrescriptionCard({
 	return (
 		<div
 			className={`rounded-lg border-2 p-4 transition-colors ${
-				isSigned ? "border-green-200 bg-green-50/30 dark:border-green-800/50 dark:bg-green-900/10" : "border-border"
+				isSigned
+					? "border-green-200 bg-green-50/30 dark:border-green-800/50 dark:bg-green-900/10"
+					: "border-border"
 			}`}
 		>
 			{/* Drug Name Header */}
@@ -229,9 +233,7 @@ function PrescriptionCard({
 				<div className="flex items-center gap-2">
 					<Pill className="text-primary mt-0.5 size-4 shrink-0" />
 					<div>
-						<p className="text-base font-semibold leading-tight">
-							{content.genericName ?? "--"}
-						</p>
+						<p className="text-base leading-tight font-semibold">{content.genericName ?? "--"}</p>
 						{content.brandName && (
 							<p className="text-muted-foreground text-sm">({content.brandName})</p>
 						)}
@@ -269,7 +271,7 @@ function PrescriptionCard({
 			{/* Medication Details — FDA format grid */}
 			<div className="mb-3 grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-3">
 				<div>
-					<p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+					<p className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
 						Dose / Form
 					</p>
 					<p>
@@ -277,13 +279,13 @@ function PrescriptionCard({
 					</p>
 				</div>
 				<div>
-					<p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+					<p className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
 						Route
 					</p>
 					<p>{content.route ?? "--"}</p>
 				</div>
 				<div>
-					<p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+					<p className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
 						Frequency
 					</p>
 					<p>
@@ -297,7 +299,7 @@ function PrescriptionCard({
 				</div>
 				{content.durationDays && (
 					<div>
-						<p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+						<p className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
 							Duration
 						</p>
 						<p>{content.durationDays} day(s)</p>
@@ -305,7 +307,7 @@ function PrescriptionCard({
 				)}
 				{content.specialInstructions && (
 					<div className="col-span-2 sm:col-span-3">
-						<p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+						<p className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
 							Special Instructions
 						</p>
 						<p className="text-muted-foreground italic">{content.specialInstructions}</p>
@@ -313,7 +315,7 @@ function PrescriptionCard({
 				)}
 				{isControlled && (
 					<div className="col-span-2 sm:col-span-3">
-						<p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+						<p className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
 							PDEA Dispensing
 						</p>
 						<p className="text-muted-foreground">
@@ -331,7 +333,7 @@ function PrescriptionCard({
 			{/* Prescriber Signature Block — FDA required */}
 			<div className="flex items-end justify-between gap-4">
 				<div className="text-xs">
-					<p className="text-muted-foreground mb-0.5 font-semibold uppercase tracking-wide">
+					<p className="text-muted-foreground mb-0.5 font-semibold tracking-wide uppercase">
 						Prescriber
 					</p>
 					<p className="font-medium">{rx.prescriberStaffName ?? "--"}</p>
@@ -394,7 +396,12 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 	const { data: profile } = useMyProfile()
 	const { data: encounter } = useEncounterDetailQuery(encounterId)
 	const medOrdersQuery = useMedOrderListQuery({ encounterId })
-	const prescriptionsQuery = usePrescriptionListQuery({ encounterId, patientId, page: 1, limit: 100 })
+	const prescriptionsQuery = usePrescriptionListQuery({
+		encounterId,
+		patientId,
+		page: 1,
+		limit: 100,
+	})
 
 	const createPrescription = useCreatePrescriptionMutation()
 	const signPrescription = useSignPrescriptionMutation()
@@ -410,10 +417,7 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 	const ptrExpiringSoon = isWithinDays(staffProfile?.ptrExpiry, 30)
 
 	const hasValidLicense = Boolean(
-		staffProfile?.prcLicenseNumber &&
-			staffProfile?.ptrNumber &&
-			!prcExpired &&
-			!ptrExpired
+		staffProfile?.prcLicenseNumber && staffProfile?.ptrNumber && !prcExpired && !ptrExpired
 	)
 
 	const licenseAlertMessages: string[] = []
@@ -424,7 +428,9 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 	else if (!staffProfile.prcLicenseNumber)
 		licenseAlertMessages.push("PRC license number is missing - prescription generation blocked.")
 	else if (!staffProfile.prcExpiry)
-		licenseAlertMessages.push("PRC license expiry is not recorded - prescription generation blocked.")
+		licenseAlertMessages.push(
+			"PRC license expiry is not recorded - prescription generation blocked."
+		)
 	else if (prcExpired)
 		licenseAlertMessages.push(
 			`PRC license expired ${formatDate(staffProfile?.prcExpiry)} - prescription generation blocked.`
@@ -472,9 +478,7 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 			{
 				onSuccess: () => toast.success("e-Prescription draft generated."),
 				onError: error =>
-					toast.error(
-						mutationErrorMessage(error, "Failed to generate e-Prescription.")
-					),
+					toast.error(mutationErrorMessage(error, "Failed to generate e-Prescription.")),
 			}
 		)
 	}
@@ -487,8 +491,7 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 		}
 		signPrescription.mutate(id, {
 			onSuccess: () => toast.success("e-Prescription signed."),
-			onError: error =>
-				toast.error(mutationErrorMessage(error, "Failed to sign e-Prescription.")),
+			onError: error => toast.error(mutationErrorMessage(error, "Failed to sign e-Prescription.")),
 		})
 	}
 
@@ -559,11 +562,13 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 						<div className="flex flex-wrap items-start justify-between gap-4">
 							{/* Patient info */}
 							<div>
-								<p className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
+								<p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
 									Patient
 								</p>
 								<p className="font-semibold">{encounter?.patientName ?? "--"}</p>
-								<p className="text-muted-foreground text-sm">MRN: {encounter?.patientMrn ?? "--"}</p>
+								<p className="text-muted-foreground text-sm">
+									MRN: {encounter?.patientMrn ?? "--"}
+								</p>
 								<p className="text-muted-foreground text-sm">
 									Date: {formatDate(encounter?.admissionDatetime)}
 								</p>
@@ -571,12 +576,10 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 
 							{/* Prescriber license block */}
 							<div>
-								<p className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
+								<p className="text-muted-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
 									Prescriber License
 								</p>
-								<p className="mb-2 font-semibold">
-									{profile?.user?.name ?? "--"}
-								</p>
+								<p className="mb-2 font-semibold">{profile?.user?.name ?? "--"}</p>
 								<div className="flex flex-wrap gap-2">
 									<LicenseBadge
 										label="PRC"
@@ -651,7 +654,7 @@ export function EPrescriptionPage({ encounterId, facilityId, patientId }: EPresc
 											<p className="font-medium">
 												{order.genericName}
 												{order.brandName && (
-													<span className="text-muted-foreground ml-1 font-normal text-sm">
+													<span className="text-muted-foreground ml-1 text-sm font-normal">
 														({order.brandName})
 													</span>
 												)}

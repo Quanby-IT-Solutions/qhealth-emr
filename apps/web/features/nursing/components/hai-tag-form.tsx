@@ -4,12 +4,7 @@ import { useState } from "react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/core/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import {
@@ -51,7 +46,10 @@ type HaiStatus = "suspected" | "confirmed" | "resolved"
 type HaiType = "clabsi" | "cauti" | "vap" | "ssi" | "cdiff"
 
 function statusBadge(status: HaiStatus) {
-	const config: Record<HaiStatus, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+	const config: Record<
+		HaiStatus,
+		{ variant: "default" | "secondary" | "destructive" | "outline"; label: string }
+	> = {
 		suspected: { variant: "outline", label: "Suspected" },
 		confirmed: { variant: "destructive", label: "Confirmed" },
 		resolved: { variant: "secondary", label: "Resolved" },
@@ -104,58 +102,56 @@ export function HaiTagForm({ encounterId, facilityId, readOnly }: HaiTagFormProp
 	return (
 		<>
 			{/* Report HAI dialog — nurses only */}
-			{!readOnly && <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Report Healthcare-Associated Infection</DialogTitle>
-					</DialogHeader>
-					<form onSubmit={handleCreate} className="grid gap-3">
-						<div>
-							<Label htmlFor="haiType">HAI Type</Label>
-							<select
-								id="haiType"
-								name="haiType"
-								className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-								required
-							>
-								<option value="">Select HAI type…</option>
-								{(Object.entries(HAI_TYPE_LABELS) as [HaiType, string][]).map(
-									([value, label]) => (
-										<option key={value} value={value}>
-											{label}
-										</option>
-									)
-								)}
-							</select>
-						</div>
-						<div>
-							<Label htmlFor="onsetDate">Onset Date</Label>
-							<Input id="onsetDate" name="onsetDate" type="date" required />
-						</div>
-						<div>
-							<Label htmlFor="notes">Notes / Device &amp; Site Information</Label>
-							<Textarea
-								id="notes"
-								name="notes"
-								rows={3}
-								placeholder="e.g. Right femoral central line, day 5 of insertion…"
-							/>
-						</div>
-						<div className="flex justify-end gap-2 pt-2">
-							<Button
-								type="button"
-								variant="outline"
-								onClick={() => setCreateOpen(false)}
-							>
-								Cancel
-							</Button>
-							<Button type="submit" disabled={createHai.isPending}>
-								{createHai.isPending ? "Saving…" : "Report HAI"}
-							</Button>
-						</div>
-					</form>
-				</DialogContent>
-			</Dialog>}
+			{!readOnly && (
+				<Dialog open={createOpen} onOpenChange={setCreateOpen}>
+					<DialogContent>
+						<DialogHeader>
+							<DialogTitle>Report Healthcare-Associated Infection</DialogTitle>
+						</DialogHeader>
+						<form onSubmit={handleCreate} className="grid gap-3">
+							<div>
+								<Label htmlFor="haiType">HAI Type</Label>
+								<select
+									id="haiType"
+									name="haiType"
+									className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+									required
+								>
+									<option value="">Select HAI type…</option>
+									{(Object.entries(HAI_TYPE_LABELS) as [HaiType, string][]).map(
+										([value, label]) => (
+											<option key={value} value={value}>
+												{label}
+											</option>
+										)
+									)}
+								</select>
+							</div>
+							<div>
+								<Label htmlFor="onsetDate">Onset Date</Label>
+								<Input id="onsetDate" name="onsetDate" type="date" required />
+							</div>
+							<div>
+								<Label htmlFor="notes">Notes / Device &amp; Site Information</Label>
+								<Textarea
+									id="notes"
+									name="notes"
+									rows={3}
+									placeholder="e.g. Right femoral central line, day 5 of insertion…"
+								/>
+							</div>
+							<div className="flex justify-end gap-2 pt-2">
+								<Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+									Cancel
+								</Button>
+								<Button type="submit" disabled={createHai.isPending}>
+									{createHai.isPending ? "Saving…" : "Report HAI"}
+								</Button>
+							</div>
+						</form>
+					</DialogContent>
+				</Dialog>
+			)}
 
 			<div className="mb-4 flex items-center justify-between">
 				<h3 className="font-semibold">Healthcare-Associated Infections</h3>
@@ -169,9 +165,7 @@ export function HaiTagForm({ encounterId, facilityId, readOnly }: HaiTagFormProp
 			{haiTags.isLoading ? (
 				<div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
 			) : !haiTags.data?.data?.length ? (
-				<div className="text-muted-foreground py-8 text-center text-sm">
-					No HAI tags recorded.
-				</div>
+				<div className="text-muted-foreground py-8 text-center text-sm">No HAI tags recorded.</div>
 			) : (
 				<div className="overflow-auto rounded-md border">
 					<Table>
@@ -189,9 +183,7 @@ export function HaiTagForm({ encounterId, facilityId, readOnly }: HaiTagFormProp
 						<TableBody>
 							{haiTags.data.data.map(h => (
 								<TableRow key={h.id}>
-									<TableCell className="font-medium uppercase">
-										{h.haiType}
-									</TableCell>
+									<TableCell className="font-medium uppercase">{h.haiType}</TableCell>
 									<TableCell>{formatDate(h.onsetDate)}</TableCell>
 									<TableCell>{statusBadge(h.status)}</TableCell>
 									<TableCell className="whitespace-nowrap">
@@ -200,9 +192,7 @@ export function HaiTagForm({ encounterId, facilityId, readOnly }: HaiTagFormProp
 									<TableCell className="whitespace-nowrap">
 										{formatDateTime(h.resolvedAt)}
 									</TableCell>
-									<TableCell className="max-w-[200px] truncate">
-										{h.notes ?? "—"}
-									</TableCell>
+									<TableCell className="max-w-[200px] truncate">{h.notes ?? "—"}</TableCell>
 									<TableCell>
 										<div className="flex gap-1">
 											{!readOnly && h.status === "suspected" && (

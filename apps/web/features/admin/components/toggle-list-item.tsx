@@ -44,9 +44,7 @@ export function ToggleListItem({
 						</span>
 					)}
 				</div>
-				{description && (
-					<p className="text-muted-foreground text-xs">{description}</p>
-				)}
+				{description && <p className="text-muted-foreground text-xs">{description}</p>}
 				{(lastChangedAt || lastChangedBy) && (
 					<p className="text-muted-foreground text-[10px]">
 						{lastChangedBy && `By ${lastChangedBy}`}

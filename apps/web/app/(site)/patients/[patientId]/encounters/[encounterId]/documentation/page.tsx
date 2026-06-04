@@ -1,13 +1,15 @@
 "use client"
 
-import { DocumentationTab } from "@/features/clinical-docs/components/documentation-tab"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { DocumentationTab } from "@/features/clinical-docs/components/documentation-tab"
 import { useChartContext } from "@/features/encounters/context/chart-context"
 
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {

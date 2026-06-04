@@ -22,7 +22,7 @@ export function VersionDiffViewer({ fromVersion, toVersion, entries }: VersionDi
 
 	return (
 		<div className="space-y-4">
-			<div className="flex items-center gap-2 text-sm text-muted-foreground">
+			<div className="text-muted-foreground flex items-center gap-2 text-sm">
 				<span>{fromVersion}</span>
 				<span>-&gt;</span>
 				<span>{toVersion}</span>
@@ -44,7 +44,7 @@ export function VersionDiffViewer({ fromVersion, toVersion, entries }: VersionDi
 			{removed.length > 0 && (
 				<Card>
 					<CardHeader className="pb-2">
-						<CardTitle className="text-sm text-destructive">Removed ({removed.length})</CardTitle>
+						<CardTitle className="text-destructive text-sm">Removed ({removed.length})</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-1">
 						{removed.map(e => (
@@ -75,7 +75,7 @@ export function VersionDiffViewer({ fromVersion, toVersion, entries }: VersionDi
 				</Card>
 			)}
 			{entries.length === 0 && (
-				<p className="py-4 text-center text-sm text-muted-foreground">No differences found.</p>
+				<p className="text-muted-foreground py-4 text-center text-sm">No differences found.</p>
 			)}
 		</div>
 	)

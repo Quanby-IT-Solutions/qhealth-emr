@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation"
 
-import { EmrShell } from "@/features/app-shell/components/emr-shell"
 import { getSession } from "@/services/better-auth/auth-server"
 import { NotificationProvider } from "@/services/notifications/notification-provider"
+import { EmrShell } from "@/features/app-shell/components/emr-shell"
 
 export default async function SiteLayout({
 	children,

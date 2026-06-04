@@ -19,7 +19,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { Input } from "@/core/components/ui/input"
 import type { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
-import { useSurgicalCaseListQuery, type SurgicalCase, type SurgeryStatus } from "../api/surgical.hooks"
+import {
+	useSurgicalCaseListQuery,
+	type SurgeryStatus,
+	type SurgicalCase,
+} from "../api/surgical.hooks"
 
 type MyProfile = NonNullable<ReturnType<typeof useMyProfile>["data"]>
 type StaffProfile = MyProfile["staffProfiles"][number]
@@ -52,7 +56,13 @@ function statusLabel(status: SurgeryStatus) {
 	return status.replace(/_/g, " ")
 }
 
-function CaseRow({ surgicalCase, actionLabel }: { surgicalCase: SurgicalCase; actionLabel: string }) {
+function CaseRow({
+	surgicalCase,
+	actionLabel,
+}: {
+	surgicalCase: SurgicalCase
+	actionLabel: string
+}) {
 	return (
 		<div className="hover:bg-secondary/40 flex flex-col gap-2 rounded-lg border p-3 transition-colors sm:flex-row sm:items-center sm:justify-between">
 			<div className="min-w-0 space-y-1">
@@ -63,7 +73,8 @@ function CaseRow({ surgicalCase, actionLabel }: { surgicalCase: SurgicalCase; ac
 					</Badge>
 				</div>
 				<p className="text-muted-foreground text-xs">
-					{surgicalCase.patientName ?? "Patient not linked"} - {surgicalCase.orSuite ?? "OR not assigned"} -{" "}
+					{surgicalCase.patientName ?? "Patient not linked"} -{" "}
+					{surgicalCase.orSuite ?? "OR not assigned"} -{" "}
 					{formatDateTime(surgicalCase.scheduledDatetime)}
 				</p>
 			</div>
@@ -287,7 +298,7 @@ export function SurgeonDashboard({ profile }: SurgeonDashboardProps) {
 							<CardHeader className="border-b pb-2">
 								<CardTitle className="text-base">Role Boundary</CardTitle>
 							</CardHeader>
-							<CardContent className="space-y-2 pt-3 text-xs text-muted-foreground">
+							<CardContent className="text-muted-foreground space-y-2 pt-3 text-xs">
 								<div className="flex gap-2">
 									<Scissors className="mt-0.5 size-4 shrink-0" />
 									<p>Surgeon owns operation record signing and RVS procedure mapping.</p>

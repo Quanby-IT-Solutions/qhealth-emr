@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+
 import { useMswEvaluationQuery, useTagBenefitsMutation } from "../api/assessment.hooks"
 
 interface BenefitTagConfig {
@@ -49,7 +50,7 @@ export function BenefitTags({ encounterId }: BenefitTagsProps) {
 	if (isLoading) {
 		return (
 			<Card>
-				<CardContent className="py-6 text-center text-sm text-muted-foreground">
+				<CardContent className="text-muted-foreground py-6 text-center text-sm">
 					Loading benefit tags…
 				</CardContent>
 			</Card>
@@ -59,7 +60,7 @@ export function BenefitTags({ encounterId }: BenefitTagsProps) {
 	if (!evaluation) {
 		return (
 			<Card>
-				<CardContent className="py-6 text-center text-sm text-muted-foreground">
+				<CardContent className="text-muted-foreground py-6 text-center text-sm">
 					Complete the financial evaluation first to tag benefits.
 				</CardContent>
 			</Card>
@@ -74,12 +75,12 @@ export function BenefitTags({ encounterId }: BenefitTagsProps) {
 				<div className="flex items-start justify-between">
 					<div>
 						<CardTitle className="text-base">Benefit Tags</CardTitle>
-						<p className="mt-0.5 text-sm text-muted-foreground">
+						<p className="text-muted-foreground mt-0.5 text-sm">
 							Tag applicable PhilHealth benefit programs. Visible in the billing module.
 						</p>
 					</div>
 					{activeCount > 0 && (
-						<span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+						<span className="bg-primary/10 text-primary rounded-full px-2.5 py-0.5 text-xs font-medium">
 							{activeCount} active
 						</span>
 					)}
@@ -114,16 +115,14 @@ export function BenefitTags({ encounterId }: BenefitTagsProps) {
 								>
 									{label}
 								</span>
-								<span className="text-xs font-normal text-muted-foreground">
-									{description}
-								</span>
+								<span className="text-muted-foreground text-xs font-normal">{description}</span>
 							</div>
 						</Button>
 					)
 				})}
 
 				{tagMutation.isError && (
-					<div className="flex items-center gap-2 text-sm text-destructive">
+					<div className="text-destructive flex items-center gap-2 text-sm">
 						<AlertCircle className="size-4 shrink-0" />
 						<span>Failed to update tags. Please try again.</span>
 					</div>

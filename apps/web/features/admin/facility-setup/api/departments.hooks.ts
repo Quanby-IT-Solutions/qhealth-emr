@@ -18,8 +18,7 @@ export function useUpsertDepartmentMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.departments.upsert.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.departments.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.departments.key() }),
 		})
 	)
 }
@@ -28,8 +27,7 @@ export function useDeleteDepartmentMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.departments.delete.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.departments.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.departments.key() }),
 		})
 	)
 }

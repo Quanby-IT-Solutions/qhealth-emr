@@ -1,6 +1,7 @@
 "use client"
 
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
+
 import { AuditLogTable } from "./audit-log-table"
 
 export function AuditLogPageClient() {

@@ -77,7 +77,7 @@ export function LcrPanel() {
 						<Card>
 							<CardContent className="pt-4">
 								<p className="text-muted-foreground text-xs">Draft / pending</p>
-								<p className="text-2xl font-bold tabular-nums text-yellow-600">
+								<p className="text-2xl font-bold text-yellow-600 tabular-nums">
 									{data.pendingCertificateCount}
 								</p>
 							</CardContent>
@@ -85,7 +85,7 @@ export function LcrPanel() {
 						<Card>
 							<CardContent className="pt-4">
 								<p className="text-muted-foreground text-xs">Completed, not submitted</p>
-								<p className="text-2xl font-bold tabular-nums text-blue-600">
+								<p className="text-2xl font-bold text-blue-600 tabular-nums">
 									{data.completedNotSubmittedCount}
 								</p>
 							</CardContent>
@@ -93,7 +93,7 @@ export function LcrPanel() {
 						<Card>
 							<CardContent className="pt-4">
 								<p className="text-muted-foreground text-xs">Submitted to registrar</p>
-								<p className="text-2xl font-bold tabular-nums text-green-700">
+								<p className="text-2xl font-bold text-green-700 tabular-nums">
 									{data.submittedCount}
 								</p>
 							</CardContent>

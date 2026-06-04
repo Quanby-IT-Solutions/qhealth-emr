@@ -59,7 +59,11 @@ export function useDismissHaiMutation() {
 	)
 }
 
-export function useHaiReportQuery(input: { facilityId: string; periodStart: string; periodEnd: string }) {
+export function useHaiReportQuery(input: {
+	facilityId: string
+	periodStart: string
+	periodEnd: string
+}) {
 	return useQuery(
 		himOrpc.haiReport.queryOptions({
 			input,

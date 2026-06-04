@@ -39,9 +39,7 @@ function ClearanceRow({
 				{clearedAt && (
 					<span className="text-muted-foreground text-xs">{formatDatetime(clearedAt)}</span>
 				)}
-				<Badge variant={cleared ? "default" : "secondary"}>
-					{cleared ? "Cleared" : "Pending"}
-				</Badge>
+				<Badge variant={cleared ? "default" : "secondary"}>{cleared ? "Cleared" : "Pending"}</Badge>
 			</div>
 		</div>
 	)

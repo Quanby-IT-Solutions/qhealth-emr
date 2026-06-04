@@ -1,12 +1,14 @@
 "use client"
 
-import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { MedicationCompliancePanel } from "@/features/admin/components/medication-compliance-panel"
+import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -18,7 +20,7 @@ export default function AdminMedicationCompliancePage() {
 
 	if (!can(permSet, "formulary", "clinical_policy")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access medication compliance.
 			</div>
 		)

@@ -6,7 +6,9 @@ import { SlaComplianceReport } from "@/features/sla/components/sla-compliance-re
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 export default function ReportingSlaPage() {
@@ -15,7 +17,7 @@ export default function ReportingSlaPage() {
 
 	if (!canAccess) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access SLA compliance reports.
 			</div>
 		)

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { CheckCircle2, Scan, XCircle } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -10,8 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { cn } from "@/core/lib/utils"
-import { type BedsideVerifyResult, useBedsideVerifyMutation } from "@/features/lab/api/lab.hooks"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { useBedsideVerifyMutation, type BedsideVerifyResult } from "@/features/lab/api/lab.hooks"
 
 // ============================================================================
 // Barcode Input Field (simulates barcode scanner)
@@ -39,21 +38,21 @@ function BarcodeInput({
 			<div className="relative">
 				<Input
 					value={value}
-					onChange={(e) => onChange(e.target.value)}
+					onChange={e => onChange(e.target.value)}
 					placeholder={placeholder}
 					className={cn(
 						"pr-8",
 						verified === true &&
 							"border-green-500 ring-1 ring-green-500 focus-visible:ring-green-500",
 						verified === false &&
-							"border-destructive ring-1 ring-destructive focus-visible:ring-destructive",
+							"border-destructive ring-destructive focus-visible:ring-destructive ring-1"
 					)}
 				/>
 				{verified === true && (
-					<CheckCircle2 className="absolute right-2 top-2.5 size-4 text-green-600" />
+					<CheckCircle2 className="absolute top-2.5 right-2 size-4 text-green-600" />
 				)}
 				{verified === false && (
-					<XCircle className="absolute right-2 top-2.5 size-4 text-destructive" />
+					<XCircle className="text-destructive absolute top-2.5 right-2 size-4" />
 				)}
 			</div>
 		</div>
@@ -73,15 +72,11 @@ function VerificationResult({ result }: { result: BedsideVerifyResult }) {
 				"rounded-md border p-4 text-sm",
 				allVerified
 					? "border-green-500 bg-green-50 text-green-800 dark:bg-green-950/30 dark:text-green-300"
-					: "border-destructive bg-destructive/10 text-destructive dark:bg-destructive/20",
+					: "border-destructive bg-destructive/10 text-destructive dark:bg-destructive/20"
 			)}
 		>
 			<div className="flex items-center gap-2 font-semibold">
-				{allVerified ? (
-					<CheckCircle2 className="size-5" />
-				) : (
-					<XCircle className="size-5" />
-				)}
+				{allVerified ? <CheckCircle2 className="size-5" /> : <XCircle className="size-5" />}
 				{allVerified
 					? "Verification Successful — Safe to Transfuse"
 					: "Verification Failed — DO NOT Transfuse"}
@@ -92,7 +87,7 @@ function VerificationResult({ result }: { result: BedsideVerifyResult }) {
 					{result.patientMatch ? (
 						<CheckCircle2 className="size-3.5 text-green-600" />
 					) : (
-						<XCircle className="size-3.5 text-destructive" />
+						<XCircle className="text-destructive size-3.5" />
 					)}
 					Patient wristband match: {result.patientMatch ? "✓" : "✗ MISMATCH"}
 				</li>
@@ -100,17 +95,13 @@ function VerificationResult({ result }: { result: BedsideVerifyResult }) {
 					{result.unitMatch ? (
 						<CheckCircle2 className="size-3.5 text-green-600" />
 					) : (
-						<XCircle className="size-3.5 text-destructive" />
+						<XCircle className="text-destructive size-3.5" />
 					)}
 					Blood unit barcode match: {result.unitMatch ? "✓" : "✗ MISMATCH"}
 				</li>
 			</ul>
 
-			{!allVerified && (
-				<p className="mt-2 font-medium">
-					{result.message}
-				</p>
-			)}
+			{!allVerified && <p className="mt-2 font-medium">{result.message}</p>}
 		</div>
 	)
 }
@@ -127,7 +118,7 @@ export function BedsideMatching({ crossMatchId: initialCrossMatchId }: BedsideMa
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
 	const hasLabEditPerm = permissions.some(
-		(p: { module: string; action: string }) => p.module === "laboratory" && p.action === "edit",
+		(p: { module: string; action: string }) => p.module === "laboratory" && p.action === "edit"
 	)
 	const [crossMatchId, setCrossMatchId] = useState(initialCrossMatchId ?? "")
 	const [unitBarcode, setUnitBarcode] = useState("")
@@ -146,8 +137,8 @@ export function BedsideMatching({ crossMatchId: initialCrossMatchId }: BedsideMa
 				patientWristbandBarcode: patientWristband.trim(),
 			},
 			{
-				onSuccess: (data) => setVerifyResult(data),
-			},
+				onSuccess: data => setVerifyResult(data),
+			}
 		)
 	}
 
@@ -169,7 +160,7 @@ export function BedsideMatching({ crossMatchId: initialCrossMatchId }: BedsideMa
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-2xl font-semibold">Bedside Barcode Matching</h1>
-				<p className="text-sm text-muted-foreground">
+				<p className="text-muted-foreground text-sm">
 					Scan patient wristband and blood unit barcode to verify before transfusion
 				</p>
 			</div>
@@ -186,12 +177,11 @@ export function BedsideMatching({ crossMatchId: initialCrossMatchId }: BedsideMa
 						{/* Step 1: Cross-match request ID */}
 						<div className="space-y-2">
 							<Label>
-								Cross-Match Request ID{" "}
-								<span className="text-destructive">*</span>
+								Cross-Match Request ID <span className="text-destructive">*</span>
 							</Label>
 							<Input
 								value={crossMatchId}
-								onChange={(e) => {
+								onChange={e => {
 									setCrossMatchId(e.target.value)
 									setVerifyResult(null)
 								}}
@@ -205,7 +195,7 @@ export function BedsideMatching({ crossMatchId: initialCrossMatchId }: BedsideMa
 								<span className="w-full border-t" />
 							</div>
 							<div className="relative flex justify-center">
-								<span className="bg-background px-2 text-xs text-muted-foreground">
+								<span className="bg-background text-muted-foreground px-2 text-xs">
 									SCAN BARCODES
 								</span>
 							</div>
@@ -215,43 +205,35 @@ export function BedsideMatching({ crossMatchId: initialCrossMatchId }: BedsideMa
 						<BarcodeInput
 							label="Patient Wristband Barcode"
 							value={patientWristband}
-							onChange={(v) => {
+							onChange={v => {
 								setPatientWristband(v)
 								setVerifyResult(null)
 							}}
 							placeholder="Scan or type wristband barcode"
-							verified={
-								verifyResult
-									? verifyResult.patientMatch
-									: null
-							}
+							verified={verifyResult ? verifyResult.patientMatch : null}
 						/>
 
 						{/* Step 3: Blood unit */}
 						<BarcodeInput
 							label="Blood Unit Barcode"
 							value={unitBarcode}
-							onChange={(v) => {
+							onChange={v => {
 								setUnitBarcode(v)
 								setVerifyResult(null)
 							}}
 							placeholder="Scan or type blood unit barcode"
-							verified={
-								verifyResult ? verifyResult.unitMatch : null
-							}
+							verified={verifyResult ? verifyResult.unitMatch : null}
 						/>
 
 						{/* Verification status badge */}
 						{verifyMutation.isPending && (
-							<div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
+							<div className="text-muted-foreground flex items-center justify-center gap-2 py-2 text-sm">
 								<span className="animate-pulse">Verifying…</span>
 							</div>
 						)}
 
 						{/* Result */}
-						{verifyResult && (
-							<VerificationResult result={verifyResult} />
-						)}
+						{verifyResult && <VerificationResult result={verifyResult} />}
 
 						{/* Actions */}
 						<div className="flex gap-2 pt-2">
@@ -263,11 +245,7 @@ export function BedsideMatching({ crossMatchId: initialCrossMatchId }: BedsideMa
 							>
 								Reset
 							</Button>
-							<Button
-								className="flex-1"
-								disabled={!canVerify}
-								onClick={handleVerify}
-							>
+							<Button className="flex-1" disabled={!canVerify} onClick={handleVerify}>
 								<Scan className="mr-1 size-4" />
 								{verifyMutation.isPending ? "Verifying…" : "Verify Match"}
 							</Button>
@@ -279,10 +257,7 @@ export function BedsideMatching({ crossMatchId: initialCrossMatchId }: BedsideMa
 								<p className="mb-2 text-sm font-medium text-green-800 dark:text-green-300">
 									Both barcodes verified. Safe to proceed with transfusion.
 								</p>
-								<Badge
-									variant="default"
-									className="bg-green-600 text-white hover:bg-green-700"
-								>
+								<Badge variant="default" className="bg-green-600 text-white hover:bg-green-700">
 									Verified — Proceed
 								</Badge>
 							</div>

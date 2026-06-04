@@ -15,10 +15,7 @@ export function useBorDashboardQuery(facilityId: string, enabled = true) {
 	)
 }
 
-export function useBorCensusQuery(params: {
-	facilityId: string
-	date?: string
-}) {
+export function useBorCensusQuery(params: { facilityId: string; date?: string }) {
 	return useQuery(
 		orpc.bed.census.queryOptions({
 			input: {

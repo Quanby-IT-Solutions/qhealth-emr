@@ -13,7 +13,6 @@ export default defineConfig({
 		// one fork per CPU core spikes Windows' commit charge enough to crash
 		// V8 with "out of memory" even when physical RAM is free.
 		maxWorkers: 2,
-		minWorkers: 1,
 		coverage: {
 			provider: "v8",
 			reporter: ["text", "json", "json-summary", "html"],

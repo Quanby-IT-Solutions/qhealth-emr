@@ -178,13 +178,7 @@ describe("filterNavItems", () => {
 			item => item.title
 		)
 
-		expect(primaryTitles).toEqual([
-			"Dashboard",
-			"Patients",
-			"Emergency",
-			"OPD",
-			"Telemedicine",
-		])
+		expect(primaryTitles).toEqual(["Dashboard", "Patients", "Emergency", "OPD", "Telemedicine"])
 		expect(secondaryTitles).toEqual([])
 	})
 

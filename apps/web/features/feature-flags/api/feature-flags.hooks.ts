@@ -32,8 +32,7 @@ export function useCreateFeatureFlagMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.featureFlags.create.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.featureFlags.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.featureFlags.key() }),
 		})
 	)
 }
@@ -44,8 +43,7 @@ export function useUpdateFeatureFlagMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.featureFlags.update.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.featureFlags.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.featureFlags.key() }),
 		})
 	)
 }
@@ -56,8 +54,7 @@ export function useDeleteFeatureFlagMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.featureFlags.delete.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.featureFlags.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.featureFlags.key() }),
 		})
 	)
 }
@@ -68,8 +65,7 @@ export function useUpdateFeatureFlagTargetingMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.featureFlags.updateTargeting.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.featureFlags.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.featureFlags.key() }),
 		})
 	)
 }

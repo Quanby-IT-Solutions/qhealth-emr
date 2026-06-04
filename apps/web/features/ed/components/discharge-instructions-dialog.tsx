@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-
 import { FileText, Loader2, Printer } from "lucide-react"
 
 import { Button } from "@/core/components/ui/button"
@@ -283,31 +282,29 @@ export function DischargeInstructionsDialog({
 						<div className="space-y-3 rounded-md border p-4">
 							<div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
 								<div>
-									<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+									<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 										Patient
 									</p>
 									<p className="font-semibold">{encounter.patientName}</p>
 									<p className="text-muted-foreground">MRN: {encounter.patientMrn}</p>
 								</div>
 								<div>
-									<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+									<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 										Discharge
 									</p>
 									<p>{formatDateTime(new Date())}</p>
 								</div>
 								<div>
-									<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+									<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 										Chief Complaint
 									</p>
 									<p>{encounter.chiefComplaint ?? "—"}</p>
 								</div>
 								<div>
-									<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+									<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 										Attending Physician
 									</p>
-									<p>
-										{encounter.attendingStaffName ?? encounter.admittingStaffName ?? "—"}
-									</p>
+									<p>{encounter.attendingStaffName ?? encounter.admittingStaffName ?? "—"}</p>
 								</div>
 							</div>
 						</div>
@@ -316,13 +313,11 @@ export function DischargeInstructionsDialog({
 
 						{/* Diagnoses */}
 						<div>
-							<p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+							<p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
 								Active Diagnoses / Problems
 							</p>
 							{activeProblems.length === 0 ? (
-								<p className="text-muted-foreground text-sm italic">
-									No active problems recorded.
-								</p>
+								<p className="text-muted-foreground text-sm italic">No active problems recorded.</p>
 							) : (
 								<ol className="list-inside list-decimal space-y-1 text-sm">
 									{activeProblems.map(p => (
@@ -341,7 +336,7 @@ export function DischargeInstructionsDialog({
 
 						{/* Signed Notes */}
 						<div>
-							<p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+							<p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
 								Signed Clinical Notes ({signedNotes.length})
 							</p>
 							{signedNotes.length === 0 ? (
@@ -355,11 +350,10 @@ export function DischargeInstructionsDialog({
 											<div className="mb-1 flex items-center justify-between">
 												<span className="font-medium">{noteTypeLabel(note.noteType)}</span>
 												<span className="text-muted-foreground text-xs">
-													{note.authorStaffName ?? "Unknown"} ·{" "}
-													{formatDateTime(note.signedAt)}
+													{note.authorStaffName ?? "Unknown"} · {formatDateTime(note.signedAt)}
 												</span>
 											</div>
-											<div className="text-muted-foreground line-clamp-4 whitespace-pre-wrap text-xs">
+											<div className="text-muted-foreground line-clamp-4 text-xs whitespace-pre-wrap">
 												{note.content}
 											</div>
 										</div>

@@ -56,7 +56,7 @@ function MalasakitQueueInner() {
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-xl font-semibold">Malasakit Case Tracking</h1>
-					<p className="text-sm text-muted-foreground">Story 12.10 · Flow L10</p>
+					<p className="text-muted-foreground text-sm">Story 12.10 · Flow L10</p>
 				</div>
 				<Button size="sm" className="gap-1.5">
 					<Plus className="size-4" />
@@ -89,7 +89,7 @@ function MalasakitQueueInner() {
 					</SelectContent>
 				</Select>
 				<div className="space-y-1">
-					<Label className="text-xs text-muted-foreground">Date From</Label>
+					<Label className="text-muted-foreground text-xs">Date From</Label>
 					<Input
 						type="date"
 						className="w-[155px]"
@@ -98,7 +98,7 @@ function MalasakitQueueInner() {
 					/>
 				</div>
 				<div className="space-y-1">
-					<Label className="text-xs text-muted-foreground">Date To</Label>
+					<Label className="text-muted-foreground text-xs">Date To</Label>
 					<Input
 						type="date"
 						className="w-[155px]"
@@ -118,7 +118,7 @@ function MalasakitQueueInner() {
 
 			{error && (
 				<Card>
-					<CardContent className="py-8 text-center text-sm text-destructive">
+					<CardContent className="text-destructive py-8 text-center text-sm">
 						Failed to load cases. Please try again.
 					</CardContent>
 				</Card>
@@ -126,7 +126,7 @@ function MalasakitQueueInner() {
 
 			{!isLoading && !error && data?.data.length === 0 && (
 				<Card>
-					<CardContent className="py-8 text-center text-sm text-muted-foreground">
+					<CardContent className="text-muted-foreground py-8 text-center text-sm">
 						No Malasakit cases found.
 					</CardContent>
 				</Card>
@@ -135,7 +135,7 @@ function MalasakitQueueInner() {
 			{!isLoading && !error && data && data.data.length > 0 && (
 				<div className="space-y-2">
 					{data.data.map(c => (
-						<Card key={c.id} className="cursor-pointer transition-colors hover:bg-accent/50">
+						<Card key={c.id} className="hover:bg-accent/50 cursor-pointer transition-colors">
 							<CardContent
 								className="flex items-center justify-between py-4"
 								onClick={() => router.push(`/msw/malasakit/${c.id}`)}
@@ -146,13 +146,13 @@ function MalasakitQueueInner() {
 										<Badge variant="outline">{c.source}</Badge>
 										<Badge variant={STATUS_VARIANT[c.status] ?? "secondary"}>{c.status}</Badge>
 										{c.amountGranted != null && (
-											<span className="text-xs text-muted-foreground">
+											<span className="text-muted-foreground text-xs">
 												₱{c.amountGranted.toLocaleString()}
 											</span>
 										)}
 									</div>
 								</div>
-								<span className="text-xs text-muted-foreground">
+								<span className="text-muted-foreground text-xs">
 									{new Date(c.updatedAt).toLocaleDateString()}
 								</span>
 							</CardContent>
@@ -162,7 +162,7 @@ function MalasakitQueueInner() {
 			)}
 
 			{data && data.totalPages > 1 && (
-				<p className="text-center text-xs text-muted-foreground">
+				<p className="text-muted-foreground text-center text-xs">
 					Page {data.page} of {data.totalPages} · {data.total} cases
 				</p>
 			)}
@@ -172,7 +172,7 @@ function MalasakitQueueInner() {
 
 export function MalasakitQueueClient() {
 	return (
-		<Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+		<Suspense fallback={<div className="text-muted-foreground p-6 text-sm">Loading…</div>}>
 			<MalasakitQueueInner />
 		</Suspense>
 	)

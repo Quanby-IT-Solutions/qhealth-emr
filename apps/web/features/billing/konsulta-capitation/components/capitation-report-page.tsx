@@ -26,7 +26,7 @@ export function CapitationReportPage({ facilityId }: CapitationReportPageProps) 
 	const canGenerate = !!periodStart && !!periodEnd && !!facilityId
 
 	return (
-		<div className="space-y-4 px-4 max-w-xl">
+		<div className="max-w-xl space-y-4 px-4">
 			<h1 className="text-lg font-semibold">Konsulta Capitation Report</h1>
 
 			<Card>
@@ -36,7 +36,9 @@ export function CapitationReportPage({ facilityId }: CapitationReportPageProps) 
 				<CardContent className="space-y-3">
 					<div className="grid grid-cols-2 gap-3">
 						<div className="space-y-1">
-							<Label htmlFor="period-start" className="text-xs">Start Date</Label>
+							<Label htmlFor="period-start" className="text-xs">
+								Start Date
+							</Label>
 							<Input
 								id="period-start"
 								type="date"
@@ -45,7 +47,9 @@ export function CapitationReportPage({ facilityId }: CapitationReportPageProps) 
 							/>
 						</div>
 						<div className="space-y-1">
-							<Label htmlFor="period-end" className="text-xs">End Date</Label>
+							<Label htmlFor="period-end" className="text-xs">
+								End Date
+							</Label>
 							<Input
 								id="period-end"
 								type="date"
@@ -69,21 +73,21 @@ export function CapitationReportPage({ facilityId }: CapitationReportPageProps) 
 						<CardContent className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
 							<div className="rounded border p-2 text-center">
 								<p className="text-2xl font-bold tabular-nums">{report.totalFpe}</p>
-								<p className="text-xs text-muted-foreground">FPE</p>
+								<p className="text-muted-foreground text-xs">FPE</p>
 							</div>
 							<div className="rounded border p-2 text-center">
 								<p className="text-2xl font-bold tabular-nums">{report.totalFollowUp}</p>
-								<p className="text-xs text-muted-foreground">Follow-up</p>
+								<p className="text-muted-foreground text-xs">Follow-up</p>
 							</div>
 							<div className="rounded border p-2 text-center">
 								<p className="text-2xl font-bold tabular-nums">{report.totalLab}</p>
-								<p className="text-xs text-muted-foreground">Lab</p>
+								<p className="text-muted-foreground text-xs">Lab</p>
 							</div>
 							<div className="rounded border p-2 text-center">
 								<p className="text-2xl font-bold tabular-nums">
 									{report.totalFpe + report.totalFollowUp + report.totalLab}
 								</p>
-								<p className="text-xs text-muted-foreground">Total</p>
+								<p className="text-muted-foreground text-xs">Total</p>
 							</div>
 						</CardContent>
 					</Card>
@@ -93,7 +97,7 @@ export function CapitationReportPage({ facilityId }: CapitationReportPageProps) 
 							<a
 								href={report.xmlUri}
 								download={`konsulta-report-${report.periodStart}.xml`}
-								className="text-sm underline text-primary"
+								className="text-primary text-sm underline"
 							>
 								Download XML
 							</a>
@@ -102,7 +106,7 @@ export function CapitationReportPage({ facilityId }: CapitationReportPageProps) 
 							<a
 								href={report.csvUri}
 								download={`konsulta-report-${report.periodStart}.csv`}
-								className="text-sm underline text-primary"
+								className="text-primary text-sm underline"
 							>
 								Download CSV
 							</a>

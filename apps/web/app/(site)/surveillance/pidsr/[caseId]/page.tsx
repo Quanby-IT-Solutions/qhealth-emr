@@ -2,20 +2,27 @@
 
 import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, CheckCircle, XCircle, AlertCircle } from "lucide-react"
+import { AlertCircle, ArrowLeft, CheckCircle, XCircle } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import { Label } from "@/core/components/ui/label"
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
-import { Label } from "@/core/components/ui/label"
-
-import { useDismissPidsrCaseMutation, usePidsrCaseDetailQuery, useSubmitPidsrCaseMutation } from "@/features/reporting/api/reporting.hooks"
+import {
+	useDismissPidsrCaseMutation,
+	usePidsrCaseDetailQuery,
+	useSubmitPidsrCaseMutation,
+} from "@/features/reporting/api/reporting.hooks"
 
 function formatDate(d: string | null | undefined) {
 	if (!d) return "—"
-	return new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })
+	return new Date(d).toLocaleDateString("en-PH", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	})
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -47,11 +54,14 @@ export default function PidsrCasePage() {
 		submitMut.mutate(
 			{ id: params.caseId },
 			{
-				onSuccess: (data) => {
+				onSuccess: data => {
 					setResult({ type: data.success ? "success" : "error", message: data.message })
 				},
-				onError: (err) => {
-					setResult({ type: "error", message: err instanceof Error ? err.message : "Submission failed." })
+				onError: err => {
+					setResult({
+						type: "error",
+						message: err instanceof Error ? err.message : "Submission failed.",
+					})
 				},
 			}
 		)
@@ -66,16 +76,28 @@ export default function PidsrCasePage() {
 				</Button>
 				<div>
 					<h1 className="text-xl font-semibold">PIDSR Case Submission</h1>
-					<p className="text-xs text-muted-foreground font-mono">{params.caseId}</p>
+					<p className="text-muted-foreground font-mono text-xs">{params.caseId}</p>
 				</div>
 			</div>
 
 			{result && (
-				<div className={`flex items-center gap-3 rounded-md border px-4 py-3 ${result.type === "success" ? "border-green-300 bg-green-50 text-green-800" : "border-red-300 bg-red-50 text-red-800"}`}>
-					{result.type === "success" ? <CheckCircle className="size-4 shrink-0" /> : <AlertCircle className="size-4 shrink-0" />}
+				<div
+					className={`flex items-center gap-3 rounded-md border px-4 py-3 ${result.type === "success" ? "border-green-300 bg-green-50 text-green-800" : "border-red-300 bg-red-50 text-red-800"}`}
+				>
+					{result.type === "success" ? (
+						<CheckCircle className="size-4 shrink-0" />
+					) : (
+						<AlertCircle className="size-4 shrink-0" />
+					)}
 					<span className="text-sm">{result.message}</span>
 					{result.type === "error" && (
-						<Button variant="outline" size="sm" className="ml-auto" onClick={handleSubmit} disabled={submitMut.isPending}>
+						<Button
+							variant="outline"
+							size="sm"
+							className="ml-auto"
+							onClick={handleSubmit}
+							disabled={submitMut.isPending}
+						>
 							Retry
 						</Button>
 					)}
@@ -84,22 +106,32 @@ export default function PidsrCasePage() {
 
 			{isLoading ? (
 				<Card>
-					<CardContent className="py-8 text-center text-sm text-muted-foreground">Loading case…</CardContent>
+					<CardContent className="text-muted-foreground py-8 text-center text-sm">
+						Loading case…
+					</CardContent>
 				</Card>
 			) : isError || !detail ? (
 				<Card>
-					<CardContent className="py-8 text-center text-sm text-muted-foreground">Case not found.</CardContent>
+					<CardContent className="text-muted-foreground py-8 text-center text-sm">
+						Case not found.
+					</CardContent>
 				</Card>
 			) : (
 				<div className="grid gap-4 lg:grid-cols-3">
-					<div className="lg:col-span-2 space-y-4">
+					<div className="space-y-4 lg:col-span-2">
 						<Card>
 							<CardHeader>
 								<CardTitle className="text-sm">Patient Information</CardTitle>
 							</CardHeader>
 							<CardContent className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-								<div><span className="text-muted-foreground">Name: </span>{detail.patientName ?? "—"}</div>
-								<div><span className="text-muted-foreground">MRN: </span>{detail.patientMrn ?? "—"}</div>
+								<div>
+									<span className="text-muted-foreground">Name: </span>
+									{detail.patientName ?? "—"}
+								</div>
+								<div>
+									<span className="text-muted-foreground">MRN: </span>
+									{detail.patientMrn ?? "—"}
+								</div>
 							</CardContent>
 						</Card>
 
@@ -109,12 +141,32 @@ export default function PidsrCasePage() {
 							</CardHeader>
 							<CardContent className="space-y-3 text-sm">
 								<div className="grid grid-cols-2 gap-x-4 gap-y-2">
-									<div><span className="text-muted-foreground">Disease: </span>{detail.diseaseName}</div>
-									<div><span className="text-muted-foreground">ICD-10: </span><Badge variant="outline" className="font-mono text-xs">{detail.diseaseCode}</Badge></div>
-									<div><span className="text-muted-foreground">Classification: </span><Badge variant="secondary">{detail.caseClassification}</Badge></div>
-									<div><span className="text-muted-foreground">Category: </span><CategoryBadge cat={detail.category} /></div>
-									<div><span className="text-muted-foreground">Onset: </span>{formatDate(detail.onsetDate)}</div>
-									<div><span className="text-muted-foreground">Diagnosis: </span>{formatDate(detail.diagnosisDate)}</div>
+									<div>
+										<span className="text-muted-foreground">Disease: </span>
+										{detail.diseaseName}
+									</div>
+									<div>
+										<span className="text-muted-foreground">ICD-10: </span>
+										<Badge variant="outline" className="font-mono text-xs">
+											{detail.diseaseCode}
+										</Badge>
+									</div>
+									<div>
+										<span className="text-muted-foreground">Classification: </span>
+										<Badge variant="secondary">{detail.caseClassification}</Badge>
+									</div>
+									<div>
+										<span className="text-muted-foreground">Category: </span>
+										<CategoryBadge cat={detail.category} />
+									</div>
+									<div>
+										<span className="text-muted-foreground">Onset: </span>
+										{formatDate(detail.onsetDate)}
+									</div>
+									<div>
+										<span className="text-muted-foreground">Diagnosis: </span>
+										{formatDate(detail.diagnosisDate)}
+									</div>
 								</div>
 							</CardContent>
 						</Card>
@@ -123,13 +175,22 @@ export default function PidsrCasePage() {
 							<CardHeader>
 								<CardTitle className="text-sm">Encounter Details</CardTitle>
 							</CardHeader>
-							<CardContent className="text-sm space-y-2">
+							<CardContent className="space-y-2 text-sm">
 								<div className="grid grid-cols-2 gap-x-4 gap-y-2">
-									<div><span className="text-muted-foreground">Type: </span>{detail.encounterType ?? "—"}</div>
-									<div><span className="text-muted-foreground">Physician: </span>{detail.attendingPhysician ?? "—"}</div>
+									<div>
+										<span className="text-muted-foreground">Type: </span>
+										{detail.encounterType ?? "—"}
+									</div>
+									<div>
+										<span className="text-muted-foreground">Physician: </span>
+										{detail.attendingPhysician ?? "—"}
+									</div>
 								</div>
 								{detail.chiefComplaint && (
-									<div><span className="text-muted-foreground">Chief Complaint: </span>{detail.chiefComplaint}</div>
+									<div>
+										<span className="text-muted-foreground">Chief Complaint: </span>
+										{detail.chiefComplaint}
+									</div>
 								)}
 							</CardContent>
 						</Card>
@@ -140,7 +201,7 @@ export default function PidsrCasePage() {
 									<CardTitle className="text-sm">Submission Data Preview</CardTitle>
 								</CardHeader>
 								<CardContent>
-									<pre className="bg-muted rounded-md p-3 font-mono text-xs overflow-auto max-h-40">
+									<pre className="bg-muted max-h-40 overflow-auto rounded-md p-3 font-mono text-xs">
 										{JSON.stringify(detail.submissionData, null, 2)}
 									</pre>
 								</CardContent>
@@ -180,7 +241,7 @@ export default function PidsrCasePage() {
 											className="w-full"
 											onClick={() => setShowDismiss(true)}
 										>
-											<XCircle className="size-4 mr-1" />
+											<XCircle className="mr-1 size-4" />
 											Dismiss Case
 										</Button>
 									</div>
@@ -193,7 +254,7 @@ export default function PidsrCasePage() {
 											id="dismiss-reason"
 											placeholder="Explain why this case is being dismissed…"
 											value={dismissReason}
-											onChange={(e) => setDismissReason(e.target.value)}
+											onChange={e => setDismissReason(e.target.value)}
 											className="text-sm"
 											rows={3}
 										/>
@@ -207,13 +268,16 @@ export default function PidsrCasePage() {
 													dismissMut.mutate(
 														{ id: params.caseId, reason: dismissReason.trim() },
 														{
-															onSuccess: (data) => {
+															onSuccess: data => {
 																setResult({ type: "success", message: data.message })
 																setShowDismiss(false)
 																setDismissReason("")
 															},
-															onError: (err) => {
-																setResult({ type: "error", message: err instanceof Error ? err.message : "Dismiss failed." })
+															onError: err => {
+																setResult({
+																	type: "error",
+																	message: err instanceof Error ? err.message : "Dismiss failed.",
+																})
 															},
 														}
 													)
@@ -236,7 +300,9 @@ export default function PidsrCasePage() {
 								)}
 
 								{detail.reportStatus === "submitted" && (
-									<p className="text-xs text-muted-foreground text-center">This case has been submitted to DOH PIDSR.</p>
+									<p className="text-muted-foreground text-center text-xs">
+										This case has been submitted to DOH PIDSR.
+									</p>
 								)}
 							</CardContent>
 						</Card>

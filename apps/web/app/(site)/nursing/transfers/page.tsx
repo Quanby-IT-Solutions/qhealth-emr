@@ -32,7 +32,9 @@ function formatDateTime(value: Date | string | null) {
 export default function NursingTransfersPage() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	const permSet = new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	const permSet = new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 	const staffProfileId = profile?.staffProfiles?.[0]?.id ?? ""
 
@@ -130,9 +132,7 @@ export default function NursingTransfersPage() {
 										<TableCell className="max-w-xs truncate text-sm">
 											{t.transferReason ?? "-"}
 										</TableCell>
-										<TableCell className="text-sm">
-											{formatDateTime(t.transferredAt)}
-										</TableCell>
+										<TableCell className="text-sm">{formatDateTime(t.transferredAt)}</TableCell>
 										<TableCell className="text-right">
 											<Button
 												size="sm"

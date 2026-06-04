@@ -50,13 +50,11 @@ export function LabResultCard({ item }: LabResultCardProps) {
 		<div
 			className={cn(
 				"flex items-center justify-between rounded-md border px-4 py-3 text-sm",
-				cfg.rowCn,
+				cfg.rowCn
 			)}
 		>
 			<div className="flex items-center gap-2">
-				{item.isCritical && (
-					<AlertCircle className="size-4 shrink-0 text-destructive" />
-				)}
+				{item.isCritical && <AlertCircle className="text-destructive size-4 shrink-0" />}
 				<span className="font-medium">{item.testName}</span>
 				{cfg.label && (
 					<Badge variant={cfg.badgeVariant} className="text-[10px]">
@@ -68,14 +66,10 @@ export function LabResultCard({ item }: LabResultCardProps) {
 			<div className="flex items-center gap-4 text-right">
 				<span className={cn("text-base", cfg.valueCn)}>
 					{String(item.value)}{" "}
-					<span className="text-xs font-normal text-muted-foreground">
-						{item.unit}
-					</span>
+					<span className="text-muted-foreground text-xs font-normal">{item.unit}</span>
 				</span>
 				{item.referenceRange && (
-					<span className="text-xs text-muted-foreground">
-						Ref: {item.referenceRange}
-					</span>
+					<span className="text-muted-foreground text-xs">Ref: {item.referenceRange}</span>
 				)}
 			</div>
 		</div>

@@ -15,13 +15,19 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/core/components/ui/table"
-
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { usePidsrCasesQuery, useGenerateWeeklyReportMutation } from "@/features/reporting/api/reporting.hooks"
+import {
+	useGenerateWeeklyReportMutation,
+	usePidsrCasesQuery,
+} from "@/features/reporting/api/reporting.hooks"
 
 function formatDate(d: string | null | undefined) {
 	if (!d) return "—"
-	return new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })
+	return new Date(d).toLocaleDateString("en-PH", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	})
 }
 
 export default function PidsrBatchPage() {
@@ -46,12 +52,12 @@ export default function PidsrBatchPage() {
 		if (selected.size === cases.length) {
 			setSelected(new Set())
 		} else {
-			setSelected(new Set(cases.map((c) => c.id)))
+			setSelected(new Set(cases.map(c => c.id)))
 		}
 	}
 
 	function toggle(id: string) {
-		setSelected((prev) => {
+		setSelected(prev => {
 			const next = new Set(prev)
 			if (next.has(id)) next.delete(id)
 			else next.add(id)
@@ -66,17 +72,25 @@ export default function PidsrBatchPage() {
 		const monday = new Date(today)
 		monday.setDate(today.getDate() - ((today.getDay() + 6) % 7))
 		weeklyMut.mutate(
-			{ facilityId, weekStartDate: monday.toISOString().split("T")[0]!, caseIds: Array.from(selected) },
 			{
-				onSuccess: (data) => {
-					const msg = data.status === "submitted"
-						? `Weekly report submitted. ${data.totalCases} cases transmitted.`
-						: data.transmissionNote ?? "Report generated."
+				facilityId,
+				weekStartDate: monday.toISOString().split("T")[0]!,
+				caseIds: Array.from(selected),
+			},
+			{
+				onSuccess: data => {
+					const msg =
+						data.status === "submitted"
+							? `Weekly report submitted. ${data.totalCases} cases transmitted.`
+							: (data.transmissionNote ?? "Report generated.")
 					setResult({ type: data.status === "submitted" ? "success" : "error", message: msg })
 					if (data.status === "submitted") setSelected(new Set())
 				},
-				onError: (err) => {
-					setResult({ type: "error", message: err instanceof Error ? err.message : "Transmission failed." })
+				onError: err => {
+					setResult({
+						type: "error",
+						message: err instanceof Error ? err.message : "Transmission failed.",
+					})
 				},
 			}
 		)
@@ -85,7 +99,9 @@ export default function PidsrBatchPage() {
 	if (profileLoading) {
 		return (
 			<Card>
-				<CardContent className="py-8 text-center text-sm text-muted-foreground">Loading…</CardContent>
+				<CardContent className="text-muted-foreground py-8 text-center text-sm">
+					Loading…
+				</CardContent>
 			</Card>
 		)
 	}
@@ -93,7 +109,7 @@ export default function PidsrBatchPage() {
 	if (!facilityId) {
 		return (
 			<Card>
-				<CardContent className="py-8 text-center text-sm text-muted-foreground">
+				<CardContent className="text-muted-foreground py-8 text-center text-sm">
 					No facility assigned to your profile. Contact your administrator.
 				</CardContent>
 			</Card>
@@ -104,15 +120,29 @@ export default function PidsrBatchPage() {
 		<div className="space-y-4">
 			<div>
 				<h1 className="text-xl font-semibold">Batch PIDSR Submission</h1>
-				<p className="text-sm text-muted-foreground">Select Category-2 draft cases for weekly batch transmission to DOH PIDSR.</p>
+				<p className="text-muted-foreground text-sm">
+					Select Category-2 draft cases for weekly batch transmission to DOH PIDSR.
+				</p>
 			</div>
 
 			{result && (
-				<div className={`flex items-center gap-3 rounded-md border px-4 py-3 ${result.type === "success" ? "border-green-300 bg-green-50 text-green-800" : "border-red-300 bg-red-50 text-red-800"}`}>
-					{result.type === "success" ? <CheckCircle className="size-4 shrink-0" /> : <AlertCircle className="size-4 shrink-0" />}
+				<div
+					className={`flex items-center gap-3 rounded-md border px-4 py-3 ${result.type === "success" ? "border-green-300 bg-green-50 text-green-800" : "border-red-300 bg-red-50 text-red-800"}`}
+				>
+					{result.type === "success" ? (
+						<CheckCircle className="size-4 shrink-0" />
+					) : (
+						<AlertCircle className="size-4 shrink-0" />
+					)}
 					<span className="text-sm">{result.message}</span>
 					{result.type === "error" && (
-						<Button variant="outline" size="sm" className="ml-auto" onClick={handleTransmit} disabled={weeklyMut.isPending || selected.size === 0}>
+						<Button
+							variant="outline"
+							size="sm"
+							className="ml-auto"
+							onClick={handleTransmit}
+							disabled={weeklyMut.isPending || selected.size === 0}
+						>
 							Retry
 						</Button>
 					)}
@@ -125,26 +155,28 @@ export default function PidsrBatchPage() {
 						<CardTitle className="text-sm">
 							Cat-2 Draft Cases
 							{data && (
-								<Badge variant="secondary" className="ml-2">{data.total}</Badge>
+								<Badge variant="secondary" className="ml-2">
+									{data.total}
+								</Badge>
 							)}
 						</CardTitle>
 						{selected.size > 0 && (
-							<Button
-								size="sm"
-								onClick={handleTransmit}
-								disabled={weeklyMut.isPending}
-							>
-								<Send className="size-4 mr-1.5" />
-								{weeklyMut.isPending ? "Transmitting…" : `Transmit ${selected.size} case${selected.size !== 1 ? "s" : ""}`}
+							<Button size="sm" onClick={handleTransmit} disabled={weeklyMut.isPending}>
+								<Send className="mr-1.5 size-4" />
+								{weeklyMut.isPending
+									? "Transmitting…"
+									: `Transmit ${selected.size} case${selected.size !== 1 ? "s" : ""}`}
 							</Button>
 						)}
 					</div>
 				</CardHeader>
 				<CardContent>
 					{isLoading ? (
-						<p className="text-center text-sm text-muted-foreground py-6">Loading cases…</p>
+						<p className="text-muted-foreground py-6 text-center text-sm">Loading cases…</p>
 					) : cases.length === 0 ? (
-						<p className="text-center text-sm text-muted-foreground py-6">No Category-2 draft cases pending batch submission.</p>
+						<p className="text-muted-foreground py-6 text-center text-sm">
+							No Category-2 draft cases pending batch submission.
+						</p>
 					) : (
 						<Table>
 							<TableHeader>
@@ -163,9 +195,9 @@ export default function PidsrBatchPage() {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{cases.map((c) => (
+								{cases.map(c => (
 									<TableRow key={c.id} className="cursor-pointer" onClick={() => toggle(c.id)}>
-										<TableCell onClick={(e) => e.stopPropagation()}>
+										<TableCell onClick={e => e.stopPropagation()}>
 											<Checkbox
 												checked={selected.has(c.id)}
 												onCheckedChange={() => toggle(c.id)}
@@ -174,11 +206,13 @@ export default function PidsrBatchPage() {
 										</TableCell>
 										<TableCell>
 											<div>{c.patientName ?? "—"}</div>
-											<div className="text-xs text-muted-foreground">{c.patientMrn ?? ""}</div>
+											<div className="text-muted-foreground text-xs">{c.patientMrn ?? ""}</div>
 										</TableCell>
 										<TableCell>
 											<div>{c.diseaseName}</div>
-											<Badge variant="outline" className="font-mono text-xs">{c.diseaseCode}</Badge>
+											<Badge variant="outline" className="font-mono text-xs">
+												{c.diseaseCode}
+											</Badge>
 										</TableCell>
 										<TableCell>{formatDate(c.diagnosisDate)}</TableCell>
 										<TableCell>

@@ -4,7 +4,14 @@ import Link from "next/link"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Skeleton } from "@/core/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 
 import { formatSourceLabel, sourceOriginHref, type SourceType } from "../lib/charge-utils"
 
@@ -31,14 +38,16 @@ export function AutoPulledTab({ charges, isLoading, encounterId }: AutoPulledTab
 	if (isLoading) {
 		return (
 			<div className="space-y-2 py-2">
-				{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+				{[...Array(4)].map((_, i) => (
+					<Skeleton key={i} className="h-10 w-full" />
+				))}
 			</div>
 		)
 	}
 
 	if (autoPulled.length === 0) {
 		return (
-			<p className="py-8 text-center text-sm text-muted-foreground">
+			<p className="text-muted-foreground py-8 text-center text-sm">
 				No auto-pulled charges yet. Charges from CPOE, MAR, and Ancillary orders appear here.
 			</p>
 		)
@@ -59,7 +68,11 @@ export function AutoPulledTab({ charges, isLoading, encounterId }: AutoPulledTab
 			<TableBody>
 				{autoPulled.map(charge => {
 					const originHref = sourceOriginHref(charge.sourceType, charge.sourceOrderId, encounterId)
-					const capturedDate = new Date(charge.createdAt).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
+					const capturedDate = new Date(charge.createdAt).toLocaleDateString("en-PH", {
+						month: "short",
+						day: "numeric",
+						year: "numeric",
+					})
 					return (
 						<TableRow key={charge.id}>
 							<TableCell className="text-sm">{charge.description}</TableCell>
@@ -73,7 +86,7 @@ export function AutoPulledTab({ charges, isLoading, encounterId }: AutoPulledTab
 											href={originHref}
 											target="_blank"
 											rel="noopener noreferrer"
-											className="text-xs text-muted-foreground underline hover:text-foreground"
+											className="text-muted-foreground hover:text-foreground text-xs underline"
 											aria-label={`View source order for ${charge.description}`}
 										>
 											View order
@@ -81,12 +94,16 @@ export function AutoPulledTab({ charges, isLoading, encounterId }: AutoPulledTab
 									)}
 								</div>
 							</TableCell>
-							<TableCell className="text-xs text-muted-foreground tabular-nums">{capturedDate}</TableCell>
-							<TableCell className="text-right tabular-nums text-sm">{Number(charge.quantity)}</TableCell>
-							<TableCell className="text-right tabular-nums text-sm">
+							<TableCell className="text-muted-foreground text-xs tabular-nums">
+								{capturedDate}
+							</TableCell>
+							<TableCell className="text-right text-sm tabular-nums">
+								{Number(charge.quantity)}
+							</TableCell>
+							<TableCell className="text-right text-sm tabular-nums">
 								₱{Number(charge.unitPrice).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
 							</TableCell>
-							<TableCell className="text-right tabular-nums text-sm font-medium">
+							<TableCell className="text-right text-sm font-medium tabular-nums">
 								₱{Number(charge.totalAmount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
 							</TableCell>
 						</TableRow>

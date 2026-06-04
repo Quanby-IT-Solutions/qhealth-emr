@@ -37,7 +37,12 @@ export const CF4_SECTIONS: Cf4Section[] = [
 		label: "ICD-10 Diagnoses",
 		fields: [
 			{ key: "primaryDiagnosis", label: "Primary Diagnosis", required: true, source: "diagnosis" },
-			{ key: "secondaryDiagnoses", label: "Secondary Diagnoses", required: false, source: "diagnosis" },
+			{
+				key: "secondaryDiagnoses",
+				label: "Secondary Diagnoses",
+				required: false,
+				source: "diagnosis",
+			},
 		],
 	},
 	{
@@ -52,7 +57,12 @@ export const CF4_SECTIONS: Cf4Section[] = [
 		label: "Charges",
 		fields: [
 			{ key: "totalCharges", label: "Total Hospital Charges", required: true, source: "encounter" },
-			{ key: "philhealthBenefit", label: "PhilHealth Benefit Claimed", required: true, source: "philhealth" },
+			{
+				key: "philhealthBenefit",
+				label: "PhilHealth Benefit Claimed",
+				required: true,
+				source: "philhealth",
+			},
 		],
 	},
 ]

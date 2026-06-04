@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import {
 	AlertOctagon,
 	AlertTriangle,
@@ -15,7 +14,6 @@ import {
 	ShieldAlert,
 	XCircle,
 } from "lucide-react"
-
 import { toast } from "sonner"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -26,10 +24,10 @@ import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
 
 import {
-	type SafetyCheck,
-	type SafetySeverity,
 	usePharmacyOrderDetailQuery,
 	useVerifyPharmacyOrderMutation,
+	type SafetyCheck,
+	type SafetySeverity,
 } from "../api/pharmacy.hooks"
 import { DispenseConfirmation } from "./dispense-confirmation"
 
@@ -91,7 +89,7 @@ function SafetyAlertCard({ check }: SafetyAlertCardProps) {
 		<div className={`rounded-md border p-3 ${config.className}`}>
 			<div
 				className="flex cursor-pointer items-start justify-between gap-2"
-				onClick={() => setExpanded((v) => !v)}
+				onClick={() => setExpanded(v => !v)}
 			>
 				<div className="flex items-start gap-2">
 					<Icon className="mt-0.5 size-4 shrink-0" />
@@ -100,10 +98,7 @@ function SafetyAlertCard({ check }: SafetyAlertCardProps) {
 							<span className="text-xs font-semibold uppercase">
 								{CHECK_TYPE_LABEL[check.type]}
 							</span>
-							<Badge
-								variant={check.isHardBlock ? "destructive" : "outline"}
-								className="text-xs"
-							>
+							<Badge variant={check.isHardBlock ? "destructive" : "outline"} className="text-xs">
 								{config.label}
 								{check.isHardBlock ? " — Hard Block" : ""}
 							</Badge>
@@ -225,14 +220,10 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 		)
 	}
 
-	const criticalChecks = order.safetyChecks.filter(
-		(c) => c.severity === "critical" || c.isHardBlock
-	)
-	const hasHardBlock = criticalChecks.some((c) => c.isHardBlock)
-	const warnChecks = order.safetyChecks.filter(
-		(c) => c.severity !== "critical" && !c.isHardBlock
-	)
-	const requiresOverride = order.safetyChecks.some((c) => c.requiresOverride)
+	const criticalChecks = order.safetyChecks.filter(c => c.severity === "critical" || c.isHardBlock)
+	const hasHardBlock = criticalChecks.some(c => c.isHardBlock)
+	const warnChecks = order.safetyChecks.filter(c => c.severity !== "critical" && !c.isHardBlock)
+	const requiresOverride = order.safetyChecks.some(c => c.requiresOverride)
 
 	function handleApprove() {
 		verify.mutate(
@@ -243,8 +234,7 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 			},
 			{
 				onSuccess: onDispenseSuccess,
-				onError: (err) =>
-					toast.error(err instanceof Error ? err.message : "Failed to verify order"),
+				onError: err => toast.error(err instanceof Error ? err.message : "Failed to verify order"),
 			}
 		)
 	}
@@ -258,8 +248,7 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 			},
 			{
 				onSuccess: onBack,
-				onError: (err) =>
-					toast.error(err instanceof Error ? err.message : "Failed to reject order"),
+				onError: err => toast.error(err instanceof Error ? err.message : "Failed to reject order"),
 			}
 		)
 	}
@@ -273,7 +262,7 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 			},
 			{
 				onSuccess: onBack,
-				onError: (err) =>
+				onError: err =>
 					toast.error(err instanceof Error ? err.message : "Failed to place order on hold"),
 			}
 		)
@@ -296,9 +285,7 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 							<p className="text-muted-foreground text-sm">
 								MRN: {order.patientMrn}
 								{order.patientWeight ? ` · ${order.patientWeight} kg` : ""}
-								{order.patientCreatinine
-									? ` · CrCl / SCr: ${order.patientCreatinine}`
-									: ""}
+								{order.patientCreatinine ? ` · CrCl / SCr: ${order.patientCreatinine}` : ""}
 							</p>
 						</div>
 						<div className="flex items-center gap-2">
@@ -323,10 +310,7 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 					<div className="grid grid-cols-2 gap-4 md:grid-cols-4">
 						<OrderDetail label="Generic Name" value={order.genericName} />
 						<OrderDetail label="Brand Name" value={order.brandName} />
-						<OrderDetail
-							label="Dose"
-							value={`${order.dose} ${order.doseUnit} ${order.doseForm}`}
-						/>
+						<OrderDetail label="Dose" value={`${order.dose} ${order.doseUnit} ${order.doseForm}`} />
 						<OrderDetail label="Route" value={order.route} />
 						<OrderDetail label="Frequency" value={order.frequency} />
 						<OrderDetail
@@ -344,7 +328,7 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 						/>
 					</div>
 					{order.specialInstructions && (
-						<div className="mt-3 rounded-md bg-muted p-2 text-sm">
+						<div className="bg-muted mt-3 rounded-md p-2 text-sm">
 							<strong>Special Instructions: </strong>
 							{order.specialInstructions}
 						</div>
@@ -396,11 +380,11 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 					)}
 
 					{/* Critical first */}
-					{criticalChecks.map((c) => (
+					{criticalChecks.map(c => (
 						<SafetyAlertCard key={c.id} check={c} />
 					))}
 					{/* Warnings */}
-					{warnChecks.map((c) => (
+					{warnChecks.map(c => (
 						<SafetyAlertCard key={c.id} check={c} />
 					))}
 
@@ -416,7 +400,7 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 								placeholder="Document clinical justification for overriding alert(s)…"
 								rows={3}
 								value={overrideNotes}
-								onChange={(e) => setOverrideNotes(e.target.value)}
+								onChange={e => setOverrideNotes(e.target.value)}
 							/>
 						</div>
 					)}
@@ -435,7 +419,7 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 							rows={3}
 							placeholder="Enter reason for rejection (required)…"
 							value={rejectionReason}
-							onChange={(e) => setRejectionReason(e.target.value)}
+							onChange={e => setRejectionReason(e.target.value)}
 						/>
 						<div className="flex gap-2">
 							<Button
@@ -443,15 +427,10 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 								disabled={!rejectionReason.trim() || verify.isPending}
 								onClick={handleReject}
 							>
-								{verify.isPending ? (
-									<Loader2 className="mr-1.5 size-4 animate-spin" />
-								) : null}
+								{verify.isPending ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : null}
 								Confirm Rejection
 							</Button>
-							<Button
-								variant="outline"
-								onClick={() => setShowRejectForm(false)}
-							>
+							<Button variant="outline" onClick={() => setShowRejectForm(false)}>
 								Cancel
 							</Button>
 						</div>
@@ -472,11 +451,7 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 								<XCircle className="mr-1.5 size-4" />
 								Reject Order
 							</Button>
-							<Button
-								variant="outline"
-								onClick={handleHold}
-								disabled={verify.isPending}
-							>
+							<Button variant="outline" onClick={handleHold} disabled={verify.isPending}>
 								<Clock className="mr-1.5 size-4" />
 								Place On Hold
 							</Button>
@@ -485,10 +460,7 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 						<>
 							<Button
 								onClick={() => setShowDispense(true)}
-								disabled={
-									verify.isPending ||
-									(requiresOverride && !overrideNotes.trim())
-								}
+								disabled={verify.isPending || (requiresOverride && !overrideNotes.trim())}
 							>
 								<CheckCircle2 className="mr-1.5 size-4" />
 								Approve & Dispense
@@ -496,18 +468,11 @@ export function OrderReview({ orderId, onBack, onDispenseSuccess }: OrderReviewP
 							<Button
 								variant="outline"
 								onClick={handleApprove}
-								disabled={
-									verify.isPending ||
-									(requiresOverride && !overrideNotes.trim())
-								}
+								disabled={verify.isPending || (requiresOverride && !overrideNotes.trim())}
 							>
 								Verify Only
 							</Button>
-							<Button
-								variant="outline"
-								onClick={handleHold}
-								disabled={verify.isPending}
-							>
+							<Button variant="outline" onClick={handleHold} disabled={verify.isPending}>
 								<Clock className="mr-1.5 size-4" />
 								On Hold
 							</Button>

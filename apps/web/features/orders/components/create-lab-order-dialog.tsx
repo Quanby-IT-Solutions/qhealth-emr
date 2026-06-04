@@ -23,15 +23,12 @@ import {
 	SelectValue,
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
+import { useLoincSearchQuery, type LoincCode } from "@/features/formulary/api/formulary.hooks"
+import { useCreateLabOrderMutation } from "@/features/orders/api/orders.hooks"
 import {
 	useIcd10ProblemSearchQuery,
 	type Icd10SearchResult,
 } from "@/features/problems-allergies/api/problems-allergies.hooks"
-import {
-	useLoincSearchQuery,
-	type LoincCode,
-} from "@/features/formulary/api/formulary.hooks"
-import { useCreateLabOrderMutation } from "@/features/orders/api/orders.hooks"
 
 type OrderPriority = "routine" | "urgent" | "stat"
 
@@ -63,7 +60,7 @@ function LoincTestPicker({
 		search: value.trim(),
 		limit: 10,
 	})
-	const results = open ? query.data?.data ?? [] : []
+	const results = open ? (query.data?.data ?? []) : []
 
 	function closeSearchAfterSelectionChance() {
 		window.setTimeout(() => setOpen(false), 100)
@@ -298,7 +295,7 @@ export function CreateLabOrderDialog({
 			},
 			{
 				onSuccess: () => handleOpenChange(false),
-			},
+			}
 		)
 	}
 
@@ -313,10 +310,10 @@ export function CreateLabOrderDialog({
 
 	const canSubmit = Boolean(
 		testName.trim() &&
-			loincCode.trim() &&
-			clinicalIndication.trim() &&
-			indicationDiagnosis &&
-			!createLabOrder.isPending
+		loincCode.trim() &&
+		clinicalIndication.trim() &&
+		indicationDiagnosis &&
+		!createLabOrder.isPending
 	)
 
 	return (
@@ -324,9 +321,7 @@ export function CreateLabOrderDialog({
 			<DialogContent size="lg" className="max-h-[90vh] overflow-y-auto">
 				<DialogHeader>
 					<DialogTitle>New Lab Order</DialogTitle>
-					<DialogDescription>
-						Enter the lab test details.
-					</DialogDescription>
+					<DialogDescription>Enter the lab test details.</DialogDescription>
 				</DialogHeader>
 
 				<div className="grid gap-4 py-4">
@@ -335,19 +330,14 @@ export function CreateLabOrderDialog({
 					<div className="grid gap-4 sm:grid-cols-2">
 						<div className="space-y-2">
 							<Label htmlFor="labLoincCode">LOINC Code</Label>
-							<Input
-								id="labLoincCode"
-								value={loincCode}
-								readOnly
-								placeholder="Select a lab test"
-							/>
+							<Input id="labLoincCode" value={loincCode} readOnly placeholder="Select a lab test" />
 						</div>
 						<div className="space-y-2">
 							<Label htmlFor="labSpecimenType">Specimen Type</Label>
 							<Input
 								id="labSpecimenType"
 								value={specimenType}
-								onChange={(e) => setSpecimenType(e.target.value)}
+								onChange={e => setSpecimenType(e.target.value)}
 								placeholder="e.g., Blood, Urine"
 							/>
 						</div>
@@ -375,20 +365,20 @@ export function CreateLabOrderDialog({
 						<Textarea
 							id="labClinicalIndication"
 							value={clinicalIndication}
-							onChange={(e) => setClinicalIndication(e.target.value)}
+							onChange={e => setClinicalIndication(e.target.value)}
 							rows={2}
 							placeholder="Medical necessity for the requested lab"
 						/>
 					</div>
 
-					<Icd10IndicationPicker
-						value={indicationDiagnosis}
-						onChange={setIndicationDiagnosis}
-					/>
+					<Icd10IndicationPicker value={indicationDiagnosis} onChange={setIndicationDiagnosis} />
 
 					<div className="space-y-2">
 						<Label htmlFor="labPriority">Priority</Label>
-						<Select value={priority} onValueChange={v => setPriority((v ?? "routine") as OrderPriority)}>
+						<Select
+							value={priority}
+							onValueChange={v => setPriority((v ?? "routine") as OrderPriority)}
+						>
 							<SelectTrigger id="labPriority">
 								<SelectValue />
 							</SelectTrigger>
@@ -405,10 +395,7 @@ export function CreateLabOrderDialog({
 					<Button variant="outline" onClick={() => handleOpenChange(false)}>
 						Cancel
 					</Button>
-					<Button
-						disabled={!canSubmit}
-						onClick={handleSubmit}
-					>
+					<Button disabled={!canSubmit} onClick={handleSubmit}>
 						{createLabOrder.isPending ? "Signing..." : "Sign Lab Order"}
 					</Button>
 				</DialogFooter>

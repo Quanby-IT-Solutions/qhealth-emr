@@ -1,10 +1,9 @@
 "use client"
 
 import { useCallback } from "react"
-
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
-import { type NursingRecordType, enqueueRecord } from "./nursing-offline-queue"
+import { enqueueRecord, type NursingRecordType } from "./nursing-offline-queue"
 
 type HttpMethod = "POST" | "PUT" | "PATCH"
 
@@ -72,9 +71,7 @@ export function useOfflineNursingMutation<TData extends object, TInput>(
 				throw new Error(`HTTP ${res.status}: ${res.statusText}`)
 			}
 
-			const data = opts.fromResponse
-				? await opts.fromResponse(res)
-				: ((await res.json()) as TData)
+			const data = opts.fromResponse ? await opts.fromResponse(res) : ((await res.json()) as TData)
 			return data
 		},
 
@@ -83,7 +80,7 @@ export function useOfflineNursingMutation<TData extends object, TInput>(
 
 	return useMutation({
 		mutationFn,
-		onSuccess: (data) => {
+		onSuccess: data => {
 			// Only invalidate caches when a real API call succeeded (not queued)
 			if (data && "_queued" in data) return
 			if (opts.invalidateKeys) {

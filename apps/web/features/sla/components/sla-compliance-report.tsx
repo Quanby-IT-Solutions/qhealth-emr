@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { ChevronDown, ChevronRight, Download, Info } from "lucide-react"
 
+import type { SlaComplianceMetric, SlaStepMetric } from "@repo/contracts"
+
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
@@ -17,12 +19,8 @@ import {
 	TableRow,
 } from "@/core/components/ui/table"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import {
-	WORKFLOW_LABELS,
-	type SlaWorkflowType,
-} from "@/features/sla/api/sla.hooks"
 import { useSlaComplianceReportOrpcQuery } from "@/features/sla/api/sla-orpc.hooks"
-import type { SlaComplianceMetric, SlaStepMetric } from "@repo/contracts"
+import { WORKFLOW_LABELS, type SlaWorkflowType } from "@/features/sla/api/sla.hooks"
 
 // ============================================================================
 // Helpers
@@ -73,11 +71,19 @@ interface ComplianceGaugesProps {
 	operationalPct: number
 }
 
-function ComplianceGauges({ authoritativePct, authoritativeCount, operationalPct }: ComplianceGaugesProps) {
+function ComplianceGauges({
+	authoritativePct,
+	authoritativeCount,
+	operationalPct,
+}: ComplianceGaugesProps) {
 	const authColor =
 		authoritativePct >= 95 ? "bg-green-500" : authoritativePct >= 85 ? "bg-amber-500" : "bg-red-500"
 	const authLabel =
-		authoritativePct >= 95 ? "Compliant" : authoritativePct >= 85 ? "Needs Improvement" : "Non-Compliant"
+		authoritativePct >= 95
+			? "Compliant"
+			: authoritativePct >= 85
+				? "Needs Improvement"
+				: "Non-Compliant"
 	const opColor =
 		operationalPct >= 95 ? "bg-green-500" : operationalPct >= 85 ? "bg-amber-500" : "bg-red-500"
 
@@ -88,9 +94,11 @@ function ComplianceGauges({ authoritativePct, authoritativeCount, operationalPct
 				<CardContent className="pt-6">
 					<div className="flex flex-col items-center gap-3">
 						<div className="flex items-center gap-1.5">
-							<p className="text-sm font-semibold text-muted-foreground">ARTA-Authoritative Compliance</p>
+							<p className="text-muted-foreground text-sm font-semibold">
+								ARTA-Authoritative Compliance
+							</p>
 							<span title="Includes only workflows with verified checkpoint timestamps — suitable for Citizen's Charter evidence submission.">
-								<Info className="size-3.5 text-muted-foreground cursor-help" />
+								<Info className="text-muted-foreground size-3.5 cursor-help" />
 							</span>
 						</div>
 						<p className="text-5xl font-bold">{authoritativePct.toFixed(1)}%</p>
@@ -106,13 +114,13 @@ function ComplianceGauges({ authoritativePct, authoritativeCount, operationalPct
 						>
 							{authLabel}
 						</Badge>
-						<div className="relative h-3 w-full max-w-xs overflow-hidden rounded-full bg-muted">
+						<div className="bg-muted relative h-3 w-full max-w-xs overflow-hidden rounded-full">
 							<div
 								className={`absolute inset-y-0 left-0 rounded-full transition-all ${authColor}`}
 								style={{ width: `${authoritativePct}%` }}
 							/>
 						</div>
-						<p className="text-xs text-muted-foreground">
+						<p className="text-muted-foreground text-xs">
 							Based on {authoritativeCount.toLocaleString()} checkpoint-verified records
 						</p>
 					</div>
@@ -124,20 +132,24 @@ function ComplianceGauges({ authoritativePct, authoritativeCount, operationalPct
 				<CardContent className="pt-6">
 					<div className="flex flex-col items-center gap-3">
 						<div className="flex items-center gap-1.5">
-							<p className="text-sm font-medium text-muted-foreground">Operational SLA Score</p>
+							<p className="text-muted-foreground text-sm font-medium">Operational SLA Score</p>
 							<span title="Includes all workflows — including those using proxy or partial-checkpoint timing. Not suitable as standalone ARTA compliance evidence.">
-								<Info className="size-3.5 text-muted-foreground cursor-help" />
+								<Info className="text-muted-foreground size-3.5 cursor-help" />
 							</span>
 						</div>
-						<p className="text-4xl font-semibold text-muted-foreground">{operationalPct.toFixed(1)}%</p>
-						<Badge variant="outline" className="text-muted-foreground">All workflows (incl. proxy)</Badge>
-						<div className="relative h-2 w-full max-w-xs overflow-hidden rounded-full bg-muted">
+						<p className="text-muted-foreground text-4xl font-semibold">
+							{operationalPct.toFixed(1)}%
+						</p>
+						<Badge variant="outline" className="text-muted-foreground">
+							All workflows (incl. proxy)
+						</Badge>
+						<div className="bg-muted relative h-2 w-full max-w-xs overflow-hidden rounded-full">
 							<div
-								className={`absolute inset-y-0 left-0 rounded-full transition-all opacity-60 ${opColor}`}
+								className={`absolute inset-y-0 left-0 rounded-full opacity-60 transition-all ${opColor}`}
 								style={{ width: `${operationalPct}%` }}
 							/>
 						</div>
-						<p className="text-xs text-muted-foreground">
+						<p className="text-muted-foreground text-xs">
 							Includes proxy-timed and partial-checkpoint workflows
 						</p>
 					</div>
@@ -187,7 +199,10 @@ const STEP_LABELS: Record<string, string> = {
 
 function getSlaStepLabel(step: SlaStepMetric): string {
 	if (step.stepLabel) return step.stepLabel
-	return STEP_LABELS[step.stepStatus] ?? step.stepStatus.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+	return (
+		STEP_LABELS[step.stepStatus] ??
+		step.stepStatus.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+	)
 }
 
 // ============================================================================
@@ -197,13 +212,23 @@ function getSlaStepLabel(step: SlaStepMetric): string {
 function StepMetricRow({ step }: { step: SlaStepMetric }) {
 	return (
 		<TableRow className="bg-muted/30">
-			<TableCell className="pl-10 text-sm text-muted-foreground">{getSlaStepLabel(step)}</TableCell>
+			<TableCell className="text-muted-foreground pl-10 text-sm">{getSlaStepLabel(step)}</TableCell>
 			<TableCell className="text-center text-sm">{step.totalCount}</TableCell>
-			<TableCell className="text-center text-sm text-green-700 dark:text-green-400">{step.onTimeCount}</TableCell>
-			<TableCell className="text-center text-sm text-amber-700 dark:text-amber-400">{step.approachingCount}</TableCell>
-			<TableCell className="text-center text-sm text-red-700 dark:text-red-400">{step.exceededCount}</TableCell>
-			<TableCell><ComplianceBadge pct={step.compliancePct} /></TableCell>
-			<TableCell className="text-sm">{formatMinutes(step.avgElapsedMinutes)} / {formatMinutes(step.avgTargetMinutes)}</TableCell>
+			<TableCell className="text-center text-sm text-green-700 dark:text-green-400">
+				{step.onTimeCount}
+			</TableCell>
+			<TableCell className="text-center text-sm text-amber-700 dark:text-amber-400">
+				{step.approachingCount}
+			</TableCell>
+			<TableCell className="text-center text-sm text-red-700 dark:text-red-400">
+				{step.exceededCount}
+			</TableCell>
+			<TableCell>
+				<ComplianceBadge pct={step.compliancePct} />
+			</TableCell>
+			<TableCell className="text-sm">
+				{formatMinutes(step.avgElapsedMinutes)} / {formatMinutes(step.avgTargetMinutes)}
+			</TableCell>
 		</TableRow>
 	)
 }
@@ -216,37 +241,56 @@ function MetricRow({ metric }: { metric: SlaComplianceMetric }) {
 
 	return (
 		<>
-			<TableRow className={hasSteps ? "cursor-pointer hover:bg-muted/50" : undefined} onClick={hasSteps ? () => setExpanded(e => !e) : undefined}>
+			<TableRow
+				className={hasSteps ? "hover:bg-muted/50 cursor-pointer" : undefined}
+				onClick={hasSteps ? () => setExpanded(e => !e) : undefined}
+			>
 				<TableCell className="font-medium">
 					<span className="flex items-center gap-1">
-						{hasSteps && (
-							expanded
-								? <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-								: <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-						)}
+						{hasSteps &&
+							(expanded ? (
+								<ChevronDown className="text-muted-foreground size-4 shrink-0" />
+							) : (
+								<ChevronRight className="text-muted-foreground size-4 shrink-0" />
+							))}
 						{WORKFLOW_LABELS[metric.workflowType]}
 						{isProxy && (
-							<Badge variant="outline" className="ml-1 border-amber-400 text-amber-600 text-xs dark:border-amber-500 dark:text-amber-400">
+							<Badge
+								variant="outline"
+								className="ml-1 border-amber-400 text-xs text-amber-600 dark:border-amber-500 dark:text-amber-400"
+							>
 								Proxy timing
 							</Badge>
 						)}
 						{isPartial && (
-							<Badge variant="outline" className="ml-1 border-sky-400 text-sky-600 text-xs dark:border-sky-500 dark:text-sky-400">
+							<Badge
+								variant="outline"
+								className="ml-1 border-sky-400 text-xs text-sky-600 dark:border-sky-500 dark:text-sky-400"
+							>
 								Partial checkpoints
 							</Badge>
 						)}
 					</span>
 				</TableCell>
 				<TableCell className="text-center">{metric.totalCount}</TableCell>
-				<TableCell className="text-center text-green-700 dark:text-green-400">{metric.onTimeCount}</TableCell>
-				<TableCell className="text-center text-amber-700 dark:text-amber-400">{metric.approachingCount}</TableCell>
-				<TableCell className="text-center text-red-700 dark:text-red-400">{metric.exceededCount}</TableCell>
-				<TableCell><ComplianceBadge pct={metric.compliancePct} /></TableCell>
-				<TableCell className="text-sm">{formatMinutes(metric.avgElapsedMinutes)} / {formatMinutes(metric.avgTargetMinutes)}</TableCell>
+				<TableCell className="text-center text-green-700 dark:text-green-400">
+					{metric.onTimeCount}
+				</TableCell>
+				<TableCell className="text-center text-amber-700 dark:text-amber-400">
+					{metric.approachingCount}
+				</TableCell>
+				<TableCell className="text-center text-red-700 dark:text-red-400">
+					{metric.exceededCount}
+				</TableCell>
+				<TableCell>
+					<ComplianceBadge pct={metric.compliancePct} />
+				</TableCell>
+				<TableCell className="text-sm">
+					{formatMinutes(metric.avgElapsedMinutes)} / {formatMinutes(metric.avgTargetMinutes)}
+				</TableCell>
 			</TableRow>
-			{expanded && metric.stepMetrics?.map(step => (
-				<StepMetricRow key={step.stepStatus} step={step} />
-			))}
+			{expanded &&
+				metric.stepMetrics?.map(step => <StepMetricRow key={step.stepStatus} step={step} />)}
 		</>
 	)
 }
@@ -261,9 +305,11 @@ function exportHtml(
 	periodStart: string,
 	periodEnd: string,
 	authoritativeCompliancePct: number,
-	overallCompliancePct: number,
+	overallCompliancePct: number
 ) {
-	const rows = data.map(m => `
+	const rows = data
+		.map(
+			m => `
 		<tr>
 			<td>${WORKFLOW_LABELS[m.workflowType as SlaWorkflowType]}</td>
 			<td>${m.totalCount}</td>
@@ -272,7 +318,9 @@ function exportHtml(
 			<td>${m.exceededCount}</td>
 			<td>${m.compliancePct.toFixed(1)}%</td>
 			<td>${formatMinutes(m.avgElapsedMinutes)} / ${formatMinutes(m.avgTargetMinutes)}</td>
-		</tr>`).join("")
+		</tr>`
+		)
+		.join("")
 
 	const html = `<!DOCTYPE html>
 <html lang="en">
@@ -335,8 +383,10 @@ function exportHtml(
 // ============================================================================
 
 function timingAccuracyCaveat(accuracy: string | undefined): string {
-	if (accuracy === "proxy") return "Uses record creation as substitute for workflow checkpoint — excluded from authoritative ARTA evidence until instrumented"
-	if (accuracy === "partial") return "Uses checkpoint when available, falls back to record creation otherwise"
+	if (accuracy === "proxy")
+		return "Uses record creation as substitute for workflow checkpoint — excluded from authoritative ARTA evidence until instrumented"
+	if (accuracy === "partial")
+		return "Uses checkpoint when available, falls back to record creation otherwise"
 	return ""
 }
 
@@ -350,7 +400,7 @@ function exportCsv(
 	periodStart: string,
 	periodEnd: string,
 	authoritativeCompliancePct: number,
-	overallCompliancePct: number,
+	overallCompliancePct: number
 ) {
 	const headers = [
 		"Facility ID",
@@ -442,7 +492,9 @@ function ArtaFlowTiles({ metrics }: { metrics: SlaComplianceMetric[] }) {
 	return (
 		<div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
 			{ARTA_FLOW_WORKFLOWS.map(flow => {
-				const pcts = flow.workflows.map(w => byWorkflow.get(w as SlaWorkflowType)).filter((p): p is number => p != null)
+				const pcts = flow.workflows
+					.map(w => byWorkflow.get(w as SlaWorkflowType))
+					.filter((p): p is number => p != null)
 				const avgPct = pcts.length > 0 ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null
 
 				const colorClass =
@@ -457,8 +509,8 @@ function ArtaFlowTiles({ metrics }: { metrics: SlaComplianceMetric[] }) {
 				return (
 					<Card key={flow.label}>
 						<CardContent className="pt-4 pb-3">
-							<p className="text-xs text-muted-foreground leading-tight">{flow.label}</p>
-							<p className={`text-xl font-bold tabular-nums mt-1 ${colorClass}`}>
+							<p className="text-muted-foreground text-xs leading-tight">{flow.label}</p>
+							<p className={`mt-1 text-xl font-bold tabular-nums ${colorClass}`}>
 								{avgPct != null ? `${avgPct.toFixed(1)}%` : "—"}
 							</p>
 						</CardContent>
@@ -493,7 +545,7 @@ export function SlaComplianceReport() {
 			<div className="flex flex-wrap items-start justify-between gap-4">
 				<div>
 					<h1 className="text-2xl font-bold">Citizen's Charter Compliance Report</h1>
-					<p className="text-sm text-muted-foreground">
+					<p className="text-muted-foreground text-sm">
 						SLA compliance by workflow type for the selected period.
 					</p>
 				</div>
@@ -502,14 +554,16 @@ export function SlaComplianceReport() {
 						<Button
 							variant="outline"
 							size="sm"
-							onClick={() => exportCsv(
-								data.metrics,
-								facilityId,
-								periodStart,
-								periodEnd,
-								data.authoritativeCompliancePct,
-								data.overallCompliancePct,
-							)}
+							onClick={() =>
+								exportCsv(
+									data.metrics,
+									facilityId,
+									periodStart,
+									periodEnd,
+									data.authoritativeCompliancePct,
+									data.overallCompliancePct
+								)
+							}
 						>
 							<Download className="mr-1 size-4" />
 							Export CSV
@@ -517,14 +571,16 @@ export function SlaComplianceReport() {
 						<Button
 							variant="outline"
 							size="sm"
-							onClick={() => exportHtml(
-								data.metrics,
-								facilityName,
-								periodStart,
-								periodEnd,
-								data.authoritativeCompliancePct,
-								data.overallCompliancePct,
-							)}
+							onClick={() =>
+								exportHtml(
+									data.metrics,
+									facilityName,
+									periodStart,
+									periodEnd,
+									data.authoritativeCompliancePct,
+									data.overallCompliancePct
+								)
+							}
 						>
 							<Download className="mr-1 size-4" />
 							Export PDF
@@ -564,7 +620,7 @@ export function SlaComplianceReport() {
 
 			{/* Error */}
 			{error && (
-				<div className="text-sm text-destructive">
+				<div className="text-destructive text-sm">
 					Failed to load compliance report. The SLA module may not be enabled on this server.
 				</div>
 			)}
@@ -603,14 +659,14 @@ export function SlaComplianceReport() {
 							<TableBody>
 								{isLoading && (
 									<TableRow>
-										<TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+										<TableCell colSpan={7} className="text-muted-foreground py-8 text-center">
 											Loading…
 										</TableCell>
 									</TableRow>
 								)}
 								{!isLoading && !error && !data && (
 									<TableRow>
-										<TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+										<TableCell colSpan={7} className="text-muted-foreground py-8 text-center">
 											Select a date range to view the report.
 										</TableCell>
 									</TableRow>
@@ -620,7 +676,7 @@ export function SlaComplianceReport() {
 								))}
 								{data?.metrics.length === 0 && (
 									<TableRow>
-										<TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+										<TableCell colSpan={7} className="text-muted-foreground py-8 text-center">
 											No data for this period.
 										</TableCell>
 									</TableRow>
@@ -628,16 +684,29 @@ export function SlaComplianceReport() {
 							</TableBody>
 						</Table>
 					</div>
-					{data && data.metrics.some(m => m.timingAccuracy === "proxy" || m.timingAccuracy === "partial") && (
-						<div className="border-t px-4 py-3 text-xs text-muted-foreground">
-							<span className="font-medium">Timing accuracy legend: </span>
-							<Badge variant="outline" className="mr-1 border-amber-400 text-amber-600 text-xs dark:border-amber-500 dark:text-amber-400">Proxy timing</Badge>
-							uses record creation as a substitute for a real workflow checkpoint — excluded from authoritative ARTA evidence until instrumented.
-							{" "}
-							<Badge variant="outline" className="mr-1 border-sky-400 text-sky-600 text-xs dark:border-sky-500 dark:text-sky-400">Partial checkpoints</Badge>
-							uses the checkpoint when available, falls back to record creation otherwise.
-						</div>
-					)}
+					{data &&
+						data.metrics.some(
+							m => m.timingAccuracy === "proxy" || m.timingAccuracy === "partial"
+						) && (
+							<div className="text-muted-foreground border-t px-4 py-3 text-xs">
+								<span className="font-medium">Timing accuracy legend: </span>
+								<Badge
+									variant="outline"
+									className="mr-1 border-amber-400 text-xs text-amber-600 dark:border-amber-500 dark:text-amber-400"
+								>
+									Proxy timing
+								</Badge>
+								uses record creation as a substitute for a real workflow checkpoint — excluded from
+								authoritative ARTA evidence until instrumented.{" "}
+								<Badge
+									variant="outline"
+									className="mr-1 border-sky-400 text-xs text-sky-600 dark:border-sky-500 dark:text-sky-400"
+								>
+									Partial checkpoints
+								</Badge>
+								uses the checkpoint when available, falls back to record creation otherwise.
+							</div>
+						)}
 				</CardContent>
 			</Card>
 		</div>

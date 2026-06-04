@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useMemo, useState } from "react"
-import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Button } from "@/core/components/ui/button"
@@ -24,8 +24,8 @@ import {
 } from "@/core/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { useDebounce } from "@/core/hooks/use-debounce"
-
 import { EncounterContextBar } from "@/features/billing/components/encounter-context-bar"
+
 import {
 	useChargesQuery,
 	useCreateChargeMutation,
@@ -51,7 +51,11 @@ const SOURCE_OPTIONS: { label: string; value: SourceType | "all" }[] = [
 	{ label: "Manual", value: "manual" },
 ]
 
-export function ChargeCapturePageComponent({ encounterId, facilityId, patientId }: ChargeCapturePageProps) {
+export function ChargeCapturePageComponent({
+	encounterId,
+	facilityId,
+	patientId,
+}: ChargeCapturePageProps) {
 	const router = useRouter()
 	const pathname = usePathname()
 	const searchParams = useSearchParams()
@@ -100,11 +104,12 @@ export function ChargeCapturePageComponent({ encounterId, facilityId, patientId 
 	const total = computeTotals(allCharges)
 	const hasCharges = allCharges.length > 0
 
-	const searchResults = catalogData?.items.map(item => ({
-		id: item.id,
-		description: item.description,
-		unitPrice: item.unitPrice,
-	})) ?? []
+	const searchResults =
+		catalogData?.items.map(item => ({
+			id: item.id,
+			description: item.description,
+			unitPrice: item.unitPrice,
+		})) ?? []
 
 	function updateParam(key: string, value: string) {
 		const params = new URLSearchParams(searchParams.toString())
@@ -129,10 +134,7 @@ export function ChargeCapturePageComponent({ encounterId, facilityId, patientId 
 		[createCharge, facilityId, encounterId]
 	)
 
-	const handleRemove = useCallback(
-		(id: string) => deleteCharge({ id }),
-		[deleteCharge]
-	)
+	const handleRemove = useCallback((id: string) => deleteCharge({ id }), [deleteCharge])
 
 	const handleMarkReady = useCallback(() => {
 		markReady(
@@ -150,11 +152,13 @@ export function ChargeCapturePageComponent({ encounterId, facilityId, patientId 
 		<div className="space-y-4">
 			<EncounterContextBar />
 
-			<div className="px-4 space-y-4">
+			<div className="space-y-4 px-4">
 				<div className="flex items-center justify-between">
 					<div>
 						<h1 className="text-lg font-semibold">Charge Capture</h1>
-						<p className="text-sm text-muted-foreground">Review and add charges for this encounter</p>
+						<p className="text-muted-foreground text-sm">
+							Review and add charges for this encounter
+						</p>
 					</div>
 					<Button
 						onClick={() => setConfirmOpen(true)}
@@ -166,13 +170,12 @@ export function ChargeCapturePageComponent({ encounterId, facilityId, patientId 
 				</div>
 
 				{/* Filter bar */}
-				<div className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-3">
+				<div className="bg-muted/30 flex flex-wrap items-end gap-3 rounded-md border p-3">
 					<div className="flex flex-col gap-1">
-						<Label htmlFor="filter-source" className="text-xs">Source</Label>
-						<Select
-							value={filterSource}
-							onValueChange={v => updateParam("source", v ?? "all")}
-						>
+						<Label htmlFor="filter-source" className="text-xs">
+							Source
+						</Label>
+						<Select value={filterSource} onValueChange={v => updateParam("source", v ?? "all")}>
 							<SelectTrigger id="filter-source" className="h-8 w-44 text-xs">
 								<SelectValue />
 							</SelectTrigger>
@@ -187,7 +190,9 @@ export function ChargeCapturePageComponent({ encounterId, facilityId, patientId 
 					</div>
 
 					<div className="flex flex-col gap-1">
-						<Label htmlFor="filter-from" className="text-xs">From</Label>
+						<Label htmlFor="filter-from" className="text-xs">
+							From
+						</Label>
 						<Input
 							id="filter-from"
 							type="date"
@@ -198,7 +203,9 @@ export function ChargeCapturePageComponent({ encounterId, facilityId, patientId 
 					</div>
 
 					<div className="flex flex-col gap-1">
-						<Label htmlFor="filter-to" className="text-xs">To</Label>
+						<Label htmlFor="filter-to" className="text-xs">
+							To
+						</Label>
 						<Input
 							id="filter-to"
 							type="date"
@@ -208,8 +215,10 @@ export function ChargeCapturePageComponent({ encounterId, facilityId, patientId 
 						/>
 					</div>
 
-					<div className="flex flex-col gap-1 flex-1 min-w-[160px]">
-						<Label htmlFor="filter-q" className="text-xs">Search</Label>
+					<div className="flex min-w-[160px] flex-1 flex-col gap-1">
+						<Label htmlFor="filter-q" className="text-xs">
+							Search
+						</Label>
 						<Input
 							id="filter-q"
 							placeholder="Filter by description..."
@@ -222,7 +231,9 @@ export function ChargeCapturePageComponent({ encounterId, facilityId, patientId 
 
 				{chargesData && total < 0 && (
 					<Alert variant="destructive">
-						<AlertDescription>Total charge amount is negative. Please review line items.</AlertDescription>
+						<AlertDescription>
+							Total charge amount is negative. Please review line items.
+						</AlertDescription>
 					</Alert>
 				)}
 
@@ -231,7 +242,7 @@ export function ChargeCapturePageComponent({ encounterId, facilityId, patientId 
 						<TabsTrigger value="auto">
 							Auto-Pulled
 							{charges.filter(c => c.sourceType !== "manual").length > 0 && (
-								<span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs tabular-nums">
+								<span className="bg-primary/10 ml-1.5 rounded-full px-1.5 py-0.5 text-xs tabular-nums">
 									{charges.filter(c => c.sourceType !== "manual").length}
 								</span>
 							)}
@@ -240,11 +251,7 @@ export function ChargeCapturePageComponent({ encounterId, facilityId, patientId 
 					</TabsList>
 
 					<TabsContent value="auto" className="mt-4">
-						<AutoPulledTab
-							charges={charges}
-							isLoading={chargesLoading}
-							encounterId={encounterId}
-						/>
+						<AutoPulledTab charges={charges} isLoading={chargesLoading} encounterId={encounterId} />
 					</TabsContent>
 
 					<TabsContent value="manual" className="mt-4">
@@ -273,13 +280,16 @@ export function ChargeCapturePageComponent({ encounterId, facilityId, patientId 
 					<DialogHeader>
 						<DialogTitle>Mark Ready for Invoicing</DialogTitle>
 						<DialogDescription>
-							This will lock the charges and move the encounter to invoicing. This action cannot be undone.
+							This will lock the charges and move the encounter to invoicing. This action cannot be
+							undone.
 						</DialogDescription>
 					</DialogHeader>
-					<div className="space-y-1 rounded-md bg-muted p-3 text-sm">
+					<div className="bg-muted space-y-1 rounded-md p-3 text-sm">
 						<div className="flex justify-between">
 							<span className="text-muted-foreground">Charges</span>
-							<span>{allCharges.length} item{allCharges.length !== 1 ? "s" : ""}</span>
+							<span>
+								{allCharges.length} item{allCharges.length !== 1 ? "s" : ""}
+							</span>
 						</div>
 						<div className="flex justify-between font-medium">
 							<span>Total</span>
@@ -287,7 +297,9 @@ export function ChargeCapturePageComponent({ encounterId, facilityId, patientId 
 						</div>
 					</div>
 					<DialogFooter>
-						<Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+						<Button variant="outline" onClick={() => setConfirmOpen(false)}>
+							Cancel
+						</Button>
 						<Button onClick={handleMarkReady} disabled={markingReady}>
 							{markingReady ? "Processing..." : "Confirm"}
 						</Button>

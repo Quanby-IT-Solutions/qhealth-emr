@@ -16,26 +16,26 @@ export interface FpeValidationResult {
 }
 
 const TEXT_MAX_LENGTHS: Partial<Record<FpeFieldKey, number>> = {
-	chiefComplaint: 250,
-	historyOfPresentIllness: 2000,
-	pastMedicalHistory: 1500,
-	familyHistory: 1000,
-	socialHistory: 1000,
-	mentalHealthScreening: 1000,
-	reviewOfSystems: 2000,
-	physicalExamGeneral: 1000,
-	physicalExamHeent: 1000,
-	physicalExamChestLungs: 1000,
-	physicalExamCardiovascular: 1000,
-	physicalExamAbdomen: 1000,
-	physicalExamExtremities: 1000,
-	physicalExamNeurological: 1000,
+	"chiefComplaint": 250,
+	"historyOfPresentIllness": 2000,
+	"pastMedicalHistory": 1500,
+	"familyHistory": 1000,
+	"socialHistory": 1000,
+	"mentalHealthScreening": 1000,
+	"reviewOfSystems": 2000,
+	"physicalExamGeneral": 1000,
+	"physicalExamHeent": 1000,
+	"physicalExamChestLungs": 1000,
+	"physicalExamCardiovascular": 1000,
+	"physicalExamAbdomen": 1000,
+	"physicalExamExtremities": 1000,
+	"physicalExamNeurological": 1000,
 	"primaryDiagnosis.code": 8,
 	"primaryDiagnosis.description": 160,
-	medications: 1500,
-	referrals: 1000,
-	followUp: 1000,
-	otherRemarks: 1000,
+	"medications": 1500,
+	"referrals": 1000,
+	"followUp": 1000,
+	"otherRemarks": 1000,
 }
 
 const ICD10_PATTERN = /^[A-Z][0-9][0-9A-Z](\.[0-9A-Z]{1,4})?$/
@@ -148,7 +148,10 @@ export function getFpeValidation(data: FpeData): FpeValidationResult {
 		data.primaryDiagnosis.description
 	)
 
-	if (data.vitalSigns.bloodPressure && !BLOOD_PRESSURE_PATTERN.test(data.vitalSigns.bloodPressure)) {
+	if (
+		data.vitalSigns.bloodPressure &&
+		!BLOOD_PRESSURE_PATTERN.test(data.vitalSigns.bloodPressure)
+	) {
 		fieldErrors["vitalSigns.bloodPressure"] =
 			"Blood Pressure must use systolic/diastolic format, for example 120/80."
 	}
@@ -167,8 +170,7 @@ export function getFpeValidation(data: FpeData): FpeValidationResult {
 		["height", "Height"],
 	] as const) {
 		if (data.vitalSigns[key] && !DECIMAL_PATTERN.test(data.vitalSigns[key])) {
-			fieldErrors[`vitalSigns.${key}`] =
-				`${label} must be a number with up to 2 decimal places.`
+			fieldErrors[`vitalSigns.${key}`] = `${label} must be a number with up to 2 decimal places.`
 		}
 	}
 
@@ -179,7 +181,12 @@ export function getFpeValidation(data: FpeData): FpeValidationResult {
 		"History of Present Illness",
 		data.historyOfPresentIllness
 	)
-	addTextFormatError(fieldErrors, "pastMedicalHistory", "Past Medical History", data.pastMedicalHistory)
+	addTextFormatError(
+		fieldErrors,
+		"pastMedicalHistory",
+		"Past Medical History",
+		data.pastMedicalHistory
+	)
 	addTextFormatError(fieldErrors, "familyHistory", "Family History", data.familyHistory)
 	addTextFormatError(fieldErrors, "socialHistory", "Social History", data.socialHistory)
 	addTextFormatError(
@@ -189,8 +196,18 @@ export function getFpeValidation(data: FpeData): FpeValidationResult {
 		data.mentalHealthScreening
 	)
 	addTextFormatError(fieldErrors, "reviewOfSystems", "Review of Systems", data.reviewOfSystems)
-	addTextFormatError(fieldErrors, "physicalExamGeneral", "Physical Exam General", data.physicalExamGeneral)
-	addTextFormatError(fieldErrors, "physicalExamHeent", "Physical Exam HEENT", data.physicalExamHeent)
+	addTextFormatError(
+		fieldErrors,
+		"physicalExamGeneral",
+		"Physical Exam General",
+		data.physicalExamGeneral
+	)
+	addTextFormatError(
+		fieldErrors,
+		"physicalExamHeent",
+		"Physical Exam HEENT",
+		data.physicalExamHeent
+	)
 	addTextFormatError(
 		fieldErrors,
 		"physicalExamChestLungs",
@@ -203,7 +220,12 @@ export function getFpeValidation(data: FpeData): FpeValidationResult {
 		"Physical Exam Cardiovascular",
 		data.physicalExamCardiovascular
 	)
-	addTextFormatError(fieldErrors, "physicalExamAbdomen", "Physical Exam Abdomen", data.physicalExamAbdomen)
+	addTextFormatError(
+		fieldErrors,
+		"physicalExamAbdomen",
+		"Physical Exam Abdomen",
+		data.physicalExamAbdomen
+	)
 	addTextFormatError(
 		fieldErrors,
 		"physicalExamExtremities",
@@ -232,8 +254,7 @@ export function getFpeValidation(data: FpeData): FpeValidationResult {
 		fieldErrors,
 		formatErrorFields,
 		allBlockingMessages,
-		canSaveDraft:
-			draftMissingFields.length === 0 && !fieldErrors["primaryDiagnosis.code"],
+		canSaveDraft: draftMissingFields.length === 0 && !fieldErrors["primaryDiagnosis.code"],
 		canReview: submitMissingFields.length === 0 && !hasFormatErrors,
 	}
 }

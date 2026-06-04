@@ -284,16 +284,16 @@ export default function CachedPatientSummaryPage({
 				</CardHeader>
 				<CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 					<div>
-						<p className="text-muted-foreground text-xs uppercase tracking-wider">Name</p>
+						<p className="text-muted-foreground text-xs tracking-wider uppercase">Name</p>
 						<p className="mt-1 text-sm font-medium">{name}</p>
 					</div>
 					<div>
-						<p className="text-muted-foreground text-xs uppercase tracking-wider">MRN</p>
+						<p className="text-muted-foreground text-xs tracking-wider uppercase">MRN</p>
 						<p className="mt-1 font-mono text-sm">{mrn}</p>
 					</div>
 					{dob && (
 						<div>
-							<p className="text-muted-foreground text-xs uppercase tracking-wider">
+							<p className="text-muted-foreground text-xs tracking-wider uppercase">
 								Date of Birth
 							</p>
 							<p className="mt-1 text-sm">
@@ -302,7 +302,7 @@ export default function CachedPatientSummaryPage({
 						</div>
 					)}
 					<div>
-						<p className="text-muted-foreground text-xs uppercase tracking-wider">Sex</p>
+						<p className="text-muted-foreground text-xs tracking-wider uppercase">Sex</p>
 						<p className="mt-1 text-sm capitalize">{sex}</p>
 					</div>
 				</CardContent>
@@ -331,7 +331,7 @@ export default function CachedPatientSummaryPage({
 								<div className="grid gap-4 sm:grid-cols-3">
 									{encounter.latestVitals.temperature !== null && (
 										<div>
-											<p className="text-muted-foreground text-xs uppercase tracking-wider">
+											<p className="text-muted-foreground text-xs tracking-wider uppercase">
 												Temperature
 											</p>
 											<p className="mt-1 text-sm font-medium">
@@ -342,7 +342,7 @@ export default function CachedPatientSummaryPage({
 									{encounter.latestVitals.bpSystolic !== null &&
 										encounter.latestVitals.bpDiastolic !== null && (
 											<div>
-												<p className="text-muted-foreground text-xs uppercase tracking-wider">
+												<p className="text-muted-foreground text-xs tracking-wider uppercase">
 													Blood Pressure
 												</p>
 												<p className="mt-1 text-sm font-medium">
@@ -353,7 +353,7 @@ export default function CachedPatientSummaryPage({
 										)}
 									{encounter.latestVitals.heartRate !== null && (
 										<div>
-											<p className="text-muted-foreground text-xs uppercase tracking-wider">
+											<p className="text-muted-foreground text-xs tracking-wider uppercase">
 												Heart Rate
 											</p>
 											<p className="mt-1 text-sm font-medium">
@@ -363,7 +363,7 @@ export default function CachedPatientSummaryPage({
 									)}
 									{encounter.latestVitals.respiratoryRate !== null && (
 										<div>
-											<p className="text-muted-foreground text-xs uppercase tracking-wider">
+											<p className="text-muted-foreground text-xs tracking-wider uppercase">
 												Respiratory Rate
 											</p>
 											<p className="mt-1 text-sm font-medium">
@@ -373,7 +373,7 @@ export default function CachedPatientSummaryPage({
 									)}
 									{encounter.latestVitals.spo2 !== null && (
 										<div>
-											<p className="text-muted-foreground text-xs uppercase tracking-wider">SpO2</p>
+											<p className="text-muted-foreground text-xs tracking-wider uppercase">SpO2</p>
 											<p className="mt-1 text-sm font-medium">{encounter.latestVitals.spo2}%</p>
 										</div>
 									)}

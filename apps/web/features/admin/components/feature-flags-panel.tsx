@@ -1,10 +1,11 @@
 "use client"
 
-import Link from "next/link"
 import { startTransition, useState } from "react"
-import { toast } from "sonner"
+import Link from "next/link"
 import { Info, Plus, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 
+import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -15,10 +16,15 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/core/components/ui/alert-dialog"
-import { Alert, AlertDescription } from "@/core/components/ui/alert"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/core/components/ui/card"
 import { Checkbox } from "@/core/components/ui/checkbox"
 import {
 	Dialog,
@@ -45,6 +51,7 @@ import {
 	useFeatureFlagsListQuery,
 	useUpdateFeatureFlagMutation,
 } from "@/features/feature-flags/api/feature-flags.hooks"
+
 import { ToggleListItem } from "./toggle-list-item"
 
 type FeatureFlagGroup = "platform-control" | "financial" | "compliance" | "integration"
@@ -71,28 +78,32 @@ const INITIAL_CREATE_FORM: CreateFlagForm = {
 }
 
 // TOR §2 category mapping — 4 groups per ADM-FE-04
-const FEATURE_FLAG_GROUPS: Array<{ value: FeatureFlagGroup; title: string; description: string }> = [
-	{
-		value: "platform-control",
-		title: "Clinical",
-		description: "Patient-facing workflow gates for staged rollout of clinical modules and high-risk features.",
-	},
-	{
-		value: "financial",
-		title: "Financial",
-		description: "Revenue cycle, billing, and PhilHealth integration controls.",
-	},
-	{
-		value: "compliance",
-		title: "Reporting",
-		description: "Toggles that affect regulatory evidence, audit strength, or TOR-mandated safeguards.",
-	},
-	{
-		value: "integration",
-		title: "Interop",
-		description: "Feature gates for external systems, FHIR endpoints, and phased partner activation.",
-	},
-]
+const FEATURE_FLAG_GROUPS: Array<{ value: FeatureFlagGroup; title: string; description: string }> =
+	[
+		{
+			value: "platform-control",
+			title: "Clinical",
+			description:
+				"Patient-facing workflow gates for staged rollout of clinical modules and high-risk features.",
+		},
+		{
+			value: "financial",
+			title: "Financial",
+			description: "Revenue cycle, billing, and PhilHealth integration controls.",
+		},
+		{
+			value: "compliance",
+			title: "Reporting",
+			description:
+				"Toggles that affect regulatory evidence, audit strength, or TOR-mandated safeguards.",
+		},
+		{
+			value: "integration",
+			title: "Interop",
+			description:
+				"Feature gates for external systems, FHIR endpoints, and phased partner activation.",
+		},
+	]
 
 interface FeatureFlagsPanelProps {
 	canEdit: boolean
@@ -232,9 +243,9 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 				<div className="space-y-2">
 					<h1 className="text-2xl font-semibold">Feature Flags</h1>
 					<p className="text-muted-foreground max-w-3xl text-sm">
-						Release controls let administrators stage new workflows, protect high-risk
-						clinical changes, and phase integrations without editing role definitions.
-						Use the detail page to configure per-environment and per-facility targeting.
+						Release controls let administrators stage new workflows, protect high-risk clinical
+						changes, and phase integrations without editing role definitions. Use the detail page to
+						configure per-environment and per-facility targeting.
 					</p>
 				</div>
 				{canEdit && (
@@ -291,7 +302,10 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 									const isDirty = draft[flag.id] !== undefined
 
 									return (
-										<div key={flag.id} className={`space-y-2 px-4 py-1 ${isDirty ? "bg-primary/5" : ""}`}>
+										<div
+											key={flag.id}
+											className={`space-y-2 px-4 py-1 ${isDirty ? "bg-primary/5" : ""}`}
+										>
 											<ToggleListItem
 												label={flag.name}
 												description={flag.description ?? undefined}
@@ -312,10 +326,16 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 													>
 														{flag.riskLevel} risk
 													</Badge>
-													<Badge variant="outline" className="text-[10px] border-amber-400 text-amber-600">
+													<Badge
+														variant="outline"
+														className="border-amber-400 text-[10px] text-amber-600"
+													>
 														Staging
 													</Badge>
-													<Badge variant="outline" className="text-[10px] border-blue-500 text-blue-600">
+													<Badge
+														variant="outline"
+														className="border-blue-500 text-[10px] text-blue-600"
+													>
 														Production
 													</Badge>
 													{isDirty && (
@@ -393,11 +413,11 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 							Review the changes below before saving. All changes are logged to the audit trail.
 						</DialogDescription>
 					</DialogHeader>
-					<div className="max-h-64 overflow-y-auto space-y-2 py-2">
+					<div className="max-h-64 space-y-2 overflow-y-auto py-2">
 						{draftDiff.map(({ id, name, before, after }) => (
 							<div key={id} className="flex items-center justify-between text-sm">
 								<span className="truncate font-medium">{name}</span>
-								<span className="flex-shrink-0 flex items-center gap-1.5 text-xs">
+								<span className="flex flex-shrink-0 items-center gap-1.5 text-xs">
 									<span className={before ? "text-emerald-600" : "text-muted-foreground"}>
 										{before ? "On" : "Off"}
 									</span>
@@ -432,12 +452,19 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 
 					<div className="space-y-4 py-2">
 						<div className="space-y-1.5">
-							<Label htmlFor="ff-key">Key <span className="text-destructive">*</span></Label>
+							<Label htmlFor="ff-key">
+								Key <span className="text-destructive">*</span>
+							</Label>
 							<Input
 								id="ff-key"
 								placeholder="my-feature-flag"
 								value={createForm.key}
-								onChange={e => setCreateForm(f => ({ ...f, key: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") }))}
+								onChange={e =>
+									setCreateForm(f => ({
+										...f,
+										key: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
+									}))
+								}
 							/>
 							<p className="text-muted-foreground text-xs">
 								Lowercase letters, digits, and hyphens only.
@@ -445,7 +472,9 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 						</div>
 
 						<div className="space-y-1.5">
-							<Label htmlFor="ff-name">Name <span className="text-destructive">*</span></Label>
+							<Label htmlFor="ff-name">
+								Name <span className="text-destructive">*</span>
+							</Label>
 							<Input
 								id="ff-name"
 								placeholder="My Feature Flag"
@@ -467,10 +496,17 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 
 						<div className="grid grid-cols-2 gap-4">
 							<div className="space-y-1.5">
-								<Label>TOR §2 Category <span className="text-destructive">*</span></Label>
+								<Label>
+									TOR §2 Category <span className="text-destructive">*</span>
+								</Label>
 								<Select
 									value={createForm.group}
-									onValueChange={v => setCreateForm(f => ({ ...f, group: (v ?? "platform-control") as FeatureFlagGroup }))}
+									onValueChange={v =>
+										setCreateForm(f => ({
+											...f,
+											group: (v ?? "platform-control") as FeatureFlagGroup,
+										}))
+									}
 								>
 									<SelectTrigger>
 										<SelectValue />
@@ -485,10 +521,14 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 							</div>
 
 							<div className="space-y-1.5">
-								<Label>Risk level <span className="text-destructive">*</span></Label>
+								<Label>
+									Risk level <span className="text-destructive">*</span>
+								</Label>
 								<Select
 									value={createForm.riskLevel}
-									onValueChange={v => setCreateForm(f => ({ ...f, riskLevel: (v ?? "low") as FeatureFlagRiskLevel }))}
+									onValueChange={v =>
+										setCreateForm(f => ({ ...f, riskLevel: (v ?? "low") as FeatureFlagRiskLevel }))
+									}
 								>
 									<SelectTrigger>
 										<SelectValue />
@@ -525,12 +565,20 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 					</div>
 
 					<DialogFooter>
-						<Button variant="outline" onClick={() => { setCreateOpen(false); setCreateForm(INITIAL_CREATE_FORM) }}>
+						<Button
+							variant="outline"
+							onClick={() => {
+								setCreateOpen(false)
+								setCreateForm(INITIAL_CREATE_FORM)
+							}}
+						>
 							Cancel
 						</Button>
 						<Button
 							onClick={handleCreate}
-							disabled={!createForm.key.trim() || !createForm.name.trim() || createMutation.isPending}
+							disabled={
+								!createForm.key.trim() || !createForm.name.trim() || createMutation.isPending
+							}
 						>
 							{createMutation.isPending ? "Creating…" : "Create flag"}
 						</Button>
@@ -539,7 +587,12 @@ export function FeatureFlagsPanel({ canEdit }: FeatureFlagsPanelProps) {
 			</Dialog>
 
 			{/* Delete confirmation */}
-			<AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null) }}>
+			<AlertDialog
+				open={!!deleteTarget}
+				onOpenChange={open => {
+					if (!open) setDeleteTarget(null)
+				}}
+			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete &ldquo;{deleteTarget?.name}&rdquo;?</AlertDialogTitle>

@@ -207,12 +207,7 @@ export function useProblemsQuery(params: ProblemListParams) {
 	const { patientId, status, page, limit } = params
 
 	return useQuery({
-		queryKey: problemsAllergiesKeys.problems(
-			patientId,
-			status,
-			page,
-			limit
-		),
+		queryKey: problemsAllergiesKeys.problems(patientId, status, page, limit),
 		queryFn: () =>
 			fetchJson<ProblemListResponse>(
 				`${API_BASE}/problems${buildQueryString({ patientId, status, page, limit })}`

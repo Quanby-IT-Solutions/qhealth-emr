@@ -13,14 +13,10 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/core/components/ui/dropdown-menu"
-import {
-	SidebarMenu,
-	SidebarMenuButton,
-	SidebarMenuItem,
-} from "@/core/components/ui/sidebar"
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/core/components/ui/sidebar"
 import { getInitials } from "@/core/lib/utils"
-import { useSignOutMutation } from "@/features/auth/api/session.hooks"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { useSignOutMutation } from "@/features/auth/api/session.hooks"
 
 export function UserMenu() {
 	const { data: profile } = useMyProfile()
@@ -41,9 +37,7 @@ export function UserMenu() {
 						</Avatar>
 						<div className="flex flex-col text-left leading-tight">
 							<span className="truncate text-sm font-medium">{user?.name ?? "User"}</span>
-							<span className="text-muted-foreground truncate text-xs">
-								{user?.email ?? ""}
-							</span>
+							<span className="text-muted-foreground truncate text-xs">{user?.email ?? ""}</span>
 						</div>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent side="top" align="start" className="w-56">
@@ -63,10 +57,7 @@ export function UserMenu() {
 							<span>Settings</span>
 						</DropdownMenuItem>
 						<DropdownMenuSeparator />
-						<DropdownMenuItem
-							onClick={() => signOut.mutate()}
-							disabled={signOut.isPending}
-						>
+						<DropdownMenuItem onClick={() => signOut.mutate()} disabled={signOut.isPending}>
 							<HugeiconsIcon icon={Logout03FreeIcons} className="size-4" />
 							<span>{signOut.isPending ? "Signing out..." : "Sign Out"}</span>
 						</DropdownMenuItem>

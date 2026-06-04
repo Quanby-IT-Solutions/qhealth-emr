@@ -27,8 +27,7 @@ export default function TeleTriagePage() {
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 	const staffProfileId = profile?.staffProfiles?.[0]?.id ?? ""
 
-	const permissions: { module: string; action: string }[] =
-		profile?.activeRole?.permissions ?? []
+	const permissions: { module: string; action: string }[] = profile?.activeRole?.permissions ?? []
 	const canEdit = permissions.some(p => p.module === "ed" && p.action === "edit")
 
 	const createMutation = useCreateInboundTriageMutation()
@@ -233,19 +232,11 @@ export default function TeleTriagePage() {
 
 							<div className="flex items-center gap-6 md:col-span-2">
 								<div className="flex items-center gap-2">
-									<Checkbox
-										id="bed"
-										checked={bedReady}
-										onCheckedChange={v => setBedReady(!!v)}
-									/>
+									<Checkbox id="bed" checked={bedReady} onCheckedChange={v => setBedReady(!!v)} />
 									<Label htmlFor="bed">Bed ready</Label>
 								</div>
 								<div className="flex items-center gap-2">
-									<Checkbox
-										id="code"
-										checked={codeTeam}
-										onCheckedChange={v => setCodeTeam(!!v)}
-									/>
+									<Checkbox id="code" checked={codeTeam} onCheckedChange={v => setCodeTeam(!!v)} />
 									<Label htmlFor="code">Code team</Label>
 								</div>
 							</div>

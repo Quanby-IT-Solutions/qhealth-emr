@@ -18,25 +18,19 @@ interface CriticalValueAlertProps {
 	className?: string
 }
 
-export function CriticalValueAlert({
-	items,
-	onAcknowledge,
-	className,
-}: CriticalValueAlertProps) {
+export function CriticalValueAlert({ items, onAcknowledge, className }: CriticalValueAlertProps) {
 	if (items.length === 0) return null
 
 	return (
 		<div
 			className={cn(
-				"flex items-start gap-3 rounded-md border border-destructive bg-destructive/10 p-4 text-destructive dark:bg-destructive/20",
-				className,
+				"border-destructive bg-destructive/10 text-destructive dark:bg-destructive/20 flex items-start gap-3 rounded-md border p-4",
+				className
 			)}
 		>
 			<AlertCircle className="mt-0.5 size-5 shrink-0" />
 			<div className="flex-1">
-				<p className="font-semibold">
-					Critical Lab Value{items.length > 1 ? "s" : ""} Detected
-				</p>
+				<p className="font-semibold">Critical Lab Value{items.length > 1 ? "s" : ""} Detected</p>
 				<ul className="mt-1 space-y-0.5 text-sm">
 					{items.map((item, i) => (
 						<li key={i}>
@@ -45,9 +39,7 @@ export function CriticalValueAlert({
 								{String(item.value)} {item.unit}
 							</span>
 							{item.referenceRange && (
-								<span className="ml-1 opacity-75">
-									(Ref: {item.referenceRange})
-								</span>
+								<span className="ml-1 opacity-75">(Ref: {item.referenceRange})</span>
 							)}
 						</li>
 					))}
@@ -61,7 +53,7 @@ export function CriticalValueAlert({
 					type="button"
 					variant="ghost"
 					size="sm"
-					className="shrink-0 text-destructive hover:bg-destructive/20 hover:text-destructive"
+					className="text-destructive hover:bg-destructive/20 hover:text-destructive shrink-0"
 					onClick={onAcknowledge}
 				>
 					<X className="size-4" />

@@ -2,7 +2,11 @@
 
 import { useCallback } from "react"
 
-import { LineItemEditor, type LineItem, type LineItemExport } from "@/features/billing/components/line-item-editor"
+import {
+	LineItemEditor,
+	type LineItem,
+	type LineItemExport,
+} from "@/features/billing/components/line-item-editor"
 
 interface ManualCharge {
 	id: string

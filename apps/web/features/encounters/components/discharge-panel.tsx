@@ -29,11 +29,7 @@ interface DischargePanelProps {
 	patientDateOfBirth?: string
 }
 
-export function DischargePanel({
-	encounterId,
-	encounterType,
-	patientId,
-}: DischargePanelProps) {
+export function DischargePanel({ encounterId, encounterType, patientId }: DischargePanelProps) {
 	const router = useRouter()
 	const { data: profile } = useMyProfile()
 	const canSignMayGoHome = (profile?.activeRole?.permissions ?? []).some(
@@ -53,10 +49,9 @@ export function DischargePanel({
 	)
 
 	const signedNoteCount = (notesData?.data ?? []).filter(n => n.status === "signed").length
-	const printablePrescriptionCount =
-		(prescriptionsData?.data ?? []).filter(
-			rx => rx.status === "signed" || rx.status === "issued"
-		).length
+	const printablePrescriptionCount = (prescriptionsData?.data ?? []).filter(
+		rx => rx.status === "signed" || rx.status === "issued"
+	).length
 
 	const [abstractOpen, setAbstractOpen] = useState(false)
 	const [rxPrintOpen, setRxPrintOpen] = useState(false)
@@ -148,8 +143,8 @@ export function DischargePanel({
 					</CardHeader>
 					<CardContent className="space-y-3">
 						<p className="text-muted-foreground text-sm">
-							Complete the signed discharge summary, final ICD-10 diagnosis, discharge
-							medications, and follow-up plan before downstream clearances finish.
+							Complete the signed discharge summary, final ICD-10 diagnosis, discharge medications,
+							and follow-up plan before downstream clearances finish.
 						</p>
 						<div className="flex flex-col gap-2 sm:flex-row">
 							<Button
@@ -213,8 +208,8 @@ export function DischargePanel({
 								<Alert>
 									<AlertDescription>
 										This encounter is now pending discharge. It will appear in the Registrar
-										Discharge Processing queue after Pharmacy, Nursing, and Billing clearances
-										are ready for gate-pass processing.
+										Discharge Processing queue after Pharmacy, Nursing, and Billing clearances are
+										ready for gate-pass processing.
 									</AlertDescription>
 								</Alert>
 							)}

@@ -36,10 +36,16 @@ type BedStatus = "available" | "occupied" | "reserved" | "cleaning" | "out_of_se
 type WardType = "general" | "icu" | "er" | "or" | "nursery"
 
 const STATUS_BADGE: Record<BedStatus, { label: string; className: string }> = {
-	available: { label: "Available", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+	available: {
+		label: "Available",
+		className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+	},
 	occupied: { label: "Occupied", className: "bg-amber-100 text-amber-700 border-amber-200" },
 	reserved: { label: "Reserved", className: "bg-blue-100 text-blue-700 border-blue-200" },
-	cleaning: { label: "Dirty/For Cleaning", className: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+	cleaning: {
+		label: "Dirty/For Cleaning",
+		className: "bg-yellow-100 text-yellow-700 border-yellow-200",
+	},
 	out_of_service: {
 		label: "Out of Service",
 		className: "bg-zinc-100 text-zinc-600 border-zinc-200",
@@ -222,11 +228,10 @@ export function WardsPage() {
 		}
 	}, [wards])
 
-	if (!facilityId)
-		return <p className="text-sm text-muted-foreground">No facility selected.</p>
+	if (!facilityId) return <p className="text-muted-foreground text-sm">No facility selected.</p>
 
 	if (wardsLoading || bedsLoading)
-		return <p className="animate-pulse text-sm text-muted-foreground">Loading wards...</p>
+		return <p className="text-muted-foreground animate-pulse text-sm">Loading wards...</p>
 
 	function toggleWard(wardId: string) {
 		setExpandedWards(prev => {
@@ -277,7 +282,7 @@ export function WardsPage() {
 			</div>
 
 			{!wards || wards.length === 0 ? (
-				<p className="py-8 text-center text-sm text-muted-foreground">
+				<p className="text-muted-foreground py-8 text-center text-sm">
 					No wards configured for this facility.
 				</p>
 			) : (
@@ -301,10 +306,16 @@ export function WardsPage() {
 								key={ward.id}
 								draggable={true}
 								onDragStart={() => setDraggedWardId(ward.id)}
-								onDragOver={e => { e.preventDefault(); setDragOverWardId(ward.id) }}
+								onDragOver={e => {
+									e.preventDefault()
+									setDragOverWardId(ward.id)
+								}}
 								onDrop={() => handleDrop(ward.id)}
-								onDragEnd={() => { setDraggedWardId(null); setDragOverWardId(null) }}
-								className={dragOverWardId === ward.id ? "ring-2 ring-primary" : undefined}
+								onDragEnd={() => {
+									setDraggedWardId(null)
+									setDragOverWardId(null)
+								}}
+								className={dragOverWardId === ward.id ? "ring-primary ring-2" : undefined}
 							>
 								<CardHeader className="pb-2">
 									<div className="flex items-center justify-between">
@@ -328,29 +339,23 @@ export function WardsPage() {
 										<div className="flex items-center gap-2">
 											<button
 												type="button"
-												className="text-xs text-muted-foreground underline"
+												className="text-muted-foreground text-xs underline"
 												onClick={() => toggleWard(ward.id)}
 											>
 												{isExpanded ? "Collapse" : "Expand"}
 											</button>
 										</div>
 									</div>
-									<div className="mt-1 flex flex-wrap gap-4 text-sm text-muted-foreground">
+									<div className="text-muted-foreground mt-1 flex flex-wrap gap-4 text-sm">
 										<span>Total beds: {ward.totalBeds}</span>
 										{statusCounts.available != null && (
-											<span className="text-emerald-600">
-												Available: {statusCounts.available}
-											</span>
+											<span className="text-emerald-600">Available: {statusCounts.available}</span>
 										)}
 										{statusCounts.occupied != null && (
-											<span className="text-amber-600">
-												Occupied: {statusCounts.occupied}
-											</span>
+											<span className="text-amber-600">Occupied: {statusCounts.occupied}</span>
 										)}
 										{statusCounts.reserved != null && (
-											<span className="text-blue-600">
-												Reserved: {statusCounts.reserved}
-											</span>
+											<span className="text-blue-600">Reserved: {statusCounts.reserved}</span>
 										)}
 										{statusCounts.cleaning != null && (
 											<span className="text-yellow-600">
@@ -368,7 +373,7 @@ export function WardsPage() {
 								{isExpanded && (
 									<CardContent>
 										{beds.length === 0 ? (
-											<p className="py-4 text-center text-sm text-muted-foreground">
+											<p className="text-muted-foreground py-4 text-center text-sm">
 												No beds in this ward.
 											</p>
 										) : (
@@ -382,7 +387,7 @@ export function WardsPage() {
 														<button
 															key={bed.id}
 															type="button"
-															className="group flex flex-col items-start gap-1 rounded-md border p-2 text-left transition-colors hover:bg-muted/50"
+															className="group hover:bg-muted/50 flex flex-col items-start gap-1 rounded-md border p-2 text-left transition-colors"
 															onClick={() =>
 																setBedStatusDialog({
 																	bedId: bed.id,
@@ -398,7 +403,7 @@ export function WardsPage() {
 																{info.label}
 															</span>
 															{bed.patientName && (
-																<span className="line-clamp-1 text-[10px] text-muted-foreground">
+																<span className="text-muted-foreground line-clamp-1 text-[10px]">
 																	{bed.patientName}
 																</span>
 															)}
@@ -415,11 +420,7 @@ export function WardsPage() {
 				</div>
 			)}
 
-			<AddWardDialog
-				facilityId={facilityId}
-				open={addWardOpen}
-				onOpenChange={setAddWardOpen}
-			/>
+			<AddWardDialog facilityId={facilityId} open={addWardOpen} onOpenChange={setAddWardOpen} />
 
 			{bedStatusDialog && (
 				<SetBedStatusDialog

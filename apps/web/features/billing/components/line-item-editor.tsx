@@ -4,8 +4,16 @@ import { useCallback, useMemo, useState } from "react"
 
 import { Button } from "@/core/components/ui/button"
 import { Input } from "@/core/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { cn } from "@/core/lib/utils"
+
 import { MoneyInput } from "./money-input"
 
 type SortColumn = "description" | "quantity" | "unitPrice" | "totalAmount"
@@ -160,7 +168,7 @@ export function LineItemEditor({
 								<button
 									type="button"
 									onClick={() => handleSort("description")}
-									className="text-left font-medium hover:text-foreground"
+									className="hover:text-foreground text-left font-medium"
 									aria-label={`Sort by description ${sortColumn === "description" ? sortDir : "ascending"}`}
 								>
 									Description{sortIndicator("description")}
@@ -170,7 +178,7 @@ export function LineItemEditor({
 								<button
 									type="button"
 									onClick={() => handleSort("quantity")}
-									className="font-medium hover:text-foreground"
+									className="hover:text-foreground font-medium"
 									aria-label={`Sort by quantity ${sortColumn === "quantity" ? sortDir : "ascending"}`}
 								>
 									Qty{sortIndicator("quantity")}
@@ -180,7 +188,7 @@ export function LineItemEditor({
 								<button
 									type="button"
 									onClick={() => handleSort("unitPrice")}
-									className="font-medium hover:text-foreground"
+									className="hover:text-foreground font-medium"
 									aria-label={`Sort by unit price ${sortColumn === "unitPrice" ? sortDir : "ascending"}`}
 								>
 									Unit Price{sortIndicator("unitPrice")}
@@ -190,7 +198,7 @@ export function LineItemEditor({
 								<button
 									type="button"
 									onClick={() => handleSort("totalAmount")}
-									className="font-medium hover:text-foreground"
+									className="hover:text-foreground font-medium"
 									aria-label={`Sort by total ${sortColumn === "totalAmount" ? sortDir : "ascending"}`}
 								>
 									Total{sortIndicator("totalAmount")}
@@ -202,78 +210,78 @@ export function LineItemEditor({
 					<TableBody>
 						{items.length === 0 && (
 							<TableRow>
-								<TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+								<TableCell colSpan={5} className="text-muted-foreground py-8 text-center text-sm">
 									No items. Add a line item below.
 								</TableCell>
 							</TableRow>
 						)}
 						{sortedItems.map(item => (
 							<TableRow key={item.id}>
-									<TableCell className="align-top">
-										<div className="flex flex-col gap-1">
-											<span className="text-sm">{item.description}</span>
-											{editingOverride === item.id ? (
-												<Input
-													value={item.overrideReason ?? ""}
-													onChange={e => handleOverrideReason(item.id, e.target.value)}
-													onBlur={() => setEditingOverride(null)}
-													placeholder="Reason for price override..."
-													className="h-7 text-xs"
-													autoFocus
-													aria-label="Override reason"
-												/>
-											) : item.overrideReason ? (
-												<button
-													type="button"
-													onClick={() => setEditingOverride(item.id)}
-													className="text-left text-xs text-muted-foreground underline decoration-dotted"
-												>
-													Override: {item.overrideReason}
-												</button>
-											) : null}
-										</div>
-									</TableCell>
-									<TableCell className="align-top">
-										<MoneyInput
-											value={item.quantity}
-											onChange={v => handleFieldChange(item.id, "quantity", v)}
-											step={1}
-											currencySymbol=""
-											disabled={disabled}
-											className="w-20 ml-auto"
-											aria-label={`Quantity for ${item.description}`}
-										/>
-									</TableCell>
-									<TableCell className="align-top">
-										<div className="flex flex-col gap-1 items-end">
-											<MoneyInput
-												value={item.unitPrice}
-												onChange={v => {
-													handleFieldChange(item.id, "unitPrice", v)
-													if (!item.overrideReason) {
-														setEditingOverride(item.id)
-													}
-												}}
-												disabled={disabled}
-												aria-label={`Unit price for ${item.description}`}
+								<TableCell className="align-top">
+									<div className="flex flex-col gap-1">
+										<span className="text-sm">{item.description}</span>
+										{editingOverride === item.id ? (
+											<Input
+												value={item.overrideReason ?? ""}
+												onChange={e => handleOverrideReason(item.id, e.target.value)}
+												onBlur={() => setEditingOverride(null)}
+												placeholder="Reason for price override..."
+												className="h-7 text-xs"
+												autoFocus
+												aria-label="Override reason"
 											/>
-										</div>
-									</TableCell>
-									<TableCell className="align-top text-right tabular-nums text-sm">
-										₱{item.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-									</TableCell>
-									<TableCell className="align-top">
-										<button
-											type="button"
-											onClick={() => handleRemove(item.id)}
+										) : item.overrideReason ? (
+											<button
+												type="button"
+												onClick={() => setEditingOverride(item.id)}
+												className="text-muted-foreground text-left text-xs underline decoration-dotted"
+											>
+												Override: {item.overrideReason}
+											</button>
+										) : null}
+									</div>
+								</TableCell>
+								<TableCell className="align-top">
+									<MoneyInput
+										value={item.quantity}
+										onChange={v => handleFieldChange(item.id, "quantity", v)}
+										step={1}
+										currencySymbol=""
+										disabled={disabled}
+										className="ml-auto w-20"
+										aria-label={`Quantity for ${item.description}`}
+									/>
+								</TableCell>
+								<TableCell className="align-top">
+									<div className="flex flex-col items-end gap-1">
+										<MoneyInput
+											value={item.unitPrice}
+											onChange={v => {
+												handleFieldChange(item.id, "unitPrice", v)
+												if (!item.overrideReason) {
+													setEditingOverride(item.id)
+												}
+											}}
 											disabled={disabled}
-											className="text-muted-foreground hover:text-destructive disabled:opacity-40"
-											aria-label={`Remove ${item.description}`}
-										>
-											×
-										</button>
-									</TableCell>
-								</TableRow>
+											aria-label={`Unit price for ${item.description}`}
+										/>
+									</div>
+								</TableCell>
+								<TableCell className="text-right align-top text-sm tabular-nums">
+									₱{item.totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+								</TableCell>
+								<TableCell className="align-top">
+									<button
+										type="button"
+										onClick={() => handleRemove(item.id)}
+										disabled={disabled}
+										className="text-muted-foreground hover:text-destructive disabled:opacity-40"
+										aria-label={`Remove ${item.description}`}
+									>
+										×
+									</button>
+								</TableCell>
+							</TableRow>
 						))}
 					</TableBody>
 				</Table>
@@ -282,10 +290,7 @@ export function LineItemEditor({
 			{/* Total row */}
 			<div className="flex justify-end px-2">
 				<span
-					className={cn(
-						"text-sm font-medium tabular-nums",
-						hasNegative ? "text-destructive" : ""
-					)}
+					className={cn("text-sm font-medium tabular-nums", hasNegative ? "text-destructive" : "")}
 					role="status"
 					aria-live="polite"
 				>
@@ -293,7 +298,7 @@ export function LineItemEditor({
 				</span>
 			</div>
 			{hasNegative && (
-				<p className="text-xs text-destructive" role="alert">
+				<p className="text-destructive text-xs" role="alert">
 					Line item total cannot be negative.
 				</p>
 			)}
@@ -302,7 +307,7 @@ export function LineItemEditor({
 			{!disabled && (
 				<div className="space-y-2">
 					{showSearch ? (
-						<div className="rounded-md border p-3 space-y-2">
+						<div className="space-y-2 rounded-md border p-3">
 							<Input
 								value={searchQuery}
 								onChange={e => {
@@ -314,13 +319,17 @@ export function LineItemEditor({
 								aria-label="Search for a service item"
 							/>
 							{searchResults.length > 0 && (
-								<ul className="max-h-48 overflow-y-auto space-y-1" role="listbox" aria-label="Search results">
+								<ul
+									className="max-h-48 space-y-1 overflow-y-auto"
+									role="listbox"
+									aria-label="Search results"
+								>
 									{searchResults.map(r => (
 										<li key={r.id}>
 											<button
 												type="button"
 												onClick={() => handleAdd(r)}
-												className="w-full text-left rounded px-2 py-1.5 text-sm hover:bg-muted flex justify-between"
+												className="hover:bg-muted flex w-full justify-between rounded px-2 py-1.5 text-left text-sm"
 												role="option"
 												aria-selected={false}
 											>

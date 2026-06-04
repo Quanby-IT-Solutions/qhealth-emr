@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { AlertCircle, CheckCircle2, ClipboardList, Loader2 } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/core/components/ui/alert"
@@ -10,13 +9,19 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Label } from "@/core/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/core/components/ui/radio-group"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { Separator } from "@/core/components/ui/separator"
 
 import {
+	useScoreScreeningMutation,
 	type ScreeningScoreInput,
 	type ScreeningScoreResult,
-	useScoreScreeningMutation,
 } from "../api/nutrition.hooks"
 
 // ============================================================================
@@ -35,9 +40,7 @@ function RiskBadge({ risk }: { risk: "low" | "moderate" | "high" }) {
 		moderate: "bg-yellow-100 text-yellow-800 border-yellow-200",
 		high: "bg-red-100 text-red-800 border-red-200",
 	}
-	return (
-		<Badge className={`border font-semibold capitalize ${map[risk]}`}>{risk} risk</Badge>
-	)
+	return <Badge className={`border font-semibold capitalize ${map[risk]}`}>{risk} risk</Badge>
 }
 
 // ============================================================================
@@ -65,13 +68,16 @@ function RadioQuestion({
 		<div className="space-y-2">
 			<p className="text-sm font-medium">{label}</p>
 			<RadioGroup value={value} onValueChange={v => onChange(String(v))} className="space-y-1">
-				{options.map((opt) => (
-					<div key={opt.value} className="flex items-start gap-2 rounded-md border p-3 hover:bg-muted/40">
+				{options.map(opt => (
+					<div
+						key={opt.value}
+						className="hover:bg-muted/40 flex items-start gap-2 rounded-md border p-3"
+					>
 						<RadioGroupItem value={opt.value} id={`${label}-${opt.value}`} className="mt-0.5" />
 						<Label htmlFor={`${label}-${opt.value}`} className="cursor-pointer leading-none">
 							<span className="font-medium">{opt.label}</span>
 							{opt.description && (
-								<span className="block text-xs text-muted-foreground">{opt.description}</span>
+								<span className="text-muted-foreground block text-xs">{opt.description}</span>
 							)}
 						</Label>
 					</div>
@@ -243,17 +249,20 @@ const SGA_OPTIONS: RadioOption[] = [
 	{
 		value: "A",
 		label: "SGA-A — Well-nourished",
-		description: "No significant changes in weight, dietary intake, or functional capacity; no signs of malnutrition on physical exam",
+		description:
+			"No significant changes in weight, dietary intake, or functional capacity; no signs of malnutrition on physical exam",
 	},
 	{
 		value: "B",
 		label: "SGA-B — Mildly to moderately malnourished",
-		description: "Definite decrease in subcutaneous fat and/or mild muscle wasting; history of weight loss or decreased intake",
+		description:
+			"Definite decrease in subcutaneous fat and/or mild muscle wasting; history of weight loss or decreased intake",
 	},
 	{
 		value: "C",
 		label: "SGA-C — Severely malnourished",
-		description: "Severe muscle wasting, loss of subcutaneous fat, and/or edema/ascites with nutritional implications",
+		description:
+			"Severe muscle wasting, loss of subcutaneous fat, and/or edema/ascites with nutritional implications",
 	},
 ]
 
@@ -285,7 +294,7 @@ function ScoreResult({ result }: { result: ScreeningScoreResult }) {
 		sga: "SGA",
 	}
 	return (
-		<div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+		<div className="bg-muted/30 space-y-4 rounded-lg border p-4">
 			<div className="flex items-center justify-between">
 				<div className="flex items-center gap-2">
 					<CheckCircle2 className="size-5 text-green-600" />
@@ -360,7 +369,7 @@ export function ScreeningTool({ defaultTool = "nrs_2002", onResult }: ScreeningT
 	function handleCalculate() {
 		setResult(null)
 		mutate(buildInput(), {
-			onSuccess: (res) => {
+			onSuccess: res => {
 				setResult(res)
 				onResult?.(res)
 			},
@@ -395,7 +404,7 @@ export function ScreeningTool({ defaultTool = "nrs_2002", onResult }: ScreeningT
 						onValueChange={v => handleToolChange(String(v))}
 						className="grid gap-2 sm:grid-cols-3"
 					>
-						{(["nrs_2002", "must", "sga"] as const).map((t) => (
+						{(["nrs_2002", "must", "sga"] as const).map(t => (
 							<div
 								key={t}
 								className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 transition-colors ${
@@ -403,13 +412,16 @@ export function ScreeningTool({ defaultTool = "nrs_2002", onResult }: ScreeningT
 								}`}
 							>
 								<RadioGroupItem value={t} id={`tool-${t}`} />
-								<Label htmlFor={`tool-${t}`} className="cursor-pointer text-sm font-medium leading-tight">
+								<Label
+									htmlFor={`tool-${t}`}
+									className="cursor-pointer text-sm leading-tight font-medium"
+								>
 									{t === "nrs_2002" ? "NRS-2002" : t === "must" ? "MUST" : "SGA"}
 								</Label>
 							</div>
 						))}
 					</RadioGroup>
-					<p className="text-xs text-muted-foreground">{toolLabel[tool]}</p>
+					<p className="text-muted-foreground text-xs">{toolLabel[tool]}</p>
 				</div>
 
 				<Separator />
@@ -436,7 +448,7 @@ export function ScreeningTool({ defaultTool = "nrs_2002", onResult }: ScreeningT
 					/>
 				)}
 				{tool === "sga" && (
-					<SgaForm rating={sgaRating} onRatingChange={(v) => setSgaRating(v as "A" | "B" | "C")} />
+					<SgaForm rating={sgaRating} onRatingChange={v => setSgaRating(v as "A" | "B" | "C")} />
 				)}
 
 				<Button onClick={handleCalculate} disabled={isPending} className="w-full">

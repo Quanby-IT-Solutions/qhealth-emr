@@ -5,7 +5,13 @@ import { ArrowRight, Calendar, Loader2, Search, User, UserRound, X } from "lucid
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
@@ -20,7 +26,9 @@ const OPD_PATIENTS_PAGE_SIZE = 50
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
-	return new Set(permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`))
+	return new Set(
+		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
+	)
 }
 
 function can(permSet: Set<string>, module: string, action: string) {
@@ -70,12 +78,12 @@ export default function OpdPage() {
 			page,
 			limit: OPD_PATIENTS_PAGE_SIZE,
 		},
-		{ enabled: !!facilityId },
+		{ enabled: !!facilityId }
 	)
 
 	if (!can(permSet, "opd", "view")) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access OPD.
 			</div>
 		)
@@ -95,7 +103,8 @@ export default function OpdPage() {
 						<CardHeader>
 							<CardTitle>OPD Patient Not Ready For Your Role</CardTitle>
 							<CardDescription>
-								This patient is currently waiting for {activeStep?.responsibleRole ?? "another role"}.
+								This patient is currently waiting for{" "}
+								{activeStep?.responsibleRole ?? "another role"}.
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
@@ -112,19 +121,21 @@ export default function OpdPage() {
 		return (
 			<div>
 				{/* Patient context bar */}
-				<div className="flex items-center justify-between border-b bg-muted/40 px-6 py-3">
+				<div className="bg-muted/40 flex items-center justify-between border-b px-6 py-3">
 					<div className="flex items-center gap-3">
-						<div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
-							<User className="size-4 text-primary" />
+						<div className="bg-primary/10 flex size-8 items-center justify-center rounded-full">
+							<User className="text-primary size-4" />
 						</div>
 						<div>
-							<p className="text-sm font-semibold leading-none">{patientName}</p>
-							<p className="mt-0.5 font-mono text-xs text-muted-foreground">{selectedPatient.mrn}</p>
+							<p className="text-sm leading-none font-semibold">{patientName}</p>
+							<p className="text-muted-foreground mt-0.5 font-mono text-xs">
+								{selectedPatient.mrn}
+							</p>
 						</div>
 						{selectedPatient.dateOfBirth && (
 							<>
-								<div className="h-4 w-px bg-border" />
-								<div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+								<div className="bg-border h-4 w-px" />
+								<div className="text-muted-foreground flex items-center gap-1.5 text-sm">
 									<Calendar className="size-3.5" />
 									{new Date(selectedPatient.dateOfBirth).toLocaleDateString()}
 								</div>
@@ -155,7 +166,7 @@ export default function OpdPage() {
 	const visiblePatients = patients
 		.map(patient => ({ patient, activeStep: getPatientActiveOpdStep(patient.id) }))
 		.filter(({ activeStep }) =>
-			activeStep ? canRoleActOnOpdStep(permSet, activeRoleName, activeStep) : false,
+			activeStep ? canRoleActOnOpdStep(permSet, activeRoleName, activeStep) : false
 		)
 	const totalPages = Math.max(searchQuery.data?.totalPages ?? 1, 1)
 	const currentPage = Math.min(page, totalPages)
@@ -184,7 +195,7 @@ export default function OpdPage() {
 
 				<CardContent className="space-y-3 pt-3">
 					<div className="relative">
-						<Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+						<Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
 						<Input
 							placeholder="Filter by name or MRN..."
 							value={search}
@@ -192,11 +203,11 @@ export default function OpdPage() {
 								setSearch(e.target.value)
 								setPage(1)
 							}}
-							className="h-9 rounded-xl border-border/60 bg-background pl-9"
+							className="border-border/60 bg-background h-9 rounded-xl pl-9"
 							autoFocus
 						/>
 						{isFetching && (
-							<Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+							<Loader2 className="text-muted-foreground absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin" />
 						)}
 					</div>
 
@@ -214,13 +225,14 @@ export default function OpdPage() {
 						</div>
 					) : (
 						<>
-							<p className="text-xs text-muted-foreground px-0.5">
-								Showing {visiblePatientCount} {visiblePatientCount === 1 ? "patient" : "patients"} waiting for your role
+							<p className="text-muted-foreground px-0.5 text-xs">
+								Showing {visiblePatientCount} {visiblePatientCount === 1 ? "patient" : "patients"}{" "}
+								waiting for your role
 								{trimmedSearch && ` matching "${search}"`}
 								{isFetching && " · Updating..."}
 							</p>
 
-							<div className="border-border/60 bg-background overflow-hidden rounded-2xl border divide-y divide-border/60">
+							<div className="border-border/60 bg-background divide-border/60 divide-y overflow-hidden rounded-2xl border">
 								{visiblePatients.map(({ patient: p, activeStep }) => (
 									<div
 										key={p.id}
@@ -244,13 +256,18 @@ export default function OpdPage() {
 													{p.isActive ? "Active" : "Inactive"}
 												</Badge>
 												{activeStep ? (
-													<Badge variant="outline" className="rounded-full px-2 py-0.5 text-[0.68rem]">
+													<Badge
+														variant="outline"
+														className="rounded-full px-2 py-0.5 text-[0.68rem]"
+													>
 														Next: {activeStep.label}
 													</Badge>
 												) : null}
 											</div>
 											<p className="text-muted-foreground text-xs">
-												{p.dateOfBirth ? `DOB ${new Date(String(p.dateOfBirth)).toLocaleDateString()}` : "DOB —"}
+												{p.dateOfBirth
+													? `DOB ${new Date(String(p.dateOfBirth)).toLocaleDateString()}`
+													: "DOB —"}
 												{p.lastEncounterDate
 													? ` · Last encounter ${new Date(String(p.lastEncounterDate)).toLocaleDateString()}`
 													: ""}
@@ -280,7 +297,9 @@ export default function OpdPage() {
 							</div>
 
 							<div className="flex items-center justify-between gap-3 px-0.5">
-								<p className="text-xs text-muted-foreground">Page {currentPage} of {totalPages}</p>
+								<p className="text-muted-foreground text-xs">
+									Page {currentPage} of {totalPages}
+								</p>
 								<div className="flex items-center gap-2">
 									<Button
 										variant="outline"

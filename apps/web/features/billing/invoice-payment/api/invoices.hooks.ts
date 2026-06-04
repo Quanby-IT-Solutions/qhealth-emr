@@ -61,10 +61,11 @@ export function useRecordPaymentMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		billingOrpc.recordPayment.mutationOptions({
-			onSuccess: () => Promise.all([
-				qc.invalidateQueries({ queryKey: billingOrpc.listPayments.key() }),
-				qc.invalidateQueries({ queryKey: billingOrpc.listInvoices.key() }),
-			]),
+			onSuccess: () =>
+				Promise.all([
+					qc.invalidateQueries({ queryKey: billingOrpc.listPayments.key() }),
+					qc.invalidateQueries({ queryKey: billingOrpc.listInvoices.key() }),
+				]),
 		})
 	)
 }
@@ -73,10 +74,11 @@ export function useIssueReceiptMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		billingOrpc.issueReceipt.mutationOptions({
-			onSuccess: () => Promise.all([
-				qc.invalidateQueries({ queryKey: billingOrpc.listPayments.key() }),
-				qc.invalidateQueries({ queryKey: billingOrpc.listInvoices.key() }),
-			]),
+			onSuccess: () =>
+				Promise.all([
+					qc.invalidateQueries({ queryKey: billingOrpc.listPayments.key() }),
+					qc.invalidateQueries({ queryKey: billingOrpc.listInvoices.key() }),
+				]),
 		})
 	)
 }

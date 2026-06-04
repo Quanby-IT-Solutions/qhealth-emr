@@ -17,8 +17,7 @@ export function useCreateChargeMutation(encounterId: string) {
 	void encounterId
 	return useMutation(
 		billingOrpc.createCharge.mutationOptions({
-			onSuccess: () =>
-				qc.invalidateQueries({ queryKey: billingOrpc.listCharges.key() }),
+			onSuccess: () => qc.invalidateQueries({ queryKey: billingOrpc.listCharges.key() }),
 		})
 	)
 }
@@ -27,8 +26,7 @@ export function useUpdateChargeMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		billingOrpc.updateCharge.mutationOptions({
-			onSuccess: () =>
-				qc.invalidateQueries({ queryKey: billingOrpc.listCharges.key() }),
+			onSuccess: () => qc.invalidateQueries({ queryKey: billingOrpc.listCharges.key() }),
 		})
 	)
 }
@@ -37,8 +35,7 @@ export function useDeleteChargeMutation() {
 	const qc = useQueryClient()
 	return useMutation(
 		billingOrpc.deleteCharge.mutationOptions({
-			onSuccess: () =>
-				qc.invalidateQueries({ queryKey: billingOrpc.listCharges.key() }),
+			onSuccess: () => qc.invalidateQueries({ queryKey: billingOrpc.listCharges.key() }),
 		})
 	)
 }

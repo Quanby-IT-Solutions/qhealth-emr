@@ -9,7 +9,9 @@ export default function SchedulingSlotsPage() {
 	const { data: profile, isLoading } = useMyProfile()
 	const facilityId = useActiveFacilityId()
 	const permissionSet = new Set(
-		profile?.activeRole?.permissions.map(permission => `${permission.module}:${permission.action}`) ?? []
+		profile?.activeRole?.permissions.map(
+			permission => `${permission.module}:${permission.action}`
+		) ?? []
 	)
 
 	if (isLoading) {

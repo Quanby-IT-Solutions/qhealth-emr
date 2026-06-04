@@ -1,8 +1,8 @@
 "use client"
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { BLOOD_BANK_ROLE_NAMES, roleNameMatches } from "@/features/app-shell/lib/navigation"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { BedsideMatching } from "@/features/lab/components/bedside-matching"
 import { CrossMatchForm } from "@/features/lab/components/cross-match-form"
 
@@ -26,7 +26,7 @@ export default function BloodBankPage() {
 
 	if (!can(permSet, "laboratory", "view") || !roleNameMatches(roleName, BLOOD_BANK_ROLE_NAMES)) {
 		return (
-			<div className="flex items-center justify-center p-8 text-muted-foreground">
+			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access blood bank records.
 			</div>
 		)

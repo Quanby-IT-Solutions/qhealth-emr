@@ -39,7 +39,12 @@ export function S2ValidationModal({
 	facilityId,
 	onProceed,
 }: S2ValidationModalProps) {
-	const { data: licenseStatus, isLoading, isError, error } = useCheckPdeaLicenseQuery({
+	const {
+		data: licenseStatus,
+		isLoading,
+		isError,
+		error,
+	} = useCheckPdeaLicenseQuery({
 		staffId,
 		facilityId,
 		enabled: open && !!staffId && !!facilityId,
@@ -72,14 +77,14 @@ export function S2ValidationModal({
 
 				<div className="py-2">
 					{isLoading && (
-						<div className="flex items-center gap-3 rounded-md border bg-muted/40 px-4 py-4 text-sm">
-							<Loader2 className="size-5 animate-spin text-muted-foreground" />
+						<div className="bg-muted/40 flex items-center gap-3 rounded-md border px-4 py-4 text-sm">
+							<Loader2 className="text-muted-foreground size-5 animate-spin" />
 							<span className="text-muted-foreground">Validating PDEA S-2 license…</span>
 						</div>
 					)}
 
 					{isError && (
-						<div className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-4 text-sm text-destructive">
+						<div className="border-destructive/40 bg-destructive/10 text-destructive flex items-start gap-3 rounded-md border px-4 py-4 text-sm">
 							<AlertCircle className="mt-0.5 size-5 shrink-0" />
 							<div className="space-y-1">
 								<p className="font-medium">License check failed</p>
@@ -129,7 +134,7 @@ export function S2ValidationModal({
 					)}
 
 					{!isLoading && !isError && licenseStatus && !canPrescribe && (
-						<div className="space-y-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-4 text-sm text-destructive">
+						<div className="border-destructive/40 bg-destructive/10 text-destructive space-y-3 rounded-md border px-4 py-4 text-sm">
 							<div className="flex items-center gap-2">
 								<AlertCircle className="size-5 shrink-0" />
 								<span className="font-semibold">
@@ -149,7 +154,7 @@ export function S2ValidationModal({
 					)}
 
 					{!isLoading && !isError && !licenseStatus && (
-						<div className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-4 text-sm text-destructive">
+						<div className="border-destructive/40 bg-destructive/10 text-destructive flex items-start gap-3 rounded-md border px-4 py-4 text-sm">
 							<AlertCircle className="mt-0.5 size-5 shrink-0" />
 							<p>No S-2 license information found. Contact your administrator.</p>
 						</div>

@@ -1,8 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query"
 
-import { createQueryClient } from "@/services/tanstack-query/query-client"
 import { himServerOrpc, prepareServerOrpc, serverOrpc } from "@/services/orpc/orpc-server"
-
+import { createQueryClient } from "@/services/tanstack-query/query-client"
 import { HimHaiClient } from "@/features/him/hai-reconciliation/components/him-hai-client"
 
 export default async function HimHaiPage() {

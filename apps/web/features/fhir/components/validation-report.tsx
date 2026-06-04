@@ -1,16 +1,23 @@
 "use client"
 
-import { AlertCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Info } from "lucide-react"
 import { useState } from "react"
+import {
+	AlertCircle,
+	AlertTriangle,
+	CheckCircle2,
+	ChevronDown,
+	ChevronRight,
+	Info,
+} from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import {
+	useValidationReportQuery,
 	type FhirValidationReport,
 	type ValidationIssue,
 	type ValidationResourceSummary,
-	useValidationReportQuery,
 } from "@/features/fhir/api/fhir.hooks"
 
 // ============================================================================
@@ -28,7 +35,13 @@ function IssueSeverityIcon({ severity }: { severity: ValidationIssue["severity"]
 	}
 }
 
-function SeverityBadge({ severity, count }: { severity: ValidationIssue["severity"]; count: number }) {
+function SeverityBadge({
+	severity,
+	count,
+}: {
+	severity: ValidationIssue["severity"]
+	count: number
+}) {
 	if (count === 0) return null
 	const cls =
 		severity === "error"
@@ -52,15 +65,15 @@ function ResourceRow({ resource }: { resource: ValidationResourceSummary }) {
 			<tr className="border-b">
 				<td className="p-3">
 					<button
-						className="flex items-center gap-1.5 font-medium text-sm"
+						className="flex items-center gap-1.5 text-sm font-medium"
 						onClick={() => hasIssues && setExpanded(e => !e)}
 						disabled={!hasIssues}
 					>
 						{hasIssues ? (
 							expanded ? (
-								<ChevronDown className="size-4 text-muted-foreground" />
+								<ChevronDown className="text-muted-foreground size-4" />
 							) : (
-								<ChevronRight className="size-4 text-muted-foreground" />
+								<ChevronRight className="text-muted-foreground size-4" />
 							)
 						) : (
 							<span className="size-4" />
@@ -74,15 +87,11 @@ function ResourceRow({ resource }: { resource: ValidationResourceSummary }) {
 				</td>
 				<td className="p-3 text-center">
 					<SeverityBadge severity="error" count={resource.errorCount} />
-					{resource.errorCount === 0 && (
-						<span className="text-xs text-muted-foreground">—</span>
-					)}
+					{resource.errorCount === 0 && <span className="text-muted-foreground text-xs">—</span>}
 				</td>
 				<td className="p-3 text-center">
 					<SeverityBadge severity="warning" count={resource.warningCount} />
-					{resource.warningCount === 0 && (
-						<span className="text-xs text-muted-foreground">—</span>
-					)}
+					{resource.warningCount === 0 && <span className="text-muted-foreground text-xs">—</span>}
 				</td>
 				<td className="p-3 text-center">
 					{resource.errorCount === 0 ? (
@@ -93,16 +102,16 @@ function ResourceRow({ resource }: { resource: ValidationResourceSummary }) {
 				</td>
 			</tr>
 			{expanded && resource.issues.length > 0 && (
-				<tr className="border-b bg-muted/30">
+				<tr className="bg-muted/30 border-b">
 					<td colSpan={6} className="px-6 py-3">
-						<p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+						<p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
 							Issues
 						</p>
 						<div className="space-y-1.5">
 							{resource.issues.map((issue, i) => (
 								<div key={i} className="flex items-start gap-2 text-sm">
 									<IssueSeverityIcon severity={issue.severity} />
-									<span className="font-mono text-xs text-muted-foreground">[{issue.code}]</span>
+									<span className="text-muted-foreground font-mono text-xs">[{issue.code}]</span>
 									<span className="flex-1">{issue.message}</span>
 									<Badge variant="outline" className="text-xs">
 										×{issue.count}
@@ -123,34 +132,32 @@ function ResourceRow({ resource }: { resource: ValidationResourceSummary }) {
 
 function SummaryGauges({ report }: { report: FhirValidationReport }) {
 	const pct =
-		report.totalResources > 0
-			? Math.round((report.totalValid / report.totalResources) * 100)
-			: 0
+		report.totalResources > 0 ? Math.round((report.totalValid / report.totalResources) * 100) : 0
 
 	return (
 		<div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
 			<Card>
 				<CardContent className="pt-4">
 					<p className="text-2xl font-bold">{report.totalResources}</p>
-					<p className="text-sm text-muted-foreground">Total Resources</p>
+					<p className="text-muted-foreground text-sm">Total Resources</p>
 				</CardContent>
 			</Card>
 			<Card>
 				<CardContent className="pt-4">
 					<p className="text-2xl font-bold text-green-600">{pct}%</p>
-					<p className="text-sm text-muted-foreground">Valid</p>
+					<p className="text-muted-foreground text-sm">Valid</p>
 				</CardContent>
 			</Card>
 			<Card>
 				<CardContent className="pt-4">
 					<p className="text-2xl font-bold text-red-600">{report.totalErrors}</p>
-					<p className="text-sm text-muted-foreground">Errors</p>
+					<p className="text-muted-foreground text-sm">Errors</p>
 				</CardContent>
 			</Card>
 			<Card>
 				<CardContent className="pt-4">
 					<p className="text-2xl font-bold text-amber-600">{report.totalWarnings}</p>
-					<p className="text-sm text-muted-foreground">Warnings</p>
+					<p className="text-muted-foreground text-sm">Warnings</p>
 				</CardContent>
 			</Card>
 		</div>
@@ -179,13 +186,13 @@ export function ValidationReportPanel({ exportId, onClose }: ValidationReportPan
 			</div>
 
 			{isLoading && (
-				<div className="py-8 text-center text-sm text-muted-foreground">
+				<div className="text-muted-foreground py-8 text-center text-sm">
 					Loading validation report…
 				</div>
 			)}
 
 			{error && (
-				<div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+				<div className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border p-4 text-sm">
 					Validation report not available. The export may still be processing, or no validation was
 					run.
 				</div>
@@ -207,10 +214,12 @@ export function ValidationReportPanel({ exportId, onClose }: ValidationReportPan
 							<AlertCircle className="size-5 text-red-600" />
 						)}
 						<div>
-							<p className="font-semibold text-sm">
-								{data.isValid ? "Passed — ready for NHDR submission" : "Validation failed — review errors before submitting"}
+							<p className="text-sm font-semibold">
+								{data.isValid
+									? "Passed — ready for NHDR submission"
+									: "Validation failed — review errors before submitting"}
 							</p>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-muted-foreground text-xs">
 								Validated {new Date(data.validatedAt).toLocaleString("en-PH")}
 							</p>
 						</div>
@@ -260,7 +269,5 @@ interface ValidationReportProps {
 }
 
 export function ValidationReport({ exportId }: ValidationReportProps) {
-	return (
-		<ValidationReportPanel exportId={exportId} onClose={() => {}} />
-	)
+	return <ValidationReportPanel exportId={exportId} onClose={() => {}} />
 }

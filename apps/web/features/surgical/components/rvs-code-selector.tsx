@@ -71,7 +71,10 @@ function formatAssignmentType(type: RvsAssignmentType) {
 }
 
 function modifierInput(value: string) {
-	return value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 2)
+	return value
+		.toUpperCase()
+		.replace(/[^A-Z0-9]/g, "")
+		.slice(0, 2)
 }
 
 function positiveWholeNumberInput(value: string) {
@@ -166,11 +169,7 @@ function SearchResultRow({
 									disabled={isSuggesting}
 								/>
 							</div>
-							<Button
-								size="sm"
-								disabled={isSuggesting}
-								onClick={handleConfirm}
-							>
+							<Button size="sm" disabled={isSuggesting} onClick={handleConfirm}>
 								{isSuggesting ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : null}
 								Add
 							</Button>
@@ -508,8 +507,7 @@ export function RvsCodeSelector({
 				assignment => assignment.assignmentType === "adjunct"
 			).length
 			const finalizedPrimaryCount = relatedAssignments.filter(
-				assignment =>
-					assignment.assignmentType === "primary" && assignment.status === "finalized"
+				assignment => assignment.assignmentType === "primary" && assignment.status === "finalized"
 			).length
 
 			return {
@@ -537,13 +535,9 @@ export function RvsCodeSelector({
 		procedure => procedure.finalizedPrimaryCount === 0
 	).length
 	const claimReady =
-		procedureCoverage.length > 0 &&
-		missingPrimaryCount === 0 &&
-		missingFinalizedPrimaryCount === 0
+		procedureCoverage.length > 0 && missingPrimaryCount === 0 && missingFinalizedPrimaryCount === 0
 	const pendingBillingReview =
-		missingPrimaryCount === 0 &&
-		hasAnyAssignment &&
-		missingFinalizedPrimaryCount > 0
+		missingPrimaryCount === 0 && hasAnyAssignment && missingFinalizedPrimaryCount > 0
 
 	const selectedStillExists = procedureCoverage.some(
 		procedure =>
@@ -578,9 +572,7 @@ export function RvsCodeSelector({
 					{!isOperationRecordSigned ? (
 						<div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
 							<Lock className="mt-0.5 size-4 shrink-0 text-amber-600" />
-							<p>
-								Sign the operative record before mapping, validating, or finalizing RVS codes.
-							</p>
+							<p>Sign the operative record before mapping, validating, or finalizing RVS codes.</p>
 						</div>
 					) : null}
 
@@ -604,8 +596,8 @@ export function RvsCodeSelector({
 						<div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
 							<ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
 							<p>
-								{missingPrimaryCount} procedure{missingPrimaryCount === 1 ? "" : "s"} still need
-								a primary RVS code before surgical billing is ready.
+								{missingPrimaryCount} procedure{missingPrimaryCount === 1 ? "" : "s"} still need a
+								primary RVS code before surgical billing is ready.
 							</p>
 						</div>
 					) : null}

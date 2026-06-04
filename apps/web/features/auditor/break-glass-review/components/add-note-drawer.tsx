@@ -13,7 +13,6 @@ import {
 	SheetTitle,
 } from "@/core/components/ui/sheet"
 import { Textarea } from "@/core/components/ui/textarea"
-
 import { useAddNoteMutation } from "@/features/auditor/break-glass-review/api/break-glass.hooks"
 
 interface AddNoteDrawerProps {
@@ -70,7 +69,9 @@ export function AddNoteDrawer({ open, eventId, onClose }: AddNoteDrawerProps) {
 							rows={5}
 						/>
 						{note.length > 0 && note.length < 10 && (
-							<p className="text-xs text-destructive">{10 - note.length} more character(s) required</p>
+							<p className="text-destructive text-xs">
+								{10 - note.length} more character(s) required
+							</p>
 						)}
 					</div>
 
@@ -85,10 +86,7 @@ export function AddNoteDrawer({ open, eventId, onClose }: AddNoteDrawerProps) {
 					<Button variant="outline" onClick={handleClose} disabled={mutation.isPending}>
 						Cancel
 					</Button>
-					<Button
-						onClick={handleSubmit}
-						disabled={mutation.isPending || note.trim().length < 10}
-					>
+					<Button onClick={handleSubmit} disabled={mutation.isPending || note.trim().length < 10}>
 						{mutation.isPending ? "Saving..." : "Save Note"}
 					</Button>
 				</SheetFooter>

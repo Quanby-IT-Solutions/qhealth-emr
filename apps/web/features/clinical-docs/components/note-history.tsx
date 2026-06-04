@@ -39,7 +39,7 @@ export function NoteHistory({ note }: NoteHistoryProps) {
 	return (
 		<div className="space-y-4">
 			<div className="flex items-center gap-2">
-				<History className="size-4 text-muted-foreground" />
+				<History className="text-muted-foreground size-4" />
 				<h4 className="text-sm font-semibold">Version Trail</h4>
 				<Badge variant="outline" className="text-xs">
 					{totalVersions} {totalVersions === 1 ? "version" : "versions"}
@@ -49,12 +49,12 @@ export function NoteHistory({ note }: NoteHistoryProps) {
 			<ol className="relative space-y-4 border-l pl-6">
 				{/* v1 — original note */}
 				<li className="relative">
-					<span className="bg-primary text-primary-foreground absolute -left-[31px] flex size-6 items-center justify-center rounded-full text-xs font-medium ring-4 ring-background">
+					<span className="bg-primary text-primary-foreground ring-background absolute -left-[31px] flex size-6 items-center justify-center rounded-full text-xs font-medium ring-4">
 						1
 					</span>
 					<div className="space-y-2 rounded-md border p-3">
 						<div className="flex flex-wrap items-center gap-2">
-							<FileText className="size-4 text-muted-foreground" />
+							<FileText className="text-muted-foreground size-4" />
 							<span className="text-sm font-medium">Original Note</span>
 							<Badge variant={note.status === "signed" ? "default" : "secondary"}>
 								{note.status === "signed" ? (
@@ -69,21 +69,16 @@ export function NoteHistory({ note }: NoteHistoryProps) {
 						</div>
 						<div className="text-muted-foreground space-y-0.5 text-xs">
 							<div>
-								<span className="font-medium">Author:</span>{" "}
-								{note.authorStaffName ?? "Unknown"}
+								<span className="font-medium">Author:</span> {note.authorStaffName ?? "Unknown"}
 							</div>
 							<div>
-								<span className="font-medium">Created:</span>{" "}
-								{formatDateTime(note.createdAt)}
+								<span className="font-medium">Created:</span> {formatDateTime(note.createdAt)}
 							</div>
 							{note.signedAt && (
 								<div className="flex items-center gap-1">
 									<ShieldCheck className="size-3 text-green-600" />
-									<span className="font-medium">Signed:</span>{" "}
-									{formatDateTime(note.signedAt)}
-									{note.signedIp && (
-										<span className="ml-1 font-mono">(IP {note.signedIp})</span>
-									)}
+									<span className="font-medium">Signed:</span> {formatDateTime(note.signedAt)}
+									{note.signedIp && <span className="ml-1 font-mono">(IP {note.signedIp})</span>}
 								</div>
 							)}
 						</div>
@@ -94,7 +89,7 @@ export function NoteHistory({ note }: NoteHistoryProps) {
 				{addenda.map((addendum, idx) => (
 					<li key={addendum.id} className="relative">
 						<span
-							className={`absolute -left-[31px] flex size-6 items-center justify-center rounded-full text-xs font-medium ring-4 ring-background ${
+							className={`ring-background absolute -left-[31px] flex size-6 items-center justify-center rounded-full text-xs font-medium ring-4 ${
 								addendum.status === "signed"
 									? "bg-primary text-primary-foreground"
 									: "bg-muted text-muted-foreground"
@@ -104,7 +99,7 @@ export function NoteHistory({ note }: NoteHistoryProps) {
 						</span>
 						<div className="space-y-2 rounded-md border p-3">
 							<div className="flex flex-wrap items-center gap-2">
-								<PenSquare className="size-4 text-muted-foreground" />
+								<PenSquare className="text-muted-foreground size-4" />
 								<span className="text-sm font-medium">Addendum</span>
 								<Badge variant={addendum.status === "signed" ? "default" : "secondary"}>
 									{addendum.status === "signed" ? (
@@ -124,14 +119,12 @@ export function NoteHistory({ note }: NoteHistoryProps) {
 									{addendum.authorStaffName ?? "Unknown"}
 								</div>
 								<div>
-									<span className="font-medium">Created:</span>{" "}
-									{formatDateTime(addendum.createdAt)}
+									<span className="font-medium">Created:</span> {formatDateTime(addendum.createdAt)}
 								</div>
 								{addendum.signedAt && (
 									<div className="flex items-center gap-1">
 										<ShieldCheck className="size-3 text-green-600" />
-										<span className="font-medium">Signed:</span>{" "}
-										{formatDateTime(addendum.signedAt)}
+										<span className="font-medium">Signed:</span> {formatDateTime(addendum.signedAt)}
 										{addendum.signedIp && (
 											<span className="ml-1 font-mono">(IP {addendum.signedIp})</span>
 										)}
@@ -143,16 +136,14 @@ export function NoteHistory({ note }: NoteHistoryProps) {
 								<>
 									<Separator />
 									<div className="text-xs">
-										<span className="text-muted-foreground font-medium">
-											Reason for amendment:
-										</span>{" "}
+										<span className="text-muted-foreground font-medium">Reason for amendment:</span>{" "}
 										{addendum.reason}
 									</div>
 								</>
 							)}
 
 							<Separator />
-							<div className="bg-muted/40 whitespace-pre-wrap rounded p-2 font-mono text-xs">
+							<div className="bg-muted/40 rounded p-2 font-mono text-xs whitespace-pre-wrap">
 								{addendum.content}
 							</div>
 						</div>

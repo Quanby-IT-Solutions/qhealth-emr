@@ -1,13 +1,19 @@
 "use client"
 
-import Link from "next/link"
 import { useState } from "react"
-import { toast } from "sonner"
+import Link from "next/link"
 import { Plus, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card"
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/core/components/ui/card"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import {
@@ -76,9 +82,7 @@ export function FeatureFlagDetail({ flagId, canEdit }: FeatureFlagDetailProps) {
 
 	if (isError || !flag) {
 		return (
-			<p className="text-destructive text-sm">
-				Failed to load feature flag. It may not exist.
-			</p>
+			<p className="text-destructive text-sm">Failed to load feature flag. It may not exist.</p>
 		)
 	}
 
@@ -119,8 +123,7 @@ export function FeatureFlagDetail({ flagId, canEdit }: FeatureFlagDetailProps) {
 		setShowAddRow(false)
 	}
 
-	const hasDraft =
-		Object.keys(draftToggles).length > 0 || removedIds.size > 0 || newRows.length > 0
+	const hasDraft = Object.keys(draftToggles).length > 0 || removedIds.size > 0 || newRows.length > 0
 
 	const handleSave = async () => {
 		const mergedTargets = [
@@ -189,27 +192,25 @@ export function FeatureFlagDetail({ flagId, canEdit }: FeatureFlagDetailProps) {
 				</CardHeader>
 				<CardContent className="grid gap-3 text-sm sm:grid-cols-2">
 					<div>
-						<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-							Key
-						</p>
+						<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Key</p>
 						<p className="font-mono">{flag.key}</p>
 					</div>
 					<div>
-						<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+						<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 							Default enabled
 						</p>
 						<p>{flag.defaultEnabled ? "Yes" : "No"}</p>
 					</div>
 					{flag.ownerTeam && (
 						<div>
-							<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+							<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 								Owner team
 							</p>
 							<p>{flag.ownerTeam}</p>
 						</div>
 					)}
 					<div>
-						<p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+						<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
 							Group
 						</p>
 						<p className="capitalize">{flag.group.replace("-", " ")}</p>
@@ -223,18 +224,14 @@ export function FeatureFlagDetail({ flagId, canEdit }: FeatureFlagDetailProps) {
 					<div className="space-y-1">
 						<h2 className="text-lg font-medium">Targeting overrides</h2>
 						<p className="text-muted-foreground text-sm">
-							Each row overrides the default for the intersection of non-null dimensions.
-							Null means wildcard. Highest specificity tier wins; within a tier, any{" "}
-							<em>disabled</em> entry disables the flag.
+							Each row overrides the default for the intersection of non-null dimensions. Null means
+							wildcard. Highest specificity tier wins; within a tier, any <em>disabled</em> entry
+							disables the flag.
 						</p>
 					</div>
 					{canEdit && (
 						<div className="flex shrink-0 gap-2">
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => setShowAddRow(v => !v)}
-							>
+							<Button variant="outline" size="sm" onClick={() => setShowAddRow(v => !v)}>
 								<Plus className="mr-1.5 size-4" />
 								Add row
 							</Button>
@@ -263,9 +260,7 @@ export function FeatureFlagDetail({ flagId, canEdit }: FeatureFlagDetailProps) {
 					<Card className="border-dashed">
 						<CardHeader>
 							<CardTitle className="text-sm">New targeting row</CardTitle>
-							<CardDescription>
-								Leave a field blank to match any value (wildcard).
-							</CardDescription>
+							<CardDescription>Leave a field blank to match any value (wildcard).</CardDescription>
 						</CardHeader>
 						<CardContent className="grid gap-4 sm:grid-cols-2">
 							<div className="space-y-1.5">
@@ -325,11 +320,16 @@ export function FeatureFlagDetail({ flagId, canEdit }: FeatureFlagDetailProps) {
 							</div>
 
 							<div className="flex gap-2 sm:col-span-2">
-								<Button size="sm" onClick={addNewRow}>Add row</Button>
+								<Button size="sm" onClick={addNewRow}>
+									Add row
+								</Button>
 								<Button
 									size="sm"
 									variant="outline"
-									onClick={() => { setShowAddRow(false); setNewRowForm(INITIAL_NEW_ROW) }}
+									onClick={() => {
+										setShowAddRow(false)
+										setNewRowForm(INITIAL_NEW_ROW)
+									}}
 								>
 									Cancel
 								</Button>
@@ -343,7 +343,8 @@ export function FeatureFlagDetail({ flagId, canEdit }: FeatureFlagDetailProps) {
 						<CardHeader>
 							<CardTitle className="text-base">No targeting overrides</CardTitle>
 							<CardDescription>
-								This flag resolves to its default ({flag.defaultEnabled ? "enabled" : "disabled"}) for all contexts.
+								This flag resolves to its default ({flag.defaultEnabled ? "enabled" : "disabled"})
+								for all contexts.
 								{canEdit && ' Use "Add row" to create overrides.'}
 							</CardDescription>
 						</CardHeader>
@@ -373,19 +374,25 @@ export function FeatureFlagDetail({ flagId, canEdit }: FeatureFlagDetailProps) {
 											className={`border-b last:border-0 ${isDirty ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}`}
 										>
 											<td className="px-4 py-2">
-												{target.environment
-													? ENVIRONMENT_LABELS[target.environment] ?? target.environment
-													: <span className="text-muted-foreground italic">Any</span>}
+												{target.environment ? (
+													(ENVIRONMENT_LABELS[target.environment] ?? target.environment)
+												) : (
+													<span className="text-muted-foreground italic">Any</span>
+												)}
 											</td>
 											<td className="px-4 py-2">
-												{target.facilityId
-													? <span className="font-mono text-xs">{target.facilityId}</span>
-													: <span className="text-muted-foreground italic">Any</span>}
+												{target.facilityId ? (
+													<span className="font-mono text-xs">{target.facilityId}</span>
+												) : (
+													<span className="text-muted-foreground italic">Any</span>
+												)}
 											</td>
 											<td className="px-4 py-2">
-												{target.roleId
-													? <span className="font-mono text-xs">{target.roleId}</span>
-													: <span className="text-muted-foreground italic">Any</span>}
+												{target.roleId ? (
+													<span className="font-mono text-xs">{target.roleId}</span>
+												) : (
+													<span className="text-muted-foreground italic">Any</span>
+												)}
 											</td>
 											<td className="px-4 py-2">
 												{canEdit ? (
@@ -424,25 +431,33 @@ export function FeatureFlagDetail({ flagId, canEdit }: FeatureFlagDetailProps) {
 										className="border-b bg-green-50 last:border-0 dark:bg-green-950/20"
 									>
 										<td className="px-4 py-2">
-											{row.environment
-												? ENVIRONMENT_LABELS[row.environment] ?? row.environment
-												: <span className="text-muted-foreground italic">Any</span>}
+											{row.environment ? (
+												(ENVIRONMENT_LABELS[row.environment] ?? row.environment)
+											) : (
+												<span className="text-muted-foreground italic">Any</span>
+											)}
 										</td>
 										<td className="px-4 py-2">
-											{row.facilityId
-												? <span className="font-mono text-xs">{row.facilityId}</span>
-												: <span className="text-muted-foreground italic">Any</span>}
+											{row.facilityId ? (
+												<span className="font-mono text-xs">{row.facilityId}</span>
+											) : (
+												<span className="text-muted-foreground italic">Any</span>
+											)}
 										</td>
 										<td className="px-4 py-2">
-											{row.roleId
-												? <span className="font-mono text-xs">{row.roleId}</span>
-												: <span className="text-muted-foreground italic">Any</span>}
+											{row.roleId ? (
+												<span className="font-mono text-xs">{row.roleId}</span>
+											) : (
+												<span className="text-muted-foreground italic">Any</span>
+											)}
 										</td>
 										<td className="px-4 py-2">
 											<Badge variant={row.enabled ? "default" : "secondary"}>
 												{row.enabled ? "On" : "Off"}
 											</Badge>
-											<Badge variant="outline" className="ml-1 text-xs">Pending</Badge>
+											<Badge variant="outline" className="ml-1 text-xs">
+												Pending
+											</Badge>
 										</td>
 										{canEdit && (
 											<td className="px-4 py-2">

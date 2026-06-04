@@ -1,6 +1,6 @@
 "use client"
 
-import { useQueries, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { billingOrpc, himOrpc, orpc } from "@/services/orpc/client"
 
@@ -70,7 +70,8 @@ export function useTerminologySystemsQuery() {
 
 export function useIcd10LookupQuery(query: string) {
 	const systemsQuery = useTerminologySystemsQuery()
-	const icd10System = systemsQuery.data?.find(system => system.name.toLowerCase().includes("icd-10")) ?? null
+	const icd10System =
+		systemsQuery.data?.find(system => system.name.toLowerCase().includes("icd-10")) ?? null
 
 	return useQuery(
 		orpc.terminology.searchCodes.queryOptions({

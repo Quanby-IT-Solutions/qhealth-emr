@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import { AlertTriangle, Check, GitMerge, RefreshCw, X } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -52,10 +51,10 @@ interface DiffRowProps {
 
 function DiffRow({ conflict, resolution, onChoose }: DiffRowProps) {
 	return (
-		<div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-start py-2 text-sm">
+		<div className="grid grid-cols-[1fr_auto_1fr] items-start gap-2 py-2 text-sm">
 			{/* Local */}
 			<div
-				className={`rounded-md border px-3 py-2 cursor-pointer transition-colors ${
+				className={`cursor-pointer rounded-md border px-3 py-2 transition-colors ${
 					resolution === "local"
 						? "border-green-500 bg-green-50 dark:bg-green-900/20"
 						: "hover:bg-muted/50"
@@ -63,28 +62,30 @@ function DiffRow({ conflict, resolution, onChoose }: DiffRowProps) {
 				onClick={() => onChoose("local")}
 				role="button"
 				tabIndex={0}
-				onKeyDown={(e) => e.key === "Enter" && onChoose("local")}
+				onKeyDown={e => e.key === "Enter" && onChoose("local")}
 			>
-				<p className="text-xs font-medium text-muted-foreground mb-1">Local</p>
-				<p className="wrap-break-word">{conflict.localValue || <span className="italic text-muted-foreground">empty</span>}</p>
+				<p className="text-muted-foreground mb-1 text-xs font-medium">Local</p>
+				<p className="wrap-break-word">
+					{conflict.localValue || <span className="text-muted-foreground italic">empty</span>}
+				</p>
 				{resolution === "local" && (
-					<div className="flex items-center gap-1 mt-1 text-green-600 text-xs">
+					<div className="mt-1 flex items-center gap-1 text-xs text-green-600">
 						<Check className="size-3" /> Selected
 					</div>
 				)}
 			</div>
 
 			{/* Field label */}
-			<div className="flex flex-col items-center pt-2 gap-1">
+			<div className="flex flex-col items-center gap-1 pt-2">
 				<Badge variant="outline" className="text-xs whitespace-nowrap">
 					{conflict.label}
 				</Badge>
-				<RefreshCw className="size-3 text-muted-foreground" />
+				<RefreshCw className="text-muted-foreground size-3" />
 			</div>
 
 			{/* Server */}
 			<div
-				className={`rounded-md border px-3 py-2 cursor-pointer transition-colors ${
+				className={`cursor-pointer rounded-md border px-3 py-2 transition-colors ${
 					resolution === "server"
 						? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
 						: "hover:bg-muted/50"
@@ -92,12 +93,14 @@ function DiffRow({ conflict, resolution, onChoose }: DiffRowProps) {
 				onClick={() => onChoose("server")}
 				role="button"
 				tabIndex={0}
-				onKeyDown={(e) => e.key === "Enter" && onChoose("server")}
+				onKeyDown={e => e.key === "Enter" && onChoose("server")}
 			>
-				<p className="text-xs font-medium text-muted-foreground mb-1">Server</p>
-				<p className="wrap-break-word">{conflict.serverValue || <span className="italic text-muted-foreground">empty</span>}</p>
+				<p className="text-muted-foreground mb-1 text-xs font-medium">Server</p>
+				<p className="wrap-break-word">
+					{conflict.serverValue || <span className="text-muted-foreground italic">empty</span>}
+				</p>
 				{resolution === "server" && (
-					<div className="flex items-center gap-1 mt-1 text-blue-600 text-xs">
+					<div className="mt-1 flex items-center gap-1 text-xs text-blue-600">
 						<Check className="size-3" /> Selected
 					</div>
 				)}
@@ -117,22 +120,20 @@ interface ConflictResolverProps {
 }
 
 function ConflictResolver({ record, onResolve, onSkip }: ConflictResolverProps) {
-	const [fieldResolutions, setFieldResolutions] = useState<
-		Record<string, "local" | "server">
-	>({})
+	const [fieldResolutions, setFieldResolutions] = useState<Record<string, "local" | "server">>({})
 	const [mode, setMode] = useState<ResolutionMode>("merge")
 
 	const allResolved =
-		mode !== "merge" || record.fields.every((f) => fieldResolutions[f.field] !== undefined)
+		mode !== "merge" || record.fields.every(f => fieldResolutions[f.field] !== undefined)
 
 	function handleChoose(field: string, choice: "local" | "server") {
-		setFieldResolutions((prev) => ({ ...prev, [field]: choice }))
+		setFieldResolutions(prev => ({ ...prev, [field]: choice }))
 	}
 
 	function handleAcceptAll(side: "local" | "server") {
 		setMode(side)
 		const all: Record<string, "local" | "server"> = {}
-		record.fields.forEach((f) => {
+		record.fields.forEach(f => {
 			all[f.field] = side
 		})
 		setFieldResolutions(all)
@@ -141,13 +142,13 @@ function ConflictResolver({ record, onResolve, onSkip }: ConflictResolverProps) 
 	function handleSubmit() {
 		if (mode === "local") {
 			const all: Record<string, "local" | "server"> = {}
-			record.fields.forEach((f) => {
+			record.fields.forEach(f => {
 				all[f.field] = "local"
 			})
 			onResolve(record.id, all)
 		} else if (mode === "server") {
 			const all: Record<string, "local" | "server"> = {}
-			record.fields.forEach((f) => {
+			record.fields.forEach(f => {
 				all[f.field] = "server"
 			})
 			onResolve(record.id, all)
@@ -159,15 +160,14 @@ function ConflictResolver({ record, onResolve, onSkip }: ConflictResolverProps) 
 	return (
 		<div className="space-y-4">
 			{/* Context */}
-			<div className="rounded-md border bg-amber-50 dark:bg-amber-900/10 px-4 py-3">
+			<div className="rounded-md border bg-amber-50 px-4 py-3 dark:bg-amber-900/10">
 				<div className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
-					<AlertTriangle className="size-4 mt-0.5 shrink-0" />
+					<AlertTriangle className="mt-0.5 size-4 shrink-0" />
 					<div>
 						<p className="text-sm font-medium">Conflict in {record.recordType}</p>
-						<p className="text-xs mt-0.5">{record.description}</p>
-						<p className="text-xs mt-1 opacity-70">
-							Local modified{" "}
-							{new Date(record.localUpdatedAt).toLocaleString("en-PH")} · Server
+						<p className="mt-0.5 text-xs">{record.description}</p>
+						<p className="mt-1 text-xs opacity-70">
+							Local modified {new Date(record.localUpdatedAt).toLocaleString("en-PH")} · Server
 							modified {new Date(record.serverUpdatedAt).toLocaleString("en-PH")}
 						</p>
 					</div>
@@ -175,13 +175,13 @@ function ConflictResolver({ record, onResolve, onSkip }: ConflictResolverProps) 
 			</div>
 
 			{/* Bulk actions */}
-			<div className="flex items-center gap-2 flex-wrap">
-				<span className="text-xs text-muted-foreground">Quick actions:</span>
+			<div className="flex flex-wrap items-center gap-2">
+				<span className="text-muted-foreground text-xs">Quick actions:</span>
 				<Button
 					variant="outline"
 					size="sm"
 					onClick={() => handleAcceptAll("local")}
-					className="text-green-700 border-green-300 hover:bg-green-50"
+					className="border-green-300 text-green-700 hover:bg-green-50"
 				>
 					<Check className="mr-1.5 size-3.5" />
 					Accept All Local
@@ -190,7 +190,7 @@ function ConflictResolver({ record, onResolve, onSkip }: ConflictResolverProps) 
 					variant="outline"
 					size="sm"
 					onClick={() => handleAcceptAll("server")}
-					className="text-blue-700 border-blue-300 hover:bg-blue-50"
+					className="border-blue-300 text-blue-700 hover:bg-blue-50"
 				>
 					<Check className="mr-1.5 size-3.5" />
 					Accept All Server
@@ -213,16 +213,12 @@ function ConflictResolver({ record, onResolve, onSkip }: ConflictResolverProps) 
 			{/* Field-level diff */}
 			<ScrollArea className="max-h-96">
 				<div className="divide-y">
-					{record.fields.map((f) => (
+					{record.fields.map(f => (
 						<DiffRow
 							key={f.field}
 							conflict={f}
-							resolution={
-								mode !== "merge"
-									? mode
-									: (fieldResolutions[f.field] ?? null)
-							}
-							onChoose={(choice) => {
+							resolution={mode !== "merge" ? mode : (fieldResolutions[f.field] ?? null)}
+							onChoose={choice => {
 								setMode("merge")
 								handleChoose(f.field, choice)
 							}}
@@ -232,7 +228,7 @@ function ConflictResolver({ record, onResolve, onSkip }: ConflictResolverProps) 
 			</ScrollArea>
 
 			{/* Submit */}
-			<div className="flex justify-between items-center">
+			<div className="flex items-center justify-between">
 				<Button variant="ghost" onClick={onSkip}>
 					<X className="mr-1.5 size-3.5" />
 					Skip for Now
@@ -258,33 +254,30 @@ export function SyncConflict({ conflicts, onAllResolved }: SyncConflictProps) {
 	const [remaining, setRemaining] = useState<ConflictRecord[]>(conflicts)
 	const [resolvedCount, setResolvedCount] = useState(0)
 
-	function handleResolve(
-		recordId: string,
-		_resolutions: Record<string, "local" | "server">
-	) {
+	function handleResolve(recordId: string, _resolutions: Record<string, "local" | "server">) {
 		// In a real implementation, apply resolutions to local store and re-sync.
 		// Here we just remove the record from the list.
-		const next = remaining.filter((r) => r.id !== recordId)
+		const next = remaining.filter(r => r.id !== recordId)
 		setRemaining(next)
-		setResolvedCount((c) => c + 1)
+		setResolvedCount(c => c + 1)
 		if (next.length === 0) onAllResolved?.()
 	}
 
 	function handleSkip() {
 		if (remaining.length <= 1) return
 		// Rotate: move first to end
-		setRemaining((prev) => [...prev.slice(1), prev[0]!])
+		setRemaining(prev => [...prev.slice(1), prev[0]!])
 	}
 
 	if (remaining.length === 0) {
 		return (
 			<Card>
 				<CardContent className="flex flex-col items-center py-10 text-center">
-					<Check className="size-12 text-green-500 mb-3" />
+					<Check className="mb-3 size-12 text-green-500" />
 					<p className="font-semibold">All conflicts resolved</p>
-					<p className="text-sm text-muted-foreground mt-1">
-						{resolvedCount} record{resolvedCount !== 1 ? "s" : ""} resolved.
-						Sync will proceed automatically.
+					<p className="text-muted-foreground mt-1 text-sm">
+						{resolvedCount} record{resolvedCount !== 1 ? "s" : ""} resolved. Sync will proceed
+						automatically.
 					</p>
 				</CardContent>
 			</Card>
@@ -302,21 +295,15 @@ export function SyncConflict({ conflicts, onAllResolved }: SyncConflictProps) {
 							<AlertTriangle className="size-4 text-red-500" />
 							Sync Conflicts
 						</span>
-						<Badge variant="destructive">
-							{remaining.length} remaining
-						</Badge>
+						<Badge variant="destructive">{remaining.length} remaining</Badge>
 					</CardTitle>
 					<CardDescription>
-						Resolve each conflict before records can be synchronized. Choose which
-						version to keep for each conflicting field.
+						Resolve each conflict before records can be synchronized. Choose which version to keep
+						for each conflicting field.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<ConflictResolver
-						record={current}
-						onResolve={handleResolve}
-						onSkip={handleSkip}
-					/>
+					<ConflictResolver record={current} onResolve={handleResolve} onSkip={handleSkip} />
 				</CardContent>
 			</Card>
 		</div>

@@ -7,6 +7,6 @@ import { RecordsRequestListPage } from "./records-request-list-page"
 export function HimRecordsClient() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
-	if (!facilityId) return <div className="p-8 text-muted-foreground">Loading…</div>
+	if (!facilityId) return <div className="text-muted-foreground p-8">Loading…</div>
 	return <RecordsRequestListPage facilityId={facilityId} />
 }

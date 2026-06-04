@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-
 import {
 	CheckCircle2,
 	ChevronRight,
@@ -20,17 +19,24 @@ import { Checkbox } from "@/core/components/ui/checkbox"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Separator } from "@/core/components/ui/separator"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table"
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/core/components/ui/table"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 
 import {
-	type DispenseStep,
-	type OpdPrescription,
-	type OpdPrescriptionItem,
 	useOpdDispenseMutation,
 	useOpdPrescriptionQueueQuery,
 	useOpdPrescriptionSearchQuery,
+	type DispenseStep,
+	type OpdPrescription,
+	type OpdPrescriptionItem,
 } from "../api/pharmacy.hooks"
 
 // ── Step indicator ────────────────────────────────────────────────────────────
@@ -46,7 +52,7 @@ const STEPS: Array<{ key: DispenseStep; label: string; icon: typeof Search }> = 
 ]
 
 function StepIndicator({ current }: StepIndicatorProps) {
-	const currentIdx = STEPS.findIndex((s) => s.key === current)
+	const currentIdx = STEPS.findIndex(s => s.key === current)
 
 	return (
 		<div className="flex items-center gap-0">
@@ -66,11 +72,7 @@ function StepIndicator({ current }: StepIndicatorProps) {
 										: "text-muted-foreground"
 							}`}
 						>
-							{isDone ? (
-								<CheckCircle2 className="size-4" />
-							) : (
-								<Icon className="size-4" />
-							)}
+							{isDone ? <CheckCircle2 className="size-4" /> : <Icon className="size-4" />}
 							{step.label}
 						</div>
 						{idx < STEPS.length - 1 && (
@@ -95,7 +97,12 @@ function RxVerifyStep({ facilityId, onPrescriptionFound }: RxVerifyStepProps) {
 	const [submitted, setSubmitted] = useState("")
 
 	const queue = useOpdPrescriptionQueueQuery({ facilityId, status: "signed" })
-	const { data, isLoading: searchLoading, error, isFetching } = useOpdPrescriptionSearchQuery(submitted)
+	const {
+		data,
+		isLoading: searchLoading,
+		error,
+		isFetching,
+	} = useOpdPrescriptionSearchQuery(submitted)
 
 	function handleSearch() {
 		setSubmitted(input.trim())
@@ -136,10 +143,10 @@ function RxVerifyStep({ facilityId, onPrescriptionFound }: RxVerifyStepProps) {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{queue.data?.data?.map((rx) => (
+								{queue.data?.data?.map(rx => (
 									<TableRow
 										key={rx.id}
-										className="cursor-pointer hover:bg-muted/50"
+										className="hover:bg-muted/50 cursor-pointer"
 										onClick={() => setSubmitted(rx.patientMrn)}
 									>
 										<TableCell className="font-medium">{rx.patientName}</TableCell>
@@ -163,7 +170,7 @@ function RxVerifyStep({ facilityId, onPrescriptionFound }: RxVerifyStepProps) {
 											<Button
 												size="sm"
 												variant="outline"
-												onClick={(e) => {
+												onClick={e => {
 													e.stopPropagation()
 													setSubmitted(rx.patientMrn)
 												}}
@@ -186,19 +193,19 @@ function RxVerifyStep({ facilityId, onPrescriptionFound }: RxVerifyStepProps) {
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<p className="text-muted-foreground text-sm">
-						Scan the QR code on the prescription slip, or manually enter the prescription
-						number or patient MRN.
+						Scan the QR code on the prescription slip, or manually enter the prescription number or
+						patient MRN.
 					</p>
 
 					<div className="flex gap-2">
 						<div className="relative flex-1">
-							<QrCode className="text-muted-foreground absolute left-2.5 top-2.5 size-4" />
+							<QrCode className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
 							<Input
 								className="pl-9"
 								placeholder="Rx number, patient MRN, or scan QR…"
 								value={input}
-								onChange={(e) => setInput(e.target.value)}
-								onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+								onChange={e => setInput(e.target.value)}
+								onKeyDown={e => e.key === "Enter" && handleSearch()}
 							/>
 						</div>
 						{input && (
@@ -223,7 +230,7 @@ function RxVerifyStep({ facilityId, onPrescriptionFound }: RxVerifyStepProps) {
 					)}
 
 					{data && (
-						<div className="rounded-md border p-4 space-y-3">
+						<div className="space-y-3 rounded-md border p-4">
 							<div className="flex items-start justify-between">
 								<div>
 									<p className="font-semibold">{data.patientName}</p>
@@ -236,9 +243,11 @@ function RxVerifyStep({ facilityId, onPrescriptionFound }: RxVerifyStepProps) {
 								</div>
 								<Badge
 									variant={
-										data.status === "issued" ? "secondary"
-											: data.status === "signed" ? "default"
-											: "secondary"
+										data.status === "issued"
+											? "secondary"
+											: data.status === "signed"
+												? "default"
+												: "secondary"
 									}
 								>
 									{data.status}
@@ -248,10 +257,10 @@ function RxVerifyStep({ facilityId, onPrescriptionFound }: RxVerifyStepProps) {
 							<Separator />
 
 							<div>
-								<p className="text-xs text-muted-foreground mb-1">
+								<p className="text-muted-foreground mb-1 text-xs">
 									Prescriber: {data.prescriberName ?? "—"} · PRC {data.prescriberPrc}
 								</p>
-								<p className="text-xs text-muted-foreground">
+								<p className="text-muted-foreground text-xs">
 									Rx #{data.prescriptionNumber} · Prescribed:{" "}
 									{new Date(data.prescribedAt).toLocaleDateString("en-PH")}
 								</p>
@@ -267,18 +276,15 @@ function RxVerifyStep({ facilityId, onPrescriptionFound }: RxVerifyStepProps) {
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{data.items.map((item) => (
+									{data.items.map(item => (
 										<TableRow key={item.id}>
 											<TableCell>
 												<p className="text-sm font-medium">{item.genericName}</p>
 												{item.brandName && (
-													<p className="text-muted-foreground text-xs">
-														({item.brandName})
-													</p>
+													<p className="text-muted-foreground text-xs">({item.brandName})</p>
 												)}
 												<p className="text-muted-foreground text-xs">
-													{item.dose} {item.doseUnit} · {item.route} ·{" "}
-													{item.frequency}
+													{item.dose} {item.doseUnit} · {item.route} · {item.frequency}
 												</p>
 											</TableCell>
 											<TableCell className="text-center text-sm">
@@ -337,7 +343,7 @@ function BillingStep({ prescription, onConfirm, onBack }: BillingStepProps) {
 					<CardTitle className="text-base">Step 2 — Billing Confirmation</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
-					<div className="rounded-md bg-muted p-4 space-y-2">
+					<div className="bg-muted space-y-2 rounded-md p-4">
 						<div className="flex justify-between text-sm">
 							<span>Estimated Total</span>
 							<span className="font-medium">₱{(prescription.estimatedTotal ?? 0).toFixed(2)}</span>
@@ -397,8 +403,8 @@ function OpdDispenseStep({ prescription, facilityId, onSuccess, onBack }: Dispen
 		}>
 	>(
 		prescription.items
-			.filter((i) => !i.dispensed)
-			.map((i) => ({
+			.filter(i => !i.dispensed)
+			.map(i => ({
 				prescriptionItemId: i.id,
 				dispensedQuantity: i.quantity,
 				lotNumber: "",
@@ -416,24 +422,22 @@ function OpdDispenseStep({ prescription, facilityId, onSuccess, onBack }: Dispen
 		{ key: "storage", label: "Storage requirements communicated" },
 	]
 
-	function updateItem(id: string, field: "dispensedQuantity" | "lotNumber", value: string | number) {
-		setItems((prev) =>
-			prev.map((i) =>
-				i.prescriptionItemId === id ? { ...i, [field]: value } : i
-			)
-		)
+	function updateItem(
+		id: string,
+		field: "dispensedQuantity" | "lotNumber",
+		value: string | number
+	) {
+		setItems(prev => prev.map(i => (i.prescriptionItemId === id ? { ...i, [field]: value } : i)))
 	}
 
 	function toggleItem(id: string) {
-		setItems((prev) =>
-			prev.map((i) =>
-				i.prescriptionItemId === id ? { ...i, selected: !i.selected } : i
-			)
+		setItems(prev =>
+			prev.map(i => (i.prescriptionItemId === id ? { ...i, selected: !i.selected } : i))
 		)
 	}
 
 	function toggleEducation(key: string) {
-		setEducation((prev) => {
+		setEducation(prev => {
 			const next = new Set(prev)
 			if (next.has(key)) next.delete(key)
 			else next.add(key)
@@ -442,16 +446,16 @@ function OpdDispenseStep({ prescription, facilityId, onSuccess, onBack }: Dispen
 	}
 
 	function getPrescriptionItem(id: string): OpdPrescriptionItem | undefined {
-		return prescription.items.find((i) => i.id === id)
+		return prescription.items.find(i => i.id === id)
 	}
 
 	function handleDispense() {
-		const selected = items.filter((i) => i.selected)
+		const selected = items.filter(i => i.selected)
 		dispense.mutate(
 			{
 				prescriptionId: prescription.id,
 				facilityId,
-				items: selected.map((i) => ({
+				items: selected.map(i => ({
 					prescriptionItemId: i.prescriptionItemId,
 					dispensedQuantity: i.dispensedQuantity,
 					lotNumber: i.lotNumber || undefined,
@@ -459,11 +463,11 @@ function OpdDispenseStep({ prescription, facilityId, onSuccess, onBack }: Dispen
 				counselingNotes: counselingNotes || undefined,
 				patientEducation: Array.from(education),
 			},
-			{ onSuccess: (data) => onSuccess(data) }
+			{ onSuccess: data => onSuccess(data) }
 		)
 	}
 
-	const hasSelected = items.some((i) => i.selected)
+	const hasSelected = items.some(i => i.selected)
 
 	return (
 		<div className="space-y-4">
@@ -482,7 +486,7 @@ function OpdDispenseStep({ prescription, facilityId, onSuccess, onBack }: Dispen
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{items.map((item) => {
+							{items.map(item => {
 								const rxItem = getPrescriptionItem(item.prescriptionItemId)
 								return (
 									<TableRow key={item.prescriptionItemId}>
@@ -493,13 +497,9 @@ function OpdDispenseStep({ prescription, facilityId, onSuccess, onBack }: Dispen
 											/>
 										</TableCell>
 										<TableCell>
-											<p className="text-sm font-medium">
-												{rxItem?.genericName}
-											</p>
+											<p className="text-sm font-medium">{rxItem?.genericName}</p>
 											{rxItem?.brandName && (
-												<p className="text-muted-foreground text-xs">
-													({rxItem.brandName})
-												</p>
+												<p className="text-muted-foreground text-xs">({rxItem.brandName})</p>
 											)}
 											<p className="text-muted-foreground text-xs">
 												{rxItem?.dose} {rxItem?.doseUnit} · {rxItem?.doseForm}
@@ -511,7 +511,7 @@ function OpdDispenseStep({ prescription, facilityId, onSuccess, onBack }: Dispen
 												min="1"
 												className="w-20 text-center"
 												value={item.dispensedQuantity}
-												onChange={(e) =>
+												onChange={e =>
 													updateItem(
 														item.prescriptionItemId,
 														"dispensedQuantity",
@@ -526,12 +526,8 @@ function OpdDispenseStep({ prescription, facilityId, onSuccess, onBack }: Dispen
 												placeholder="Optional"
 												className="w-32"
 												value={item.lotNumber}
-												onChange={(e) =>
-													updateItem(
-														item.prescriptionItemId,
-														"lotNumber",
-														e.target.value
-													)
+												onChange={e =>
+													updateItem(item.prescriptionItemId, "lotNumber", e.target.value)
 												}
 												disabled={!item.selected}
 											/>
@@ -553,14 +549,14 @@ function OpdDispenseStep({ prescription, facilityId, onSuccess, onBack }: Dispen
 							rows={3}
 							placeholder="Document what was discussed with the patient…"
 							value={counselingNotes}
-							onChange={(e) => setCounselingNotes(e.target.value)}
+							onChange={e => setCounselingNotes(e.target.value)}
 						/>
 					</div>
 
 					<div>
 						<p className="mb-2 text-sm font-medium">Patient Education</p>
 						<div className="space-y-2">
-							{EDUCATION_KEYS.map((item) => (
+							{EDUCATION_KEYS.map(item => (
 								<div key={item.key} className="flex items-center gap-2">
 									<Checkbox
 										id={`opd-edu-${item.key}`}
@@ -579,10 +575,7 @@ function OpdDispenseStep({ prescription, facilityId, onSuccess, onBack }: Dispen
 					</div>
 
 					<div className="flex gap-3">
-						<Button
-							onClick={handleDispense}
-							disabled={!hasSelected || dispense.isPending}
-						>
+						<Button onClick={handleDispense} disabled={!hasSelected || dispense.isPending}>
 							{dispense.isPending ? (
 								<Loader2 className="mr-1.5 size-4 animate-spin" />
 							) : (
@@ -656,7 +649,7 @@ export function OpdDispensing() {
 			{step === "verify" && (
 				<RxVerifyStep
 					facilityId={facilityId}
-					onPrescriptionFound={(rx) => {
+					onPrescriptionFound={rx => {
 						setPrescription(rx)
 						setStep("billing")
 					}}

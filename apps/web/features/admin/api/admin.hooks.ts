@@ -41,8 +41,7 @@ export function useCreateStaffMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.createStaff.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
 		})
 	)
 }
@@ -51,8 +50,7 @@ export function useUpdateStaffMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.updateStaff.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
 		})
 	)
 }
@@ -61,8 +59,7 @@ export function useDeactivateStaffMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.deactivateStaff.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
 		})
 	)
 }
@@ -71,8 +68,7 @@ export function useAssignUserRolesMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.assignUserRoles.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
 		})
 	)
 }
@@ -107,8 +103,7 @@ export function useCreateRoleMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.createRole.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listRoles.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listRoles.key() }),
 		})
 	)
 }
@@ -117,8 +112,7 @@ export function useUpdateRoleMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.updateRole.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listRoles.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listRoles.key() }),
 		})
 	)
 }
@@ -127,8 +121,7 @@ export function useUpdateRolePermissionsMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.updateRolePermissions.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listRoles.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listRoles.key() }),
 		})
 	)
 }
@@ -137,8 +130,7 @@ export function useArchiveRoleMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.archiveRole.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listRoles.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listRoles.key() }),
 		})
 	)
 }
@@ -149,8 +141,7 @@ export function useCreateUserMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.createUser.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
 		})
 	)
 }
@@ -159,8 +150,7 @@ export function useReEnableUserMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.reEnableUser.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
 		})
 	)
 }
@@ -169,8 +159,7 @@ export function useAddStaffFacilityMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.addStaffFacility.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
 		})
 	)
 }
@@ -179,8 +168,7 @@ export function useRemoveStaffFacilityMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.removeStaffFacility.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
 		})
 	)
 }
@@ -189,8 +177,7 @@ export function useAddUserRoleMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.addUserRole.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
 		})
 	)
 }
@@ -199,8 +186,7 @@ export function useRemoveUserRoleMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(
 		orpc.rbac.removeUserRole.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.rbac.listStaff.key() }),
 		})
 	)
 }

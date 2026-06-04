@@ -1,9 +1,7 @@
 "use client"
 
 import { useState } from "react"
-
 import { CheckCircle2, Loader2 } from "lucide-react"
-
 import { toast } from "sonner"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -16,9 +14,9 @@ import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
 
 import {
-	type PharmacyOrderDetail,
 	useDispenseOrderMutation,
 	useVerifyPharmacyOrderMutation,
+	type PharmacyOrderDetail,
 } from "../api/pharmacy.hooks"
 
 // ── Patient education checklist ───────────────────────────────────────────────
@@ -66,7 +64,7 @@ export function DispenseConfirmation({
 	const [education, setEducation] = useState<Set<string>>(new Set())
 
 	function toggleEducation(key: string) {
-		setEducation((prev) => {
+		setEducation(prev => {
 			const next = new Set(prev)
 			if (next.has(key)) next.delete(key)
 			else next.add(key)
@@ -78,7 +76,7 @@ export function DispenseConfirmation({
 		const allKeys = [
 			...EDUCATION_ITEMS,
 			...(order.isControlledSubstance ? CS_EDUCATION_ITEMS : []),
-		].map((i) => i.key)
+		].map(i => i.key)
 		setEducation(new Set(allKeys))
 	}
 
@@ -106,17 +104,11 @@ export function DispenseConfirmation({
 								toast.success("Order approved and dispensed")
 								onSuccess()
 							},
-							onError: (err) =>
-								toast.error(
-									err instanceof Error ? err.message : "Dispense failed"
-								),
+							onError: err => toast.error(err instanceof Error ? err.message : "Dispense failed"),
 						}
 					)
 				},
-				onError: (err) =>
-					toast.error(
-						err instanceof Error ? err.message : "Failed to approve order"
-					),
+				onError: err => toast.error(err instanceof Error ? err.message : "Failed to approve order"),
 			}
 		)
 	}
@@ -138,7 +130,7 @@ export function DispenseConfirmation({
 					</div>
 				</CardHeader>
 				<CardContent>
-					<div className="rounded-md bg-muted p-3">
+					<div className="bg-muted rounded-md p-3">
 						<p className="font-medium">
 							{order.genericName}
 							{order.brandName ? ` (${order.brandName})` : ""}
@@ -147,12 +139,8 @@ export function DispenseConfirmation({
 							{order.dose} {order.doseUnit} · {order.route} · {order.frequency}
 							{order.durationDays ? ` · ${order.durationDays} days` : ""}
 						</p>
-						<p className="text-muted-foreground text-xs mt-1">
-							Patient:{" "}
-							<strong>
-								{order.patientName}
-							</strong>{" "}
-							· MRN: {order.patientMrn}
+						<p className="text-muted-foreground mt-1 text-xs">
+							Patient: <strong>{order.patientName}</strong> · MRN: {order.patientMrn}
 						</p>
 					</div>
 				</CardContent>
@@ -177,14 +165,14 @@ export function DispenseConfirmation({
 									step="1"
 									placeholder="0"
 									value={quantity}
-									onChange={(e) => setQuantity(e.target.value)}
+									onChange={e => setQuantity(e.target.value)}
 									className="w-24"
 								/>
 								<Input
 									aria-label="Unit"
 									placeholder="unit (e.g. tablet)"
 									value={quantityUnit}
-									onChange={(e) => setQuantityUnit(e.target.value)}
+									onChange={e => setQuantityUnit(e.target.value)}
 								/>
 							</div>
 						</div>
@@ -197,7 +185,7 @@ export function DispenseConfirmation({
 								id="lotNum"
 								placeholder="Optional"
 								value={lotNumber}
-								onChange={(e) => setLotNumber(e.target.value)}
+								onChange={e => setLotNumber(e.target.value)}
 							/>
 						</div>
 
@@ -209,7 +197,7 @@ export function DispenseConfirmation({
 								id="expDate"
 								type="date"
 								value={expiryDate}
-								onChange={(e) => setExpiryDate(e.target.value)}
+								onChange={e => setExpiryDate(e.target.value)}
 							/>
 						</div>
 					</div>
@@ -223,7 +211,7 @@ export function DispenseConfirmation({
 							rows={3}
 							placeholder="Document patient counseling session, questions raised, understanding confirmed…"
 							value={counselingNotes}
-							onChange={(e) => setCounselingNotes(e.target.value)}
+							onChange={e => setCounselingNotes(e.target.value)}
 						/>
 					</div>
 				</CardContent>
@@ -233,9 +221,7 @@ export function DispenseConfirmation({
 			<Card>
 				<CardHeader>
 					<div className="flex items-center justify-between">
-						<CardTitle className="text-sm font-medium">
-							Patient Education Checklist
-						</CardTitle>
+						<CardTitle className="text-sm font-medium">Patient Education Checklist</CardTitle>
 						<Button variant="ghost" size="sm" onClick={selectAll}>
 							Select All
 						</Button>
@@ -246,7 +232,7 @@ export function DispenseConfirmation({
 						Check all topics covered during patient counseling.
 					</p>
 
-					{EDUCATION_ITEMS.map((item) => (
+					{EDUCATION_ITEMS.map(item => (
 						<div key={item.key} className="flex items-center gap-2">
 							<Checkbox
 								id={`edu-${item.key}`}
@@ -262,10 +248,10 @@ export function DispenseConfirmation({
 					{order.isControlledSubstance && (
 						<>
 							<Separator className="my-2" />
-							<p className="text-xs font-semibold uppercase text-orange-700">
+							<p className="text-xs font-semibold text-orange-700 uppercase">
 								Controlled Substance Counseling
 							</p>
-							{CS_EDUCATION_ITEMS.map((item) => (
+							{CS_EDUCATION_ITEMS.map(item => (
 								<div key={item.key} className="flex items-center gap-2">
 									<Checkbox
 										id={`edu-${item.key}`}
@@ -285,8 +271,7 @@ export function DispenseConfirmation({
 
 					<p className="text-muted-foreground pt-2 text-xs">
 						{education.size} /{" "}
-						{EDUCATION_ITEMS.length +
-							(order.isControlledSubstance ? CS_EDUCATION_ITEMS.length : 0)}{" "}
+						{EDUCATION_ITEMS.length + (order.isControlledSubstance ? CS_EDUCATION_ITEMS.length : 0)}{" "}
 						topics covered
 					</p>
 				</CardContent>
@@ -294,16 +279,17 @@ export function DispenseConfirmation({
 
 			{/* Actions */}
 			<div className="flex items-center gap-3">
-				<Button
-					onClick={handleSubmit}
-					disabled={!isValid || isBusy}
-				>
+				<Button onClick={handleSubmit} disabled={!isValid || isBusy}>
 					{isBusy ? (
 						<Loader2 className="mr-1.5 size-4 animate-spin" />
 					) : (
 						<CheckCircle2 className="mr-1.5 size-4" />
 					)}
-					{verify.isPending ? "Approving…" : dispense.isPending ? "Dispensing…" : "Approve & Dispense"}
+					{verify.isPending
+						? "Approving…"
+						: dispense.isPending
+							? "Dispensing…"
+							: "Approve & Dispense"}
 				</Button>
 				<Button variant="outline" onClick={onCancel} disabled={isBusy}>
 					Cancel

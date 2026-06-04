@@ -74,9 +74,7 @@ export function BedCensusMetrics({ census }: BedCensusMetricsProps) {
 				<Card>
 					<CardContent className="pt-6">
 						<p className="text-muted-foreground text-sm">Available</p>
-						<p className="text-2xl font-bold text-green-600 dark:text-green-400">
-							{available}
-						</p>
+						<p className="text-2xl font-bold text-green-600 dark:text-green-400">{available}</p>
 					</CardContent>
 				</Card>
 
@@ -84,7 +82,9 @@ export function BedCensusMetrics({ census }: BedCensusMetricsProps) {
 					<CardContent className="pt-6">
 						<p className="text-muted-foreground text-sm">BOR</p>
 						<div className="flex items-center gap-2">
-							<p className={`text-2xl font-bold ${borColor(bor)}`}>{census.overall.borPercentage}%</p>
+							<p className={`text-2xl font-bold ${borColor(bor)}`}>
+								{census.overall.borPercentage}%
+							</p>
 							<Badge variant={borBadge(bor)} className="text-xs">
 								{bor >= 90 ? "Critical" : bor >= 75 ? "High" : "Normal"}
 							</Badge>
@@ -97,7 +97,9 @@ export function BedCensusMetrics({ census }: BedCensusMetricsProps) {
 					<CardContent className="pt-6">
 						<p className="text-muted-foreground text-sm">Midnight Census</p>
 						<p className="text-2xl font-bold">{midnightCensus}</p>
-						<p className="text-muted-foreground text-xs">as of {new Date(census.date).toLocaleDateString("en-PH")}</p>
+						<p className="text-muted-foreground text-xs">
+							as of {new Date(census.date).toLocaleDateString("en-PH")}
+						</p>
 					</CardContent>
 				</Card>
 			</div>
@@ -107,7 +109,8 @@ export function BedCensusMetrics({ census }: BedCensusMetricsProps) {
 				<div className="flex items-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 dark:border-yellow-900/50 dark:bg-yellow-900/20">
 					<TrendingUp className="size-4 text-yellow-600 dark:text-yellow-400" />
 					<p className="text-sm text-yellow-800 dark:text-yellow-300">
-						High occupancy forecast — BOR exceeds 85%. Consider early discharge planning or diversion protocols.
+						High occupancy forecast — BOR exceeds 85%. Consider early discharge planning or
+						diversion protocols.
 					</p>
 				</div>
 			)}

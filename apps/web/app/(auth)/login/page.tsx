@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { motion, useScroll, useTransform } from "framer-motion"
 import { useTheme } from "next-themes"
 
@@ -20,21 +20,39 @@ function ThemeToggle() {
 	return (
 		<button
 			onClick={() => setTheme(isDark ? "light" : "dark")}
-			className="fixed top-6 right-6 z-50 flex h-8 w-14 cursor-pointer items-center rounded-full border border-border bg-card p-1 shadow-sm transition-colors hover:bg-accent/10"
+			className="border-border bg-card hover:bg-accent/10 fixed top-6 right-6 z-50 flex h-8 w-14 cursor-pointer items-center rounded-full border p-1 shadow-sm transition-colors"
 			aria-label="Toggle Dark Mode"
 		>
 			<motion.div
-				className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
+				className="bg-primary text-primary-foreground flex h-6 w-6 items-center justify-center rounded-full shadow-sm"
 				layout
 				transition={{ type: "spring", stiffness: 700, damping: 30 }}
 				style={{ marginLeft: isDark ? "auto" : "0" }}
 			>
 				{isDark ? (
-					<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+					<svg
+						width="12"
+						height="12"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
 						<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
 					</svg>
 				) : (
-					<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+					<svg
+						width="12"
+						height="12"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
 						<circle cx="12" cy="12" r="5" />
 						<line x1="12" y1="1" x2="12" y2="3" />
 						<line x1="12" y1="21" x2="12" y2="23" />
@@ -56,8 +74,8 @@ function BlueprintBackground() {
 	const y = useTransform(scrollY, [0, 1000], [0, 50])
 
 	return (
-		<motion.div 
-			className="fixed inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.05]"
+		<motion.div
+			className="pointer-events-none fixed inset-0 opacity-[0.03] dark:opacity-[0.05]"
 			style={{ y }}
 		>
 			<svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
@@ -74,14 +92,14 @@ function BlueprintBackground() {
 
 export default function LoginPage() {
 	return (
-		<div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background">
+		<div className="bg-background relative flex min-h-screen flex-col items-center justify-center overflow-hidden">
 			<ThemeToggle />
-			
-			<motion.div 
+
+			<motion.div
 				initial={{ opacity: 0 }}
 				animate={{ opacity: 1 }}
 				transition={{ duration: 0.8 }}
-				className="absolute inset-0 pointer-events-none"
+				className="pointer-events-none absolute inset-0"
 			>
 				<BlueprintBackground />
 			</motion.div>
@@ -95,7 +113,7 @@ export default function LoginPage() {
 				>
 					<LoginForm className="w-full" />
 				</motion.div>
-				
+
 				<motion.div
 					className="w-full"
 					initial={{ opacity: 0, y: 10 }}

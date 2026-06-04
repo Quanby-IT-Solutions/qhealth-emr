@@ -214,8 +214,9 @@ export function VirtualVisitScheduler({
 	function validateBookingForm(): BookingFormErrors {
 		const nextErrors: BookingFormErrors = {}
 		const activeAppointments =
-			appointments?.data.filter(appt => !["cancelled", "no-show", "completed"].includes(appt.status)) ??
-			[]
+			appointments?.data.filter(
+				appt => !["cancelled", "no-show", "completed"].includes(appt.status)
+			) ?? []
 
 		if (!facilityId) nextErrors.schedule = "Select an active facility before booking."
 		if (!form.patientId || !form.patientName || !form.patientMrn) {
@@ -232,16 +233,17 @@ export function VirtualVisitScheduler({
 			if (!isFutureAppointment(form.scheduledDate, form.scheduledTime)) {
 				nextErrors.schedule = "Appointment date and time must be in the future."
 			} else {
-				const hasConflict = activeAppointments.some(appt =>
-					appt.clinicianId === form.clinicianId &&
-					appointmentsOverlap(
-						form.scheduledDate,
-						form.scheduledTime,
-						form.durationMinutes,
-						appt.scheduledDate,
-						appt.scheduledTime,
-						appt.durationMinutes
-					)
+				const hasConflict = activeAppointments.some(
+					appt =>
+						appt.clinicianId === form.clinicianId &&
+						appointmentsOverlap(
+							form.scheduledDate,
+							form.scheduledTime,
+							form.durationMinutes,
+							appt.scheduledDate,
+							appt.scheduledTime,
+							appt.durationMinutes
+						)
 				)
 				if (hasConflict) {
 					nextErrors.schedule =
@@ -328,8 +330,8 @@ export function VirtualVisitScheduler({
 				<div className="border-destructive/30 bg-destructive/10 text-destructive flex items-start gap-2 rounded-lg border px-4 py-3 text-sm">
 					<AlertCircle className="mt-0.5 size-4 shrink-0" />
 					<p>
-						Your account is not linked to an active facility, so appointments cannot be
-						booked from this screen.
+						Your account is not linked to an active facility, so appointments cannot be booked from
+						this screen.
 					</p>
 				</div>
 			)}
@@ -400,13 +402,13 @@ export function VirtualVisitScheduler({
 								</div>
 								{form.patientId && (
 									<>
-										<div className="rounded-md border bg-muted/30 px-3 py-2">
+										<div className="bg-muted/30 rounded-md border px-3 py-2">
 											<p className="text-muted-foreground text-xs">Contact Number</p>
 											<p className="text-sm font-medium">
 												{form.patientContactNumber || "No number on patient record"}
 											</p>
 										</div>
-										<div className="rounded-md border bg-muted/30 px-3 py-2">
+										<div className="bg-muted/30 rounded-md border px-3 py-2">
 											<p className="text-muted-foreground text-xs">Email</p>
 											<p className="text-sm font-medium">
 												{form.patientEmail || "No email on patient record"}
@@ -521,7 +523,9 @@ export function VirtualVisitScheduler({
 							</div>
 
 							{error && (
-								<p className="text-destructive rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">{error}</p>
+								<p className="text-destructive border-destructive/30 bg-destructive/10 rounded-md border px-3 py-2 text-sm">
+									{error}
+								</p>
 							)}
 
 							<div className="flex justify-end gap-3">
@@ -563,7 +567,10 @@ export function VirtualVisitScheduler({
 							{appointments.data.map(appt => {
 								const isSelected = selectedAppointmentId === appt.id
 								return (
-									<div key={appt.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:gap-4">
+									<div
+										key={appt.id}
+										className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:gap-4"
+									>
 										<div className="bg-primary/10 flex size-10 shrink-0 items-center justify-center rounded-full">
 											<Video className="text-primary size-5" />
 										</div>

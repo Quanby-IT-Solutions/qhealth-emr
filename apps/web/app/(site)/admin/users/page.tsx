@@ -1,8 +1,10 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query"
 
-import { createQueryClient } from "@/services/tanstack-query/query-client"
 import { orpc } from "@/services/orpc/client"
+import { createQueryClient } from "@/services/tanstack-query/query-client"
+
 import "@/services/orpc/orpc-server"
+
 import { UsersPageClient } from "@/features/admin/components/users-page-client"
 
 export default async function AdminUsersPage() {

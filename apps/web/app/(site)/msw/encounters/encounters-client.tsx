@@ -34,9 +34,9 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | 
 }
 
 function StatusIcon({ status }: { status: string }) {
-	if (status === "completed") return <CheckCircle2 className="size-4 text-muted-foreground" />
-	if (status === "cancelled") return <XCircle className="size-4 text-destructive" />
-	return <Clock className="size-4 text-muted-foreground" />
+	if (status === "completed") return <CheckCircle2 className="text-muted-foreground size-4" />
+	if (status === "cancelled") return <XCircle className="text-destructive size-4" />
+	return <Clock className="text-muted-foreground size-4" />
 }
 
 function formatDate(d: Date | string) {
@@ -67,12 +67,10 @@ function EvaluationRow({ ev }: { ev: Evaluation }) {
 						<p className="text-sm font-medium">
 							{ev.patientName ?? "Unknown Patient"}
 							{ev.patientMrn && (
-								<span className="ml-2 font-normal text-muted-foreground">
-									MRN {ev.patientMrn}
-								</span>
+								<span className="text-muted-foreground ml-2 font-normal">MRN {ev.patientMrn}</span>
 							)}
 						</p>
-						<p className="text-xs text-muted-foreground">
+						<p className="text-muted-foreground text-xs">
 							Encounter {ev.encounterId.slice(0, 8)} · {formatDate(ev.createdAt)}
 						</p>
 					</div>
@@ -104,7 +102,7 @@ export function EncountersClient() {
 	const { data, isLoading } = useMswEvaluationListQuery({ page: 1, limit: 25 })
 	const evaluations = data?.data ?? []
 
-	const filtered = evaluations.filter((ev) => {
+	const filtered = evaluations.filter(ev => {
 		if (statusFilter !== "all" && ev.status !== statusFilter) return false
 		if (search.trim()) {
 			const q = search.toLowerCase()
@@ -120,27 +118,24 @@ export function EncountersClient() {
 	return (
 		<div className="space-y-4">
 			<div className="flex items-center gap-3">
-				<HeartHandshake className="size-5 text-primary" />
+				<HeartHandshake className="text-primary size-5" />
 				<div>
 					<h1 className="text-xl font-semibold">Assessment & CoE Queue</h1>
-					<p className="text-sm text-muted-foreground">Story 12.8 · Flow L8</p>
+					<p className="text-muted-foreground text-sm">Story 12.8 · Flow L8</p>
 				</div>
 			</div>
 
 			<div className="flex flex-wrap gap-3">
 				<div className="relative min-w-[200px] flex-1">
-					<Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+					<Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
 					<Input
 						placeholder="Search by patient name, MRN, or encounter ID…"
 						value={search}
-						onChange={(e) => setSearch(e.target.value)}
+						onChange={e => setSearch(e.target.value)}
 						className="pl-9"
 					/>
 				</div>
-				<Select
-					value={statusFilter}
-					onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-				>
+				<Select value={statusFilter} onValueChange={v => setStatusFilter(v as StatusFilter)}>
 					<SelectTrigger className="w-[160px]">
 						<SelectValue />
 					</SelectTrigger>
@@ -156,13 +151,13 @@ export function EncountersClient() {
 
 			{isLoading ? (
 				<Card>
-					<CardContent className="py-8 text-center text-sm text-muted-foreground">
+					<CardContent className="text-muted-foreground py-8 text-center text-sm">
 						Loading assessments…
 					</CardContent>
 				</Card>
 			) : filtered.length === 0 ? (
 				<Card>
-					<CardContent className="py-8 text-center text-sm text-muted-foreground">
+					<CardContent className="text-muted-foreground py-8 text-center text-sm">
 						{evaluations.length === 0
 							? "No assessments found. Evaluations are created from patient encounter MSW tabs."
 							: "No assessments match the current filters."}
@@ -170,13 +165,13 @@ export function EncountersClient() {
 				</Card>
 			) : (
 				<div className="space-y-2">
-					{filtered.map((ev) => (
+					{filtered.map(ev => (
 						<EvaluationRow key={ev.id} ev={ev} />
 					))}
 				</div>
 			)}
 
-			<div className="pt-1 text-xs text-muted-foreground">
+			<div className="text-muted-foreground pt-1 text-xs">
 				{filtered.length} assessment{filtered.length !== 1 ? "s" : ""} shown
 				{statusFilter !== "all" && ` · ${STATUS_LABELS[statusFilter]} filter active`}
 			</div>

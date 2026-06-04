@@ -1,8 +1,10 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import { toast } from "sonner"
+import { useCallback, useState } from "react"
 import { ChevronDown, ChevronRight, Info, Pencil, Plus, Trash2 } from "lucide-react"
+import { toast } from "sonner"
+
+import type { SlaConfig, SlaStepConfig, SlaStepType } from "@repo/contracts"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -35,21 +37,20 @@ import {
 } from "@/core/components/ui/table"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
-	type SlaWorkflowType,
+	useCreateSlaConfigOrpcMutation,
+	useCreateSlaStepConfigOrpcMutation,
+	useDeleteSlaConfigOrpcMutation,
+	useDeleteSlaStepConfigOrpcMutation,
+	useListStepConfigsOrpcQuery,
+	useSlaConfigsOrpcQuery,
+	useUpdateSlaConfigOrpcMutation,
+	useUpdateSlaStepConfigOrpcMutation,
+} from "@/features/sla/api/sla-orpc.hooks"
+import {
 	DEFAULT_SLA_TARGETS,
 	WORKFLOW_LABELS,
+	type SlaWorkflowType,
 } from "@/features/sla/api/sla.hooks"
-import type { SlaConfig, SlaStepConfig, SlaStepType } from "@repo/contracts"
-import {
-	useSlaConfigsOrpcQuery,
-	useCreateSlaConfigOrpcMutation,
-	useUpdateSlaConfigOrpcMutation,
-	useDeleteSlaConfigOrpcMutation,
-	useListStepConfigsOrpcQuery,
-	useCreateSlaStepConfigOrpcMutation,
-	useUpdateSlaStepConfigOrpcMutation,
-	useDeleteSlaStepConfigOrpcMutation,
-} from "@/features/sla/api/sla-orpc.hooks"
 
 // ============================================================================
 // Helpers
@@ -97,24 +98,81 @@ const STEP_LABELS: Record<SlaStepType, string> = {
 
 // TOR-prescribed default target minutes per step (mirrors SLA_STEP_DEFAULT_TARGETS in @repo/contracts)
 const STEP_DEFAULTS: Record<SlaStepType, number> = {
-	opd_triage: 5, opd_registration: 10, opd_vitals: 5, opd_consultation: 30, opd_disposition: 2,
-	ed_rapid_triage: 3, ed_registration: 10, ed_disposition: 60,
-	ancillary_order_receipt: 1, ancillary_payment_clearance: 15, ancillary_procedure: 120, ancillary_release: 1440,
-	admission_order: 5, admission_bed_assignment: 15, admission_financial_orientation: 10, admission_physical_transfer: 30,
-	discharge_may_go_home: 5, discharge_chart_completion: 240, discharge_clearance: 60, discharge_bill_generation: 60, discharge_gate_pass: 5,
-	pharmacy_rx_verification: 5, pharmacy_clearance: 15, pharmacy_dispensing: 10,
-	records_request: 5, records_payment: 5, records_processing_release: 30,
+	opd_triage: 5,
+	opd_registration: 10,
+	opd_vitals: 5,
+	opd_consultation: 30,
+	opd_disposition: 2,
+	ed_rapid_triage: 3,
+	ed_registration: 10,
+	ed_disposition: 60,
+	ancillary_order_receipt: 1,
+	ancillary_payment_clearance: 15,
+	ancillary_procedure: 120,
+	ancillary_release: 1440,
+	admission_order: 5,
+	admission_bed_assignment: 15,
+	admission_financial_orientation: 10,
+	admission_physical_transfer: 30,
+	discharge_may_go_home: 5,
+	discharge_chart_completion: 240,
+	discharge_clearance: 60,
+	discharge_bill_generation: 60,
+	discharge_gate_pass: 5,
+	pharmacy_rx_verification: 5,
+	pharmacy_clearance: 15,
+	pharmacy_dispensing: 10,
+	records_request: 5,
+	records_payment: 5,
+	records_processing_release: 30,
 }
 
 // TOR flows: groups of steps by flow
 const STEP_FLOWS: { label: string; steps: SlaStepType[] }[] = [
-	{ label: "Flow 1 — OPD Consultation", steps: ["opd_triage", "opd_registration", "opd_vitals", "opd_consultation", "opd_disposition"] },
-	{ label: "Flow 2 — Emergency Department", steps: ["ed_rapid_triage", "ed_registration", "ed_disposition"] },
-	{ label: "Flow 3 — Ancillary (Lab / Radiology)", steps: ["ancillary_order_receipt", "ancillary_payment_clearance", "ancillary_procedure", "ancillary_release"] },
-	{ label: "Flow 4 — Inpatient Admission", steps: ["admission_order", "admission_bed_assignment", "admission_financial_orientation", "admission_physical_transfer"] },
-	{ label: "Flow 5 — Discharge & Billing", steps: ["discharge_may_go_home", "discharge_chart_completion", "discharge_clearance", "discharge_bill_generation", "discharge_gate_pass"] },
-	{ label: "Flow 6 — Outpatient Pharmacy", steps: ["pharmacy_rx_verification", "pharmacy_clearance", "pharmacy_dispensing"] },
-	{ label: "Flow 7 — Medical Records & Certificates", steps: ["records_request", "records_payment", "records_processing_release"] },
+	{
+		label: "Flow 1 — OPD Consultation",
+		steps: ["opd_triage", "opd_registration", "opd_vitals", "opd_consultation", "opd_disposition"],
+	},
+	{
+		label: "Flow 2 — Emergency Department",
+		steps: ["ed_rapid_triage", "ed_registration", "ed_disposition"],
+	},
+	{
+		label: "Flow 3 — Ancillary (Lab / Radiology)",
+		steps: [
+			"ancillary_order_receipt",
+			"ancillary_payment_clearance",
+			"ancillary_procedure",
+			"ancillary_release",
+		],
+	},
+	{
+		label: "Flow 4 — Inpatient Admission",
+		steps: [
+			"admission_order",
+			"admission_bed_assignment",
+			"admission_financial_orientation",
+			"admission_physical_transfer",
+		],
+	},
+	{
+		label: "Flow 5 — Discharge & Billing",
+		steps: [
+			"discharge_may_go_home",
+			"discharge_chart_completion",
+			"discharge_clearance",
+			"discharge_bill_generation",
+			"discharge_gate_pass",
+		],
+	},
+	{
+		label: "Flow 6 — Outpatient Pharmacy",
+		steps: ["pharmacy_rx_verification", "pharmacy_clearance", "pharmacy_dispensing"],
+	},
+	{
+		label: "Flow 7 — Medical Records & Certificates",
+		steps: ["records_request", "records_payment", "records_processing_release"],
+	},
 ]
 
 // Steps that are defined in the TOR but do not yet have a backend evidence path
@@ -174,18 +232,15 @@ function SlaConfigDialog({ facilityId, editing, open, onOpenChange }: SlaConfigD
 		setForm(prev => ({ ...prev, [key]: val }))
 	}
 
-	const handleWorkflowChange = useCallback(
-		(wt: string | null) => {
-			if (!wt) return
-			const w = wt as SlaWorkflowType
-			setForm(prev => ({
-				...prev,
-				workflowType: w,
-				targetMinutes: String(DEFAULT_SLA_TARGETS[w] ?? 30),
-			}))
-		},
-		[]
-	)
+	const handleWorkflowChange = useCallback((wt: string | null) => {
+		if (!wt) return
+		const w = wt as SlaWorkflowType
+		setForm(prev => ({
+			...prev,
+			workflowType: w,
+			targetMinutes: String(DEFAULT_SLA_TARGETS[w] ?? 30),
+		}))
+	}, [])
 
 	function handleSubmit() {
 		setError(null)
@@ -283,7 +338,7 @@ function SlaConfigDialog({ facilityId, editing, open, onOpenChange }: SlaConfigD
 								placeholder="e.g. 30"
 							/>
 							{form.targetMinutes && (
-								<p className="text-xs text-muted-foreground">
+								<p className="text-muted-foreground text-xs">
 									= {formatMinutes(parseInt(form.targetMinutes, 10) || 0)}
 								</p>
 							)}
@@ -299,7 +354,7 @@ function SlaConfigDialog({ facilityId, editing, open, onOpenChange }: SlaConfigD
 								onChange={e => setField("hardCapMinutes", e.target.value)}
 								placeholder="e.g. 60"
 							/>
-							<p className="text-xs text-muted-foreground">Must be ≥ target</p>
+							<p className="text-muted-foreground text-xs">Must be ≥ target</p>
 						</div>
 					</div>
 
@@ -315,7 +370,7 @@ function SlaConfigDialog({ facilityId, editing, open, onOpenChange }: SlaConfigD
 								onChange={e => setField("warningThresholdPct", e.target.value)}
 								placeholder="e.g. 80"
 							/>
-							<p className="text-xs text-muted-foreground">Alert when this % is reached</p>
+							<p className="text-muted-foreground text-xs">Alert when this % is reached</p>
 						</div>
 					</div>
 
@@ -329,9 +384,7 @@ function SlaConfigDialog({ facilityId, editing, open, onOpenChange }: SlaConfigD
 						/>
 					</div>
 
-					{error && (
-						<p className="text-sm text-destructive">{error}</p>
-					)}
+					{error && <p className="text-destructive text-sm">{error}</p>}
 				</div>
 
 				<DialogFooter>
@@ -393,7 +446,7 @@ export function SlaConfig() {
 				<CardHeader className="flex flex-row items-center justify-between">
 					<div>
 						<CardTitle>SLA Configuration</CardTitle>
-						<p className="mt-1 text-sm text-muted-foreground">
+						<p className="text-muted-foreground mt-1 text-sm">
 							Set turnaround time targets per workflow type for Citizen's Charter compliance.
 						</p>
 					</div>
@@ -404,7 +457,7 @@ export function SlaConfig() {
 				</CardHeader>
 				<CardContent className="p-0">
 					{error && (
-						<div className="p-6 text-sm text-destructive">
+						<div className="text-destructive p-6 text-sm">
 							Failed to load SLA configurations. The SLA module may not be enabled.
 						</div>
 					)}
@@ -424,26 +477,26 @@ export function SlaConfig() {
 							<TableBody>
 								{isLoading && (
 									<TableRow>
-										<TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+										<TableCell colSpan={6} className="text-muted-foreground py-8 text-center">
 											Loading…
 										</TableCell>
 									</TableRow>
 								)}
 								{!isLoading && configs.length === 0 && (
 									<TableRow>
-										<TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+										<TableCell colSpan={6} className="text-muted-foreground py-8 text-center">
 											No SLA targets configured yet. Click "Add SLA" to create one.
 										</TableCell>
 									</TableRow>
 								)}
 								{configs.map(config => (
 									<TableRow key={config.id}>
-										<TableCell className="font-medium text-sm">
+										<TableCell className="text-sm font-medium">
 											{WORKFLOW_LABELS[config.workflowType]}
 										</TableCell>
 										<TableCell>{formatMinutes(config.targetMinutes)}</TableCell>
 										<TableCell>{config.warningThresholdPct}%</TableCell>
-										<TableCell className="max-w-48 truncate text-sm text-muted-foreground">
+										<TableCell className="text-muted-foreground max-w-48 truncate text-sm">
 											{config.description || "—"}
 										</TableCell>
 										<TableCell>
@@ -470,7 +523,7 @@ export function SlaConfig() {
 												<Button
 													variant="ghost"
 													size="icon"
-													className="size-7 text-destructive hover:text-destructive"
+													className="text-destructive hover:text-destructive size-7"
 													onClick={() => setDeleteConfirm(config)}
 												>
 													<Trash2 className="size-3.5" />
@@ -499,7 +552,12 @@ export function SlaConfig() {
 			)}
 
 			{/* Delete Confirmation Dialog */}
-			<Dialog open={!!deleteConfirm} onOpenChange={open => { if (!open) setDeleteConfirm(null) }}>
+			<Dialog
+				open={!!deleteConfirm}
+				onOpenChange={open => {
+					if (!open) setDeleteConfirm(null)
+				}}
+			>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>Delete SLA Configuration</DialogTitle>
@@ -511,12 +569,20 @@ export function SlaConfig() {
 							? This cannot be undone.
 						</DialogDescription>
 					</DialogHeader>
-					{deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+					{deleteError && <p className="text-destructive text-sm">{deleteError}</p>}
 					<DialogFooter>
-						<Button variant="outline" onClick={() => setDeleteConfirm(null)} disabled={deleteMutation.isPending}>
+						<Button
+							variant="outline"
+							onClick={() => setDeleteConfirm(null)}
+							disabled={deleteMutation.isPending}
+						>
 							Cancel
 						</Button>
-						<Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
+						<Button
+							variant="destructive"
+							onClick={handleDelete}
+							disabled={deleteMutation.isPending}
+						>
 							{deleteMutation.isPending ? "Deleting…" : "Delete"}
 						</Button>
 					</DialogFooter>
@@ -548,7 +614,13 @@ interface SlaStepConfigDialogProps {
 	onOpenChange: (open: boolean) => void
 }
 
-function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange }: SlaStepConfigDialogProps) {
+function SlaStepConfigDialog({
+	facilityId,
+	stepType,
+	editing,
+	open,
+	onOpenChange,
+}: SlaStepConfigDialogProps) {
 	const isEdit = !!editing
 	const torDefault = STEP_DEFAULTS[stepType]
 
@@ -598,7 +670,13 @@ function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange
 
 		if (isEdit && editing) {
 			updateMutation.mutate(
-				{ id: editing.id, targetMinutes, hardCapMinutes: hardCapMinutes ?? null, warningThresholdPct, description: form.description.trim() },
+				{
+					id: editing.id,
+					targetMinutes,
+					hardCapMinutes: hardCapMinutes ?? null,
+					warningThresholdPct,
+					description: form.description.trim(),
+				},
 				{
 					onSuccess: () => onOpenChange(false),
 					onError: err => setError(err instanceof Error ? err.message : "Failed to update"),
@@ -606,7 +684,14 @@ function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange
 			)
 		} else {
 			createMutation.mutate(
-				{ facilityId, stepType, targetMinutes, hardCapMinutes, warningThresholdPct, description: form.description.trim() },
+				{
+					facilityId,
+					stepType,
+					targetMinutes,
+					hardCapMinutes,
+					warningThresholdPct,
+					description: form.description.trim(),
+				},
 				{
 					onSuccess: () => onOpenChange(false),
 					onError: err => setError(err instanceof Error ? err.message : "Failed to create"),
@@ -622,8 +707,8 @@ function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange
 					<DialogTitle>{isEdit ? "Edit Step Target" : "Set Step Target"}</DialogTitle>
 					<DialogDescription>
 						Configure a facility-specific target for{" "}
-						<span className="font-medium">{STEP_LABELS[stepType]}</span>.{" "}
-						TOR default: {formatMinutes(torDefault)}.
+						<span className="font-medium">{STEP_LABELS[stepType]}</span>. TOR default:{" "}
+						{formatMinutes(torDefault)}.
 					</DialogDescription>
 				</DialogHeader>
 
@@ -640,7 +725,7 @@ function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange
 								placeholder={String(torDefault)}
 							/>
 							{form.targetMinutes && (
-								<p className="text-xs text-muted-foreground">
+								<p className="text-muted-foreground text-xs">
 									= {formatMinutes(parseInt(form.targetMinutes, 10) || 0)}
 								</p>
 							)}
@@ -655,7 +740,7 @@ function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange
 								onChange={e => setField("hardCapMinutes", e.target.value)}
 								placeholder="e.g. 60"
 							/>
-							<p className="text-xs text-muted-foreground">Must be ≥ target</p>
+							<p className="text-muted-foreground text-xs">Must be ≥ target</p>
 						</div>
 					</div>
 					<div className="grid grid-cols-2 gap-4">
@@ -670,7 +755,7 @@ function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange
 								onChange={e => setField("warningThresholdPct", e.target.value)}
 								placeholder="80"
 							/>
-							<p className="text-xs text-muted-foreground">Alert when this % is reached</p>
+							<p className="text-muted-foreground text-xs">Alert when this % is reached</p>
 						</div>
 					</div>
 					<div className="space-y-2">
@@ -682,7 +767,7 @@ function SlaStepConfigDialog({ facilityId, stepType, editing, open, onOpenChange
 							placeholder="e.g. Per Citizen's Charter Annex A"
 						/>
 					</div>
-					{error && <p className="text-sm text-destructive">{error}</p>}
+					{error && <p className="text-destructive text-sm">{error}</p>}
 				</div>
 
 				<DialogFooter>
@@ -731,7 +816,8 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 	const configByStep = new Map((data?.data ?? []).map(c => [c.stepType, c]))
 
 	const allConfiguredStepIds = (data?.data ?? []).map(c => c.id)
-	const allSelected = allConfiguredStepIds.length > 0 && allConfiguredStepIds.every(id => selectedStepIds.has(id))
+	const allSelected =
+		allConfiguredStepIds.length > 0 && allConfiguredStepIds.every(id => selectedStepIds.has(id))
 
 	function toggleSelectAll() {
 		if (allSelected) {
@@ -765,7 +851,10 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 			toast.error("Target minutes must be a positive number.")
 			return
 		}
-		if (bulkWarningPct && (!warningThresholdPct || warningThresholdPct <= 0 || warningThresholdPct >= 100)) {
+		if (
+			bulkWarningPct &&
+			(!warningThresholdPct || warningThresholdPct <= 0 || warningThresholdPct >= 100)
+		) {
 			toast.error("Warning threshold must be between 1 and 99.")
 			return
 		}
@@ -812,7 +901,7 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 				<CardHeader className="flex flex-row items-start justify-between">
 					<div>
 						<CardTitle>TOR Step Targets</CardTitle>
-						<p className="mt-1 text-sm text-muted-foreground">
+						<p className="text-muted-foreground mt-1 text-sm">
 							Override the default per-step targets prescribed by the TOR (Section 6, Flows 1–7).
 							Steps without an override use the TOR default shown in the table.
 						</p>
@@ -830,15 +919,13 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 				</CardHeader>
 				<CardContent className="p-0">
 					{error && (
-						<div className="p-6 text-sm text-destructive">
-							Failed to load step configurations.
-						</div>
+						<div className="text-destructive p-6 text-sm">Failed to load step configurations.</div>
 					)}
 
 					{STEP_FLOWS.map(flow => (
 						<div key={flow.label}>
-							<div className="bg-muted/40 px-6 py-2 border-y border-border flex items-center justify-between">
-								<p className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+							<div className="bg-muted/40 border-border flex items-center justify-between border-y px-6 py-2">
+								<p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
 									{flow.label}
 								</p>
 								<button
@@ -847,132 +934,149 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 									className="text-muted-foreground hover:text-foreground"
 									aria-label={collapsedFlows.has(flow.label) ? "Expand flow" : "Collapse flow"}
 								>
-									{collapsedFlows.has(flow.label)
-										? <ChevronRight className="size-4" />
-										: <ChevronDown className="size-4" />
-									}
+									{collapsedFlows.has(flow.label) ? (
+										<ChevronRight className="size-4" />
+									) : (
+										<ChevronDown className="size-4" />
+									)}
 								</button>
 							</div>
-							{!collapsedFlows.has(flow.label) && <Table>
-								<TableHeader>
-									<TableRow>
-										{bulkEditMode && (
-											<TableHead className="w-10">
-												<Checkbox
-													checked={allSelected}
-													onCheckedChange={toggleSelectAll}
-													aria-label="Select all"
-												/>
-											</TableHead>
-										)}
-										<TableHead>Step</TableHead>
-										<TableHead>TOR Default</TableHead>
-										<TableHead>Facility Override</TableHead>
-										<TableHead>Warning At</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead>Actions</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{flow.steps.map(stepType => {
-										const override = configByStep.get(stepType)
-										const torDefault = STEP_DEFAULTS[stepType]
-										const unsupportedNote = UNSUPPORTED_STEPS[stepType]
-										const isUnsupported = !!unsupportedNote
-										const isSelected = override ? selectedStepIds.has(override.id) : false
-										return (
-											<TableRow key={stepType} className={isUnsupported ? "opacity-60" : undefined}>
-												{bulkEditMode && (
-													<TableCell>
-														{override && !isUnsupported ? (
-															<Checkbox
-																checked={isSelected}
-																onCheckedChange={() => toggleSelectStep(override.id)}
-																aria-label={`Select ${STEP_LABELS[stepType]}`}
-															/>
-														) : null}
+							{!collapsedFlows.has(flow.label) && (
+								<Table>
+									<TableHeader>
+										<TableRow>
+											{bulkEditMode && (
+												<TableHead className="w-10">
+													<Checkbox
+														checked={allSelected}
+														onCheckedChange={toggleSelectAll}
+														aria-label="Select all"
+													/>
+												</TableHead>
+											)}
+											<TableHead>Step</TableHead>
+											<TableHead>TOR Default</TableHead>
+											<TableHead>Facility Override</TableHead>
+											<TableHead>Warning At</TableHead>
+											<TableHead>Status</TableHead>
+											<TableHead>Actions</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{flow.steps.map(stepType => {
+											const override = configByStep.get(stepType)
+											const torDefault = STEP_DEFAULTS[stepType]
+											const unsupportedNote = UNSUPPORTED_STEPS[stepType]
+											const isUnsupported = !!unsupportedNote
+											const isSelected = override ? selectedStepIds.has(override.id) : false
+											return (
+												<TableRow
+													key={stepType}
+													className={isUnsupported ? "opacity-60" : undefined}
+												>
+													{bulkEditMode && (
+														<TableCell>
+															{override && !isUnsupported ? (
+																<Checkbox
+																	checked={isSelected}
+																	onCheckedChange={() => toggleSelectStep(override.id)}
+																	aria-label={`Select ${STEP_LABELS[stepType]}`}
+																/>
+															) : null}
+														</TableCell>
+													)}
+													<TableCell className="text-sm font-medium">
+														<span className="flex items-center gap-1.5">
+															{STEP_LABELS[stepType]}
+															{isUnsupported && (
+																<Badge
+																	variant="outline"
+																	className="border-destructive/40 text-destructive cursor-help text-xs"
+																	title={unsupportedNote}
+																>
+																	Not instrumented
+																</Badge>
+															)}
+														</span>
 													</TableCell>
-												)}
-												<TableCell className="text-sm font-medium">
-													<span className="flex items-center gap-1.5">
-														{STEP_LABELS[stepType]}
-														{isUnsupported && (
+													<TableCell className="text-muted-foreground text-sm">
+														{formatMinutes(torDefault)}
+													</TableCell>
+													<TableCell className="text-sm">
+														{isUnsupported ? (
+															<span className="text-muted-foreground italic">Not measurable</span>
+														) : override ? (
+															<span className="font-medium">
+																{formatMinutes(override.targetMinutes)}
+															</span>
+														) : (
+															<span className="text-muted-foreground italic">
+																Using TOR default
+															</span>
+														)}
+													</TableCell>
+													<TableCell className="text-sm">
+														{isUnsupported
+															? "—"
+															: override
+																? `${override.warningThresholdPct}%`
+																: "80%"}
+													</TableCell>
+													<TableCell>
+														{isUnsupported ? (
 															<Badge
 																variant="outline"
-																className="border-destructive/40 text-destructive text-xs cursor-help"
-																title={unsupportedNote}
+																className="border-destructive/40 text-destructive text-xs"
 															>
-																Not instrumented
+																Unsupported
 															</Badge>
-														)}
-													</span>
-												</TableCell>
-												<TableCell className="text-sm text-muted-foreground">
-													{formatMinutes(torDefault)}
-												</TableCell>
-												<TableCell className="text-sm">
-													{isUnsupported ? (
-														<span className="italic text-muted-foreground">Not measurable</span>
-													) : override ? (
-														<span className="font-medium">{formatMinutes(override.targetMinutes)}</span>
-													) : (
-														<span className="italic text-muted-foreground">Using TOR default</span>
-													)}
-												</TableCell>
-												<TableCell className="text-sm">
-													{isUnsupported ? "—" : override ? `${override.warningThresholdPct}%` : "80%"}
-												</TableCell>
-												<TableCell>
-													{isUnsupported ? (
-														<Badge variant="outline" className="border-destructive/40 text-destructive text-xs">
-															Unsupported
-														</Badge>
-													) : override ? (
-														override.isActive ? (
-															<Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-																Override active
-															</Badge>
+														) : override ? (
+															override.isActive ? (
+																<Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+																	Override active
+																</Badge>
+															) : (
+																<Badge variant="outline" className="text-muted-foreground">
+																	Inactive
+																</Badge>
+															)
 														) : (
 															<Badge variant="outline" className="text-muted-foreground">
-																Inactive
+																<Info className="mr-1 size-3" />
+																TOR default
 															</Badge>
-														)
-													) : (
-														<Badge variant="outline" className="text-muted-foreground">
-															<Info className="mr-1 size-3" />
-															TOR default
-														</Badge>
-													)}
-												</TableCell>
-												<TableCell>
-													<div className="flex gap-1">
-														{!isUnsupported && !isLoading && (
-															<Button
-																variant="ghost"
-																size="icon"
-																className="size-7"
-																onClick={() => openEditStep(stepType)}
-															>
-																<Pencil className="size-3.5" />
-															</Button>
 														)}
-														{!isUnsupported && override && (
-															<Button
-																variant="ghost"
-																size="icon"
-																className="size-7 text-destructive hover:text-destructive"
-																onClick={() => setDeleteConfirm(override)}
-															>
-																<Trash2 className="size-3.5" />
-															</Button>
-														)}
-													</div>
-												</TableCell>
-											</TableRow>
-										)
-									})}
-								</TableBody>
-							</Table>}
+													</TableCell>
+													<TableCell>
+														<div className="flex gap-1">
+															{!isUnsupported && !isLoading && (
+																<Button
+																	variant="ghost"
+																	size="icon"
+																	className="size-7"
+																	onClick={() => openEditStep(stepType)}
+																>
+																	<Pencil className="size-3.5" />
+																</Button>
+															)}
+															{!isUnsupported && override && (
+																<Button
+																	variant="ghost"
+																	size="icon"
+																	className="text-destructive hover:text-destructive size-7"
+																	onClick={() => setDeleteConfirm(override)}
+																>
+																	<Trash2 className="size-3.5" />
+																</Button>
+															)}
+														</div>
+													</TableCell>
+												</TableRow>
+											)
+										})}
+									</TableBody>
+								</Table>
+							)}
 						</div>
 					))}
 				</CardContent>
@@ -980,14 +1084,15 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 
 			{/* Bulk Update Targets section */}
 			{bulkEditMode && selectedStepIds.size > 0 && (
-				<Card className="mt-4 border-primary/40">
+				<Card className="border-primary/40 mt-4">
 					<CardHeader>
 						<CardTitle className="text-base">
-							Bulk Update Targets ({selectedStepIds.size} step{selectedStepIds.size !== 1 ? "s" : ""} selected)
+							Bulk Update Targets ({selectedStepIds.size} step
+							{selectedStepIds.size !== 1 ? "s" : ""} selected)
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="grid grid-cols-2 gap-4 max-w-md">
+						<div className="grid max-w-md grid-cols-2 gap-4">
 							<div className="space-y-2">
 								<Label htmlFor="bulk-target-minutes">Target (minutes)</Label>
 								<Input
@@ -1012,11 +1117,7 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 								/>
 							</div>
 						</div>
-						<Button
-							className="mt-4"
-							onClick={handleBulkApply}
-							disabled={updateMutation.isPending}
-						>
+						<Button className="mt-4" onClick={handleBulkApply} disabled={updateMutation.isPending}>
 							{updateMutation.isPending ? "Applying…" : "Apply to Selected"}
 						</Button>
 					</CardContent>
@@ -1040,7 +1141,12 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 			)}
 
 			{/* Delete Step Override Dialog */}
-			<Dialog open={!!deleteConfirm} onOpenChange={open => { if (!open) setDeleteConfirm(null) }}>
+			<Dialog
+				open={!!deleteConfirm}
+				onOpenChange={open => {
+					if (!open) setDeleteConfirm(null)
+				}}
+			>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>Remove Step Override</DialogTitle>
@@ -1053,12 +1159,20 @@ function SlaStepTargets({ facilityId }: { facilityId: string }) {
 							{deleteConfirm ? formatMinutes(STEP_DEFAULTS[deleteConfirm.stepType]) : ""}.
 						</DialogDescription>
 					</DialogHeader>
-					{deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+					{deleteError && <p className="text-destructive text-sm">{deleteError}</p>}
 					<DialogFooter>
-						<Button variant="outline" onClick={() => setDeleteConfirm(null)} disabled={deleteMutation.isPending}>
+						<Button
+							variant="outline"
+							onClick={() => setDeleteConfirm(null)}
+							disabled={deleteMutation.isPending}
+						>
 							Cancel
 						</Button>
-						<Button variant="destructive" onClick={handleDeleteStep} disabled={deleteMutation.isPending}>
+						<Button
+							variant="destructive"
+							onClick={handleDeleteStep}
+							disabled={deleteMutation.isPending}
+						>
 							{deleteMutation.isPending ? "Removing…" : "Remove Override"}
 						</Button>
 					</DialogFooter>

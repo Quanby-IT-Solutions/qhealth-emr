@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { Link2, Loader2, Mail, MonitorSmartphone, Printer, QrCode } from "lucide-react"
 import * as QRCode from "qrcode"
 import { toast } from "sonner"
 
-import { Link2, Loader2, Mail, MonitorSmartphone, Printer, QrCode } from "lucide-react"
-
-import { Button } from "@/core/components/ui/button"
 import { Badge } from "@/core/components/ui/badge"
+import { Button } from "@/core/components/ui/button"
 import {
 	Dialog,
 	DialogContent,
@@ -563,8 +562,7 @@ export function PrescriptionPrintDialog({
 															)}
 														</p>
 														<p className="text-muted-foreground text-xs">
-															{rx.dose} {rx.doseUnit} - {rx.doseForm} · {rx.route} ·{" "}
-															{rx.frequency}
+															{rx.dose} {rx.doseUnit} - {rx.doseForm} · {rx.route} · {rx.frequency}
 														</p>
 														{rx.pdeaDispensingInstructions && (
 															<p className="text-muted-foreground text-xs">
@@ -605,8 +603,8 @@ export function PrescriptionPrintDialog({
 								<p className="font-medium">Prescription details incomplete</p>
 								<p className="mt-1 text-xs">
 									Please complete the missing fields in the medication order, then sign the
-									prescription again before printing, emailing, sending to the portal, or
-									generating the QR code.
+									prescription again before printing, emailing, sending to the portal, or generating
+									the QR code.
 								</p>
 								<Button
 									type="button"

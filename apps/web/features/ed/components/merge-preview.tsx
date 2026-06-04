@@ -124,10 +124,11 @@ export function MergePreview({
 							<div key={row.key} className="flex items-center justify-between text-sm">
 								<span className="text-muted-foreground">{row.label}</span>
 								<div className="flex items-center gap-1">
-									{count > 0 && (
-										<CheckCircle2 className="size-3 text-green-500" />
-									)}
-									<Badge variant={count > 0 ? "default" : "secondary"} className="min-w-[1.75rem] justify-center text-xs">
+									{count > 0 && <CheckCircle2 className="size-3 text-green-500" />}
+									<Badge
+										variant={count > 0 ? "default" : "secondary"}
+										className="min-w-[1.75rem] justify-center text-xs"
+									>
 										{count}
 									</Badge>
 								</div>

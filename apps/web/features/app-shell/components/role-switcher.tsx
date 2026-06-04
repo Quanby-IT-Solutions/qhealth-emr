@@ -26,9 +26,7 @@ export function RoleSwitcher() {
 
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger
-				className="hover:bg-accent flex items-center gap-2 rounded-md px-2 py-1 text-sm"
-			>
+			<DropdownMenuTrigger className="hover:bg-accent flex items-center gap-2 rounded-md px-2 py-1 text-sm">
 				<HugeiconsIcon icon={ArrowTurnBackwardFreeIcons} className="size-4" />
 				<span className="max-w-[120px] truncate">{activeRole?.name ?? "No Role"}</span>
 			</DropdownMenuTrigger>

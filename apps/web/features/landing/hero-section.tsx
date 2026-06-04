@@ -1,7 +1,7 @@
 "use client"
 
-import { motion, useScroll, useTransform, type Variants } from "framer-motion"
 import Link from "next/link"
+import { motion, useScroll, useTransform, type Variants } from "framer-motion"
 
 export function HeroSection() {
 	const { scrollY } = useScroll()
@@ -31,13 +31,18 @@ export function HeroSection() {
 	}
 
 	return (
-		<section className="relative min-h-[90vh] flex flex-col justify-center pt-24 pb-12 overflow-hidden bg-background">
+		<section className="bg-background relative flex min-h-[90vh] flex-col justify-center overflow-hidden pt-24 pb-12">
 			{/* Parallax Background Grid */}
-			<motion.div 
-				style={{ y, opacity }} 
-				className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none"
+			<motion.div
+				style={{ y, opacity }}
+				className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
 			>
-				<svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" className="opacity-[0.03] text-foreground stroke-current">
+				<svg
+					width="100%"
+					height="100%"
+					xmlns="http://www.w3.org/2000/svg"
+					className="text-foreground stroke-current opacity-[0.03]"
+				>
 					<defs>
 						<pattern id="blueprint" width="40" height="40" patternUnits="userSpaceOnUse">
 							<path d="M 40 0 L 0 0 0 40" fill="none" strokeWidth="0.5" />
@@ -47,36 +52,62 @@ export function HeroSection() {
 				</svg>
 			</motion.div>
 
-			<div className="container relative z-10 mx-auto px-6 max-w-7xl">
-				<div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+			<div className="relative z-10 container mx-auto max-w-7xl px-6">
+				<div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-8">
 					{/* Text Content */}
-					<motion.div 
-						className="lg:col-span-7 flex flex-col items-start text-left"
+					<motion.div
+						className="flex flex-col items-start text-left lg:col-span-7"
 						initial="hidden"
 						animate="show"
 						variants={containerVariants}
 					>
-						<motion.h1 
+						<motion.h1
 							variants={itemVariants}
-							className="font-serif text-5xl md:text-6xl lg:text-7xl font-medium tracking-tight leading-[1.1] text-foreground mb-8 max-w-3xl"
+							className="text-foreground mb-8 max-w-3xl font-serif text-5xl leading-[1.1] font-medium tracking-tight md:text-6xl lg:text-7xl"
 						>
-							An Electronic Medical Record built for the realities of <span className="text-primary italic font-semibold">Philippine healthcare.</span>
+							An Electronic Medical Record built for the realities of{" "}
+							<span className="text-primary font-semibold italic">Philippine healthcare.</span>
 						</motion.h1>
-						
-						<motion.p 
+
+						<motion.p
 							variants={itemVariants}
-							className="text-lg md:text-xl text-muted-foreground leading-relaxed mb-10 max-w-2xl font-sans"
+							className="text-muted-foreground mb-10 max-w-2xl font-sans text-lg leading-relaxed md:text-xl"
 						>
-							Engineered around DOH licensing requirements, PhilHealth eClaims automation, FDA and PDEA prescription mandates, and the seven patient flows that define daily hospital operations. Compliant by design. Reportable by default. Resilient through offline mode.
+							Engineered around DOH licensing requirements, PhilHealth eClaims automation, FDA and
+							PDEA prescription mandates, and the seven patient flows that define daily hospital
+							operations. Compliant by design. Reportable by default. Resilient through offline
+							mode.
 						</motion.p>
-						
-						<motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4 mb-16 w-full sm:w-auto">
-							<Link href="#briefing" className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-base font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
+
+						<motion.div
+							variants={itemVariants}
+							className="mb-16 flex w-full flex-col gap-4 sm:w-auto sm:flex-row"
+						>
+							<Link
+								href="#briefing"
+								className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-12 items-center justify-center rounded-md px-8 text-base font-medium shadow transition-colors"
+							>
 								Request a Briefing
 							</Link>
-							<Link href="#compliance-brief" className="inline-flex h-12 items-center justify-center rounded-md border border-border bg-transparent px-8 text-base font-medium text-foreground shadow-sm transition-colors hover:bg-muted group">
-								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-2 text-foreground/70 group-hover:text-foreground">
-									<path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M7 10L12 15M12 15L17 10M12 15V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+							<Link
+								href="#compliance-brief"
+								className="border-border text-foreground hover:bg-muted group inline-flex h-12 items-center justify-center rounded-md border bg-transparent px-8 text-base font-medium shadow-sm transition-colors"
+							>
+								<svg
+									width="20"
+									height="20"
+									viewBox="0 0 24 24"
+									fill="none"
+									xmlns="http://www.w3.org/2000/svg"
+									className="text-foreground/70 group-hover:text-foreground mr-2"
+								>
+									<path
+										d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M7 10L12 15M12 15L17 10M12 15V3"
+										stroke="currentColor"
+										strokeWidth="1.5"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									/>
 								</svg>
 								Download Compliance Brief
 							</Link>
@@ -84,23 +115,25 @@ export function HeroSection() {
 					</motion.div>
 
 					{/* Artifact Grid */}
-					<motion.div 
-						className="lg:col-span-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-4 md:gap-6"
+					<motion.div
+						className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-6 lg:col-span-5 lg:grid-cols-2"
 						initial="hidden"
 						animate="show"
 						variants={containerVariants}
 					>
 						{seals.map((seal, i) => (
-							<motion.div 
-								key={seal.name} 
+							<motion.div
+								key={seal.name}
 								variants={itemVariants}
-								className="flex flex-col items-center justify-center p-6 border border-border/60 rounded-xl bg-card/50 backdrop-blur-sm shadow-sm"
+								className="border-border/60 bg-card/50 flex flex-col items-center justify-center rounded-xl border p-6 shadow-sm backdrop-blur-sm"
 								whileHover={{ scale: 1.02, borderColor: "var(--primary)" }}
 							>
-								<div className="w-16 h-16 rounded-full border-[1.5px] border-primary text-primary flex items-center justify-center mb-4">
-									<span className="font-serif font-bold text-lg">{seal.name}</span>
+								<div className="border-primary text-primary mb-4 flex h-16 w-16 items-center justify-center rounded-full border-[1.5px]">
+									<span className="font-serif text-lg font-bold">{seal.name}</span>
 								</div>
-								<span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-center">{seal.desc}</span>
+								<span className="text-muted-foreground text-center text-xs font-medium tracking-wider uppercase">
+									{seal.desc}
+								</span>
 							</motion.div>
 						))}
 					</motion.div>
@@ -108,14 +141,14 @@ export function HeroSection() {
 			</div>
 
 			{/* Metadata Row */}
-			<motion.div 
-				className="container mx-auto px-6 max-w-7xl mt-auto pt-12"
+			<motion.div
+				className="container mx-auto mt-auto max-w-7xl px-6 pt-12"
 				initial={{ opacity: 0 }}
 				animate={{ opacity: 1 }}
 				transition={{ delay: 1, duration: 1 }}
 			>
-				<div className="w-full h-px bg-border mb-4" />
-				<div className="flex flex-wrap justify-between gap-4 text-xs font-mono text-muted-foreground uppercase tracking-wider">
+				<div className="bg-border mb-4 h-px w-full" />
+				<div className="text-muted-foreground flex flex-wrap justify-between gap-4 font-mono text-xs tracking-wider uppercase">
 					<span>HL7 FHIR R4</span>
 					<span className="hidden sm:inline">·</span>
 					<span>NHDR-Ready</span>
