@@ -2,9 +2,9 @@
 
 import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import { cva, type VariantProps } from "class-variance-authority"
 import { Cancel01Icon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
+import { cva, type VariantProps } from "class-variance-authority"
 
 import { Button } from "@/core/components/ui/button"
 import { cn } from "@/core/lib/utils"
@@ -48,8 +48,8 @@ const dialogContentVariants = cva(
 				lg: "sm:max-w-2xl",
 				xl: "sm:max-w-5xl",
 				full: "sm:max-w-[min(1100px,calc(100vw-2rem))]",
-			stepper:
-				"sm:max-w-[min(1100px,calc(100vw-2rem))] max-h-[calc(100svh-2rem)] overflow-y-auto",
+				stepper:
+					"max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-[min(1100px,calc(100vw-2rem))]",
 			},
 		},
 		defaultVariants: {
@@ -61,16 +61,18 @@ const dialogContentVariants = cva(
 function DialogContent({
 	className,
 	children,
+	overlayClassName,
 	size = "default",
 	showCloseButton = true,
 	...props
 }: DialogPrimitive.Popup.Props & {
+	overlayClassName?: string
 	size?: VariantProps<typeof dialogContentVariants>["size"]
 	showCloseButton?: boolean
 }) {
 	return (
 		<DialogPortal>
-			<DialogOverlay />
+			<DialogOverlay className={overlayClassName} />
 			<DialogPrimitive.Popup
 				data-slot="dialog-content"
 				className={cn(dialogContentVariants({ size }), className)}

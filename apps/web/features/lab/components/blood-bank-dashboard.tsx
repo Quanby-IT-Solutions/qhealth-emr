@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, type ReactElement } from "react"
+import { useEffect, useMemo, useState, type ReactElement } from "react"
 import { CheckCircle2, Droplets, Package, ShieldAlert, XCircle } from "lucide-react"
 import { toast } from "sonner"
 
@@ -132,15 +132,20 @@ function BloodBankActionModal({ request, action, children }: BloodBankActionModa
 	const compatibilityResult: "compatible" | "incompatible" =
 		action === "approve" ? "compatible" : "incompatible"
 	const resolution: ResolutionCode = action === "approve" ? "routine" : "compatibility_failed"
-	const notes =
+	const defaultNotes =
 		action === "approve"
 			? `${request.componentType} cross-match reviewed for ${request.patientName}. Units verified and ready for issue.`
 			: `Cross-match request for ${request.patientName} rejected pending correction or clinical review.`
+	const [notes, setNotes] = useState(defaultNotes)
 	const approveCrossMatch = useApproveCrossMatchMutation()
 	const copy = actionModalCopy[action]
 	const unitBarcodes = request.bloodUnits.map(unit => unit.unitBarcode).join(", ")
 	const isMockRequest = request.id.startsWith("mock-")
 	const actionDisabled = !canResolveCrossMatch(request.status)
+
+	useEffect(() => {
+		if (open) setNotes(defaultNotes)
+	}, [defaultNotes, open])
 
 	function handleConfirm() {
 		if (actionDisabled) return
@@ -159,6 +164,8 @@ function BloodBankActionModal({ request, action, children }: BloodBankActionModa
 				compatibilityResult,
 				bloodUnitIds:
 					compatibilityResult === "compatible" ? request.bloodUnits.map(unit => unit.id) : [],
+				rejectionReason:
+					compatibilityResult === "incompatible" ? notes.trim() || undefined : undefined,
 			},
 			{
 				onSuccess: () => {
@@ -167,8 +174,8 @@ function BloodBankActionModal({ request, action, children }: BloodBankActionModa
 					)
 					setOpen(false)
 				},
-				onError: () => {
-					toast.error("Unable to save blood bank action.")
+				onError: error => {
+					toast.error(error instanceof Error ? error.message : "Unable to save blood bank action.")
 				},
 			}
 		)
@@ -249,7 +256,12 @@ function BloodBankActionModal({ request, action, children }: BloodBankActionModa
 						<Label className="text-muted-foreground mb-2 text-xs">
 							{action === "approve" ? "Cross-match notes" : "Rejection notes"}
 						</Label>
-						<Textarea value={notes} readOnly className="min-h-24" />
+						<Textarea
+							value={notes}
+							onChange={event => setNotes(event.target.value)}
+							disabled={approveCrossMatch.isPending || actionDisabled}
+							className="min-h-24"
+						/>
 					</div>
 				</div>
 

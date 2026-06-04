@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { and, count, desc, eq, gte, ilike, inArray, lt, max, or, sql } from "drizzle-orm"
+import { and, count, desc, eq, gte, ilike, lt, max, sql } from "drizzle-orm"
 
 import {
 	encounters,
@@ -11,6 +11,7 @@ import {
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
+import { supabase, unwrapMany } from "@/common/database/supabase.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { AuditService } from "@/modules/v1/audit/audit.service"
 import { ChartAccessService, type ChartAccessActor } from "@/modules/v1/audit/chart-access.service"
@@ -22,6 +23,23 @@ type UpdatePatientInput = V1Inputs["patient"]["update"]
 type RegisterPatientWithOpdEncounterInput = V1Inputs["patient"]["registerWithOpdEncounter"]
 type ListCliniciansInput = V1Inputs["patient"]["listClinicians"]
 type VerifyMrnInput = V1Inputs["patient"]["verifyMrn"]
+
+type SupabasePatientSearchRow = {
+	id: string
+	mrn: string
+	first_name: string
+	last_name: string
+	middle_name: string | null
+	date_of_birth: string
+	sex: "male" | "female" | "other"
+	philhealth_member_id: string | null
+	is_active: boolean
+}
+
+type SupabasePatientEncounterRow = {
+	patient_id: string
+	admission_datetime: string | null
+}
 
 @Injectable()
 export class PatientsService {
@@ -84,99 +102,98 @@ export class PatientsService {
 					? false
 					: true
 
-		const conditions = [eq(patients.facilityId, filter.facilityId)]
-
-		conditions.push(eq(patients.isActive, isActive))
-
-		if (filter.search) {
-			const searchTokens = this.tokenizeSearch(filter.search)
-
-			if (searchTokens.length > 0) {
-				conditions.push(
-					and(...searchTokens.map(token => this.buildPatientSearchTokenCondition(token)))!
+		const hasPatientIdentifierSearch = Boolean(filter.search?.trim() || filter.mrn?.trim())
+		const buildPatientQuery = (facilityScoped: boolean) => {
+			let query = supabase
+				.from("patients")
+				.select(
+					"id, mrn, first_name, last_name, middle_name, date_of_birth, sex, philhealth_member_id, is_active",
+					{ count: "exact" }
 				)
+				.eq("is_active", isActive)
+
+			if (facilityScoped) {
+				query = query.eq("facility_id", filter.facilityId)
 			}
+
+			if (filter.search) {
+				const searchTokens = this.tokenizeSearch(filter.search)
+
+				for (const token of searchTokens) {
+					query = query.or(this.buildSupabasePatientSearchTokenFilter(token))
+				}
+			}
+
+			if (filter.mrn) {
+				const m = this.escapeLike(filter.mrn)
+				query = query.ilike("mrn", `%${m}%`)
+			}
+
+			if (filter.dateOfBirth) {
+				query = query.eq("date_of_birth", filter.dateOfBirth)
+			}
+
+			if (filter.philhealthMemberId) {
+				const philhealthMemberId = this.escapeLike(filter.philhealthMemberId)
+				query = query.ilike("philhealth_member_id", `%${philhealthMemberId}%`)
+			}
+
+			return query
+				.order("last_name", { ascending: true })
+				.order("first_name", { ascending: true })
+				.range(offset, offset + limit - 1)
 		}
 
-		if (filter.mrn) {
-			const m = this.escapeLike(filter.mrn)
-			conditions.push(ilike(patients.mrn, `%${m}%`))
+		let result = await buildPatientQuery(true)
+
+		if (result.error) throw new Error(result.error.message)
+
+		let data = (result.data ?? []) as SupabasePatientSearchRow[]
+		let total = result.count ?? 0
+
+		if (data.length === 0 && hasPatientIdentifierSearch) {
+			result = await buildPatientQuery(false)
+			if (result.error) throw new Error(result.error.message)
+
+			data = (result.data ?? []) as SupabasePatientSearchRow[]
+			total = result.count ?? 0
 		}
 
-		if (filter.dateOfBirth) {
-			conditions.push(eq(patients.dateOfBirth, filter.dateOfBirth))
-		}
-
-		if (filter.philhealthMemberId) {
-			const philhealthMemberId = this.escapeLike(filter.philhealthMemberId)
-			conditions.push(ilike(patients.philhealthMemberId, `%${philhealthMemberId}%`))
-		}
-
-		const whereClause = and(...conditions)
-
-		// Subquery for last encounter date
-		const lastEncounterSq = db
-			.select({
-				patientId: encounters.patientId,
-				lastEncounterDate: sql<string>`max(${encounters.admissionDatetime})`.as(
-					"last_encounter_date"
-				),
-			})
-			.from(encounters)
-			.groupBy(encounters.patientId)
-			.as("last_enc")
-
-		const [data, totalResult] = await Promise.all([
-			db
-				.select({
-					id: patients.id,
-					mrn: patients.mrn,
-					firstName: patients.firstName,
-					lastName: patients.lastName,
-					middleName: patients.middleName,
-					dateOfBirth: patients.dateOfBirth,
-					sex: patients.sex,
-					philhealthMemberId: patients.philhealthMemberId,
-					isActive: patients.isActive,
-					lastEncounterDate: lastEncounterSq.lastEncounterDate,
-				})
-				.from(patients)
-				.leftJoin(lastEncounterSq, eq(patients.id, lastEncounterSq.patientId))
-				.where(whereClause)
-				.orderBy(patients.lastName, patients.firstName)
-				.limit(limit)
-				.offset(offset),
-			db.select({ count: count() }).from(patients).where(whereClause),
-		])
-
-		const total = totalResult[0]?.count ?? 0
+		const patientIds = data.map(row => row.id)
+		const lastEncounterDates = await this.getSupabaseLastEncounterDates(patientIds)
 
 		const hasDirectAccessSet = new Set<string>()
 		if (filter.clinicianStaffId && data.length > 0) {
-			const patientIds = data.map(r => r.id)
-			const accessRows = await db
-				.selectDistinct({ patientId: encounters.patientId })
-				.from(encounters)
-				.where(
-					and(
-						inArray(encounters.patientId, patientIds),
-						inArray(encounters.status, ["active", "discharged", "closed"]),
-						or(
-							eq(encounters.clinicianStaffId, filter.clinicianStaffId),
-							eq(encounters.attendingStaffId, filter.clinicianStaffId),
-							eq(encounters.admittingStaffId, filter.clinicianStaffId)
-						)
+			const accessRows = unwrapMany(
+				await supabase
+					.from("encounters")
+					.select("patient_id")
+					.in("patient_id", patientIds)
+					.in("status", ["active", "discharged", "closed"])
+					.or(
+						[
+							`clinician_staff_id.eq.${filter.clinicianStaffId}`,
+							`attending_staff_id.eq.${filter.clinicianStaffId}`,
+							`admitting_staff_id.eq.${filter.clinicianStaffId}`,
+						].join(",")
 					)
-				)
-			for (const row of accessRows) {
-				hasDirectAccessSet.add(row.patientId)
-			}
+			) as Array<{ patient_id: string }>
+
+			for (const row of accessRows) hasDirectAccessSet.add(row.patient_id)
 		}
 
 		return {
 			data: data.map(row => ({
-				...this.serializePatient(row),
-				lastEncounterDate: row.lastEncounterDate ?? null,
+				id: row.id,
+				mrn: row.mrn,
+				firstName: row.first_name,
+				lastName: row.last_name,
+				middleName: row.middle_name,
+				dateOfBirth: this.formatDateOnly(row.date_of_birth),
+				sex: row.sex,
+				philhealthMemberId: row.philhealth_member_id,
+				isActive: row.is_active,
+				lastEncounterDate: lastEncounterDates.get(row.id) ?? null,
 				hasDirectAccess: filter.clinicianStaffId ? hasDirectAccessSet.has(row.id) : true,
 			})),
 			total,
@@ -599,15 +616,40 @@ export class PatientsService {
 			.filter(Boolean)
 	}
 
-	private buildPatientSearchTokenCondition(token: string) {
+	private buildSupabasePatientSearchTokenFilter(token: string) {
 		const escapedToken = this.escapeLike(token)
+		const pattern = `%${escapedToken}%`
 
-		return or(
-			ilike(patients.firstName, `%${escapedToken}%`),
-			ilike(patients.middleName, `%${escapedToken}%`),
-			ilike(patients.lastName, `%${escapedToken}%`),
-			ilike(patients.mrn, `%${escapedToken}%`)
-		)!
+		return [
+			`first_name.ilike.${pattern}`,
+			`middle_name.ilike.${pattern}`,
+			`last_name.ilike.${pattern}`,
+			`mrn.ilike.${pattern}`,
+		].join(",")
+	}
+
+	private async getSupabaseLastEncounterDates(patientIds: string[]) {
+		const ids = [...new Set(patientIds)]
+		const lastEncounterDates = new Map<string, string>()
+		if (ids.length === 0) return lastEncounterDates
+
+		const rows = unwrapMany(
+			await supabase
+				.from("encounters")
+				.select("patient_id, admission_datetime")
+				.in("patient_id", ids)
+		) as SupabasePatientEncounterRow[]
+
+		for (const row of rows) {
+			if (!row.admission_datetime) continue
+
+			const current = lastEncounterDates.get(row.patient_id)
+			if (!current || new Date(row.admission_datetime) > new Date(current)) {
+				lastEncounterDates.set(row.patient_id, row.admission_datetime)
+			}
+		}
+
+		return lastEncounterDates
 	}
 
 	/** Detect a PostgreSQL unique-constraint violation (SQLSTATE 23505). */

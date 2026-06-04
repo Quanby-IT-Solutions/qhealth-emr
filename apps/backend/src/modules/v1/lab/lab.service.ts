@@ -18,6 +18,10 @@ import { supabase, unwrap, unwrapMany } from "@/common/database/supabase.client"
 
 type CrossMatchRow = typeof crossMatchRequests.$inferSelect
 type BloodUnitRow = typeof bloodUnits.$inferSelect
+type SupabasePatientRow = {
+	id: string
+	facility_id: string
+}
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -94,14 +98,7 @@ export class LabService {
 		// Resolve patient MRN → id (the original used an inner join on patients).
 		let patientId: string | undefined
 		if (query.patientMrn) {
-			const patient = unwrap(
-				await supabase
-					.from("patients")
-					.select("id")
-					.eq("facility_id", query.facilityId)
-					.eq("mrn", query.patientMrn)
-					.maybeSingle()
-			)
+			const patient = await this.findPatientForCrossMatch(query.patientMrn, query.facilityId)
 			if (!patient) return { data: [], total: 0, page, limit, totalPages: 0 }
 			patientId = patient.id
 		}
@@ -152,40 +149,67 @@ export class LabService {
 
 		const patient = await this.getPatientForCrossMatch(input.patientId, input.facilityId)
 
-		if (patient.facilityId !== input.facilityId) {
-			throw new BadRequestException("Patient does not belong to the selected facility")
-		}
-
 		const encounterId = await this.resolveEncounterId(input, patient.id)
 		const donorUnits = await this.getCompatibleDonorUnits(input)
 		const hasUnits = donorUnits.length > 0
 
-		// Atomic insert + unit reservation runs in the bb_create_cross_match RPC.
-		const createdId = unwrap(
-			await supabase.rpc("bb_create_cross_match", {
-				p_request: {
-					facility_id: input.facilityId,
-					patient_id: patient.id,
-					encounter_id: encounterId,
-					source_lab_order_id: input.sourceLabOrderId ?? null,
-					blood_type: input.bloodType ?? null,
-					component_type: input.componentType,
-					units_requested: input.unitsRequested,
-					urgency: input.urgency,
-					clinical_indication: input.clinicalIndication ?? null,
-					compatibility_result: "pending",
-					status: hasUnits ? "cross_matched" : "pending",
-					requested_by_staff_id: staff.id,
-					cross_matched_by_staff_id: hasUnits ? staff.id : null,
-					cross_matched_at: hasUnits ? new Date().toISOString() : null,
-				},
-				p_blood_unit_ids: donorUnits.map(unit => unit.id),
-			})
-		)
+		const requestPayload = {
+			facility_id: input.facilityId,
+			patient_id: patient.id,
+			encounter_id: encounterId,
+			source_lab_order_id: input.sourceLabOrderId ?? null,
+			blood_type: input.bloodType ?? null,
+			component_type: input.componentType,
+			units_requested: input.unitsRequested,
+			urgency: input.urgency,
+			clinical_indication: input.clinicalIndication ?? null,
+			compatibility_result: "pending",
+			status: hasUnits ? "cross_matched" : "pending",
+			requested_by_staff_id: staff.id,
+			cross_matched_by_staff_id: hasUnits ? staff.id : null,
+			cross_matched_at: hasUnits ? new Date().toISOString() : null,
+		}
+
+		const createdId = hasUnits
+			? await this.createCrossMatchWithReservedUnits(
+					requestPayload,
+					donorUnits.map(unit => unit.id)
+				)
+			: await this.createPendingCrossMatch(requestPayload)
 
 		if (!createdId) throw new BadRequestException("Unable to create cross-match request")
 
-		return this.getCrossMatchOrThrow(createdId as string)
+		return this.getCrossMatchOrThrow(createdId)
+	}
+
+	private async createPendingCrossMatch(requestPayload: Record<string, unknown>) {
+		const result = await supabase
+			.from("cross_match_requests")
+			.insert(requestPayload)
+			.select("id")
+			.single()
+
+		if (result.error) {
+			throw new BadRequestException(result.error.message)
+		}
+
+		return (result.data as { id: string } | null)?.id ?? null
+	}
+
+	private async createCrossMatchWithReservedUnits(
+		requestPayload: Record<string, unknown>,
+		bloodUnitIds: string[]
+	) {
+		const result = await supabase.rpc("bb_create_cross_match", {
+			p_request: requestPayload,
+			p_blood_unit_ids: bloodUnitIds,
+		})
+
+		if (result.error) {
+			throw new BadRequestException(result.error.message)
+		}
+
+		return (result.data as string | null) ?? null
 	}
 
 	async approveCrossMatch(
@@ -204,14 +228,7 @@ export class LabService {
 		}
 
 		if (input.compatibilityResult === "incompatible") {
-			unwrap(
-				await supabase.rpc("bb_approve_cross_match_incompatible", {
-					p_id: input.id,
-					p_staff_id: staff.id,
-					p_rejection_reason: input.rejectionReason ?? null,
-				})
-			)
-
+			await this.rejectCrossMatchRequest(input.id, staff.id, input.rejectionReason)
 			return this.getCrossMatchOrThrow(input.id)
 		}
 
@@ -246,18 +263,94 @@ export class LabService {
 
 		const newBloodUnitIds = bloodUnitIds.filter(id => !existingAssignedUnitIdSet.has(id))
 
+		if (bloodUnitIds.length === 0) {
+			await this.approveCrossMatchWithoutUnits(input.id, staff.id, request.crossMatchedAt)
+			return this.getCrossMatchOrThrow(input.id)
+		}
+
 		// Atomic unit reservation + request approval runs in the RPC.
-		unwrap(
-			await supabase.rpc("bb_approve_cross_match_compatible", {
-				p_id: input.id,
-				p_blood_unit_ids: bloodUnitIds,
-				p_new_blood_unit_ids: newBloodUnitIds,
-				p_staff_id: staff.id,
-				p_cross_matched_at: request.crossMatchedAt ? request.crossMatchedAt.toISOString() : null,
-			})
-		)
+		const approveResult = await supabase.rpc("bb_approve_cross_match_compatible", {
+			p_id: input.id,
+			p_blood_unit_ids: bloodUnitIds,
+			p_new_blood_unit_ids: newBloodUnitIds,
+			p_staff_id: staff.id,
+			p_cross_matched_at: request.crossMatchedAt ? request.crossMatchedAt.toISOString() : null,
+		})
+		if (approveResult.error) {
+			throw new BadRequestException(approveResult.error.message)
+		}
 
 		return this.getCrossMatchOrThrow(input.id)
+	}
+
+	private async rejectCrossMatchRequest(
+		id: string,
+		staffId: string,
+		rejectionReason: string | undefined
+	) {
+		const assignments = unwrapMany(
+			await supabase
+				.from("cross_match_unit_assignments")
+				.select("blood_unit_id")
+				.eq("cross_match_request_id", id)
+		)
+		const bloodUnitIds = assignments.map((row: { blood_unit_id: string }) => row.blood_unit_id)
+		const now = new Date().toISOString()
+
+		if (bloodUnitIds.length > 0) {
+			const unitsResult = await supabase
+				.from("blood_units")
+				.update({ status: "available", updated_at: now })
+				.in("id", bloodUnitIds)
+			if (unitsResult.error) throw new BadRequestException(unitsResult.error.message)
+
+			const assignmentsResult = await supabase
+				.from("cross_match_unit_assignments")
+				.update({ status: "released", updated_at: now })
+				.eq("cross_match_request_id", id)
+			if (assignmentsResult.error) {
+				throw new BadRequestException(assignmentsResult.error.message)
+			}
+		}
+
+		const requestResult = await supabase
+			.from("cross_match_requests")
+			.update({
+				status: "cancelled",
+				compatibility_result: "incompatible",
+				cross_matched_by_staff_id: staffId,
+				cross_matched_at: now,
+				approved_by_staff_id: staffId,
+				approved_at: now,
+				cancelled_by_staff_id: staffId,
+				cancelled_at: now,
+				rejection_reason: rejectionReason ?? "Cross-match incompatible",
+				updated_at: now,
+			})
+			.eq("id", id)
+		if (requestResult.error) throw new BadRequestException(requestResult.error.message)
+	}
+
+	private async approveCrossMatchWithoutUnits(
+		id: string,
+		staffId: string,
+		crossMatchedAt: Date | null
+	) {
+		const now = new Date().toISOString()
+		const requestResult = await supabase
+			.from("cross_match_requests")
+			.update({
+				status: "approved",
+				compatibility_result: "compatible",
+				cross_matched_by_staff_id: staffId,
+				cross_matched_at: crossMatchedAt ? crossMatchedAt.toISOString() : now,
+				approved_by_staff_id: staffId,
+				approved_at: now,
+				rejection_reason: null,
+				updated_at: now,
+			})
+			.eq("id", id)
+		if (requestResult.error) throw new BadRequestException(requestResult.error.message)
 	}
 
 	// ========================================================================
@@ -349,7 +442,9 @@ export class LabService {
 	}
 
 	/** Attach patient name/MRN to raw cross-match rows (replaces the patients join). */
-	private async assembleRows(rawRows: Array<Record<string, unknown>>): Promise<CrossMatchListRow[]> {
+	private async assembleRows(
+		rawRows: Array<Record<string, unknown>>
+	): Promise<CrossMatchListRow[]> {
 		if (rawRows.length === 0) return []
 
 		const patientIds = [...new Set(rawRows.map(r => r.patient_id as string))]
@@ -429,9 +524,7 @@ export class LabService {
 				.select("cross_match_request_id, blood_unit_id")
 				.in("cross_match_request_id", requestIds)
 		)
-		const unitIds = [
-			...new Set(assignments.map((a: { blood_unit_id: string }) => a.blood_unit_id)),
-		]
+		const unitIds = [...new Set(assignments.map((a: { blood_unit_id: string }) => a.blood_unit_id))]
 		if (unitIds.length === 0) return new Map()
 
 		const units = unwrapMany(await supabase.from("blood_units").select("*").in("id", unitIds))
@@ -496,17 +589,47 @@ export class LabService {
 		patientIdentifier: string,
 		facilityId: string
 	): Promise<{ id: string; facilityId: string }> {
-		const normalizedIdentifier = patientIdentifier.trim()
-		let query = supabase.from("patients").select("id, facility_id")
-		query = UUID_REGEX.test(normalizedIdentifier)
-			? query.eq("id", normalizedIdentifier)
-			: query.eq("facility_id", facilityId).eq("mrn", normalizedIdentifier)
-
-		const patient = unwrap(await query.maybeSingle())
+		const patient = await this.findPatientForCrossMatch(patientIdentifier, facilityId)
 
 		if (!patient) throw new NotFoundException(`Patient ${patientIdentifier} not found`)
 
 		return { id: patient.id, facilityId: patient.facility_id }
+	}
+
+	private async findPatientForCrossMatch(
+		patientIdentifier: string,
+		facilityId: string
+	): Promise<SupabasePatientRow | null> {
+		const normalizedIdentifier = patientIdentifier.trim()
+		const selectPatient = () => supabase.from("patients").select("id, facility_id")
+		if (!UUID_REGEX.test(normalizedIdentifier)) {
+			return this.getPatientByMrnForCrossMatch(normalizedIdentifier, facilityId)
+		}
+
+		return unwrap(
+			await selectPatient().eq("id", normalizedIdentifier).limit(1).maybeSingle()
+		) as SupabasePatientRow | null
+	}
+
+	private async getPatientByMrnForCrossMatch(
+		patientMrn: string,
+		facilityId: string
+	): Promise<SupabasePatientRow | null> {
+		const selectPatient = () => supabase.from("patients").select("id, facility_id")
+
+		const facilityPatient = unwrap(
+			await selectPatient()
+				.ilike("mrn", patientMrn)
+				.eq("facility_id", facilityId)
+				.limit(1)
+				.maybeSingle()
+		) as SupabasePatientRow | null
+
+		if (facilityPatient) return facilityPatient
+
+		return unwrap(
+			await selectPatient().ilike("mrn", patientMrn).limit(1).maybeSingle()
+		) as SupabasePatientRow | null
 	}
 
 	private async resolveEncounterId(

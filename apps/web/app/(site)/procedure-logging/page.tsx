@@ -37,6 +37,10 @@ import {
 } from "@/features/msw/ancillary-clearance/api/clearance.hooks"
 
 const SLA_TARGET_MINUTES = 120
+const APP_LOCALE = "en-PH"
+const APP_TIME_ZONE = "Asia/Manila"
+const TIMESTAMP_WITH_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}/
+const TIMESTAMP_TIMEZONE_PATTERN = /(?:Z|[+-]\d{2}(?::?\d{2})?)$/i
 type ScanType = "start" | "end"
 type ProcedureStatus = "not_started" | "in_progress" | "completed"
 type ProcedureLogRowForScan = {
@@ -58,18 +62,50 @@ function can(permSet: Set<string>, module: string, action: string) {
 	return permSet.has(`${module}:${action}`)
 }
 
+function parseTimestamp(value: Date | string) {
+	if (value instanceof Date) return value
+
+	const normalizedValue =
+		TIMESTAMP_WITH_TIME_PATTERN.test(value) && !TIMESTAMP_TIMEZONE_PATTERN.test(value)
+			? `${value}Z`
+			: value
+
+	return new Date(normalizedValue)
+}
+
 function formatTimestamp(value: Date | string | null | undefined) {
 	if (!value) return "-"
-	const date = new Date(value)
+	const date = parseTimestamp(value)
 	if (Number.isNaN(date.getTime())) return "-"
 
-	return date
-		.toLocaleTimeString([], {
-			hour: "2-digit",
-			minute: "2-digit",
-			second: "2-digit",
-		})
-		.concat(`.${String(date.getMilliseconds()).padStart(3, "0")}`)
+	const parts = new Intl.DateTimeFormat(APP_LOCALE, {
+		timeZone: APP_TIME_ZONE,
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+	}).formatToParts(date)
+	const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+		parts.find(part => part.type === type)?.value ?? ""
+	const dayPeriod = getPart("dayPeriod")
+
+	return `${getPart("hour")}:${getPart("minute")}:${getPart("second")}.${String(
+		date.getMilliseconds()
+	).padStart(3, "0")}${dayPeriod ? ` ${dayPeriod}` : ""}`
+}
+
+function formatDateTime(value: Date | string | null | undefined) {
+	if (!value) return "-"
+	const date = parseTimestamp(value)
+	if (Number.isNaN(date.getTime())) return "-"
+
+	return date.toLocaleString(APP_LOCALE, {
+		timeZone: APP_TIME_ZONE,
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	})
 }
 
 function formatDuration(durationMinutes: number | null | undefined, hasStarted = true) {
@@ -96,14 +132,13 @@ function formatCompactId(value: string) {
 
 function isToday(value: Date | string | null | undefined) {
 	if (!value) return false
-	const date = new Date(value)
+	const date = parseTimestamp(value)
 	if (Number.isNaN(date.getTime())) return false
 
 	const today = new Date()
 	return (
-		date.getFullYear() === today.getFullYear() &&
-		date.getMonth() === today.getMonth() &&
-		date.getDate() === today.getDate()
+		date.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIME_ZONE }) ===
+		today.toLocaleDateString(APP_LOCALE, { timeZone: APP_TIME_ZONE })
 	)
 }
 
@@ -201,9 +236,8 @@ export default function ProcedureLoggingPage() {
 	const [scanType, setScanType] = useState<ScanType>("start")
 	const trimmedPatientBarcode = patientBarcode.trim()
 	const procedureLogQuery = useAncillaryProcedureLogQuery({
-		facilityId,
 		enabled: hasViewPermission,
-		limit: 50,
+		limit: 100,
 	})
 	const procedureClearanceByMrnQuery = useAncillaryProcedureClearanceByMrnQuery({
 		facilityId,
@@ -281,7 +315,13 @@ export default function ProcedureLoggingPage() {
 		shouldLockScanType && procedureStatusDetail
 			? scanTypeForProcedureStatus(procedureStatusDetail.status)
 			: null
-	const selectedScanType = autoScanType ?? scanType
+	const canSelectEndScan =
+		isSelectedClearanceSaved &&
+		Boolean(procedureStatusDetail) &&
+		procedureStatusDetail?.status !== "not_started"
+	const selectedScanType =
+		autoScanType ?? (scanType === "end" && !canSelectEndScan ? "start" : scanType)
+	const markEndCheckboxDisabled = shouldLockScanType || !canSelectEndScan
 	const selectedClearanceScanEligible = procedureStatusDetail
 		? isProcedureStatusEligibleForScan(procedureStatusDetail.status, selectedScanType)
 		: false
@@ -565,8 +605,11 @@ export default function ProcedureLoggingPage() {
 										<Checkbox
 											id="mark-end"
 											checked={selectedScanType === "end"}
-											disabled={shouldLockScanType}
-											onCheckedChange={checked => setScanType(checked === true ? "end" : "start")}
+											disabled={markEndCheckboxDisabled}
+											onCheckedChange={checked => {
+												if (shouldLockScanType || (checked === true && !canSelectEndScan)) return
+												setScanType(checked === true ? "end" : "start")
+											}}
 										/>
 										<label htmlFor="mark-end" className="text-muted-foreground text-sm">
 											Mark END
@@ -643,12 +686,12 @@ export default function ProcedureLoggingPage() {
 					<CardTitle className="text-base">Procedure log</CardTitle>
 				</CardHeader>
 				<CardContent>
-					<Table>
+					<Table className="min-w-[900px]">
 						<TableHeader>
 							<TableRow>
 								<TableHead>Clearance ID</TableHead>
 								<TableHead>Patient</TableHead>
-								<TableHead>Procedure</TableHead>
+								<TableHead>Status</TableHead>
 								<TableHead>Start</TableHead>
 								<TableHead>End</TableHead>
 								<TableHead>Duration</TableHead>
@@ -691,24 +734,32 @@ export default function ProcedureLoggingPage() {
 										)}
 									</TableCell>
 									<TableCell>
-										<div>{row.procedureName ?? "Ancillary order"}</div>
-										<div className="text-muted-foreground text-xs">{row.ancillaryType}</div>
+										<Badge variant={row.status === "pending" ? "outline" : "secondary"}>
+											{row.status}
+										</Badge>
+										<div className="text-muted-foreground mt-1 text-xs">
+											Updated {formatDateTime(row.updatedAt)}
+										</div>
 									</TableCell>
 									<TableCell>{formatTimestamp(row.startAt)}</TableCell>
 									<TableCell>{formatTimestamp(row.endAt)}</TableCell>
 									<TableCell>{formatDuration(row.durationMinutes, Boolean(row.startAt))}</TableCell>
 									<TableCell>
 										<div className="flex flex-col gap-1">
-											<ScanAuditMark
-												label="Start"
-												matched={row.procedureStartBarcodeMatched}
-												staffId={row.procedureStartedByStaffId}
-											/>
-											<ScanAuditMark
-												label="End"
-												matched={row.procedureEndBarcodeMatched}
-												staffId={row.procedureEndedByStaffId}
-											/>
+											<div>
+												<ScanAuditMark
+													label="Start"
+													matched={row.procedureStartBarcodeMatched}
+													staffId={row.procedureStartedByStaffId}
+												/>
+											</div>
+											<div>
+												<ScanAuditMark
+													label="End"
+													matched={row.procedureEndBarcodeMatched}
+													staffId={row.procedureEndedByStaffId}
+												/>
+											</div>
 										</div>
 									</TableCell>
 									<TableCell>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, type KeyboardEvent } from "react"
 import { ArrowRight, Clock3, FlaskConical, ShieldCheck, TriangleAlert } from "lucide-react"
 
 import { Badge } from "@/core/components/ui/badge"
@@ -81,10 +81,6 @@ function calculateAge(dateOfBirth: string) {
 
 	if (!hasBirthdayPassed) age -= 1
 	return String(Math.max(0, age))
-}
-
-function normalizeMrn(value: string | null | undefined) {
-	return value?.trim().toUpperCase() ?? ""
 }
 
 function priorityBadge(priority: LabOrder["priority"]) {
@@ -312,6 +308,9 @@ export function LabDashboard() {
 		notes: "",
 	})
 	const [manualErrors, setManualErrors] = useState<Record<string, string>>({})
+	const [patientSearchTerm, setPatientSearchTerm] = useState("")
+	const [patientSuggestionsOpen, setPatientSuggestionsOpen] = useState(false)
+	const [highlightedPatientIndex, setHighlightedPatientIndex] = useState(0)
 
 	const validateManualEntry = () => {
 		const errors: Record<string, string> = {}
@@ -366,49 +365,56 @@ export function LabDashboard() {
 			notes: "",
 		})
 		setManualErrors({})
+		setPatientSearchTerm("")
+		setPatientSuggestionsOpen(false)
+		setHighlightedPatientIndex(0)
 		setSex("F")
 		setPriority("Routine")
 	}
 
 	const { data: wardsData } = useWardsQuery(facilityId)
+	const trimmedPatientSearch = patientSearchTerm.trim()
 	const patientsQuery = usePatientSearchQuery(
 		{
 			facilityId,
+			search: trimmedPatientSearch || undefined,
 			isActive: true,
-			limit: 100,
+			limit: 10,
 		},
-		{ enabled: Boolean(facilityId) && manualEntryOpen }
+		{ enabled: Boolean(facilityId) && manualEntryOpen && trimmedPatientSearch.length > 0 }
 	)
-	const existingPatientIds = useMemo(
-		() => new Set(allOrders.map(order => order.patientId).filter(Boolean)),
-		[allOrders]
-	)
-	const existingPatientMrns = useMemo(
-		() => new Set(allOrders.map(order => normalizeMrn(order.patientMrn)).filter(Boolean)),
-		[allOrders]
-	)
-	const availablePatients = useMemo(
-		() =>
-			(patientsQuery.data?.data ?? []).filter(
-				patient =>
-					!existingPatientIds.has(patient.id) && !existingPatientMrns.has(normalizeMrn(patient.mrn))
-			),
-		[existingPatientIds, existingPatientMrns, patientsQuery.data?.data]
-	)
+	const patientMatches = useMemo(() => patientsQuery.data?.data ?? [], [patientsQuery.data?.data])
 	const isPatientAutoFilled = Boolean(manualForm.patientId)
 	const isAgeAutoFilled = isPatientAutoFilled
 
+	function handlePatientSearchChange(value: string) {
+		setPatientSearchTerm(value)
+		setPatientSuggestionsOpen(true)
+		setHighlightedPatientIndex(0)
+		setManualForm(current => ({
+			...current,
+			patientId: "",
+			patientName: value,
+			mrn: "",
+			age: "",
+		}))
+	}
+
 	function handlePatientSelect(patientId: string) {
-		const patient = availablePatients.find(candidate => candidate.id === patientId)
+		const patient = patientMatches.find(candidate => candidate.id === patientId)
 		if (!patient) return
 
-		setManualForm({
-			...manualForm,
+		const patientName = formatPatientOptionName(patient)
+		setPatientSearchTerm(patientName)
+		setPatientSuggestionsOpen(false)
+		setHighlightedPatientIndex(0)
+		setManualForm(current => ({
+			...current,
 			patientId: patient.id,
-			patientName: formatPatientOptionName(patient),
+			patientName,
 			mrn: patient.mrn,
 			age: calculateAge(patient.dateOfBirth),
-		})
+		}))
 
 		if (patient.sex === "female") setSex("F")
 		if (patient.sex === "male") setSex("M")
@@ -420,6 +426,35 @@ export function LabDashboard() {
 			delete nextErrors.age
 			return nextErrors
 		})
+	}
+
+	function handlePatientSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+		if (event.key === "ArrowDown") {
+			event.preventDefault()
+			setPatientSuggestionsOpen(true)
+			setHighlightedPatientIndex(current =>
+				Math.min(current + 1, Math.max(patientMatches.length - 1, 0))
+			)
+			return
+		}
+
+		if (event.key === "ArrowUp") {
+			event.preventDefault()
+			setHighlightedPatientIndex(current => Math.max(current - 1, 0))
+			return
+		}
+
+		if (event.key === "Enter" && patientSuggestionsOpen && patientMatches.length > 0) {
+			event.preventDefault()
+			const selectedPatient =
+				patientMatches[Math.min(highlightedPatientIndex, patientMatches.length - 1)]
+			if (selectedPatient) handlePatientSelect(selectedPatient.id)
+			return
+		}
+
+		if (event.key === "Escape") {
+			setPatientSuggestionsOpen(false)
+		}
 	}
 
 	return (
@@ -530,45 +565,58 @@ export function LabDashboard() {
 												<label className="text-muted-foreground text-xs">
 													Patient name <span className="text-rose-600">*</span>
 												</label>
-												<Select
-													value={manualForm.patientId}
-													onValueChange={value => {
-														if (value) handlePatientSelect(value)
-													}}
-												>
-													<SelectTrigger
+												<div className="relative">
+													<Input
+														value={patientSearchTerm}
+														onChange={event => handlePatientSearchChange(event.target.value)}
+														onFocus={() => {
+															if (trimmedPatientSearch) setPatientSuggestionsOpen(true)
+														}}
+														onBlur={() => setPatientSuggestionsOpen(false)}
+														onKeyDown={handlePatientSearchKeyDown}
 														className={cn(
 															"h-8 w-full text-xs",
 															manualErrors.patientName && "border-rose-500"
 														)}
-													>
-														<span
-															data-slot="select-value"
-															className={cn(
-																"truncate text-left",
-																!manualForm.patientName && "text-muted-foreground"
+														placeholder="Search patient name"
+													/>
+													{patientSuggestionsOpen && trimmedPatientSearch.length > 0 && (
+														<div className="bg-popover absolute top-[calc(100%+4px)] right-0 left-0 z-50 max-h-44 overflow-y-auto rounded-md border shadow-lg">
+															{patientsQuery.isFetching && (
+																<div className="text-muted-foreground px-2.5 py-2 text-xs">
+																	Loading patients...
+																</div>
 															)}
-														>
-															{manualForm.patientName
-																? `${manualForm.patientName} - MRN ${manualForm.mrn}`
-																: patientsQuery.isFetching
-																	? "Loading patients..."
-																	: "Select patient"}
-														</span>
-													</SelectTrigger>
-													<SelectContent>
-														{availablePatients.map(patient => (
-															<SelectItem key={patient.id} value={patient.id}>
-																{formatPatientOptionName(patient)} - MRN {patient.mrn}
-															</SelectItem>
-														))}
-														{!patientsQuery.isFetching && availablePatients.length === 0 && (
-															<SelectItem value="no-patients" disabled>
-																No available patients
-															</SelectItem>
-														)}
-													</SelectContent>
-												</Select>
+															{!patientsQuery.isFetching &&
+																patientMatches.map((patient, index) => (
+																	<button
+																		key={patient.id}
+																		type="button"
+																		onMouseDown={event => {
+																			event.preventDefault()
+																			handlePatientSelect(patient.id)
+																		}}
+																		className={cn(
+																			"hover:bg-muted flex w-full flex-col items-start px-2.5 py-2 text-left text-xs",
+																			index === highlightedPatientIndex && "bg-muted"
+																		)}
+																	>
+																		<span className="font-medium">
+																			{formatPatientOptionName(patient)}
+																		</span>
+																		<span className="text-muted-foreground font-mono">
+																			MRN {patient.mrn}
+																		</span>
+																	</button>
+																))}
+															{!patientsQuery.isFetching && patientMatches.length === 0 && (
+																<div className="text-muted-foreground px-2.5 py-2 text-xs">
+																	No matching patients
+																</div>
+															)}
+														</div>
+													)}
+												</div>
 												{manualErrors.patientName && (
 													<p className="mt-0.5 text-xs text-rose-600">{manualErrors.patientName}</p>
 												)}

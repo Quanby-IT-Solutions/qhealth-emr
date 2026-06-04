@@ -18,6 +18,7 @@ import {
 } from "@/core/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { Textarea } from "@/core/components/ui/textarea"
+import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
 	useApproveCrossMatchMutation,
@@ -178,7 +179,7 @@ function NewCrossMatchForm({
 			<div className="grid grid-cols-2 gap-4">
 				<div className="space-y-2">
 					<Label>
-						Patient ID <span className="text-destructive">*</span>
+						Patient MRN / ID <span className="text-destructive">*</span>
 					</Label>
 					<Input
 						value={patientId}
@@ -242,10 +243,7 @@ function NewCrossMatchForm({
 
 			<div className="space-y-2">
 				<Label>Urgency</Label>
-				<Select
-					value={urgency}
-					onValueChange={v => setUrgency(v as CrossMatchRequest["urgency"])}
-				>
+				<Select value={urgency} onValueChange={v => setUrgency(v as CrossMatchRequest["urgency"])}>
 					<SelectTrigger>
 						<SelectValue />
 					</SelectTrigger>
@@ -280,8 +278,6 @@ function NewCrossMatchForm({
 function CrossMatchRequestCards({
 	requests,
 	isLoading,
-	onApprove,
-	canApprove,
 }: {
 	requests: CrossMatchRequest[]
 	isLoading: boolean
@@ -308,7 +304,7 @@ function CrossMatchRequestCards({
 				const unitBarcodes = req.bloodUnits.map(unit => unit.unitBarcode).join(", ")
 
 				return (
-					<div key={req.id} className="rounded-md border bg-background p-4">
+					<div key={req.id} className="bg-background rounded-md border p-4">
 						<div className="flex flex-wrap items-start justify-between gap-3">
 							<div className="min-w-0 space-y-1">
 								<div className="flex flex-wrap items-center gap-2">
@@ -528,7 +524,8 @@ function ApproveDialog({
 
 export function CrossMatchForm() {
 	const { data: profile } = useMyProfile()
-	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
+	const activeFacilityId = useActiveFacilityId()
+	const facilityId = activeFacilityId ?? profile?.staffProfiles?.[0]?.facilityId ?? ""
 	const permissions = profile?.activeRole?.permissions ?? []
 	const permSet = new Set(
 		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
@@ -554,6 +551,9 @@ export function CrossMatchForm() {
 		status: "approved",
 		limit: 50,
 	})
+	const pendingCount = pendingQuery.data?.total ?? 0
+	const crossMatchedCount = activeQuery.data?.total ?? 0
+	const approvedCount = approvedQuery.data?.total ?? 0
 
 	function handleApprove(req: CrossMatchRequest) {
 		setApproveTarget(req)
@@ -598,23 +598,9 @@ export function CrossMatchForm() {
 					<CardContent>
 						<Tabs defaultValue="pending">
 							<TabsList className="mb-4">
-								<TabsTrigger value="pending">
-									Pending
-									{(pendingQuery.data?.total ?? 0) > 0 && (
-										<Badge variant="secondary" className="ml-1.5 text-[10px]">
-											{pendingQuery.data?.total}
-										</Badge>
-									)}
-								</TabsTrigger>
-								<TabsTrigger value="cross_matched">
-									Cross-Matched
-									{(activeQuery.data?.total ?? 0) > 0 && (
-										<Badge variant="secondary" className="ml-1.5 text-[10px]">
-											{activeQuery.data?.total}
-										</Badge>
-									)}
-								</TabsTrigger>
-								<TabsTrigger value="approved">Approved</TabsTrigger>
+								<TabsTrigger value="pending">Pending (<p className="text-blue-500">{pendingCount}</p>)</TabsTrigger>
+								<TabsTrigger value="cross_matched">Cross-Matched (<p className="text-blue-500">{crossMatchedCount}</p>)</TabsTrigger>
+								<TabsTrigger value="approved">Approved (<p className="text-blue-500">{approvedCount}</p>)</TabsTrigger>
 							</TabsList>
 
 							<TabsContent value="pending">

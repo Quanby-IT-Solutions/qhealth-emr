@@ -36,7 +36,7 @@ import {
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
-import { supabase, unwrap } from "@/common/database/supabase.client"
+import { supabase, unwrap, unwrapMany } from "@/common/database/supabase.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { closeOpenSlaStep } from "@/utils/sla-events"
 import { resolveStepTarget } from "@/utils/sla-step-target"
@@ -72,6 +72,14 @@ type OpdDispenseInput = V1Inputs["orders"]["opdDispense"]
 type OpdDispenseHistoryInput = V1Inputs["orders"]["listOpdDispenseHistory"]
 type SaveCounselingLogInput = V1Inputs["orders"]["saveCounselingLog"]
 type CounselingLogListInput = V1Inputs["orders"]["listCounselingLogs"]
+
+type SupabasePatientDisplayRow = {
+	id: string
+	mrn: string | null
+	first_name: string | null
+	middle_name: string | null
+	last_name: string | null
+}
 
 const PDEA_TRANCHE_DAYS = 30
 const PDEA_MAX_CONTROLLED_DAYS = 90
@@ -1347,6 +1355,30 @@ export class OrdersService {
 		})
 	}
 
+	private async getSupabasePatientsByIds(patientIds: string[]) {
+		const ids = [...new Set(patientIds)]
+		if (ids.length === 0) return new Map<string, SupabasePatientDisplayRow>()
+
+		const rows = unwrapMany(
+			await supabase
+				.from("patients")
+				.select("id, mrn, first_name, middle_name, last_name")
+				.in("id", ids)
+		) as SupabasePatientDisplayRow[]
+
+		return new Map(rows.map(patient => [patient.id, patient]))
+	}
+
+	private formatSupabasePatientName(patient: SupabasePatientDisplayRow | null | undefined) {
+		if (!patient) return null
+
+		const name = [patient.last_name, patient.first_name, patient.middle_name]
+			.filter((part): part is string => Boolean(part?.trim()))
+			.join(", ")
+
+		return name || null
+	}
+
 	async findLabOrders(input: LabOrderListInput) {
 		const page = Number(input.page) || 1
 		const limit = Number(input.limit) || 50
@@ -1381,10 +1413,7 @@ export class OrdersService {
 					specimenType: labOrders.specimenType,
 					orderingStaffId: labOrders.orderingStaffId,
 					orderingStaffName: users.name,
-					patientId: patients.id,
-					patientFirstName: patients.firstName,
-					patientLastName: patients.lastName,
-					patientMrn: patients.mrn,
+					patientId: encounters.patientId,
 					wardName: wards.name,
 					bedNumber: beds.bedNumber,
 					collectionDatetime: labOrders.collectionDatetime,
@@ -1396,7 +1425,6 @@ export class OrdersService {
 				})
 				.from(labOrders)
 				.leftJoin(encounters, eq(labOrders.encounterId, encounters.id))
-				.leftJoin(patients, eq(encounters.patientId, patients.id))
 				.leftJoin(beds, eq(encounters.bedId, beds.id))
 				.leftJoin(wards, eq(beds.wardId, wards.id))
 				.leftJoin(staffProfiles, eq(labOrders.orderingStaffId, staffProfiles.id))
@@ -1408,17 +1436,22 @@ export class OrdersService {
 		])
 
 		const total = totalResult?.count ?? 0
+		const patientsById = await this.getSupabasePatientsByIds(
+			rows.map(row => row.patientId).filter((patientId): patientId is string => Boolean(patientId))
+		)
 
 		return {
-			data: rows.map(row => ({
-				...row,
-				patientId: row.patientId ?? null,
-				patientName:
-					row.patientLastName && row.patientFirstName
-						? `${row.patientLastName}, ${row.patientFirstName}`
-						: null,
-				hasCriticalValues: this.computeHasCriticalValues(row.results),
-			})),
+			data: rows.map(row => {
+				const patient = row.patientId ? patientsById.get(row.patientId) : null
+
+				return {
+					...row,
+					patientId: row.patientId ?? null,
+					patientName: this.formatSupabasePatientName(patient),
+					patientMrn: patient?.mrn ?? null,
+					hasCriticalValues: this.computeHasCriticalValues(row.results),
+				}
+			}),
 			total,
 			page,
 			limit,
@@ -1445,10 +1478,7 @@ export class OrdersService {
 				specimenType: labOrders.specimenType,
 				orderingStaffId: labOrders.orderingStaffId,
 				orderingStaffName: users.name,
-				patientId: patients.id,
-				patientFirstName: patients.firstName,
-				patientLastName: patients.lastName,
-				patientMrn: patients.mrn,
+				patientId: encounters.patientId,
 				wardName: wards.name,
 				bedNumber: beds.bedNumber,
 				collectionDatetime: labOrders.collectionDatetime,
@@ -1462,7 +1492,6 @@ export class OrdersService {
 			})
 			.from(labOrders)
 			.leftJoin(encounters, eq(labOrders.encounterId, encounters.id))
-			.leftJoin(patients, eq(encounters.patientId, patients.id))
 			.leftJoin(beds, eq(encounters.bedId, beds.id))
 			.leftJoin(wards, eq(beds.wardId, wards.id))
 			.leftJoin(staffProfiles, eq(labOrders.orderingStaffId, staffProfiles.id))
@@ -1470,13 +1499,15 @@ export class OrdersService {
 			.where(eq(labOrders.id, id))
 
 		if (!row) throw new NotFoundException(`Lab order ${id} not found`)
+		const patient = row.patientId
+			? (await this.getSupabasePatientsByIds([row.patientId])).get(row.patientId)
+			: null
+
 		return {
 			...row,
 			patientId: row.patientId ?? null,
-			patientName:
-				row.patientLastName && row.patientFirstName
-					? `${row.patientLastName}, ${row.patientFirstName}`
-					: null,
+			patientName: this.formatSupabasePatientName(patient),
+			patientMrn: patient?.mrn ?? null,
 			hasCriticalValues: this.computeHasCriticalValues(row.results),
 		}
 	}

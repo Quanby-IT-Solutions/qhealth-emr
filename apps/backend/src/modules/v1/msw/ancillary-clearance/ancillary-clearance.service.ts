@@ -10,7 +10,6 @@ import {
 	labOrders,
 	malasakitCases,
 	mswEvaluations,
-	patients,
 	staffProfiles,
 } from "@repo/db/schema"
 
@@ -23,14 +22,86 @@ type CoverageSource = {
 	amount: number
 }
 
+type SupabasePatientRow = {
+	id: string
+	facility_id: string
+	mrn: string
+	first_name: string | null
+	middle_name: string | null
+	last_name: string | null
+}
+
+type SupabaseEncounterRow = {
+	id: string
+	status: string
+}
+
+type SupabaseProcedureLogEncounterRow = {
+	id: string
+	facility_id: string
+	patient_id: string
+}
+
+type SupabaseAncillaryClearanceRow = {
+	id: string
+	order_id: string
+	encounter_id: string | null
+	status: string
+	cleared_at: string | null
+	procedure_start_at: string | null
+	procedure_end_at: string | null
+	procedure_start_barcode: string | null
+	procedure_end_barcode: string | null
+	procedure_start_barcode_matched: boolean
+	procedure_end_barcode_matched: boolean
+	procedure_started_by_staff_id: string | null
+	procedure_ended_by_staff_id: string | null
+	created_at: string
+	updated_at: string
+}
+
+type SupabaseLabOrderRow = {
+	id: string
+	encounter_id: string | null
+	facility_id: string
+	test_name: string | null
+	panel_name: string | null
+}
+
+type SupabaseImagingOrderRow = {
+	id: string
+	encounter_id: string | null
+	facility_id: string
+	modality: string | null
+	body_part: string | null
+}
+
 type AncillaryClearanceRow = typeof ancillaryClearance.$inferSelect
 
 const ANCILLARY_PROCEDURE_SLA_MINUTES = 120
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const DATABASE_TIMESTAMP_WITH_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}/
+const DATABASE_TIMESTAMP_TIMEZONE_PATTERN = /(?:Z|[+-]\d{2}(?::?\d{2})?)$/i
+
+function parseDatabaseUtcTimestamp(value: unknown): Date {
+	if (value instanceof Date) return value
+
+	const rawValue = String(value)
+	const normalizedValue =
+		DATABASE_TIMESTAMP_WITH_TIME_PATTERN.test(rawValue) &&
+		!DATABASE_TIMESTAMP_TIMEZONE_PATTERN.test(rawValue)
+			? `${rawValue}Z`
+			: rawValue
+
+	return new Date(normalizedValue)
+}
 
 const toClearanceDate = (value: unknown): Date | null =>
-	value == null ? null : new Date(value as string)
-const toClearanceDateReq = (value: unknown): Date => new Date(value as string)
+	value == null ? null : parseDatabaseUtcTimestamp(value)
+const toClearanceDateReq = (value: unknown): Date => parseDatabaseUtcTimestamp(value)
+const toClearanceIso = (value: unknown): string | null =>
+	value == null ? null : parseDatabaseUtcTimestamp(value).toISOString()
+const toClearanceIsoReq = (value: unknown): string => parseDatabaseUtcTimestamp(value).toISOString()
 
 /** Map a snake_case ancillary_clearance row from Supabase to the camelCase row shape. */
 function toAncillaryClearanceRow(r: Record<string, unknown>): AncillaryClearanceRow {
@@ -83,101 +154,139 @@ export class AncillaryClearanceService {
 	}
 
 	async procedureLog(input: { facilityId?: string; limit?: number }) {
-		const facilityFilter = input.facilityId
-			? or(
-					eq(encounters.facilityId, input.facilityId),
-					eq(labOrders.facilityId, input.facilityId),
-					eq(imagingOrders.facilityId, input.facilityId)
+		const limit = input.limit ?? 50
+		const rows = (unwrap(
+			await supabase
+				.from("ancillary_clearance")
+				.select(
+					[
+						"id",
+						"order_id",
+						"encounter_id",
+						"status",
+						"cleared_at",
+						"procedure_start_at",
+						"procedure_end_at",
+						"procedure_start_barcode",
+						"procedure_end_barcode",
+						"procedure_start_barcode_matched",
+						"procedure_end_barcode_matched",
+						"procedure_started_by_staff_id",
+						"procedure_ended_by_staff_id",
+						"created_at",
+						"updated_at",
+					].join(", ")
 				)
-			: undefined
+				.order("created_at", { ascending: false })
+				.limit(input.facilityId ? Math.max(limit * 4, 100) : limit)
+		) ?? []) as unknown as SupabaseAncillaryClearanceRow[]
 
-		const rows = await this.db
-			.select({
-				id: ancillaryClearance.id,
-				orderId: ancillaryClearance.orderId,
-				encounterId: ancillaryClearance.encounterId,
-				status: ancillaryClearance.status,
-				createdAt: ancillaryClearance.createdAt,
-				clearedAt: ancillaryClearance.clearedAt,
-				procedureStartAt: ancillaryClearance.procedureStartAt,
-				procedureEndAt: ancillaryClearance.procedureEndAt,
-				procedureStartBarcodeMatched: ancillaryClearance.procedureStartBarcodeMatched,
-				procedureEndBarcodeMatched: ancillaryClearance.procedureEndBarcodeMatched,
-				procedureStartedByStaffId: ancillaryClearance.procedureStartedByStaffId,
-				procedureEndedByStaffId: ancillaryClearance.procedureEndedByStaffId,
-				patientMrn: patients.mrn,
-				patientFirstName: patients.firstName,
-				patientMiddleName: patients.middleName,
-				patientLastName: patients.lastName,
-				labOrderId: labOrders.id,
-				labTestName: labOrders.testName,
-				labPanelName: labOrders.panelName,
-				imagingOrderId: imagingOrders.id,
-				imagingModality: imagingOrders.modality,
-				imagingBodyPart: imagingOrders.bodyPart,
-			})
-			.from(ancillaryClearance)
-			.leftJoin(labOrders, eq(ancillaryClearance.orderId, labOrders.id))
-			.leftJoin(imagingOrders, eq(ancillaryClearance.orderId, imagingOrders.id))
-			.leftJoin(encounters, this.clearanceEncounterJoinCondition())
-			.leftJoin(patients, eq(encounters.patientId, patients.id))
-			.where(facilityFilter)
-			.orderBy(desc(ancillaryClearance.createdAt))
-			.limit(input.limit ?? 50)
+		const orderIds = Array.from(new Set(rows.map(row => row.order_id)))
+		const [labOrdersById, imagingOrdersById] = await Promise.all([
+			this.getLabOrdersByIdsFromSupabase(orderIds),
+			this.getImagingOrdersByIdsFromSupabase(orderIds),
+		])
 
-		return rows.map(row => {
-			const startedAt = row.procedureStartAt ? new Date(row.procedureStartAt) : null
-			const endedAt = row.procedureEndAt ? new Date(row.procedureEndAt) : null
-			const durationMinutes =
-				startedAt && endedAt
-					? Math.max(0, Math.round((endedAt.getTime() - startedAt.getTime()) / 60000))
+		const encounterIds = Array.from(
+			new Set(
+				rows
+					.map(row => {
+						const labOrder = labOrdersById.get(row.order_id)
+						const imagingOrder = imagingOrdersById.get(row.order_id)
+
+						return row.encounter_id ?? labOrder?.encounter_id ?? imagingOrder?.encounter_id ?? null
+					})
+					.filter((id): id is string => Boolean(id))
+			)
+		)
+		const encountersById = await this.getProcedureLogEncountersByIdsFromSupabase(encounterIds)
+		const patientsById = await this.getPatientsByIdsFromSupabase(
+			Array.from(
+				new Set(Array.from(encountersById.values()).map(encounter => encounter.patient_id))
+			)
+		)
+
+		return rows
+			.map(row => {
+				const labOrder = labOrdersById.get(row.order_id) ?? null
+				const imagingOrder = imagingOrdersById.get(row.order_id) ?? null
+				const resolvedEncounterId =
+					row.encounter_id ?? labOrder?.encounter_id ?? imagingOrder?.encounter_id
+				const encounter = resolvedEncounterId
+					? (encountersById.get(resolvedEncounterId) ?? null)
 					: null
-			const elapsedMinutes = startedAt
-				? Math.max(0, Math.floor(((endedAt ?? new Date()).getTime() - startedAt.getTime()) / 60000))
-				: 0
-			const procedureName =
-				row.labPanelName ??
-				row.labTestName ??
-				[row.imagingModality?.toUpperCase(), row.imagingBodyPart].filter(Boolean).join(" ") ??
-				null
-			const ancillaryType: "Lab" | "Imaging" | "Pharmacy" = row.imagingOrderId ? "Imaging" : "Lab"
-			const procedureStatus: "not_started" | "in_progress" | "completed" = !startedAt
-				? "not_started"
-				: endedAt
-					? "completed"
-					: "in_progress"
-			const slaStatus: "ok" | "breach" | "in_progress" | "not_started" =
-				procedureStatus === "not_started"
-					? "not_started"
-					: procedureStatus === "in_progress"
-						? "in_progress"
-						: elapsedMinutes > ANCILLARY_PROCEDURE_SLA_MINUTES
-							? "breach"
-							: "ok"
+				const patient = encounter ? (patientsById.get(encounter.patient_id) ?? null) : null
+				const resolvedFacilityId =
+					encounter?.facility_id ?? labOrder?.facility_id ?? imagingOrder?.facility_id ?? null
 
-			return {
-				id: row.id,
-				orderId: row.orderId,
-				encounterId: row.encounterId,
-				patientName:
-					[row.patientFirstName, row.patientMiddleName, row.patientLastName]
+				if (input.facilityId && resolvedFacilityId && resolvedFacilityId !== input.facilityId) {
+					return null
+				}
+
+				const startedAt = toClearanceDate(row.procedure_start_at)
+				const endedAt = toClearanceDate(row.procedure_end_at)
+				const durationMinutes =
+					startedAt && endedAt
+						? Math.max(0, Math.round((endedAt.getTime() - startedAt.getTime()) / 60000))
+						: null
+				const elapsedMinutes = startedAt
+					? Math.max(
+							0,
+							Math.floor(((endedAt ?? new Date()).getTime() - startedAt.getTime()) / 60000)
+						)
+					: 0
+				const procedureName =
+					labOrder?.panel_name ??
+					labOrder?.test_name ??
+					[imagingOrder?.modality?.toUpperCase(), imagingOrder?.body_part]
 						.filter(Boolean)
-						.join(" ") || null,
-				patientMrn: row.patientMrn ?? null,
-				ancillaryType,
-				procedureName: procedureName || null,
-				status: row.status,
-				procedureStatus,
-				startAt: row.procedureStartAt,
-				endAt: row.procedureEndAt,
-				durationMinutes,
-				slaStatus,
-				procedureStartBarcodeMatched: row.procedureStartBarcodeMatched,
-				procedureEndBarcodeMatched: row.procedureEndBarcodeMatched,
-				procedureStartedByStaffId: row.procedureStartedByStaffId,
-				procedureEndedByStaffId: row.procedureEndedByStaffId,
-			}
-		})
+						.join(" ") ??
+					null
+				const ancillaryType: "Lab" | "Imaging" | "Pharmacy" = imagingOrder ? "Imaging" : "Lab"
+				const procedureStatus: "not_started" | "in_progress" | "completed" = !startedAt
+					? "not_started"
+					: endedAt
+						? "completed"
+						: "in_progress"
+				const slaStatus: "ok" | "breach" | "in_progress" | "not_started" =
+					procedureStatus === "not_started"
+						? "not_started"
+						: procedureStatus === "in_progress"
+							? "in_progress"
+							: elapsedMinutes > ANCILLARY_PROCEDURE_SLA_MINUTES
+								? "breach"
+								: "ok"
+
+				return {
+					id: row.id,
+					orderId: row.order_id,
+					encounterId: row.encounter_id,
+					patientName:
+						[patient?.first_name, patient?.middle_name, patient?.last_name]
+							.filter(Boolean)
+							.join(" ") || null,
+					patientMrn: patient?.mrn ?? null,
+					ancillaryType,
+					procedureName: procedureName || null,
+					status: row.status,
+					clearedAt: toClearanceIso(row.cleared_at),
+					createdAt: toClearanceIsoReq(row.created_at),
+					updatedAt: toClearanceIsoReq(row.updated_at),
+					procedureStatus,
+					startAt: toClearanceIso(row.procedure_start_at),
+					endAt: toClearanceIso(row.procedure_end_at),
+					procedureStartBarcode: row.procedure_start_barcode,
+					procedureEndBarcode: row.procedure_end_barcode,
+					durationMinutes,
+					slaStatus,
+					procedureStartBarcodeMatched: row.procedure_start_barcode_matched,
+					procedureEndBarcodeMatched: row.procedure_end_barcode_matched,
+					procedureStartedByStaffId: row.procedure_started_by_staff_id,
+					procedureEndedByStaffId: row.procedure_ended_by_staff_id,
+				}
+			})
+			.filter((row): row is NonNullable<typeof row> => Boolean(row))
+			.slice(0, limit)
 	}
 
 	async resolveProcedureClearance(input: {
@@ -186,22 +295,10 @@ export class AncillaryClearanceService {
 		scanType: "start" | "end"
 	}) {
 		const patientMrn = input.patientMrn.trim()
-		const patientConditions = [eq(patients.mrn, patientMrn)]
-		if (input.facilityId) {
-			patientConditions.push(eq(patients.facilityId, input.facilityId))
-		}
-
-		const [patient] = await this.db
-			.select({
-				id: patients.id,
-				mrn: patients.mrn,
-				firstName: patients.firstName,
-				middleName: patients.middleName,
-				lastName: patients.lastName,
-			})
-			.from(patients)
-			.where(and(...patientConditions))
-			.limit(1)
+		const patient = await this.getPatientByMrnFromSupabase({
+			facilityId: input.facilityId,
+			patientMrn,
+		})
 
 		if (!patient) {
 			return { patient: null, clearance: null }
@@ -233,9 +330,9 @@ export class AncillaryClearanceService {
 				id: patient.id,
 				mrn: patient.mrn,
 				name: this.formatPatientName({
-					patientFirstName: patient.firstName,
-					patientMiddleName: patient.middleName,
-					patientLastName: patient.lastName,
+					patientFirstName: patient.first_name,
+					patientMiddleName: patient.middle_name,
+					patientLastName: patient.last_name,
 				}),
 			},
 			clearance: clearance
@@ -260,22 +357,10 @@ export class AncillaryClearanceService {
 		clearanceId?: string
 	}) {
 		const patientMrn = input.patientMrn.trim()
-		const patientConditions = [eq(patients.mrn, patientMrn)]
-		if (input.facilityId) {
-			patientConditions.push(eq(patients.facilityId, input.facilityId))
-		}
-
-		const [patient] = await this.db
-			.select({
-				id: patients.id,
-				mrn: patients.mrn,
-				firstName: patients.firstName,
-				middleName: patients.middleName,
-				lastName: patients.lastName,
-			})
-			.from(patients)
-			.where(and(...patientConditions))
-			.limit(1)
+		const patient = await this.getPatientByMrnFromSupabase({
+			facilityId: input.facilityId,
+			patientMrn,
+		})
 
 		if (!patient) {
 			throw new NotFoundException("Cannot find the MRN of the patient.")
@@ -304,12 +389,7 @@ export class AncillaryClearanceService {
 		let clearanceCreated = false
 
 		if (!clearance) {
-			const encounter = await this.getLatestPatientEncounterForProcedureClearance(patient.id)
-			if (!encounter) {
-				throw new BadRequestException(
-					"Patient must have an encounter before saving a clearance record."
-				)
-			}
+			const encounter = await this.getOrCreatePatientEncounterForProcedureClearance(patient)
 
 			const values: typeof ancillaryClearance.$inferInsert = {
 				orderId: randomUUID(),
@@ -338,9 +418,9 @@ export class AncillaryClearanceService {
 				id: patient.id,
 				mrn: patient.mrn,
 				name: this.formatPatientName({
-					patientFirstName: patient.firstName,
-					patientMiddleName: patient.middleName,
-					patientLastName: patient.lastName,
+					patientFirstName: patient.first_name,
+					patientMiddleName: patient.middle_name,
+					patientLastName: patient.last_name,
 				}),
 			},
 			clearance: {
@@ -377,7 +457,7 @@ export class AncillaryClearanceService {
 				.or(`id.eq.${identifier},order_id.eq.${identifier}`)
 				.limit(1)
 				.maybeSingle()
-		)
+		) as Record<string, unknown> | null
 
 		if (!clearanceRaw) {
 			throw new NotFoundException("Ancillary clearance record not found")
@@ -429,10 +509,9 @@ export class AncillaryClearanceService {
 			patientLastName: (patient?.last_name as string | null) ?? null,
 		}
 
-		const patientIdentifiers = [
-			patient?.id as string | null,
-			patient?.mrn as string | null,
-		].filter((value): value is string => Boolean(value))
+		const patientIdentifiers = [patient?.id as string | null, patient?.mrn as string | null].filter(
+			(value): value is string => Boolean(value)
+		)
 		if (patientIdentifiers.length === 0) {
 			throw new BadRequestException("Unable to verify patient barcode for this clearance record")
 		}
@@ -466,7 +545,7 @@ export class AncillaryClearanceService {
 					.eq("id", clearance.id)
 					.select("*")
 					.single()
-			)
+			) as Record<string, unknown> | null
 
 			if (!updated) throw new BadRequestException("Procedure start scan failed")
 
@@ -497,7 +576,7 @@ export class AncillaryClearanceService {
 				.eq("id", clearance.id)
 				.select("*")
 				.single()
-		)
+		) as Record<string, unknown> | null
 
 		if (!updated) throw new BadRequestException("Procedure end scan failed")
 
@@ -653,22 +732,110 @@ export class AncillaryClearanceService {
 		return staff ?? null
 	}
 
-	private async getLatestPatientEncounterForProcedureClearance(patientId: string) {
-		const rows = await this.db
-			.select({
-				id: encounters.id,
-				status: encounters.status,
-			})
-			.from(encounters)
-			.where(eq(encounters.patientId, patientId))
-			.orderBy(desc(encounters.admissionDatetime))
-			.limit(10)
+	private async getPatientByMrnFromSupabase(input: { facilityId?: string; patientMrn: string }) {
+		const selectPatient = () =>
+			supabase.from("patients").select("id, facility_id, mrn, first_name, middle_name, last_name")
 
-		return (
-			rows.find(row => row.status === "active" || row.status === "pending_discharge") ??
-			rows[0] ??
+		if (input.facilityId) {
+			const facilityPatient = unwrap(
+				await selectPatient()
+					.ilike("mrn", input.patientMrn)
+					.eq("facility_id", input.facilityId)
+					.limit(1)
+					.maybeSingle()
+			) as SupabasePatientRow | null
+
+			if (facilityPatient) return facilityPatient
+		}
+
+		return unwrap(
+			await selectPatient().ilike("mrn", input.patientMrn).limit(1).maybeSingle()
+		) as SupabasePatientRow | null
+	}
+
+	private async getPatientsByIdsFromSupabase(patientIds: string[]) {
+		if (patientIds.length === 0) return new Map<string, SupabasePatientRow>()
+
+		const rows = unwrap(
+			await supabase
+				.from("patients")
+				.select("id, facility_id, mrn, first_name, middle_name, last_name")
+				.in("id", patientIds)
+		) as SupabasePatientRow[] | null
+
+		return new Map((rows ?? []).map(patient => [patient.id, patient]))
+	}
+
+	private async getLabOrdersByIdsFromSupabase(orderIds: string[]) {
+		if (orderIds.length === 0) return new Map<string, SupabaseLabOrderRow>()
+
+		const rows = unwrap(
+			await supabase
+				.from("lab_orders")
+				.select("id, encounter_id, facility_id, test_name, panel_name")
+				.in("id", orderIds)
+		) as SupabaseLabOrderRow[] | null
+
+		return new Map((rows ?? []).map(order => [order.id, order]))
+	}
+
+	private async getImagingOrdersByIdsFromSupabase(orderIds: string[]) {
+		if (orderIds.length === 0) return new Map<string, SupabaseImagingOrderRow>()
+
+		const rows = unwrap(
+			await supabase
+				.from("imaging_orders")
+				.select("id, encounter_id, facility_id, modality, body_part")
+				.in("id", orderIds)
+		) as SupabaseImagingOrderRow[] | null
+
+		return new Map((rows ?? []).map(order => [order.id, order]))
+	}
+
+	private async getProcedureLogEncountersByIdsFromSupabase(encounterIds: string[]) {
+		if (encounterIds.length === 0) return new Map<string, SupabaseProcedureLogEncounterRow>()
+
+		const rows = unwrap(
+			await supabase.from("encounters").select("id, facility_id, patient_id").in("id", encounterIds)
+		) as SupabaseProcedureLogEncounterRow[] | null
+
+		return new Map((rows ?? []).map(encounter => [encounter.id, encounter]))
+	}
+
+	private async getOrCreatePatientEncounterForProcedureClearance(patient: SupabasePatientRow) {
+		const rows = unwrap(
+			await supabase
+				.from("encounters")
+				.select("id, status")
+				.eq("patient_id", patient.id)
+				.order("admission_datetime", { ascending: false })
+				.limit(10)
+		) as SupabaseEncounterRow[] | null
+
+		const existing =
+			rows?.find(row => row.status === "active" || row.status === "pending_discharge") ??
+			rows?.[0] ??
 			null
-		)
+
+		if (existing) return existing
+
+		const created = unwrap(
+			await supabase
+				.from("encounters")
+				.insert({
+					facility_id: patient.facility_id,
+					patient_id: patient.id,
+					encounter_type: "outpatient",
+					status: "active",
+					chief_complaint: "Ancillary procedure logging",
+				})
+				.select("id, status")
+				.single()
+		) as SupabaseEncounterRow | null
+
+		if (!created) throw new BadRequestException("Unable to create patient encounter.")
+
+		return created
 	}
 
 	private getProcedureStatus(row: {

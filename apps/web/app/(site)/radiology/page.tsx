@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
 	Ban,
@@ -96,6 +96,7 @@ interface RadiologyReportEditorProps {
 const PENDING_STATUSES = new Set(["ordered", "scheduled"])
 const ACTIVE_STATUSES = new Set(["in_progress"])
 const COMPLETED_STATUSES = new Set(["completed", "cancelled"])
+const PACS_FRAME_LOAD_DELAY_MS = 125
 
 function can(
 	permissions: Array<{ module: string; action: string }>,
@@ -215,14 +216,37 @@ function getReportStatus(order: ImagingOrder) {
 export default function RadiologyPage() {
 	const router = useRouter()
 	const searchParams = useSearchParams()
-	const orderId = searchParams.get("orderId") ?? searchParams.get("imagingOrderId") ?? ""
+	const orderIdFromUrl = searchParams.get("orderId") ?? searchParams.get("imagingOrderId") ?? ""
+	const [selectedOrderId, setSelectedOrderId] = useState(orderIdFromUrl)
+	const [, startRouteTransition] = useTransition()
 	const facilityId = useActiveFacilityId()
 	const { data: profile } = useMyProfile()
 	const permissions = profile?.activeRole?.permissions ?? []
 	const hasViewPermission = can(permissions, "radiology", "view")
 	const hasEditPermission = can(permissions, "radiology", "edit")
 	const worklistQuery = useImagingOrderListQuery({ facilityId, limit: 100 })
-	const imagingOrderQuery = useImagingOrderDetailQuery(orderId, facilityId)
+	const imagingOrderQuery = useImagingOrderDetailQuery(selectedOrderId, facilityId)
+
+	useEffect(() => {
+		setSelectedOrderId(orderIdFromUrl)
+	}, [orderIdFromUrl])
+
+	const handleSelectOrder = useCallback(
+		(id: string) => {
+			setSelectedOrderId(id)
+			startRouteTransition(() => {
+				router.push(`/radiology?orderId=${encodeURIComponent(id)}`)
+			})
+		},
+		[router, startRouteTransition]
+	)
+
+	const handleCloseOrder = useCallback(() => {
+		setSelectedOrderId("")
+		startRouteTransition(() => {
+			router.replace("/radiology")
+		})
+	}, [router, startRouteTransition])
 
 	if (!hasViewPermission) {
 		return (
@@ -243,21 +267,22 @@ export default function RadiologyPage() {
 
 			<RadiologyWorklist
 				orders={worklistQuery.data?.data ?? []}
-				selectedOrderId={orderId}
+				selectedOrderId={selectedOrderId}
 				isLoading={!facilityId || worklistQuery.isLoading}
 				isError={worklistQuery.isError}
-				onSelect={id => router.push(`/radiology?orderId=${encodeURIComponent(id)}`)}
+				onSelect={handleSelectOrder}
 			/>
 
 			<Dialog
-				open={Boolean(orderId)}
+				open={Boolean(selectedOrderId)}
 				onOpenChange={open => {
-					if (!open) router.replace("/radiology")
+					if (!open) handleCloseOrder()
 				}}
 			>
 				<DialogContent
 					size="full"
-					className="h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-[min(1500px,calc(100vw-2rem))]"
+					overlayClassName="supports-backdrop-filter:backdrop-blur-none"
+					className="data-closed:zoom-out-100 data-open:zoom-in-100 h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-[min(1500px,calc(100vw-2rem))]"
 				>
 					<DialogHeader className="bg-background border-b px-4 py-4 pr-14">
 						<DialogTitle>Radiology Order Details</DialogTitle>
@@ -306,19 +331,33 @@ function RadiologyWorklist({
 	const [tab, setTab] = useState<WorklistTab>("pending")
 	const [search, setSearch] = useState("")
 	const normalizedSearch = search.trim().toLowerCase()
-	const counts = {
-		pending: orders.filter(order => classifyOrder(order) === "pending").length,
-		in_progress: orders.filter(order => classifyOrder(order) === "in_progress").length,
-		completed: orders.filter(order => classifyOrder(order) === "completed").length,
-	}
-	const filtered = orders.filter(order => {
-		if (classifyOrder(order) !== tab) return false
-		if (!normalizedSearch) return true
+	const { counts, filtered } = useMemo(() => {
+		const nextCounts: Record<WorklistTab, number> = {
+			pending: 0,
+			in_progress: 0,
+			completed: 0,
+		}
+		const nextFiltered: ImagingOrder[] = []
 
-		return [order.patientName, order.patientMrn, order.modality, order.bodyPart, order.id].some(
-			value => value?.toLowerCase().includes(normalizedSearch)
-		)
-	})
+		for (const order of orders) {
+			const orderTab = classifyOrder(order)
+			nextCounts[orderTab] += 1
+
+			if (orderTab !== tab) continue
+			if (
+				normalizedSearch &&
+				![order.patientName, order.patientMrn, order.modality, order.bodyPart, order.id].some(
+					value => value?.toLowerCase().includes(normalizedSearch)
+				)
+			) {
+				continue
+			}
+
+			nextFiltered.push(order)
+		}
+
+		return { counts: nextCounts, filtered: nextFiltered }
+	}, [normalizedSearch, orders, tab])
 
 	return (
 		<Card className="gap-0 py-0">
@@ -757,21 +796,7 @@ function RadiologyReportEditor({
 							</div>
 						</div>
 						<div className="bg-black">
-							{pacsUrl ? (
-								<iframe
-									title="Embedded PACS viewer"
-									src={pacsUrl}
-									className="h-[548px] w-full border-0 bg-black"
-									referrerPolicy="no-referrer"
-									sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
-								/>
-							) : (
-								<div className="flex h-[548px] flex-col items-center justify-center gap-2 text-zinc-500">
-									<ImageOff className="size-8" />
-									<div className="font-mono text-xs">NO PACS STUDY LINKED</div>
-									<div className="text-xs">The PACS integration has not attached a study URL.</div>
-								</div>
-							)}
+							<PacsFrame orderId={order.id} pacsUrl={pacsUrl} />
 						</div>
 					</Card>
 				</div>
@@ -966,6 +991,52 @@ function RadiologyReportEditor({
 				</CardContent>
 			</Card>
 		</div>
+	)
+}
+
+function PacsFrame({ orderId, pacsUrl }: { orderId: string; pacsUrl: string }) {
+	const [shouldLoadFrame, setShouldLoadFrame] = useState(false)
+
+	useEffect(() => {
+		setShouldLoadFrame(false)
+
+		if (!pacsUrl) return
+
+		const timeoutId = window.setTimeout(() => {
+			setShouldLoadFrame(true)
+		}, PACS_FRAME_LOAD_DELAY_MS)
+
+		return () => window.clearTimeout(timeoutId)
+	}, [orderId, pacsUrl])
+
+	if (!pacsUrl) {
+		return (
+			<div className="flex h-[548px] flex-col items-center justify-center gap-2 text-zinc-500">
+				<ImageOff className="size-8" />
+				<div className="font-mono text-xs">NO PACS STUDY LINKED</div>
+				<div className="text-xs">The PACS integration has not attached a study URL.</div>
+			</div>
+		)
+	}
+
+	if (!shouldLoadFrame) {
+		return (
+			<div className="flex h-[548px] flex-col items-center justify-center gap-2 text-zinc-500">
+				<MonitorPlay className="size-8" />
+				<div className="font-mono text-xs">OPENING PACS STUDY</div>
+			</div>
+		)
+	}
+
+	return (
+		<iframe
+			title="Embedded PACS viewer"
+			src={pacsUrl}
+			className="h-[548px] w-full border-0 bg-black"
+			loading="lazy"
+			referrerPolicy="no-referrer"
+			sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
+		/>
 	)
 }
 
