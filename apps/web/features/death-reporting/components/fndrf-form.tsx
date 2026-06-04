@@ -240,7 +240,6 @@ export function FndrfForm({
 
 	useEffect(() => {
 		if (existing) {
-			// eslint-disable-next-line react-hooks/set-state-in-effect
 			setForm({
 				newbornName: existing.newbornName,
 				newbornMrn: existing.newbornMrn,

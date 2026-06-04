@@ -120,7 +120,7 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 
 	useEffect(() => {
 		if (!data) return
-		// eslint-disable-next-line react-hooks/set-state-in-effect -- syncing server-fetched codes into local editor state is intentional
+
 		setEditorRows(
 			data.codes.map(code =>
 				createEditorRow({
@@ -143,7 +143,6 @@ export function CodingPage({ encounterId }: CodingPageProps) {
 		const addDisplay = searchParams.get("addDisplay") ?? ""
 		const targetRow = searchParams.get("targetRow")
 
-		// eslint-disable-next-line react-hooks/set-state-in-effect -- syncing URL params into local editor state is intentional
 		setEditorRows(prev => {
 			if (targetRow && prev.some(row => row.clientId === targetRow)) {
 				return prev.map(row =>

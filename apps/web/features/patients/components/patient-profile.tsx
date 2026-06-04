@@ -243,7 +243,6 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 	useEffect(() => {
 		if (sourceFromQuery === "list" || sourceFromQuery === "register") {
-			// eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors the navigation source into local state and session storage
 			setSource(sourceFromQuery)
 			sessionStorage.setItem("patientProfileSource", sourceFromQuery)
 			return
@@ -312,7 +311,6 @@ export function PatientProfile({ patientId }: PatientProfileProps) {
 
 	useEffect(() => {
 		if (breakGlassRequired && canBreakGlass && activeFacilityId) {
-			// eslint-disable-next-line react-hooks/set-state-in-effect -- opens the required access dialog once the access context is known
 			setBreakGlassOpen(true)
 		}
 	}, [activeFacilityId, breakGlassRequired, canBreakGlass])

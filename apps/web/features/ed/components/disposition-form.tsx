@@ -124,7 +124,6 @@ export function DispositionForm({
 
 	useEffect(() => {
 		if (needsDeathReport && !deathReportsDone) {
-			// eslint-disable-next-line react-hooks/set-state-in-effect
 			setDeathReportOpen(true)
 		}
 	}, [deathReportsDone, needsDeathReport])

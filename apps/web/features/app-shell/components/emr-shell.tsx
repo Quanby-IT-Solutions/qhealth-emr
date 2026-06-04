@@ -1097,7 +1097,6 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 		getDesktopBreakpointServerSnapshot
 	)
 
-	/* eslint-disable react-hooks/set-state-in-effect */
 	useEffect(() => {
 		if (!prevOnline && isOnline) {
 			setShowSyncing(true)
@@ -1107,7 +1106,6 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 		}
 		setPrevOnline(isOnline)
 	}, [isOnline, prevOnline])
-	/* eslint-enable react-hooks/set-state-in-effect */
 
 	const sidebarWidth = isCollapsed ? 72 : 256
 	const mainContentMarginLeft = !isMobileOpen && isDesktop ? sidebarWidth : 0
