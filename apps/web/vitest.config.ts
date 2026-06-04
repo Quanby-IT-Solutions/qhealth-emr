@@ -35,6 +35,9 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "."),
+			// Resolve workspace packages to source so tests don't depend on a
+			// prior `tsc` build of the package's dist output.
+			"@repo/contracts": path.resolve(__dirname, "../../packages/contracts/src/index.ts"),
 		},
 	},
 })
