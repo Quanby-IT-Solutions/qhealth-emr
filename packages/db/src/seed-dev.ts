@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import "dotenv/config"
 
 import { and, eq, sql } from "drizzle-orm"
@@ -19,7 +20,6 @@ import {
 	facilities,
 	facilityProfiles,
 	featureFlags,
-	featureFlagTargets,
 	flowsheetEntries,
 	formularyItems,
 	haiTags,

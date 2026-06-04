@@ -11,6 +11,7 @@ import {
 	Plus,
 	XCircle,
 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
@@ -409,7 +410,9 @@ export function FhirExportDashboard({ canEdit }: FhirExportDashboardProps) {
 		try {
 			await downloadBundleAsync(exportId)
 		} catch (err) {
-			console.error("[FHIR] Bundle download failed:", err)
+			toast.error("Bundle download failed.", {
+				description: err instanceof Error ? err.message : "Please try again.",
+			})
 		} finally {
 			setDownloadingId(null)
 		}

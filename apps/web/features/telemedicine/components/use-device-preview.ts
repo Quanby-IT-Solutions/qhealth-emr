@@ -40,6 +40,33 @@ export function useDevicePreview(videoEnabled: boolean, audioEnabled: boolean): 
 
 		let cancelled = false
 
+		function syncDevices() {
+			void navigator.mediaDevices
+				.enumerateDevices()
+				.then(devices => {
+					if (cancelled) return
+					setVideoDevices(devices.filter(d => d.kind === "videoinput"))
+					setAudioDevices(devices.filter(d => d.kind === "audioinput"))
+				})
+				.catch(() => undefined)
+		}
+
+		syncDevices()
+		navigator.mediaDevices.addEventListener?.("devicechange", syncDevices)
+
+		return () => {
+			cancelled = true
+			navigator.mediaDevices.removeEventListener?.("devicechange", syncDevices)
+		}
+	}, [])
+
+	useEffect(() => {
+		if (typeof navigator === "undefined" || !navigator.mediaDevices) {
+			return
+		}
+
+		let cancelled = false
+
 		if (!videoEnabled && !audioEnabled) {
 			streamRef.current?.getTracks().forEach(track => track.stop())
 			streamRef.current = null
