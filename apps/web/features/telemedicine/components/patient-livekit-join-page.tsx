@@ -630,8 +630,6 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 
 							<DeviceSelectors
 								dark
-								videoEnabled={choices.videoEnabled}
-								audioEnabled={choices.audioEnabled}
 								videoDevices={devicePreview.videoDevices}
 								audioDevices={devicePreview.audioDevices}
 								videoDeviceId={devicePreview.videoDeviceId}

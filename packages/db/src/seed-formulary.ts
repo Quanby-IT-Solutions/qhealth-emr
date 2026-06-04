@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Seed script for formulary reference data.
  * Run with: npx tsx packages/db/src/seed-formulary.ts

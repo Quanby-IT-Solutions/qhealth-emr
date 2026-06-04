@@ -19,10 +19,6 @@ import {
 	useRevokeApiKeyMutation,
 } from "@/features/admin/integrations/api/api-keys.hooks"
 
-function onKeyReveal({ integrationId: id }: { integrationId: string }) {
-	console.info("[audit] key revealed for integration:", id)
-}
-
 interface ApiKeyManagementPageProps {
 	integrationId: string
 }
@@ -44,7 +40,6 @@ export function ApiKeyManagementPage({ integrationId }: ApiKeyManagementPageProp
 				onSuccess: data => {
 					setShowNewKey({ key: data.rawKey, isRotation: false })
 					setNewLabel("")
-					onKeyReveal({ integrationId })
 				},
 			}
 		)
