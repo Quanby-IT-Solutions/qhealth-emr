@@ -306,8 +306,6 @@ function MicVisualizer({ stream, audioEnabled }: MicVisualizerProps) {
 }
 
 interface DeviceSelectorsProps {
-	videoEnabled: boolean
-	audioEnabled: boolean
 	videoDevices: MediaDeviceInfo[]
 	audioDevices: MediaDeviceInfo[]
 	videoDeviceId: string | undefined
@@ -317,9 +315,19 @@ interface DeviceSelectorsProps {
 	dark?: boolean
 }
 
+function getDeviceDisplayName(
+	device: MediaDeviceInfo | undefined,
+	fallbackPrefix: "Camera" | "Microphone",
+	index?: number
+) {
+	const label = device?.label.trim()
+	if (label) return label
+	return typeof index === "number"
+		? `${fallbackPrefix} ${index + 1}`
+		: `Selected ${fallbackPrefix.toLowerCase()}`
+}
+
 export function DeviceSelectors({
-	videoEnabled,
-	audioEnabled,
 	videoDevices,
 	audioDevices,
 	videoDeviceId,
@@ -334,26 +342,30 @@ export function DeviceSelectors({
 	const triggerClass = dark
 		? "w-full min-w-0 bg-muted/60 border-border text-foreground hover:bg-muted focus:ring-ring/40 data-[placeholder]:text-muted-foreground"
 		: "w-full min-w-0"
+	const selectedVideoDeviceId = videoDeviceId ?? videoDevices[0]?.deviceId ?? ""
+	const selectedAudioDeviceId = audioDeviceId ?? audioDevices[0]?.deviceId ?? ""
+	const selectedVideoDevice = videoDevices.find(device => device.deviceId === selectedVideoDeviceId)
+	const selectedAudioDevice = audioDevices.find(device => device.deviceId === selectedAudioDeviceId)
+	const selectedVideoDeviceLabel = getDeviceDisplayName(selectedVideoDevice, "Camera")
+	const selectedAudioDeviceLabel = getDeviceDisplayName(selectedAudioDevice, "Microphone")
 
 	return (
 		<div className="space-y-3">
 			<div className="space-y-1.5">
 				<p className={labelClass}>Camera</p>
 				<Select
-					value={videoDeviceId ?? videoDevices[0]?.deviceId ?? ""}
+					value={selectedVideoDeviceId}
 					onValueChange={value => onVideoDeviceChange(value ?? undefined)}
-					disabled={!videoEnabled || videoDevices.length === 0}
+					disabled={videoDevices.length === 0}
 				>
 					<SelectTrigger className={triggerClass}>
-						<SelectValue
-							placeholder={videoEnabled ? "Enable camera to see devices" : "Camera is off"}
-						/>
+						<SelectValue placeholder="No camera found">{selectedVideoDeviceLabel}</SelectValue>
 					</SelectTrigger>
 					<SelectContent className="max-w-[var(--anchor-width)]">
-						{videoDevices.map(device => (
+						{videoDevices.map((device, index) => (
 							<SelectItem key={device.deviceId} value={device.deviceId}>
-								<span className="block min-w-0 truncate" title={device.label}>
-									{device.label || `Camera (${device.deviceId.slice(0, 6)})`}
+								<span className="block min-w-0 truncate" title={device.label || undefined}>
+									{getDeviceDisplayName(device, "Camera", index)}
 								</span>
 							</SelectItem>
 						))}
@@ -363,20 +375,18 @@ export function DeviceSelectors({
 			<div className="space-y-1.5">
 				<p className={labelClass}>Microphone</p>
 				<Select
-					value={audioDeviceId ?? audioDevices[0]?.deviceId ?? ""}
+					value={selectedAudioDeviceId}
 					onValueChange={value => onAudioDeviceChange(value ?? undefined)}
-					disabled={!audioEnabled || audioDevices.length === 0}
+					disabled={audioDevices.length === 0}
 				>
 					<SelectTrigger className={triggerClass}>
-						<SelectValue
-							placeholder={audioEnabled ? "Enable microphone to see devices" : "Microphone is off"}
-						/>
+						<SelectValue placeholder="No microphone found">{selectedAudioDeviceLabel}</SelectValue>
 					</SelectTrigger>
 					<SelectContent className="max-w-[var(--anchor-width)]">
-						{audioDevices.map(device => (
+						{audioDevices.map((device, index) => (
 							<SelectItem key={device.deviceId} value={device.deviceId}>
-								<span className="block min-w-0 truncate" title={device.label}>
-									{device.label || `Microphone (${device.deviceId.slice(0, 6)})`}
+								<span className="block min-w-0 truncate" title={device.label || undefined}>
+									{getDeviceDisplayName(device, "Microphone", index)}
 								</span>
 							</SelectItem>
 						))}
@@ -491,8 +501,6 @@ function LiveKitPreJoin({
 						<div className="border-border bg-muted/40 mb-4 space-y-3 rounded-2xl border p-4">
 							<DeviceSelectors
 								dark
-								videoEnabled={videoEnabled}
-								audioEnabled={audioEnabled}
 								videoDevices={preview.videoDevices}
 								audioDevices={preview.audioDevices}
 								videoDeviceId={preview.videoDeviceId}
