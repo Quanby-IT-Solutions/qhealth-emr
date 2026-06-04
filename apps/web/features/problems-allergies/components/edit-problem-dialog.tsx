@@ -71,7 +71,7 @@ export function EditProblemDialog({ open, onOpenChange, problem }: EditProblemDi
 
 	useEffect(() => {
 		if (!problem || !open) return
-		// eslint-disable-next-line react-hooks/set-state-in-effect -- syncing the selected problem into local editable form state is intentional
+
 		setDescription(problem.description)
 		setOnsetDate(problem.onsetDate ?? "")
 		setResolutionDate(problem.resolutionDate ?? "")

@@ -361,7 +361,6 @@ export function FmdrfForm({
 	// Populate form from existing report or prefill values
 	useEffect(() => {
 		if (existing) {
-			// eslint-disable-next-line react-hooks/set-state-in-effect
 			setForm({
 				patientName: existing.patientName,
 				patientMrn: existing.patientMrn,
