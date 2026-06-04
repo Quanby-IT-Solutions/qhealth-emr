@@ -189,7 +189,9 @@
       "Bash(pnpm *)",
       "Bash(DRIZZLE_KIT_DEBUG=1 npx drizzle-kit generate)",
       "Bash(npx vitest *)",
-      "Bash(npx jest *)"
+      "Bash(npx jest *)",
+      "Bash(xargs -I{} sh -c 'echo \"FILE: {}\"; head -40 \"{}\"')",
+      "Bash(E2E_AUTH_API_URL=http://localhost:3000/api/v1/auth/ pnpm playwright test --list --project=chromium-authenticated tests/authenticated.spec.ts)"
     ]
   }
 }

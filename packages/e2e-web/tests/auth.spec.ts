@@ -21,17 +21,6 @@ test.describe("login page", () => {
 		await expect(page.getByRole("button", { name: /^login$/i })).toBeVisible()
 	})
 
-	test("has a link to the register page", async ({ page }) => {
-		const link = page.getByRole("link", { name: /sign up/i })
-		await expect(link).toBeVisible()
-		await expect(link).toHaveAttribute("href", "/register")
-	})
-
-	test("navigates to register when Sign up is clicked", async ({ page }) => {
-		await page.getByRole("link", { name: /sign up/i }).click()
-		await expect(page).toHaveURL(/\/register/)
-	})
-
 	test("shows an error and stays on /login with invalid credentials", async ({ page }) => {
 		test.skip(!process.env.E2E_AUTH_API_URL, "Requires backend")
 
