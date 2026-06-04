@@ -59,11 +59,14 @@ export function getJoinWindowState(
 	return { kind: "open", startsAt, endsAt }
 }
 
+const PH_TIME_ZONE = "Asia/Manila"
+
 export function formatJoinDate(value: Date): string {
 	return value.toLocaleDateString("en-PH", {
 		month: "short",
 		day: "numeric",
 		year: "numeric",
+		timeZone: PH_TIME_ZONE,
 	})
 }
 
@@ -71,11 +74,12 @@ export function formatJoinTime(value: Date): string {
 	return value.toLocaleTimeString("en-PH", {
 		hour: "numeric",
 		minute: "2-digit",
+		timeZone: PH_TIME_ZONE,
 	})
 }
 
 export function formatJoinWindowRange(startsAt: Date, endsAt: Date): string {
-	const sameDate = startsAt.toDateString() === endsAt.toDateString()
+	const sameDate = formatJoinDate(startsAt) === formatJoinDate(endsAt)
 	if (sameDate) {
 		return `${formatJoinDate(startsAt)}, ${formatJoinTime(startsAt)} to ${formatJoinTime(endsAt)}`
 	}
