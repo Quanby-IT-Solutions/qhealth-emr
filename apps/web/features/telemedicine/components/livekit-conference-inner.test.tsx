@@ -265,7 +265,8 @@ describe("LiveKitConferenceInner", () => {
 			"true"
 		)
 		expect(screen.getByRole("button", { name: /share screen/i })).toBeVisible()
-		expect(screen.getByRole("button", { name: /settings/i })).toBeVisible()
+		expect(screen.getByRole("button", { name: /microphone device options/i })).toBeVisible()
+		expect(screen.getByRole("button", { name: /camera device options/i })).toBeVisible()
 		expect(screen.getByRole("button", { name: /end call/i })).toBeVisible()
 	})
 
@@ -381,10 +382,10 @@ describe("LiveKitConferenceInner", () => {
 
 		renderRoom()
 
-		fireEvent.click(screen.getByRole("button", { name: /settings/i }))
-		expect(screen.getByRole("dialog", { name: /call device settings/i })).toBeVisible()
-		expect(screen.getByTestId("media-device-select-audioinput")).toBeVisible()
-		expect(screen.getByTestId("media-device-select-videoinput")).toBeVisible()
+		fireEvent.click(screen.getByRole("button", { name: /microphone device options/i }))
+		expect(await screen.findByText("Microphone")).toBeVisible()
+		expect(screen.getByText(/choose which device to use in this call/i)).toBeVisible()
+		expect(screen.getByText(/no microphone found/i)).toBeVisible()
 
 		fireEvent.click(screen.getByRole("button", { name: /end call/i }))
 		expect(screen.getByText(/end this video call/i)).toBeVisible()

@@ -307,10 +307,10 @@ export function VirtualVisitScheduler({
 	const canSubmit = Boolean(facilityId) && !createMutation.isPending
 
 	return (
-		<div className="space-y-4">
+		<div className="min-w-0 space-y-4">
 			{/* Header */}
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-				<div>
+				<div className="min-w-0">
 					<h2 className="text-lg font-semibold">Virtual Visit Scheduler</h2>
 					<p className="text-muted-foreground text-sm">
 						Book telemedicine appointments and secure patient invite links
@@ -338,7 +338,7 @@ export function VirtualVisitScheduler({
 
 			{/* Booking Form */}
 			{showForm && (
-				<Card>
+				<Card className="min-w-0">
 					<CardHeader>
 						<CardTitle className="text-base">Book Virtual Appointment</CardTitle>
 					</CardHeader>
@@ -528,7 +528,7 @@ export function VirtualVisitScheduler({
 								</p>
 							)}
 
-							<div className="flex justify-end gap-3">
+							<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
 								<Button
 									type="button"
 									variant="outline"
@@ -538,10 +538,11 @@ export function VirtualVisitScheduler({
 										setFieldErrors({})
 									}}
 									disabled={createMutation.isPending}
+									className="w-full sm:w-auto"
 								>
 									Cancel
 								</Button>
-								<Button type="submit" disabled={!canSubmit}>
+								<Button type="submit" disabled={!canSubmit} className="w-full sm:w-auto">
 									{createMutation.isPending ? "Booking..." : "Book Appointment"}
 								</Button>
 							</div>
@@ -551,7 +552,7 @@ export function VirtualVisitScheduler({
 			)}
 
 			{/* Appointments List */}
-			<Card>
+			<Card className="min-w-0">
 				<CardHeader>
 					<CardTitle className="text-base">Appointments</CardTitle>
 				</CardHeader>
@@ -575,8 +576,8 @@ export function VirtualVisitScheduler({
 											<Video className="text-primary size-5" />
 										</div>
 										<div className="min-w-0 flex-1 space-y-1">
-											<div className="flex items-center gap-2">
-												<span className="text-sm font-medium">{appt.patientName}</span>
+											<div className="flex flex-wrap items-center gap-2">
+												<span className="min-w-0 text-sm font-medium">{appt.patientName}</span>
 												<Badge variant="outline" className="text-xs">
 													{appt.patientMrn}
 												</Badge>

@@ -142,8 +142,8 @@ function TabNavigation<TTab extends string>({
 }) {
 	return (
 		<div
-			className={`grid grid-cols-2 gap-3 ${
-				tabs.length === 5 ? "sm:grid-cols-5" : "sm:grid-cols-4"
+			className={`xs:grid-cols-2 grid grid-cols-1 gap-3 ${
+				tabs.length === 5 ? "lg:grid-cols-5" : "md:grid-cols-4"
 			}`}
 		>
 			{tabs.map(({ id, label, icon: Icon, description, completed, disabled, disabledReason }) => {
@@ -157,7 +157,7 @@ function TabNavigation<TTab extends string>({
 						title={disabled ? disabledReason : undefined}
 						aria-disabled={disabled}
 						className={[
-							"relative flex flex-col items-start gap-1.5 rounded-xl border-2 p-4 text-left transition-colors",
+							"relative flex min-w-0 flex-col items-start gap-1.5 rounded-xl border-2 p-4 text-left transition-colors",
 							disabled
 								? "border-muted bg-muted/30 cursor-not-allowed opacity-60"
 								: isActive
@@ -185,7 +185,7 @@ function TabNavigation<TTab extends string>({
 						>
 							<Icon className="size-4" />
 						</div>
-						<div>
+						<div className="min-w-0">
 							<p className={`text-sm font-semibold ${isActive && !disabled ? "text-primary" : ""}`}>
 								{label}
 							</p>
@@ -234,11 +234,11 @@ function AppointmentContextBanner({
 						: "border-primary/20 bg-primary/5",
 			].join(" ")}
 		>
-			<div className="flex flex-wrap items-center gap-3 text-sm">
+			<div className="flex min-w-0 flex-wrap items-center gap-3 text-sm">
 				<span className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-full">
 					<User className="size-4" />
 				</span>
-				<div className="space-y-0.5">
+				<div className="min-w-0 space-y-0.5">
 					<p className="font-semibold">{appointment.patientName}</p>
 					<div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
 						<span>{appointment.patientMrn}</span>
@@ -260,19 +260,31 @@ function AppointmentContextBanner({
 					</div>
 					{joinWindowText && (
 						<p className="text-muted-foreground text-xs">
-							<span className="font-medium">{statusText}:</span> {joinWindowText}
+							<span className="font-medium">{statusText}.</span> {joinWindowText}
 						</p>
 					)}
 				</div>
 			</div>
-			<div className="flex gap-2">
+			<div className="flex w-full flex-wrap gap-2 sm:w-auto">
 				{onChange && (
-					<Button type="button" variant="outline" size="sm" onClick={onChange}>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={onChange}
+						className="flex-1 sm:flex-none"
+					>
 						Change
 					</Button>
 				)}
 				{onClear && (
-					<Button type="button" variant="ghost" size="sm" onClick={onClear}>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onClick={onClear}
+						className="flex-1 sm:flex-none"
+					>
 						<X className="size-3.5" />
 						Clear
 					</Button>
@@ -395,9 +407,9 @@ function StandardTelemedicineDashboard({ profile }: { profile?: MyProfile }) {
 	const tabs: TabConfig<StandardActiveTab>[] = STANDARD_TABS_BASE.map(t => ({ ...t }))
 
 	return (
-		<div className="space-y-6">
+		<div className="min-w-0 space-y-6">
 			<div>
-				<h1 className="text-2xl font-bold">Telemedicine</h1>
+				<h1 className="text-xl font-bold sm:text-2xl">Telemedicine</h1>
 				<p className="text-muted-foreground text-sm">
 					Virtual consultations with integrated scheduling, clinical notes, and e-prescriptions
 				</p>
@@ -608,9 +620,9 @@ function PhysicianTelemedicineDashboard({ profile }: { profile?: MyProfile }) {
 	]
 
 	return (
-		<div className="space-y-6">
+		<div className="min-w-0 space-y-6">
 			<div className="space-y-1">
-				<h1 className="text-2xl font-bold">Telemedicine</h1>
+				<h1 className="text-xl font-bold sm:text-2xl">Telemedicine</h1>
 				<p className="text-muted-foreground text-sm">
 					Your assigned virtual consultations ·{" "}
 					{hasAppointment ? "Active patient selected" : "Pick an appointment to begin"}

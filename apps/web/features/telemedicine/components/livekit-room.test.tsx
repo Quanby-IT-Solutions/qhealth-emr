@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
 import { LiveKitErrorCard, LiveKitVideoRoom } from "./livekit-room"
@@ -45,8 +45,14 @@ describe("LiveKitVideoRoom", () => {
 
 		expect(screen.getByTestId("livekit-prejoin-card")).toBeVisible()
 		expect(screen.getByRole("heading", { name: /telemedicine consultation/i })).toBeVisible()
-		expect(screen.getByText("Dr. Miguel Santos")).toBeVisible()
-		expect(screen.getByRole("button", { name: /join session/i })).toBeVisible()
+		expect(
+			within(screen.getByTestId("livekit-prejoin-card")).getAllByText("Dr. Miguel Santos")[0]
+		).toBeVisible()
+		expect(
+			within(screen.getByTestId("livekit-prejoin-card")).getAllByRole("button", {
+				name: /join session/i,
+			})[0]
+		).toBeVisible()
 	})
 
 	it("renders join-window errors as a schedule notice", () => {

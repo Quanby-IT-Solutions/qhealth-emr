@@ -211,8 +211,8 @@ export function VideoLinkLaunchPage({ appointmentId }: VideoLinkLaunchPageProps)
 		: "Telemedicine appointment"
 
 	return (
-		<div className="bg-background text-foreground flex h-[calc(100vh-4rem)] min-h-[calc(100vh-4rem)] flex-col overflow-hidden">
-			<header className="bg-card/80 border-border flex h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-xl">
+		<div className="bg-background text-foreground flex h-[calc(100dvh-4rem)] min-h-[calc(100dvh-4rem)] flex-col overflow-hidden">
+			<header className="bg-card/80 border-border flex h-14 shrink-0 items-center gap-2 border-b px-3 backdrop-blur-xl sm:gap-3 sm:px-4">
 				<BackLink />
 				<div className="bg-border hidden h-5 w-px sm:block" />
 				<div className="flex min-w-0 flex-1 items-center justify-center gap-2 text-center">
@@ -238,7 +238,7 @@ export function VideoLinkLaunchPage({ appointmentId }: VideoLinkLaunchPageProps)
 							<Info className="size-3.5" />
 							<span className="hidden sm:inline">Details</span>
 						</DialogTrigger>
-						<DialogContent className="sm:max-w-lg">
+						<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
 							<DialogHeader>
 								<DialogTitle className="flex items-center gap-2">
 									<Info className="text-primary size-4" />

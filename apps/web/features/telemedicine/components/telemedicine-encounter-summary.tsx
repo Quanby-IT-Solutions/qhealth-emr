@@ -17,7 +17,7 @@ interface TelemedicineEncounterSummaryProps {
 
 function Field({ label, value }: { label: string; value?: string | null }) {
 	return (
-		<div>
+		<div className="min-w-0">
 			<p className="text-muted-foreground text-xs">{label}</p>
 			<p className="text-sm font-medium">{value || "-"}</p>
 		</div>
@@ -98,14 +98,14 @@ export function TelemedicineEncounterSummary({
 	const { data: encounter, isLoading } = useEncounterQuery(encounterId)
 
 	return (
-		<Card>
+		<Card className="min-w-0">
 			<CardHeader>
 				<div className="flex flex-wrap items-center justify-between gap-3">
-					<div className="flex items-center gap-3">
+					<div className="flex min-w-0 items-center gap-3">
 						<div className="bg-primary/10 flex size-10 items-center justify-center rounded-full">
 							<ClipboardList className="text-primary size-5" />
 						</div>
-						<div>
+						<div className="min-w-0">
 							<CardTitle className="text-base">Telemedicine Encounter</CardTitle>
 							<p className="text-muted-foreground text-xs">
 								{encounter?.patientName ?? "Clinical note"}
@@ -161,12 +161,17 @@ export function TelemedicineEncounterSummary({
 							<NoteBlock label="Plan" value={encounter.planNotes} />
 						</div>
 
-						<div className="flex flex-wrap justify-end gap-2">
-							<Button type="button" variant="outline" onClick={onLaunchVideo}>
+						<div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={onLaunchVideo}
+								className="w-full sm:w-auto"
+							>
 								<Video className="mr-1.5 size-4" />
 								Launch Video
 							</Button>
-							<Button type="button" onClick={onGenerateAbstract}>
+							<Button type="button" onClick={onGenerateAbstract} className="w-full sm:w-auto">
 								<FileText className="mr-1.5 size-4" />
 								Generate Abstract
 							</Button>

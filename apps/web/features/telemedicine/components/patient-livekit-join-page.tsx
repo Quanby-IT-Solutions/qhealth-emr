@@ -10,13 +10,10 @@ import {
 	Info,
 	Loader2,
 	LogOut,
-	Mic,
-	MicOff,
 	ShieldCheck,
 	Stethoscope,
 	User,
 	Video,
-	VideoOff,
 } from "lucide-react"
 
 import {
@@ -38,7 +35,7 @@ import {
 } from "@/features/telemedicine/api/telemedicine.hooks"
 import {
 	CameraPreview,
-	DeviceSelectors,
+	DeviceControl,
 	LiveKitTokenRoom,
 	type PreJoinChoices,
 } from "@/features/telemedicine/components/livekit-room"
@@ -262,8 +259,8 @@ function PatientLiveKitConferenceShell({
 		: "Telemedicine visit"
 
 	return (
-		<div className="bg-background text-foreground flex h-screen min-h-screen flex-col overflow-hidden">
-			<header className="bg-card/80 border-border flex h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-xl">
+		<div className="bg-background text-foreground flex h-dvh min-h-dvh flex-col overflow-hidden">
+			<header className="bg-card/80 border-border flex h-14 shrink-0 items-center gap-2 border-b px-3 backdrop-blur-xl sm:gap-3 sm:px-4">
 				<div className="flex shrink-0 items-center gap-2">
 					<div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-xl shadow-lg">
 						<Stethoscope className="size-4" aria-hidden="true" />
@@ -296,7 +293,7 @@ function PatientLiveKitConferenceShell({
 							<Info className="size-3.5" />
 							<span className="hidden sm:inline">Details</span>
 						</DialogTrigger>
-						<DialogContent className="sm:max-w-lg">
+						<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
 							<DialogHeader>
 								<DialogTitle className="flex items-center gap-2">
 									<Info className="text-primary size-4" />
@@ -410,6 +407,8 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 	const preview = previewQuery.data
 	const joinWindowState: JoinWindowState | null = preview ? getJoinWindowState(preview) : null
 	const canSubmit = Boolean(preview && joinWindowState?.kind === "open" && !joinRoom.data)
+	const hasVerificationInput = Boolean(dateOfBirth || mrn.trim())
+	const canJoin = canSubmit && hasVerificationInput && !joinRoom.isPending
 	const todayInputDate = getTodayInputDate()
 
 	async function handleJoin(e: React.FormEvent) {
@@ -439,7 +438,7 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 				mrn: mrn.trim() || undefined,
 			})
 		} catch {
-			setFormError(null)
+			setFormError("The date of birth or MRN does not match this appointment.")
 		}
 	}
 
@@ -465,8 +464,8 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 		"border-border bg-muted/60 text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-ring/30 w-full rounded-xl border px-3 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
 
 	return (
-		<main className="bg-background text-foreground flex h-screen min-h-screen flex-col overflow-hidden">
-			<header className="bg-card/80 border-border flex h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-xl">
+		<main className="bg-background text-foreground flex h-dvh min-h-dvh flex-col overflow-hidden">
+			<header className="bg-card/80 border-border flex h-14 shrink-0 items-center gap-2 border-b px-3 backdrop-blur-xl sm:gap-3 sm:px-4">
 				<div className="flex shrink-0 items-center gap-2">
 					<div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-xl shadow-lg">
 						<Stethoscope className="size-4" aria-hidden="true" />
@@ -496,7 +495,7 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 								<Info className="size-3.5" />
 								<span className="hidden sm:inline">Details</span>
 							</DialogTrigger>
-							<DialogContent className="sm:max-w-lg">
+							<DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
 								<DialogHeader>
 									<DialogTitle className="flex items-center gap-2">
 										<Info className="text-primary size-4" />
@@ -537,7 +536,7 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 				</div>
 			</header>
 
-			<div className="flex min-h-0 flex-1 items-center justify-center p-4 sm:p-6">
+			<div className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-4 sm:items-center sm:p-6">
 				{previewQuery.isLoading ? (
 					<div className="w-full max-w-md">
 						<AppointmentSkeletonCard />
@@ -554,7 +553,7 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 					<form
 						onSubmit={handleJoin}
 						noValidate
-						className="border-border bg-card grid h-full max-h-160 w-full max-w-5xl grid-cols-1 overflow-hidden rounded-3xl border shadow-2xl lg:grid-cols-[1.2fr_1fr]"
+						className="border-border bg-card grid w-full max-w-5xl grid-cols-1 overflow-hidden rounded-3xl border shadow-2xl sm:max-h-[calc(100dvh-7rem)] lg:grid-cols-[1.2fr_1fr]"
 					>
 						{/* LEFT — camera + devices */}
 						<section className="bg-muted/30 border-border flex min-h-0 flex-col gap-4 overflow-y-auto border-b p-4 sm:p-6 lg:border-r lg:border-b-0">
@@ -573,70 +572,34 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 								/>
 							</div>
 
-							<div className="flex items-center justify-center gap-6">
-								<div className="flex flex-col items-center gap-1.5">
-									<button
-										type="button"
-										aria-pressed={choices.audioEnabled}
-										aria-label={choices.audioEnabled ? "Mute microphone" : "Unmute microphone"}
-										onClick={() =>
-											setChoices(prev => ({
-												...prev,
-												audioEnabled: !prev.audioEnabled,
-											}))
-										}
-										className={cn(
-											"focus-visible:ring-ring focus-visible:ring-offset-background flex size-12 items-center justify-center rounded-full border transition-all hover:scale-105 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95",
-											choices.audioEnabled
-												? "border-border bg-card text-success"
-												: "border-destructive/30 bg-destructive/10 text-destructive"
-										)}
-									>
-										{choices.audioEnabled ? (
-											<Mic className="size-5" />
-										) : (
-											<MicOff className="size-5" />
-										)}
-									</button>
-									<span className="text-muted-foreground text-xs">Mic</span>
-								</div>
-								<div className="flex flex-col items-center gap-1.5">
-									<button
-										type="button"
-										aria-pressed={choices.videoEnabled}
-										aria-label={choices.videoEnabled ? "Turn camera off" : "Turn camera on"}
-										onClick={() =>
-											setChoices(prev => ({
-												...prev,
-												videoEnabled: !prev.videoEnabled,
-											}))
-										}
-										className={cn(
-											"focus-visible:ring-ring focus-visible:ring-offset-background flex size-12 items-center justify-center rounded-full border transition-all hover:scale-105 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95",
-											choices.videoEnabled
-												? "border-border bg-card text-success"
-												: "border-destructive/30 bg-destructive/10 text-destructive"
-										)}
-									>
-										{choices.videoEnabled ? (
-											<Video className="size-5" />
-										) : (
-											<VideoOff className="size-5" />
-										)}
-									</button>
-									<span className="text-muted-foreground text-xs">Camera</span>
-								</div>
+							<div className="flex items-start justify-center gap-10">
+								<DeviceControl
+									type="audio"
+									enabled={choices.audioEnabled}
+									devices={devicePreview.audioDevices}
+									deviceId={devicePreview.audioDeviceId}
+									onDeviceChange={devicePreview.setAudioDeviceId}
+									onEnabledChange={enabled =>
+										setChoices(prev => ({
+											...prev,
+											audioEnabled: enabled,
+										}))
+									}
+								/>
+								<DeviceControl
+									type="video"
+									enabled={choices.videoEnabled}
+									devices={devicePreview.videoDevices}
+									deviceId={devicePreview.videoDeviceId}
+									onDeviceChange={devicePreview.setVideoDeviceId}
+									onEnabledChange={enabled =>
+										setChoices(prev => ({
+											...prev,
+											videoEnabled: enabled,
+										}))
+									}
+								/>
 							</div>
-
-							<DeviceSelectors
-								dark
-								videoDevices={devicePreview.videoDevices}
-								audioDevices={devicePreview.audioDevices}
-								videoDeviceId={devicePreview.videoDeviceId}
-								audioDeviceId={devicePreview.audioDeviceId}
-								onVideoDeviceChange={devicePreview.setVideoDeviceId}
-								onAudioDeviceChange={devicePreview.setAudioDeviceId}
-							/>
 
 							{devicePreview.permissionError && (
 								<p className="text-destructive text-xs" role="alert">
@@ -674,7 +637,10 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 										className={inputBaseClass}
 										value={dateOfBirth}
 										max={todayInputDate}
-										onChange={e => setDateOfBirth(e.target.value)}
+										onChange={e => {
+											setDateOfBirth(e.target.value)
+											setFormError(null)
+										}}
 										disabled={!canSubmit || joinRoom.isPending}
 										aria-describedby="verify-help"
 									/>
@@ -700,7 +666,11 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 										id="mrn"
 										className={inputBaseClass}
 										value={mrn}
-										onChange={e => setMrn(e.target.value)}
+										onChange={e => {
+											setMrn(e.target.value)
+											setFormError(null)
+										}}
+										placeholder="e.g. MRN-2026-000123"
 										disabled={!canSubmit || joinRoom.isPending}
 										autoComplete="off"
 										aria-describedby="verify-help"
@@ -708,7 +678,7 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 								</div>
 
 								<p id="verify-help" className="text-muted-foreground text-xs">
-									Either field is enough to verify your visit.
+									Enter your date of birth or MRN to verify your visit.
 								</p>
 							</div>
 
@@ -723,7 +693,7 @@ export function PatientLiveKitJoinPage({ inviteToken }: PatientLiveKitJoinPagePr
 
 							<button
 								type="submit"
-								disabled={!canSubmit || joinRoom.isPending}
+								disabled={!canJoin}
 								aria-label={hasDisconnected ? "Join Again" : "Join Video Room"}
 								className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring focus-visible:ring-offset-background mt-auto flex h-12 w-full items-center justify-center gap-2 rounded-full text-base font-semibold shadow-lg transition-all hover:scale-[1.01] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
 							>

@@ -170,7 +170,7 @@ function CopyButton({
 			type="button"
 			variant={variant}
 			size={size}
-			className="rounded-full"
+			className="w-full rounded-full sm:w-auto"
 			disabled={disabled}
 			onClick={() => {
 				if (disabled) {
@@ -310,7 +310,7 @@ function VideoCallContent({
 		<div className="space-y-4">
 			<div
 				className={[
-					"rounded-2xl border px-4 py-3",
+					"flex flex-col gap-2 rounded-2xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
 					joinWindowState.kind === "open"
 						? "border-success/30 bg-success/10"
 						: joinWindowState.kind === "closed"
@@ -330,21 +330,19 @@ function VideoCallContent({
 				>
 					<Video className="size-4" />
 					{joinWindowState.kind === "open"
-						? "Video room is open now"
+						? "Room open"
 						: joinWindowState.kind === "closed"
-							? "Video room window has passed"
-							: "Video room opens later"}
+							? "Room closed"
+							: "Room opens later"}
 				</p>
-				<p className="text-muted-foreground mt-1 text-xs">
-					{joinWindowText
-						? `Video access: ${joinWindowText}.`
-						: "Video access window is unavailable for this appointment."}
+				<p className="text-muted-foreground text-xs sm:text-right">
+					{joinWindowText ?? "Access window unavailable"}
 				</p>
 			</div>
 
-			<div className="flex flex-wrap gap-2">
+			<div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
 				{joinWindowState.kind === "open" ? (
-					<Button asChild className="rounded-full">
+					<Button asChild className="w-full rounded-full sm:w-auto">
 						<Link
 							href={getVideoLaunchPath(currentAppt.id)}
 							target="_blank"
@@ -356,7 +354,7 @@ function VideoCallContent({
 						</Link>
 					</Button>
 				) : (
-					<Button type="button" className="rounded-full" disabled>
+					<Button type="button" className="w-full rounded-full sm:w-auto" disabled>
 						<Video className="size-4" />
 						{joinWindowState.kind === "closed" ? "Room Closed" : "Room Opens Later"}
 					</Button>
@@ -374,7 +372,7 @@ function VideoCallContent({
 							disabledMessage="Regenerate the expired invite before sharing."
 						/>
 						{mailtoHref && (
-							<Button asChild variant="outline" className="rounded-full">
+							<Button asChild variant="outline" className="w-full rounded-full sm:w-auto">
 								<a href={mailtoHref}>
 									<Mail className="size-3.5" />
 									Email to Patient
@@ -389,7 +387,7 @@ function VideoCallContent({
 
 			<div className="space-y-3">
 				<div className="flex flex-wrap items-center justify-between gap-3">
-					<div>
+					<div className="min-w-0">
 						<h4 className="flex items-center gap-2 text-sm font-medium">
 							<ShieldCheck className="text-primary size-4" />
 							Secure Patient Invite
@@ -399,7 +397,7 @@ function VideoCallContent({
 							replaces any existing link.
 						</p>
 					</div>
-					<div className="flex flex-wrap gap-2">
+					<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
 						<Button
 							type="button"
 							size="sm"
@@ -441,24 +439,41 @@ function VideoCallContent({
 				)}
 
 				{patientInviteUrl ? (
-					<div className="border-border/60 rounded-2xl border bg-white p-3">
-						<div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+					<div className="border-border bg-background/70 min-w-0 rounded-2xl border p-3 shadow-sm">
+						<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
 							<span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-								Patient Join Link
+								Patient join link
 							</span>
-							<CopyButton
-								text={patientInviteUrl}
-								copyKey="patientInvite"
-								copied={copied}
-								onCopy={copyText}
-								successMessage="Patient link copied"
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								className="h-8 rounded-full"
 								disabled={!canSharePatientInvite}
-								disabledMessage="Regenerate the expired invite before sharing."
-							/>
+								onClick={() => {
+									if (!canSharePatientInvite) {
+										toast.error("Regenerate the expired invite before sharing.")
+										return
+									}
+									copyText(patientInviteUrl, "patientInvite", "Patient link copied")
+								}}
+							>
+								{copied === "patientInvite" ? (
+									<>
+										<Check className="text-success size-3.5" />
+										Copied
+									</>
+								) : (
+									<>
+										<Copy className="size-3.5" />
+										Copy
+									</>
+								)}
+							</Button>
 						</div>
-						<p className="text-primary text-sm break-all underline underline-offset-2">
-							{patientInviteUrl}
-						</p>
+						<div className="border-border bg-muted/30 rounded-xl border px-3 py-2">
+							<p className="text-primary text-sm break-all">{patientInviteUrl}</p>
+						</div>
 						{expiryState.tone === "danger" && (
 							<p className="text-destructive mt-2 flex items-center gap-1 text-xs">
 								<AlertTriangle className="size-3" />
@@ -536,7 +551,7 @@ function VideoCallContent({
 			<Separator />
 
 			<div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-				<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+				<div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
 					<span className="font-medium">{currentAppt.patientName}</span>
 					<span className="text-muted-foreground text-xs">
 						{formatDate(currentAppt.scheduledDate)} · {formatTime(currentAppt.scheduledTime)}
