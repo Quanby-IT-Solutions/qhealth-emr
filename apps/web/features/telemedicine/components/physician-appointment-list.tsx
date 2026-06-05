@@ -128,14 +128,14 @@ function AppointmentStatusBadge({ status }: { status: AppointmentStatus }) {
 
 function AppointmentSkeleton() {
 	return (
-		<div className="flex items-start gap-4 py-4">
+		<div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:gap-4">
 			<Skeleton className="size-10 shrink-0 rounded-full" />
 			<div className="flex-1 space-y-2">
-				<Skeleton className="h-4 w-48" />
-				<Skeleton className="h-3 w-72" />
+				<Skeleton className="h-4 w-40 sm:w-48" />
+				<Skeleton className="h-3 w-full max-w-72" />
 				<Skeleton className="h-3 w-40" />
 			</div>
-			<Skeleton className="h-9 w-32" />
+			<Skeleton className="h-9 w-full sm:w-32" />
 		</div>
 	)
 }
@@ -184,7 +184,7 @@ function AppointmentRow({
 	return (
 		<div
 			className={[
-				"flex items-start gap-4 rounded-lg border p-3 transition-colors",
+				"flex min-w-0 flex-col gap-3 rounded-lg border p-3 transition-colors sm:flex-row sm:items-start sm:gap-4",
 				isSelected
 					? "border-primary bg-primary/5"
 					: "hover:border-muted hover:bg-muted/30 border-transparent",
@@ -263,7 +263,13 @@ function AppointmentRow({
 					</p>
 				)}
 			</div>
-			<Button type="button" size="sm" variant={ctaVariant} onClick={onSelect} className="shrink-0">
+			<Button
+				type="button"
+				size="sm"
+				variant={ctaVariant}
+				onClick={onSelect}
+				className="w-full shrink-0 sm:w-auto"
+			>
 				{ctaLabel}
 				<ArrowRight className="ml-1.5 size-3.5" />
 			</Button>
@@ -326,7 +332,7 @@ export function PhysicianAppointmentList({
 	const profileMissing = !facilityId || !staffProfileId
 
 	return (
-		<div className="space-y-4">
+		<div className="min-w-0 space-y-4">
 			<div className="border-primary/30 bg-primary/10 text-primary flex items-start gap-2 rounded-lg border px-4 py-3 text-sm">
 				<Info className="mt-0.5 size-4 shrink-0" />
 				<div className="space-y-1">
@@ -338,10 +344,10 @@ export function PhysicianAppointmentList({
 				</div>
 			</div>
 
-			<Card>
+			<Card className="min-w-0">
 				<CardHeader className="space-y-3">
 					<div className="flex flex-wrap items-center justify-between gap-3">
-						<div>
+						<div className="min-w-0">
 							<CardTitle className="text-base">Assigned Virtual Appointments</CardTitle>
 							<p className="text-muted-foreground text-sm">
 								{hasAssigned
@@ -355,13 +361,14 @@ export function PhysicianAppointmentList({
 							size="sm"
 							onClick={() => void refetch()}
 							disabled={isFetching || profileMissing}
+							className="w-full sm:w-auto"
 						>
 							{isFetching ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : null}
 							Refresh
 						</Button>
 					</div>
 					{hasAssigned && (
-						<div className="flex flex-col gap-2 sm:flex-row">
+						<div className="flex min-w-0 flex-col gap-2 sm:flex-row">
 							<div className="relative flex-1">
 								<Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
 								<Input
@@ -372,7 +379,7 @@ export function PhysicianAppointmentList({
 								/>
 							</div>
 							<Select value={statusFilter} onValueChange={v => setStatusFilter(v as StatusFilter)}>
-								<SelectTrigger className="sm:w-48">
+								<SelectTrigger className="w-full sm:w-48">
 									<SelectValue>
 										{STATUS_FILTERS.find(o => o.value === statusFilter)?.label ?? "All statuses"}
 									</SelectValue>

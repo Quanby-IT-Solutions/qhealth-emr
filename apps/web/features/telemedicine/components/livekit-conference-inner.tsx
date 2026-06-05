@@ -14,7 +14,6 @@ import {
 	ConnectionStateToast,
 	isTrackReference,
 	LiveKitRoom as LiveKitRoomProvider,
-	MediaDeviceSelect,
 	RoomAudioRenderer,
 	useChat,
 	useConnectionQualityIndicator,
@@ -35,6 +34,7 @@ import "@livekit/components-styles"
 import {
 	AlertTriangle,
 	Check,
+	ChevronDown,
 	Copy,
 	MessageSquare,
 	Mic,
@@ -45,7 +45,6 @@ import {
 	PhoneOff,
 	Repeat2,
 	Send,
-	Settings2,
 	Video,
 	VideoOff,
 	X,
@@ -61,6 +60,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/core/components/ui/alert-dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/core/components/ui/popover"
 import { Skeleton } from "@/core/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/core/components/ui/tooltip"
 import { cn } from "@/core/lib/utils"
@@ -655,6 +655,92 @@ function DockButton({
 	)
 }
 
+interface InCallDeviceButtonProps {
+	label: string
+	deviceLabel: string
+	pressed?: boolean
+	disabled?: boolean
+	variant: "active" | "muted"
+	devices: MediaDeviceInfo[]
+	open: boolean
+	onOpenChange: (open: boolean) => void
+	onDeviceSelect: (deviceId: string) => void
+	onToggle: () => void
+	children: ReactNode
+}
+
+function InCallDeviceButton({
+	label,
+	deviceLabel,
+	pressed,
+	disabled,
+	variant,
+	devices,
+	open,
+	onOpenChange,
+	onDeviceSelect,
+	onToggle,
+	children,
+}: InCallDeviceButtonProps) {
+	return (
+		<div className="relative">
+			<DockButton
+				label={label}
+				pressed={pressed}
+				variant={variant}
+				disabled={disabled}
+				onClick={onToggle}
+			>
+				{children}
+			</DockButton>
+			<Popover open={open} onOpenChange={onOpenChange}>
+				<PopoverTrigger
+					type="button"
+					aria-label={`${deviceLabel} device options`}
+					disabled={disabled}
+					className="absolute -right-1 -bottom-1 z-10 inline-flex size-5 items-center justify-center rounded-full border border-white/10 bg-zinc-900 text-zinc-300 shadow-sm transition-colors outline-none hover:bg-zinc-800 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-400 disabled:pointer-events-none disabled:opacity-50"
+				>
+					<ChevronDown className="size-3" />
+				</PopoverTrigger>
+				<PopoverContent
+					side="top"
+					align="center"
+					sideOffset={12}
+					className="w-[min(calc(100vw-2rem),20rem)] gap-3 rounded-2xl border border-white/10 bg-zinc-900/95 p-3 text-zinc-100 shadow-2xl backdrop-blur-xl"
+				>
+					<div className="space-y-1">
+						<p className="text-sm font-semibold">{deviceLabel}</p>
+						<p className="text-xs text-zinc-400">Choose which device to use in this call.</p>
+					</div>
+					<div className="max-h-64 space-y-1 overflow-y-auto pr-1">
+						{devices.length ? (
+							devices.map((device, index) => (
+								<button
+									key={device.deviceId || `${device.kind}-${index}`}
+									type="button"
+									className="w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-100 transition-colors hover:bg-white/10 focus-visible:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+									onClick={() => {
+										onDeviceSelect(device.deviceId)
+										onOpenChange(false)
+									}}
+								>
+									<span className="block truncate">
+										{device.label || `${deviceLabel} ${index + 1}`}
+									</span>
+								</button>
+							))
+						) : (
+							<p className="rounded-lg border border-white/10 px-3 py-2 text-sm text-zinc-400">
+								No {deviceLabel.toLowerCase()} found.
+							</p>
+						)}
+					</div>
+				</PopoverContent>
+			</Popover>
+		</div>
+	)
+}
+
 interface FloatingControlDockProps {
 	visible: boolean
 	chatOpen: boolean
@@ -671,16 +757,34 @@ function FloatingControlDock({
 	const room = useRoomContext()
 	const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } =
 		useLocalParticipant()
-	const [settingsOpen, setSettingsOpen] = useState(false)
+	const [deviceMenuOpen, setDeviceMenuOpen] = useState<"microphone" | "camera" | null>(null)
+	const [mediaDevices, setMediaDevices] = useState<MediaDeviceInfo[]>([])
 	const [endDialogOpen, setEndDialogOpen] = useState(false)
 	const [pendingControl, setPendingControl] = useState<"microphone" | "camera" | "screen" | null>(
 		null
 	)
 	const [controlError, setControlError] = useState<string | null>(null)
 	const localControlsReady = Boolean(localParticipant)
-	const dockIsVisible = visible || settingsOpen || endDialogOpen || Boolean(controlError)
-	const deviceSelectClassName =
-		"w-full min-w-0 [&_*]:min-w-0 [&_button]:w-full [&_button]:max-w-full [&_button]:overflow-hidden [&_button]:truncate [&_button]:whitespace-nowrap [&_button]:rounded-lg [&_button]:px-3 [&_button]:py-2 [&_button]:text-left [&_button]:text-sm [&_button]:text-zinc-200 [&_button]:hover:bg-white/10 [&_li]:max-w-full [&_li]:overflow-hidden [&_li_button]:truncate [&_li_button]:whitespace-nowrap [&_li[data-lk-active=true]_button]:bg-cyan-400/15 [&_li[data-lk-active=true]_button]:text-cyan-200"
+	const dockIsVisible = visible || Boolean(deviceMenuOpen) || endDialogOpen || Boolean(controlError)
+	const audioDevices = mediaDevices.filter(device => device.kind === "audioinput")
+	const videoDevices = mediaDevices.filter(device => device.kind === "videoinput")
+
+	const refreshMediaDevices = useCallback(async () => {
+		if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) return
+		try {
+			setMediaDevices(await navigator.mediaDevices.enumerateDevices())
+		} catch (error) {
+			setControlError(error instanceof Error ? error.message : "Unable to load media devices")
+		}
+	}, [])
+
+	useEffect(() => {
+		void refreshMediaDevices()
+	}, [refreshMediaDevices])
+
+	useEffect(() => {
+		if (deviceMenuOpen) void refreshMediaDevices()
+	}, [deviceMenuOpen, refreshMediaDevices])
 
 	useEffect(() => {
 		if (!controlError) return
@@ -719,6 +823,20 @@ function FloatingControlDock({
 			setPendingControl(null)
 		}
 	}, [isCameraEnabled, localParticipant])
+
+	const selectDevice = useCallback(
+		async (kind: "audioinput" | "videoinput", deviceId: string) => {
+			if (!deviceId) return
+			setControlError(null)
+			try {
+				await room.switchActiveDevice(kind, deviceId)
+				await refreshMediaDevices()
+			} catch (error) {
+				setControlError(error instanceof Error ? error.message : "Unable to switch device")
+			}
+		},
+		[refreshMediaDevices, room]
+	)
 
 	const toggleScreenShare = useCallback(async () => {
 		if (!localParticipant) {
@@ -767,48 +885,6 @@ function FloatingControlDock({
 	return (
 		<>
 			<AnimatePresence>
-				{settingsOpen && (
-					<div className="absolute bottom-20 left-1/2 z-50 w-[min(calc(100vw-2rem),22rem)] -translate-x-1/2">
-						<motion.div
-							initial={{ opacity: 0, y: 8, scale: 0.98 }}
-							animate={{ opacity: 1, y: 0, scale: 1 }}
-							exit={{ opacity: 0, y: 8, scale: 0.98 }}
-							transition={{ duration: 0.16 }}
-							role="dialog"
-							aria-label="Call device settings"
-							className="rounded-2xl border border-white/10 bg-zinc-900/90 p-4 text-zinc-100 shadow-2xl backdrop-blur-xl"
-						>
-							<div className="mb-3 flex items-center justify-between gap-3">
-								<p className="text-sm font-semibold">Devices</p>
-								<button
-									type="button"
-									aria-label="Close device settings"
-									className="rounded-full px-2 py-1 text-xs text-zinc-400 outline-none hover:bg-white/10 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-cyan-400"
-									onClick={() => setSettingsOpen(false)}
-								>
-									Close
-								</button>
-							</div>
-							<div className="space-y-4">
-								<div className="space-y-2">
-									<p className="text-xs font-medium tracking-wider text-zinc-500 uppercase">
-										Microphone
-									</p>
-									<MediaDeviceSelect kind="audioinput" className={deviceSelectClassName} />
-								</div>
-								<div className="space-y-2">
-									<p className="text-xs font-medium tracking-wider text-zinc-500 uppercase">
-										Camera
-									</p>
-									<MediaDeviceSelect kind="videoinput" className={deviceSelectClassName} />
-								</div>
-							</div>
-						</motion.div>
-					</div>
-				)}
-			</AnimatePresence>
-
-			<AnimatePresence>
 				{controlError && (
 					<div className="pointer-events-none absolute inset-x-0 bottom-20 z-50 flex justify-center px-4 sm:bottom-24">
 						<motion.div
@@ -845,24 +921,34 @@ function FloatingControlDock({
 						!dockIsVisible && "pointer-events-none"
 					)}
 				>
-					<DockButton
+					<InCallDeviceButton
 						label={isMicrophoneEnabled ? "Mute microphone" : "Unmute microphone"}
+						deviceLabel="Microphone"
 						pressed={isMicrophoneEnabled}
 						variant={isMicrophoneEnabled ? "active" : "muted"}
 						disabled={!localControlsReady || pendingControl === "microphone"}
-						onClick={() => void toggleMicrophone()}
+						devices={audioDevices}
+						open={deviceMenuOpen === "microphone"}
+						onOpenChange={open => setDeviceMenuOpen(open ? "microphone" : null)}
+						onDeviceSelect={deviceId => void selectDevice("audioinput", deviceId)}
+						onToggle={() => void toggleMicrophone()}
 					>
 						{isMicrophoneEnabled ? <Mic className="size-5" /> : <MicOff className="size-5" />}
-					</DockButton>
-					<DockButton
+					</InCallDeviceButton>
+					<InCallDeviceButton
 						label={isCameraEnabled ? "Turn camera off" : "Turn camera on"}
+						deviceLabel="Camera"
 						pressed={isCameraEnabled}
 						variant={isCameraEnabled ? "active" : "muted"}
 						disabled={!localControlsReady || pendingControl === "camera"}
-						onClick={() => void toggleCamera()}
+						devices={videoDevices}
+						open={deviceMenuOpen === "camera"}
+						onOpenChange={open => setDeviceMenuOpen(open ? "camera" : null)}
+						onDeviceSelect={deviceId => void selectDevice("videoinput", deviceId)}
+						onToggle={() => void toggleCamera()}
 					>
 						{isCameraEnabled ? <Video className="size-5" /> : <VideoOff className="size-5" />}
-					</DockButton>
+					</InCallDeviceButton>
 					<DockButton
 						label={isScreenShareEnabled ? "Stop screen share" : "Share screen"}
 						pressed={isScreenShareEnabled}
@@ -902,14 +988,6 @@ function FloatingControlDock({
 							</span>
 						)}
 					</div>
-					<DockButton
-						label="Settings"
-						pressed={settingsOpen}
-						variant={settingsOpen ? "active" : "default"}
-						onClick={() => setSettingsOpen(open => !open)}
-					>
-						<Settings2 className="size-5" />
-					</DockButton>
 					<div className="mx-1 h-8 w-px bg-white/10" />
 					<DockButton label="End call" variant="danger" onClick={() => setEndDialogOpen(true)}>
 						<PhoneOff className="size-5" />

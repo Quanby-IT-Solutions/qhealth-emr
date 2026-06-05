@@ -158,7 +158,7 @@ function EncounterTypeToggle({
 	isLoadingLinkedVisits: boolean
 }) {
 	return (
-		<div className="grid gap-3 sm:grid-cols-2">
+		<div className="grid gap-3 md:grid-cols-2">
 			<button
 				type="button"
 				onClick={() => onChange("standalone")}
@@ -457,13 +457,13 @@ export function TelemedicineEncounterForm({
 
 	return (
 		<>
-			<Card>
+			<Card className="min-w-0">
 				<CardHeader>
-					<div className="flex items-center gap-3">
+					<div className="flex min-w-0 items-center gap-3">
 						<div className="bg-primary/10 flex size-10 items-center justify-center rounded-full">
 							<ClipboardList className="text-primary size-5" />
 						</div>
-						<div>
+						<div className="min-w-0">
 							<CardTitle className="text-base">Telemedicine Clinical Note</CardTitle>
 							<p className="text-muted-foreground text-xs">
 								{patientName ? `${patientName} · ` : ""}Documented by {clinicianName || "you"}
@@ -535,7 +535,7 @@ export function TelemedicineEncounterForm({
 															{formatEncounterDate(encounter.admissionDatetime)}
 														</span>
 													</div>
-													<div className="text-muted-foreground mt-1 grid gap-1 text-xs sm:grid-cols-3">
+													<div className="text-muted-foreground mt-1 grid gap-1 text-xs md:grid-cols-3">
 														<span>Status: {formatEncounterType(encounter.status)}</span>
 														<span>Attending: {encounter.attendingStaffName || "Unassigned"}</span>
 														<span>{encounter.chiefComplaint || "No chief complaint"}</span>
@@ -584,7 +584,7 @@ export function TelemedicineEncounterForm({
 									Optional. Leave blank if not measured during the call.
 								</p>
 							</div>
-							<div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+							<div className="xs:grid-cols-2 grid grid-cols-1 gap-3 lg:grid-cols-5">
 								{[
 									{
 										key: "bloodPressure" as const,
@@ -623,7 +623,7 @@ export function TelemedicineEncounterForm({
 							</div>
 							{SOAP_SECTIONS.map(({ key, label, hint, placeholder }) => (
 								<div key={key} data-field={key} className="space-y-1.5">
-									<div className="flex items-baseline justify-between gap-2">
+									<div className="flex flex-wrap items-baseline justify-between gap-2">
 										<label
 											htmlFor={key}
 											className="text-muted-foreground text-xs font-medium tracking-wide uppercase"
@@ -698,16 +698,21 @@ export function TelemedicineEncounterForm({
 							</div>
 						)}
 
-						<div className="flex flex-wrap justify-end gap-3 pt-2">
+						<div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:flex-wrap sm:justify-end">
 							<Button
 								type="button"
 								variant="outline"
 								onClick={() => setClearDialogOpen(true)}
 								disabled={createMutation.isPending}
+								className="w-full sm:w-auto"
 							>
 								Clear
 							</Button>
-							<Button type="submit" disabled={createMutation.isPending}>
+							<Button
+								type="submit"
+								disabled={createMutation.isPending}
+								className="w-full sm:w-auto"
+							>
 								{createMutation.isPending ? "Saving..." : "Save Clinical Note"}
 							</Button>
 						</div>

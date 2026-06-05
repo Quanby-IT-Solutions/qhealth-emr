@@ -6,6 +6,7 @@ import { motion } from "framer-motion"
 import {
 	AlertTriangle,
 	CalendarClock,
+	ChevronDown,
 	Loader2,
 	Mic,
 	MicOff,
@@ -20,6 +21,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/core/components/ui/alert"
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
+import { Popover, PopoverContent, PopoverTrigger } from "@/core/components/ui/popover"
 import {
 	Select,
 	SelectContent,
@@ -397,6 +399,102 @@ export function DeviceSelectors({
 	)
 }
 
+interface DeviceControlProps {
+	type: "audio" | "video"
+	enabled: boolean
+	devices: MediaDeviceInfo[]
+	deviceId: string | undefined
+	onDeviceChange: (id: string | undefined) => void
+	onEnabledChange: (enabled: boolean) => void
+}
+
+export function DeviceControl({
+	type,
+	enabled,
+	devices,
+	deviceId,
+	onDeviceChange,
+	onEnabledChange,
+}: DeviceControlProps) {
+	const isAudio = type === "audio"
+	const selectedDeviceId = deviceId ?? devices[0]?.deviceId ?? ""
+	const selectedDevice = devices.find(device => device.deviceId === selectedDeviceId)
+	const label = isAudio ? "Microphone" : "Camera"
+	const Icon = isAudio ? (enabled ? Mic : MicOff) : enabled ? Video : VideoOff
+
+	return (
+		<div className="flex flex-col items-center gap-1.5">
+			<Popover>
+				<div className="relative">
+					<button
+						type="button"
+						aria-pressed={enabled}
+						aria-label={
+							enabled ? `Turn ${label.toLowerCase()} off` : `Turn ${label.toLowerCase()} on`
+						}
+						onClick={() => onEnabledChange(!enabled)}
+						className={cn(
+							"focus-visible:ring-ring focus-visible:ring-offset-background flex size-12 items-center justify-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+							enabled
+								? "border-border bg-muted text-success"
+								: "border-destructive/30 bg-destructive/10 text-destructive"
+						)}
+					>
+						<Icon className="size-5" />
+					</button>
+					<PopoverTrigger
+						type="button"
+						aria-label={`${label} device options`}
+						className="bg-card text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring focus-visible:ring-offset-background absolute -right-1 -bottom-1 flex size-6 items-center justify-center rounded-full border shadow-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+					>
+						<ChevronDown className="size-3.5" />
+					</PopoverTrigger>
+				</div>
+				<PopoverContent align="center" className="w-[min(calc(100vw-2rem),20rem)] space-y-3 p-3">
+					<div className="flex items-center justify-between gap-3">
+						<div className="min-w-0">
+							<p className="text-sm font-medium">{label}</p>
+							<p className="text-muted-foreground truncate text-xs">
+								{getDeviceDisplayName(selectedDevice, label)}
+							</p>
+						</div>
+						<Button
+							type="button"
+							size="sm"
+							variant={enabled ? "outline" : "default"}
+							onClick={() => onEnabledChange(!enabled)}
+							className="shrink-0"
+						>
+							{enabled ? "Off" : "On"}
+						</Button>
+					</div>
+					<Select
+						value={selectedDeviceId}
+						onValueChange={value => onDeviceChange(value || undefined)}
+						disabled={devices.length === 0}
+					>
+						<SelectTrigger className="w-full min-w-0">
+							<SelectValue placeholder={`No ${label.toLowerCase()} found`}>
+								{getDeviceDisplayName(selectedDevice, label)}
+							</SelectValue>
+						</SelectTrigger>
+						<SelectContent className="max-w-[var(--anchor-width)]">
+							{devices.map((device, index) => (
+								<SelectItem key={device.deviceId} value={device.deviceId}>
+									<span className="block min-w-0 truncate" title={device.label || undefined}>
+										{getDeviceDisplayName(device, label, index)}
+									</span>
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</PopoverContent>
+			</Popover>
+			<span className="text-muted-foreground text-xs">{isAudio ? "Mic" : "Camera"}</span>
+		</div>
+	)
+}
+
 function LiveKitPreJoin({
 	clinicianName,
 	patientName,
@@ -415,114 +513,168 @@ function LiveKitPreJoin({
 	const displayName = clinicianName?.trim() || "You"
 	const preview = useDevicePreview(videoEnabled, audioEnabled)
 
-	const toggleBase =
-		"focus-visible:ring-ring focus-visible:ring-offset-background flex size-12 items-center justify-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-	const toggleOn = "border-border bg-muted text-success"
-	const toggleOff = "border-destructive/30 bg-destructive/10 text-destructive"
-
 	return (
 		<div
 			className={cn(
-				"bg-background relative flex w-full items-center justify-center overflow-hidden p-4 sm:p-6",
-				fullViewport ? "min-h-[360px] flex-1 self-stretch" : "min-h-[640px]"
+				"bg-background relative flex w-full items-start justify-center overflow-y-auto p-3 pb-4 sm:p-5 lg:p-6",
+				fullViewport ? "min-h-0 flex-1 self-stretch" : "min-h-[640px] sm:items-center"
 			)}
 		>
 			<div
 				data-testid="livekit-prejoin-card"
-				className="border-border bg-card relative mx-auto w-full max-w-md rounded-3xl border p-5 shadow-2xl sm:p-6 lg:max-w-4xl lg:p-8"
+				className="border-border bg-card relative mx-auto w-full max-w-md rounded-3xl border p-4 shadow-2xl sm:p-5 lg:max-w-5xl lg:p-8"
 			>
-				<div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
+				<div className="grid gap-7 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.8fr)] lg:items-stretch lg:gap-8">
 					<div className="flex min-w-0 flex-col">
-						<div className="mb-4 flex flex-col items-center text-center lg:items-start lg:text-left">
-							<div className="bg-primary text-primary-foreground mb-3 flex size-12 items-center justify-center rounded-2xl shadow-lg">
-								<Stethoscope className="size-6" aria-hidden="true" />
+						<div className="mb-4 flex items-start gap-3 lg:mb-5">
+							<div className="bg-primary text-primary-foreground flex size-10 shrink-0 items-center justify-center rounded-2xl shadow-lg lg:size-11">
+								<Stethoscope className="size-5" aria-hidden="true" />
 							</div>
-							<h2 className="text-foreground text-lg font-semibold">Telemedicine Consultation</h2>
-							<p className="text-muted-foreground mt-1 flex items-center gap-1 text-xs">
-								<ShieldCheck className="size-3" aria-hidden="true" />
-								Secure encrypted session
-							</p>
+							<div className="min-w-0 pt-0.5">
+								<h2 className="text-foreground text-base font-semibold lg:text-lg">
+									Telemedicine Consultation
+								</h2>
+								<p className="text-muted-foreground mt-1 flex items-center gap-1 text-xs">
+									<ShieldCheck className="size-3" aria-hidden="true" />
+									Secure encrypted session
+								</p>
+							</div>
+						</div>
+
+						<div className="mb-4 lg:hidden">
+							<p className="text-foreground text-sm font-semibold">{displayName}</p>
+							{patientName && (
+								<p className="text-muted-foreground text-xs">
+									Meeting with <span className="text-foreground font-medium">{patientName}</span>
+								</p>
+							)}
 						</div>
 
 						<CameraPreview
 							stream={preview.stream}
 							videoEnabled={videoEnabled}
 							displayName={displayName}
-							className="border-border rounded-2xl border shadow-none ring-0"
+							className="border-border max-h-[34dvh] rounded-2xl border shadow-none ring-0 lg:max-h-none lg:min-h-[268px]"
 						/>
 
-						<div className="mt-4">
+						<div className="mt-3 lg:mt-5">
 							<MicVisualizer stream={preview.stream} audioEnabled={audioEnabled} />
 						</div>
 
-						<div className="mt-4 flex items-start justify-center gap-8">
-							<div className="flex flex-col items-center gap-1.5">
-								<button
-									type="button"
-									aria-pressed={audioEnabled}
-									aria-label={audioEnabled ? "Mute microphone" : "Unmute microphone"}
-									onClick={() => setAudioEnabled(v => !v)}
-									className={cn(toggleBase, audioEnabled ? toggleOn : toggleOff)}
-								>
-									{audioEnabled ? <Mic className="size-5" /> : <MicOff className="size-5" />}
-								</button>
-								<span className="text-muted-foreground text-xs">Mic</span>
-							</div>
-							<div className="flex flex-col items-center gap-1.5">
-								<button
-									type="button"
-									aria-pressed={videoEnabled}
-									aria-label={videoEnabled ? "Turn camera off" : "Turn camera on"}
-									onClick={() => setVideoEnabled(v => !v)}
-									className={cn(toggleBase, videoEnabled ? toggleOn : toggleOff)}
-								>
-									{videoEnabled ? <Video className="size-5" /> : <VideoOff className="size-5" />}
-								</button>
-								<span className="text-muted-foreground text-xs">Camera</span>
-							</div>
+						<div className="mt-4 flex items-start justify-center gap-10 lg:mt-5">
+							<DeviceControl
+								type="audio"
+								enabled={audioEnabled}
+								devices={preview.audioDevices}
+								deviceId={preview.audioDeviceId}
+								onDeviceChange={preview.setAudioDeviceId}
+								onEnabledChange={setAudioEnabled}
+							/>
+							<DeviceControl
+								type="video"
+								enabled={videoEnabled}
+								devices={preview.videoDevices}
+								deviceId={preview.videoDeviceId}
+								onDeviceChange={preview.setVideoDeviceId}
+								onEnabledChange={setVideoEnabled}
+							/>
 						</div>
+
+						{preview.permissionError && (
+							<p className="text-destructive mt-3 text-center text-xs lg:hidden" role="alert">
+								{preview.permissionError}
+							</p>
+						)}
+
+						<button
+							type="button"
+							aria-label={joinLabel}
+							className="mt-4 flex h-11 w-full items-center justify-center rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition-colors hover:from-sky-400 hover:to-indigo-400 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 focus-visible:outline-none lg:hidden"
+							onClick={() =>
+								onJoin({
+									audioEnabled,
+									videoEnabled,
+									videoDeviceId: preview.videoDeviceId,
+									audioDeviceId: preview.audioDeviceId,
+								})
+							}
+						>
+							{joinLabel}
+						</button>
 					</div>
 
-					<div className="flex min-w-0 flex-col">
-						<div className="mb-4 space-y-1 text-center lg:text-left">
-							<p className="text-foreground text-lg font-semibold">{displayName}</p>
-							{patientName && (
-								<p className="text-muted-foreground text-sm">
-									Ready to meet with{" "}
-									<span className="text-foreground font-medium">{patientName}</span>
+					<div className="bg-muted/20 hidden min-w-0 flex-col justify-between gap-5 rounded-2xl border p-4 lg:flex">
+						<div className="space-y-4">
+							<div className="bg-background/70 rounded-xl border p-4">
+								<p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+									Clinician
 								</p>
-							)}
-							<p className="text-muted-foreground flex items-center justify-center gap-1 text-xs lg:justify-start">
-								<ShieldCheck className="size-3" aria-hidden="true" />
-								End-to-end encrypted
-							</p>
-						</div>
+								<p className="text-foreground mt-1 text-lg font-semibold">{displayName}</p>
+								{patientName && (
+									<p className="text-muted-foreground mt-1 text-sm">
+										Ready to meet with{" "}
+										<span className="text-foreground font-medium">{patientName}</span>
+									</p>
+								)}
+								<p className="text-muted-foreground mt-2 flex items-center gap-1 text-xs">
+									<ShieldCheck className="size-3" aria-hidden="true" />
+									End-to-end encrypted
+								</p>
+							</div>
 
-						<div className="border-border bg-muted/40 mb-4 space-y-3 rounded-2xl border p-4">
-							<DeviceSelectors
-								dark
-								videoDevices={preview.videoDevices}
-								audioDevices={preview.audioDevices}
-								videoDeviceId={preview.videoDeviceId}
-								audioDeviceId={preview.audioDeviceId}
-								onVideoDeviceChange={preview.setVideoDeviceId}
-								onAudioDeviceChange={preview.setAudioDeviceId}
-							/>
-							{preview.permissionError && (
-								<p className="text-destructive text-xs" role="alert">
-									{preview.permissionError}
+							<div className="border-border bg-background/70 space-y-3 rounded-xl border p-4">
+								<div>
+									<p className="text-foreground text-sm font-medium">Ready check</p>
+									<p className="text-muted-foreground mt-1 text-xs">
+										Toggle devices on the preview controls. Use each small chevron to choose a
+										device.
+									</p>
+								</div>
+								<div className="space-y-2 text-xs">
+									<div className="bg-muted/30 flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5">
+										<div className="flex min-w-0 items-center gap-2">
+											<Mic className="text-muted-foreground size-3.5 shrink-0" />
+											<p className="text-muted-foreground">Microphone</p>
+										</div>
+										<p
+											className={cn(
+												"shrink-0 font-medium",
+												audioEnabled ? "text-success" : "text-destructive"
+											)}
+										>
+											{audioEnabled ? "On" : "Muted"}
+										</p>
+									</div>
+									<div className="bg-muted/30 flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5">
+										<div className="flex min-w-0 items-center gap-2">
+											<Video className="text-muted-foreground size-3.5 shrink-0" />
+											<p className="text-muted-foreground">Camera</p>
+										</div>
+										<p
+											className={cn(
+												"shrink-0 font-medium",
+												videoEnabled ? "text-success" : "text-destructive"
+											)}
+										>
+											{videoEnabled ? "On" : "Off"}
+										</p>
+									</div>
+								</div>
+								<p className="text-muted-foreground text-xs">
+									Your browser may ask for permission when devices are turned on.
 								</p>
-							)}
-							<p className="text-muted-foreground text-xs">
-								Your browser will ask for permission when you turn these on. You can change them
-								anytime inside the call.
-							</p>
+								{preview.permissionError && (
+									<p className="text-destructive text-xs" role="alert">
+										{preview.permissionError}
+									</p>
+								)}
+							</div>
 						</div>
 
 						<button
 							type="button"
 							aria-label={joinLabel}
-							className="mt-auto flex h-12 w-full items-center justify-center rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 text-base font-semibold text-white shadow-lg shadow-sky-500/20 transition-colors hover:from-sky-400 hover:to-indigo-400 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 focus-visible:outline-none"
+							className="flex h-12 w-full items-center justify-center rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 text-base font-semibold text-white shadow-lg shadow-sky-500/20 transition-colors hover:from-sky-400 hover:to-indigo-400 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 focus-visible:outline-none"
 							onClick={() =>
 								onJoin({
 									audioEnabled,
@@ -852,7 +1004,7 @@ function LiveKitVideoRoomSession({
 		)
 	) : !choices ? (
 		fullViewport ? (
-			<div className="flex min-h-[360px] flex-1 items-stretch overflow-hidden">
+			<div className="flex min-h-0 flex-1 items-stretch overflow-y-auto">
 				<LiveKitPreJoin
 					clinicianName={clinicianName}
 					patientName={patientName}
@@ -888,7 +1040,7 @@ function LiveKitVideoRoomSession({
 
 	if (fullViewport) {
 		return (
-			<div className="bg-background text-foreground flex h-full min-h-[360px] flex-1 flex-col overflow-hidden">
+			<div className="bg-background text-foreground flex h-full min-h-0 flex-1 flex-col overflow-y-auto">
 				{content}
 			</div>
 		)

@@ -301,8 +301,8 @@ function MedicationRow({
 	removeDisabled?: boolean
 }) {
 	return (
-		<div className="space-y-3 rounded-lg border p-4">
-			<div className="flex items-center justify-between">
+		<div className="min-w-0 space-y-3 rounded-lg border p-4">
+			<div className="flex min-w-0 items-center justify-between gap-3">
 				<span className="text-muted-foreground text-sm font-medium">Medication #{index + 1}</span>
 				<button
 					type="button"
@@ -315,7 +315,7 @@ function MedicationRow({
 				</button>
 			</div>
 
-			<div className="grid grid-cols-2 gap-3">
+			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 				<div className="space-y-1">
 					<label className="text-muted-foreground text-xs">Generic Name *</label>
 					<input
@@ -363,11 +363,11 @@ function MedicationRow({
 				</div>
 				<div className="space-y-1">
 					<label className="text-muted-foreground text-xs">Quantity *</label>
-					<div className="flex gap-2">
+					<div className="flex min-w-0 gap-2">
 						<input
 							type="number"
 							min={1}
-							className="border-input bg-background w-20 rounded border px-2 py-1.5 text-sm"
+							className="border-input bg-background w-20 shrink-0 rounded border px-2 py-1.5 text-sm"
 							value={med.quantity}
 							onChange={e => onChange("quantity", Number(e.target.value))}
 							required
@@ -511,8 +511,8 @@ function PrescriptionPreview({
 		<div className="space-y-4">
 			{/* Header */}
 			<div className="rounded-lg border p-4">
-				<div className="mb-3 flex items-start justify-between">
-					<div>
+				<div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+					<div className="min-w-0">
 						<h3 className="text-base font-bold">{rx.facilityName}</h3>
 						<p className="text-muted-foreground text-xs">{rx.facilityAddress}</p>
 					</div>
@@ -521,7 +521,7 @@ function PrescriptionPreview({
 					</Badge>
 				</div>
 				<Separator className="mb-3" />
-				<div className="grid grid-cols-2 gap-2 text-sm">
+				<div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
 					<div>
 						<span className="text-muted-foreground">Patient: </span>
 						<span className="font-medium">{rx.patientName}</span>
@@ -581,7 +581,7 @@ function PrescriptionPreview({
 							<span className="bg-primary/10 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">
 								{i + 1}
 							</span>
-							<div>
+							<div className="min-w-0">
 								<p className="text-sm font-semibold">
 									{med.genericName}
 									{med.brandName && (
@@ -680,7 +680,7 @@ function PrescriptionPreview({
 				<form onSubmit={handleSendEmail} className="mt-3 flex flex-wrap gap-2">
 					<input
 						type="email"
-						className="border-input bg-background min-w-64 flex-1 rounded-md border px-3 py-2 text-sm"
+						className="border-input bg-background min-w-0 flex-1 rounded-md border px-3 py-2 text-sm sm:min-w-64"
 						value={sendEmail}
 						onChange={e => setSendEmailOverride(e.target.value)}
 						placeholder="patient@email.com"
@@ -813,10 +813,10 @@ export function EPrescriptionCard({
 	}
 
 	return (
-		<Card>
+		<Card className="min-w-0">
 			<CardHeader>
-				<div className="flex items-center justify-between">
-					<CardTitle className="flex items-center gap-2 text-base">
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+					<CardTitle className="flex min-w-0 items-center gap-2 text-base">
 						<Pill className="text-primary size-5" />
 						E-Prescription
 					</CardTitle>
@@ -825,6 +825,7 @@ export function EPrescriptionCard({
 						onClick={() => setShowForm(v => !v)}
 						variant={showForm ? "outline" : "default"}
 						disabled={licenseBlocked && !showForm}
+						className="w-full sm:w-auto"
 					>
 						{showForm ? (
 							"Cancel"
@@ -889,11 +890,20 @@ export function EPrescriptionCard({
 							</p>
 						)}
 
-						<div className="flex justify-end gap-3">
-							<Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+						<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setShowForm(false)}
+								className="w-full sm:w-auto"
+							>
 								Cancel
 							</Button>
-							<Button type="submit" disabled={createMutation.isPending || licenseBlocked}>
+							<Button
+								type="submit"
+								disabled={createMutation.isPending || licenseBlocked}
+								className="w-full sm:w-auto"
+							>
 								{createMutation.isPending ? (
 									<>
 										<Loader2 className="mr-1.5 size-3.5 animate-spin" />
@@ -919,7 +929,11 @@ export function EPrescriptionCard({
 						<p className="text-muted-foreground text-sm">
 							No prescriptions yet for this encounter.
 						</p>
-						<Button onClick={() => setShowForm(true)} disabled={licenseBlocked}>
+						<Button
+							onClick={() => setShowForm(true)}
+							disabled={licenseBlocked}
+							className="w-full sm:w-auto"
+						>
 							<Plus className="mr-1.5 size-3.5" />
 							Generate E-Prescription
 						</Button>

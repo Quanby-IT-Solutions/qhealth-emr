@@ -163,15 +163,15 @@ function AbstractPreview({ abstract }: { abstract: TeleAbstract }) {
 		<div className="space-y-4">
 			{/* Header */}
 			<div className="rounded-lg border p-4">
-				<div className="mb-3 flex items-start justify-between">
-					<div>
+				<div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+					<div className="min-w-0">
 						<h3 className="text-base font-bold">{abstract.facilityName}</h3>
 						<p className="text-muted-foreground text-xs">Telemedicine Encounter Abstract</p>
 					</div>
 					<AbstractStatusBadge status={abstract.status} />
 				</div>
 				<Separator className="mb-3" />
-				<div className="grid grid-cols-2 gap-2 text-sm">
+				<div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
 					<div>
 						<span className="text-muted-foreground">Patient: </span>
 						<span className="font-medium">{abstract.patientName}</span>
@@ -397,15 +397,19 @@ export function TeleAbstractPage({
 	}
 
 	return (
-		<Card>
+		<Card className="min-w-0">
 			<CardHeader>
-				<div className="flex items-center justify-between">
-					<CardTitle className="flex items-center gap-2 text-base">
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+					<CardTitle className="flex min-w-0 items-center gap-2 text-base">
 						<FileText className="text-primary size-5" />
 						Tele-Encounter Abstract
 					</CardTitle>
 					{!abstract && !generateMutation.isPending && (
-						<Button onClick={handleGenerate} disabled={generateMutation.isPending}>
+						<Button
+							onClick={handleGenerate}
+							disabled={generateMutation.isPending}
+							className="w-full sm:w-auto"
+						>
 							<ClipboardList className="mr-1.5 size-3.5" />
 							Generate Abstract
 						</Button>
@@ -477,12 +481,16 @@ export function TeleAbstractPage({
 						)}
 
 						{/* Actions */}
-						<div data-tele-abstract-actions className="flex flex-wrap gap-3">
+						<div
+							data-tele-abstract-actions
+							className="flex flex-col gap-3 sm:flex-row sm:flex-wrap"
+						>
 							<Button
 								variant="outline"
 								size="sm"
 								onClick={handlePrint}
 								disabled={abstract.status === "draft"}
+								className="w-full sm:w-auto"
 							>
 								<Printer className="mr-1.5 size-3.5" />
 								Print
@@ -492,6 +500,7 @@ export function TeleAbstractPage({
 								size="sm"
 								onClick={() => openAbstractPrintWindow(abstract)}
 								disabled={abstract.status === "draft"}
+								className="w-full sm:w-auto"
 							>
 								<Printer className="mr-1.5 size-3.5" />
 								Print Preview
@@ -501,13 +510,19 @@ export function TeleAbstractPage({
 								size="sm"
 								onClick={handleDownloadPdf}
 								disabled={abstract.status === "draft"}
+								className="w-full sm:w-auto"
 							>
 								<Download className="mr-1.5 size-3.5" />
 								Download PDF
 							</Button>
 
 							{abstract.status === "draft" && (
-								<Button size="sm" onClick={handleSign} disabled={signMutation.isPending}>
+								<Button
+									size="sm"
+									onClick={handleSign}
+									disabled={signMutation.isPending}
+									className="w-full sm:w-auto"
+								>
 									{signMutation.isPending ? (
 										<>
 											<Loader2 className="mr-1.5 size-3.5 animate-spin" />
@@ -523,7 +538,12 @@ export function TeleAbstractPage({
 							)}
 
 							{abstract.status === "signed" && !showSendForm && (
-								<Button size="sm" variant="outline" onClick={() => setShowSendForm(true)}>
+								<Button
+									size="sm"
+									variant="outline"
+									onClick={() => setShowSendForm(true)}
+									className="w-full sm:w-auto"
+								>
 									<Mail className="mr-1.5 size-3.5" />
 									Send to Patient
 								</Button>
@@ -555,7 +575,7 @@ export function TeleAbstractPage({
 										required
 									/>
 								</div>
-								<div className="flex justify-end gap-3">
+								<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
 									<Button
 										type="button"
 										variant="outline"
@@ -564,10 +584,16 @@ export function TeleAbstractPage({
 											setShowSendForm(false)
 											setSendEmailOverride(null)
 										}}
+										className="w-full sm:w-auto"
 									>
 										Cancel
 									</Button>
-									<Button type="submit" size="sm" disabled={sendMutation.isPending}>
+									<Button
+										type="submit"
+										size="sm"
+										disabled={sendMutation.isPending}
+										className="w-full sm:w-auto"
+									>
 										{sendMutation.isPending ? (
 											<>
 												<Loader2 className="mr-1.5 size-3.5 animate-spin" />
