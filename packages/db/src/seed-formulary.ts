@@ -5,6 +5,8 @@
  *
  * Requires DATABASE_URL environment variable.
  */
+import "dotenv/config"
+
 import { drizzle } from "drizzle-orm/node-postgres"
 
 import {

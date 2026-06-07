@@ -404,6 +404,30 @@ interface DemoFacility {
 
 const demoUsers: DemoUser[] = [
 	{
+		email: "demo.admin@qhealth.local",
+		name: "Demo Administrator",
+		roleName: "Administrator",
+		department: "Administration",
+		employeeNumber: "DEMO-ADM-001",
+	},
+	{
+		email: "demo.scheduler@qhealth.local",
+		name: "Demo Scheduler",
+		roleName: "Scheduler",
+		department: "Admissions and Scheduling",
+		employeeNumber: "DEMO-SCH-001",
+	},
+	{
+		email: "demo.doctor@qhealth.local",
+		name: "Dr. Demo Physician",
+		roleName: "Physician",
+		department: "Emergency Department",
+		employeeNumber: "DEMO-MD-001",
+		prcLicenseNumber: "DEMO-PRC-100001",
+		ptrNumber: "DEMO-PTR-100001",
+		pdeaS2License: "DEMO-S2-100001",
+	},
+	{
 		email: "admin@qhealth.local",
 		name: "QHealth Admin",
 		roleName: "Administrator",
@@ -651,6 +675,8 @@ const demoFacilities: DemoFacility[] = [
 ]
 
 const staffFacilityAssignments: Record<string, string[]> = {
+	"demo.admin@qhealth.local": demoFacilities.map(facility => facility.key),
+	"demo.scheduler@qhealth.local": demoFacilities.map(facility => facility.key),
 	"admin@qhealth.local": demoFacilities.map(facility => facility.key),
 	"scheduler@qhealth.local": demoFacilities.map(facility => facility.key),
 	"familymed@qhealth.local": ["main", "north-clinic"],
@@ -821,6 +847,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["adt", ["view", "create"]],
 		["patients", ["view"]], // Patient record access for appointment scheduling
 		["scheduling", ["view", "create", "edit"]],
+		["telemedicine", ["view", "create", "edit"]], // Book and update virtual visit appointments
 		["notifications", ["view"]], // All staff receive system notifications
 	],
 	"Auditor": [

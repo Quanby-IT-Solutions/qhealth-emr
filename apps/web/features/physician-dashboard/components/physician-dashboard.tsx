@@ -23,8 +23,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { Input } from "@/core/components/ui/input"
 import { Skeleton } from "@/core/components/ui/skeleton"
 import type { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { canRoleActOnOpdStep, getPatientActiveOpdStep } from "@/features/opd/components/opd-flow"
-import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
+import {
+	useClinicQueueQuery,
+	type UnifiedQueueEntry,
+} from "@/features/scheduling/api/scheduling.hooks"
 import {
 	formatAppointmentStatusLabel,
 	getAppointmentStatusColor,
@@ -44,10 +46,6 @@ interface Permission {
 interface PhysicianDashboardProps {
 	profile?: MyProfile
 }
-
-type PatientSearchItem = NonNullable<
-	ReturnType<typeof usePatientSearchQuery>["data"]
->["data"][number]
 
 const ACTIVE_APPOINTMENT_STATUSES = new Set<AppointmentStatus>([
 	"scheduled",
@@ -91,8 +89,12 @@ function isToday(date: string) {
 	)
 }
 
-function getPatientName(patient: PatientSearchItem) {
-	return `${patient.firstName} ${patient.lastName}`.trim()
+function todayIso() {
+	return new Date().toISOString().slice(0, 10)
+}
+
+function queueEntryChartHref(entry: UnifiedQueueEntry) {
+	return `/patients/${entry.patientId}/encounters/${entry.encounterId}/documentation`
 }
 
 function SectionEmpty({
@@ -134,39 +136,31 @@ function WorklistSkeleton() {
 	)
 }
 
-function PatientQueueRow({ patient }: { patient: PatientSearchItem }) {
-	const activeStep = getPatientActiveOpdStep(patient.id)
-
+function PatientQueueRow({ entry }: { entry: UnifiedQueueEntry }) {
 	return (
 		<div className="hover:bg-secondary/30 flex flex-col gap-2 rounded-lg border p-2.5 transition-colors sm:flex-row sm:items-center sm:justify-between">
 			<div className="min-w-0 space-y-1">
 				<div className="flex flex-wrap items-center gap-2">
-					<p className="truncate text-sm font-semibold">{getPatientName(patient)}</p>
+					<p className="truncate text-sm font-semibold">{entry.patientName ?? "Unnamed patient"}</p>
 					<Badge variant="secondary" className="font-mono text-[0.68rem] tracking-[0.12em]">
-						{patient.mrn}
+						{entry.patientMrn ?? "No MRN"}
 					</Badge>
-					{activeStep ? (
-						<Badge variant="outline" className="text-[0.68rem]">
-							{activeStep.label}
-						</Badge>
-					) : null}
+					<Badge variant="outline" className="text-[0.68rem]">
+						Queue #{entry.queueNumber ?? "-"}
+					</Badge>
 				</div>
 				<p className="text-muted-foreground text-xs">
-					{patient.dateOfBirth
-						? `DOB ${new Date(String(patient.dateOfBirth)).toLocaleDateString("en-PH")}`
-						: "DOB not recorded"}
-					{patient.lastEncounterDate
-						? ` - Last encounter ${new Date(String(patient.lastEncounterDate)).toLocaleDateString(
-								"en-PH"
-							)}`
-						: ""}
+					{entry.entryType === "appointment" ? "Appointment" : "Walk-in"} - With doctor
 				</p>
 			</div>
-			<Button asChild size="xs" className="self-start sm:self-auto">
-				<Link href="/opd">
-					Start
-					<ArrowRight className="size-3.5" />
-				</Link>
+			<Button
+				size="xs"
+				className="self-start sm:self-auto"
+				nativeButton={false}
+				render={<Link href={queueEntryChartHref(entry)} />}
+			>
+				Start
+				<ArrowRight className="size-3.5" />
 			</Button>
 		</div>
 	)
@@ -271,28 +265,19 @@ export function PhysicianDashboard({ profile }: PhysicianDashboardProps) {
 	const canViewPatients = permSet.has("patients:view")
 	const canUseTelemedicine = permSet.has("telemedicine:view")
 
-	const patientQuery = usePatientSearchQuery(
-		{
-			facilityId,
-			isActive: true,
-			page: 1,
-			limit: 8,
-			clinicianStaffId: staffProfileId || undefined,
-		},
-		{ enabled: Boolean(facilityId && canViewOpd) }
+	const clinicQueueQuery = useClinicQueueQuery(
+		{ facilityId, clinicianStaffId: staffProfileId || undefined, date: todayIso() },
+		{ refetchInterval: 20_000 }
 	)
 
 	const appointmentsQuery = useAppointmentsQuery(facilityId, 1, 25)
 
 	const patientsWaiting = useMemo(() => {
-		const patients = patientQuery.data?.data ?? []
-		return patients
-			.map(patient => ({ patient, activeStep: getPatientActiveOpdStep(patient.id) }))
-			.filter(({ activeStep }) =>
-				activeStep ? canRoleActOnOpdStep(permSet, roleName, activeStep) : false
-			)
-			.map(({ patient }) => patient)
-	}, [patientQuery.data?.data, permSet, roleName])
+		const entries = clinicQueueQuery.data?.entries ?? []
+		return entries
+			.filter(entry => entry.status === "in_progress" && !!entry.encounterId)
+			.sort((a, b) => (a.queueNumber ?? 9999) - (b.queueNumber ?? 9999))
+	}, [clinicQueueQuery.data?.entries])
 
 	const assignedAppointments = useMemo(() => {
 		const appointments = appointmentsQuery.data?.data ?? []
@@ -416,9 +401,9 @@ export function PhysicianDashboard({ profile }: PhysicianDashboardProps) {
 								) : firstWaitingPatient ? (
 									<ActionRow
 										icon={Stethoscope}
-										title={getPatientName(firstWaitingPatient)}
-										description={`Next OPD patient - ${firstWaitingPatient.mrn}`}
-										href="/opd"
+										title={firstWaitingPatient.patientName ?? "Unnamed patient"}
+										description={`OPD queue #${firstWaitingPatient.queueNumber ?? "-"} - ${firstWaitingPatient.patientMrn ?? "No MRN"}`}
+										href={queueEntryChartHref(firstWaitingPatient)}
 										label="Start"
 									/>
 								) : (
@@ -439,14 +424,14 @@ export function PhysicianDashboard({ profile }: PhysicianDashboardProps) {
 										Only patients ready for physician action.
 									</p>
 								</div>
-								{patientQuery.isFetching ? (
+								{clinicQueueQuery.isFetching ? (
 									<Loader2 className="text-muted-foreground size-4 animate-spin" />
 								) : (
 									<Badge variant="outline">{patientsWaiting.length}</Badge>
 								)}
 							</CardHeader>
 							<CardContent className="space-y-2 pt-3">
-								{patientQuery.isLoading ? (
+								{clinicQueueQuery.isLoading ? (
 									<WorklistSkeleton />
 								) : !canViewOpd ? (
 									<SectionEmpty
@@ -457,7 +442,7 @@ export function PhysicianDashboard({ profile }: PhysicianDashboardProps) {
 								) : patientsWaiting.length ? (
 									patientsWaiting
 										.slice(0, 6)
-										.map(patient => <PatientQueueRow key={patient.id} patient={patient} />)
+										.map(entry => <PatientQueueRow key={entry.id} entry={entry} />)
 								) : (
 									<SectionEmpty
 										icon={UserRound}

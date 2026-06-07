@@ -1486,28 +1486,25 @@ export class OrdersService {
 		await this.assertAncillaryOrderContextInFacility(input)
 		await this.assertLabOrderTerminologyIsReady(input)
 
-		const created = unwrap(
-			await supabase
-				.from("lab_orders")
-				.insert({
-					facility_id: input.facilityId,
-					encounter_id: input.encounterId ?? null,
-					pre_encounter_id: input.preEncounterId ?? null,
-					loinc_code: input.loincCode ?? null,
-					panel_code: input.panelCode ?? null,
-					test_name: input.testName,
-					panel_name: input.panelName ?? null,
-					clinical_indication: input.clinicalIndication ?? null,
-					indication_icd10_code: input.indicationIcd10Code ?? null,
-					indication_icd10_display: input.indicationIcd10Display ?? null,
-					priority: input.priority ?? "routine",
-					status: "ordered",
-					specimen_type: input.specimenType ?? null,
-					ordering_staff_id: staff.id,
-				})
-				.select("id")
-				.single()
-		)
+		const [created] = await db
+			.insert(labOrders)
+			.values({
+				facilityId: input.facilityId,
+				encounterId: input.encounterId ?? null,
+				preEncounterId: input.preEncounterId ?? null,
+				loincCode: input.loincCode ?? null,
+				panelCode: input.panelCode ?? null,
+				testName: input.testName,
+				panelName: input.panelName ?? null,
+				clinicalIndication: input.clinicalIndication ?? null,
+				indicationIcd10Code: input.indicationIcd10Code ?? null,
+				indicationIcd10Display: input.indicationIcd10Display ?? null,
+				priority: input.priority ?? "routine",
+				status: "ordered",
+				specimenType: input.specimenType ?? null,
+				orderingStaffId: staff.id,
+			})
+			.returning({ id: labOrders.id })
 
 		if (!created) throw new BadRequestException("Unable to create lab order")
 
@@ -1533,19 +1530,17 @@ export class OrdersService {
 		// Only encounter-linked orders carry an SLA clock.
 		if (input.encounterId) {
 			const slaMins = await resolveStepTarget(input.facilityId, "ancillary", "lab_ordered")
-			unwrap(
-				await supabase.from("encounter_status_events").insert({
-					facility_id: input.facilityId,
-					encounter_id: input.encounterId,
-					from_status: null,
-					to_status: "lab_ordered",
-					workflow_type: "ancillary",
-					staff_id: staff.id,
-					sla_target_minutes: slaMins,
-					notes: `Lab order: ${input.testName ?? input.panelName ?? "Unknown"}`,
-					occurred_at: new Date().toISOString(),
-				})
-			)
+			await db.insert(encounterStatusEvents).values({
+				facilityId: input.facilityId,
+				encounterId: input.encounterId,
+				fromStatus: null,
+				toStatus: "lab_ordered",
+				workflowType: "ancillary" as const,
+				staffId: staff.id,
+				slaTargetMinutes: slaMins,
+				notes: `Lab order: ${input.testName ?? input.panelName ?? "Unknown"}`,
+				occurredAt: new Date(),
+			})
 		}
 
 		return this.findLabOrder(created.id)
@@ -1562,15 +1557,11 @@ export class OrdersService {
 			throw new BadRequestException("Select an active LOINC lab test before signing a lab order.")
 		}
 
-		const loincMatch = unwrap(
-			await supabase
-				.from("loinc_codes")
-				.select("loinc_num")
-				.eq("loinc_num", loincCode)
-				.eq("is_active", true)
-				.limit(1)
-				.maybeSingle()
-		)
+		const [loincMatch] = await db
+			.select({ loincNum: loincCodes.loincNum })
+			.from(loincCodes)
+			.where(and(eq(loincCodes.loincNum, loincCode), eq(loincCodes.isActive, true)))
+			.limit(1)
 
 		if (!loincMatch) {
 			throw new BadRequestException("Select an active LOINC lab test before signing a lab order.")
@@ -1581,15 +1572,11 @@ export class OrdersService {
 			throw new BadRequestException("ICD-10 indication is required before signing a lab order.")
 		}
 
-		const icd10Match = unwrap(
-			await supabase
-				.from("icd10_codes")
-				.select("code")
-				.eq("code", icd10Code)
-				.eq("is_active", true)
-				.limit(1)
-				.maybeSingle()
-		)
+		const [icd10Match] = await db
+			.select({ code: icd10Codes.code })
+			.from(icd10Codes)
+			.where(and(eq(icd10Codes.code, icd10Code), eq(icd10Codes.isActive, true)))
+			.limit(1)
 
 		if (!icd10Match) {
 			throw new BadRequestException(

@@ -82,24 +82,25 @@ export function ClinicQueue({ facilityId, clinicianStaffId }: ClinicQueueProps) 
 		)[0]
 		if (!nextWaiting) return
 
-		if (nextWaiting.entryType === "appointment" && nextWaiting.appointmentId) {
-			apptStatusMut.mutate({
-				id: nextWaiting.appointmentId,
-				status: "in_progress",
-			})
-		} else if (nextWaiting.entryType === "walk_in" && nextWaiting.encounterId) {
+		if (nextWaiting.encounterId) {
 			encounterQueueStatusMut.mutate({
 				id: nextWaiting.encounterId,
+				status: "in_progress",
+			})
+		} else if (nextWaiting.entryType === "appointment" && nextWaiting.appointmentId) {
+			apptStatusMut.mutate({
+				id: nextWaiting.appointmentId,
 				status: "in_progress",
 			})
 		}
 	}
 
 	function markCompleted(entry: UnifiedQueueEntry) {
-		if (entry.entryType === "appointment" && entry.appointmentId) {
+		if (entry.encounterId) {
+			encounterQueueStatusMut.mutate({ id: entry.encounterId, status: "completed" })
+		} else if (entry.entryType === "appointment" && entry.appointmentId) {
 			apptStatusMut.mutate({ id: entry.appointmentId, status: "completed" })
 		}
-		// Walk-in encounters must be finalized through the chart disposition panel (PS-016 TOR Flow 1 Step 5)
 	}
 
 	return (
@@ -217,7 +218,7 @@ export function ClinicQueue({ facilityId, clinicianStaffId }: ClinicQueueProps) 
 												<TableCell>
 													{entry.status === "in_progress" && (
 														<div className="flex gap-2">
-															{entry.entryType === "walk_in" && entry.encounterId && (
+															{entry.encounterId && (
 																<>
 																	<Button
 																		size="sm"
@@ -256,22 +257,20 @@ export function ClinicQueue({ facilityId, clinicianStaffId }: ClinicQueueProps) 
 															)}
 														</div>
 													)}
-													{entry.status === "waiting" &&
-														entry.entryType === "walk_in" &&
-														entry.encounterId && (
-															<Button
-																size="sm"
-																variant="outline"
-																onClick={() =>
-																	setVitalsEntry({
-																		encounterId: entry.encounterId!,
-																		patientName: entry.patientName ?? "",
-																	})
-																}
-															>
-																Vitals
-															</Button>
-														)}
+													{entry.status === "waiting" && entry.encounterId && (
+														<Button
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																setVitalsEntry({
+																	encounterId: entry.encounterId!,
+																	patientName: entry.patientName ?? "",
+																})
+															}
+														>
+															Vitals
+														</Button>
+													)}
 												</TableCell>
 											</TableRow>
 										))}

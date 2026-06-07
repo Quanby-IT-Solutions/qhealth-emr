@@ -11,8 +11,8 @@ const DATABASE_URL =
 	process.env.DATABASE_URL ?? "postgres://postgres:password@localhost:5432/qhealth-emr"
 const DEFAULT_PASSWORD = process.env.E2E_SEED_PASSWORD ?? "Password123"
 
-const SCHEDULER_EMAIL = "scheduler@qhealth.local"
-const PHYSICIAN_EMAIL = "doctor@qhealth.local"
+const SCHEDULER_EMAIL = process.env.E2E_SCHEDULER_EMAIL ?? "scheduler@qhealth.local"
+const PHYSICIAN_EMAIL = process.env.E2E_PHYSICIAN_EMAIL ?? "doctor@qhealth.local"
 const PATIENT_MRN = "QH-000002"
 
 type StaffContext = {
@@ -158,7 +158,7 @@ test.describe.serial("Scheduler telemedicine booking workflow", () => {
 
 		try {
 			const create = await createAppointment(api, context, context.physicianStaffId, notes)
-			expect(create.ok()).toBeTruthy()
+			expect(create.ok(), await create.text()).toBeTruthy()
 
 			const appointment = (await create.json()) as {
 				id: string
@@ -228,7 +228,7 @@ test.describe.serial("Scheduler telemedicine booking workflow", () => {
 				`E2E physician self booking ${Date.now()}`,
 				60
 			)
-			expect(create.ok()).toBeTruthy()
+			expect(create.ok(), await create.text()).toBeTruthy()
 
 			const appointment = (await create.json()) as {
 				id: string
