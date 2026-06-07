@@ -86,8 +86,33 @@ jest.mock("@repo/db/schema", () => ({
 		createdAt: "appointments.createdAt",
 		updatedAt: "appointments.updatedAt",
 	},
-	encounters: {},
-	encounterStatusEvents: {},
+	encounters: {
+		id: "encounters.id",
+		facilityId: "encounters.facilityId",
+		patientId: "encounters.patientId",
+		encounterType: "encounters.encounterType",
+		status: "encounters.status",
+		chiefComplaint: "encounters.chiefComplaint",
+		admittingStaffId: "encounters.admittingStaffId",
+		attendingStaffId: "encounters.attendingStaffId",
+		admissionDatetime: "encounters.admissionDatetime",
+		appointmentId: "encounters.appointmentId",
+		queueNumber: "encounters.queueNumber",
+		clinicianStaffId: "encounters.clinicianStaffId",
+		queueStatus: "encounters.queueStatus",
+		updatedAt: "encounters.updatedAt",
+	},
+	encounterStatusEvents: {
+		facilityId: "encounterStatusEvents.facilityId",
+		encounterId: "encounterStatusEvents.encounterId",
+		fromStatus: "encounterStatusEvents.fromStatus",
+		toStatus: "encounterStatusEvents.toStatus",
+		workflowType: "encounterStatusEvents.workflowType",
+		staffId: "encounterStatusEvents.staffId",
+		slaTargetMinutes: "encounterStatusEvents.slaTargetMinutes",
+		notes: "encounterStatusEvents.notes",
+		occurredAt: "encounterStatusEvents.occurredAt",
+	},
 	patients: {},
 	users: {},
 }))
@@ -173,6 +198,27 @@ function makeAppointment(overrides: Record<string, unknown> = {}) {
 		cancellationReason: null,
 		createdAt: new Date("2026-05-06T00:00:00.000Z"),
 		updatedAt: new Date("2026-05-06T00:00:00.000Z"),
+		...overrides,
+	}
+}
+
+function makeEncounter(overrides: Record<string, unknown> = {}) {
+	return {
+		id: "encounter-1",
+		facilityId: "fac-1",
+		patientId: "patient-1",
+		encounterType: "outpatient",
+		status: "active",
+		chiefComplaint: "Scheduled OPD appointment",
+		admittingStaffId: "staff-actor-1",
+		attendingStaffId: "clinician-1",
+		admissionDatetime: new Date("2026-05-07T08:00:00.000Z"),
+		appointmentId: "appointment-1",
+		queueNumber: 1,
+		clinicianStaffId: "clinician-1",
+		queueStatus: "waiting",
+		createdAt: new Date("2026-05-07T08:00:00.000Z"),
+		updatedAt: new Date("2026-05-07T08:00:00.000Z"),
 		...overrides,
 	}
 }
@@ -691,6 +737,67 @@ describe("SchedulingService", () => {
 			expect(rejected!.reason).toBeInstanceOf(ConflictException)
 			expect(slotState.status).toBe("booked")
 			expect(slotState.appointmentId).toBe("appointment-1")
+		})
+	})
+
+	describe("checkInAppointment()", () => {
+		it("creates a linked OPD encounter when a booked appointment is checked in", async () => {
+			const existing = makeAppointment({
+				status: "booked",
+				queueNumber: 3,
+				chiefComplaint: "Cough",
+			})
+			const updated = makeAppointment({
+				status: "checked_in",
+				queueNumber: 3,
+				checkedInAt: new Date("2026-05-07T08:00:00.000Z"),
+			})
+			const encounter = makeEncounter({
+				chiefComplaint: "Cough",
+				queueNumber: 3,
+			})
+			const insertEncounter = mockInsertReturning(encounter)
+			const insertStatusEvent = { values: jest.fn().mockResolvedValue(undefined) }
+			const updateAppointment = mockUpdateReturning(updated)
+
+			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([existing]))
+			;(db.transaction as jest.Mock).mockImplementation(
+				async (fn: (tx: unknown) => Promise<unknown>) => {
+					const tx = {
+						select: jest.fn().mockReturnValueOnce(mockSelectChain([])),
+						insert: jest
+							.fn()
+							.mockReturnValueOnce(insertEncounter)
+							.mockReturnValueOnce(insertStatusEvent),
+						update: jest.fn().mockReturnValue(updateAppointment),
+					}
+
+					return fn(tx)
+				}
+			)
+
+			const result = await service.checkInAppointment({ id: "appointment-1" })
+
+			expect(result.queueNumber).toBe(3)
+			expect(result.appointment.status).toBe("checked_in")
+			expect(insertEncounter.values).toHaveBeenCalledWith(
+				expect.objectContaining({
+					facilityId: "fac-1",
+					patientId: "patient-1",
+					encounterType: "outpatient",
+					appointmentId: "appointment-1",
+					clinicianStaffId: "clinician-1",
+					queueNumber: 3,
+					queueStatus: "waiting",
+				})
+			)
+			expect(insertStatusEvent.values).toHaveBeenCalledWith(
+				expect.objectContaining({
+					encounterId: "encounter-1",
+					toStatus: "waiting",
+					workflowType: "opd",
+				})
+			)
 		})
 	})
 

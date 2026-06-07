@@ -13,6 +13,7 @@ const DEFAULT_PASSWORD = process.env.E2E_SEED_PASSWORD ?? "Password123"
 const CLINICIAN_USER_ID = "e2e-license-validation-user"
 const CLINICIAN_EMAIL = "e2e-license-validation@qhealth.local"
 const CLINICIAN_NAME = "Dr. License Validation"
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@qhealth.local"
 
 const LICENSES = [
 	{ type: "PRC", option: "PRC", number: "PRC-E2E-900001", expiry: "2027-12-31" },
@@ -210,7 +211,7 @@ test.describe.serial("Admin clinician license validation", () => {
 	test.setTimeout(180_000)
 
 	test.beforeAll(async () => {
-		authCookiesByEmail.set("admin@qhealth.local", await signInForCookies("admin@qhealth.local"))
+		authCookiesByEmail.set(ADMIN_EMAIL, await signInForCookies(ADMIN_EMAIL))
 	})
 
 	test("admin adds and verifies PRC, PTR, and S2 licenses that feed Physician prescribing credentials", async ({
@@ -218,7 +219,7 @@ test.describe.serial("Admin clinician license validation", () => {
 	}) => {
 		const fixture = await seedLicenseFixture()
 
-		await signInAs(page, "admin@qhealth.local")
+		await signInAs(page, ADMIN_EMAIL)
 		await page.goto("/admin/clinician-licenses")
 
 		await expect(page.getByRole("heading", { name: /clinician licenses/i })).toBeVisible({

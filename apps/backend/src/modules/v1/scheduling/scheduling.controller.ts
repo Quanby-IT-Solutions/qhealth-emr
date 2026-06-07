@@ -5,7 +5,7 @@ import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
 import type { Request } from "express"
 
 import { v1 } from "@/config/api-versions.config"
-import { RequirePermission } from "@/modules/v1/rbac/rbac.guard"
+import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
 
 import { SchedulingService } from "./scheduling.service"
 
@@ -135,7 +135,10 @@ export class SchedulingController {
 		})
 	}
 
-	@RequirePermission("scheduling", "view")
+	@RequireAnyPermissions([
+		{ module: "scheduling", action: "view" },
+		{ module: "opd", action: "view" },
+	])
 	@Implement(v1.scheduling.getClinicQueue)
 	async getClinicQueue() {
 		return implement(v1.scheduling.getClinicQueue).handler(async ({ input }) => {
