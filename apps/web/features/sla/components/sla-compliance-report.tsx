@@ -528,7 +528,7 @@ function ArtaFlowTiles({ metrics }: { metrics: SlaComplianceMetric[] }) {
 export function SlaComplianceReport() {
 	const { data: profile } = useMyProfile()
 	const facilityId = profile?.staffProfiles[0]?.facilityId ?? ""
-	const facilityName = profile?.staffProfiles[0]?.facility?.name ?? "QHealth EMR"
+	const facilityName = profile?.staffProfiles[0]?.facility?.name ?? "Peregrine"
 
 	const [periodStart, setPeriodStart] = useState(thirtyDaysAgo())
 	const [periodEnd, setPeriodEnd] = useState(today())

@@ -56,7 +56,7 @@ async function handleNavigation(request, url) {
 		return (
 			(await cache.match(request)) ||
 			(await cache.match(OFFLINE_ENTRY)) ||
-			new Response("QHealth EMR offline cache is unavailable on this device.", {
+			new Response("Peregrine offline cache is unavailable on this device.", {
 				status: 503,
 				headers: { "Content-Type": "text/plain" },
 			})

@@ -100,7 +100,7 @@ export function createAuth(): ReturnType<typeof betterAuth> {
 			}),
 			twoFactor({
 				// TOTP issuer shown in authenticator apps
-				issuer: "QHealth EMR",
+				issuer: "Peregrine",
 				// Backup codes provide recovery when TOTP device is lost
 				backupCodes: {
 					enabled: true,

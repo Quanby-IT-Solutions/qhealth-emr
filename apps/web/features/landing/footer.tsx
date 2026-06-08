@@ -1,3 +1,4 @@
+import Image from "next/image"
 import Link from "next/link"
 
 export function Footer() {
@@ -9,19 +10,20 @@ export function Footer() {
 				<div className="mb-16 grid grid-cols-1 gap-12 md:grid-cols-4">
 					<div className="md:col-span-1">
 						<div className="mb-6 flex items-center gap-3">
-							<svg
-								width="24"
-								height="24"
-								viewBox="0 0 24 24"
-								fill="none"
-								className="text-primary stroke-current"
-							>
-								<rect x="2" y="2" width="20" height="20" rx="4" strokeWidth="1.5" />
-								<path d="M12 7V17M7 12H17" strokeWidth="1.5" strokeLinecap="round" />
-							</svg>
-							<span className="text-foreground font-serif text-xl font-bold tracking-tight">
-								QHealth
-							</span>
+							<Image
+								src="/peregrine.svg"
+								alt="Peregrine Eye and Laser Institute"
+								width={2048}
+								height={461}
+								className="h-16 w-auto max-w-[340px] object-contain dark:hidden"
+							/>
+							<Image
+								src="/peregrinedark.svg"
+								alt="Peregrine Eye and Laser Institute"
+								width={2048}
+								height={461}
+								className="hidden h-16 w-auto max-w-[340px] object-contain dark:block"
+							/>
 						</div>
 						<p className="text-muted-foreground max-w-xs text-sm leading-relaxed">
 							A statutorily-compliant clinical platform built specifically for Philippine hospitals.
@@ -119,17 +121,7 @@ export function Footer() {
 
 				<div className="border-border mb-4 flex flex-col items-center justify-between gap-4 border-t pt-8 md:flex-row">
 					<div className="text-muted-foreground flex items-center gap-4 text-sm font-medium">
-						<svg
-							width="20"
-							height="20"
-							viewBox="0 0 24 24"
-							fill="none"
-							className="text-primary stroke-current opacity-80"
-						>
-							<rect x="2" y="2" width="20" height="20" rx="4" strokeWidth="1.5" />
-							<path d="M12 7V17M7 12H17" strokeWidth="1.5" strokeLinecap="round" />
-						</svg>
-						<span>&copy; {currentYear} QHealth EMR</span>
+						<span>&copy; {currentYear} Peregrine</span>
 						<span className="text-border hidden md:inline">|</span>
 						<span>Philippines</span>
 					</div>

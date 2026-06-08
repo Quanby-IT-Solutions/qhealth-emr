@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useForm } from "@tanstack/react-form"
 import { AnimatePresence, motion, type Variants } from "framer-motion"
 
-import { Button, buttonVariants } from "@/core/components/ui/button"
+import { buttonVariants } from "@/core/components/ui/button"
 import { Card, CardContent } from "@/core/components/ui/card"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/core/components/ui/field"
 import { Input } from "@/core/components/ui/input"
@@ -125,7 +125,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 		onSubmit: async ({ value }) => {
 			try {
 				await login(value)
-			} catch (e) {
+			} catch {
 				setShake(true)
 				setTimeout(() => setShake(false), 400)
 			}
@@ -174,7 +174,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 										Welcome back
 									</h1>
 									<p className="text-muted-foreground font-sans text-balance">
-										Sign in to access your Philippine EMR workspace
+										Sign in to access your Peregrine workspace
 									</p>
 								</motion.div>
 
@@ -472,7 +472,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 							{/* Identity Line */}
 							<div className="relative z-10 mt-4 w-full text-center">
 								<span className="text-muted-foreground font-mono text-xs font-medium tracking-widest uppercase">
-									Quanby EMR Platform
+									Peregrine
 								</span>
 							</div>
 

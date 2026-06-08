@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { motion } from "framer-motion"
 
 export function ClosingSection() {
@@ -42,10 +41,10 @@ export function ClosingSection() {
 					transition={{ delay: 0.1 }}
 					className="text-muted-foreground mb-12 font-sans text-lg leading-relaxed md:text-xl"
 				>
-					Not a generic EMR with localization patches. A clinical system designed from the first
-					line of code around DOH licensing, PhilHealth eClaims, FDA prescriptions, PDEA dangerous
-					drugs, ARTA Citizen&apos;s Charter, and the seven patient flows that define every
-					Philippine hospital day.
+					Not a generic clinical records platform with localization patches. A system designed from
+					the first line of code around DOH licensing, PhilHealth eClaims, FDA prescriptions, PDEA
+					dangerous drugs, ARTA Citizen&apos;s Charter, and the seven patient flows that define
+					every Philippine hospital day.
 				</motion.p>
 
 				<motion.div
