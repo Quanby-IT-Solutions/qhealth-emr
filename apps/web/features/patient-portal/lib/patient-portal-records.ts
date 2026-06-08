@@ -426,7 +426,7 @@ export async function getPatientPortalRecord(
 			isActive: patient.is_active,
 			createdAt: patient.created_at,
 			updatedAt: patient.updated_at,
-			facilityName: patient.facility_name ?? "QHealth Medical Center",
+			facilityName: patient.facility_name ?? "Peregrine Eye and Laser Institute",
 		},
 		snapshot: {
 			generatedAt: formatDateTime(new Date().toISOString()),
@@ -1095,7 +1095,10 @@ function buildPatientDetails(patient: PatientRow): PortalDetailItem[] {
 			label: "Next-of-kin relationship",
 			value: formatValue(patient.next_of_kin_relationship),
 		},
-		{ label: "Registered facility", value: patient.facility_name ?? "QHealth Medical Center" },
+		{
+			label: "Registered facility",
+			value: patient.facility_name ?? "Peregrine Eye and Laser Institute",
+		},
 		{ label: "Patient record status", value: patient.is_active ? "Active" : "Inactive" },
 		{ label: "Patient record created", value: formatDateTime(patient.created_at) },
 		{ label: "Last profile update", value: formatDateTime(patient.updated_at) },
@@ -1180,7 +1183,7 @@ function formatResults(results: unknown) {
 
 function buildDocumentBody(record: PatientPortalRecord) {
 	return [
-		"QHealth Patient Portal - Daily Released Medical Summary",
+		"Peregrine Patient Portal - Daily Released Medical Summary",
 		"",
 		`Patient: ${record.patient.name}`,
 		`MRN: ${record.patient.mrn}`,
@@ -1211,7 +1214,7 @@ function buildSectionDocument(
 	items: PortalSummaryItem[]
 ) {
 	return [
-		`QHealth Patient Portal - ${title}`,
+		`Peregrine Patient Portal - ${title}`,
 		"",
 		`Patient: ${record.patient.name}`,
 		`MRN: ${record.patient.mrn}`,
@@ -1227,7 +1230,7 @@ function buildDetailSectionDocument(
 	items: PortalDetailItem[]
 ) {
 	return [
-		`QHealth Patient Portal - ${title}`,
+		`Peregrine Patient Portal - ${title}`,
 		"",
 		`Patient: ${record.patient.name}`,
 		`MRN: ${record.patient.mrn}`,

@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "framer-motion"
 import { useTheme } from "next-themes"
@@ -36,33 +37,14 @@ export function Navbar() {
 			transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
 		>
 			<div className="container mx-auto flex w-full max-w-7xl items-center justify-between px-6">
-				{/* Logo */}
 				<Link href="/" className="group flex items-center gap-3">
-					<svg
-						width="24"
-						height="24"
-						viewBox="0 0 24 24"
-						fill="none"
-						xmlns="http://www.w3.org/2000/svg"
-						className="text-primary"
-					>
-						<rect
-							x="2"
-							y="2"
-							width="20"
-							height="20"
-							rx="4"
-							stroke="currentColor"
-							strokeWidth="1.5"
-						/>
-						<path
-							d="M12 7V17M7 12H17"
-							stroke="currentColor"
-							strokeWidth="1.5"
-							strokeLinecap="round"
-						/>
-					</svg>
-					<span className="font-serif text-xl font-bold tracking-tight">QHealth</span>
+					<Image
+						src={mounted && isDark ? "/peregrinedark.svg" : "/peregrine.svg"}
+						alt="Peregrine Eye and Laser Institute"
+						width={2048}
+						height={461}
+						className="h-14 w-auto max-w-[320px] object-contain"
+					/>
 				</Link>
 
 				{/* Desktop Nav */}

@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useSyncExternalStore } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
@@ -1139,27 +1140,41 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 	const SidebarContent = (
 		<div className="bg-sidebar border-sidebar-border relative z-40 flex h-full flex-col border-r">
 			{/* Institutional Identity Block */}
-			<div className="flex h-16 shrink-0 items-center overflow-hidden px-4">
-				<div className="flex w-full items-center gap-3">
-					<div className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-md font-serif text-lg font-bold shadow-sm">
-						Q
-					</div>
+			<div
+				className={cn(
+					"flex h-16 shrink-0 items-center overflow-hidden",
+					isCollapsed ? "px-3" : "px-4"
+				)}
+			>
+				<div
+					className={cn(
+						"flex w-full items-center",
+						isCollapsed ? "justify-center" : "justify-start"
+					)}
+				>
 					<AnimatePresence mode="wait">
-						{!isCollapsed && (
-							<motion.div
-								initial={{ opacity: 0 }}
-								animate={{ opacity: 1 }}
-								exit={{ opacity: 0 }}
-								className="flex flex-col whitespace-nowrap"
-							>
-								<span className="text-sidebar-foreground font-serif text-[15px] leading-tight font-medium tracking-tight">
-									Quanby EMR Platform
-								</span>
-								<span className="text-sidebar-foreground/70 font-sans text-[11px]">
-									St. Luke&apos;s Medical Center
-								</span>
-							</motion.div>
-						)}
+						<motion.div
+							key={isCollapsed ? "collapsed-logo" : "expanded-logo"}
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							exit={{ opacity: 0 }}
+							className={cn(
+								"flex items-center overflow-hidden",
+								isCollapsed ? "h-10 w-10 justify-center" : "h-14 w-full"
+							)}
+						>
+							<Image
+								src={isCollapsed ? "/logo.svg" : isDark ? "/peregrinedark.svg" : "/peregrine.svg"}
+								alt="Peregrine Eye and Laser Institute"
+								width={2048}
+								height={461}
+								priority
+								className={cn(
+									"object-contain",
+									isCollapsed ? "h-10 w-10 object-contain" : "h-full w-auto max-w-[224px]"
+								)}
+							/>
+						</motion.div>
 					</AnimatePresence>
 				</div>
 			</div>

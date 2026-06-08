@@ -162,7 +162,7 @@ export function InteropSection() {
 								</text>
 							</motion.g>
 
-							{/* Central EMR Node */}
+							{/* Central clinical node */}
 							<motion.g
 								initial={{ opacity: 0, scale: 0.8 }}
 								animate={isInView ? { opacity: 1, scale: 1 } : {}}
@@ -183,7 +183,7 @@ export function InteropSection() {
 									fill="var(--primary-foreground)"
 									className="font-serif text-xl font-bold"
 								>
-									QHealth
+									Peregrine
 								</text>
 								<text
 									x="400"
@@ -192,7 +192,7 @@ export function InteropSection() {
 									fill="var(--primary-foreground)"
 									className="font-sans text-[10px] tracking-widest uppercase opacity-80"
 								>
-									EMR Core
+									Clinical Core
 								</text>
 							</motion.g>
 

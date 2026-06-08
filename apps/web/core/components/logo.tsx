@@ -2,31 +2,45 @@
 
 import * as React from "react"
 import type { Route } from "next"
+import Image from "next/image"
 import Link from "next/link"
-import { GitbookFreeIcons } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import { useTheme } from "next-themes"
 
-import { Button, buttonVariants, type ButtonVariants } from "@/core/components/ui/button"
+import { buttonVariants, type ButtonVariants } from "@/core/components/ui/button"
 import { cn } from "@/core/lib/utils"
 
 export interface LogoIconProps extends Omit<
-	React.ComponentPropsWithoutRef<typeof HugeiconsIcon>,
-	"icon"
+	React.ComponentPropsWithoutRef<typeof Image>,
+	"src" | "width" | "height" | "alt"
 > {
-	icon?: typeof GitbookFreeIcons
+	alt?: string
+	icon?: unknown
 	strokeWidth?: number
-	ref?: React.Ref<SVGSVGElement>
+	ref?: React.Ref<HTMLImageElement>
 }
 
 export const LogoIcon = React.memo(
-	({ icon, strokeWidth = 2, className, ref, ...props }: LogoIconProps) => {
-		const iconToUse = icon || GitbookFreeIcons
+	({
+		className,
+		ref,
+		alt = "Peregrine Eye and Laser Institute",
+		icon: _icon,
+		strokeWidth: _strokeWidth,
+		...props
+	}: LogoIconProps) => {
+		const { resolvedTheme } = useTheme()
+		const [mounted, setMounted] = React.useState(false)
+
+		React.useEffect(() => setMounted(true), [])
+
 		return (
-			<HugeiconsIcon
+			<Image
 				ref={ref}
-				icon={iconToUse}
-				strokeWidth={strokeWidth}
-				className={cn("text-primary", className)}
+				src={mounted && resolvedTheme === "dark" ? "/peregrinedark.svg" : "/peregrine.svg"}
+				alt={alt}
+				width={2048}
+				height={461}
+				className={cn("h-6 w-auto max-w-[11rem] object-contain", className)}
 				{...props}
 			/>
 		)
@@ -38,7 +52,8 @@ export interface LogoProps {
 	text?: string
 	href?: Route<string>
 	showIcon?: boolean
-	icon?: typeof GitbookFreeIcons
+	showText?: boolean
+	icon?: unknown
 	strokeWidth?: number
 	size?: ButtonVariants["size"]
 	variant?: ButtonVariants["variant"]
@@ -46,11 +61,12 @@ export interface LogoProps {
 }
 
 export function Logo({
-	text = "Turbo Template",
+	text = "Peregrine",
 	href,
 	size = "lg",
 	variant = "link",
 	showIcon = true,
+	showText = true,
 	icon,
 	strokeWidth,
 	className,
@@ -58,7 +74,7 @@ export function Logo({
 	const content = (
 		<>
 			{showIcon && <LogoIcon icon={icon} strokeWidth={strokeWidth} data-icon="inline-start" />}
-			{text}
+			{showText && text}
 		</>
 	)
 

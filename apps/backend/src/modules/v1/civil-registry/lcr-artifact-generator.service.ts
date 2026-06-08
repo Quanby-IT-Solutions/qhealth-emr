@@ -272,7 +272,7 @@ export class LcrArtifactGeneratorService {
 		y -= 38
 		page.drawText(input.title, { x: 72, y, size: 18, font: bold, color: rgb(0.05, 0.05, 0.05) })
 
-		page.drawText("QHEALTH EMR GENERATED LCR COPY", {
+		page.drawText("PEREGRINE GENERATED LCR COPY", {
 			x: 120,
 			y: 380,
 			size: 28,

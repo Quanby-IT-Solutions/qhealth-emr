@@ -30,8 +30,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-	title: "QHealth EMR",
-	description: "QHealth Electronic Medical Records System",
+	title: "Peregrine",
+	description: "Peregrine Eye and Laser Institute clinical records system",
 }
 
 export default function RootLayout({
