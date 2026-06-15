@@ -70,11 +70,7 @@ type AuditRoleContext = {
 @Injectable()
 export class TelemedicineService {
 	private readonly logger = new Logger(TelemedicineService.name)
-	private static readonly PHYSICIAN_ROLE_NAMES = new Set([
-		"Physician",
-		"Surgeon",
-		"Anesthesiologist",
-	])
+	private static readonly PHYSICIAN_ROLE_NAMES = new Set(["Physician"])
 
 	constructor(
 		private readonly notificationService: NotificationService,
@@ -259,9 +255,7 @@ export class TelemedicineService {
 		const clinicianRoles = await this.getUserRoles(clinicianProfile.userId)
 
 		if (!this.hasPhysicianRole(clinicianRoles)) {
-			throw new BadRequestException(
-				"The assigned clinician must have a Physician, Surgeon, or Anesthesiologist role."
-			)
+			throw new BadRequestException("The assigned clinician must have a Physician role.")
 		}
 	}
 

@@ -74,7 +74,6 @@ export default function EncounterChartLayout({
 	const permSet = usePermissionSet()
 	const { data: profile } = useMyProfile()
 	const activeRoleName = (profile?.activeRole?.name ?? "").toLowerCase()
-	const isAnesthesiologist = activeRoleName === "anesthesiologist"
 	const canViewClinicalSummary = can(permSet, "clinical_docs", "view")
 	const canViewVitals = can(permSet, "nursing", "view") || can(permSet, "surgical", "view")
 	const { isOnline } = useOfflineSync()
@@ -179,8 +178,8 @@ export default function EncounterChartLayout({
 		{
 			label: "e-Prescription",
 			href: `${base}/e-prescription`,
-			// Surgeons may author post-op prescriptions; anesthesiologists stay in surgical workflows.
-			show: can(permSet, "orders", "sign") && !isAnesthesiologist,
+			// TOR: Clinicians, Surgeons, and Anesthesiologists can generate legally compliant e-Rx.
+			show: can(permSet, "orders", "sign"),
 		},
 		{
 			label: "Surgical",

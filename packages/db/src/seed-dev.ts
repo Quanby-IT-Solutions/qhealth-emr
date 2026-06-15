@@ -418,6 +418,13 @@ const demoUsers: DemoUser[] = [
 		employeeNumber: "DEMO-SCH-001",
 	},
 	{
+		email: "demo.registrar@qhealth.local",
+		name: "Demo Registrar",
+		roleName: "Registrar",
+		department: "Admissions",
+		employeeNumber: "DEMO-REG-001",
+	},
+	{
 		email: "demo.doctor@qhealth.local",
 		name: "Dr. Demo Physician",
 		roleName: "Physician",
@@ -426,6 +433,13 @@ const demoUsers: DemoUser[] = [
 		prcLicenseNumber: "DEMO-PRC-100001",
 		ptrNumber: "DEMO-PTR-100001",
 		pdeaS2License: "DEMO-S2-100001",
+	},
+	{
+		email: "demo.billing@qhealth.local",
+		name: "Demo Billing Officer",
+		roleName: "Billing Officer",
+		department: "Billing",
+		employeeNumber: "DEMO-BIL-001",
 	},
 	{
 		email: "admin@qhealth.local",
@@ -677,6 +691,8 @@ const demoFacilities: DemoFacility[] = [
 const staffFacilityAssignments: Record<string, string[]> = {
 	"demo.admin@qhealth.local": demoFacilities.map(facility => facility.key),
 	"demo.scheduler@qhealth.local": demoFacilities.map(facility => facility.key),
+	"demo.registrar@qhealth.local": demoFacilities.map(facility => facility.key),
+	"demo.billing@qhealth.local": demoFacilities.map(facility => facility.key),
 	"admin@qhealth.local": demoFacilities.map(facility => facility.key),
 	"scheduler@qhealth.local": demoFacilities.map(facility => facility.key),
 	"familymed@qhealth.local": ["main", "north-clinic"],
@@ -777,7 +793,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["adt", ["view"]],
 		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
-		["orders", ["view", "create", "sign"]],
+		["orders", ["view", "create", "edit", "sign"]],
 		["surgical", ["view", "create", "edit", "sign"]], // Surgical tab visibility + create/save/sign operation records for OR workflows
 		["formulary", ["view"]],
 		["opd", ["view"]], // OPD dashboard access (per TOR)
@@ -789,7 +805,7 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["adt", ["view"]],
 		["patients", ["view"]], // Patient record access (search, profile)
 		["clinical_docs", ["view", "create", "edit", "sign"]],
-		["orders", ["view", "create", "sign"]], // TOR: anesthesiologists place/sign orders and compliant e-prescriptions
+		["orders", ["view", "create", "edit", "sign"]], // TOR: anesthesiologists place/sign orders and compliant e-prescriptions
 		["surgical", ["view", "edit", "sign"]], // Surgical tab visibility + save/sign anesthesia records
 		["formulary", ["view"]],
 		["audit", ["create"]], // Break-glass emergency access invocation

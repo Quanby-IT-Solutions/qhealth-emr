@@ -77,6 +77,7 @@ const surgeonPermissions = [
 	{ module: "clinical_docs", action: "sign" },
 	{ module: "orders", action: "view" },
 	{ module: "orders", action: "create" },
+	{ module: "orders", action: "edit" },
 	{ module: "orders", action: "sign" },
 	{ module: "surgical", action: "view" },
 	{ module: "surgical", action: "create" },
@@ -87,6 +88,24 @@ const surgeonPermissions = [
 	{ module: "death_reporting", action: "view" },
 	{ module: "death_reporting", action: "create" },
 	{ module: "death_reporting", action: "edit" },
+	{ module: "audit", action: "create" },
+]
+
+const anesthesiologistPermissions = [
+	{ module: "adt", action: "view" },
+	{ module: "patients", action: "view" },
+	{ module: "clinical_docs", action: "view" },
+	{ module: "clinical_docs", action: "create" },
+	{ module: "clinical_docs", action: "edit" },
+	{ module: "clinical_docs", action: "sign" },
+	{ module: "orders", action: "view" },
+	{ module: "orders", action: "create" },
+	{ module: "orders", action: "edit" },
+	{ module: "orders", action: "sign" },
+	{ module: "surgical", action: "view" },
+	{ module: "surgical", action: "edit" },
+	{ module: "surgical", action: "sign" },
+	{ module: "formulary", action: "view" },
 	{ module: "audit", action: "create" },
 ]
 
@@ -197,6 +216,18 @@ describe("filterNavItems", () => {
 			"Surgical Services",
 			"OPD",
 		])
+		expect(secondaryTitles).toEqual([])
+	})
+
+	it("keeps the Anesthesiologist sidebar scoped to OR workflows", () => {
+		const primaryTitles = filterNavItems(PRIMARY_NAV_ITEMS, anesthesiologistPermissions).map(
+			item => item.title
+		)
+		const secondaryTitles = filterNavItems(SECONDARY_NAV_ITEMS, anesthesiologistPermissions).map(
+			item => item.title
+		)
+
+		expect(primaryTitles).toEqual(["Dashboard", "Patients", "OR Schedule", "Surgical Services"])
 		expect(secondaryTitles).toEqual([])
 	})
 

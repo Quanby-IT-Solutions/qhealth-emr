@@ -76,6 +76,7 @@ const SCHEDULER_STAFF_ID = "550e8400-e29b-41d4-a716-446655440003"
 const PHYSICIAN_STAFF_ID = "550e8400-e29b-41d4-a716-446655440004"
 const NURSE_STAFF_ID = "550e8400-e29b-41d4-a716-446655440005"
 const APPOINTMENT_ID = "550e8400-e29b-41d4-a716-446655440006"
+const SURGEON_STAFF_ID = "550e8400-e29b-41d4-a716-446655440007"
 
 type CreateAppointmentInput = Parameters<TelemedicineService["createAppointment"]>[0]
 
@@ -285,9 +286,21 @@ describe("TelemedicineService - Scheduler Validation", () => {
 
 		await expect(
 			service.createAppointment(createInput({ clinicianId: NURSE_STAFF_ID }), SCHEDULER_STAFF_ID)
-		).rejects.toThrow(
-			"The assigned clinician must have a Physician, Surgeon, or Anesthesiologist role."
+		).rejects.toThrow("The assigned clinician must have a Physician role.")
+		expect(db.insert).not.toHaveBeenCalled()
+	})
+
+	it("rejects when a scheduler assigns a surgeon to a physician-only telemedicine appointment", async () => {
+		queueSelectRows(
+			[staffProfile(SCHEDULER_STAFF_ID, "scheduler-user")],
+			[role("role-scheduler", "Scheduler")],
+			[staffProfile(SURGEON_STAFF_ID, "surgeon-user")],
+			[role("role-surgeon", "Surgeon")]
 		)
+
+		await expect(
+			service.createAppointment(createInput({ clinicianId: SURGEON_STAFF_ID }), SCHEDULER_STAFF_ID)
+		).rejects.toThrow("The assigned clinician must have a Physician role.")
 		expect(db.insert).not.toHaveBeenCalled()
 	})
 
