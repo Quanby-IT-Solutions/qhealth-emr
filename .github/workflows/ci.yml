@@ -127,10 +127,11 @@ jobs:
     # The gate's own default is 22.20.0, which is below engines.node.
     with:
       node-version: 22.22.1
-      # Always false for this repo: the gate's e2e job runs `pnpm test:e2e:web`
-      # with no web server, and packages/e2e-web here has no Playwright
-      # webServer block, so every test dies on ERR_CONNECTION_REFUSED. The
-      # web-e2e-auth job below runs Playwright with real servers instead.
+      # The gate's e2e job still runs whenever web files change (its own `if`
+      # ORs this input with the web filter) and now passes: packages/e2e-web's
+      # Playwright webServer builds and serves the app itself (start-web.sh).
+      # Kept false so non-web changes don't run it redundantly — the
+      # web-e2e-auth job below covers those with real servers and a database.
       run-e2e: false
     # `secrets: inherit` handed every repository secret — AWS keys, the auth
     # signing secret, the database URL — to an external workflow that declares

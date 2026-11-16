@@ -22,6 +22,20 @@ export default defineConfig({
 		screenshot: "only-on-failure",
 		video: "off",
 	},
+	// Builds and serves the web app when :3001 is not already listening. The
+	// shared quality-gate CI job runs `pnpm test:e2e:web` with no servers of
+	// its own; this is what keeps that job green. reuseExistingServer stays
+	// true unconditionally so a locally running dev server, or the CI job that
+	// pre-starts web and backend, is used as-is instead of fighting for the
+	// port.
+	webServer: {
+		command: "bash ./start-web.sh",
+		url: "http://localhost:3001",
+		reuseExistingServer: true,
+		timeout: 300_000,
+		stdout: "pipe",
+		stderr: "pipe",
+	},
 	projects: [
 		// ── Auth setup (runs once before authenticated tests) ──────────────────
 		...(hasBackend
