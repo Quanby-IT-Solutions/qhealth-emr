@@ -31,7 +31,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleSignIn() async {
     if (!_formKey.currentState!.validate()) return;
 
-    await ref.read(authStateProvider.notifier).signIn(
+    await ref
+        .read(authStateProvider.notifier)
+        .signIn(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
@@ -50,7 +52,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if (data is Map<String, dynamic> && data.containsKey('message')) {
           message = data['message'].toString();
         } else {
-          message = error.response?.statusMessage ?? error.message ?? 'Unknown network error';
+          message =
+              error.response?.statusMessage ??
+              error.message ??
+              'Unknown network error';
         }
       } else {
         message = error.toString();

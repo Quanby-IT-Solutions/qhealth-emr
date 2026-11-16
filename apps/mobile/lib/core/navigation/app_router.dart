@@ -60,8 +60,7 @@ GoRouter appRouter(Ref ref) {
     redirect: (context, state) {
       final isOnboardingDone = ref.read(hasCompletedOnboardingProvider);
       final authState = ref.read(authStateProvider);
-      final isAuthenticated =
-          !authState.isLoading && authState.value != null;
+      final isAuthenticated = !authState.isLoading && authState.value != null;
       final isOnOnboarding = state.matchedLocation == AppRoutes.onboarding;
       final isOnLogin = state.matchedLocation == AppRoutes.login;
       final isOnRegister = state.matchedLocation == AppRoutes.register;
@@ -107,11 +106,8 @@ GoRouter appRouter(Ref ref) {
         builder: (context, state) => const HomeScreen(),
       ),
     ],
-    errorBuilder: (context, state) => Scaffold(
-      body: Center(
-        child: Text('Page not found: ${state.uri}'),
-      ),
-    ),
+    errorBuilder: (context, state) =>
+        Scaffold(body: Center(child: Text('Page not found: ${state.uri}'))),
   );
 
   ref.onDispose(() {
