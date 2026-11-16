@@ -189,13 +189,7 @@ export interface NoteContext {
 		testName: string
 		panelName: string | null
 		status:
-			| "pending"
-			| "ordered"
-			| "collected"
-			| "in_progress"
-			| "resulted"
-			| "completed"
-			| "cancelled"
+			"pending" | "ordered" | "collected" | "in_progress" | "resulted" | "completed" | "cancelled"
 		resultedDatetime: string | null
 		results: unknown
 	}>

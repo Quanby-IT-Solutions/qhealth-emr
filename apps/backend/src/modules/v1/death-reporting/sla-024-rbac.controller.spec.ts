@@ -96,8 +96,7 @@ function getPermission(methodName: string) {
 		methodName
 	] as Function
 	return Reflect.getMetadata(RBAC_PERMISSION_KEY, method) as
-		| { module: string; action: string }
-		| undefined
+		{ module: string; action: string } | undefined
 }
 
 // ============================================================================

@@ -16,7 +16,7 @@
 		"test:watch": "jest --watch",
 		"test:cov": "jest --coverage",
 		"test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-		"test:e2e": "jest --config ./test/jest-e2e.json",
+		"test:e2e": "cross-env NODE_OPTIONS=\"--experimental-vm-modules --disable-warning=ExperimentalWarning\" jest --config ./test/jest-e2e.json --runInBand",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
@@ -98,6 +98,7 @@
 		"@types/qrcode": "^1.5.6",
 		"@types/supertest": "^6.0.3",
 		"@types/xml2js": "^0.4.14",
+		"cross-env": "^10.1.0",
 		"eslint": "catalog:",
 		"jest": "^30.5.2",
 		"pino-pretty": "^13.1.3",

@@ -62,9 +62,7 @@ interface ScanInput {
 }
 
 type NormalizedDeficiencyType =
-	| "missing_discharge_summary"
-	| "missing_signature"
-	| "undocumented_procedure"
+	"missing_discharge_summary" | "missing_signature" | "undocumented_procedure"
 type DeficiencySourceKind = "encounter" | "clinical_note" | "operation_record"
 
 interface DeficiencyDetectionResult {

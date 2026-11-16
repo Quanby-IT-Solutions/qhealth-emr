@@ -275,8 +275,7 @@ export class NbsService {
 							{
 								condition: "CH",
 								result: (input.result_ch === "positive" ? "abnormal" : "normal") as
-									| "normal"
-									| "abnormal",
+									"normal" | "abnormal",
 							},
 						]
 					: []),
@@ -285,8 +284,7 @@ export class NbsService {
 							{
 								condition: "CAH",
 								result: (input.result_cah === "positive" ? "abnormal" : "normal") as
-									| "normal"
-									| "abnormal",
+									"normal" | "abnormal",
 							},
 						]
 					: []),
@@ -295,8 +293,7 @@ export class NbsService {
 							{
 								condition: "G6PD",
 								result: (input.result_g6pd === "positive" ? "abnormal" : "normal") as
-									| "normal"
-									| "abnormal",
+									"normal" | "abnormal",
 							},
 						]
 					: []),
@@ -305,8 +302,7 @@ export class NbsService {
 							{
 								condition: "GAL",
 								result: (input.result_gal === "positive" ? "abnormal" : "normal") as
-									| "normal"
-									| "abnormal",
+									"normal" | "abnormal",
 							},
 						]
 					: []),
@@ -315,8 +311,7 @@ export class NbsService {
 							{
 								condition: "PKU",
 								result: (input.result_pku === "positive" ? "abnormal" : "normal") as
-									| "normal"
-									| "abnormal",
+									"normal" | "abnormal",
 							},
 						]
 					: []),
@@ -325,8 +320,7 @@ export class NbsService {
 							{
 								condition: "MSUD",
 								result: (input.result_msud === "positive" ? "abnormal" : "normal") as
-									| "normal"
-									| "abnormal",
+									"normal" | "abnormal",
 							},
 						]
 					: []),

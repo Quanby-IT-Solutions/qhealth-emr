@@ -60,13 +60,7 @@ export interface LabResultData {
 }
 
 export type LabOrderStatus =
-	| "ordered"
-	| "pending"
-	| "collected"
-	| "in_progress"
-	| "resulted"
-	| "completed"
-	| "cancelled"
+	"ordered" | "pending" | "collected" | "in_progress" | "resulted" | "completed" | "cancelled"
 
 export interface LabOrder {
 	id: string

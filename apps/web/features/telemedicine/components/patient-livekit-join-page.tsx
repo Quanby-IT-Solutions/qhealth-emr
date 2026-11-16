@@ -86,9 +86,7 @@ function getTodayInputDate(): string {
 }
 
 type JoinWindowState =
-	| { kind: "open" }
-	| { kind: "pending"; opensAt: string }
-	| { kind: "closed"; message: string }
+	{ kind: "open" } | { kind: "pending"; opensAt: string } | { kind: "closed"; message: string }
 
 function getJoinWindowState(preview: PatientInvitePreview): JoinWindowState {
 	if (!preview.isValid) {

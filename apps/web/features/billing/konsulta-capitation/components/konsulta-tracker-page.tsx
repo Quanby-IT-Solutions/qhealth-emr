@@ -47,10 +47,7 @@ export function KonsultaTrackerPage({ facilityId }: KonsultaTrackerPageProps) {
 
 	const page = Number(searchParams.get("page") ?? "1")
 	const filterStatus = (searchParams.get("status") ?? "all") as
-		| "all"
-		| "active"
-		| "exhausted"
-		| "inactive"
+		"all" | "active" | "exhausted" | "inactive"
 	const filterFrom = searchParams.get("from") ?? ""
 	const filterTo = searchParams.get("to") ?? ""
 

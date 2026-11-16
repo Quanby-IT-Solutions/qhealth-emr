@@ -2220,13 +2220,7 @@ export class SlaService implements OnModuleInit {
 	private async getStepComplianceForEncounterWorkflow(
 		facilityId: string,
 		eventWorkflowType:
-			| "opd"
-			| "ed"
-			| "admission"
-			| "discharge"
-			| "ancillary"
-			| "pharmacy"
-			| "billing",
+			"opd" | "ed" | "admission" | "discharge" | "ancillary" | "pharmacy" | "billing",
 		periodStart: Date,
 		periodEnd: Date,
 		warningThresholdPct: number

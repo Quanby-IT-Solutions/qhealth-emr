@@ -15,7 +15,10 @@ import { config as loadEnv } from "dotenv"
  * Postgres the app uses. The defaults below only fill what is still missing,
  * so a real value always wins.
  */
-loadEnv({ path: resolve(__dirname, ".env"), quiet: true })
+// `process.cwd()` rather than `__dirname`: this file is loaded both by the
+// CJS unit config and the ESM e2e config, and `__dirname` does not exist in
+// ESM. Jest runs with the package directory as cwd under both configs.
+loadEnv({ path: resolve(process.cwd(), ".env"), quiet: true })
 
 const fallbacks: Record<string, string> = {
 	NODE_ENV: "test",
@@ -32,6 +35,6 @@ for (const [key, value] of Object.entries(fallbacks)) {
 }
 
 // Guard against a stale build being picked up instead of source.
-if (!existsSync(resolve(__dirname, "src"))) {
+if (!existsSync(resolve(process.cwd(), "src"))) {
 	throw new Error("backend jest setup: expected to run against src/")
 }

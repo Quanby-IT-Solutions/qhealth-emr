@@ -2,12 +2,7 @@
 // Use these instead of raw colors to ensure consistent visual language.
 
 export type StatusVariant =
-	| "verified"
-	| "pending"
-	| "active"
-	| "inactive"
-	| "expired"
-	| "restricted"
+	"verified" | "pending" | "active" | "inactive" | "expired" | "restricted"
 
 export const STATUS_CLASSES: Record<StatusVariant, string> = {
 	verified: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",

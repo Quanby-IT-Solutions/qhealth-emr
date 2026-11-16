@@ -64,10 +64,7 @@ interface RequiredPermission {
 }
 
 export type AdminNavGroup =
-	| "Identity & Access"
-	| "Clinical Configuration"
-	| "Reporting & Compliance"
-	| "System Settings"
+	"Identity & Access" | "Clinical Configuration" | "Reporting & Compliance" | "System Settings"
 
 interface NavItemConfig {
 	title: string

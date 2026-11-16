@@ -175,10 +175,7 @@ export class AssessmentsService {
 			evaluatedByStaffId: row.evaluatedByStaffId,
 			evaluatedByStaffName: null,
 			status: (row.status === "approved" ? "completed" : row.status) as
-				| "pending"
-				| "in_progress"
-				| "completed"
-				| "cancelled",
+				"pending" | "in_progress" | "completed" | "cancelled",
 			completedAt: row.approvedAt ?? null,
 			createdAt: row.createdAt,
 			updatedAt: row.updatedAt,

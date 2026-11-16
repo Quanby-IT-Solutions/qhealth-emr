@@ -9,12 +9,7 @@ export function useListLcrTrackingQuery(
 		facilityId: string
 		certificateType?: "birth" | "death"
 		submissionStatus?:
-			| "not_submitted"
-			| "ready"
-			| "submitted"
-			| "acknowledged"
-			| "rejected"
-			| "error"
+			"not_submitted" | "ready" | "submitted" | "acknowledged" | "rejected" | "error"
 		page?: number
 		limit?: number
 	},

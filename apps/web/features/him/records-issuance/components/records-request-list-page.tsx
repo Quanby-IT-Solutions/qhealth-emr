@@ -41,11 +41,7 @@ export function RecordsRequestListPage({ facilityId }: RecordsRequestListPagePro
 	const pathname = usePathname()
 	const searchParams = useSearchParams()
 	const filterStatus = (searchParams.get("status") ?? "all") as
-		| "all"
-		| "pending"
-		| "processing"
-		| "completed"
-		| "rejected"
+		"all" | "pending" | "processing" | "completed" | "rejected"
 
 	const { data, isLoading, isError, refetch, error } = useMedicalRecordsRequestsQuery({
 		facilityId,

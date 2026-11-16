@@ -137,31 +137,16 @@ export function DeficiencyWorklistPage({ facilityId }: DeficiencyWorklistPagePro
 	void _busy
 
 	const filterType = (searchParams.get("type") ?? "all") as
-		| "all"
-		| "missing_discharge_summary"
-		| "missing_signature"
-		| "undocumented_procedure"
+		"all" | "missing_discharge_summary" | "missing_signature" | "undocumented_procedure"
 	const filterStatus = (searchParams.get("status") ?? "open") as
-		| "all"
-		| "open"
-		| "notified"
-		| "resolved"
-		| "dismissed"
+		"all" | "open" | "notified" | "resolved" | "dismissed"
 	const filterAge = (searchParams.get("age") ?? "all") as
-		| "all"
-		| "lt_7"
-		| "d7_14"
-		| "d14_30"
-		| "gt_30"
+		"all" | "lt_7" | "d7_14" | "d14_30" | "gt_30"
 	const filterOwner = searchParams.get("owner") ?? ""
 	const page = Number(searchParams.get("page") ?? "1")
 	const limit = Number(searchParams.get("limit") ?? "25")
 	const sortBy = (searchParams.get("sortBy") ?? "dischargeDatetime") as
-		| "dischargeDatetime"
-		| "ageDays"
-		| "status"
-		| "deficiencyType"
-		| "patientName"
+		"dischargeDatetime" | "ageDays" | "status" | "deficiencyType" | "patientName"
 	const sortDirection = (searchParams.get("sortDirection") ?? "desc") as "asc" | "desc"
 
 	const { data, isLoading, isError, refetch, error } = useDeficienciesQuery({

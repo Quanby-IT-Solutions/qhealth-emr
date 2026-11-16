@@ -23,13 +23,7 @@ export type SyncState = "online" | "offline" | "syncing" | "conflict"
 interface QueuedItem {
 	id: string
 	type:
-		| "clinical_note"
-		| "vital_sign"
-		| "mar_entry"
-		| "tar_entry"
-		| "io_entry"
-		| "hai_tag"
-		| "handoff"
+		"clinical_note" | "vital_sign" | "mar_entry" | "tar_entry" | "io_entry" | "hai_tag" | "handoff"
 	description: string
 	createdAt: string
 }

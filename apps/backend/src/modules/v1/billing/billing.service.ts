@@ -200,13 +200,7 @@ interface RecordKonsultaVisitInput {
 }
 
 type MalasakitSource =
-	| "doh_medisure"
-	| "hospital_fund"
-	| "lgu"
-	| "pcso"
-	| "dswd"
-	| "private_donation"
-	| "other"
+	"doh_medisure" | "hospital_fund" | "lgu" | "pcso" | "dswd" | "private_donation" | "other"
 type MalasakitStatus = "pending" | "approved" | "disbursed" | "denied"
 
 interface GetMalasakitInput {

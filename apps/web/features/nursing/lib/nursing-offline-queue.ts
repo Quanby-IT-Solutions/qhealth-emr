@@ -18,13 +18,7 @@ const CONFLICT_STORE = "conflicts"
 // ============================================================================
 
 export type NursingRecordType =
-	| "vital_sign"
-	| "clinical_note"
-	| "mar_entry"
-	| "tar_entry"
-	| "io_entry"
-	| "hai_tag"
-	| "handoff"
+	"vital_sign" | "clinical_note" | "mar_entry" | "tar_entry" | "io_entry" | "hai_tag" | "handoff"
 
 export interface QueueEntry {
 	id: string

@@ -162,7 +162,14 @@ export const env = createEnv({
 		SCHEDULER_SLOT_WINDOW_DAYS: z.coerce.number().int().positive().default(60),
 	},
 	runtimeEnv: process.env,
-	skipValidation: !!process.env.CI || process.env.npm_lifecycle_event === "lint",
+	// Not skipped on CI: skipping also skips zod defaults, so anything that
+	// BOOTS there (the e2e web job starts the real backend) reads undefined for
+	// every defaulted value and crashes (FILE_STORAGE_PATH did exactly that).
+	// Unit tests get their required values from jest.setup.ts fallbacks.
+	// `SKIP_ENV_VALIDATION` stays as the explicit escape hatch; `lint` stays
+	// exempt because ESLint loads modules for type info only.
+	skipValidation:
+		process.env.SKIP_ENV_VALIDATION === "true" || process.env.npm_lifecycle_event === "lint",
 })
 
 export type Env = typeof env

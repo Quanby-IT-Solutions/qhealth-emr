@@ -10,10 +10,7 @@ interface ListMedicalRecordsRequestsInput {
 	patientId?: string
 	encounterId?: string
 	requestType?:
-		| "chart_release"
-		| "medical_certificate"
-		| "discharge_summary_copy"
-		| "laboratory_results"
+		"chart_release" | "medical_certificate" | "discharge_summary_copy" | "laboratory_results"
 	status?: "pending" | "processing" | "completed" | "rejected"
 	page: number
 	limit: number
@@ -24,10 +21,7 @@ interface CreateMedicalRecordsRequestInput {
 	patientId: string
 	encounterId?: string
 	requestType:
-		| "chart_release"
-		| "medical_certificate"
-		| "discharge_summary_copy"
-		| "laboratory_results"
+		"chart_release" | "medical_certificate" | "discharge_summary_copy" | "laboratory_results"
 	requestedByName: string
 	requestedByRelationship?: "self" | "parent" | "guardian" | "legal_representative" | "other"
 	purpose?: string
@@ -106,12 +100,7 @@ export class MedicalRecordsService {
 				requestedByName: input.requestedByName,
 				requestedByRelationship:
 					(input.requestedByRelationship as
-						| "self"
-						| "parent"
-						| "guardian"
-						| "legal_representative"
-						| "other"
-						| undefined) ?? null,
+						"self" | "parent" | "guardian" | "legal_representative" | "other" | undefined) ?? null,
 				purpose: input.purpose ?? null,
 				status: "pending",
 				// SLA-020: persist identity/DPA evidence at point of receipt

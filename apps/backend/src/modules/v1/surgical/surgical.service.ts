@@ -1059,35 +1059,15 @@ export class SurgicalService {
 			id: record.id,
 			surgicalCaseId: caseId,
 			asaClass: (record.asaClass ?? null) as
-				| "ASA I"
-				| "ASA II"
-				| "ASA III"
-				| "ASA IV"
-				| "ASA V"
-				| "ASA VI"
-				| null,
+				"ASA I" | "ASA II" | "ASA III" | "ASA IV" | "ASA V" | "ASA VI" | null,
 			anesthesiaType: (record.anesthesiaType ?? null) as
-				| "general"
-				| "regional"
-				| "local"
-				| "sedation"
-				| null,
+				"general" | "regional" | "local" | "sedation" | null,
 			airwayType: (record.airwayType ?? null) as
-				| "oral_ett"
-				| "nasal_ett"
-				| "lma"
-				| "awake_fiber_optic"
-				| "tracheostomy"
-				| null,
+				"oral_ett" | "nasal_ett" | "lma" | "awake_fiber_optic" | "tracheostomy" | null,
 			airwayManagement: record.airwayManagement ?? null,
 			intubationAttempts: record.intubationAttempts ?? null,
 			intubationGrade: (record.intubationGrade ?? null) as
-				| "CL1"
-				| "CL2"
-				| "CL3"
-				| "CL4"
-				| "not_applicable"
-				| null,
+				"CL1" | "CL2" | "CL3" | "CL4" | "not_applicable" | null,
 			difficultAirway: record.difficultAirway ?? false,
 			agents: (record.agents ?? null) as Array<{
 				name: string
@@ -1173,35 +1153,15 @@ export class SurgicalService {
 			surgicalCaseId: input.caseId,
 			encounterId: surgCase.encounterId ?? null,
 			asaClass: (input.asaClass ?? null) as
-				| "ASA I"
-				| "ASA II"
-				| "ASA III"
-				| "ASA IV"
-				| "ASA V"
-				| "ASA VI"
-				| null,
+				"ASA I" | "ASA II" | "ASA III" | "ASA IV" | "ASA V" | "ASA VI" | null,
 			anesthesiaType: (input.anesthesiaType ?? null) as
-				| "general"
-				| "regional"
-				| "local"
-				| "sedation"
-				| null,
+				"general" | "regional" | "local" | "sedation" | null,
 			airwayType: (input.airwayType ?? null) as
-				| "oral_ett"
-				| "nasal_ett"
-				| "lma"
-				| "awake_fiber_optic"
-				| "tracheostomy"
-				| null,
+				"oral_ett" | "nasal_ett" | "lma" | "awake_fiber_optic" | "tracheostomy" | null,
 			airwayManagement: input.airwayManagement ?? null,
 			intubationAttempts: input.intubationAttempts ?? null,
 			intubationGrade: (input.intubationGrade ?? null) as
-				| "CL1"
-				| "CL2"
-				| "CL3"
-				| "CL4"
-				| "not_applicable"
-				| null,
+				"CL1" | "CL2" | "CL3" | "CL4" | "not_applicable" | null,
 			difficultAirway: input.difficultAirway ?? false,
 			agents:
 				input.agents ??

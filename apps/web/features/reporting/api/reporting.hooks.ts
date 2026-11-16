@@ -145,12 +145,7 @@ export function useAhsrDrilldownQuery(
 				page: params.page ?? 1,
 				limit: params.limit ?? 20,
 				metric: params.metric as
-					| "admissions"
-					| "discharges"
-					| "deaths"
-					| "morbidity"
-					| "mortality"
-					| "hai",
+					"admissions" | "discharges" | "deaths" | "morbidity" | "mortality" | "hai",
 			},
 			enabled,
 		})

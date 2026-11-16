@@ -118,12 +118,7 @@ type PatientRow = typeof patients.$inferSelect
 type LcrCertificateType = "birth" | "death"
 type LcrArtifactType = "pdf" | "xml"
 type LcrSubmissionStatus =
-	| "not_submitted"
-	| "ready"
-	| "submitted"
-	| "acknowledged"
-	| "rejected"
-	| "error"
+	"not_submitted" | "ready" | "submitted" | "acknowledged" | "rejected" | "error"
 
 interface ListLcrTrackingInput {
 	facilityId: string

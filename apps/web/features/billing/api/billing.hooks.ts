@@ -669,13 +669,7 @@ export function useRecordKonsultaVisitMutation() {
 // ============================================================================
 
 export type MalasakitSource =
-	| "doh_medisure"
-	| "hospital_fund"
-	| "lgu"
-	| "pcso"
-	| "dswd"
-	| "private_donation"
-	| "other"
+	"doh_medisure" | "hospital_fund" | "lgu" | "pcso" | "dswd" | "private_donation" | "other"
 
 export interface MalasakitAssistance {
 	id: string

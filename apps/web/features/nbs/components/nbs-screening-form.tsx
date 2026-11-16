@@ -232,10 +232,7 @@ export function NbsScreeningForm({
 				result_pku: (results.result_pku || undefined) as ResultValue | undefined,
 				result_msud: (results.result_msud || undefined) as ResultValue | undefined,
 				result_overall: (resultOverall || undefined) as
-					| "normal"
-					| "abnormal"
-					| "borderline"
-					| undefined,
+					"normal" | "abnormal" | "borderline" | undefined,
 				notes: notes.trim() || undefined,
 			}
 			updateMutation.mutate(input, { onSuccess: () => setEditing(false) })

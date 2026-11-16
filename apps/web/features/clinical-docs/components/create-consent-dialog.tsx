@@ -76,11 +76,7 @@ export function CreateConsentDialog({
 				encounterId,
 				patientId,
 				consentType: consentType as
-					| "general"
-					| "procedure"
-					| "research"
-					| "blood_transfusion"
-					| "surgery",
+					"general" | "procedure" | "research" | "blood_transfusion" | "surgery",
 				signedByName: signedByName.trim(),
 				relationship: relationship as "self" | "parent" | "guardian" | "spouse" | "other",
 				content: content || undefined,
