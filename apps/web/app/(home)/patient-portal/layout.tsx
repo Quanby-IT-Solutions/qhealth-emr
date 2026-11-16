@@ -5,7 +5,7 @@ import { LockKeyhole, ShieldCheck } from "lucide-react"
 import { PatientPortalLinkButton } from "@/features/patient-portal/components/patient-portal-link-button"
 
 export const metadata: Metadata = {
-	title: "Patient Portal | Peregrine",
+	title: "Patient Portal | Quanby",
 	description: "Secure read-only patient access to released daily medical record summaries.",
 }
 
@@ -23,7 +23,7 @@ export default function PatientPortalLayout({
 							<ShieldCheck className="size-5" />
 						</span>
 						<span>
-							<span className="block text-base font-semibold">Peregrine Patient Portal</span>
+							<span className="block text-base font-semibold">Quanby Patient Portal</span>
 							<span className="text-muted-foreground block text-xs">
 								Read-only released record access
 							</span>

@@ -12,7 +12,7 @@
 		},
 		"dev": {
 			"cache": false,
-			"persistent": true
+			"persistent": false
 		},
 		"start": {
 			"dependsOn": ["^build", "build"],
@@ -34,12 +34,12 @@
 			"cache": true
 		},
 		"test": {
-			"dependsOn": ["^test"],
+			"dependsOn": ["^build", "^test"],
 			"cache": true,
 			"outputs": ["coverage/**"]
 		},
 		"test:cov": {
-			"dependsOn": ["^test:cov"],
+			"dependsOn": ["^build", "^test:cov"],
 			"cache": true,
 			"outputs": ["coverage/**"]
 		},
@@ -50,9 +50,11 @@
 				"PLAYWRIGHT_*",
 				"BASE_URL",
 				"BACKEND_URL",
-				"E2E_TEST_EMAIL",
-				"E2E_TEST_PASSWORD",
-				"E2E_TEST_NAME"
+				"E2E_NO_WEBSERVER",
+				"E2E_TEST_EMAIL_B",
+				"E2E_*",
+				"NEXT_PUBLIC_*",
+				"SEED_ADMIN_PASSWORD"
 			]
 		},
 		"clean": {
@@ -71,6 +73,7 @@
 	"globalPassThroughEnv": [
 		"NODE_ENV",
 		"CI",
+		"BETTER_AUTH_*",
 		"VERCEL",
 		"VERCEL_ENV",
 		"VERCEL_URL",

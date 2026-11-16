@@ -174,7 +174,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 										Welcome back
 									</h1>
 									<p className="text-muted-foreground font-sans text-balance">
-										Sign in to access your Peregrine workspace
+										Sign in to access your Quanby workspace
 									</p>
 								</motion.div>
 
@@ -472,7 +472,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 							{/* Identity Line */}
 							<div className="relative z-10 mt-4 w-full text-center">
 								<span className="text-muted-foreground font-mono text-xs font-medium tracking-widest uppercase">
-									Peregrine
+									Quanby
 								</span>
 							</div>
 

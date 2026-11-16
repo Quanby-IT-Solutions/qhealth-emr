@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query"
 
+import { resetAnalyticsIdentity } from "@/services/analytics/posthog-identity"
 import { authClient } from "@/services/better-auth/auth-client"
 
 /**
@@ -50,6 +51,9 @@ export function useSignOutMutation() {
 			return result
 		},
 		onSuccess: () => {
+			// Detach the PostHog identity before the next user can sign in on this
+			// browser; a no-op while analytics is off.
+			resetAnalyticsIdentity()
 			queryClient.invalidateQueries({ queryKey: sessionKeys.all })
 			router.push("/")
 			router.refresh()

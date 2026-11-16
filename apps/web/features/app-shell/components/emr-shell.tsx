@@ -1164,16 +1164,18 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 							)}
 						>
 							<Image
-								src={isCollapsed ? "/logo.svg" : isDark ? "/peregrinedark.svg" : "/peregrine.svg"}
-								alt="Peregrine Eye and Laser Institute"
-								width={2048}
-								height={461}
+								src="/quanby-mark.png"
+								alt="Quanby Solutions, Inc."
+								width={512}
+								height={512}
 								priority
-								className={cn(
-									"object-contain",
-									isCollapsed ? "h-10 w-10 object-contain" : "h-full w-auto max-w-[224px]"
-								)}
+								className={cn("object-contain", isCollapsed ? "h-10 w-10" : "h-10 w-10 shrink-0")}
 							/>
+							{!isCollapsed && (
+								<span className="text-sidebar-foreground ml-2 truncate text-base font-semibold tracking-tight">
+									Quanby Solutions
+								</span>
+							)}
 						</motion.div>
 					</AnimatePresence>
 				</div>

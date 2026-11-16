@@ -85,6 +85,9 @@ export const appConfig = defineConfig(
 		},
 	},
 	// Next.js
+	// If a project adds settings: { next: { rootDir } }, any rootDir must be a
+	// wildcard pattern (e.g. "apps/*/") while the pnpm-workspace.yaml override
+	// is in place.
 	{
 		files: ["**/*.ts", "**/*.tsx"],
 		plugins: {

@@ -80,6 +80,12 @@ export const twoFactors = createTable(
 			.text("user_id")
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
+		// better-auth >=1.7 two-factor plugin columns. `verified` defaults to true
+		// so rows enrolled before the upgrade keep working; the plugin flips it
+		// per-row during new enrolments.
+		verified: t.boolean("verified").default(true),
+		failedVerificationCount: t.integer("failed_verification_count").default(0),
+		lockedUntil: t.timestamp("locked_until"),
 	}),
 	t => [index("two_factors_secret_idx").on(t.secret), index("two_factors_user_id_idx").on(t.userId)]
 )

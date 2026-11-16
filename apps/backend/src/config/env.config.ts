@@ -1,6 +1,8 @@
 import { createEnv } from "@t3-oss/env-core"
 import { z } from "zod"
 
+import { booleanFromEnv, exactlyTrueFromEnv } from "@/config/api-docs.config"
+
 const emptyStringToUndefined = (value: unknown) => (value === "" ? undefined : value)
 
 const optionalString = z.preprocess(emptyStringToUndefined, z.string().optional())
@@ -17,6 +19,46 @@ export const env = createEnv({
 		NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 		PORT: z.coerce.number().int().positive().default(3000),
 		CORS_ORIGINS: z.string(),
+		LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
+
+		// Error monitoring (Sentry).
+		//
+		// Declared here so the rest of the app sees the same typed, defaulted,
+		// validated values as every other setting. `src/instrument.ts` deliberately
+		// does NOT import this module — it runs before AppModule to install the SDK
+		// ahead of the libraries it instruments, and pulling fail-fast validation
+		// onto that path would let one unrelated bad variable kill the crash
+		// reporter right when it is most needed. It reads these same keys off
+		// `process.env` instead.
+		//
+		// Reporting stays OFF unless BOTH the flag and a DSN are supplied: a flag
+		// with no DSN is an unfinished deployment, a DSN with no flag is a value
+		// parked for later, and neither is consent to start shipping events.
+		SENTRY_ENABLED: exactlyTrueFromEnv,
+		SENTRY_DSN: z.string().optional(),
+		/** Falls back to NODE_ENV when unset, so environments are never merged by accident. */
+		SENTRY_ENVIRONMENT: z.string().optional(),
+		/** 0 = errors only. Tracing costs quota, so it is opt-in per environment. */
+		SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).optional().default(0),
+
+		// PostHog: feature flags (and any server-side events). Same two-part gate
+		// as Sentry: nothing is constructed unless BOTH the flag and a token are
+		// set. See docs/posthog.md.
+		POSTHOG_ENABLED: booleanFromEnv.optional().default(false),
+		POSTHOG_TOKEN: z.string().optional(),
+		POSTHOG_HOST: z.string().default("https://us.i.posthog.com"),
+		/** Project secret key (phs_...). Turns on local flag evaluation; remote evaluation without it. */
+		POSTHOG_FEATURE_FLAGS_SECRET_KEY: z.string().optional(),
+
+		// OpenTelemetry: OTLP export of traces and HTTP metrics (docs/opentelemetry.md).
+		// Read raw by `src/telemetry.ts` before this module runs (same exemption as
+		// Sentry); declared here so the rest of the app sees typed values. Export
+		// starts only when BOTH the flag and an endpoint are set.
+		OTEL_ENABLED: exactlyTrueFromEnv,
+		OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+		OTEL_SERVICE_NAME: z.string().default("qhealth-emr-api"),
+		/** Deploy image tag, injected by the deploy compose file / env; reported as the Sentry release. */
+		IMAGE_TAG: z.string().optional(),
 
 		// Database
 		DATABASE_URL: z.string(),

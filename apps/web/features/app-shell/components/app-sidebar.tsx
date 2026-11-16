@@ -83,9 +83,9 @@ export function AppSidebar() {
 			<SidebarHeader>
 				<SidebarMenu>
 					<SidebarMenuItem>
-						<SidebarMenuButton size="lg" tooltip="Peregrine">
+						<SidebarMenuButton size="lg" tooltip="Quanby">
 							<Link href="/dashboard" className="flex items-center gap-2">
-								<Logo text="Peregrine" href={undefined} size="sm" showText={false} />
+								<Logo text="Quanby" href={undefined} size="sm" showText={false} />
 							</Link>
 						</SidebarMenuButton>
 					</SidebarMenuItem>

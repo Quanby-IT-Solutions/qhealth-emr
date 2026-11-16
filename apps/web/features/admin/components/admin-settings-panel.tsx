@@ -402,7 +402,7 @@ export function AdminSettingsPanel({ canEdit }: AdminSettingsPanelProps) {
 								<Input
 									id="support-mailbox"
 									type="email"
-									placeholder="admin.ops@peregrine.local"
+									placeholder="admin.ops@quanby.local"
 									value={draft.supportMailbox}
 									onChange={e => setField("supportMailbox", e.target.value)}
 								/>

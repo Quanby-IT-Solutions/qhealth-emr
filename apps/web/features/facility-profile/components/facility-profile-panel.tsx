@@ -199,7 +199,7 @@ export function FacilityProfilePanel({ canEdit }: FacilityProfilePanelProps) {
 										id="name"
 										value={draft.name}
 										onChange={e => patch("name", e.target.value)}
-										placeholder="e.g. Peregrine Eye and Laser Institute"
+										placeholder="e.g. Quanby Solutions, Inc."
 										disabled={!canEdit}
 									/>
 								</div>

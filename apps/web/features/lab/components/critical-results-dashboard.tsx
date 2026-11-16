@@ -196,7 +196,7 @@ function CriticalActionModal({ item, action, children }: CriticalActionModalProp
 					<DialogDescription>{copy.description}</DialogDescription>
 				</DialogHeader>
 
-				<div className="-mr-4 flex-1 space-y-4 overflow-y-auto pr-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+				<div className="-mr-4 flex-1 [scrollbar-width:none] space-y-4 overflow-y-auto pr-4 [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
 					<div className="bg-muted/30 rounded-md border p-3 text-sm">
 						<div className="flex items-start justify-between gap-3">
 							<div>
@@ -455,7 +455,7 @@ function FlagCriticalModal({ onCriticalItemAdded }: FlagCriticalModalProps) {
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="-mr-4 flex-1 overflow-y-auto pr-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+				<div className="-mr-4 flex-1 [scrollbar-width:none] overflow-y-auto pr-4 [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
 					<div className="space-y-4">
 						<div className="grid grid-cols-2 gap-4">
 							<div>

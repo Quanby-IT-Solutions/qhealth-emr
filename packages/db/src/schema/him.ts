@@ -139,7 +139,10 @@ export const codeVersions = createTable(
 // HIM — Records Issuance Audit (HIM-BE-04)
 // ============================================================================
 
-export const recordsRequests = medicalRecordsRequests
+// NOTE: the former `recordsRequests` alias for `medicalRecordsRequests` was
+// removed: nothing imported it, and re-exporting the same pgTable under two
+// names makes drizzle-kit (>= 1.0.0-beta.20) see duplicate table definitions
+// and abort `push`/`generate`. Import `medicalRecordsRequests` directly.
 
 export const recordsRequestItems = createTable(
 	"records_request_items",

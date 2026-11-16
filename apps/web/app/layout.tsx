@@ -4,6 +4,7 @@ import { Fraunces, Geist, Geist_Mono } from "next/font/google"
 import { BreakpointIndicator } from "@/core/components/breakpoint-indicator"
 import { Toaster } from "@/core/components/ui/sonner"
 import { ThemeProvider } from "@/core/context/theme-provider"
+import { AnalyticsIdentity } from "@/services/analytics/analytics-identity"
 import { AuthProvider } from "@/services/better-auth/context/auth-provider"
 import { QueryProvider } from "@/services/tanstack-query/provider"
 import { OfflineServiceWorkerRegistrar } from "@/features/offline-cache/components/offline-service-worker-registrar"
@@ -30,8 +31,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-	title: "Peregrine",
-	description: "Peregrine Eye and Laser Institute clinical records system",
+	title: "Quanby",
+	description: "Quanby Solutions, Inc. clinical records system",
 }
 
 export default function RootLayout({
@@ -55,6 +56,7 @@ export default function RootLayout({
 							disableTransitionOnChange
 						>
 							<BreakpointIndicator />
+							<AnalyticsIdentity />
 							<OfflineServiceWorkerRegistrar />
 							{children}
 							<Toaster richColors closeButton />

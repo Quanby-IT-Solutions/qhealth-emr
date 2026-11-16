@@ -23,6 +23,16 @@ dependencies:
   flutter_riverpod: ^3.0.3
   riverpod_annotation: ^3.0.3
 
+  # Error monitoring
+  # Configured entirely from --dart-define values (see SentryConstants); the
+  # DSN is never bundled as an asset and never logged.
+  sentry_flutter: ^9.26.0
+
+  # Product analytics and feature flags
+  # Same rule as Sentry: configured only from --dart-define values (see
+  # PosthogConstants), off unless a build supplies them.
+  posthog_flutter: ^5.58.4
+
   # Navigation
   go_router: ^16.3.0
   persistent_bottom_nav_bar_v2: ^6.2.0

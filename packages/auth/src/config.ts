@@ -47,7 +47,7 @@ export const AUTH_BASE_PATH = "/auth"
  *
  * @returns Better Auth instance
  */
-export function createAuth(): ReturnType<typeof betterAuth> {
+export function createAuth() {
 	const db = createDBClient()
 
 	return betterAuth({
@@ -100,7 +100,7 @@ export function createAuth(): ReturnType<typeof betterAuth> {
 			}),
 			twoFactor({
 				// TOTP issuer shown in authenticator apps
-				issuer: "Peregrine",
+				issuer: "Quanby",
 				// Backup codes provide recovery when TOTP device is lost
 				backupCodes: {
 					enabled: true,
@@ -117,7 +117,9 @@ export function createAuth(): ReturnType<typeof betterAuth> {
  *
  * Lazy initialization to ensure environment variables are loaded before creating the instance.
  */
-let _auth: ReturnType<typeof betterAuth> | null = null
+type AuthInstance = ReturnType<typeof createAuth>
+
+let _auth: AuthInstance | null = null
 
 /**
  * Clear the cached auth instance. Call this when configuration changes.
@@ -126,7 +128,7 @@ export function clearAuthCache(): void {
 	_auth = null
 }
 
-export function getAuth(): ReturnType<typeof betterAuth> {
+export function getAuth(): AuthInstance {
 	if (!_auth) {
 		_auth = createAuth()
 	}

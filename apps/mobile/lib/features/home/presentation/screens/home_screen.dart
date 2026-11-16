@@ -10,6 +10,7 @@ import 'package:mobile/features/profile/presentation/screens/profile_screen.dart
 import 'package:mobile/features/todos/presentation/screens/todos_screen.dart';
 import 'package:mobile/features/home/presentation/widgets/settings_tab.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_provider.dart';
+import 'package:mobile/services/analytics/analytics_screens.dart';
 import 'package:mobile/services/storage/tour_storage_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -145,7 +146,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         title: 'Navigation',
         description: 'Switch between Home, Todos, and Settings tabs',
         child: Style1BottomNavBar(
-          navBarConfig: navBarConfig,
+          // Records tab taps as PostHog screen views; a no-op while off.
+          navBarConfig: AnalyticsScreens.recordTabTaps(navBarConfig),
           navBarDecoration: NavBarDecoration(
             color: theme.colorScheme.surface,
             border: Border(

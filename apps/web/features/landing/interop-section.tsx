@@ -183,7 +183,7 @@ export function InteropSection() {
 									fill="var(--primary-foreground)"
 									className="font-serif text-xl font-bold"
 								>
-									Peregrine
+									Quanby
 								</text>
 								<text
 									x="400"

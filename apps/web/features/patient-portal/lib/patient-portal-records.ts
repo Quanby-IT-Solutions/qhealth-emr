@@ -426,7 +426,7 @@ export async function getPatientPortalRecord(
 			isActive: patient.is_active,
 			createdAt: patient.created_at,
 			updatedAt: patient.updated_at,
-			facilityName: patient.facility_name ?? "Peregrine Eye and Laser Institute",
+			facilityName: patient.facility_name ?? "Quanby Solutions, Inc.",
 		},
 		snapshot: {
 			generatedAt: formatDateTime(new Date().toISOString()),
@@ -1097,7 +1097,7 @@ function buildPatientDetails(patient: PatientRow): PortalDetailItem[] {
 		},
 		{
 			label: "Registered facility",
-			value: patient.facility_name ?? "Peregrine Eye and Laser Institute",
+			value: patient.facility_name ?? "Quanby Solutions, Inc.",
 		},
 		{ label: "Patient record status", value: patient.is_active ? "Active" : "Inactive" },
 		{ label: "Patient record created", value: formatDateTime(patient.created_at) },
@@ -1183,7 +1183,7 @@ function formatResults(results: unknown) {
 
 function buildDocumentBody(record: PatientPortalRecord) {
 	return [
-		"Peregrine Patient Portal - Daily Released Medical Summary",
+		"Quanby Patient Portal - Daily Released Medical Summary",
 		"",
 		`Patient: ${record.patient.name}`,
 		`MRN: ${record.patient.mrn}`,
@@ -1214,7 +1214,7 @@ function buildSectionDocument(
 	items: PortalSummaryItem[]
 ) {
 	return [
-		`Peregrine Patient Portal - ${title}`,
+		`Quanby Patient Portal - ${title}`,
 		"",
 		`Patient: ${record.patient.name}`,
 		`MRN: ${record.patient.mrn}`,
@@ -1230,7 +1230,7 @@ function buildDetailSectionDocument(
 	items: PortalDetailItem[]
 ) {
 	return [
-		`Peregrine Patient Portal - ${title}`,
+		`Quanby Patient Portal - ${title}`,
 		"",
 		`Patient: ${record.patient.name}`,
 		`MRN: ${record.patient.mrn}`,

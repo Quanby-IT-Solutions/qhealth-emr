@@ -1,4 +1,5 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger } from "@nestjs/common"
+import * as Sentry from "@sentry/nestjs"
 import type { Request, Response } from "express"
 import { ZodSerializationException } from "nestjs-zod"
 import { ZodError } from "zod"
@@ -25,6 +26,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
 				response.setHeader("Access-Control-Allow-Origin", origin)
 				response.setHeader("Access-Control-Allow-Credentials", "true")
 			}
+		}
+
+		// Capture 5xx only. 4xx (RBAC denials, throttler 429s, validation errors)
+		// are expected outcomes of a working system, not incidents — reporting them
+		// buries the real failures. This filter is the only place that sees
+		// deliberate 5xx `HttpException`s, so it captures them directly rather than
+		// relying on SentryExceptionFilter, which — per Nest's `@Catch(HttpException)`
+		// precedence — only ever sees non-HttpException failures. That split is what
+		// keeps a single error from being reported twice.
+		if (status >= 500) {
+			Sentry.captureException(exception)
 		}
 
 		// Log Zod serialization errors

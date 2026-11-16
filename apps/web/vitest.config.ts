@@ -38,6 +38,10 @@ export default defineConfig({
 			// Resolve workspace packages to source so tests don't depend on a
 			// prior `tsc` build of the package's dist output.
 			"@repo/contracts": path.resolve(__dirname, "../../packages/contracts/src/index.ts"),
+			// `@repo/observability` publishes only compiled `dist` artifacts, which
+			// are not checked in. Resolve it from source so the suite runs in a
+			// clean checkout without a prior manual package build.
+			"@repo/observability": path.resolve(__dirname, "../../packages/observability/src/index.ts"),
 		},
 	},
 })

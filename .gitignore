@@ -13,6 +13,9 @@ next-env.d.ts
 # nest.js
 apps/backend/src/metadata.ts
 
+# better-auth CLI output (`pnpm auth:generate`), a reference to diff against packages/db
+packages/auth/auth-schema.generated.ts
+
 # nitro
 .nitro/
 .output/
@@ -57,8 +60,14 @@ yarn-error.log*
 !*.tfvars.example
 
 # local env files
+#
+# Ignore every .env variant and re-admit only the committed templates. The
+# previous pair (`.env` + `.env*.local`) left everything else exposed —
+# `.env.backup`, `.env.production`, `.env.staging` — each of which holds the
+# same secrets as `.env`, so one `git add -A` was all it took.
 .env
-.env*.local
+.env.*
+!.env.example
 
 # vercel
 .vercel
@@ -143,17 +152,137 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 
 # START Ruler Generated Files
+/.agents/skills/.ruler-managed.json
+/.agents/skills/aws-infrastructure
+/.agents/skills/better-auth
+/.agents/skills/ci-cd-pipelines
+/.agents/skills/docker-deployment
+/.agents/skills/drizzle-postgres
+/.agents/skills/error-handling-logging
+/.agents/skills/nestjs-framework
+/.agents/skills/nextjs-app-router
+/.agents/skills/nginx-proxy
+/.agents/skills/observability-sentry
+/.agents/skills/orpc-contracts
+/.agents/skills/redis-caching
+/.agents/skills/security-hardening
+/.agents/skills/tailwind-shadcn
+/.agents/skills/tanstack-query-orpc
+/.agents/skills/testing-strategies
+/.agents/skills/ticket-to-pr-flow
+/.agents/skills/turborepo-monorepo
+/.agents/skills/vercel-react-best-practices
+/.agents/skills/web-design-guidelines
 /.aider.conf.yml
 /.aider.conf.yml.bak
-/.claude/skills
+/.aider.conf.yml.ruler-generated
+/.claude/skills/.ruler-managed.json
+/.claude/skills/aws-infrastructure
+/.claude/skills/better-auth
+/.claude/skills/ci-cd-pipelines
+/.claude/skills/docker-deployment
+/.claude/skills/drizzle-postgres
+/.claude/skills/error-handling-logging
+/.claude/skills/nestjs-framework
+/.claude/skills/nextjs-app-router
+/.claude/skills/nginx-proxy
+/.claude/skills/observability-sentry
+/.claude/skills/orpc-contracts
+/.claude/skills/redis-caching
+/.claude/skills/security-hardening
+/.claude/skills/tailwind-shadcn
+/.claude/skills/tanstack-query-orpc
+/.claude/skills/testing-strategies
+/.claude/skills/ticket-to-pr-flow
+/.claude/skills/turborepo-monorepo
+/.claude/skills/vercel-react-best-practices
+/.claude/skills/web-design-guidelines
 /.clinerules
 /.clinerules.bak
-/.codex/config.toml
-/.codex/config.toml.bak
-/.codex/skills
-/.cursor/skills
-/.gemini/skills
-/.windsurf/skills
+/.cursor/skills/.ruler-managed.json
+/.cursor/skills/aws-infrastructure
+/.cursor/skills/better-auth
+/.cursor/skills/ci-cd-pipelines
+/.cursor/skills/docker-deployment
+/.cursor/skills/drizzle-postgres
+/.cursor/skills/error-handling-logging
+/.cursor/skills/nestjs-framework
+/.cursor/skills/nextjs-app-router
+/.cursor/skills/nginx-proxy
+/.cursor/skills/observability-sentry
+/.cursor/skills/orpc-contracts
+/.cursor/skills/redis-caching
+/.cursor/skills/security-hardening
+/.cursor/skills/tailwind-shadcn
+/.cursor/skills/tanstack-query-orpc
+/.cursor/skills/testing-strategies
+/.cursor/skills/ticket-to-pr-flow
+/.cursor/skills/turborepo-monorepo
+/.cursor/skills/vercel-react-best-practices
+/.cursor/skills/web-design-guidelines
+/.gemini/skills/.ruler-managed.json
+/.gemini/skills/aws-infrastructure
+/.gemini/skills/better-auth
+/.gemini/skills/ci-cd-pipelines
+/.gemini/skills/docker-deployment
+/.gemini/skills/drizzle-postgres
+/.gemini/skills/error-handling-logging
+/.gemini/skills/nestjs-framework
+/.gemini/skills/nextjs-app-router
+/.gemini/skills/nginx-proxy
+/.gemini/skills/observability-sentry
+/.gemini/skills/orpc-contracts
+/.gemini/skills/redis-caching
+/.gemini/skills/security-hardening
+/.gemini/skills/tailwind-shadcn
+/.gemini/skills/tanstack-query-orpc
+/.gemini/skills/testing-strategies
+/.gemini/skills/ticket-to-pr-flow
+/.gemini/skills/turborepo-monorepo
+/.gemini/skills/vercel-react-best-practices
+/.gemini/skills/web-design-guidelines
+/.github/skills/.ruler-managed.json
+/.github/skills/aws-infrastructure
+/.github/skills/better-auth
+/.github/skills/ci-cd-pipelines
+/.github/skills/docker-deployment
+/.github/skills/drizzle-postgres
+/.github/skills/error-handling-logging
+/.github/skills/nestjs-framework
+/.github/skills/nextjs-app-router
+/.github/skills/nginx-proxy
+/.github/skills/observability-sentry
+/.github/skills/orpc-contracts
+/.github/skills/redis-caching
+/.github/skills/security-hardening
+/.github/skills/tailwind-shadcn
+/.github/skills/tanstack-query-orpc
+/.github/skills/testing-strategies
+/.github/skills/ticket-to-pr-flow
+/.github/skills/turborepo-monorepo
+/.github/skills/vercel-react-best-practices
+/.github/skills/web-design-guidelines
+/.windsurf/skills/.ruler-managed.json
+/.windsurf/skills/aws-infrastructure
+/.windsurf/skills/better-auth
+/.windsurf/skills/ci-cd-pipelines
+/.windsurf/skills/docker-deployment
+/.windsurf/skills/drizzle-postgres
+/.windsurf/skills/error-handling-logging
+/.windsurf/skills/nestjs-framework
+/.windsurf/skills/nextjs-app-router
+/.windsurf/skills/nginx-proxy
+/.windsurf/skills/observability-sentry
+/.windsurf/skills/orpc-contracts
+/.windsurf/skills/redis-caching
+/.windsurf/skills/security-hardening
+/.windsurf/skills/tailwind-shadcn
+/.windsurf/skills/tanstack-query-orpc
+/.windsurf/skills/testing-strategies
+/.windsurf/skills/ticket-to-pr-flow
+/.windsurf/skills/turborepo-monorepo
+/.windsurf/skills/vercel-react-best-practices
+/.windsurf/skills/web-design-guidelines
 /AGENTS.md
 /AGENTS.md.bak
 /CLAUDE.md

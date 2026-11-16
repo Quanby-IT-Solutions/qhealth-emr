@@ -11,19 +11,15 @@ export function Footer() {
 					<div className="md:col-span-1">
 						<div className="mb-6 flex items-center gap-3">
 							<Image
-								src="/peregrine.svg"
-								alt="Peregrine Eye and Laser Institute"
-								width={2048}
-								height={461}
-								className="h-16 w-auto max-w-[340px] object-contain dark:hidden"
+								src="/quanby-mark.png"
+								alt="Quanby Solutions, Inc."
+								width={512}
+								height={512}
+								className="h-14 w-14 object-contain"
 							/>
-							<Image
-								src="/peregrinedark.svg"
-								alt="Peregrine Eye and Laser Institute"
-								width={2048}
-								height={461}
-								className="hidden h-16 w-auto max-w-[340px] object-contain dark:block"
-							/>
+							<span className="text-foreground text-lg font-semibold tracking-tight">
+								Quanby Solutions
+							</span>
 						</div>
 						<p className="text-muted-foreground max-w-xs text-sm leading-relaxed">
 							A statutorily-compliant clinical platform built specifically for Philippine hospitals.
@@ -121,7 +117,7 @@ export function Footer() {
 
 				<div className="border-border mb-4 flex flex-col items-center justify-between gap-4 border-t pt-8 md:flex-row">
 					<div className="text-muted-foreground flex items-center gap-4 text-sm font-medium">
-						<span>&copy; {currentYear} Peregrine</span>
+						<span>&copy; {currentYear} Quanby</span>
 						<span className="text-border hidden md:inline">|</span>
 						<span>Philippines</span>
 					</div>

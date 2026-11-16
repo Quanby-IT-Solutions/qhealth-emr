@@ -11,6 +11,7 @@ import 'package:mobile/services/storage/tour_storage_service.dart';
 import 'package:mobile/shared/widgets/app_card.dart';
 import 'package:mobile/shared/widgets/section_header.dart';
 import 'package:mobile/shared/widgets/settings_group.dart';
+import 'package:mobile/features/home/presentation/widgets/preview_features_tile.dart';
 
 class SettingsTab extends ConsumerWidget {
   const SettingsTab({super.key});
@@ -125,6 +126,10 @@ class SettingsTab extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
+
+          // Preview features (PostHog feature flags). Renders nothing unless
+          // analytics is enabled and at least one preview flag is on.
+          const PreviewFeaturesTile(),
 
           // Actions section
           const SectionHeader(title: 'Account'),

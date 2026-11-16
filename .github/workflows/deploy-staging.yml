@@ -1,4 +1,4 @@
-name: Deploy Staging (EC2)
+name: Deploy Staging (EC2 + Elastic IP)
 
 on:
   push:
@@ -14,47 +14,47 @@ concurrency:
   group: deploy-staging
   cancel-in-progress: true
 
+# Least privilege. This workflow reads the repo and talks to AWS and the
+# staging host with their own credentials; it never writes back to GitHub.
+permissions:
+  contents: read
+
 env:
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  # ──────────────────────────────────────────────
-  # Gate: CI must pass before deploying
-  # ──────────────────────────────────────────────
   ci:
     name: CI
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
     uses: ./.github/workflows/ci.yml
+    # Commit already passed full e2e on its dev PR; run only the lightweight
+    # quality gate as the deploy guard, skip the heavy e2e suites.
+    with:
+      skip-e2e: true
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   deploy-staging:
-    name: Deploy to Staging (EC2)
+    name: Deploy to Staging (EC2 + Elastic IP)
     needs: ci
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: staging
     env:
-      # ==========================================================
-      # AWS Configuration
-      # ==========================================================
       AWS_REGION: ${{ vars.AWS_REGION }}
       PROJECT_NAME: ${{ vars.PROJECT_NAME }}
+      ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
       ECR_REPOSITORY_WEB: ${{ vars.ECR_REPOSITORY_WEB }}
       ECR_REPOSITORY_BACKEND: ${{ vars.ECR_REPOSITORY_BACKEND }}
-
-      # ==========================================================
-      # Domain Configuration (subdomain per service)
-      # ==========================================================
-      DOMAIN_WEB: ${{ vars.DOMAIN_WEB }}
-      DOMAIN_API: ${{ vars.DOMAIN_API }}
-
-      # ==========================================================
-      # EC2 Configuration
-      # ==========================================================
-      EC2_HOST: ${{ secrets.EC2_HOST }}
-      EC2_USER: ${{ secrets.EC2_USER }}
-      EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-
-      # ==========================================================
-      # App Environment Variables
-      # ==========================================================
+      STG_EC2_HOST: ${{ vars.STG_EC2_HOST }}
+      # Public host key of the staging EC2 instance, in known_hosts format
+      # (`ssh-keyscan -t ed25519 <host>`). A repo *variable*, not a secret — it
+      # is public key material, and keeping it readable means a change is
+      # visible in review rather than silently swapped.
+      STG_EC2_HOST_KEY: ${{ vars.STG_EC2_HOST_KEY }}
       NODE_ENV: "production"
       NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
       NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
@@ -65,42 +65,25 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      # ──────────────────────────────────────────────
-      # Validate required variables
-      # ──────────────────────────────────────────────
-      - name: Validate required deployment variables
+      - name: Validate required variables
         run: |
           set -euo pipefail
-
-          require_var() {
-            local name="$1"
-            if [ -z "${!name:-}" ]; then
-              echo "❌ Missing required variable: $name"
-              exit 1
-            fi
-          }
-
-          # AWS
+          require_var() { [ -n "${!1:-}" ] || { echo "❌ Missing: $1"; exit 1; }; }
           require_var AWS_REGION
-          require_var PROJECT_NAME
+          require_var ECR_REGISTRY
           require_var ECR_REPOSITORY_WEB
           require_var ECR_REPOSITORY_BACKEND
-
-          # Domains
-          require_var DOMAIN_WEB
-          require_var DOMAIN_API
-
-          # EC2
-          require_var EC2_HOST
-          require_var EC2_USER
-          require_var EC2_SSH_KEY
-
-          # App
+          require_var STG_EC2_HOST
+          # Without a pinned host key there is nothing to verify the server
+          # against, so refuse to deploy rather than fall back to trusting
+          # whatever answers.
+          require_var STG_EC2_HOST_KEY
           require_var NEXT_PUBLIC_APP_URL
           require_var NEXT_PUBLIC_API_BASE_URL
           require_var DATABASE_URL
@@ -108,13 +91,32 @@ jobs:
           require_var BETTER_AUTH_SECRET
           require_var BETTER_AUTH_TRUSTED_ORIGINS
 
-          echo "✅ Required deployment variables are set"
+          # Reject a mistyped region or registry before credentials, build, or
+          # push. The messages name the variable and the expected shape only.
+          validate_registry() {
+            local region_re='^[a-z]{2}(-gov)?-[a-z]+-[0-9]+$'
+            local registry_re='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?$'
+            if [[ ! "$AWS_REGION" =~ $region_re ]]; then
+              echo 'AWS_REGION must match ^[a-z]{2}(-gov)?-[a-z]+-[0-9]+$'
+              exit 1
+            fi
+            if [[ ! "$ECR_REGISTRY" =~ $registry_re ]]; then
+              echo 'ECR_REGISTRY must match ^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?$'
+              exit 1
+            fi
+            local registry_region=${ECR_REGISTRY#*.dkr.ecr.}
+            registry_region=${registry_region%%.amazonaws.com*}
+            if [[ "$registry_region" != "$AWS_REGION" ]]; then
+              echo 'ECR_REGISTRY region must equal AWS_REGION'
+              exit 1
+            fi
+          }
+          validate_registry
+          echo "✅ All required variables present"
 
-      # ──────────────────────────────────────────────
-      # Build and push Docker images to ECR
-      # ──────────────────────────────────────────────
+      # ── Build & push Docker images to ECR ──────────────────────
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -122,342 +124,184 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
         with:
           mask-password: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Cache Docker layers
-        uses: actions/cache@v5
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-staging-${{ github.sha }}
+          # The key is content-addressed on the Dockerfiles and
+          # the lockfile, and restore-keys is scoped to the same ref. A broad
+          # prefix let a build on any ref restore -- and then extend -- a cache
+          # populated by another ref. Scoping the key to this ref keeps another
+          # branch's layer out of a deploy build.
+          key: ${{ runner.os }}-buildx-staging-${{ github.ref_name }}-${{ hashFiles('apps/*/Dockerfile', 'pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-buildx-staging-
+            ${{ runner.os }}-buildx-staging-${{ github.ref_name }}-${{ hashFiles('apps/*/Dockerfile', 'pnpm-lock.yaml') }}-
+            ${{ runner.os }}-buildx-staging-${{ github.ref_name }}-
 
-      - name: Build and push Web image to ECR
-        id: build-web
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      - name: Build and push Web image
         run: |
-          echo "=========================================="
-          echo "Building Web Docker Image (staging)"
-          echo "=========================================="
-
           docker buildx build \
             --file apps/web/Dockerfile \
-            --build-arg NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
-            --build-arg NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
-            --build-arg NEXT_PUBLIC_API_VERSION=$NEXT_PUBLIC_API_VERSION \
+            --build-arg "NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL" \
+            --build-arg "NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL" \
+            --build-arg "NEXT_PUBLIC_API_VERSION=${NEXT_PUBLIC_API_VERSION:-v1}" \
             --cache-from type=local,src=/tmp/.buildx-cache \
             --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
             --push \
-            --tag $ECR_REGISTRY/$ECR_REPOSITORY_WEB:$IMAGE_TAG \
-            --tag $ECR_REGISTRY/$ECR_REPOSITORY_WEB:latest \
+            --tag "$ECR_REGISTRY/$ECR_REPOSITORY_WEB:$IMAGE_TAG" \
+            --tag "$ECR_REGISTRY/$ECR_REPOSITORY_WEB:latest" \
             .
+          rm -rf /tmp/.buildx-cache && mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          echo "✅ Web image pushed: $ECR_REGISTRY/$ECR_REPOSITORY_WEB:$IMAGE_TAG"
 
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-          echo "✓ Web image pushed"
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY_WEB:$IMAGE_TAG" >> $GITHUB_OUTPUT
-
-      - name: Build and push Backend image to ECR
-        id: build-backend
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      - name: Build and push Backend image
         run: |
-          echo "=========================================="
-          echo "Building Backend Docker Image (staging)"
-          echo "=========================================="
-
           docker buildx build \
             --file apps/backend/Dockerfile \
             --cache-from type=local,src=/tmp/.buildx-cache \
             --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
             --push \
-            --tag $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_TAG \
-            --tag $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:latest \
+            --tag "$ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_TAG" \
+            --tag "$ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:latest" \
             .
+          rm -rf /tmp/.buildx-cache && mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          echo "✅ Backend image pushed: $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_TAG"
 
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-          echo "✓ Backend image pushed"
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_TAG" >> $GITHUB_OUTPUT
-
-      # ──────────────────────────────────────────────
-      # Deploy to EC2 via SSH
-      # ──────────────────────────────────────────────
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key
-          chmod 600 ~/.ssh/ec2_key
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Copy deployment files to EC2
-        run: |
-          echo "=========================================="
-          echo "Copying deployment files to EC2"
-          echo "=========================================="
-
-          SSH_OPTS="-i ~/.ssh/ec2_key -o StrictHostKeyChecking=no"
-          REMOTE="$EC2_USER@$EC2_HOST"
-
-          ssh $SSH_OPTS $REMOTE "sudo mkdir -p /opt/staging/nginx && sudo chown -R $EC2_USER:$EC2_USER /opt/staging"
-
-          # Copy docker-compose
-          scp $SSH_OPTS docker-compose.staging.yml $REMOTE:/opt/staging/docker-compose.staging.yml
-
-          # Generate nginx config templates on the runner
-          mkdir -p /tmp/nginx-configs
-
-          # ── Web HTTP ──
-          cat > /tmp/nginx-configs/web.conf << 'NGINX_WEB'
-          server {
-              listen 80;
-              server_name __DOMAIN__;
-
-              location /.well-known/acme-challenge/ {
-                  root /var/www/certbot;
-              }
-
-              location / {
-                  proxy_pass http://127.0.0.1:3001;
-                  proxy_http_version 1.1;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-                  proxy_set_header Upgrade $http_upgrade;
-                  proxy_set_header Connection "upgrade";
-                  proxy_connect_timeout 60s;
-                  proxy_send_timeout 60s;
-                  proxy_read_timeout 60s;
-              }
-          }
-          NGINX_WEB
-
-          # ── Web HTTPS ──
-          cat > /tmp/nginx-configs/web-ssl.conf << 'NGINX_WEB_SSL'
-          server {
-              listen 80;
-              server_name __DOMAIN__;
-              location /.well-known/acme-challenge/ { root /var/www/certbot; }
-              location / { return 301 https://$host$request_uri; }
-          }
-          server {
-              listen 443 ssl;
-              server_name __DOMAIN__;
-
-              ssl_certificate /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
-              ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
-              ssl_protocols TLSv1.2 TLSv1.3;
-              ssl_ciphers HIGH:!aNULL:!MD5;
-
-              location / {
-                  proxy_pass http://127.0.0.1:3001;
-                  proxy_http_version 1.1;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-                  proxy_set_header Upgrade $http_upgrade;
-                  proxy_set_header Connection "upgrade";
-                  proxy_connect_timeout 60s;
-                  proxy_send_timeout 60s;
-                  proxy_read_timeout 60s;
-              }
-          }
-          NGINX_WEB_SSL
-
-          # ── API HTTP ──
-          cat > /tmp/nginx-configs/api.conf << 'NGINX_API'
-          server {
-              listen 80;
-              server_name __DOMAIN__;
-
-              client_max_body_size 50m;
-
-              location /.well-known/acme-challenge/ {
-                  root /var/www/certbot;
-              }
-
-              location / {
-                  proxy_pass http://127.0.0.1:3000;
-                  proxy_http_version 1.1;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-                  proxy_set_header Upgrade $http_upgrade;
-                  proxy_set_header Connection "upgrade";
-                  proxy_connect_timeout 60s;
-                  proxy_send_timeout 60s;
-                  proxy_read_timeout 60s;
-              }
-          }
-          NGINX_API
-
-          # ── API HTTPS ──
-          cat > /tmp/nginx-configs/api-ssl.conf << 'NGINX_API_SSL'
-          server {
-              listen 80;
-              server_name __DOMAIN__;
-              location /.well-known/acme-challenge/ { root /var/www/certbot; }
-              location / { return 301 https://$host$request_uri; }
-          }
-          server {
-              listen 443 ssl;
-              server_name __DOMAIN__;
-
-              client_max_body_size 50m;
-
-              ssl_certificate /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
-              ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
-              ssl_protocols TLSv1.2 TLSv1.3;
-              ssl_ciphers HIGH:!aNULL:!MD5;
-
-              location / {
-                  proxy_pass http://127.0.0.1:3000;
-                  proxy_http_version 1.1;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-                  proxy_set_header Upgrade $http_upgrade;
-                  proxy_set_header Connection "upgrade";
-                  proxy_connect_timeout 60s;
-                  proxy_send_timeout 60s;
-                  proxy_read_timeout 60s;
-              }
-          }
-          NGINX_API_SSL
-
-          # Copy configs to EC2
-          scp $SSH_OPTS /tmp/nginx-configs/*.conf $REMOTE:/opt/staging/nginx/
-
-          echo "✓ Files copied"
-
-      - name: Deploy on EC2
+      # ── SSH deploy to EC2 ───────────────────────────────────────
+      - name: Load deploy key into ssh-agent and pin the host key
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          STG_EC2_SSH_KEY: ${{ secrets.STG_EC2_SSH_KEY }}
         run: |
-          echo "=========================================="
-          echo "Deploying to EC2 (staging)"
-          echo "=========================================="
+          set -euo pipefail
 
-          SSH_OPTS="-i ~/.ssh/ec2_key -o StrictHostKeyChecking=no"
-          REMOTE="$EC2_USER@$EC2_HOST"
+          # The private key goes straight from the secret store into the
+          # agent's memory. It is never written to the runner's disk, so a
+          # failed or compromised later step has no file to read — and no
+          # cleanup step has to be relied on to run.
+          eval "$(ssh-agent -s)" > /dev/null
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+          printf '%s\n' "$STG_EC2_SSH_KEY" | ssh-add - > /dev/null
 
-          ssh $SSH_OPTS $REMOTE << DEPLOY_SCRIPT
+          # Pin the expected host key. Public material, so writing it is safe.
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$STG_EC2_HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+          echo "Pinned host keys for: $(cut -d' ' -f1 ~/.ssh/known_hosts | tr '\n' ' ')"
+
+      - name: Deploy via SSH
+        run: |
+          set -euo pipefail
+
+          # The shared require_var helper says "Missing: NAME". This
+          # precondition uses its own sentence, and it runs before any SSH.
+          if [ -z "${REDIS_PASSWORD:-}" ]; then
+            echo 'REDIS_PASSWORD is not set: add it as a secret in the GitHub "staging" environment'
+            exit 1
+          fi
+
+          # Copy each value once. A newline would split a record, so refuse it.
+          reject_newline() {
+            case "$2" in
+              *$'\n'*)
+                echo "$1 contains a newline" >&2
+                exit 1
+                ;;
+            esac
+          }
+
+          # The format check already refuses a newline. Repeat it here so a
+          # deploy step never forwards one, same as put.
+          reject_newline AWS_REGION "$AWS_REGION"
+          reject_newline ECR_REGISTRY "$ECR_REGISTRY"
+
+          put() {
+            reject_newline "$1" "$2"
+            printf '%s=%s\n' "$1" "$2"
+          }
+
+          env_file=$(mktemp)
+          chmod 600 "$env_file"
+          trap 'rm -f "$env_file"' EXIT
+
+          {
+            put ECR_REGISTRY "$ECR_REGISTRY"
+            put ECR_REPOSITORY_WEB "$ECR_REPOSITORY_WEB"
+            put ECR_REPOSITORY_BACKEND "$ECR_REPOSITORY_BACKEND"
+            put IMAGE_TAG "$IMAGE_TAG"
+            put NEXT_PUBLIC_APP_URL "$NEXT_PUBLIC_APP_URL"
+            put NEXT_PUBLIC_API_BASE_URL "$NEXT_PUBLIC_API_BASE_URL"
+            put NEXT_PUBLIC_API_VERSION "${NEXT_PUBLIC_API_VERSION:-v1}"
+            put DATABASE_URL "$DATABASE_URL"
+            put CORS_ORIGINS "$CORS_ORIGINS"
+            put BETTER_AUTH_SECRET "$BETTER_AUTH_SECRET"
+            put BETTER_AUTH_TRUSTED_ORIGINS "$BETTER_AUTH_TRUSTED_ORIGINS"
+            put GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"
+            put GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"
+            put REDIS_PASSWORD "$REDIS_PASSWORD"
+            printf '%s\n' '# one proxy hop, host Nginx on the same instance; the app ports are not opened in the security group; change this only if the hop count changes.'
+            printf '%s=%s\n' TRUST_PROXY 1
+          } > "$env_file"
+
+          # StrictHostKeyChecking=yes + BatchMode=yes is the fail-closed pair:
+          # an unknown or changed host key aborts the connection instead of
+          # being auto-accepted (the old `=no`) or learned on first sight
+          # (`accept-new`), and no prompt can hang the job waiting for input.
+          ssh_opts=(
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o BatchMode=yes
+          )
+
+          # Own SSH call, separate from the deploy script. umask and chmod
+          # leave the final file mode 600.
+          ssh "${ssh_opts[@]}" "ec2-user@$STG_EC2_HOST" \
+            'umask 077; trap '\''rm -f /opt/staging/.env.tmp'\'' EXIT; cat > /opt/staging/.env.tmp && chmod 600 /opt/staging/.env.tmp && mv /opt/staging/.env.tmp /opt/staging/.env' \
+            < "$env_file"
+
+          ssh "${ssh_opts[@]}" "ec2-user@$STG_EC2_HOST" \
+            'cat > /opt/staging/docker-compose.yml' \
+            < docker-compose.staging.yml
+
+          # The coordinates are validated on the runner and sent as quoted
+          # assignments on stdin. The remote command line carries no values.
+          {
+            printf 'AWS_REGION=%q\nECR_REGISTRY=%q\n' "$AWS_REGION" "$ECR_REGISTRY"
+            cat << 'DEPLOY'
             set -euo pipefail
+
+            # ECR login on the instance
+            aws ecr get-login-password --region "$AWS_REGION" | \
+              docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+            # Pull new images and restart
             cd /opt/staging
-
-            echo "── Saving rollback state ──"
-            if [ -f .env ]; then
-              cp .env .env.rollback
-              echo "✓ Previous .env saved to .env.rollback"
-            fi
-
-            echo "── Logging into ECR ──"
-            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-
-            echo "── Writing .env file ──"
-            cat > .env << 'ENV_EOF'
-          ECR_REGISTRY=$ECR_REGISTRY
-          ECR_REPOSITORY_WEB=$ECR_REPOSITORY_WEB
-          ECR_REPOSITORY_BACKEND=$ECR_REPOSITORY_BACKEND
-          IMAGE_TAG=$IMAGE_TAG
-          NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
-          NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
-          NEXT_PUBLIC_API_VERSION=$NEXT_PUBLIC_API_VERSION
-          DATABASE_URL=$DATABASE_URL
-          CORS_ORIGINS=$CORS_ORIGINS
-          BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
-          BETTER_AUTH_TRUSTED_ORIGINS=$BETTER_AUTH_TRUSTED_ORIGINS
-          GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
-          GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
-          ENV_EOF
-
-            echo "── Pulling latest images ──"
-            docker compose -f docker-compose.staging.yml pull
-
-            echo "── Starting services ──"
-            docker compose -f docker-compose.staging.yml up -d --remove-orphans
-
-            echo "── Updating Nginx configs (subdomain routing) ──"
-            sudo mkdir -p /var/www/certbot
-
-            if [ -f "/etc/letsencrypt/live/$DOMAIN_WEB/fullchain.pem" ]; then
-              echo "  SSL cert found for $DOMAIN_WEB → HTTPS config"
-              sed "s/__DOMAIN__/$DOMAIN_WEB/g" /opt/staging/nginx/web-ssl.conf | sudo tee /etc/nginx/conf.d/$DOMAIN_WEB.conf > /dev/null
-            else
-              echo "  No SSL cert for $DOMAIN_WEB → HTTP config"
-              sed "s/__DOMAIN__/$DOMAIN_WEB/g" /opt/staging/nginx/web.conf | sudo tee /etc/nginx/conf.d/$DOMAIN_WEB.conf > /dev/null
-            fi
-
-            if [ -f "/etc/letsencrypt/live/$DOMAIN_API/fullchain.pem" ]; then
-              echo "  SSL cert found for $DOMAIN_API → HTTPS config"
-              sed "s/__DOMAIN__/$DOMAIN_API/g" /opt/staging/nginx/api-ssl.conf | sudo tee /etc/nginx/conf.d/$DOMAIN_API.conf > /dev/null
-            else
-              echo "  No SSL cert for $DOMAIN_API → HTTP config"
-              sed "s/__DOMAIN__/$DOMAIN_API/g" /opt/staging/nginx/api.conf | sudo tee /etc/nginx/conf.d/$DOMAIN_API.conf > /dev/null
-            fi
-
-            echo "── Testing Nginx config ──"
-            sudo nginx -t
-
-            echo "── Reloading Nginx ──"
-            sudo systemctl reload nginx
-
-            echo "── Cleaning up old images ──"
+            docker compose pull
+            docker compose up -d --remove-orphans
             docker image prune -f
 
-            echo "── Service status ──"
-            docker compose -f docker-compose.staging.yml ps
-
-            echo "✓ Staging deployment complete"
-          DEPLOY_SCRIPT
-
-      # ──────────────────────────────────────────────
-      # Health check with rollback
-      # ──────────────────────────────────────────────
-      - name: Verify deployment health
-        id: health-check
-        continue-on-error: true
-        run: |
-          echo "=========================================="
-          echo "Verifying deployment health"
-          echo "=========================================="
-
-          SSH_OPTS="-i ~/.ssh/ec2_key -o StrictHostKeyChecking=no"
-          REMOTE="$EC2_USER@$EC2_HOST"
-
-          sleep 15
-
-          ssh $SSH_OPTS $REMOTE << 'HEALTH_CHECK'
-            set -euo pipefail
+            # Both containers are checked on the host. 12 attempts, 10s apart.
             RETRIES=12
             DELAY=10
-            cd /opt/staging
-
-            echo "Inspecting container status..."
-            docker compose -f docker-compose.staging.yml ps || true
 
             echo "Checking Backend health..."
             for i in $(seq 1 $RETRIES); do
-              if curl -sf http://127.0.0.1:3000/api/v1/health > /dev/null 2>&1; then
+              if curl -sf --max-time 10 http://127.0.0.1:3000/api/v1/health > /dev/null 2>&1; then
                 echo "✓ Backend is healthy"
                 break
               fi
               if [ "$i" -eq "$RETRIES" ]; then
                 echo "❌ Backend health check failed after $RETRIES attempts"
-                echo "── Backend diagnostics ──"
-                docker compose -f docker-compose.staging.yml ps || true
+                docker compose ps || true
                 docker logs --tail=100 staging-backend || true
                 exit 1
               fi
@@ -467,14 +311,13 @@ jobs:
 
             echo "Checking Web..."
             for i in $(seq 1 $RETRIES); do
-              if curl -sf http://127.0.0.1:3001/ > /dev/null 2>&1; then
+              if curl -sf --max-time 10 http://127.0.0.1:3001/ > /dev/null 2>&1; then
                 echo "✓ Web is healthy"
                 break
               fi
               if [ "$i" -eq "$RETRIES" ]; then
                 echo "❌ Web health check failed after $RETRIES attempts"
-                echo "── Web diagnostics ──"
-                docker compose -f docker-compose.staging.yml ps || true
+                docker compose ps || true
                 docker logs --tail=100 staging-web || true
                 exit 1
               fi
@@ -482,77 +325,19 @@ jobs:
               sleep $DELAY
             done
 
-            echo "Checking Nginx..."
-            sudo systemctl is-active nginx > /dev/null && echo "✓ Nginx is running" || { echo "❌ Nginx is not running"; exit 1; }
-          HEALTH_CHECK
+            echo "✅ Deploy complete"
+          DEPLOY
+          } | ssh "${ssh_opts[@]}" "ec2-user@$STG_EC2_HOST" bash -s
 
-      - name: Rollback on failure
-        if: steps.health-check.outcome == 'failure'
-        run: |
-          echo "=========================================="
-          echo "⚠️  Health check failed — rolling back"
-          echo "=========================================="
-
-          SSH_OPTS="-i ~/.ssh/ec2_key -o StrictHostKeyChecking=no"
-          REMOTE="$EC2_USER@$EC2_HOST"
-
-          ssh $SSH_OPTS $REMOTE << 'ROLLBACK'
-            set -euo pipefail
-            cd /opt/staging
-
-            if [ -f .env.rollback ]; then
-              echo "── Restoring previous .env ──"
-              cp .env.rollback .env
-
-              echo "── Pulling previous images ──"
-              docker compose -f docker-compose.staging.yml pull
-
-              echo "── Restarting with previous version ──"
-              docker compose -f docker-compose.staging.yml up -d --remove-orphans
-
-              echo "── Waiting for services to start ──"
-              sleep 15
-
-              echo "── Verifying rollback ──"
-              curl -sf http://127.0.0.1:3000/api/v1/health > /dev/null && echo "✓ Backend restored" || echo "⚠️ Backend may need manual intervention"
-              curl -sf http://127.0.0.1:3001/ > /dev/null && echo "✓ Web restored" || echo "⚠️ Web may need manual intervention"
-
-              echo "✓ Rollback complete"
-            else
-              echo "❌ No rollback state found (.env.rollback missing)"
-              echo "   This may be the first deployment — manual intervention required"
-            fi
-          ROLLBACK
-
-      - name: Fail workflow if health check failed
-        if: steps.health-check.outcome == 'failure'
-        run: |
-          echo "❌ Deployment failed health checks and was rolled back"
-          exit 1
-
-      - name: Cleanup SSH key
-        if: always()
-        run: rm -rf ~/.ssh/ec2_key
-
-      # ──────────────────────────────────────────────
-      # Summary
-      # ──────────────────────────────────────────────
       - name: Deployment summary
         run: |
-          echo "=========================================="
-          echo "Staging Deployment Complete!"
-          echo "=========================================="
-          echo "Strategy:     Single EC2 + Host Nginx (subdomain routing)"
-          echo "EC2 Host:     ${{ secrets.EC2_HOST }}"
-          echo "Branch:       staging"
-          echo "Commit SHA:   ${{ github.sha }}"
-          echo ""
-          echo "Web Image:    ${{ steps.build-web.outputs.image }}"
-          echo "Backend Image: ${{ steps.build-backend.outputs.image }}"
-          echo ""
-          echo "Subdomains:"
-          echo "  Web:     ${{ vars.DOMAIN_WEB }}"
-          echo "  API:     ${{ vars.DOMAIN_API }}"
-          echo ""
-          echo "First deploy? See README.md Deployment section for SSL setup."
-          echo "=========================================="
+          echo "==========================================="
+          echo "✅ Staging Deployment Complete!"
+          echo "==========================================="
+          echo "EC2 Host:    $STG_EC2_HOST"
+          echo "Web URL:     $NEXT_PUBLIC_APP_URL"
+          echo "API URL:     $NEXT_PUBLIC_API_BASE_URL"
+          echo "Image Tag:   $IMAGE_TAG"
+          echo "Branch:      staging"
+          echo "Commit:      ${{ github.sha }}"
+          echo "==========================================="

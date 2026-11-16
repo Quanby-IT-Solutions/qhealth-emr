@@ -39,12 +39,15 @@ export function Navbar() {
 			<div className="container mx-auto flex w-full max-w-7xl items-center justify-between px-6">
 				<Link href="/" className="group flex items-center gap-3">
 					<Image
-						src={mounted && isDark ? "/peregrinedark.svg" : "/peregrine.svg"}
-						alt="Peregrine Eye and Laser Institute"
-						width={2048}
-						height={461}
-						className="h-14 w-auto max-w-[320px] object-contain"
+						src="/quanby-mark.png"
+						alt="Quanby Solutions, Inc."
+						width={512}
+						height={512}
+						className="h-12 w-12 object-contain"
 					/>
+					<span className="text-foreground text-xl font-semibold tracking-tight">
+						Quanby Solutions
+					</span>
 				</Link>
 
 				{/* Desktop Nav */}

@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:mobile/core/constants/posthog_constants.dart';
+import 'package:mobile/core/constants/sentry_constants.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:mobile/features/auth/presentation/screens/login_screen.dart';
 import 'package:mobile/features/auth/presentation/screens/register_screen.dart';
 import 'package:mobile/features/home/presentation/screens/home_screen.dart';
 import 'package:mobile/features/onboarding/presentation/providers/onboarding_provider.dart';
 import 'package:mobile/features/onboarding/presentation/screens/onboarding_screen.dart';
+import 'package:mobile/services/analytics/analytics_screens.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 part 'app_router.g.dart';
 
@@ -43,6 +48,15 @@ GoRouter appRouter(Ref ref) {
     initialLocation: AppRoutes.home,
     debugLogDiagnostics: true,
     refreshListenable: refreshNotifier,
+    // Route names become navigation breadcrumbs, so a crash report shows the
+    // screens the user passed through, and PostHog screen views. Each
+    // observer exists only in a build with its own defines; with neither, the
+    // list is empty and no observer is constructed at all.
+    observers: [
+      if (SentryConstants.isEnabled) SentryNavigatorObserver(),
+      if (PosthogConstants.isEnabled)
+        PosthogObserver(nameExtractor: AnalyticsScreens.nameFor),
+    ],
     redirect: (context, state) {
       final isOnboardingDone = ref.read(hasCompletedOnboardingProvider);
       final authState = ref.read(authStateProvider);

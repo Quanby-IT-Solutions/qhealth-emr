@@ -44,6 +44,13 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- PostHog: the native SDK must not start itself from this manifest.
+             It is set up from Dart only when the build supplies the
+             POSTHOG_* defines (see lib/core/constants/posthog_constants.dart),
+             so a build without them makes no PostHog call at all. -->
+        <meta-data
+            android:name="com.posthog.posthog.AUTO_INIT"
+            android:value="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

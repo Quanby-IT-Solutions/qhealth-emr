@@ -4,7 +4,6 @@ import * as React from "react"
 import type { Route } from "next"
 import Image from "next/image"
 import Link from "next/link"
-import { useTheme } from "next-themes"
 
 import { buttonVariants, type ButtonVariants } from "@/core/components/ui/button"
 import { cn } from "@/core/lib/utils"
@@ -23,24 +22,21 @@ export const LogoIcon = React.memo(
 	({
 		className,
 		ref,
-		alt = "Peregrine Eye and Laser Institute",
+		alt = "Quanby Solutions, Inc.",
 		icon: _icon,
 		strokeWidth: _strokeWidth,
 		...props
 	}: LogoIconProps) => {
-		const { resolvedTheme } = useTheme()
-		const [mounted, setMounted] = React.useState(false)
-
-		React.useEffect(() => setMounted(true), [])
-
+		// The round Quanby mark is a self-contained badge that reads correctly on
+		// both light and dark surfaces, so no theme-dependent asset swap is needed.
 		return (
 			<Image
 				ref={ref}
-				src={mounted && resolvedTheme === "dark" ? "/peregrinedark.svg" : "/peregrine.svg"}
+				src="/quanby-mark.png"
 				alt={alt}
-				width={2048}
-				height={461}
-				className={cn("h-6 w-auto max-w-[11rem] object-contain", className)}
+				width={512}
+				height={512}
+				className={cn("h-6 w-6 object-contain", className)}
 				{...props}
 			/>
 		)
@@ -61,7 +57,7 @@ export interface LogoProps {
 }
 
 export function Logo({
-	text = "Peregrine",
+	text = "Quanby",
 	href,
 	size = "lg",
 	variant = "link",

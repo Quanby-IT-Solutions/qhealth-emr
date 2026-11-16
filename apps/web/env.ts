@@ -2,6 +2,32 @@ import { createEnv } from "@t3-oss/env-nextjs"
 import { z } from "zod/v4"
 
 /**
+ * Strict boolean-from-env parser.
+ *
+ * `z.coerce.boolean()` delegates to `Boolean(value)`, so the string "false"
+ * coerces to `true` — any non-empty string is truthy. That silently flips a
+ * feature flag to the opposite of what the operator wrote, so the accepted
+ * spellings are enumerated instead and anything else fails validation.
+ */
+const booleanFromEnv = z
+	.enum(["true", "false", "1", "0"])
+	.transform(value => value === "true" || value === "1")
+
+/**
+ * `booleanFromEnv` for flags that are legitimately absent by default.
+ *
+ * "Unset" does not always arrive as `undefined`. Docker materializes an unset
+ * `ARG` as `ENV NAME=`, and a shell `--build-arg NAME=$NAME` on an unset
+ * variable does the same, so a build with no Sentry configuration hands the
+ * parser an empty string instead of nothing at all. Empty and whitespace-only
+ * values are therefore normalized to `undefined` here, before the enum runs.
+ */
+const optionalBooleanFromEnv = z.preprocess(
+	value => (typeof value === "string" && value.trim() === "" ? undefined : value),
+	booleanFromEnv.optional()
+)
+
+/**
  * Type-safe environment variable validation for Web App
  *
  * All environment variables are validated at build time to ensure the app
@@ -24,6 +50,32 @@ export const env = createEnv({
 		DATABASE_URL: z.string().optional(),
 		INTERNAL_API_BASE_URL: z.url().optional(),
 		PATIENT_PORTAL_SESSION_SECRET: z.string().optional(),
+		VERCEL_GIT_COMMIT_SHA: z.string().optional(),
+		GITHUB_SHA: z.string().optional(),
+		GIT_COMMIT_SHA: z.string().optional(),
+
+		// Sentry — server and edge runtimes. Every value is optional because the
+		// app must build and run without a Sentry account. The runtime gate is
+		// `SENTRY_ENABLED` AND `SENTRY_DSN`, never either one alone (see
+		// `sentry.server.config.ts`).
+		SENTRY_ENABLED: optionalBooleanFromEnv,
+		// Deliberately a plain string rather than `z.url()`. A DSN typo is an
+		// observability misconfiguration, and failing validation here would take
+		// the whole build or boot down with it — the one outcome worse than not
+		// reporting. Shape is checked in `core/lib/sentry-config.ts`, which warns
+		// and disables the SDK instead of throwing.
+		SENTRY_DSN: z.string().optional(),
+		// Falls back to NODE_ENV when unset. Worth separating because "production
+		// build running in staging" is the case NODE_ENV cannot express.
+		SENTRY_ENVIRONMENT: z.string().optional(),
+
+		// Build-time source-map upload only, read by the bundler plugin in
+		// `next.config.ts`. Deliberately server-scoped and never `NEXT_PUBLIC_*`:
+		// the auth token is a write credential for the Sentry org. Absent by
+		// default, which is what keeps upload inert for unconfigured builds.
+		SENTRY_ORG: z.string().optional(),
+		SENTRY_PROJECT: z.string().optional(),
+		SENTRY_AUTH_TOKEN: z.string().optional(),
 	},
 
 	/**
@@ -35,6 +87,29 @@ export const env = createEnv({
 		NEXT_PUBLIC_APP_URL: z.url().default("http://localhost:3000"),
 		NEXT_PUBLIC_API_BASE_URL: z.url().default("http://localhost:3000/api"),
 		NEXT_PUBLIC_API_VERSION: z.string().default("v1"),
+
+		// Sentry — browser runtime. Same two-part gate as the server pair: the
+		// flag alone does nothing without a DSN. The DSN is a public identifier
+		// (write-only ingest key), which is why this one may be `NEXT_PUBLIC_*`
+		// while `SENTRY_AUTH_TOKEN` must never be.
+		NEXT_PUBLIC_SENTRY_ENABLED: optionalBooleanFromEnv,
+		NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
+		// Browser twin of `SENTRY_ENVIRONMENT`, so a staging deployment tags its
+		// client events the same way its server and edge events are tagged.
+		NEXT_PUBLIC_SENTRY_ENVIRONMENT: z.string().optional(),
+		// Bounded to 0–1 because Sentry reads it as a probability and silently
+		// treats anything else as "sample everything". Defaults to 0 at the call
+		// sites: tracing is opt-in, reporting is not.
+		NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).optional(),
+
+		// PostHog: product analytics and feature flags in the browser. Same
+		// two-part gate as Sentry: the flag alone does nothing without a token
+		// (see `core/lib/posthog-config.ts`). The token is a public ingest key.
+		NEXT_PUBLIC_POSTHOG_ENABLED: optionalBooleanFromEnv,
+		NEXT_PUBLIC_POSTHOG_TOKEN: z.string().optional(),
+		// Ingestion host of the project's region (https, *.i.posthog.com), used
+		// only by the `/ingest` proxy route in `app/ingest`. Defaults to US.
+		NEXT_PUBLIC_POSTHOG_HOST: z.string().optional(),
 	},
 
 	/**
@@ -47,15 +122,47 @@ export const env = createEnv({
 		DATABASE_URL: process.env.DATABASE_URL,
 		INTERNAL_API_BASE_URL: process.env.INTERNAL_API_BASE_URL,
 		PATIENT_PORTAL_SESSION_SECRET: process.env.PATIENT_PORTAL_SESSION_SECRET,
+		VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA,
+		GITHUB_SHA: process.env.GITHUB_SHA,
+		GIT_COMMIT_SHA: process.env.GIT_COMMIT_SHA,
+
+		// Sentry (server / edge / build)
+		SENTRY_ENABLED: process.env.SENTRY_ENABLED,
+		SENTRY_DSN: process.env.SENTRY_DSN,
+		SENTRY_ENVIRONMENT: process.env.SENTRY_ENVIRONMENT,
+		SENTRY_ORG: process.env.SENTRY_ORG,
+		SENTRY_PROJECT: process.env.SENTRY_PROJECT,
+		SENTRY_AUTH_TOKEN: process.env.SENTRY_AUTH_TOKEN,
 
 		// Client-side variables
 		NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
 		NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
 		NEXT_PUBLIC_API_VERSION: process.env.NEXT_PUBLIC_API_VERSION,
+
+		// Sentry (browser)
+		NEXT_PUBLIC_SENTRY_ENABLED: process.env.NEXT_PUBLIC_SENTRY_ENABLED,
+		NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+		// Server-side (SSR, route handlers) this falls back to the server-only
+		// variable directly. In the browser only `NEXT_PUBLIC_*` reads survive
+		// bundling, which is why `next.config.ts` projects `SENTRY_ENVIRONMENT`
+		// onto this key at build time when only the server one is set — both
+		// runtimes then resolve the same environment.
+		NEXT_PUBLIC_SENTRY_ENVIRONMENT:
+			process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT || process.env.SENTRY_ENVIRONMENT,
+		NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
+
+		// PostHog (browser)
+		NEXT_PUBLIC_POSTHOG_ENABLED: process.env.NEXT_PUBLIC_POSTHOG_ENABLED,
+		NEXT_PUBLIC_POSTHOG_TOKEN: process.env.NEXT_PUBLIC_POSTHOG_TOKEN,
+		NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
 	},
 
 	/**
-	 * Skip validation during CI or linting to prevent errors in non-build contexts
+	 * Skip validation during CI or linting to prevent errors in non-build contexts.
+	 * `SKIP_ENV_VALIDATION` is the documented escape hatch for build-only jobs.
 	 */
-	skipValidation: !!process.env.CI || process.env.npm_lifecycle_event === "lint",
+	skipValidation:
+		!!process.env.CI ||
+		process.env.SKIP_ENV_VALIDATION === "true" ||
+		process.env.npm_lifecycle_event === "lint",
 })
