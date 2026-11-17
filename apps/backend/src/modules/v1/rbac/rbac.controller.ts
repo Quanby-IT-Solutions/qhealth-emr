@@ -1,4 +1,5 @@
 import { Controller, Req } from "@nestjs/common"
+import { Throttle } from "@nestjs/throttler"
 import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
 import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
@@ -101,6 +102,16 @@ export class RbacController {
 		})
 	}
 
+	// Verifies a co-signer's password for the high-alert medication flow.
+	// Without a permission gate this is a password oracle: any authenticated
+	// user could probe any staff member's password. Restricted to the roles
+	// that actually drive the co-sign dialog (medication order authors), and
+	// throttled hard because each call is a credential guess.
+	@RequireAnyPermissions([
+		{ module: "orders", action: "create" },
+		{ module: "orders", action: "sign" },
+	])
+	@Throttle({ default: { limit: 10, ttl: 60000 } })
 	@Implement(v1.rbac.verifyCoSignCredentials)
 	async verifyCoSignCredentials() {
 		return implement(v1.rbac.verifyCoSignCredentials).handler(async ({ input }) => {
