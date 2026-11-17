@@ -28,6 +28,7 @@ catalog:
   dotenv: ^16.6.1
   drizzle-orm: 1.0.0-beta.20
   eslint: ^9.39.2
+  fflate: ^0.8.3
   nestjs-zod: ^5.1.1
   next: 16.4.5
   pg: ^8.16.3
