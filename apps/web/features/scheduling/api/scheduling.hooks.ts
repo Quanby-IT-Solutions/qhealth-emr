@@ -1,6 +1,12 @@
 "use client"
 
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+	useMutation,
+	useQueries,
+	useQuery,
+	useQueryClient,
+	type QueryKey,
+} from "@tanstack/react-query"
 
 import type {
 	Appointment,
@@ -42,6 +48,8 @@ export interface ClinicianOption {
 	name: string
 	department?: string | null
 }
+
+type QueueSnapshot = Array<readonly [QueryKey, ClinicQueueResponse | undefined]>
 
 interface ScheduleTemplatesQueryParams {
 	facilityId?: string
@@ -335,12 +343,43 @@ export function useUpdateAppointmentStatusMutation() {
 
 	return useMutation(
 		orpc.scheduling.updateAppointmentStatus.mutationOptions({
-			onSuccess: data => {
+			onMutate: async variables => {
+				const status = variables.status
+				if (!isOptimisticQueueStatus(status)) return undefined
+
+				await queryClient.cancelQueries({
+					queryKey: orpc.scheduling.getClinicQueue.key(),
+				})
+
+				const queueSnapshots = queryClient.getQueriesData<ClinicQueueResponse>({
+					queryKey: orpc.scheduling.getClinicQueue.key(),
+				}) as QueueSnapshot
+
+				queryClient.setQueriesData<ClinicQueueResponse>(
+					{
+						queryKey: orpc.scheduling.getClinicQueue.key(),
+					},
+					current =>
+						updateClinicQueueEntryStatus(
+							current,
+							entry => entry.appointmentId === variables.id || entry.id === variables.id,
+							status
+						)
+				)
+
+				return { queueSnapshots }
+			},
+			onError: (_error, _variables, context) => {
+				context?.queueSnapshots.forEach(([queryKey, data]) => {
+					queryClient.setQueryData(queryKey, data)
+				})
+			},
+			onSettled: (_data, _error, variables) => {
 				void queryClient.invalidateQueries({
 					queryKey: orpc.scheduling.listAppointments.key(),
 				})
 				void queryClient.invalidateQueries({
-					queryKey: orpc.scheduling.getAppointment.key({ input: { id: data.id } }),
+					queryKey: orpc.scheduling.getAppointment.key({ input: { id: variables.id } }),
 				})
 				void queryClient.invalidateQueries({
 					queryKey: orpc.scheduling.getClinicQueue.key(),
@@ -355,7 +394,7 @@ export function useUpdateAppointmentStatusMutation() {
 
 export function useClinicQueueQuery(
 	params: ClinicQueueQuery,
-	options?: { refetchInterval?: number }
+	options?: { refetchInterval?: number | false }
 ) {
 	const hasFilter = !!params.facilityId || !!params.clinicId
 
@@ -373,12 +412,99 @@ export function useUpdateEncounterQueueStatusMutation() {
 
 	return useMutation(
 		orpc.scheduling.updateEncounterQueueStatus.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({
+			onMutate: async variables => {
+				await queryClient.cancelQueries({
 					queryKey: orpc.scheduling.getClinicQueue.key(),
-				}),
+				})
+
+				const queueSnapshots = queryClient.getQueriesData<ClinicQueueResponse>({
+					queryKey: orpc.scheduling.getClinicQueue.key(),
+				}) as QueueSnapshot
+
+				queryClient.setQueriesData<ClinicQueueResponse>(
+					{
+						queryKey: orpc.scheduling.getClinicQueue.key(),
+					},
+					current =>
+						updateClinicQueueEntryStatus(
+							current,
+							entry => entry.encounterId === variables.id || entry.id === variables.id,
+							variables.status,
+							variables.status === "in_progress"
+								? {
+										calledByStaffId: variables.calledByStaffId ?? null,
+										calledAt: new Date().toISOString(),
+									}
+								: undefined
+						)
+				)
+
+				return { queueSnapshots }
+			},
+			onError: (_error, _variables, context) => {
+				context?.queueSnapshots.forEach(([queryKey, data]) => {
+					queryClient.setQueryData(queryKey, data)
+				})
+			},
+			onSettled: () => {
+				void queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.getClinicQueue.key(),
+				})
+			},
 		})
 	)
+}
+
+export function useCallNextQueuePatientMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation(
+		orpc.scheduling.callNextQueuePatient.mutationOptions({
+			onSettled: () => {
+				void queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.getClinicQueue.key(),
+				})
+			},
+		})
+	)
+}
+
+function isOptimisticQueueStatus(status: string): status is UnifiedQueueEntry["status"] {
+	return status === "in_progress" || status === "completed" || status === "no_show"
+}
+
+function updateClinicQueueEntryStatus(
+	current: ClinicQueueResponse | undefined,
+	matches: (entry: UnifiedQueueEntry) => boolean,
+	status: UnifiedQueueEntry["status"],
+	patch?: Partial<UnifiedQueueEntry>
+) {
+	if (!current) return current
+
+	let changed = false
+	const entries = current.entries.map(entry => {
+		if (!matches(entry)) return entry
+		changed = true
+		return { ...entry, status, ...patch }
+	})
+
+	if (!changed) return current
+
+	return {
+		...current,
+		entries,
+		stats: getClinicQueueStats(entries),
+	}
+}
+
+function getClinicQueueStats(entries: UnifiedQueueEntry[]): ClinicQueueResponse["stats"] {
+	return {
+		waiting: entries.filter(entry => entry.status === "waiting").length,
+		inProgress: entries.filter(entry => entry.status === "in_progress").length,
+		completed: entries.filter(entry => entry.status === "completed").length,
+		noShow: entries.filter(entry => entry.status === "no_show").length,
+		total: entries.length,
+	}
 }
 
 export type {

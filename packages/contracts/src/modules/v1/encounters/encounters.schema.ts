@@ -77,7 +77,7 @@ export const EncounterSchema = z.object({
 	clinicianStaffId: z.string().uuid().nullable(),
 
 	// PS-003: Walk-in OPD queue position on the clinic queue board
-	queueStatus: z.enum(["waiting", "in_progress", "completed"]).nullable(),
+	queueStatus: z.enum(["waiting", "in_progress", "completed", "no_show"]).nullable(),
 
 	// SLA tracking (computed from encounterStatusEvents)
 	slaStatus: EncounterSlaStatusEnum.nullable(),

@@ -75,7 +75,7 @@ export const patientContract = {
 		.route({
 			method: "POST",
 			path: "/patients/register-with-opd-encounter",
-			summary: "Atomically register a new patient and create an OPD encounter (TOR Flow 1 Step 2)",
+			summary: "Atomically register a new patient and create an OPD encounter",
 			tags: ["Patients"],
 		})
 		.input(RegisterPatientWithOpdEncounterInputSchema)

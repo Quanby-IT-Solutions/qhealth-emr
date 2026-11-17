@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common"
 
 import { db } from "@/common/database/database.client"
+import { closeOpenSlaStep } from "@/utils/sla-events"
+import { resolveStepTarget } from "@/utils/sla-step-target"
 
 import { SchedulingService } from "./scheduling.service"
 
@@ -29,7 +31,7 @@ jest.mock("drizzle-orm", () => ({
 	count: jest.fn(),
 	desc: jest.fn(),
 	isNotNull: jest.fn(),
-	lt: jest.fn(),
+	lt: (left: unknown, right: unknown) => ({ op: "lt", left, right }),
 	or: jest.fn(),
 	sql: jest.fn(),
 }))
@@ -100,7 +102,12 @@ jest.mock("@repo/db/schema", () => ({
 		queueNumber: "encounters.queueNumber",
 		clinicianStaffId: "encounters.clinicianStaffId",
 		queueStatus: "encounters.queueStatus",
+		queueCalledByStaffId: "encounters.queueCalledByStaffId",
+		queueCalledAt: "encounters.queueCalledAt",
 		updatedAt: "encounters.updatedAt",
+	},
+	vitalSigns: {
+		encounterId: "vitalSigns.encounterId",
 	},
 	encounterStatusEvents: {
 		facilityId: "encounterStatusEvents.facilityId",
@@ -217,6 +224,8 @@ function makeEncounter(overrides: Record<string, unknown> = {}) {
 		queueNumber: 1,
 		clinicianStaffId: "clinician-1",
 		queueStatus: "waiting",
+		queueCalledByStaffId: null,
+		queueCalledAt: null,
 		createdAt: new Date("2026-05-07T08:00:00.000Z"),
 		updatedAt: new Date("2026-05-07T08:00:00.000Z"),
 		...overrides,
@@ -260,6 +269,62 @@ function mockSelectWhere(rows: unknown[]) {
 function mockSelectChain(rows: unknown[]) {
 	return {
 		from: jest.fn().mockReturnValue(mockSelectWhere(rows)),
+	}
+}
+
+function mockClinicianStaffSubquery() {
+	return {
+		from: jest.fn().mockReturnValue({
+			innerJoin: jest.fn().mockReturnValue({
+				as: jest.fn().mockReturnValue("clinician_staff"),
+			}),
+		}),
+	}
+}
+
+function mockQueueSelectChain(rows: unknown[]) {
+	const orderBy = jest.fn().mockResolvedValue(rows)
+	const where = jest.fn().mockReturnValue({ orderBy })
+	const leftJoinFourth = jest.fn().mockReturnValue({ where })
+	const leftJoinThird = jest.fn().mockReturnValue({ leftJoin: leftJoinFourth })
+	const leftJoinSecond = jest.fn().mockReturnValue({ leftJoin: leftJoinThird })
+	const leftJoinFirst = jest.fn().mockReturnValue({ leftJoin: leftJoinSecond })
+	const innerJoin = jest.fn().mockReturnValue({ leftJoin: leftJoinFirst })
+	const from = jest.fn().mockReturnValue({ innerJoin })
+
+	return {
+		from,
+		innerJoin,
+		leftJoinFirst,
+		leftJoinSecond,
+		leftJoinThird,
+		leftJoinFourth,
+		where,
+		orderBy,
+	}
+}
+
+function mockActiveCoordinatorSelectChain(rows: unknown[]) {
+	const limit = jest.fn().mockResolvedValue(rows)
+	const orderBy = jest.fn().mockReturnValue({ limit })
+	const where = jest.fn().mockReturnValue({ orderBy })
+	const leftJoinFourth = jest.fn().mockReturnValue({ where })
+	const leftJoinThird = jest.fn().mockReturnValue({ leftJoin: leftJoinFourth })
+	const leftJoinSecond = jest.fn().mockReturnValue({ leftJoin: leftJoinThird })
+	const leftJoinFirst = jest.fn().mockReturnValue({ leftJoin: leftJoinSecond })
+	const innerJoin = jest.fn().mockReturnValue({ leftJoin: leftJoinFirst })
+	const from = jest.fn().mockReturnValue({ innerJoin })
+
+	return {
+		from,
+		innerJoin,
+		leftJoinFirst,
+		leftJoinSecond,
+		leftJoinThird,
+		leftJoinFourth,
+		where,
+		orderBy,
+		limit,
 	}
 }
 
@@ -801,6 +866,263 @@ describe("SchedulingService", () => {
 		})
 	})
 
+	describe("getClinicQueue()", () => {
+		it("returns facility-wide walk-ins with null clinician assignment when no clinician filter is provided", async () => {
+			const rows = [
+				{
+					id: "encounter-late",
+					appointmentId: null,
+					encounterId: "encounter-late",
+					queueNumber: 2,
+					slotTime: null,
+					checkedInAt: new Date("2026-05-07T08:30:00.000Z"),
+					queueStatus: "waiting",
+					patientId: "patient-2",
+					patientFirstName: "Ben",
+					patientLastName: "Santos",
+					patientMrn: "MRN-002",
+					patientDateOfBirth: new Date(1981, 1, 3),
+					clinicianStaffId: null,
+					clinicianName: null,
+					clinicName: null,
+				},
+				{
+					id: "encounter-early",
+					appointmentId: null,
+					encounterId: "encounter-early",
+					queueNumber: 1,
+					slotTime: null,
+					checkedInAt: new Date("2026-05-07T08:00:00.000Z"),
+					queueStatus: "in_progress",
+					patientId: "patient-1",
+					patientFirstName: "Ana",
+					patientLastName: "Reyes",
+					patientMrn: "MRN-001",
+					patientDateOfBirth: new Date(1980, 0, 1),
+					clinicianStaffId: null,
+					clinicianName: null,
+					clinicName: null,
+				},
+				{
+					id: "encounter-completed",
+					appointmentId: null,
+					encounterId: "encounter-completed",
+					queueNumber: 3,
+					slotTime: null,
+					checkedInAt: new Date("2026-05-07T09:00:00.000Z"),
+					queueStatus: "completed",
+					patientId: "patient-3",
+					patientFirstName: "Cara",
+					patientLastName: "Lim",
+					patientMrn: "MRN-003",
+					patientDateOfBirth: new Date(1975, 2, 4),
+					clinicianStaffId: null,
+					clinicianName: null,
+					clinicName: null,
+				},
+			]
+			const queueSelect = mockQueueSelectChain(rows)
+
+			;(db.select as jest.Mock)
+				.mockReturnValueOnce(mockClinicianStaffSubquery())
+				.mockReturnValueOnce(mockClinicianStaffSubquery())
+				.mockReturnValueOnce(queueSelect)
+
+			const result = await service.getClinicQueue({
+				facilityId: "fac-1",
+				date: "2026-05-07",
+			})
+
+			expect(result.entries.map(entry => entry.encounterId)).toEqual([
+				"encounter-early",
+				"encounter-late",
+				"encounter-completed",
+			])
+			expect(result.entries[0]?.patientDateOfBirth).toBe("1980-01-01")
+			expect(result.entries.every(entry => entry.clinicianStaffId === null)).toBe(true)
+			expect(result.stats).toEqual({
+				waiting: 1,
+				inProgress: 1,
+				completed: 1,
+				noShow: 0,
+				total: 3,
+			})
+			expect(queueSelect.orderBy).toHaveBeenCalledWith(
+				"encounters.queueNumber",
+				"encounters.admissionDatetime",
+				"encounters.id"
+			)
+
+			const whereArg = queueSelect.where.mock.calls[0]?.[0]
+			expect(whereArg.args).not.toContainEqual(
+				expect.objectContaining({
+					op: "eq",
+					left: "encounters.clinicianStaffId",
+				})
+			)
+		})
+
+		it("preserves clinician-scoped filtering when a clinician filter is provided", async () => {
+			const rows = [
+				{
+					id: "encounter-1",
+					appointmentId: "appointment-1",
+					encounterId: "encounter-1",
+					queueNumber: 1,
+					slotTime: "08:00",
+					checkedInAt: new Date("2026-05-07T08:05:00.000Z"),
+					queueStatus: "waiting",
+					patientId: "patient-1",
+					patientFirstName: "Ana",
+					patientLastName: "Reyes",
+					patientMrn: "MRN-001",
+					patientDateOfBirth: "1980-01-01",
+					clinicianStaffId: "clinician-1",
+					clinicianName: "Dr. Cruz",
+					clinicName: "OPD AM",
+				},
+			]
+			const queueSelect = mockQueueSelectChain(rows)
+
+			;(db.select as jest.Mock)
+				.mockReturnValueOnce(mockClinicianStaffSubquery())
+				.mockReturnValueOnce(mockClinicianStaffSubquery())
+				.mockReturnValueOnce(queueSelect)
+
+			const result = await service.getClinicQueue({
+				facilityId: "fac-1",
+				clinicianStaffId: "clinician-1",
+				date: "2026-05-07",
+			})
+
+			expect(result.entries[0]).toEqual(
+				expect.objectContaining({
+					entryType: "appointment",
+					appointmentId: "appointment-1",
+					clinicianStaffId: "clinician-1",
+					clinicianName: "Dr. Cruz",
+					patientDateOfBirth: "1980-01-01",
+				})
+			)
+
+			const whereArg = queueSelect.where.mock.calls[0]?.[0]
+			expect(whereArg.args).toContainEqual(
+				expect.objectContaining({
+					op: "eq",
+					left: "encounters.clinicianStaffId",
+					right: "clinician-1",
+				})
+			)
+		})
+
+		it("filters the requested queue date using Asia/Manila day boundaries", async () => {
+			const queueSelect = mockQueueSelectChain([])
+
+			;(db.select as jest.Mock)
+				.mockReturnValueOnce(mockClinicianStaffSubquery())
+				.mockReturnValueOnce(mockClinicianStaffSubquery())
+				.mockReturnValueOnce(queueSelect)
+
+			await service.getClinicQueue({
+				facilityId: "fac-1",
+				date: "2026-05-07",
+			})
+
+			const whereArg = queueSelect.where.mock.calls[0]?.[0]
+			expect(whereArg.args).toContainEqual({
+				op: "gte",
+				left: "encounters.admissionDatetime",
+				right: new Date("2026-05-06T16:00:00.000Z"),
+			})
+			expect(whereArg.args).toContainEqual({
+				op: "lt",
+				left: "encounters.admissionDatetime",
+				right: new Date("2026-05-07T16:00:00.000Z"),
+			})
+		})
+
+		it("returns an active coordinator entry outside the selected queue date", async () => {
+			const rows = [
+				{
+					id: "encounter-today",
+					appointmentId: null,
+					encounterId: "encounter-today",
+					queueNumber: 1,
+					slotTime: null,
+					checkedInAt: new Date("2026-05-07T08:00:00.000Z"),
+					queueStatus: "waiting",
+					patientId: "patient-today",
+					patientFirstName: "Ben",
+					patientLastName: "Santos",
+					patientMrn: "MRN-002",
+					patientDateOfBirth: "1981-02-03",
+					clinicianStaffId: null,
+					clinicianName: null,
+					calledByStaffId: null,
+					calledByName: null,
+					calledAt: null,
+					clinicName: null,
+				},
+			]
+			const staleActiveRows = [
+				{
+					id: "encounter-yesterday",
+					appointmentId: null,
+					encounterId: "encounter-yesterday",
+					queueNumber: 4,
+					slotTime: null,
+					checkedInAt: new Date("2026-05-06T08:00:00.000Z"),
+					queueStatus: "in_progress",
+					patientId: "patient-yesterday",
+					patientFirstName: "Ana",
+					patientLastName: "Reyes",
+					patientMrn: "MRN-001",
+					patientDateOfBirth: "1980-01-01",
+					clinicianStaffId: null,
+					clinicianName: null,
+					calledByStaffId: actor.staffProfileId,
+					calledByName: "Coordinator One",
+					calledAt: new Date("2026-05-06T08:05:00.000Z"),
+					clinicName: null,
+				},
+			]
+			const queueSelect = mockQueueSelectChain(rows)
+			const activeCoordinatorSelect = mockActiveCoordinatorSelectChain(staleActiveRows)
+
+			;(db.select as jest.Mock)
+				.mockReturnValueOnce(mockClinicianStaffSubquery())
+				.mockReturnValueOnce(mockClinicianStaffSubquery())
+				.mockReturnValueOnce(queueSelect)
+				.mockReturnValueOnce(mockClinicianStaffSubquery())
+				.mockReturnValueOnce(mockClinicianStaffSubquery())
+				.mockReturnValueOnce(activeCoordinatorSelect)
+
+			const result = await service.getClinicQueue({
+				facilityId: "fac-1",
+				calledByStaffId: actor.staffProfileId,
+				date: "2026-05-07",
+			})
+
+			expect(result.entries.map(entry => entry.encounterId)).toEqual(["encounter-today"])
+			expect(result.activeCoordinatorEntry).toEqual(
+				expect.objectContaining({
+					encounterId: "encounter-yesterday",
+					status: "in_progress",
+					calledByStaffId: actor.staffProfileId,
+					patientName: "Reyes, Ana",
+					checkInTime: "2026-05-06T08:00:00.000Z",
+				})
+			)
+			expect(result.stats).toEqual({
+				waiting: 1,
+				inProgress: 0,
+				completed: 0,
+				noShow: 0,
+				total: 1,
+			})
+		})
+	})
+
 	describe("updateAppointmentStatus()", () => {
 		it("releases the linked slot when an appointment is cancelled", async () => {
 			const existing = makeAppointment({ clinicSlotId: "slot-1", status: "booked" })
@@ -838,6 +1160,218 @@ describe("SchedulingService", () => {
 					appointmentId: null,
 				})
 			)
+		})
+	})
+
+	describe("updateEncounterQueueStatus()", () => {
+		it("updates queue status and writes the SLA event inside the same transaction", async () => {
+			const current = makeEncounter({ queueStatus: "waiting" })
+			const updated = makeEncounter({ queueStatus: "in_progress" })
+			const updateEncounter = mockUpdateReturning(updated)
+			const updateAppointment = mockUpdateWithoutReturning()
+			const insertStatusEvent = { values: jest.fn().mockResolvedValue(undefined) }
+			let transactionClient: unknown
+			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([current]))
+			;(db.transaction as jest.Mock).mockImplementation(
+				async (fn: (tx: unknown) => Promise<unknown>) => {
+					const tx = {
+						select: jest.fn().mockReturnValue(mockSelectChain([])),
+						update: jest
+							.fn()
+							.mockReturnValueOnce(updateEncounter)
+							.mockReturnValueOnce(updateAppointment),
+						insert: jest.fn().mockReturnValueOnce(insertStatusEvent),
+					}
+					transactionClient = tx
+					return fn(tx)
+				}
+			)
+
+			const result = await service.updateEncounterQueueStatus(
+				{
+					id: current.id,
+					status: "in_progress",
+					calledByStaffId: "client-staff-1",
+				},
+				actor
+			)
+
+			expect(result).toEqual({ id: "encounter-1", queueStatus: "in_progress" })
+			expect(resolveStepTarget).toHaveBeenCalledWith("fac-1", "opd", "in_progress")
+			expect(closeOpenSlaStep).toHaveBeenCalledWith(
+				transactionClient,
+				"encounter-1",
+				"opd",
+				expect.any(Date)
+			)
+			expect(insertStatusEvent.values).toHaveBeenCalledWith(
+				expect.objectContaining({
+					encounterId: "encounter-1",
+					fromStatus: "waiting",
+					toStatus: "in_progress",
+					workflowType: "opd",
+					staffId: actor.staffProfileId,
+					slaTargetMinutes: 15,
+					notes: "OPD queue: waiting -> in_progress",
+				})
+			)
+		})
+
+		it("marks the called patient as no-show and syncs the linked appointment", async () => {
+			const current = makeEncounter({
+				queueStatus: "in_progress",
+				queueCalledByStaffId: actor.staffProfileId,
+			})
+			const updated = makeEncounter({
+				queueStatus: "no_show",
+				queueCalledByStaffId: actor.staffProfileId,
+			})
+			const updateEncounter = mockUpdateReturning(updated)
+			const updateAppointment = mockUpdateWithoutReturning()
+			const insertStatusEvent = { values: jest.fn().mockResolvedValue(undefined) }
+			let updateMock: jest.Mock
+			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([current]))
+			;(db.transaction as jest.Mock).mockImplementation(
+				async (fn: (tx: unknown) => Promise<unknown>) => {
+					updateMock = jest
+						.fn()
+						.mockReturnValueOnce(updateEncounter)
+						.mockReturnValueOnce(updateAppointment)
+					const tx = {
+						select: jest.fn().mockReturnValue(mockSelectChain([])),
+						update: updateMock,
+						insert: jest.fn().mockReturnValueOnce(insertStatusEvent),
+					}
+					return fn(tx)
+				}
+			)
+
+			const result = await service.updateEncounterQueueStatus(
+				{
+					id: current.id,
+					status: "no_show",
+				},
+				actor
+			)
+
+			expect(result).toEqual({ id: "encounter-1", queueStatus: "no_show" })
+			expect(resolveStepTarget).toHaveBeenCalledWith("fac-1", "opd", "no_show")
+			expect(updateAppointment.set).toHaveBeenCalledWith(
+				expect.objectContaining({ status: "no_show" })
+			)
+			expect(insertStatusEvent.values).toHaveBeenCalledWith(
+				expect.objectContaining({
+					encounterId: "encounter-1",
+					fromStatus: "in_progress",
+					toStatus: "no_show",
+					workflowType: "opd",
+					staffId: actor.staffProfileId,
+					notes: "OPD queue: in_progress -> no_show",
+				})
+			)
+		})
+
+		it("rejects no-show updates from staff who did not call the patient", async () => {
+			const current = makeEncounter({
+				queueStatus: "in_progress",
+				queueCalledByStaffId: "staff-who-called",
+			})
+			;(db.select as jest.Mock).mockReturnValueOnce(mockSelectChain([current]))
+
+			await expect(
+				service.updateEncounterQueueStatus(
+					{
+						id: current.id,
+						status: "no_show",
+					},
+					actor
+				)
+			).rejects.toThrow(ConflictException)
+
+			expect(db.transaction).not.toHaveBeenCalled()
+		})
+	})
+
+	describe("callNextQueuePatient()", () => {
+		it("atomically claims the next waiting encounter for the current coordinator", async () => {
+			const claimed = {
+				id: "encounter-1",
+				facilityId: "fac-1",
+				appointmentId: "appointment-1",
+				queueStatus: "in_progress",
+				queueCalledByStaffId: actor.staffProfileId,
+				queueCalledAt: new Date("2026-05-07T08:05:00.000Z"),
+			}
+			const updateAppointment = mockUpdateWithoutReturning()
+			const insertStatusEvent = { values: jest.fn().mockResolvedValue(undefined) }
+			let transactionClient: unknown
+			let executeMock: jest.Mock
+			;(db.transaction as jest.Mock).mockImplementation(
+				async (fn: (tx: unknown) => Promise<unknown>) => {
+					executeMock = jest.fn().mockResolvedValue({ rows: [claimed] })
+					const tx = {
+						select: jest.fn().mockReturnValue(mockSelectChain([])),
+						execute: executeMock,
+						update: jest.fn().mockReturnValueOnce(updateAppointment),
+						insert: jest.fn().mockReturnValueOnce(insertStatusEvent),
+					}
+					transactionClient = tx
+					return fn(tx)
+				}
+			)
+
+			const result = await service.callNextQueuePatient(
+				{
+					facilityId: "fac-1",
+					clinicianStaffId: "clinician-1",
+					date: "2026-05-07",
+					calledByStaffId: "client-staff-1",
+				},
+				actor
+			)
+
+			expect(result).toEqual({ id: "encounter-1", queueStatus: "in_progress" })
+			expect(executeMock!).toHaveBeenCalledTimes(1)
+			expect(resolveStepTarget).toHaveBeenCalledWith("fac-1", "opd", "in_progress")
+			expect(closeOpenSlaStep).toHaveBeenCalledWith(
+				transactionClient,
+				"encounter-1",
+				"opd",
+				expect.any(Date)
+			)
+			expect(insertStatusEvent.values).toHaveBeenCalledWith(
+				expect.objectContaining({
+					facilityId: "fac-1",
+					encounterId: "encounter-1",
+					fromStatus: "waiting",
+					toStatus: "in_progress",
+					workflowType: "opd",
+					staffId: actor.staffProfileId,
+					slaTargetMinutes: 15,
+					notes: "OPD queue: waiting -> in_progress",
+				})
+			)
+		})
+
+		it("rejects calling another patient when the coordinator has an active queue patient", async () => {
+			;(db.transaction as jest.Mock).mockImplementation(
+				async (fn: (tx: unknown) => Promise<unknown>) => {
+					const tx = {
+						select: jest.fn().mockReturnValue(mockSelectChain([{ id: "encounter-active" }])),
+					}
+					return fn(tx)
+				}
+			)
+
+			await expect(
+				service.callNextQueuePatient(
+					{
+						facilityId: "fac-1",
+						date: "2026-05-07",
+					},
+					actor
+				)
+			).rejects.toBeInstanceOf(ConflictException)
 		})
 	})
 

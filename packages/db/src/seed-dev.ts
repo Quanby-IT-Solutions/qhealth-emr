@@ -587,6 +587,20 @@ const demoUsers: DemoUser[] = [
 		employeeNumber: "SCH-001",
 	},
 	{
+		email: "coordinator@qhealth.local",
+		name: "Demo Clinic Coordinator",
+		roleName: "Clinic Coordinator",
+		department: "Outpatient Department",
+		employeeNumber: "CCO-001",
+	},
+	{
+		email: "coordinator2@qhealth.local",
+		name: "Demo Clinic Coordinator 2",
+		roleName: "Clinic Coordinator",
+		department: "Outpatient Department",
+		employeeNumber: "CCO-002",
+	},
+	{
 		email: "auditor@qhealth.local",
 		name: "Ramon Santos",
 		roleName: "Auditor",
@@ -890,6 +904,19 @@ const roleBundles: Record<string, Array<[ModuleName, ActionName[]]>> = {
 		["medical_records", ["view"]], // TOR: medical records release audit
 		["opd", ["view"]], // TOR: OPD encounter audit
 		["notifications", ["view"]], // All staff receive system notifications
+	],
+	// Mission-day front desk + community chart: registration, OPD queue, limited chart (no pharmacy verify / admin / HIM / billing).
+	"Clinic Coordinator": [
+		["adt", ["view", "create", "edit"]],
+		["patients", ["view", "create", "edit"]],
+		["scheduling", ["view", "create", "edit"]],
+		["opd", ["view"]],
+		["nursing", ["view", "create", "edit"]], // OPD triage/vitals steps when coordinator covers the desk
+		["clinical_docs", ["view", "create", "edit", "sign"]], // Summary / Problems + disposition
+		["orders", ["view", "create", "edit", "sign"]], // Orders + e-Rx (not pharmacy verify)
+		["formulary", ["view"]], // e-Rx drug lookup only
+		["audit", ["create"]],
+		["notifications", ["view"]],
 	],
 }
 

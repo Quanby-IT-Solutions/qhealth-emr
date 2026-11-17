@@ -37,7 +37,7 @@ export function AppTopbar() {
 					{canSearchPatients && (
 						<Link
 							href={patientSearchHref}
-							className="bg-muted/40 hover:bg-muted/60 flex h-9 w-full max-w-sm items-center gap-2 rounded-md border px-3 text-sm transition-colors"
+							className="bg-muted/40 hover:border-accent/40 hover:bg-muted/60 flex h-9 w-full max-w-sm items-center gap-2 rounded-md border px-3 text-sm transition-colors"
 						>
 							<HugeiconsIcon icon={Search01FreeIcons} className="text-muted-foreground size-4" />
 							<span className="text-muted-foreground text-[13px]">

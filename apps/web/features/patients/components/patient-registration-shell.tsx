@@ -29,7 +29,7 @@ function StepBadge({
 	return (
 		<div
 			className={cn(
-				"flex size-10 items-center justify-center rounded-full border text-sm font-semibold tabular-nums transition-colors",
+				"flex size-8 items-center justify-center rounded-full border text-xs font-semibold tabular-nums transition-colors sm:size-10 sm:text-sm",
 				status === "pending"
 					? "border-border/60 bg-background text-muted-foreground"
 					: "border-primary bg-primary text-primary-foreground"
@@ -62,8 +62,10 @@ export function PatientRegistrationShell({
 						Step {currentIndex + 1} of {REGISTRATION_STEPS.length}
 					</p>
 					<div className="space-y-2">
-						<h2 className="text-foreground text-3xl font-semibold tracking-tight">{title}</h2>
-						<p className="text-muted-foreground max-w-3xl text-base">{subtitle}</p>
+						<h2 className="text-foreground text-2xl font-semibold tracking-tight sm:text-3xl">
+							{title}
+						</h2>
+						<p className="text-muted-foreground max-w-3xl text-sm sm:text-base">{subtitle}</p>
 					</div>
 				</div>
 
@@ -79,7 +81,7 @@ export function PatientRegistrationShell({
 										<StepBadge index={index} status={status} />
 										<p
 											className={cn(
-												"text-xs font-medium tracking-tight",
+												"text-[0.68rem] font-medium tracking-tight sm:text-xs",
 												status === "pending" ? "text-muted-foreground" : "text-foreground"
 											)}
 										>

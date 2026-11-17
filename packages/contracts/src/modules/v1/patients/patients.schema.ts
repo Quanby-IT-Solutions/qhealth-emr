@@ -128,19 +128,11 @@ export type CreatePatientInput = z.infer<typeof CreatePatientSchema>
 
 export const RegisterPatientWithOpdEncounterInputSchema = CreatePatientSchema.extend({
 	admittingStaffId: z.string().uuid().optional(),
-	// PS-036: required — OPD registration must always produce a clinic-scoped queue number
-	clinicianStaffId: z.string().uuid(),
+	// Optional for clinical coordinator medical mission walk-ins. When omitted,
+	// queue numbering is facility/date scoped instead of clinician scoped.
+	clinicianStaffId: z.string().uuid().optional(),
 	/** Present when reconciling a walk-in triage intake — the intake is linked atomically */
 	pendingTriageId: z.string().uuid().optional(),
-}).superRefine((data, ctx) => {
-	// PS-044: OPD registration always requires prior triage (TOR Flow 1 Step 1)
-	if (!data.pendingTriageId) {
-		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
-			message: "Outpatient registration requires a pending triage intake (TOR Flow 1 Step 1)",
-			path: ["pendingTriageId"],
-		})
-	}
 })
 
 export type RegisterPatientWithOpdEncounterInput = z.infer<

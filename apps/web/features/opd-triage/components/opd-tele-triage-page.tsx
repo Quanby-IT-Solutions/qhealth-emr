@@ -29,6 +29,8 @@ import {
 import { Textarea } from "@/core/components/ui/textarea"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { FaceScanVitalsButton } from "@/features/face-scan/components/face-scan-vitals-button"
+import { toOpdTriageFields } from "@/features/face-scan/lib/face-scan-vitals"
 import {
 	useCancelOpdRemoteTriageMutation,
 	useCreateOpdRemoteTriageMutation,
@@ -267,6 +269,15 @@ export function OpdTeleTriagePage() {
 		})
 	}
 
+	function applyFaceScanVitals(vitals: Parameters<typeof toOpdTriageFields>[0]) {
+		const mapped = toOpdTriageFields(vitals)
+		if (mapped.systolicBp) update("systolicBp", mapped.systolicBp)
+		if (mapped.diastolicBp) update("diastolicBp", mapped.diastolicBp)
+		if (mapped.heartRateBpm) update("heartRateBpm", mapped.heartRateBpm)
+		if (mapped.respiratoryRate) update("respiratoryRate", mapped.respiratoryRate)
+		if (mapped.oxygenSatPct) update("oxygenSatPct", mapped.oxygenSatPct)
+	}
+
 	function validateForm() {
 		const nextErrors: FormErrors = {}
 		if (!form.callerName.trim()) nextErrors.callerName = "Caller name is required."
@@ -459,7 +470,7 @@ export function OpdTeleTriagePage() {
 								key={`opd-tele-triage:${activeVideo.id}:${activeVideo.sessionCount}`}
 								response={joinLiveKit.data}
 								choices={{ audioEnabled: false, videoEnabled: false }}
-								className="qhealth-livekit-room min-h-[520px]"
+								className="juanmeds-livekit-room min-h-[520px]"
 								onDisconnected={handleEndVideo}
 							/>
 						) : (
@@ -618,9 +629,15 @@ export function OpdTeleTriagePage() {
 								<FieldError message={errors.chiefComplaint} />
 							</div>
 							<div className="md:col-span-2">
-								<div className="mb-3 flex items-center gap-2">
-									<Activity className="text-muted-foreground size-4" />
-									<h2 className="text-sm font-medium">Vitals</h2>
+								<div className="mb-3 flex items-center justify-between gap-2">
+									<div className="flex items-center gap-2">
+										<Activity className="text-muted-foreground size-4" />
+										<h2 className="text-sm font-medium">Vitals</h2>
+									</div>
+									<FaceScanVitalsButton
+										facilityId={facilityId || undefined}
+										onComplete={applyFaceScanVitals}
+									/>
 								</div>
 								<div className="grid gap-4 md:grid-cols-3">
 									<div className="space-y-2">

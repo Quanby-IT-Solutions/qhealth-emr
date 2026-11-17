@@ -17,12 +17,14 @@ import {
 	patients,
 	staffProfiles,
 	users,
+	vitalSigns,
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
 import type { V1Inputs } from "@/config/contract-types"
 import { AUDIT_ENTITY_TYPES } from "@/modules/v1/audit/audit-entity-types"
 import { AuditService, type DBTransaction } from "@/modules/v1/audit/audit.service"
+import { NotificationService } from "@/modules/v1/notifications/notification.service"
 import { closeOpenSlaStep } from "@/utils/sla-events"
 import { resolveStepTarget } from "@/utils/sla-step-target"
 
@@ -44,6 +46,7 @@ type UpdateAppointmentStatusInput = V1Inputs["scheduling"]["updateAppointmentSta
 type AvailableSlotsInput = V1Inputs["scheduling"]["getAvailableSlots"]
 type ClinicQueueInput = V1Inputs["scheduling"]["getClinicQueue"]
 type UpdateEncounterQueueStatusInput = V1Inputs["scheduling"]["updateEncounterQueueStatus"]
+type CallNextQueuePatientInput = V1Inputs["scheduling"]["callNextQueuePatient"]
 
 type SchedulingActor = {
 	userId: string
@@ -51,6 +54,37 @@ type SchedulingActor = {
 	staffProfileId: string | null
 	ipAddress: string | null
 	userAgent: string | null
+}
+
+type ClaimedQueueEncounter = {
+	id: string
+	facilityId: string
+	appointmentId: string | null
+	queueStatus: "waiting" | "in_progress" | "completed" | "no_show"
+	queueCalledByStaffId: string | null
+	queueCalledAt: Date | null
+}
+
+type ClinicQueueRow = {
+	id: string
+	appointmentId: string | null
+	encounterId: string | null
+	queueNumber: number | null
+	slotTime: string | null
+	checkedInAt: Date | null
+	queueStatus: string | null
+	patientId: string
+	patientFirstName: string | null
+	patientLastName: string | null
+	patientMrn: string | null
+	patientDateOfBirth: Date | string | null
+	clinicianStaffId: string | null
+	clinicianName: string | null
+	calledByStaffId: string | null
+	calledByName: string | null
+	calledAt: Date | null
+	clinicName: string | null
+	hasVitals: boolean
 }
 
 type ClinicTemplateRow = typeof clinicTemplates.$inferSelect
@@ -63,6 +97,18 @@ type FieldChange = {
 
 const ALLOWED_SLOT_DURATIONS = [5, 10, 15, 20, 30, 45, 60] as const
 const REGENERATIVE_TEMPLATE_FIELDS = ["startTime", "endTime", "slotDurationMinutes"] as const
+const MANILA_UTC_OFFSET_MINUTES = 8 * 60
+
+function getManilaDateRange(date: string) {
+	const [year, month, day] = date.split("-").map(Number)
+	const utcStartMillis =
+		Date.UTC(year!, month! - 1, day!, 0, 0, 0, 0) - MANILA_UTC_OFFSET_MINUTES * 60_000
+	const start = new Date(utcStartMillis)
+	const end = new Date(start)
+	end.setUTCDate(end.getUTCDate() + 1)
+
+	return { start, end }
+}
 
 @Injectable()
 export class SchedulingService {
@@ -71,8 +117,30 @@ export class SchedulingService {
 
 	constructor(
 		private readonly auditService: AuditService,
-		private readonly slotGenerator: SlotGeneratorService
+		private readonly slotGenerator: SlotGeneratorService,
+		private readonly notificationService?: NotificationService
 	) {}
+
+	private broadcastOpdQueueUpdate(encounter: {
+		id: string
+		facilityId: string
+		queueStatus: "waiting" | "in_progress" | "completed" | "no_show" | null
+		queueCalledByStaffId?: string | null
+		queueCalledAt?: Date | null
+	}) {
+		this.notificationService?.broadcast(
+			"opd_queue",
+			"OPD queue updated",
+			`OPD queue status changed to ${encounter.queueStatus}`,
+			{
+				encounterId: encounter.id,
+				facilityId: encounter.facilityId,
+				status: encounter.queueStatus,
+				calledByStaffId: encounter.queueCalledByStaffId ?? null,
+				calledAt: encounter.queueCalledAt ?? null,
+			}
+		)
+	}
 
 	// ========================================================================
 	// Clinic Templates
@@ -832,9 +900,7 @@ export class SchedulingService {
 		// Scheduled appointments are linked through encounters.appointmentId; walk-ins have no appointment.
 		const theFacilityId = input.facilityId ?? input.clinicId
 
-		const dayStart = new Date(`${input.date}T00:00:00.000Z`)
-		const nextDayStart = new Date(dayStart)
-		nextDayStart.setUTCDate(nextDayStart.getUTCDate() + 1)
+		const { start: dayStart, end: nextDayStart } = getManilaDateRange(input.date)
 
 		const queueConditions: SQL[] = [
 			eq(encounters.encounterType, sql`'outpatient'`),
@@ -854,8 +920,13 @@ export class SchedulingService {
 			.from(staffProfiles)
 			.innerJoin(users, eq(staffProfiles.userId, users.id))
 			.as("clinician_staff")
+		const calledByStaffSq = db
+			.select({ id: staffProfiles.id, name: users.name })
+			.from(staffProfiles)
+			.innerJoin(users, eq(staffProfiles.userId, users.id))
+			.as("called_by_staff")
 
-		const rows = await db
+		const rows: ClinicQueueRow[] = await db
 			.select({
 				id: encounters.id,
 				appointmentId: encounters.appointmentId,
@@ -868,58 +939,142 @@ export class SchedulingService {
 				patientFirstName: patients.firstName,
 				patientLastName: patients.lastName,
 				patientMrn: patients.mrn,
+				patientDateOfBirth: patients.dateOfBirth,
 				clinicianStaffId: encounters.clinicianStaffId,
 				clinicianName: clinicianStaffSq.name,
+				calledByStaffId: encounters.queueCalledByStaffId,
+				calledByName: calledByStaffSq.name,
+				calledAt: encounters.queueCalledAt,
 				clinicName: clinicTemplates.clinicName,
+				hasVitals: sql<boolean>`exists (
+					select 1 from ${vitalSigns}
+					where ${vitalSigns.encounterId} = ${encounters.id}
+				)`,
 			})
 			.from(encounters)
 			.innerJoin(patients, eq(encounters.patientId, patients.id))
 			.leftJoin(appointments, eq(encounters.appointmentId, appointments.id))
 			.leftJoin(clinicianStaffSq, eq(encounters.clinicianStaffId, clinicianStaffSq.id))
+			.leftJoin(calledByStaffSq, eq(encounters.queueCalledByStaffId, calledByStaffSq.id))
 			.leftJoin(clinicTemplates, eq(appointments.clinicTemplateId, clinicTemplates.id))
 			.where(and(...queueConditions))
-			.orderBy(encounters.queueNumber)
+			.orderBy(encounters.queueNumber, encounters.admissionDatetime, encounters.id)
 
-		const entries = rows.map(row => ({
-			entryType: row.appointmentId ? ("appointment" as const) : ("walk_in" as const),
-			id: row.id,
-			appointmentId: row.appointmentId,
-			encounterId: row.encounterId,
-			queueNumber: row.queueNumber,
-			slotTime: row.slotTime,
-			checkInTime: row.checkedInAt ? String(row.checkedInAt) : null,
-			status: (row.queueStatus ?? "waiting") as "waiting" | "in_progress" | "completed",
-			patientId: row.patientId,
-			patientName: row.patientFirstName
-				? `${row.patientLastName}, ${row.patientFirstName}`
-				: undefined,
-			patientMrn: row.patientMrn ?? undefined,
-			clinicianStaffId: row.clinicianStaffId,
-			clinicianName: row.clinicianName ?? undefined,
-		}))
+		const entries = rows.map(row => this.mapClinicQueueRow(row))
 
-		entries.sort((a, b) => (a.queueNumber ?? 9999) - (b.queueNumber ?? 9999))
+		entries.sort((a, b) => {
+			const queueComparison =
+				(a.queueNumber ?? Number.MAX_SAFE_INTEGER) - (b.queueNumber ?? Number.MAX_SAFE_INTEGER)
+			if (queueComparison !== 0) return queueComparison
+
+			const aCheckInTime = a.checkInTime
+				? new Date(a.checkInTime).getTime()
+				: Number.MAX_SAFE_INTEGER
+			const bCheckInTime = b.checkInTime
+				? new Date(b.checkInTime).getTime()
+				: Number.MAX_SAFE_INTEGER
+			if (aCheckInTime !== bCheckInTime) return aCheckInTime - bCheckInTime
+
+			return a.id.localeCompare(b.id)
+		})
 
 		const clinicName = rows.find(r => r.clinicName)?.clinicName ?? null
+		let activeCoordinatorEntry: ReturnType<typeof this.mapClinicQueueRow> | null = null
+		if (input.calledByStaffId && theFacilityId) {
+			const activeClinicianStaffSq = db
+				.select({ id: staffProfiles.id, name: users.name })
+				.from(staffProfiles)
+				.innerJoin(users, eq(staffProfiles.userId, users.id))
+				.as("clinician_staff")
+			const activeCalledByStaffSq = db
+				.select({ id: staffProfiles.id, name: users.name })
+				.from(staffProfiles)
+				.innerJoin(users, eq(staffProfiles.userId, users.id))
+				.as("called_by_staff")
+
+			const activeRows: ClinicQueueRow[] = await db
+				.select({
+					id: encounters.id,
+					appointmentId: encounters.appointmentId,
+					encounterId: encounters.id,
+					queueNumber: encounters.queueNumber,
+					slotTime: appointments.appointmentTime,
+					checkedInAt: encounters.admissionDatetime,
+					queueStatus: encounters.queueStatus,
+					patientId: encounters.patientId,
+					patientFirstName: patients.firstName,
+					patientLastName: patients.lastName,
+					patientMrn: patients.mrn,
+					patientDateOfBirth: patients.dateOfBirth,
+					clinicianStaffId: encounters.clinicianStaffId,
+					clinicianName: activeClinicianStaffSq.name,
+					calledByStaffId: encounters.queueCalledByStaffId,
+					calledByName: activeCalledByStaffSq.name,
+					calledAt: encounters.queueCalledAt,
+					clinicName: clinicTemplates.clinicName,
+					hasVitals: sql<boolean>`exists (
+						select 1 from ${vitalSigns}
+						where ${vitalSigns.encounterId} = ${encounters.id}
+					)`,
+				})
+				.from(encounters)
+				.innerJoin(patients, eq(encounters.patientId, patients.id))
+				.leftJoin(appointments, eq(encounters.appointmentId, appointments.id))
+				.leftJoin(
+					activeClinicianStaffSq,
+					eq(encounters.clinicianStaffId, activeClinicianStaffSq.id)
+				)
+				.leftJoin(
+					activeCalledByStaffSq,
+					eq(encounters.queueCalledByStaffId, activeCalledByStaffSq.id)
+				)
+				.leftJoin(clinicTemplates, eq(appointments.clinicTemplateId, clinicTemplates.id))
+				.where(
+					and(
+						eq(encounters.encounterType, sql`'outpatient'`),
+						eq(encounters.facilityId, theFacilityId),
+						eq(encounters.queueCalledByStaffId, input.calledByStaffId),
+						eq(encounters.queueStatus, "in_progress")
+					)
+				)
+				.orderBy(encounters.admissionDatetime, encounters.id)
+				.limit(1)
+			activeCoordinatorEntry = activeRows[0] ? this.mapClinicQueueRow(activeRows[0]) : null
+		}
 
 		const waiting = entries.filter(e => e.status === "waiting").length
 		const inProgress = entries.filter(e => e.status === "in_progress").length
 		const completed = entries.filter(e => e.status === "completed").length
+		const noShow = entries.filter(e => e.status === "no_show").length
 
 		return {
 			entries,
+			activeCoordinatorEntry,
 			clinicName,
-			stats: { waiting, inProgress, completed, total: entries.length },
+			stats: { waiting, inProgress, completed, noShow, total: entries.length },
 		}
 	}
 
-	async updateEncounterQueueStatus(input: UpdateEncounterQueueStatusInput) {
+	async updateEncounterQueueStatus(
+		input: UpdateEncounterQueueStatusInput,
+		actor?: Pick<SchedulingActor, "staffProfileId">
+	) {
+		const actingStaffId = actor?.staffProfileId ?? input.calledByStaffId ?? null
+
+		if (input.status === "in_progress" && !actingStaffId) {
+			throw new BadRequestException(
+				"A clinic coordinator staff profile is required to call a patient"
+			)
+		}
+
 		// Fetch current encounter to capture fromStatus and facilityId for the SLA event (PS-005)
 		const [current] = await db
 			.select({
+				id: encounters.id,
 				queueStatus: encounters.queueStatus,
 				facilityId: encounters.facilityId,
 				appointmentId: encounters.appointmentId,
+				queueCalledByStaffId: encounters.queueCalledByStaffId,
 			})
 			.from(encounters)
 			.where(eq(encounters.id, input.id))
@@ -929,14 +1084,64 @@ export class SchedulingService {
 		}
 
 		const fromStatus = current.queueStatus ?? null
+		if (input.status === "in_progress" && fromStatus !== "waiting") {
+			throw new ConflictException("This patient has already been called by another coordinator")
+		}
+		if (
+			input.status === "no_show" &&
+			fromStatus === "in_progress" &&
+			current.queueCalledByStaffId !== actingStaffId
+		) {
+			throw new ConflictException("Only the doctor who called this patient can mark no-show")
+		}
 
 		const now = new Date()
+		const queueSlaMins = await resolveStepTarget(current.facilityId, "opd", input.status)
 		const [enc] = await db.transaction(async (tx: DBTransaction) => {
+			if (input.status === "in_progress" && actingStaffId) {
+				const [activeForCoordinator] = await tx
+					.select({ id: encounters.id })
+					.from(encounters)
+					.where(
+						and(
+							eq(encounters.queueCalledByStaffId, actingStaffId),
+							eq(encounters.queueStatus, "in_progress")
+						)
+					)
+
+				if (activeForCoordinator && activeForCoordinator.id !== input.id) {
+					throw new ConflictException(
+						"Finish the current patient at this coordinator counter before calling another"
+					)
+				}
+			}
+
+			const updateValues =
+				input.status === "in_progress"
+					? {
+							queueStatus: input.status,
+							queueCalledByStaffId: actingStaffId,
+							queueCalledAt: now,
+							updatedAt: now,
+						}
+					: {
+							queueStatus: input.status,
+							updatedAt: now,
+						}
+
 			const [saved] = await tx
 				.update(encounters)
-				.set({ queueStatus: input.status, updatedAt: now })
-				.where(eq(encounters.id, input.id))
+				.set(updateValues)
+				.where(
+					input.status === "in_progress"
+						? and(eq(encounters.id, input.id), eq(encounters.queueStatus, "waiting"))
+						: eq(encounters.id, input.id)
+				)
 				.returning()
+
+			if (!saved) {
+				throw new ConflictException("This patient has already been called by another coordinator")
+			}
 
 			if (current.appointmentId) {
 				await tx
@@ -945,6 +1150,20 @@ export class SchedulingService {
 					.where(eq(appointments.id, current.appointmentId))
 			}
 
+			await closeOpenSlaStep(tx, saved.id, "opd", now)
+
+			await tx.insert(encounterStatusEvents).values({
+				facilityId: current.facilityId,
+				encounterId: saved.id,
+				fromStatus,
+				toStatus: input.status,
+				workflowType: "opd" as WorkflowType,
+				staffId: actingStaffId,
+				slaTargetMinutes: queueSlaMins,
+				notes: `OPD queue: ${fromStatus ?? "none"} -> ${input.status}`,
+				occurredAt: now,
+			})
+
 			return [saved]
 		})
 
@@ -952,30 +1171,138 @@ export class SchedulingService {
 			throw new NotFoundException(`Encounter ${input.id} not found`)
 		}
 
-		// SLA-001/SLA-004: Close the previous open OPD step before writing the new transition
-		await closeOpenSlaStep(db, enc.id, "opd")
-
-		// Log durable workflow-status event for SLA / audit tracking (PS-005)
-		const queueSlaMins = await resolveStepTarget(current.facilityId, "opd", input.status)
-		await db.insert(encounterStatusEvents).values({
-			facilityId: current.facilityId,
-			encounterId: enc.id,
-			fromStatus,
-			toStatus: input.status,
-			workflowType: "opd" as WorkflowType,
-			staffId: null,
-			slaTargetMinutes: queueSlaMins,
-			notes: `OPD queue: ${fromStatus ?? "none"} → ${input.status}`,
-			occurredAt: new Date(),
-		})
+		this.broadcastOpdQueueUpdate(enc)
 
 		this.logger.log(`Updated encounter ${input.id} queue status to ${input.status}`)
 		return { id: enc.id, queueStatus: enc.queueStatus! }
 	}
 
+	async callNextQueuePatient(
+		input: CallNextQueuePatientInput,
+		actor?: Pick<SchedulingActor, "staffProfileId">
+	) {
+		const actingStaffId = actor?.staffProfileId ?? input.calledByStaffId ?? null
+
+		if (!actingStaffId) {
+			throw new BadRequestException(
+				"A clinic coordinator staff profile is required to call a patient"
+			)
+		}
+
+		const { start: dayStart, end: nextDayStart } = getManilaDateRange(input.date)
+		const now = new Date()
+		const queueSlaMins = await resolveStepTarget(input.facilityId, "opd", "in_progress")
+
+		const enc = await db.transaction(async (tx: DBTransaction) => {
+			const [activeForCoordinator] = await tx
+				.select({ id: encounters.id })
+				.from(encounters)
+				.where(
+					and(
+						eq(encounters.queueCalledByStaffId, actingStaffId),
+						eq(encounters.queueStatus, "in_progress")
+					)
+				)
+
+			if (activeForCoordinator) {
+				throw new ConflictException(
+					"Finish the current patient at this coordinator counter before calling another"
+				)
+			}
+
+			const claimResult = (await tx.execute(sql<ClaimedQueueEncounter>`
+				UPDATE encounters
+				SET
+					queue_status = 'in_progress',
+					queue_called_by_staff_id = ${actingStaffId},
+					queue_called_at = ${now},
+					updated_at = ${now}
+				WHERE id = (
+					SELECT id
+					FROM encounters
+					WHERE encounter_type = 'outpatient'
+						AND queue_status = 'waiting'
+						AND facility_id = ${input.facilityId}
+						AND admission_datetime >= ${dayStart}
+						AND admission_datetime < ${nextDayStart}
+						${input.clinicianStaffId ? sql`AND clinician_staff_id = ${input.clinicianStaffId}` : sql``}
+					ORDER BY queue_number ASC NULLS LAST, admission_datetime ASC, id ASC
+					FOR UPDATE SKIP LOCKED
+					LIMIT 1
+				)
+				RETURNING
+					id,
+					facility_id AS "facilityId",
+					appointment_id AS "appointmentId",
+					queue_status AS "queueStatus",
+					queue_called_by_staff_id AS "queueCalledByStaffId",
+					queue_called_at AS "queueCalledAt"
+			`)) as { rows: ClaimedQueueEncounter[] }
+			const [saved] = claimResult.rows
+
+			if (!saved) {
+				throw new NotFoundException("No waiting OPD patients are available to call")
+			}
+
+			if (saved.appointmentId) {
+				await tx
+					.update(appointments)
+					.set({ status: "in_progress", updatedAt: now })
+					.where(eq(appointments.id, saved.appointmentId))
+			}
+
+			await closeOpenSlaStep(tx, saved.id, "opd", now)
+
+			await tx.insert(encounterStatusEvents).values({
+				facilityId: input.facilityId,
+				encounterId: saved.id,
+				fromStatus: "waiting",
+				toStatus: "in_progress",
+				workflowType: "opd" as WorkflowType,
+				staffId: actingStaffId,
+				slaTargetMinutes: queueSlaMins,
+				notes: "OPD queue: waiting -> in_progress",
+				occurredAt: now,
+			})
+
+			return saved
+		})
+
+		this.broadcastOpdQueueUpdate(enc)
+		this.logger.log(`Called next OPD queue encounter ${enc.id}`)
+		return { id: enc.id, queueStatus: enc.queueStatus }
+	}
+
 	// ========================================================================
 	// Helpers
 	// ========================================================================
+
+	private mapClinicQueueRow(row: ClinicQueueRow) {
+		return {
+			entryType: row.appointmentId ? ("appointment" as const) : ("walk_in" as const),
+			id: row.id,
+			appointmentId: row.appointmentId,
+			encounterId: row.encounterId,
+			queueNumber: row.queueNumber,
+			slotTime: row.slotTime,
+			checkInTime: row.checkedInAt ? row.checkedInAt.toISOString() : null,
+			status: (row.queueStatus ?? "waiting") as "waiting" | "in_progress" | "completed" | "no_show",
+			patientId: row.patientId,
+			patientName: row.patientFirstName
+				? `${row.patientLastName}, ${row.patientFirstName}`
+				: undefined,
+			patientMrn: row.patientMrn ?? undefined,
+			patientDateOfBirth: row.patientDateOfBirth
+				? this.formatDateOnly(row.patientDateOfBirth)
+				: undefined,
+			clinicianStaffId: row.clinicianStaffId,
+			clinicianName: row.clinicianName ?? undefined,
+			calledByStaffId: row.calledByStaffId ?? null,
+			calledByName: row.calledByName ?? undefined,
+			calledAt: row.calledAt ? row.calledAt.toISOString() : null,
+			hasVitals: row.hasVitals,
+		}
+	}
 
 	private timeToMinutes(time: string): number {
 		const [hours, minutes] = time.split(":").map(Number)
@@ -990,6 +1317,16 @@ export class SchedulingService {
 
 	private todayDateString(): string {
 		return new Date().toISOString().slice(0, 10)
+	}
+
+	private formatDateOnly(value: Date | string): string {
+		if (typeof value === "string") return value
+
+		const year = value.getFullYear().toString()
+		const month = (value.getMonth() + 1).toString().padStart(2, "0")
+		const day = value.getDate().toString().padStart(2, "0")
+
+		return `${year}-${month}-${day}`
 	}
 
 	private assertValidSlotRange(fromDate: string, toDate: string): void {

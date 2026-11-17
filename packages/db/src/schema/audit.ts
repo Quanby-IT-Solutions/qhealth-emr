@@ -113,6 +113,7 @@ export const notifications = createTable(
 				| "break_glass"
 				| "system"
 				| "ed_queue"
+				| "opd_queue"
 				| "tele_triage"
 				| "sla_warning"
 				| "sla_exceeded"

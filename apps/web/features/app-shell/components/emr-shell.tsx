@@ -18,6 +18,8 @@ import {
 import { cn, getInitials } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import {
+	canManageOwnLicenses,
+	dedupeNavItems,
 	filterNavItems,
 	PRIMARY_NAV_ITEMS,
 	SECONDARY_NAV_ITEMS,
@@ -1021,9 +1023,17 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 	const activeRole = profile?.activeRole
 	const initials = user?.name ? getInitials(user.name) : "?"
 	const permissions = activeRole?.permissions ?? []
+	const showMyLicensesMenu = canManageOwnLicenses(permissions, {
+		staffProfileCount: profile?.staffProfiles.length ?? 0,
+		roleName: activeRole?.name,
+	})
 
-	const primaryItems = filterNavItems(PRIMARY_NAV_ITEMS, permissions, activeRole?.name)
-	const secondaryItems = filterNavItems(SECONDARY_NAV_ITEMS, permissions, activeRole?.name)
+	const primaryItems = dedupeNavItems(
+		filterNavItems(PRIMARY_NAV_ITEMS, permissions, activeRole?.name)
+	)
+	const secondaryItems = dedupeNavItems(
+		filterNavItems(SECONDARY_NAV_ITEMS, permissions, activeRole?.name)
+	)
 	const allAllowedItems = [...primaryItems, ...secondaryItems]
 
 	// Create dynamic filtered groups based on the actual RBAC allowed items
@@ -1281,6 +1291,28 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 									Account Settings
 								</span>
 							</DropdownMenuItem>
+							{showMyLicensesMenu ? (
+								<DropdownMenuItem
+									className="data-highlighted:bg-sidebar-accent hover:bg-sidebar-accent focus:bg-sidebar-accent cursor-pointer gap-3 p-2"
+									onClick={() => router.push("/account/licenses")}
+								>
+									<Icons.Vitals
+										className="size-4"
+										strokeWidth={2.1}
+										style={{
+											color: "var(--sidebar-foreground)",
+											stroke: "var(--sidebar-foreground)",
+											opacity: 1,
+										}}
+									/>
+									<span
+										className="text-sm font-medium"
+										style={{ color: "var(--sidebar-foreground)" }}
+									>
+										My Licenses
+									</span>
+								</DropdownMenuItem>
+							) : null}
 							<DropdownMenuSeparator className="bg-sidebar-border" />
 							<DropdownMenuItem
 								variant="destructive"

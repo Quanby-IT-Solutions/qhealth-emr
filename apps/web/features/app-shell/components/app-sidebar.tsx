@@ -29,6 +29,7 @@ import {
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { NAV_ICONS } from "@/features/app-shell/lib/nav-icons"
 import {
+	dedupeNavItems,
 	filterNavItems,
 	PRIMARY_NAV_ITEMS,
 	SECONDARY_NAV_ITEMS,
@@ -52,8 +53,12 @@ export function AppSidebar() {
 
 	const permissions = profile?.activeRole?.permissions ?? []
 	const activeRoleName = profile?.activeRole?.name
-	const primaryItems = filterNavItems(PRIMARY_NAV_ITEMS, permissions, activeRoleName)
-	const allSecondaryItems = filterNavItems(SECONDARY_NAV_ITEMS, permissions, activeRoleName)
+	const primaryItems = dedupeNavItems(
+		filterNavItems(PRIMARY_NAV_ITEMS, permissions, activeRoleName)
+	)
+	const allSecondaryItems = dedupeNavItems(
+		filterNavItems(SECONDARY_NAV_ITEMS, permissions, activeRoleName)
+	)
 	const secondaryItems = allSecondaryItems.filter(item => !item.adminGroup)
 
 	const adminGroupMap = new Map(
@@ -83,9 +88,9 @@ export function AppSidebar() {
 			<SidebarHeader>
 				<SidebarMenu>
 					<SidebarMenuItem>
-						<SidebarMenuButton size="lg" tooltip="Quanby">
+						<SidebarMenuButton size="lg" tooltip="JuanMeds">
 							<Link href="/dashboard" className="flex items-center gap-2">
-								<Logo text="Quanby" href={undefined} size="sm" showText={false} />
+								<Logo text="JuanMeds" href={undefined} size="sm" showText={false} />
 							</Link>
 						</SidebarMenuButton>
 					</SidebarMenuItem>

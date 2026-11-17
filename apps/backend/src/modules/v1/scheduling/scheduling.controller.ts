@@ -150,9 +150,17 @@ export class SchedulingController {
 	// PS-006: Only Schedulers (scheduling:edit) may advance the clinic queue
 	@RequirePermission("scheduling", "edit")
 	@Implement(v1.scheduling.updateEncounterQueueStatus)
-	async updateEncounterQueueStatus() {
+	async updateEncounterQueueStatus(@Session() session: UserSession, @Req() req: Request) {
 		return implement(v1.scheduling.updateEncounterQueueStatus).handler(async ({ input }) => {
-			return this.schedulingService.updateEncounterQueueStatus(input)
+			return this.schedulingService.updateEncounterQueueStatus(input, extractActor(session, req))
+		})
+	}
+
+	@RequirePermission("scheduling", "edit")
+	@Implement(v1.scheduling.callNextQueuePatient)
+	async callNextQueuePatient(@Session() session: UserSession, @Req() req: Request) {
+		return implement(v1.scheduling.callNextQueuePatient).handler(async ({ input }) => {
+			return this.schedulingService.callNextQueuePatient(input, extractActor(session, req))
 		})
 	}
 }

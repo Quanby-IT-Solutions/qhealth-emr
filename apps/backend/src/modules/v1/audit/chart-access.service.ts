@@ -156,7 +156,8 @@ export class ChartAccessService {
 					or(
 						eq(encounters.clinicianStaffId, clinicianStaffId),
 						eq(encounters.attendingStaffId, clinicianStaffId),
-						eq(encounters.admittingStaffId, clinicianStaffId)
+						eq(encounters.admittingStaffId, clinicianStaffId),
+						eq(encounters.queueCalledByStaffId, clinicianStaffId)
 					)
 				)
 			)
@@ -272,6 +273,7 @@ export class ChartAccessService {
 				clinicianStaffId: encounters.clinicianStaffId,
 				attendingStaffId: encounters.attendingStaffId,
 				admittingStaffId: encounters.admittingStaffId,
+				queueCalledByStaffId: encounters.queueCalledByStaffId,
 			})
 			.from(encounters)
 			.where(eq(encounters.id, encounterId))
@@ -285,6 +287,7 @@ export class ChartAccessService {
 			encounter.clinicianStaffId,
 			encounter.attendingStaffId,
 			encounter.admittingStaffId,
+			encounter.queueCalledByStaffId,
 		].includes(activeStaffProfile.id)
 		if (hasRegularAccess) {
 			return { mode: "regular", staffProfileId: activeStaffProfile.id }

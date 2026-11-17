@@ -33,6 +33,7 @@ jest.mock("@repo/db/schema", () => ({
 		clinicianStaffId: "encounters.clinicianStaffId",
 		attendingStaffId: "encounters.attendingStaffId",
 		admittingStaffId: "encounters.admittingStaffId",
+		queueCalledByStaffId: "encounters.queueCalledByStaffId",
 	},
 	staffProfiles: {
 		id: "staffProfiles.id",
@@ -91,6 +92,18 @@ describe("ChartAccessService", () => {
 	})
 
 	it("allows regular patient access for an assigned clinician", async () => {
+		mockSelectRows([[{ id: "encounter-1" }]])
+
+		const result = await service.ensurePatientChartReadAccess(actor, "patient-1", {
+			entityType: "patient",
+			entityId: "patient-1",
+		})
+
+		expect(result).toEqual({ mode: "regular", staffProfileId: "doctor-staff" })
+		expect(db.update).not.toHaveBeenCalled()
+	})
+
+	it("allows regular patient access for the OPD coordinator serving the patient", async () => {
 		mockSelectRows([[{ id: "encounter-1" }]])
 
 		const result = await service.ensurePatientChartReadAccess(actor, "patient-1", {
@@ -184,6 +197,7 @@ describe("ChartAccessService", () => {
 					clinicianStaffId: "other-staff",
 					attendingStaffId: null,
 					admittingStaffId: null,
+					queueCalledByStaffId: null,
 				},
 			],
 			[{ id: "break-glass-1", facilityId: "facility-1", recordsAccessed: null }],
@@ -201,5 +215,26 @@ describe("ChartAccessService", () => {
 			breakGlassEventId: "break-glass-1",
 			staffProfileId: "doctor-staff",
 		})
+	})
+
+	it("allows regular encounter access for the OPD coordinator serving that encounter", async () => {
+		mockSelectRows([
+			{
+				id: "encounter-1",
+				patientId: "patient-1",
+				clinicianStaffId: "other-staff",
+				attendingStaffId: null,
+				admittingStaffId: null,
+				queueCalledByStaffId: "doctor-staff",
+			},
+		])
+
+		const result = await service.ensureEncounterChartReadAccess(actor, "encounter-1", {
+			entityType: "encounter",
+			entityId: "encounter-1",
+		})
+
+		expect(result).toEqual({ mode: "regular", staffProfileId: "doctor-staff" })
+		expect(db.update).not.toHaveBeenCalled()
 	})
 })
