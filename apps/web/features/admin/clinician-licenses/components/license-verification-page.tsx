@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { StatusBadge } from "@/core/components/status-badge"
@@ -12,11 +13,14 @@ import { Skeleton } from "@/core/components/ui/skeleton"
 import type { StatusVariant } from "@/core/styles/status-tokens"
 
 import {
+	useDeleteLicenseMutation,
 	useGetClinicianLicensesQuery,
 	useMarkPendingMutation,
 	useVerifyLicenseMutation,
 } from "../api/licenses.hooks"
-import { AddLicenseDrawer } from "./add-license-drawer"
+import { AddLicenseDialog } from "./add-license-dialog"
+import { DeleteLicenseAlert } from "./delete-license-alert"
+import { EditLicenseDialog } from "./edit-license-dialog"
 
 function getBadgeVariant(status: string | null | undefined): StatusVariant {
 	if (status === "verified") return "verified"
@@ -33,8 +37,21 @@ export function LicenseVerificationPage({ staffProfileId }: LicenseVerificationP
 	const { data, isLoading, isError } = useGetClinicianLicensesQuery(staffProfileId)
 	const verifyMutation = useVerifyLicenseMutation()
 	const markPendingMutation = useMarkPendingMutation()
+	const deleteMutation = useDeleteLicenseMutation()
 	const [proofInputs, setProofInputs] = useState<Record<string, string>>({})
 	const [addOpen, setAddOpen] = useState(false)
+	const [editingLicense, setEditingLicense] = useState<{
+		id: string
+		licenseType: string
+		licenseNumber: string
+		issueDate: string | null
+		expiryDate: string | null
+	} | null>(null)
+	const [deletingLicense, setDeletingLicense] = useState<{
+		id: string
+		licenseType: string
+		licenseNumber: string
+	} | null>(null)
 
 	if (isLoading) return <Skeleton className="h-64 w-full" />
 	if (isError || !data)
@@ -71,6 +88,15 @@ export function LicenseVerificationPage({ staffProfileId }: LicenseVerificationP
 							</div>
 						</CardHeader>
 						<CardContent className="space-y-3">
+							<div className="flex justify-end gap-2">
+								<Button size="sm" variant="outline" onClick={() => setEditingLicense(license)}>
+									Edit
+								</Button>
+								<Button size="sm" variant="destructive" onClick={() => setDeletingLicense(license)}>
+									<Trash2 className="size-3.5" />
+									Delete
+								</Button>
+							</div>
 							<div className="space-y-1 text-sm">
 								<p>
 									<span className="text-muted-foreground">Number:</span> {license.licenseNumber}
@@ -163,7 +189,35 @@ export function LicenseVerificationPage({ staffProfileId }: LicenseVerificationP
 				))}
 			</div>
 
-			<AddLicenseDrawer open={addOpen} onOpenChange={setAddOpen} staffProfileId={staffProfileId} />
+			<AddLicenseDialog open={addOpen} onOpenChange={setAddOpen} staffProfileId={staffProfileId} />
+			<EditLicenseDialog
+				open={editingLicense !== null}
+				onOpenChange={open => {
+					if (!open) setEditingLicense(null)
+				}}
+				license={editingLicense}
+			/>
+			<DeleteLicenseAlert
+				open={deletingLicense !== null}
+				onOpenChange={open => {
+					if (!open) setDeletingLicense(null)
+				}}
+				license={deletingLicense}
+				isPending={deleteMutation.isPending}
+				onConfirm={() => {
+					if (!deletingLicense) return
+					deleteMutation.mutate(
+						{ id: deletingLicense.id },
+						{
+							onSuccess: () => {
+								toast.success("License deleted.")
+								setDeletingLicense(null)
+							},
+							onError: () => toast.error("Failed to delete license."),
+						}
+					)
+				}}
+			/>
 		</div>
 	)
 }

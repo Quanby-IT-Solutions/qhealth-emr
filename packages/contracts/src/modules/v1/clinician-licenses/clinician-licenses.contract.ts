@@ -3,10 +3,12 @@ import { z } from "zod"
 
 import {
 	AddLicenseSchema,
+	AddMyLicenseSchema,
 	ClinicianLicenseSchema,
 	ClinicianWithLicensesSchema,
 	LicenseIdSchema,
 	ListCliniciansQuerySchema,
+	UpdateLicenseSchema,
 	VerifyLicenseSchema,
 } from "./clinician-licenses.schema.js"
 
@@ -28,6 +30,15 @@ export const clinicianLicensesContract = {
 			})
 		),
 
+	getMine: oc
+		.route({
+			method: "GET",
+			path: "/me",
+			summary: "Get licenses for the signed-in clinician",
+			tags: ["Clinician Licenses"],
+		})
+		.output(ClinicianWithLicensesSchema),
+
 	get: oc
 		.route({
 			method: "GET",
@@ -38,6 +49,16 @@ export const clinicianLicensesContract = {
 		.input(z.object({ staffProfileId: z.string().uuid() }))
 		.output(ClinicianWithLicensesSchema),
 
+	addMine: oc
+		.route({
+			method: "POST",
+			path: "/me",
+			summary: "Add a license record for the signed-in clinician",
+			tags: ["Clinician Licenses"],
+		})
+		.input(AddMyLicenseSchema)
+		.output(ClinicianLicenseSchema),
+
 	add: oc
 		.route({
 			method: "POST",
@@ -46,6 +67,36 @@ export const clinicianLicensesContract = {
 			tags: ["Clinician Licenses"],
 		})
 		.input(AddLicenseSchema)
+		.output(ClinicianLicenseSchema),
+
+	updateMine: oc
+		.route({
+			method: "PATCH",
+			path: "/me/{id}",
+			summary: "Update a license record for the signed-in clinician",
+			tags: ["Clinician Licenses"],
+		})
+		.input(UpdateLicenseSchema)
+		.output(ClinicianLicenseSchema),
+
+	update: oc
+		.route({
+			method: "PATCH",
+			path: "/{id}",
+			summary: "Update a clinician license record",
+			tags: ["Clinician Licenses"],
+		})
+		.input(UpdateLicenseSchema)
+		.output(ClinicianLicenseSchema),
+
+	verifyMine: oc
+		.route({
+			method: "POST",
+			path: "/me/{id}/verify",
+			summary: "Verify a license record for the signed-in clinician",
+			tags: ["Clinician Licenses"],
+		})
+		.input(VerifyLicenseSchema)
 		.output(ClinicianLicenseSchema),
 
 	verify: oc
@@ -67,6 +118,16 @@ export const clinicianLicensesContract = {
 		})
 		.input(LicenseIdSchema)
 		.output(ClinicianLicenseSchema),
+
+	deleteMine: oc
+		.route({
+			method: "DELETE",
+			path: "/me/{id}",
+			summary: "Delete a license record for the signed-in clinician",
+			tags: ["Clinician Licenses"],
+		})
+		.input(LicenseIdSchema)
+		.output(z.object({ success: z.boolean() })),
 
 	delete: oc
 		.route({

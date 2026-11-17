@@ -1,12 +1,13 @@
 import { z } from "zod"
 
-export const LicenseTypeEnum = z.enum(["PRC", "PTR", "S2"])
+export const LicenseTypeSchema = z.string().trim().min(1)
+export const LicenseTypeEnum = LicenseTypeSchema
 export const LicenseStatusEnum = z.enum(["pending", "verified", "expired"])
 
 export const ClinicianLicenseSchema = z.object({
 	id: z.string().uuid(),
 	staffProfileId: z.string().uuid(),
-	licenseType: LicenseTypeEnum,
+	licenseType: LicenseTypeSchema,
 	licenseNumber: z.string(),
 	issueDate: z.string().nullable(),
 	expiryDate: z.string().nullable(),
@@ -43,12 +44,14 @@ export const ListCliniciansQuerySchema = z.object({
 
 export const AddLicenseSchema = z.object({
 	staffProfileId: z.string().uuid(),
-	licenseType: LicenseTypeEnum,
+	licenseType: LicenseTypeSchema,
 	licenseNumber: z.string().min(1),
 	issueDate: z.string().optional(),
 	expiryDate: z.string().optional(),
 	documentUri: z.string().optional(),
 })
+
+export const AddMyLicenseSchema = AddLicenseSchema.omit({ staffProfileId: true })
 
 export const LicenseIdSchema = z.object({ id: z.string().uuid() })
 
@@ -57,7 +60,17 @@ export const VerifyLicenseSchema = z.object({
 	verificationProof: z.string().optional(),
 })
 
-export type LicenseType = z.infer<typeof LicenseTypeEnum>
+export const UpdateLicenseSchema = z.object({
+	id: z.string().uuid(),
+	licenseNumber: z.string().min(1).optional(),
+	issueDate: z.string().nullable().optional(),
+	expiryDate: z.string().nullable().optional(),
+	documentUri: z.string().nullable().optional(),
+})
+
+export type LicenseType = z.infer<typeof LicenseTypeSchema>
 export type LicenseStatus = z.infer<typeof LicenseStatusEnum>
 export type ClinicianLicense = z.infer<typeof ClinicianLicenseSchema>
 export type AddLicenseInput = z.infer<typeof AddLicenseSchema>
+export type AddMyLicenseInput = z.infer<typeof AddMyLicenseSchema>
+export type UpdateLicenseInput = z.infer<typeof UpdateLicenseSchema>

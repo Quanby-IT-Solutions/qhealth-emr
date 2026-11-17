@@ -25,9 +25,9 @@ import {
 import type { StatusVariant } from "@/core/styles/status-tokens"
 
 import { useListCliniciansQuery } from "../api/licenses.hooks"
-import { AddLicenseDrawer } from "./add-license-drawer"
+import { AddLicenseDialog } from "./add-license-dialog"
 
-type LicenseType = "PRC" | "PTR" | "S2"
+type LicenseType = string
 type LicenseStatus = "pending" | "verified" | "expired"
 
 function getBadgeVariant(status: LicenseStatus | null | undefined): StatusVariant {
@@ -174,21 +174,21 @@ export function ClinicianLicenseList() {
 											{prc ? (
 												<StatusBadge variant={getBadgeVariant(prc.status)} />
 											) : (
-												<span className="text-muted-foreground text-xs">—</span>
+												<span className="text-muted-foreground text-xs">-</span>
 											)}
 										</TableCell>
 										<TableCell>
 											{ptr ? (
 												<StatusBadge variant={getBadgeVariant(ptr.status)} />
 											) : (
-												<span className="text-muted-foreground text-xs">—</span>
+												<span className="text-muted-foreground text-xs">-</span>
 											)}
 										</TableCell>
 										<TableCell>
 											{s2 ? (
 												<StatusBadge variant={getBadgeVariant(s2.status)} />
 											) : (
-												<span className="text-muted-foreground text-xs">—</span>
+												<span className="text-muted-foreground text-xs">-</span>
 											)}
 										</TableCell>
 										<TableCell>
@@ -201,7 +201,7 @@ export function ClinicianLicenseList() {
 													{row.daysUntilNextExpiry}d
 												</span>
 											) : (
-												<span className="text-muted-foreground text-xs">—</span>
+												<span className="text-muted-foreground text-xs">-</span>
 											)}
 										</TableCell>
 										<TableCell>
@@ -244,7 +244,7 @@ export function ClinicianLicenseList() {
 				</>
 			)}
 
-			<AddLicenseDrawer open={addOpen} onOpenChange={setAddOpen} />
+			<AddLicenseDialog open={addOpen} onOpenChange={setAddOpen} />
 		</div>
 	)
 }
