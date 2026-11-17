@@ -17,11 +17,18 @@ import { getFpeValidation } from "./fpe-validation"
 interface FpeEditorFlowProps {
 	encounterId: string
 	facilityId: string
+	patientId?: string
 	onBack: () => void
 	onDone: () => void
 }
 
-export function FpeEditorFlow({ encounterId, facilityId, onBack, onDone }: FpeEditorFlowProps) {
+export function FpeEditorFlow({
+	encounterId,
+	facilityId,
+	patientId,
+	onBack,
+	onDone,
+}: FpeEditorFlowProps) {
 	const [step, setStep] = useState<"fill" | "review">("fill")
 	const [fpeData, setFpeData] = useState<FpeData>({ ...EMPTY_FPE_DATA })
 	const [noteId, setNoteId] = useState<string | null>(null)
@@ -122,7 +129,14 @@ export function FpeEditorFlow({ encounterId, facilityId, onBack, onDone }: FpeEd
 				</div>
 			</div>
 
-			<FpeTemplate value={fpeData} onChange={handleChange} validation={validation} />
+			<FpeTemplate
+				value={fpeData}
+				onChange={handleChange}
+				validation={validation}
+				facilityId={facilityId}
+				encounterId={encounterId}
+				patientId={patientId}
+			/>
 
 			{!validation.canReview && (
 				<div className="border-destructive/40 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">

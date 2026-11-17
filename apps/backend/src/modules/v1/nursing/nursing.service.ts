@@ -1,9 +1,17 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
+import {
+	BadRequestException,
+	Injectable,
+	Logger,
+	NotFoundException,
+	ServiceUnavailableException,
+} from "@nestjs/common"
+import { createHash, randomBytes } from "crypto"
 import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm"
 
 import {
 	consentRecords,
 	encounters,
+	faceScanPhoneSessions,
 	flowsheetEntries,
 	haiTags,
 	ioEntries,
@@ -17,6 +25,7 @@ import {
 } from "@repo/db/schema"
 
 import { db } from "@/common/database/database.client"
+import { InsightGenieService } from "@/common/insight-genie/insight-genie.service"
 
 // ============================================================================
 // Input Types (explicit — avoids TypeScript depth limit on InferContractRouterInputs)
@@ -40,10 +49,60 @@ interface CreateVitalSignInput {
 	heartRate?: number
 	respiratoryRate?: number
 	spo2?: number
-	painScore?: number
+	spo2Scale?: "scale1" | "scale2"
+	oxygenTherapy?: boolean
+	oxygenDeliveryDevice?: string
+	oxygenFlowRate?: number
 	weight?: number
 	height?: number
+	consciousnessLevel?: "A" | "C" | "V" | "P" | "U"
 }
+
+interface FaceScanTokenInput {
+	clientId: string
+	age?: number
+	gender?: "male" | "female"
+	smoking?: boolean
+	heightCm?: number
+	weightKg?: number
+}
+
+interface FaceScanPhoneVitals {
+	bpSystolic: number | null
+	bpDiastolic: number | null
+	heartRate: number | null
+	respiratoryRate: number | null
+	spo2: number | null
+	heightCm?: number
+	weightKg?: number
+}
+
+interface CreateFaceScanPhoneSessionInput {
+	facilityId?: string
+	encounterId?: string
+	patientId?: string
+	age?: number
+	gender?: "male" | "female"
+	smoking?: boolean
+}
+
+interface CreateFaceScanPhoneTokenInput {
+	token: string
+	clientId: string
+	age?: number
+	gender?: "male" | "female"
+	smoking?: boolean
+	heightCm?: number
+	weightKg?: number
+}
+
+interface CompleteFaceScanPhoneSessionInput {
+	token: string
+	vitals: FaceScanPhoneVitals
+}
+
+const FACE_SCAN_PHONE_TOKEN_BYTES = 32
+const FACE_SCAN_PHONE_SESSION_TTL_MS = 10 * 60 * 1000
 
 interface MarEntryListInput {
 	page: number
@@ -200,6 +259,8 @@ interface CreateConsentRecordInput {
 export class NursingService {
 	private readonly logger = new Logger(NursingService.name)
 
+	constructor(private readonly insightGenieService: InsightGenieService) {}
+
 	// ========================================================================
 	// NEWS Score Calculation
 	// ========================================================================
@@ -207,9 +268,12 @@ export class NursingService {
 	private calculateNEWS(vitals: {
 		respiratoryRate?: number | null
 		spo2?: number | string | null
+		spo2Scale?: "scale1" | "scale2" | null
+		oxygenTherapy?: boolean | null
 		temperature?: number | string | null
 		bpSystolic?: number | null
 		heartRate?: number | null
+		consciousnessLevel?: "A" | "C" | "V" | "P" | "U" | null
 	}): { newsScore: number; newsRiskLevel: "low" | "medium" | "high" } {
 		let score = 0
 
@@ -226,11 +290,26 @@ export class NursingService {
 		// SpO2
 		const spo2Val = vitals.spo2 != null ? Number(vitals.spo2) : null
 		if (spo2Val != null) {
-			if (spo2Val <= 91) score += 3
-			else if (spo2Val <= 93) score += 2
-			else if (spo2Val <= 95) score += 1
-			else score += 0
+			if (vitals.spo2Scale === "scale2") {
+				if (spo2Val <= 83) score += 3
+				else if (spo2Val <= 85) score += 2
+				else if (spo2Val <= 87) score += 1
+				else if (spo2Val <= 92) score += 0
+				else if (vitals.oxygenTherapy) {
+					if (spo2Val <= 94) score += 1
+					else if (spo2Val <= 96) score += 2
+					else score += 3
+				}
+			} else {
+				if (spo2Val <= 91) score += 3
+				else if (spo2Val <= 93) score += 2
+				else if (spo2Val <= 95) score += 1
+				else score += 0
+			}
 		}
+
+		// Supplemental oxygen
+		if (vitals.oxygenTherapy) score += 2
 
 		// Temperature
 		const tempVal = vitals.temperature != null ? Number(vitals.temperature) : null
@@ -263,7 +342,8 @@ export class NursingService {
 			else score += 3
 		}
 
-		// Consciousness — always 0 (not tracked yet)
+		// Consciousness (NEWS2 ACVPU: A = 0, C/V/P/U = 3)
+		if (vitals.consciousnessLevel && vitals.consciousnessLevel !== "A") score += 3
 
 		const newsRiskLevel: "low" | "medium" | "high" =
 			score >= 7 ? "high" : score >= 5 ? "medium" : "low"
@@ -328,14 +408,42 @@ export class NursingService {
 	}
 
 	async createVital(input: CreateVitalSignInput, userId: string) {
+		const spo2Scale = input.spo2Scale ?? "scale1"
+		const oxygenTherapy = input.oxygenTherapy ?? false
+		const oxygenDeliveryDevice = oxygenTherapy ? input.oxygenDeliveryDevice : undefined
+		const oxygenFlowRate = oxygenTherapy ? input.oxygenFlowRate : undefined
+		const consciousnessLevel = input.consciousnessLevel ?? "A"
+
+		const hasMeasurement = [
+			input.temperature,
+			input.bpSystolic,
+			input.bpDiastolic,
+			input.heartRate,
+			input.respiratoryRate,
+			input.spo2,
+			oxygenTherapy ? true : undefined,
+			oxygenDeliveryDevice,
+			oxygenFlowRate,
+			input.weight,
+			input.height,
+			consciousnessLevel !== "A" ? consciousnessLevel : undefined,
+		].some(value => value !== undefined && value !== null)
+
+		if (!hasMeasurement) {
+			throw new BadRequestException("At least one vital sign measurement is required")
+		}
+
 		const staffProfileId = await this.getStaffProfileId(userId)
 
 		const { newsScore, newsRiskLevel } = this.calculateNEWS({
 			respiratoryRate: input.respiratoryRate,
 			spo2: input.spo2,
+			spo2Scale,
+			oxygenTherapy,
 			temperature: input.temperature,
 			bpSystolic: input.bpSystolic,
 			heartRate: input.heartRate,
+			consciousnessLevel,
 		})
 
 		const [row] = await db
@@ -350,9 +458,13 @@ export class NursingService {
 				heartRate: input.heartRate,
 				respiratoryRate: input.respiratoryRate,
 				spo2: input.spo2?.toString(),
-				painScore: input.painScore,
+				spo2Scale,
+				oxygenTherapy,
+				oxygenDeliveryDevice,
+				oxygenFlowRate: oxygenFlowRate?.toString(),
 				weight: input.weight?.toString(),
 				height: input.height?.toString(),
+				consciousnessLevel,
 				newsScore,
 				newsRiskLevel,
 				recordedByStaffId: staffProfileId,
@@ -372,7 +484,11 @@ export class NursingService {
 				{ name: "Heart Rate", value: input.heartRate, unit: "bpm" },
 				{ name: "Respiratory Rate", value: input.respiratoryRate, unit: "breaths/min" },
 				{ name: "SpO2", value: input.spo2, unit: "%" },
-				{ name: "Pain Score", value: input.painScore, unit: "/10" },
+				{
+					name: "Oxygen Flow",
+					value: oxygenFlowRate,
+					unit: "L/min",
+				},
 				{ name: "Weight", value: input.weight, unit: "kg" },
 				{ name: "Height", value: input.height, unit: "cm" },
 			]
@@ -392,9 +508,260 @@ export class NursingService {
 			if (entriesToInsert.length > 0) {
 				await db.insert(flowsheetEntries).values(entriesToInsert)
 			}
+
+			const textEntries = [
+				spo2Scale
+					? {
+							name: "SpO2 Scale",
+							value: spo2Scale === "scale2" ? "Scale 2" : "Scale 1",
+							unit: null,
+						}
+					: null,
+				input.oxygenTherapy !== undefined
+					? {
+							name: "Oxygen Therapy",
+							value: oxygenTherapy ? "Yes" : "No",
+							unit: null,
+						}
+					: null,
+				oxygenDeliveryDevice
+					? {
+							name: "Oxygen Delivery Device",
+							value: oxygenDeliveryDevice,
+							unit: null,
+						}
+					: null,
+				consciousnessLevel
+					? {
+							name: "Consciousness",
+							value: consciousnessLevel,
+							unit: "ACVPU",
+						}
+					: null,
+			].filter(entry => entry != null)
+
+			if (textEntries.length > 0) {
+				await db.insert(flowsheetEntries).values(
+					textEntries.map(entry => ({
+						facilityId: input.facilityId,
+						encounterId: input.encounterId!,
+						parameterName: entry.name,
+						parameterValue: entry.value,
+						unit: entry.unit,
+						recordedByStaffId: staffProfileId,
+						recordedAt,
+					}))
+				)
+			}
 		}
 
 		return row
+	}
+
+	private hashFaceScanPhoneToken(token: string): string {
+		return createHash("sha256").update(token).digest("hex")
+	}
+
+	private generateFaceScanPhoneToken(): string {
+		return randomBytes(FACE_SCAN_PHONE_TOKEN_BYTES).toString("base64url")
+	}
+
+	private serializeFaceScanPhoneSession(row: {
+		id: string
+		token?: string
+		status: "pending" | "complete" | "expired"
+		expiresAt: Date
+		completedAt: Date | null
+		vitals: FaceScanPhoneVitals | null
+	}) {
+		const status = row.status === "pending" && row.expiresAt <= new Date() ? "expired" : row.status
+
+		return {
+			id: row.id,
+			...(row.token ? { token: row.token } : {}),
+			status,
+			expiresAt: row.expiresAt.toISOString(),
+			completedAt: row.completedAt?.toISOString() ?? null,
+			vitals: row.vitals ?? null,
+		}
+	}
+
+	private hasReturnedFaceScanVitals(vitals: FaceScanPhoneVitals): boolean {
+		return (
+			vitals.bpSystolic != null ||
+			vitals.bpDiastolic != null ||
+			vitals.heartRate != null ||
+			vitals.respiratoryRate != null ||
+			vitals.spo2 != null
+		)
+	}
+
+	private async findFaceScanPhoneSessionByToken(token: string) {
+		const tokenHash = this.hashFaceScanPhoneToken(token)
+		const [row] = await db
+			.select()
+			.from(faceScanPhoneSessions)
+			.where(eq(faceScanPhoneSessions.tokenHash, tokenHash))
+			.limit(1)
+
+		if (!row) throw new NotFoundException("Face scan phone session not found")
+		return row
+	}
+
+	getFaceScanStatus() {
+		return { enabled: this.insightGenieService.isEnabled() }
+	}
+
+	async createFaceScanToken(input: FaceScanTokenInput) {
+		const request = this.insightGenieService.createDefaultRequest(input.clientId, {
+			age: input.age,
+			gender: input.gender,
+		})
+		const response = await this.insightGenieService.generateVideoToken(request, {
+			age: input.age,
+			gender: input.gender,
+			smoking: input.smoking,
+			heightCm: input.heightCm,
+			weightKg: input.weightKg,
+		})
+		return {
+			videoIframeUrl: response.videoIframeUrl,
+			enabled: true,
+		}
+	}
+
+	async createFaceScanPhoneSession(input: CreateFaceScanPhoneSessionInput, userId: string) {
+		if (!this.insightGenieService.isEnabled()) {
+			throw new ServiceUnavailableException("Face scan is not available.")
+		}
+
+		const token = this.generateFaceScanPhoneToken()
+		const tokenHash = this.hashFaceScanPhoneToken(token)
+		const expiresAt = new Date(Date.now() + FACE_SCAN_PHONE_SESSION_TTL_MS)
+
+		const [row] = await db
+			.insert(faceScanPhoneSessions)
+			.values({
+				tokenHash,
+				status: "pending",
+				facilityId: input.facilityId,
+				encounterId: input.encounterId,
+				patientId: input.patientId,
+				age: input.age,
+				gender: input.gender,
+				smoking: input.smoking,
+				createdByUserId: userId,
+				expiresAt,
+			})
+			.returning()
+
+		if (!row) throw new NotFoundException("Failed to create face scan phone session")
+
+		return this.serializeFaceScanPhoneSession({ ...row, token })
+	}
+
+	async getFaceScanPhoneSession(id: string, userId: string) {
+		const [row] = await db
+			.select()
+			.from(faceScanPhoneSessions)
+			.where(
+				and(eq(faceScanPhoneSessions.id, id), eq(faceScanPhoneSessions.createdByUserId, userId))
+			)
+			.limit(1)
+
+		if (!row) throw new NotFoundException("Face scan phone session not found")
+
+		const serialized = this.serializeFaceScanPhoneSession(row)
+		if (serialized.status === "expired" && row.status === "pending") {
+			await db
+				.update(faceScanPhoneSessions)
+				.set({ status: "expired", updatedAt: new Date() })
+				.where(eq(faceScanPhoneSessions.id, row.id))
+		}
+
+		return serialized
+	}
+
+	async getFaceScanPhoneSessionPreview(input: { token: string }) {
+		const row = await this.findFaceScanPhoneSessionByToken(input.token)
+		const serialized = this.serializeFaceScanPhoneSession(row)
+		if (serialized.status === "expired" && row.status === "pending") {
+			await db
+				.update(faceScanPhoneSessions)
+				.set({ status: "expired", updatedAt: new Date() })
+				.where(eq(faceScanPhoneSessions.id, row.id))
+		}
+
+		return {
+			enabled: this.insightGenieService.isEnabled(),
+			status: serialized.status,
+			expiresAt: serialized.expiresAt,
+			requiresAge: row.age == null,
+			requiresGender: row.gender == null,
+			requiresSmoking: row.smoking == null,
+		}
+	}
+
+	async createFaceScanPhoneToken(input: CreateFaceScanPhoneTokenInput) {
+		const row = await this.findFaceScanPhoneSessionByToken(input.token)
+		const serialized = this.serializeFaceScanPhoneSession(row)
+
+		if (serialized.status === "expired") {
+			throw new BadRequestException("Face scan phone session has expired.")
+		}
+		if (serialized.status === "complete") {
+			throw new BadRequestException("Face scan phone session is already complete.")
+		}
+
+		const age = row.age ?? input.age
+		const gender = row.gender ?? input.gender
+		const smoking = row.smoking ?? input.smoking
+
+		const request = this.insightGenieService.createDefaultRequest(input.clientId, {
+			age: age ?? undefined,
+			gender: gender ?? undefined,
+		})
+		const response = await this.insightGenieService.generateVideoToken(request, {
+			age: age ?? undefined,
+			gender: gender ?? undefined,
+			smoking: smoking ?? undefined,
+			heightCm: input.heightCm,
+			weightKg: input.weightKg,
+		})
+		return {
+			videoIframeUrl: response.videoIframeUrl,
+			enabled: true,
+		}
+	}
+
+	async completeFaceScanPhoneSession(input: CompleteFaceScanPhoneSessionInput) {
+		const row = await this.findFaceScanPhoneSessionByToken(input.token)
+		const serialized = this.serializeFaceScanPhoneSession(row)
+
+		if (serialized.status === "expired") {
+			throw new BadRequestException("Face scan phone session has expired.")
+		}
+		if (serialized.status === "complete") {
+			throw new BadRequestException("Face scan phone session is already complete.")
+		}
+		if (!this.hasReturnedFaceScanVitals(input.vitals)) {
+			throw new BadRequestException("Face scan did not return any vital measurements.")
+		}
+
+		const completedAt = new Date()
+		const [updated] = await db
+			.update(faceScanPhoneSessions)
+			.set({
+				status: "complete",
+				vitals: input.vitals,
+				completedAt,
+				updatedAt: completedAt,
+			})
+			.where(eq(faceScanPhoneSessions.id, row.id))
+			.returning()
+
+		if (!updated) throw new NotFoundException("Face scan phone session not found")
+		return this.serializeFaceScanPhoneSession(updated)
 	}
 
 	// ========================================================================

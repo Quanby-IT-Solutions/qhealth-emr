@@ -1,7 +1,8 @@
 import { index, uniqueIndex } from "drizzle-orm/pg-core"
 
 import { createTable } from "../utils/table.js"
-import { encounters, preEncounters } from "./core.js"
+import { users } from "./auth.js"
+import { encounters, patients, preEncounters } from "./core.js"
 import { medicationOrders } from "./orders.js"
 import { facilities, staffProfiles } from "./rbac.js"
 
@@ -27,9 +28,18 @@ export const vitalSigns = createTable(
 		heartRate: t.integer("heart_rate"),
 		respiratoryRate: t.integer("respiratory_rate"),
 		spo2: t.numeric("spo2", { precision: 4, scale: 1 }),
+		spo2Scale: t.text("spo2_scale").notNull().default("scale1").$type<"scale1" | "scale2">(),
+		oxygenTherapy: t.boolean("oxygen_therapy").notNull().default(false),
+		oxygenDeliveryDevice: t.text("oxygen_delivery_device"),
+		oxygenFlowRate: t.numeric("oxygen_flow_rate", { precision: 4, scale: 1 }),
 		painScore: t.integer("pain_score"),
 		weight: t.numeric("weight", { precision: 5, scale: 2 }),
 		height: t.numeric("height", { precision: 5, scale: 2 }),
+		consciousnessLevel: t
+			.text("consciousness_level")
+			.notNull()
+			.default("A")
+			.$type<"A" | "C" | "V" | "P" | "U">(),
 		newsScore: t.integer("news_score"),
 		newsRiskLevel: t.text("news_risk_level").$type<"low" | "medium" | "high">(),
 		recordedByStaffId: t
@@ -44,6 +54,49 @@ export const vitalSigns = createTable(
 		index("vital_signs_encounter_id_idx").on(t.encounterId),
 		index("vital_signs_pre_encounter_id_idx").on(t.preEncounterId),
 		index("vital_signs_recorded_at_idx").on(t.recordedAt),
+	]
+)
+
+export const faceScanPhoneSessions = createTable(
+	"face_scan_phone_sessions",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		tokenHash: t.text("token_hash").notNull(),
+		status: t
+			.text("status")
+			.notNull()
+			.default("pending")
+			.$type<"pending" | "complete" | "expired">(),
+		facilityId: t.uuid("facility_id").references(() => facilities.id, { onDelete: "set null" }),
+		encounterId: t.uuid("encounter_id").references(() => encounters.id, { onDelete: "set null" }),
+		patientId: t.uuid("patient_id").references(() => patients.id, { onDelete: "set null" }),
+		age: t.integer("age"),
+		gender: t.text("gender").$type<"male" | "female">(),
+		smoking: t.boolean("smoking"),
+		vitals: t.jsonb("vitals").$type<{
+			bpSystolic: number | null
+			bpDiastolic: number | null
+			heartRate: number | null
+			respiratoryRate: number | null
+			spo2: number | null
+			heightCm?: number
+			weightKg?: number
+		}>(),
+		createdByUserId: t
+			.text("created_by_user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		expiresAt: t.timestamp("expires_at", { withTimezone: true }).notNull(),
+		completedAt: t.timestamp("completed_at", { withTimezone: true }),
+		createdAt: t.timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: t.timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	}),
+	t => [
+		uniqueIndex("face_scan_phone_sessions_token_hash_uniq").on(t.tokenHash),
+		index("face_scan_phone_sessions_created_by_user_id_idx").on(t.createdByUserId),
+		index("face_scan_phone_sessions_expires_at_idx").on(t.expiresAt),
+		index("face_scan_phone_sessions_encounter_id_idx").on(t.encounterId),
+		index("face_scan_phone_sessions_patient_id_idx").on(t.patientId),
 	]
 )
 

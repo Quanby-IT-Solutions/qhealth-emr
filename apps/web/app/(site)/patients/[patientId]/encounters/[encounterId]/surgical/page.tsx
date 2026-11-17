@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { isCoordinatorRole } from "@/features/app-shell/lib/navigation"
 import { useChartContext } from "@/features/encounters/context/chart-context"
 import {
 	useAnesthesiaRecordQuery,
@@ -54,17 +55,19 @@ export default function SurgicalPage() {
 	const roleName = (profile?.activeRole?.name ?? "").toLowerCase()
 	const isSurgeon = roleName === "surgeon"
 	const isAnesthesiologist = roleName === "anesthesiologist"
+	const isCoordinator = isCoordinatorRole(profile?.activeRole?.name)
 
 	const defaultTab = isSurgeon ? "operation" : isAnesthesiologist ? "anesthesia" : "checklist"
-	const showRvsTab = !isAnesthesiologist
+	const showRvsTab = !isAnesthesiologist || isCoordinator
 
-	const canEditPreOp = isAnesthesiologist ? false : canEditSurgical
-	const canEditOperation = isAnesthesiologist ? false : canEditSurgical
-	const canSignOperation = isAnesthesiologist ? false : canSignSurgical
+	const canEditPreOp = isAnesthesiologist && !isCoordinator ? false : canEditSurgical
+	const canEditOperation = isAnesthesiologist && !isCoordinator ? false : canEditSurgical
+	const canSignOperation = isAnesthesiologist && !isCoordinator ? false : canSignSurgical
 	const isAssignedAnesthesiologist =
-		isAnesthesiologist &&
-		!!surgicalCase?.anesthesiologistStaffId &&
-		surgicalCase.anesthesiologistStaffId === staffId
+		(isAnesthesiologist &&
+			!!surgicalCase?.anesthesiologistStaffId &&
+			surgicalCase.anesthesiologistStaffId === staffId) ||
+		isCoordinator
 	const canEditAnesthesia = isAssignedAnesthesiologist && canEditSurgical
 	const canSignAnesthesia = isAssignedAnesthesiologist && canSignSurgical
 

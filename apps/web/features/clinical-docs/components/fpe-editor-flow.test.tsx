@@ -16,6 +16,10 @@ vi.mock("@/features/clinical-docs/api/clinical-docs.hooks", () => ({
 	useSubmitFpeMutation: (...args: unknown[]) => mockUseSubmitFpeMutation(...args),
 }))
 
+vi.mock("@/features/face-scan/components/face-scan-vitals-button", () => ({
+	FaceScanVitalsButton: () => null,
+}))
+
 describe("FpeEditorFlow", () => {
 	const createMutate = vi.fn()
 	const updateMutate = vi.fn()

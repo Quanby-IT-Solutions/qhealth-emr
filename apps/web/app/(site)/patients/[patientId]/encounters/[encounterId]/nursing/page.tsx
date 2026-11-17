@@ -1,6 +1,7 @@
 "use client"
 
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { excludeClinicalSignerFromEncounterTab } from "@/features/app-shell/lib/navigation"
 import { useChartContext } from "@/features/encounters/context/chart-context"
 import { NursingTab } from "@/features/nursing/components/nursing-tab"
 
@@ -14,7 +15,10 @@ export default function NursingPage() {
 		p => p.module === "clinical_docs" && p.action === "sign"
 	)
 
-	if (!canViewNursing || isClinicalSigner) {
+	if (
+		!canViewNursing ||
+		excludeClinicalSignerFromEncounterTab(profile?.activeRole?.name, isClinicalSigner)
+	) {
 		return (
 			<div className="text-muted-foreground py-8 text-center text-sm">
 				You do not have permission to view nursing workflows.

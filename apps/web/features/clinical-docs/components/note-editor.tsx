@@ -42,6 +42,7 @@ import {
 } from "@/features/clinical-docs/api/clinical-docs.hooks"
 import { useSpeechToText } from "@/features/clinical-docs/api/use-speech-to-text"
 import { expandDotPhrase } from "@/features/clinical-docs/lib/dot-phrases"
+import { formatVitalLine, hasVitalMeasurements } from "@/features/clinical-docs/lib/vital-line"
 import {
 	useIcd10ProblemSearchQuery,
 	type Icd10SearchResult,
@@ -123,21 +124,6 @@ function formatDateTime(dateStr: string | null | undefined) {
 		hour: "2-digit",
 		minute: "2-digit",
 	})
-}
-
-function vitalLine(vitals: NonNullable<NoteContext["latestVitals"]>) {
-	const parts = [
-		vitals.bpSystolic && vitals.bpDiastolic
-			? `BP ${vitals.bpSystolic}/${vitals.bpDiastolic} mmHg`
-			: null,
-		vitals.heartRate ? `HR ${vitals.heartRate} bpm` : null,
-		vitals.respiratoryRate ? `RR ${vitals.respiratoryRate}/min` : null,
-		vitals.temperature ? `Temp ${vitals.temperature} C` : null,
-		vitals.spo2 ? `SpO2 ${vitals.spo2}%` : null,
-		vitals.painScore !== null ? `Pain ${vitals.painScore}/10` : null,
-	].filter(Boolean)
-
-	return `Vitals (${formatDateTime(vitals.recordedAt)}): ${parts.join(", ")}`
 }
 
 function allergyLine(context: NoteContext) {
@@ -653,7 +639,10 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 				: lastSavedAt
 					? `Saved ${formatDateTime(lastSavedAt)}`
 					: "Not saved"
-	const latestVitalsText = context?.latestVitals ? vitalLine(context.latestVitals) : ""
+	const latestVitalsText =
+		context?.latestVitals && hasVitalMeasurements(context.latestVitals)
+			? formatVitalLine(context.latestVitals)
+			: ""
 	const allergiesText = context ? allergyLine(context) : ""
 	const labsText = context ? labLine(context) : ""
 
@@ -894,20 +883,18 @@ export function NoteEditor({ encounterId, facilityId, template, onBack, onDone }
 										<InsertButton
 											label="Insert vitals into Objective"
 											disabled={
-												!context.latestVitals ||
+												!latestVitalsText ||
 												!objectiveKey ||
 												sectionHasSourceBlock(objectiveKey, "vitals", latestVitalsText)
 											}
 											onClick={() =>
-												context.latestVitals &&
+												latestVitalsText &&
 												insertIntoSection(objectiveKey, latestVitalsText, "vitals")
 											}
 										/>
 									</div>
 									<p className="text-muted-foreground text-sm whitespace-pre-wrap">
-										{context.latestVitals
-											? vitalLine(context.latestVitals)
-											: "No vitals recorded for this encounter."}
+										{latestVitalsText || "No vitals recorded for this encounter."}
 									</p>
 								</div>
 

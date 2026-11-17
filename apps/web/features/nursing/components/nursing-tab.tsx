@@ -35,7 +35,7 @@ export function NursingTab({
 }: NursingTabProps) {
 	return (
 		<Tabs defaultValue="vitals">
-			<TabsList variant="line">
+			<TabsList variant="line" className="w-full justify-start overflow-x-auto">
 				<TabsTrigger value="vitals">Vitals</TabsTrigger>
 				<TabsTrigger value="mar">MAR</TabsTrigger>
 				<TabsTrigger value="tar">TAR</TabsTrigger>
