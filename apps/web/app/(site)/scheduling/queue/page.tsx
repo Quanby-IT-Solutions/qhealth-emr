@@ -24,7 +24,7 @@ export default function ClinicQueuePage() {
 	const permSet = usePermissionSet()
 	const facilityId = profile?.staffProfiles?.[0]?.facilityId ?? ""
 	const currentStaffId = profile?.staffProfiles?.[0]?.id ?? ""
-	const isClinicCoordinator = isCoordinatorRole(profile?.activeRole?.name)
+	const isClinicCoordinator = isCoordinatorRole(profile?.activeRole)
 
 	// Default to the current user's own clinic scope (PS-013: queue must be clinic-scoped)
 	const [showAllClinics, setShowAllClinics] = useState(false)

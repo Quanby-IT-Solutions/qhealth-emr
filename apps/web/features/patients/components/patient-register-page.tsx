@@ -186,7 +186,7 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 	const isBreakGlassEnforced = permissions.some(
 		permission => permission.module === "audit" && permission.action === "create"
 	)
-	const isClinicCoordinator = isCoordinatorRole(profile?.activeRole?.name)
+	const isClinicCoordinator = isCoordinatorRole(profile?.activeRole)
 	const shouldUseDirectOpdRegistration = isClinicCoordinator && !pendingTriageId
 	const shouldStartAtForm =
 		shouldUseDirectOpdRegistration || (canOpenRegistrationWorkflow && !canSearchPatients)
@@ -717,7 +717,7 @@ export function PatientRegisterPageContent() {
 	const canCreatePatient = permissions.some(
 		permission => permission.module === "patients" && permission.action === "create"
 	)
-	const isClinicCoordinator = isCoordinatorRole(profile?.activeRole?.name)
+	const isClinicCoordinator = isCoordinatorRole(profile?.activeRole)
 
 	// Auto-open the wizard when a triage intake is pending
 	const [isDialogOpen, setIsDialogOpen] = useState(!!pendingTriageId)

@@ -1026,12 +1026,28 @@ async function ensureFacilityProfile(facilityId: string, seed: DemoFacility) {
 	})
 }
 
+/** Stable machine key for a seeded role; gating matches this, not the name. */
+function roleSystemKey(roleName: string): string {
+	return roleName
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "_")
+		.replace(/^_+|_+$/g, "")
+}
+
 async function ensureRole(facilityId: string, roleName: string) {
+	const systemKey = roleSystemKey(roleName)
 	const [existing] = await db
 		.select()
 		.from(roles)
 		.where(and(eq(roles.facilityId, facilityId), eq(roles.name, roleName)))
-	if (existing) return existing
+	if (existing) {
+		// Backfill the key on roles seeded before system_key existed.
+		if (!existing.systemKey) {
+			await db.update(roles).set({ systemKey }).where(eq(roles.id, existing.id))
+			return { ...existing, systemKey }
+		}
+		return existing
+	}
 	const [created] = await db
 		.insert(roles)
 		.values({
@@ -1039,6 +1055,7 @@ async function ensureRole(facilityId: string, roleName: string) {
 			name: roleName,
 			description: `${roleName} access role`,
 			isSystemDefault: true,
+			systemKey,
 		})
 		.returning()
 	return created!

@@ -52,12 +52,10 @@ export function AppSidebar() {
 	const { isOnline } = useOfflineSync()
 
 	const permissions = profile?.activeRole?.permissions ?? []
-	const activeRoleName = profile?.activeRole?.name
-	const primaryItems = dedupeNavItems(
-		filterNavItems(PRIMARY_NAV_ITEMS, permissions, activeRoleName)
-	)
+	const activeRole = profile?.activeRole
+	const primaryItems = dedupeNavItems(filterNavItems(PRIMARY_NAV_ITEMS, permissions, activeRole))
 	const allSecondaryItems = dedupeNavItems(
-		filterNavItems(SECONDARY_NAV_ITEMS, permissions, activeRoleName)
+		filterNavItems(SECONDARY_NAV_ITEMS, permissions, activeRole)
 	)
 	const secondaryItems = allSecondaryItems.filter(item => !item.adminGroup)
 

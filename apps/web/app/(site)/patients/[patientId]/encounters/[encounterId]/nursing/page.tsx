@@ -17,7 +17,7 @@ export default function NursingPage() {
 
 	if (
 		!canViewNursing ||
-		excludeClinicalSignerFromEncounterTab(profile?.activeRole?.name, isClinicalSigner)
+		excludeClinicalSignerFromEncounterTab(profile?.activeRole, isClinicalSigner)
 	) {
 		return (
 			<div className="text-muted-foreground py-8 text-center text-sm">

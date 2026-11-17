@@ -59,12 +59,21 @@ export const roles = createTable(
 			.references(() => facilities.id, { onDelete: "cascade" }),
 		name: t.text("name").notNull(),
 		description: t.text("description"),
+		// Stable machine identifier for seeded system roles (e.g.
+		// "clinic_coordinator"). Gating code matches on this key, never on the
+		// display name, so an admin renaming a role cannot silently break
+		// role-scoped behaviour. Null for admin-created custom roles; set only
+		// at seed/creation time and never editable through the role admin API.
+		systemKey: t.text("system_key"),
 		isSystemDefault: t.boolean("is_system_default").notNull().default(false),
 		isArchived: t.boolean("is_archived").notNull().default(false),
 		archivedAt: t.timestamp("archived_at"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 	}),
-	t => [index("roles_facility_id_idx").on(t.facilityId)]
+	t => [
+		index("roles_facility_id_idx").on(t.facilityId),
+		index("roles_system_key_idx").on(t.systemKey),
+	]
 )
 
 export const rolePermissions = createTable(

@@ -18,7 +18,7 @@ export default function BillingPage() {
 
 	if (
 		!canViewBilling ||
-		excludeClinicalSignerFromEncounterTab(profile?.activeRole?.name, isClinicalSigner)
+		excludeClinicalSignerFromEncounterTab(profile?.activeRole, isClinicalSigner)
 	) {
 		return (
 			<div className="text-muted-foreground py-8 text-center text-sm">

@@ -11,7 +11,7 @@ import { Label } from "@/core/components/ui/label"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { canAccessRoleGatedModule, NURSE_ROLE_NAMES } from "@/features/app-shell/lib/navigation"
+import { canAccessRoleGatedModule, NURSE_ROLES } from "@/features/app-shell/lib/navigation"
 import {
 	useBedsideVerifyMutation,
 	useCrossMatchListQuery,
@@ -25,7 +25,7 @@ function useAccessContext() {
 		permSet: new Set(
 			permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
 		),
-		roleName: profile?.activeRole?.name,
+		role: profile?.activeRole,
 	}
 }
 
@@ -150,7 +150,7 @@ function VerificationResult({ result }: { result: BedsideVerifyResult }) {
 }
 
 export default function TransfusionPage() {
-	const { permSet, roleName } = useAccessContext()
+	const { permSet, role } = useAccessContext()
 	const facilityId = useActiveFacilityId()
 	const verifyMutation = useBedsideVerifyMutation()
 	const [patientMrn, setPatientMrn] = useState("")
@@ -159,16 +159,10 @@ export default function TransfusionPage() {
 	const [showErrors, setShowErrors] = useState(false)
 	const [verifyResult, setVerifyResult] = useState<BedsideVerifyResult | null>(null)
 
-	const hasViewPermission = canAccessRoleGatedModule(
-		roleName,
-		NURSE_ROLE_NAMES,
-		permSet,
-		"nursing",
-		"view"
-	)
+	const hasViewPermission = canAccessRoleGatedModule(role, NURSE_ROLES, permSet, "nursing", "view")
 	const hasVerifyPermission = canAccessRoleGatedModule(
-		roleName,
-		NURSE_ROLE_NAMES,
+		role,
+		NURSE_ROLES,
 		permSet,
 		"nursing",
 		"edit"

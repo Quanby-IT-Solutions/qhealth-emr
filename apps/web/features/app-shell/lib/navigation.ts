@@ -75,6 +75,8 @@ interface NavItemConfig {
 	 * other roles. Names are matched case-insensitively.
 	 */
 	allowedRoleNames?: string[]
+	/** Rename-proof companion to allowedRoleNames; matched against roles.system_key first. */
+	allowedRoleKeys?: string[]
 	/**
 	 * Always-show when empty. Otherwise the item is visible if the user holds
 	 * ANY of the listed module+action pairs. Use this instead of requiredModules
@@ -123,6 +125,46 @@ export const NURSE_ROLE_NAMES = ["Nurse"]
 export const RADIOLOGIST_ROLE_NAMES = ["Radiologist"]
 export const COORDINATOR_ROLE_NAMES = ["Clinic Coordinator"]
 
+// Stable system keys for the same groups (roles.system_key, set at seed time).
+// Matching prefers these: an admin renaming "Lab Technologist" to anything
+// else keeps the role's gating intact because the key never changes. Names
+// remain as a fallback for roles created before system_key existed.
+export const LAB_TECH_ROLE_KEYS = ["lab_technologist", "lab_technician", "lab_tech"]
+export const BLOOD_BANK_ROLE_KEYS = ["blood_bank_technician", "blood_bank_officer"]
+export const NURSE_ROLE_KEYS = ["nurse"]
+export const RADIOLOGIST_ROLE_KEYS = ["radiologist"]
+export const COORDINATOR_ROLE_KEYS = ["clinic_coordinator"]
+
+/** Grouped key+name constants for role-gated module checks. */
+export interface RoleGroup {
+	keys: string[]
+	names: string[]
+}
+export const LAB_TECH_ROLES: RoleGroup = { keys: LAB_TECH_ROLE_KEYS, names: LAB_TECH_ROLE_NAMES }
+export const BLOOD_BANK_ROLES: RoleGroup = {
+	keys: BLOOD_BANK_ROLE_KEYS,
+	names: BLOOD_BANK_ROLE_NAMES,
+}
+export const NURSE_ROLES: RoleGroup = { keys: NURSE_ROLE_KEYS, names: NURSE_ROLE_NAMES }
+export const RADIOLOGIST_ROLES: RoleGroup = {
+	keys: RADIOLOGIST_ROLE_KEYS,
+	names: RADIOLOGIST_ROLE_NAMES,
+}
+
+/**
+ * A role reference for gating checks: the full activeRole object (preferred —
+ * carries the rename-proof systemKey), or a bare display name for callers and
+ * data that predate system_key.
+ */
+export type RoleInput =
+	{ name?: string | null; systemKey?: string | null } | string | null | undefined
+
+function normalizeRole(role: RoleInput): { name: string | null; key: string | null } {
+	if (role == null) return { name: null, key: null }
+	if (typeof role === "string") return { name: role, key: null }
+	return { name: role.name ?? null, key: role.systemKey ?? null }
+}
+
 export function roleNameMatches(roleName: string | null | undefined, allowedRoleNames: string[]) {
 	const normalizedRoleName = roleName?.trim().toLowerCase()
 	if (!normalizedRoleName) return false
@@ -130,16 +172,20 @@ export function roleNameMatches(roleName: string | null | undefined, allowedRole
 	return allowedRoleNames.some(allowed => allowed.trim().toLowerCase() === normalizedRoleName)
 }
 
-export function isCoordinatorRole(roleName: string | null | undefined) {
-	return roleNameMatches(roleName, COORDINATOR_ROLE_NAMES)
+/** Key-first role matching: systemKey wins; display name is the fallback. */
+export function roleMatches(role: RoleInput, keys: string[], names: string[]) {
+	const { name, key } = normalizeRole(role)
+	if (key && keys.includes(key)) return true
+	return roleNameMatches(name, names)
+}
+
+export function isCoordinatorRole(role: RoleInput) {
+	return roleMatches(role, COORDINATOR_ROLE_KEYS, COORDINATOR_ROLE_NAMES)
 }
 
 /** Clinicians who sign notes are excluded from nurse/billing tabs unless Clinic Coordinator. */
-export function excludeClinicalSignerFromEncounterTab(
-	roleName: string | null | undefined,
-	isClinicalSigner: boolean
-) {
-	return isClinicalSigner && !isCoordinatorRole(roleName)
+export function excludeClinicalSignerFromEncounterTab(role: RoleInput, isClinicalSigner: boolean) {
+	return isClinicalSigner && !isCoordinatorRole(role)
 }
 
 export function hasPermission(permSet: Set<string>, module: string, action: string) {
@@ -148,28 +194,34 @@ export function hasPermission(permSet: Set<string>, module: string, action: stri
 
 export function canManageOwnLicenses(
 	_permissions: Array<{ module: string; action: string }>,
-	options: { staffProfileCount: number; roleName?: string | null }
+	options: { staffProfileCount: number; role?: RoleInput }
 ) {
 	if (options.staffProfileCount === 0) return false
-	return isCoordinatorRole(options.roleName)
+	return isCoordinatorRole(options.role)
 }
 
-/** Permission check with optional role-name gate; Clinic Coordinator bypasses the role gate. */
+/** Permission check with a role gate; Clinic Coordinator bypasses the role gate. */
 export function canAccessRoleGatedModule(
-	roleName: string | null | undefined,
-	allowedRoleNames: string[],
+	role: RoleInput,
+	allowed: RoleGroup | string[],
 	permSet: Set<string>,
 	module: string,
 	action: string
 ) {
 	if (!hasPermission(permSet, module, action)) return false
-	if (isCoordinatorRole(roleName)) return true
-	return roleNameMatches(roleName, allowedRoleNames)
+	if (isCoordinatorRole(role)) return true
+	const group: RoleGroup = Array.isArray(allowed) ? { keys: [], names: allowed } : allowed
+	return roleMatches(role, group.keys, group.names)
 }
 
-export function canActAsClinicalClinician(roleName: string | null | undefined) {
-	const normalized = (roleName ?? "").trim().toLowerCase()
-	return normalized.includes("physician") || normalized === "surgeon" || isCoordinatorRole(roleName)
+export function canActAsClinicalClinician(role: RoleInput) {
+	const { name, key } = ((r: RoleInput) =>
+		typeof r === "string" || r == null
+			? { name: r ?? null, key: null }
+			: { name: r.name ?? null, key: r.systemKey ?? null })(role)
+	if (key && (key === "physician" || key === "surgeon")) return true
+	const normalized = (name ?? "").trim().toLowerCase()
+	return normalized.includes("physician") || normalized === "surgeon" || isCoordinatorRole(role)
 }
 
 /**
@@ -439,6 +491,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		// Laboratory module is seeded for Lab Technologist role
 		// Admin does not have laboratory access per TOR
 		allowedRoleNames: LAB_TECH_ROLE_NAMES,
+		allowedRoleKeys: LAB_TECH_ROLE_KEYS,
 		requiredPermissions: [{ module: "laboratory", action: "view" }],
 	},
 	{
@@ -446,6 +499,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		href: "/laboratory/critical-results",
 		iconName: "laboratory",
 		allowedRoleNames: LAB_TECH_ROLE_NAMES,
+		allowedRoleKeys: LAB_TECH_ROLE_KEYS,
 		requiredPermissions: [{ module: "laboratory", action: "view" }],
 	},
 	{
@@ -453,6 +507,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		href: "/laboratory/blood-bank",
 		iconName: "blood-bank",
 		allowedRoleNames: BLOOD_BANK_ROLE_NAMES,
+		allowedRoleKeys: BLOOD_BANK_ROLE_KEYS,
 		requiredPermissions: [{ module: "laboratory", action: "view" }],
 	},
 	{
@@ -460,6 +515,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		href: "/transfusion",
 		iconName: "blood-bank",
 		allowedRoleNames: NURSE_ROLE_NAMES,
+		allowedRoleKeys: NURSE_ROLE_KEYS,
 		requiredPermissions: [{ module: "nursing", action: "view" }],
 	},
 	{
@@ -467,6 +523,7 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
 		href: "/procedure-logging",
 		iconName: "laboratory",
 		allowedRoleNames: [...LAB_TECH_ROLE_NAMES, ...RADIOLOGIST_ROLE_NAMES],
+		allowedRoleKeys: [...LAB_TECH_ROLE_KEYS, ...RADIOLOGIST_ROLE_KEYS],
 		requiredPermissions: [
 			{ module: "laboratory", action: "view" },
 			{ module: "radiology", action: "view" },
@@ -751,6 +808,7 @@ export const SECONDARY_NAV_ITEMS: NavItemConfig[] = [
 		// Blood Bank is tied to Laboratory module but owned by Blood Bank staff.
 		// Admin does not have blood bank access per TOR
 		allowedRoleNames: BLOOD_BANK_ROLE_NAMES,
+		allowedRoleKeys: BLOOD_BANK_ROLE_KEYS,
 		requiredPermissions: [{ module: "laboratory", action: "view" }],
 		isSecondary: true,
 	},
@@ -876,10 +934,10 @@ export function getDefaultPatientsHref(permissions: Permission[]): string {
 export function filterNavItems(
 	items: NavItemConfig[],
 	permissions: Permission[],
-	roleName?: string | null
+	role?: RoleInput
 ): NavItemConfig[] {
 	const permSet = new Set(permissions.map(p => `${p.module}:${p.action}`))
-	const isCoordinator = roleNameMatches(roleName, COORDINATOR_ROLE_NAMES)
+	const isCoordinator = isCoordinatorRole(role)
 
 	return items.filter(item => {
 		if (isCoordinator) {
@@ -891,9 +949,9 @@ export function filterNavItems(
 		}
 
 		if (
-			item.allowedRoleNames?.length &&
+			(item.allowedRoleNames?.length || item.allowedRoleKeys?.length) &&
 			!isCoordinator &&
-			!roleNameMatches(roleName, item.allowedRoleNames)
+			!roleMatches(role, item.allowedRoleKeys ?? [], item.allowedRoleNames ?? [])
 		) {
 			return false
 		}

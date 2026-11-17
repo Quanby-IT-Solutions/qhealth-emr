@@ -162,6 +162,9 @@ export const RoleSchema = z.object({
 	id: z.string().uuid(),
 	facilityId: z.string().uuid(),
 	name: z.string(),
+	// Stable machine key for seeded system roles ("clinic_coordinator", ...).
+	// Gating matches this, never the display name. Null for custom roles.
+	systemKey: z.string().nullable().optional(),
 	description: z.string().nullable(),
 	isSystemDefault: z.boolean(),
 	isArchived: z.boolean(),

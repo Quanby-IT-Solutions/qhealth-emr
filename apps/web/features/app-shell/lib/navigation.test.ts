@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest"
 
 import {
+	canAccessRoleGatedModule,
 	canManageOwnLicenses,
 	dedupeNavItems,
 	excludeClinicalSignerFromEncounterTab,
 	filterNavItems,
 	getDefaultPatientsHref,
+	isCoordinatorRole,
+	LAB_TECH_ROLES,
 	PRIMARY_NAV_ITEMS,
 	SECONDARY_NAV_ITEMS,
 } from "./navigation"
@@ -299,7 +302,7 @@ describe("Clinic Coordinator navigation", () => {
 		expect(
 			canManageOwnLicenses(coordinatorPermissions, {
 				staffProfileCount: 1,
-				roleName: "Clinic Coordinator",
+				role: "Clinic Coordinator",
 			})
 		).toBe(true)
 	})
@@ -308,7 +311,7 @@ describe("Clinic Coordinator navigation", () => {
 		expect(
 			canManageOwnLicenses([{ module: "clinical_docs", action: "sign" }], {
 				staffProfileCount: 1,
-				roleName: "Physician",
+				role: "Physician",
 			})
 		).toBe(false)
 	})
@@ -349,5 +352,41 @@ describe("dedupeNavItems", () => {
 describe("getDefaultPatientsHref", () => {
 	it("routes the Triage Officer bundle away from registrar registration", () => {
 		expect(getDefaultPatientsHref(triagePermissions)).toBe("/triage")
+	})
+})
+
+describe("rename-safe role matching (systemKey)", () => {
+	it("a renamed Clinic Coordinator keeps the coordinator nav via systemKey", () => {
+		const renamed = { name: "Front Desk Lead", systemKey: "clinic_coordinator" }
+		expect(isCoordinatorRole(renamed)).toBe(true)
+		const items = filterNavItems(PRIMARY_NAV_ITEMS, [], renamed)
+		expect(items.map(i => i.href)).toContain("/dashboard")
+		// Still locked to the coordinator whitelist, not the whole nav.
+		expect(
+			items.every(i => ["/dashboard", "/patients/register", "/scheduling/queue"].includes(i.href))
+		).toBe(true)
+	})
+
+	it("a renamed Lab Technologist keeps role-gated module access via systemKey", () => {
+		const renamed = { name: "Laboratory Specialist", systemKey: "lab_technologist" }
+		const permSet = new Set(["laboratory:view"])
+		expect(canAccessRoleGatedModule(renamed, LAB_TECH_ROLES, permSet, "laboratory", "view")).toBe(
+			true
+		)
+		// Same rename WITHOUT the key falls back to name matching and is denied.
+		expect(
+			canAccessRoleGatedModule(
+				"Laboratory Specialist",
+				LAB_TECH_ROLES,
+				permSet,
+				"laboratory",
+				"view"
+			)
+		).toBe(false)
+	})
+
+	it("plain display-name strings still match as a fallback", () => {
+		expect(isCoordinatorRole("Clinic Coordinator")).toBe(true)
+		expect(isCoordinatorRole({ name: "Clinic Coordinator", systemKey: null })).toBe(true)
 	})
 })

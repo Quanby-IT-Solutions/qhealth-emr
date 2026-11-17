@@ -58,6 +58,9 @@ export const MyProfileResponseSchema = z.object({
 		.object({
 			id: z.string().uuid(),
 			name: z.string(),
+			// Stable machine key for seeded system roles; gating matches this,
+			// never the display name. Null for admin-created custom roles.
+			systemKey: z.string().nullable().optional(),
 			permissions: z.array(
 				z.object({
 					module: RbacModuleEnum,

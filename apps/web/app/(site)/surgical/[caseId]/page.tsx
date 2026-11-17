@@ -67,7 +67,7 @@ export default function SurgicalCaseDetailPage({
 	const roleName = (profile?.activeRole?.name ?? "").toLowerCase()
 	const isSurgeon = roleName === "surgeon"
 	const isAnesthesiologist = roleName === "anesthesiologist"
-	const isCoordinator = isCoordinatorRole(profile?.activeRole?.name)
+	const isCoordinator = isCoordinatorRole(profile?.activeRole)
 
 	const defaultTab = isSurgeon ? "operation" : isAnesthesiologist ? "anesthesia" : "checklist"
 	const showRvsTab = !isAnesthesiologist || isCoordinator

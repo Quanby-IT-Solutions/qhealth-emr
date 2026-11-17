@@ -177,7 +177,13 @@ export class RbacService {
 			.where(and(eq(staffProfiles.userId, userId), eq(staffProfiles.isActive, true)))
 
 		// 3. Batch-fetch roles and facilities for all profiles in two queries
-		type RoleRow = { id: string; name: string; isPrimary: boolean; staffProfileId: string }
+		type RoleRow = {
+			id: string
+			name: string
+			systemKey: string | null
+			isPrimary: boolean
+			staffProfileId: string
+		}
 		let allRoleRows: RoleRow[] = []
 		let allFacilityRows: {
 			id: string
@@ -193,6 +199,7 @@ export class RbacService {
 				.select({
 					id: roles.id,
 					name: roles.name,
+					systemKey: roles.systemKey,
 					isPrimary: userRoles.isPrimary,
 					staffProfileId: userRoles.staffProfileId,
 				})
@@ -208,11 +215,11 @@ export class RbacService {
 
 		const rolesByProfileId = new Map<
 			string,
-			Array<{ id: string; name: string; isPrimary: boolean }>
+			Array<{ id: string; name: string; systemKey: string | null; isPrimary: boolean }>
 		>()
 		for (const row of allRoleRows) {
 			const list = rolesByProfileId.get(row.staffProfileId) ?? []
-			list.push({ id: row.id, name: row.name, isPrimary: row.isPrimary })
+			list.push({ id: row.id, name: row.name, systemKey: row.systemKey, isPrimary: row.isPrimary })
 			rolesByProfileId.set(row.staffProfileId, list)
 		}
 		const facilitiesById = new Map(allFacilityRows.map(f => [f.id, f]))
@@ -246,6 +253,7 @@ export class RbacService {
 				activeRole = {
 					id: selectedRole.id,
 					name: selectedRole.name,
+					systemKey: selectedRole.systemKey ?? null,
 					permissions: permRows as PermissionEntry[],
 				}
 			}
@@ -339,13 +347,20 @@ export class RbacService {
 		const profileIds = allProfiles.map(p => p.id)
 
 		// Batch-fetch all roles for those profiles
-		type ProfileRoleRow = { id: string; name: string; isPrimary: boolean; staffProfileId: string }
+		type ProfileRoleRow = {
+			id: string
+			name: string
+			systemKey: string | null
+			isPrimary: boolean
+			staffProfileId: string
+		}
 		let allRoleRows: ProfileRoleRow[] = []
 		if (profileIds.length > 0) {
 			allRoleRows = await db
 				.select({
 					id: roles.id,
 					name: roles.name,
+					systemKey: roles.systemKey,
 					isPrimary: userRoles.isPrimary,
 					staffProfileId: userRoles.staffProfileId,
 				})
@@ -356,11 +371,11 @@ export class RbacService {
 
 		const rolesByProfileId = new Map<
 			string,
-			Array<{ id: string; name: string; isPrimary: boolean }>
+			Array<{ id: string; name: string; systemKey: string | null; isPrimary: boolean }>
 		>()
 		for (const row of allRoleRows) {
 			const list = rolesByProfileId.get(row.staffProfileId) ?? []
-			list.push({ id: row.id, name: row.name, isPrimary: row.isPrimary })
+			list.push({ id: row.id, name: row.name, systemKey: row.systemKey, isPrimary: row.isPrimary })
 			rolesByProfileId.set(row.staffProfileId, list)
 		}
 

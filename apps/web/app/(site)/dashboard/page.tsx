@@ -22,7 +22,7 @@ export default function DashboardPage() {
 		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
 	)
 	const widgetIds = getDashboardWidgetsForPermissions(permissions)
-	const canViewCoordinatorDashboard = isCoordinatorRole(profile?.activeRole?.name)
+	const canViewCoordinatorDashboard = isCoordinatorRole(profile?.activeRole)
 	const canViewAdminDashboard = permSet.has("admin:view")
 	const canViewNursingDashboard = permSet.has("nursing:view") && !permSet.has("clinical_docs:sign")
 	const canViewPharmacyDashboard = permSet.has("orders:verify")

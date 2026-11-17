@@ -44,7 +44,7 @@ function formatCredential(value: string | null | undefined, expiry: string | nul
 
 export function MyLicensesPage() {
 	const { data: profile, isLoading: isProfileLoading, isError: isProfileError } = useMyProfile()
-	const isClinicCoordinator = isCoordinatorRole(profile?.activeRole?.name)
+	const isClinicCoordinator = isCoordinatorRole(profile?.activeRole)
 	const {
 		data,
 		isLoading: isLicensesLoading,

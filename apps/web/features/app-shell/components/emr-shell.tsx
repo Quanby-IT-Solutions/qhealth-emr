@@ -1025,14 +1025,12 @@ export function EmrShell({ children }: { children: React.ReactNode }) {
 	const permissions = activeRole?.permissions ?? []
 	const showMyLicensesMenu = canManageOwnLicenses(permissions, {
 		staffProfileCount: profile?.staffProfiles.length ?? 0,
-		roleName: activeRole?.name,
+		role: activeRole,
 	})
 
-	const primaryItems = dedupeNavItems(
-		filterNavItems(PRIMARY_NAV_ITEMS, permissions, activeRole?.name)
-	)
+	const primaryItems = dedupeNavItems(filterNavItems(PRIMARY_NAV_ITEMS, permissions, activeRole))
 	const secondaryItems = dedupeNavItems(
-		filterNavItems(SECONDARY_NAV_ITEMS, permissions, activeRole?.name)
+		filterNavItems(SECONDARY_NAV_ITEMS, permissions, activeRole)
 	)
 	const allAllowedItems = [...primaryItems, ...secondaryItems]
 

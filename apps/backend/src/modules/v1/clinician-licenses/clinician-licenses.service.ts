@@ -173,22 +173,29 @@ export class ClinicianLicensesService {
 
 		const roleIds = assignments.map(assignment => assignment.roleId)
 		const roleRows = await db
-			.select({ id: roles.id, name: roles.name })
+			.select({ id: roles.id, name: roles.name, systemKey: roles.systemKey })
 			.from(roles)
 			.where(inArray(roles.id, roleIds))
 
-		const rolesById = new Map(roleRows.map(role => [role.id, role.name]))
+		const rolesById = new Map(roleRows.map(role => [role.id, role]))
 		const activeAssignment = assignments.find(assignment => assignment.isPrimary) ?? assignments[0]!
+		const activeRole = rolesById.get(activeAssignment.roleId)
 
 		return {
 			staffProfileId: activeAssignment.staffProfileId,
-			roleName: rolesById.get(activeAssignment.roleId) ?? null,
+			roleName: activeRole?.name ?? null,
+			roleSystemKey: activeRole?.systemKey ?? null,
 		}
 	}
 
 	private async resolveCoordinatorStaffProfileIdForUser(userId: string) {
 		const activeProfile = await this.resolveActiveStaffProfileForUser(userId)
-		if (activeProfile.roleName?.trim().toLowerCase() !== "clinic coordinator") {
+		// Match the rename-proof system key first; the display-name comparison
+		// only remains as a fallback for roles created before system_key existed.
+		const isCoordinator =
+			activeProfile.roleSystemKey === "clinic_coordinator" ||
+			activeProfile.roleName?.trim().toLowerCase() === "clinic coordinator"
+		if (!isCoordinator) {
 			throw new ForbiddenException("Only Clinic Coordinator can manage license records")
 		}
 		return activeProfile.staffProfileId
