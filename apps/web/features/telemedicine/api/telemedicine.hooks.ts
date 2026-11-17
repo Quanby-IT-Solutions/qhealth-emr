@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { getPublicAppUrl } from "@/core/lib/utils"
 import { env } from "@/env"
 
 // ============================================================================
@@ -676,7 +677,7 @@ export function getPatientInvitePath(token: string): string {
 }
 
 export function getPatientInviteUrl(token: string): string {
-	return `${env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}${getPatientInvitePath(token)}`
+	return getPublicAppUrl(getPatientInvitePath(token))
 }
 
 export function formatAppointmentStatusLabel(status: AppointmentStatus): string {

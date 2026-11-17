@@ -21,6 +21,10 @@ vi.mock("@/features/telemedicine/api/telemedicine.hooks", () => ({
 	useCreateEncounterMutation: (...args: unknown[]) => mockUseCreateEncounterMutation(...args),
 }))
 
+vi.mock("@/features/face-scan/components/face-scan-vitals-button", () => ({
+	FaceScanVitalsButton: () => null,
+}))
+
 vi.mock("sonner", () => ({
 	toast: {
 		error: vi.fn(),

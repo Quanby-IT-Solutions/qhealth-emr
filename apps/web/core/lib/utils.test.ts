@@ -1,10 +1,22 @@
 import { describe, expect, it } from "vitest"
 
-import { getApiUrl, getAppUrl, getInitials } from "./utils"
+import { getApiUrl, getAppUrl, getInitials, getPublicAppUrl } from "./utils"
 
 describe("getAppUrl", () => {
 	it("returns the app URL from env", () => {
 		expect(getAppUrl()).toBe("http://localhost:3001")
+	})
+})
+
+describe("getPublicAppUrl", () => {
+	it("builds absolute public app URLs from relative paths", () => {
+		expect(getPublicAppUrl("/lab-requests/token")).toBe("http://localhost:3001/lab-requests/token")
+	})
+
+	it("preserves absolute URLs returned by an API", () => {
+		expect(getPublicAppUrl("https://example.com/prescriptions/token")).toBe(
+			"https://example.com/prescriptions/token"
+		)
 	})
 })
 

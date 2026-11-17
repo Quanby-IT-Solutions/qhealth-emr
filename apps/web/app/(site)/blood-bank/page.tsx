@@ -2,7 +2,10 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { BLOOD_BANK_ROLE_NAMES, roleNameMatches } from "@/features/app-shell/lib/navigation"
+import {
+	BLOOD_BANK_ROLE_NAMES,
+	canAccessRoleGatedModule,
+} from "@/features/app-shell/lib/navigation"
 import { BedsideMatching } from "@/features/lab/components/bedside-matching"
 import { CrossMatchForm } from "@/features/lab/components/cross-match-form"
 
@@ -17,14 +20,10 @@ function useAccessContext() {
 	}
 }
 
-function can(permSet: Set<string>, module: string, action: string) {
-	return permSet.has(`${module}:${action}`)
-}
-
 export default function BloodBankPage() {
 	const { permSet, roleName } = useAccessContext()
 
-	if (!can(permSet, "laboratory", "view") || !roleNameMatches(roleName, BLOOD_BANK_ROLE_NAMES)) {
+	if (!canAccessRoleGatedModule(roleName, BLOOD_BANK_ROLE_NAMES, permSet, "laboratory", "view")) {
 		return (
 			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access blood bank records.
@@ -41,7 +40,7 @@ export default function BloodBankPage() {
 				</p>
 			</div>
 			<Tabs defaultValue="cross-match">
-				<TabsList className="mb-6">
+				<TabsList className="mb-6 w-full justify-start overflow-x-auto">
 					<TabsTrigger value="cross-match">Cross-Match Requests</TabsTrigger>
 					<TabsTrigger value="bedside">Bedside Verification</TabsTrigger>
 				</TabsList>

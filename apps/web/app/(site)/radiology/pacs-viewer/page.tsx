@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/core/components/ui/card"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
 import { useImagingOrderDetailQuery } from "@/features/orders/api/orders.hooks"
+import { formatImagingExamName } from "@/features/orders/lib/imaging-modality"
 
 type PacsStructuredResults = {
 	pacsUrl?: string
@@ -87,7 +88,7 @@ export default function PacsViewerPage() {
 						PACS Viewer
 					</h1>
 					<p className="text-muted-foreground text-sm">
-						{order.modality.toUpperCase()} {order.bodyPart}
+						{formatImagingExamName(order.modality, order.bodyPart)}
 					</p>
 				</div>
 				<Button

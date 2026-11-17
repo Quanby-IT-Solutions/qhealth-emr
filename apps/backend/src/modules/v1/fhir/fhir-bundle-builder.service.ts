@@ -283,6 +283,35 @@ function ref(resourceType: string, id: string, display?: string): FhirReference 
 	return { reference: `${resourceType}/${id}`, ...(display ? { display } : {}) }
 }
 
+function formatImagingModalityLabel(modality: string): string {
+	switch (modality.trim().toLowerCase()) {
+		case "xray":
+			return "X-Ray / Radiography"
+		case "ct":
+			return "CT Scan"
+		case "mri":
+			return "MRI"
+		case "ultrasound":
+			return "Ultrasound"
+		case "mammography":
+			return "Mammography"
+		case "fluoroscopy":
+			return "Fluoroscopy"
+		case "nuclear_medicine":
+			return "Nuclear Medicine"
+		case "pet_ct":
+			return "PET / PET-CT"
+		case "dexa":
+			return "DEXA / Bone Density"
+		case "interventional_radiology":
+			return "Interventional Radiology"
+		case "other":
+			return "Other"
+		default:
+			return modality.replaceAll("_", " ")
+	}
+}
+
 function mapEncounterStatus(status: string): string {
 	switch (status) {
 		case "active":
@@ -818,6 +847,7 @@ export class FhirBundleBuilderService {
 			for (const i of imagingRows) {
 				const patientId = i.encounterId ? (encPatientMap2.get(i.encounterId) ?? "") : ""
 				const isCompleted = i.status === "completed"
+				const imagingStudyName = `${formatImagingModalityLabel(i.modality)} ${i.bodyPart}`
 				const diag: FhirDiagnosticReport = {
 					resourceType: "DiagnosticReport",
 					id: i.id,
@@ -836,10 +866,10 @@ export class FhirBundleBuilderService {
 												: i.modality === "ultrasound"
 													? "24542-3"
 													: "18748-4",
-								display: `${i.modality.toUpperCase()} ${i.bodyPart}`,
+								display: imagingStudyName,
 							},
 						],
-						text: `${i.modality.toUpperCase()} ${i.bodyPart}`,
+						text: imagingStudyName,
 					},
 					subject: ref("Patient", patientId),
 					...(i.encounterId ? { encounter: ref("Encounter", i.encounterId) } : {}),

@@ -71,7 +71,7 @@ import { cn } from "@/core/lib/utils"
 
 type PipCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right"
 
-const PIP_CORNER_STORAGE_KEY = "qhealth:pip-corner"
+const PIP_CORNER_STORAGE_KEY = "juanmeds:pip-corner"
 const PIP_SPRING = { type: "spring", stiffness: 380, damping: 34 } as const
 
 function getInitials(name?: string | null): string {
@@ -1685,7 +1685,7 @@ function VideoConferenceLayout({ fullViewport, waitingRoom }: VideoConferenceLay
 
 	return (
 		<div
-			data-qhealth-livekit-layout
+			data-juanmeds-livekit-layout
 			className={cn(
 				"bg-background text-foreground flex flex-1 flex-col",
 				fullViewport ? "h-full min-h-0" : "min-h-[560px] sm:min-h-[640px]"
@@ -1780,9 +1780,9 @@ export default function LiveKitConferenceInner({
 	return (
 		<div
 			className={cn(
-				"qhealth-livekit-room bg-background text-foreground",
+				"juanmeds-livekit-room bg-background text-foreground",
 				fullViewport
-					? "qhealth-livekit-full-room flex h-full min-h-0 flex-col"
+					? "juanmeds-livekit-full-room flex h-full min-h-0 flex-col"
 					: "border-border overflow-hidden rounded-2xl border shadow-sm",
 				className
 			)}
@@ -1797,7 +1797,7 @@ export default function LiveKitConferenceInner({
 				onDisconnected={onDisconnected}
 				data-lk-theme="default"
 				className={cn(
-					"qhealth-livekit-custom-room flex flex-col",
+					"juanmeds-livekit-custom-room flex flex-col",
 					fullViewport ? "h-full min-h-0 flex-1" : "min-h-[560px]"
 				)}
 				style={fullViewport ? { minHeight: 0 } : { minHeight: 560 }}

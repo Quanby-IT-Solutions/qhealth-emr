@@ -53,18 +53,6 @@ export class ProblemsAllergiesService {
 		return new Date().toISOString().split("T")[0]!
 	}
 
-	private assertProblemHasClinicalCode(input: {
-		icd10Code?: string | null
-		snomedCode?: string | null
-	}) {
-		if (
-			!this.normalizeOptionalText(input.icd10Code) &&
-			!this.normalizeOptionalText(input.snomedCode)
-		) {
-			throw new BadRequestException("At least one of ICD-10 or SNOMED CT code is required.")
-		}
-	}
-
 	private async assertSubmittedProblemCodesAreActive(input: {
 		icd10Code?: string | null
 		snomedCode?: string | null
@@ -341,7 +329,6 @@ export class ProblemsAllergiesService {
 			entityType: "problem",
 			entityId: input.patientId,
 		})
-		this.assertProblemHasClinicalCode(input)
 		await this.assertSubmittedProblemCodesAreActive(input)
 		await this.assertNoDuplicateActiveProblem({
 			patientId: input.patientId,
@@ -404,7 +391,6 @@ export class ProblemsAllergiesService {
 			input.snomedCode !== undefined
 				? this.normalizeOptionalText(input.snomedCode)
 				: existing.snomedCode
-		this.assertProblemHasClinicalCode({ icd10Code: nextIcd10Code, snomedCode: nextSnomedCode })
 		await this.assertSubmittedProblemCodesAreActive({
 			icd10Code: input.icd10Code,
 			snomedCode: input.snomedCode,

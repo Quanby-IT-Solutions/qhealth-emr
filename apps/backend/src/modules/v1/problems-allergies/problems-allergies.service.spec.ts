@@ -354,4 +354,67 @@ describe("ProblemsAllergiesService", () => {
 		expect(mockDb.insert).not.toHaveBeenCalled()
 		expect(auditService.log).not.toHaveBeenCalled()
 	})
+
+	it("creates a text-only custom diagnosis without ICD-10 or SNOMED codes", async () => {
+		const actor = {
+			userId: "user-1",
+			facilityId: "550e8400-e29b-41d4-a716-446655440000",
+		}
+		const createdProblem = buildProblem({
+			icd10Code: null,
+			icd10Display: null,
+			snomedCode: null,
+			snomedDisplay: null,
+			description: "Clinical diagnosis pending coding review",
+		})
+		const insertBuilder = createMutationBuilder([{ id: createdProblem.id }])
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "550e8400-e29b-41d4-a716-446655440002" }])
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([
+					{
+						id: "550e8400-e29b-41d4-a716-446655440001",
+						facilityId: "550e8400-e29b-41d4-a716-446655440000",
+					},
+				])
+			)
+			.mockImplementationOnce(() => createSelectBuilder([createdProblem], { resolveOnWhere: true }))
+		mockDb.insert.mockReturnValue(insertBuilder)
+
+		const result = await service.createProblem(
+			{
+				facilityId: "550e8400-e29b-41d4-a716-446655440000",
+				patientId: "550e8400-e29b-41d4-a716-446655440001",
+				description: "Clinical diagnosis pending coding review",
+				status: "active",
+			},
+			"user-1",
+			actor as never
+		)
+
+		expect(insertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				icd10Code: null,
+				icd10Display: null,
+				snomedCode: null,
+				snomedDisplay: null,
+				description: "Clinical diagnosis pending coding review",
+			})
+		)
+		expect(result).toEqual(createdProblem)
+		expect(auditService.log).toHaveBeenCalledWith(
+			expect.objectContaining({
+				action: "create",
+				entityType: "problem",
+				afterState: expect.objectContaining({
+					icd10Code: null,
+					snomedCode: null,
+					description: "Clinical diagnosis pending coding review",
+				}),
+			})
+		)
+	})
 })

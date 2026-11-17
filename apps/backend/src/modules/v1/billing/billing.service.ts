@@ -888,7 +888,7 @@ export class BillingService {
 			workflowType: "billing" as const,
 			staffId: null,
 			slaTargetMinutes: finalizedSlaMins,
-			notes: `Invoice ${invoice.invoiceNumber}: draft → finalized`,
+			notes: `Invoice ${invoice.invoiceNumber}: draft -> finalized`,
 			occurredAt: new Date(),
 		})
 
@@ -1003,7 +1003,7 @@ export class BillingService {
 			workflowType: "billing" as const,
 			staffId: null,
 			slaTargetMinutes: paymentSlaMins,
-			notes: `Invoice ${invoice.invoiceNumber}: ${invoice.status} → ${newStatus}`,
+			notes: `Invoice ${invoice.invoiceNumber}: ${invoice.status} -> ${newStatus}`,
 			occurredAt: new Date(),
 		})
 

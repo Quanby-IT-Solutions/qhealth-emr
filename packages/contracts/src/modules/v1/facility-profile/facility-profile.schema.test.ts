@@ -18,9 +18,9 @@ const validProfile = {
 	province: "Metro Manila",
 	zipCode: "1234",
 	telephone: "+63 2 8123 0000",
-	email: "info@qhealth.local",
+	email: "info@juanmeds.local",
 	adminContactName: "A. Cruz",
-	adminContactEmail: "admin@qhealth.local",
+	adminContactEmail: "admin@juanmeds.local",
 	updatedAt: null,
 }
 
@@ -137,9 +137,9 @@ describe("UpdateFacilityProfileSchema", () => {
 			province: "Metro Manila",
 			zipCode: "1234",
 			telephone: "+63 2 8123 0000",
-			email: "info@qhealth.local",
+			email: "info@juanmeds.local",
 			adminContactName: "A. Cruz",
-			adminContactEmail: "admin@qhealth.local",
+			adminContactEmail: "admin@juanmeds.local",
 		})
 		expect(result.success).toBe(true)
 	})

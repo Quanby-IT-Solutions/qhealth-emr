@@ -1,9 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { DayPicker, getDefaultClassNames, type DayButton } from "react-day-picker"
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+import { DayPicker, getDefaultClassNames, type DayButton, type Locale } from "react-day-picker"
 
 import { Button, buttonVariants } from "@/core/components/ui/button"
 import { cn } from "@/core/lib/utils"
@@ -14,6 +13,7 @@ function Calendar({
 	showOutsideDays = true,
 	captionLayout = "label",
 	buttonVariant = "ghost",
+	locale,
 	formatters,
 	components,
 	...props
@@ -32,8 +32,9 @@ function Calendar({
 				className
 			)}
 			captionLayout={captionLayout}
+			locale={locale}
 			formatters={{
-				formatMonthDropdown: date => date.toLocaleString("default", { month: "short" }),
+				formatMonthDropdown: date => date.toLocaleString(locale?.code, { month: "short" }),
 				...formatters,
 			}}
 			classNames={{
@@ -70,11 +71,11 @@ function Calendar({
 				caption_label: cn(
 					"font-medium select-none",
 					captionLayout === "label"
-						? "text-sm"
+						? "cn-calendar-caption text-sm"
 						: "cn-calendar-caption-label [&>svg]:text-muted-foreground flex items-center gap-1 rounded-(--cell-radius) text-sm [&>svg]:size-3.5",
 					defaultClassNames.caption_label
 				),
-				table: "w-full border-collapse",
+				month_grid: cn("w-full border-collapse", defaultClassNames.month_grid),
 				weekdays: cn("flex", defaultClassNames.weekdays),
 				weekday: cn(
 					"text-muted-foreground flex-1 rounded-(--cell-radius) text-[0.8rem] font-normal select-none",
@@ -94,12 +95,12 @@ function Calendar({
 					defaultClassNames.day
 				),
 				range_start: cn(
-					"bg-muted elative after:bg-muted isolate -z-0 rounded-l-(--cell-radius) after:absolute after:inset-y-0 after:right-0 after:w-4",
+					"bg-muted after:bg-muted relative isolate z-0 rounded-l-(--cell-radius) after:absolute after:inset-y-0 after:right-0 after:w-4",
 					defaultClassNames.range_start
 				),
 				range_middle: cn("rounded-none", defaultClassNames.range_middle),
 				range_end: cn(
-					"bg-muted after:bg-muted relative isolate -z-0 rounded-r-(--cell-radius) after:absolute after:inset-y-0 after:left-0 after:w-4",
+					"bg-muted after:bg-muted relative isolate z-0 rounded-r-(--cell-radius) after:absolute after:inset-y-0 after:left-0 after:w-4",
 					defaultClassNames.range_end
 				),
 				today: cn(
@@ -125,44 +126,21 @@ function Calendar({
 				Chevron: ({
 					className,
 					orientation,
-					strokeWidth,
 					...props
 				}: React.ComponentProps<"svg"> & {
 					orientation?: "left" | "right" | "up" | "down"
-					strokeWidth?: number
 				}) => {
 					if (orientation === "left") {
-						return (
-							<HugeiconsIcon
-								icon={ArrowLeftIcon}
-								strokeWidth={strokeWidth ?? 2}
-								className={cn("size-4", className)}
-								{...props}
-							/>
-						)
+						return <ChevronLeftIcon className={cn("cn-rtl-flip size-4", className)} {...props} />
 					}
 
 					if (orientation === "right") {
-						return (
-							<HugeiconsIcon
-								icon={ArrowRightIcon}
-								strokeWidth={strokeWidth ?? 2}
-								className={cn("size-4", className)}
-								{...props}
-							/>
-						)
+						return <ChevronRightIcon className={cn("cn-rtl-flip size-4", className)} {...props} />
 					}
 
-					return (
-						<HugeiconsIcon
-							icon={ArrowDownIcon}
-							strokeWidth={strokeWidth ?? 2}
-							className={cn("size-4", className)}
-							{...props}
-						/>
-					)
+					return <ChevronDownIcon className={cn("size-4", className)} {...props} />
 				},
-				DayButton: CalendarDayButton,
+				DayButton: ({ ...props }) => <CalendarDayButton locale={locale} {...props} />,
 				WeekNumber: ({ children, ...props }) => {
 					return (
 						<td {...props}>
@@ -183,8 +161,9 @@ function CalendarDayButton({
 	className,
 	day,
 	modifiers,
+	locale,
 	...props
-}: React.ComponentProps<typeof DayButton>) {
+}: React.ComponentProps<typeof DayButton> & { locale?: Partial<Locale> }) {
 	const defaultClassNames = getDefaultClassNames()
 
 	const ref = React.useRef<HTMLButtonElement>(null)
@@ -194,9 +173,10 @@ function CalendarDayButton({
 
 	return (
 		<Button
+			ref={ref}
 			variant="ghost"
 			size="icon"
-			data-day={day.date.toLocaleDateString()}
+			data-day={day.date.toLocaleDateString(locale?.code)}
 			data-selected-single={
 				modifiers.selected &&
 				!modifiers.range_start &&

@@ -11,7 +11,7 @@ import { Label } from "@/core/components/ui/label"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { cn } from "@/core/lib/utils"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { NURSE_ROLE_NAMES, roleNameMatches } from "@/features/app-shell/lib/navigation"
+import { canAccessRoleGatedModule, NURSE_ROLE_NAMES } from "@/features/app-shell/lib/navigation"
 import {
 	useBedsideVerifyMutation,
 	useCrossMatchListQuery,
@@ -27,10 +27,6 @@ function useAccessContext() {
 		),
 		roleName: profile?.activeRole?.name,
 	}
-}
-
-function can(permSet: Set<string>, module: string, action: string) {
-	return permSet.has(`${module}:${action}`)
 }
 
 type VerificationFieldProps = {
@@ -109,8 +105,8 @@ function ReadinessBadge({ ready }: { ready: boolean }) {
 
 function RecordStatusRow({ label, ready }: { label: string; ready: boolean }) {
 	return (
-		<div className="flex items-center justify-between gap-3">
-			<span className="text-muted-foreground">{label}</span>
+		<div className="flex min-w-0 items-center justify-between gap-3">
+			<span className="text-muted-foreground min-w-0 truncate">{label}</span>
 			<ReadinessBadge ready={ready} />
 		</div>
 	)
@@ -163,9 +159,20 @@ export default function TransfusionPage() {
 	const [showErrors, setShowErrors] = useState(false)
 	const [verifyResult, setVerifyResult] = useState<BedsideVerifyResult | null>(null)
 
-	const isNurse = roleNameMatches(roleName, NURSE_ROLE_NAMES)
-	const hasViewPermission = isNurse && can(permSet, "nursing", "view")
-	const hasVerifyPermission = isNurse && can(permSet, "nursing", "edit")
+	const hasViewPermission = canAccessRoleGatedModule(
+		roleName,
+		NURSE_ROLE_NAMES,
+		permSet,
+		"nursing",
+		"view"
+	)
+	const hasVerifyPermission = canAccessRoleGatedModule(
+		roleName,
+		NURSE_ROLE_NAMES,
+		permSet,
+		"nursing",
+		"edit"
+	)
 	const trimmedPatientMrn = patientMrn.trim()
 	const crossMatchesQuery = useCrossMatchListQuery({
 		facilityId: hasViewPermission && trimmedPatientMrn ? (facilityId ?? "") : "",
@@ -356,10 +363,19 @@ export default function TransfusionPage() {
 						{verifyResult && <VerificationResult result={verifyResult} />}
 
 						<div className="flex flex-wrap gap-2 pt-2">
-							<Button className="min-w-36" onClick={handleVerify} disabled={!canSubmit}>
+							<Button
+								className="h-10 w-full min-w-36 sm:w-auto"
+								onClick={handleVerify}
+								disabled={!canSubmit}
+							>
 								{verifyMutation.isPending ? "Verifying..." : "Verify match"}
 							</Button>
-							<Button variant="outline" onClick={handleReset} disabled={verifyMutation.isPending}>
+							<Button
+								className="h-10 w-full sm:w-auto"
+								variant="outline"
+								onClick={handleReset}
+								disabled={verifyMutation.isPending}
+							>
 								Reset
 							</Button>
 						</div>

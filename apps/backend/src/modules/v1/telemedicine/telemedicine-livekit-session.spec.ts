@@ -136,7 +136,7 @@ function makePatientAppointment(overrides: Record<string, unknown> = {}) {
 		patientLastName: "Dela Cruz",
 		patientMrn: "MRN-001",
 		patientDateOfBirth: "1990-01-01",
-		facilityName: "QHealth Test",
+		facilityName: "JuanMeds Test",
 		...overrides,
 	}
 }

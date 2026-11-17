@@ -27,6 +27,7 @@ import {
 	useClinicQueueQuery,
 	type UnifiedQueueEntry,
 } from "@/features/scheduling/api/scheduling.hooks"
+import { todayIsoInManila } from "@/features/scheduling/lib/queue-date"
 import {
 	formatAppointmentStatusLabel,
 	getAppointmentStatusColor,
@@ -87,10 +88,6 @@ function isToday(date: string) {
 		target.getMonth() === now.getMonth() &&
 		target.getDate() === now.getDate()
 	)
-}
-
-function todayIso() {
-	return new Date().toISOString().slice(0, 10)
 }
 
 function queueEntryChartHref(entry: UnifiedQueueEntry) {
@@ -266,7 +263,7 @@ export function PhysicianDashboard({ profile }: PhysicianDashboardProps) {
 	const canUseTelemedicine = permSet.has("telemedicine:view")
 
 	const clinicQueueQuery = useClinicQueueQuery(
-		{ facilityId, clinicianStaffId: staffProfileId || undefined, date: todayIso() },
+		{ facilityId, clinicianStaffId: staffProfileId || undefined, date: todayIsoInManila() },
 		{ refetchInterval: 20_000 }
 	)
 

@@ -165,7 +165,7 @@ export function BedsideMatching({ crossMatchId: initialCrossMatchId }: BedsideMa
 				</p>
 			</div>
 
-			<div className="mx-auto max-w-lg">
+			<div className="mx-auto max-w-2xl">
 				<Card>
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2 text-base">
@@ -236,16 +236,16 @@ export function BedsideMatching({ crossMatchId: initialCrossMatchId }: BedsideMa
 						{verifyResult && <VerificationResult result={verifyResult} />}
 
 						{/* Actions */}
-						<div className="flex gap-2 pt-2">
+						<div className="flex flex-col gap-2 pt-2 sm:flex-row">
 							<Button
 								variant="outline"
-								className="flex-1"
+								className="h-10 flex-1"
 								onClick={handleReset}
 								disabled={verifyMutation.isPending}
 							>
 								Reset
 							</Button>
-							<Button className="flex-1" disabled={!canVerify} onClick={handleVerify}>
+							<Button className="h-10 flex-1" disabled={!canVerify} onClick={handleVerify}>
 								<Scan className="mr-1 size-4" />
 								{verifyMutation.isPending ? "Verifying…" : "Verify Match"}
 							</Button>

@@ -17,6 +17,7 @@ import {
 import { Button } from "@/core/components/ui/button"
 import { Card, CardContent } from "@/core/components/ui/card"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { canActAsClinicalClinician } from "@/features/app-shell/lib/navigation"
 import {
 	formatAppointmentStatusLabel,
 	getAppointmentStatusColor,
@@ -94,7 +95,7 @@ const STANDARD_TABS_BASE: TabConfig<StandardActiveTab>[] = [
 // ============================================================================
 
 function isPhysicianRole(roleName?: string | null) {
-	return (roleName ?? "").toLowerCase().includes("physician")
+	return canActAsClinicalClinician(roleName)
 }
 
 function getActiveStaffProfile(

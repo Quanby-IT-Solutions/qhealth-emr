@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react"
 import { Badge } from "@/core/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/tabs"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { isCoordinatorRole } from "@/features/app-shell/lib/navigation"
 import {
 	useAnesthesiaRecordQuery,
 	useOperationRecordQuery,
@@ -66,13 +67,14 @@ export default function SurgicalCaseDetailPage({
 	const roleName = (profile?.activeRole?.name ?? "").toLowerCase()
 	const isSurgeon = roleName === "surgeon"
 	const isAnesthesiologist = roleName === "anesthesiologist"
+	const isCoordinator = isCoordinatorRole(profile?.activeRole?.name)
 
-	const defaultTab = isSurgeon ? "operation" : "anesthesia"
-	const showRvsTab = !isAnesthesiologist
+	const defaultTab = isSurgeon ? "operation" : isAnesthesiologist ? "anesthesia" : "checklist"
+	const showRvsTab = !isAnesthesiologist || isCoordinator
 
-	const canEditPreOp = isAnesthesiologist ? false : canEditSurgical
-	const canEditOperation = isAnesthesiologist ? false : canEditSurgical
-	const canSignOperation = isAnesthesiologist ? false : canSignSurgical
+	const canEditPreOp = isAnesthesiologist && !isCoordinator ? false : canEditSurgical
+	const canEditOperation = isAnesthesiologist && !isCoordinator ? false : canEditSurgical
+	const canSignOperation = isAnesthesiologist && !isCoordinator ? false : canSignSurgical
 	const activeStaffProfile =
 		profile?.staffProfiles?.find((sp: { roles?: { id: string }[] }) =>
 			sp.roles?.some((role: { id: string }) => role.id === profile.activeRole?.id)
@@ -87,9 +89,10 @@ export default function SurgicalCaseDetailPage({
 
 	const isOperationRecordSigned = opRecord?.status === "signed"
 	const isAssignedAnesthesiologist =
-		isAnesthesiologist &&
-		!!surgicalCase?.anesthesiologistStaffId &&
-		surgicalCase.anesthesiologistStaffId === staffId
+		(isAnesthesiologist &&
+			!!surgicalCase?.anesthesiologistStaffId &&
+			surgicalCase.anesthesiologistStaffId === staffId) ||
+		isCoordinator
 	const canEditAnesthesia = isAssignedAnesthesiologist && canEditSurgical
 	const canSignAnesthesia = isAssignedAnesthesiologist && canSignSurgical
 

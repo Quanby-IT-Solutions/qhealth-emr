@@ -71,7 +71,7 @@ function makeProfileRow(overrides: Record<string, unknown> = {}) {
 function makeFacilityRow(overrides: Record<string, unknown> = {}) {
 	return {
 		id: FACILITY_ID,
-		name: "QHealth General Hospital",
+		name: "JuanMeds General Hospital",
 		facilityType: "community" as const,
 		address: null,
 		dohLicenseNumber: null,
@@ -89,7 +89,7 @@ function makeFullRow(
 ) {
 	return {
 		...makeProfileRow(profileOverrides),
-		name: (facilityOverrides.name as string) ?? "QHealth General Hospital",
+		name: (facilityOverrides.name as string) ?? "JuanMeds General Hospital",
 		facilityType: (facilityOverrides.facilityType as string) ?? "community",
 		dohLicenseNumber: (facilityOverrides.dohLicenseNumber as string | null) ?? null,
 		philhealthAccreditationId:
@@ -158,7 +158,7 @@ describe("FacilityProfileService", () => {
 			expect(db.insert).toHaveBeenCalledTimes(1)
 			expect(db.select).toHaveBeenCalledTimes(1)
 			expect(result.facilityId).toBe(FACILITY_ID)
-			expect(result.name).toBe("QHealth General Hospital")
+			expect(result.name).toBe("JuanMeds General Hospital")
 		})
 
 		it("is idempotent — second get returns same row without error", async () => {
