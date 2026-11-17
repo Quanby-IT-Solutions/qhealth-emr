@@ -77,7 +77,12 @@ function parseHandlers(source: string): Handler[] {
 			}
 			// Blank lines and comments between decorators keep the chain alive;
 			// anything else (method or not) terminates it.
-			if (line !== "" && !line.startsWith("//") && !line.startsWith("/*") && !line.startsWith("*")) {
+			if (
+				line !== "" &&
+				!line.startsWith("//") &&
+				!line.startsWith("/*") &&
+				!line.startsWith("*")
+			) {
 				chain = []
 			}
 		}
