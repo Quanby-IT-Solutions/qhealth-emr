@@ -89,7 +89,7 @@ export function DrugSearchCombobox({
 
 	const formularyItems = (searchEnabled ? (data?.data ?? []) : []) as FormularySearchItem[]
 	const genericItems = (searchEnabled ? (genericData?.data ?? []) : []) as DrugGeneric[]
-	const items = buildSearchSelections(formularyItems, genericItems)
+	const items = buildSearchSelections(formularyItems, genericItems, trimmedValue)
 	const isSearching = isLoading || genericsLoading
 
 	useEffect(() => {
@@ -157,11 +157,10 @@ export function DrugSearchCombobox({
 							<>
 								<CommandEmpty>
 									<div className="px-3 py-4 text-left text-sm">
-										<p>No orderable generic found.</p>
+										<p>No catalog match found.</p>
 										<p className="text-muted-foreground mt-1 text-xs">
-											Search a specific generic drug name, such as amoxicillin, or check the drug
-											catalog. Allergy classes like penicillin are not orderable unless they exist
-											as active generics.
+											You can continue with the typed generic name as custom text. Brand names
+											should stay in the optional brand field when known.
 										</p>
 									</div>
 								</CommandEmpty>
@@ -201,7 +200,8 @@ export function DrugSearchCombobox({
 
 function buildSearchSelections(
 	formularyItems: FormularySearchItem[],
-	genericItems: DrugGeneric[]
+	genericItems: DrugGeneric[],
+	searchValue = ""
 ): DrugSearchSelection[] {
 	const genericNamesWithFormulary = new Set(
 		formularyItems.map(item => normalizeDrugName(item.genericName))
@@ -214,7 +214,7 @@ function buildSearchSelections(
 		return true
 	})
 
-	return [
+	const selections = [
 		...formularyItems.map(item => ({
 			id: item.id,
 			formularyItemId: item.id,
@@ -233,9 +233,56 @@ function buildSearchSelections(
 			brandName: null,
 			isFormulary: false,
 		})),
-	]
+	].filter(dedupeDrugSearchSelection())
+
+	return rankDrugSearchSelections(selections, searchValue)
+}
+
+function dedupeDrugSearchSelection() {
+	const seen = new Set<string>()
+
+	return (item: DrugSearchSelection) => {
+		const key = [
+			item.isFormulary ? "formulary" : "generic",
+			normalizeDrugName(item.genericName),
+			normalizeDrugName(item.brandName ?? ""),
+			normalizeDrugName(item.doseForm ?? ""),
+			normalizeDrugName(item.strength ?? ""),
+			normalizeDrugName(item.route ?? ""),
+		].join("\u001f")
+
+		if (seen.has(key)) return false
+		seen.add(key)
+		return true
+	}
 }
 
 function normalizeDrugName(name: string) {
 	return name.trim().replace(/\s+/g, " ").toLowerCase()
+}
+
+function rankDrugSearchSelections(items: DrugSearchSelection[], searchValue: string) {
+	const normalizedSearch = normalizeDrugName(searchValue)
+	if (!normalizedSearch) return items
+
+	return [...items].sort((left, right) => {
+		const leftRank = getDrugSearchRank(left, normalizedSearch)
+		const rightRank = getDrugSearchRank(right, normalizedSearch)
+
+		if (leftRank !== rightRank) return leftRank - rightRank
+		if (left.isFormulary !== right.isFormulary) return left.isFormulary ? -1 : 1
+
+		return left.genericName.localeCompare(right.genericName)
+	})
+}
+
+function getDrugSearchRank(item: DrugSearchSelection, normalizedSearch: string) {
+	const normalizedName = normalizeDrugName(item.genericName)
+
+	if (normalizedName === normalizedSearch) return 0
+	if (normalizedName.startsWith(normalizedSearch)) return 1
+	if (normalizedName.includes(` / ${normalizedSearch}`)) return 2
+	if (normalizedName.includes(normalizedSearch)) return 3
+	if (normalizeDrugName(item.brandName ?? "").includes(normalizedSearch)) return 4
+	return 5
 }

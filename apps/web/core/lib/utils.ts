@@ -22,8 +22,15 @@ export function cn(...inputs: ClassValue[]) {
  * @returns The application URL
  */
 export const getAppUrl = cache(() => {
-	return env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL
+	return (env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL).replace(/\/$/, "")
 })
+
+/**
+ * Build an absolute URL on the public web app origin.
+ */
+export function getPublicAppUrl(path: string) {
+	return new URL(path, `${getAppUrl()}/`).toString()
+}
 
 /**
  * Get the API URL

@@ -52,78 +52,78 @@
 :root {
 	color-scheme: light;
 	--background: oklch(0.99 0.005 85); /* Slightly warm off-white paper */
-	--foreground: oklch(0.18 0.01 250); /* Dark sophisticated blue-gray */
+	--foreground: oklch(0.244 0.061 261.8); /* Deep JuanMeds blue */
 	--card: oklch(1 0 0); /* Pure white */
-	--card-foreground: oklch(0.18 0.01 250);
+	--card-foreground: oklch(0.244 0.061 261.8);
 	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.18 0.01 250);
-	--primary: oklch(0.45 0.13 250); /* Institutional medical blue */
+	--popover-foreground: oklch(0.244 0.061 261.8);
+	--primary: oklch(0.487 0.218 261.6); /* Logo blue */
 	--primary-foreground: oklch(0.99 0 0);
 	--secondary: oklch(0.96 0.01 250); /* Very light blue-gray */
 	--secondary-foreground: oklch(0.25 0.05 250);
 	--muted: oklch(0.96 0.005 85);
 	--muted-foreground: oklch(0.45 0.01 250);
-	--accent: oklch(0.5 0.1 150); /* Deep medical green */
+	--accent: oklch(0.551 0.184 141.6); /* Accessible logo green */
 	--accent-foreground: oklch(0.99 0 0);
-	--destructive: oklch(0.5 0.18 20); /* Philippine sovereign red */
+	--destructive: oklch(0.626 0.193 23);
 	--destructive-foreground: oklch(0.99 0 0);
-	--success: oklch(0.5 0.1 150);
+	--success: oklch(0.551 0.184 141.6);
 	--success-foreground: oklch(0.99 0 0);
 	--border: oklch(0.92 0.005 250);
 	--input: oklch(0.92 0.005 250);
-	--ring: oklch(0.45 0.13 250);
-	--chart-1: oklch(0.45 0.13 250);
-	--chart-2: oklch(0.5 0.1 150);
-	--chart-3: oklch(0.6 0.15 200);
-	--chart-4: oklch(0.7 0.15 280);
-	--chart-5: oklch(0.5 0.18 20);
+	--ring: oklch(0.487 0.218 261.6);
+	--chart-1: oklch(0.487 0.218 261.6);
+	--chart-2: oklch(0.551 0.184 141.6);
+	--chart-3: oklch(0.732 0.13 83);
+	--chart-4: oklch(0.532 0.22 260.2);
+	--chart-5: oklch(0.626 0.193 23);
 	--radius: 0.5rem; /* Clean editorial radius */
 	--sidebar: oklch(0.99 0.005 85);
-	--sidebar-foreground: oklch(0.18 0.01 250);
-	--sidebar-primary: oklch(0.45 0.13 250);
+	--sidebar-foreground: oklch(0.244 0.061 261.8);
+	--sidebar-primary: oklch(0.487 0.218 261.6);
 	--sidebar-primary-foreground: oklch(0.99 0 0);
 	--sidebar-accent: oklch(0.96 0.01 250);
-	--sidebar-accent-foreground: oklch(0.18 0.01 250);
+	--sidebar-accent-foreground: oklch(0.244 0.061 261.8);
 	--sidebar-border: oklch(0.92 0.005 250);
-	--sidebar-ring: oklch(0.45 0.13 250);
+	--sidebar-ring: oklch(0.487 0.218 261.6);
 }
 
 .dark {
 	color-scheme: dark;
 	--background: oklch(0.12 0.01 250); /* Deep midnight blue */
-	--foreground: oklch(0.95 0.005 250);
+	--foreground: oklch(0.97 0.012 252.2);
 	--card: oklch(0.15 0.01 250);
 	--card-foreground: oklch(0.95 0.005 250);
 	--popover: oklch(0.15 0.01 250);
 	--popover-foreground: oklch(0.95 0.005 250);
-	--primary: oklch(0.55 0.13 250); /* Lighter blue for dark mode */
+	--primary: oklch(0.657 0.182 261.7); /* Illuminated logo blue */
 	--primary-foreground: oklch(0.99 0 0);
 	--secondary: oklch(0.2 0.02 250);
 	--secondary-foreground: oklch(0.95 0.005 250);
 	--muted: oklch(0.18 0.01 250);
 	--muted-foreground: oklch(0.65 0.01 250);
-	--accent: oklch(0.55 0.1 150);
-	--accent-foreground: oklch(0.99 0 0);
-	--destructive: oklch(0.6 0.18 20);
+	--accent: oklch(0.822 0.22 136.3);
+	--accent-foreground: oklch(0.13 0.045 141.6);
+	--destructive: oklch(0.704 0.191 22.2);
 	--destructive-foreground: oklch(0.99 0 0);
-	--success: oklch(0.55 0.1 150);
-	--success-foreground: oklch(0.99 0 0);
+	--success: oklch(0.822 0.22 136.3);
+	--success-foreground: oklch(0.13 0.045 141.6);
 	--border: oklch(0.25 0.01 250);
 	--input: oklch(0.25 0.01 250);
-	--ring: oklch(0.55 0.13 250);
-	--chart-1: oklch(0.55 0.13 250);
-	--chart-2: oklch(0.55 0.1 150);
-	--chart-3: oklch(0.65 0.15 200);
-	--chart-4: oklch(0.75 0.15 280);
-	--chart-5: oklch(0.6 0.18 20);
+	--ring: oklch(0.657 0.182 261.7);
+	--chart-1: oklch(0.657 0.182 261.7);
+	--chart-2: oklch(0.822 0.22 136.3);
+	--chart-3: oklch(0.847 0.137 88);
+	--chart-4: oklch(0.72 0.16 210);
+	--chart-5: oklch(0.704 0.191 22.2);
 	--sidebar: oklch(0.15 0.01 250);
-	--sidebar-foreground: oklch(0.95 0.005 250);
-	--sidebar-primary: oklch(0.55 0.13 250);
+	--sidebar-foreground: oklch(0.97 0.012 252.2);
+	--sidebar-primary: oklch(0.657 0.182 261.7);
 	--sidebar-primary-foreground: oklch(0.99 0 0);
 	--sidebar-accent: oklch(0.2 0.02 250);
-	--sidebar-accent-foreground: oklch(0.95 0.005 250);
+	--sidebar-accent-foreground: oklch(0.97 0.012 252.2);
 	--sidebar-border: oklch(0.25 0.01 250);
-	--sidebar-ring: oklch(0.55 0.13 250);
+	--sidebar-ring: oklch(0.657 0.182 261.7);
 }
 
 @layer base {
@@ -137,18 +137,18 @@
 
 /* LiveKit rooms need an explicit stage height. Without it, the default
    provider can shrink to the control bar when camera tracks are muted. */
-.qhealth-livekit-room {
+.juanmeds-livekit-room {
 	min-height: 520px;
 	background: var(--card);
 	color: var(--foreground);
 }
 
-.qhealth-livekit-room.qhealth-livekit-full-room {
+.juanmeds-livekit-room.juanmeds-livekit-full-room {
 	height: 100%;
 	min-height: 0;
 }
 
-.qhealth-livekit-room [data-lk-theme="default"] {
+.juanmeds-livekit-room [data-lk-theme="default"] {
 	--lk-bg: var(--background);
 	--lk-bg2: var(--card);
 	--lk-bg3: var(--muted);
@@ -185,7 +185,7 @@
 	--lk-drop-shadow: rgba(15, 23, 42, 0.14) 0px 0px 24px;
 }
 
-.dark .qhealth-livekit-room [data-lk-theme="default"] {
+.dark .juanmeds-livekit-room [data-lk-theme="default"] {
 	color-scheme: dark;
 	--lk-bg: var(--background);
 	--lk-bg2: var(--card);
@@ -211,15 +211,15 @@
 	color: var(--foreground);
 }
 
-.lk-room-container:not(:has([data-qhealth-livekit-layout])),
-.lk-room-container:not(.qhealth-livekit-custom-room) {
+.lk-room-container:not(:has([data-juanmeds-livekit-layout])),
+.lk-room-container:not(.juanmeds-livekit-custom-room) {
 	display: grid !important;
 	grid-template-rows: minmax(420px, 1fr) auto !important;
 	min-height: 520px !important;
 }
 
-.lk-room-container:not(:has([data-qhealth-livekit-layout]))::before,
-.lk-room-container:not(.qhealth-livekit-custom-room)::before {
+.lk-room-container:not(:has([data-juanmeds-livekit-layout]))::before,
+.lk-room-container:not(.juanmeds-livekit-custom-room)::before {
 	content: "Camera off";
 	display: flex;
 	min-height: 420px;
@@ -232,19 +232,19 @@
 	font-weight: 600;
 }
 
-.lk-room-container.qhealth-livekit-custom-room::before {
+.lk-room-container.juanmeds-livekit-custom-room::before {
 	content: none;
 	display: none;
 }
 
-.lk-room-container:not(:has([data-qhealth-livekit-layout])):has(video)::before,
-.lk-room-container:not(.qhealth-livekit-custom-room):has(video)::before {
+.lk-room-container:not(:has([data-juanmeds-livekit-layout])):has(video)::before,
+.lk-room-container:not(.juanmeds-livekit-custom-room):has(video)::before {
 	content: none;
 	display: none;
 }
 
-.qhealth-livekit-room > .lk-room-container,
-.qhealth-livekit-room .lk-room-container {
+.juanmeds-livekit-room > .lk-room-container,
+.juanmeds-livekit-room .lk-room-container {
 	display: flex !important;
 	min-height: 520px !important;
 	height: auto !important;
@@ -252,31 +252,31 @@
 	background: var(--card);
 }
 
-.qhealth-livekit-room.qhealth-livekit-full-room > .lk-room-container,
-.qhealth-livekit-room.qhealth-livekit-full-room .lk-room-container.qhealth-livekit-custom-room {
+.juanmeds-livekit-room.juanmeds-livekit-full-room > .lk-room-container,
+.juanmeds-livekit-room.juanmeds-livekit-full-room .lk-room-container.juanmeds-livekit-custom-room {
 	height: 100% !important;
 	min-height: 0 !important;
 	flex: 1 1 auto !important;
 }
 
-.qhealth-livekit-room [data-qhealth-livekit-layout] {
+.juanmeds-livekit-room [data-juanmeds-livekit-layout] {
 	display: flex;
 	min-height: 520px;
 	flex: 1 1 auto;
 	flex-direction: column;
 }
 
-.qhealth-livekit-room.qhealth-livekit-full-room [data-qhealth-livekit-layout] {
+.juanmeds-livekit-room.juanmeds-livekit-full-room [data-juanmeds-livekit-layout] {
 	height: 100%;
 	min-height: 0;
 }
 
-.qhealth-livekit-room [data-qhealth-livekit-grid] {
+.juanmeds-livekit-room [data-juanmeds-livekit-grid] {
 	min-height: 420px;
 	flex: 1 1 auto;
 }
 
-.qhealth-livekit-room .lk-control-bar {
+.juanmeds-livekit-room .lk-control-bar {
 	flex-shrink: 0;
 	display: flex;
 	flex-wrap: wrap;
@@ -292,8 +292,8 @@
 }
 
 /* Discord-style circular control buttons */
-.qhealth-livekit-room .lk-control-bar .lk-button,
-.qhealth-livekit-room .lk-control-bar > button {
+.juanmeds-livekit-room .lk-control-bar .lk-button,
+.juanmeds-livekit-room .lk-control-bar > button {
 	width: 3rem;
 	height: 3rem;
 	min-width: 3rem;
@@ -311,51 +311,51 @@
 		color 0.15s ease;
 }
 
-.qhealth-livekit-room .lk-control-bar .lk-button:hover,
-.qhealth-livekit-room .lk-control-bar > button:hover {
+.juanmeds-livekit-room .lk-control-bar .lk-button:hover,
+.juanmeds-livekit-room .lk-control-bar > button:hover {
 	background: color-mix(in oklch, var(--muted) 70%, var(--primary));
 	color: var(--foreground);
 }
 
-.qhealth-livekit-room .lk-control-bar .lk-button[data-lk-enabled="true"],
-.qhealth-livekit-room .lk-control-bar .lk-button[aria-pressed="true"],
-.qhealth-livekit-room .lk-control-bar > button[data-lk-enabled="true"],
-.qhealth-livekit-room .lk-control-bar > button[aria-pressed="true"] {
+.juanmeds-livekit-room .lk-control-bar .lk-button[data-lk-enabled="true"],
+.juanmeds-livekit-room .lk-control-bar .lk-button[aria-pressed="true"],
+.juanmeds-livekit-room .lk-control-bar > button[data-lk-enabled="true"],
+.juanmeds-livekit-room .lk-control-bar > button[aria-pressed="true"] {
 	background: color-mix(in oklch, var(--muted) 70%, var(--primary));
 	color: var(--foreground);
 }
 
 /* Hide verbose text labels — keep icon-only buttons */
-.qhealth-livekit-room
+.juanmeds-livekit-room
 	.lk-control-bar
 	.lk-button
 	> span:not([class*="lk-source-icon"]):not([class*="icon"]),
-.qhealth-livekit-room
+.juanmeds-livekit-room
 	.lk-control-bar
 	> button
 	> span:not([class*="lk-source-icon"]):not([class*="icon"]) {
 	display: none;
 }
 
-.qhealth-livekit-room .lk-control-bar svg {
+.juanmeds-livekit-room .lk-control-bar svg {
 	width: 1.25rem;
 	height: 1.25rem;
 }
 
 /* Red disconnect/leave button */
-.qhealth-livekit-room .lk-control-bar .lk-disconnect-button {
+.juanmeds-livekit-room .lk-control-bar .lk-disconnect-button {
 	background: var(--destructive);
 	color: var(--destructive-foreground);
 	border-color: transparent;
 }
 
-.qhealth-livekit-room .lk-control-bar .lk-disconnect-button:hover {
+.juanmeds-livekit-room .lk-control-bar .lk-disconnect-button:hover {
 	background: color-mix(in oklch, var(--destructive) 85%, black);
 	color: var(--destructive-foreground);
 }
 
 /* Small companion chevron for device-selector menus */
-.qhealth-livekit-room .lk-control-bar .lk-button-group-menu {
+.juanmeds-livekit-room .lk-control-bar .lk-button-group-menu {
 	width: 1.75rem;
 	height: 1.75rem;
 	min-width: 1.75rem;
@@ -363,14 +363,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.qhealth-livekit-room .lk-control-bar .lk-button,
-	.qhealth-livekit-room .lk-control-bar > button {
+	.juanmeds-livekit-room .lk-control-bar .lk-button,
+	.juanmeds-livekit-room .lk-control-bar > button {
 		transition: none;
 	}
 }
 
-.qhealth-livekit-room .lk-room-container:not(:has([data-qhealth-livekit-layout])),
-.qhealth-livekit-room .lk-room-container:not(.qhealth-livekit-custom-room) {
+.juanmeds-livekit-room .lk-room-container:not(:has([data-juanmeds-livekit-layout])),
+.juanmeds-livekit-room .lk-room-container:not(.juanmeds-livekit-custom-room) {
 	display: grid !important;
 	grid-template-rows: minmax(420px, 1fr) auto !important;
 }
@@ -442,7 +442,7 @@
 	bottom: 4px;
 	width: 3px;
 	border-radius: 0 2px 2px 0;
-	background-color: var(--sidebar-primary);
+	background-color: var(--accent);
 }
 
 /* Sidebar separator: subtle editorial line */
@@ -464,7 +464,7 @@
 }
 [data-slot="sidebar-rail"]:hover::after {
 	width: 2px;
-	background-color: var(--sidebar-primary);
+	background-color: var(--accent);
 	opacity: 0.5;
 }
 

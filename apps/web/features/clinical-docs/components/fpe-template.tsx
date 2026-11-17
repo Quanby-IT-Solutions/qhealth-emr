@@ -7,6 +7,8 @@ import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
+import { FaceScanVitalsButton } from "@/features/face-scan/components/face-scan-vitals-button"
+import { toFpeFields } from "@/features/face-scan/lib/face-scan-vitals"
 
 import {
 	maxLengthForFpeField,
@@ -63,6 +65,9 @@ interface FpeTemplateProps {
 	onChange?: (data: FpeData) => void
 	readOnly?: boolean
 	validation?: FpeValidationResult
+	facilityId?: string
+	encounterId?: string
+	patientId?: string
 }
 
 const EMPTY_VITALS: VitalSigns = {
@@ -138,7 +143,15 @@ function calculateBmi(weightKg: string, heightCm: string) {
 	return (weight / (heightMeters * heightMeters)).toFixed(1)
 }
 
-export function FpeTemplate({ value, onChange, readOnly = false, validation }: FpeTemplateProps) {
+export function FpeTemplate({
+	value,
+	onChange,
+	readOnly = false,
+	validation,
+	facilityId,
+	encounterId,
+	patientId,
+}: FpeTemplateProps) {
 	const isReadOnly = readOnly || !onChange
 	const missing = new Set(validation?.submitMissingFields ?? [])
 	const fieldErrors = validation?.fieldErrors ?? {}
@@ -155,6 +168,16 @@ export function FpeTemplate({ value, onChange, readOnly = false, validation }: F
 					? sanitizeWholeNumber(val)
 					: sanitizeDecimal(val)
 		onChange?.({ ...value, vitalSigns: { ...value.vitalSigns, [key]: sanitized } })
+	}
+
+	function applyFaceScanVitals(vitals: Parameters<typeof toFpeFields>[0]) {
+		const mapped = toFpeFields(vitals)
+		if (mapped.bloodPressure) setVital("bloodPressure", mapped.bloodPressure)
+		if (mapped.heartRate) setVital("heartRate", mapped.heartRate)
+		if (mapped.respiratoryRate) setVital("respiratoryRate", mapped.respiratoryRate)
+		if (mapped.oxygenSaturation) setVital("oxygenSaturation", mapped.oxygenSaturation)
+		if (mapped.height) setVital("height", mapped.height)
+		if (mapped.weight) setVital("weight", mapped.weight)
 	}
 
 	function setPrimaryDiag(field: "code" | "description", val: string) {
@@ -354,9 +377,19 @@ export function FpeTemplate({ value, onChange, readOnly = false, validation }: F
 				<SectionHeader number={8} title="Physical Examination" />
 
 				<div>
-					<p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
-						Vital Signs
-					</p>
+					<div className="mb-2 flex items-center justify-between gap-2">
+						<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+							Vital Signs
+						</p>
+						{!isReadOnly && (
+							<FaceScanVitalsButton
+								facilityId={facilityId}
+								encounterId={encounterId}
+								patientId={patientId}
+								onComplete={applyFaceScanVitals}
+							/>
+						)}
+					</div>
 					<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
 						{(
 							[

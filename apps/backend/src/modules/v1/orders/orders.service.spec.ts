@@ -619,6 +619,43 @@ describe("OrdersService", () => {
 		)
 	})
 
+	it("allows custom generic text during CDS evaluation as an off-formulary soft block", async () => {
+		problemsAllergiesMock.getActiveAllergies.mockResolvedValue({ allergies: [] })
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withLimit: true }))
+			.mockImplementationOnce(() => createSelectBuilder([], { withLimit: true }))
+			.mockImplementationOnce(() => createSelectBuilder([], { withOrderBy: true, withLimit: true }))
+
+		const result = await service.evaluateCds({
+			patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+			facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+			genericName: "Custom Herbal Capsule",
+			orderingStaffId: "staff-1",
+		})
+
+		expect(result.canProceed).toBe(true)
+		expect(result.requiresOverride).toBe(true)
+		expect(result.alerts).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					type: "formulary_warning",
+					severity: "soft_block",
+				}),
+			])
+		)
+	})
+
 	it("rejects CDS evaluation when the patient is outside the facility", async () => {
 		mockDb.select.mockImplementationOnce(() =>
 			createSelectBuilder(
@@ -1002,6 +1039,79 @@ describe("OrdersService", () => {
 		expect(mockDb.insert).not.toHaveBeenCalled()
 	})
 
+	it("creates medication orders with custom generic text when off-formulary warning is overridden", async () => {
+		const createdAt = new Date("2025-04-16T12:00:00.000Z")
+		problemsAllergiesMock.getActiveAllergies.mockResolvedValue({ allergies: [] })
+		jest.spyOn(service, "findMedOrder").mockResolvedValue({ id: "order-created" } as never)
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: "staff-1", userId: "user-1" }], { withLimit: true })
+			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withLimit: true }))
+			.mockImplementationOnce(() => createSelectBuilder([], { withLimit: true }))
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[
+						{
+							id: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+							facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+						},
+					],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withOrderBy: true, withLimit: true }))
+
+		const insertBuilder = createInsertBuilder([
+			{
+				id: "order-created",
+				createdAt,
+				updatedAt: createdAt,
+			},
+		])
+		mockDb.insert.mockImplementationOnce(() => insertBuilder)
+		mockDb.insert.mockImplementation(() => createInsertBuilder([]))
+
+		await service.createMedOrder(
+			{
+				facilityId: "8138a4f3-d2a7-41ba-8e12-2c4191aa174c",
+				patientId: "d7f56ece-966e-4266-8f3c-ea71d58ee79b",
+				genericName: "  Custom   Herbal Capsule  ",
+				dose: "1",
+				doseUnit: "capsule",
+				doseForm: "capsule",
+				route: "PO",
+				frequency: "once",
+				cdsAlerts: [],
+				cdsOverrides: {
+					overrides: [
+						{
+							alertId: "formulary-0",
+							reason: "Clinician entered custom generic text after review",
+							overriddenAt: createdAt.toISOString(),
+						},
+					],
+				},
+			},
+			"user-1"
+		)
+
+		expect(insertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				formularyItemId: null,
+				genericName: "Custom Herbal Capsule",
+				rxnormCode: null,
+				cdsAlerts: [
+					expect.objectContaining({
+						type: "formulary_warning",
+						severity: "soft_block",
+					}),
+				],
+			})
+		)
+	})
+
 	it("persists server-evaluated CDS alerts when creating a medication order", async () => {
 		const createdAt = new Date("2025-04-16T12:00:00.000Z")
 		problemsAllergiesMock.getActiveAllergies.mockResolvedValue({
@@ -1107,7 +1217,15 @@ describe("OrdersService", () => {
 						}),
 					}),
 				],
-				status: "pending_verification",
+				cdsOverrides: expect.objectContaining({
+					overrides: [
+						expect.objectContaining({
+							alertId: "allergy-0",
+							reason: "Benefit outweighs risk",
+						}),
+					],
+				}),
+				status: "verified",
 			})
 		)
 	})
@@ -1201,7 +1319,114 @@ describe("OrdersService", () => {
 		expect(result).toEqual({ id: labOrderId })
 	})
 
-	it("rejects lab order signing without an active LOINC test", async () => {
+	it("creates a signed lab order with a text-only clinical indication", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const encounterId = "99999999-9999-4999-9999-999999999999"
+		const labOrderId = "11111111-1111-4111-8111-111111111112"
+		const labInsertBuilder = createInsertBuilder([{ id: labOrderId }])
+		const auditInsertBuilder = createInsertBuilder([])
+		const slaInsertBuilder = createInsertBuilder([])
+
+		jest.spyOn(service, "findLabOrder").mockResolvedValue({ id: labOrderId } as never)
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[{ id: "staff-physician", userId: "user-1", facilityId, isActive: true }],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: encounterId, facilityId }], { withLimit: true })
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ loincNum: "57021-8" }], { withLimit: true })
+			)
+
+		mockDb.insert
+			.mockImplementationOnce(() => labInsertBuilder)
+			.mockImplementationOnce(() => auditInsertBuilder)
+			.mockImplementationOnce(() => slaInsertBuilder)
+
+		const result = await service.createLabOrder(
+			{
+				facilityId,
+				encounterId,
+				testName: "Complete Blood Count",
+				loincCode: "57021-8",
+				clinicalIndication: "Fever and productive cough",
+				priority: "stat",
+				specimenType: "Blood",
+			},
+			"user-1"
+		)
+
+		expect(labInsertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				clinicalIndication: "Fever and productive cough",
+				indicationIcd10Code: null,
+				indicationIcd10Display: null,
+			})
+		)
+		expect(auditInsertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				metadata: expect.objectContaining({
+					indicationIcd10Code: null,
+				}),
+			})
+		)
+		expect(result).toEqual({ id: labOrderId })
+	})
+
+	it("creates a signed lab order with a text-only lab test name and no LOINC code", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const encounterId = "99999999-9999-4999-9999-999999999999"
+		const labOrderId = "11111111-1111-4111-8111-111111111113"
+		const labInsertBuilder = createInsertBuilder([{ id: labOrderId }])
+		const auditInsertBuilder = createInsertBuilder([])
+		const slaInsertBuilder = createInsertBuilder([])
+
+		jest.spyOn(service, "findLabOrder").mockResolvedValue({ id: labOrderId } as never)
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[{ id: "staff-physician", userId: "user-1", facilityId, isActive: true }],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: encounterId, facilityId }], { withLimit: true })
+			)
+
+		mockDb.insert
+			.mockImplementationOnce(() => labInsertBuilder)
+			.mockImplementationOnce(() => auditInsertBuilder)
+			.mockImplementationOnce(() => slaInsertBuilder)
+
+		const result = await service.createLabOrder(
+			{
+				facilityId,
+				encounterId,
+				testName: "Custom send-out assay",
+				clinicalIndication: "Fever and productive cough",
+				priority: "urgent",
+				specimenType: "Serum",
+			},
+			"user-1"
+		)
+
+		expect(labInsertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				testName: "Custom send-out assay",
+				loincCode: null,
+				clinicalIndication: "Fever and productive cough",
+			})
+		)
+		expect(result).toEqual({ id: labOrderId })
+	})
+
+	it("rejects lab order signing with an inactive or unknown LOINC code", async () => {
 		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
 		const encounterId = "99999999-9999-4999-9999-999999999999"
 
@@ -1215,6 +1440,7 @@ describe("OrdersService", () => {
 			.mockImplementationOnce(() =>
 				createSelectBuilder([{ id: encounterId, facilityId }], { withLimit: true })
 			)
+			.mockImplementationOnce(() => createSelectBuilder([], { withLimit: true }))
 
 		await expect(
 			service.createLabOrder(
@@ -1222,9 +1448,8 @@ describe("OrdersService", () => {
 					facilityId,
 					encounterId,
 					testName: "Complete Blood Count",
+					loincCode: "99999-9",
 					clinicalIndication: "Fever and productive cough",
-					indicationIcd10Code: "J18.9",
-					indicationIcd10Display: "Pneumonia, unspecified organism",
 				},
 				"user-1"
 			)
@@ -1345,6 +1570,61 @@ describe("OrdersService", () => {
 				encounterId,
 				toStatus: "imaging_ordered",
 				staffId: "staff-physician",
+			})
+		)
+		expect(result).toEqual({ id: imagingOrderId })
+	})
+
+	it("creates a signed imaging order with a text-only clinical indication", async () => {
+		const facilityId = "8138a4f3-d2a7-41ba-8e12-2c4191aa174c"
+		const encounterId = "99999999-9999-4999-9999-999999999999"
+		const imagingOrderId = "22222222-2222-4222-8222-222222222223"
+		const orderInsertBuilder = createInsertBuilder([{ id: imagingOrderId }])
+		const auditInsertBuilder = createInsertBuilder([])
+		const slaInsertBuilder = createInsertBuilder([])
+
+		jest.spyOn(service, "findImagingOrder").mockResolvedValue({ id: imagingOrderId } as never)
+
+		mockDb.select
+			.mockImplementationOnce(() =>
+				createSelectBuilder(
+					[{ id: "staff-physician", userId: "user-1", facilityId, isActive: true }],
+					{ withLimit: true }
+				)
+			)
+			.mockImplementationOnce(() =>
+				createSelectBuilder([{ id: encounterId, facilityId }], { withLimit: true })
+			)
+
+		mockDb.insert
+			.mockImplementationOnce(() => orderInsertBuilder)
+			.mockImplementationOnce(() => auditInsertBuilder)
+			.mockImplementationOnce(() => slaInsertBuilder)
+
+		const result = await service.createImagingOrder(
+			{
+				facilityId,
+				encounterId,
+				modality: "xray",
+				bodyPart: "Chest",
+				clinicalIndication: "Fever and productive cough",
+				priority: "urgent",
+			},
+			"user-1"
+		)
+
+		expect(orderInsertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				clinicalIndication: "Fever and productive cough",
+				indicationIcd10Code: null,
+				indicationIcd10Display: null,
+			})
+		)
+		expect(auditInsertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				metadata: expect.objectContaining({
+					indicationIcd10Code: null,
+				}),
 			})
 		)
 		expect(result).toEqual({ id: imagingOrderId })

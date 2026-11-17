@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useState } from "react"
 import {
 	AlertCircle,
 	CheckCircle2,
@@ -59,32 +59,34 @@ interface StepIndicatorProps {
 
 function StepIndicator({ current, completed }: StepIndicatorProps) {
 	return (
-		<div className="flex flex-wrap items-center gap-0">
-			{STEPS.map((step, idx) => {
-				const Icon = step.icon
-				const isActive = step.key === current
-				const isDone = completed.includes(step.key)
+		<div className="-mx-1 overflow-x-auto px-1 pb-1">
+			<div className="flex min-w-max items-center gap-0">
+				{STEPS.map((step, idx) => {
+					const Icon = step.icon
+					const isActive = step.key === current
+					const isDone = completed.includes(step.key)
 
-				return (
-					<div key={step.key} className="flex items-center">
-						<div
-							className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
-								isActive
-									? "bg-primary text-primary-foreground"
-									: isDone
-										? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-										: "text-muted-foreground"
-							}`}
-						>
-							{isDone ? <CheckCircle2 className="size-4" /> : <Icon className="size-4" />}
-							<span className="hidden sm:inline">{step.label}</span>
+					return (
+						<div key={step.key} className="flex items-center">
+							<div
+								className={`flex min-h-9 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
+									isActive
+										? "bg-primary text-primary-foreground"
+										: isDone
+											? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+											: "text-muted-foreground"
+								}`}
+							>
+								{isDone ? <CheckCircle2 className="size-4" /> : <Icon className="size-4" />}
+								<span>{step.label}</span>
+							</div>
+							{idx < STEPS.length - 1 && (
+								<ChevronRight className="text-muted-foreground mx-1 size-4" />
+							)}
 						</div>
-						{idx < STEPS.length - 1 && (
-							<ChevronRight className="text-muted-foreground mx-1 size-4" />
-						)}
-					</div>
-				)
-			})}
+					)
+				})}
+			</div>
 		</div>
 	)
 }
@@ -121,11 +123,11 @@ function ScanStep({ title, description, icon, placeholder, scan, onScan, onClear
 			<CardContent className="space-y-4">
 				<p className="text-muted-foreground text-sm">{description}</p>
 
-				<div className="flex gap-2">
+				<div className="flex flex-col gap-2 sm:flex-row">
 					<div className="relative flex-1">
 						<QrCode className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
 						<Input
-							className="pl-9"
+							className="h-10 pl-9"
 							placeholder={placeholder}
 							value={input}
 							onChange={e => setInput(e.target.value)}
@@ -134,11 +136,15 @@ function ScanStep({ title, description, icon, placeholder, scan, onScan, onClear
 						/>
 					</div>
 					{scan.status === "pass" ? (
-						<Button variant="outline" size="icon" onClick={onClear}>
+						<Button className="h-10 w-full sm:w-10" variant="outline" size="icon" onClick={onClear}>
 							<RotateCcw className="size-4" />
 						</Button>
 					) : (
-						<Button onClick={handleSubmit} disabled={!input.trim()}>
+						<Button
+							className="h-10 w-full sm:w-auto"
+							onClick={handleSubmit}
+							disabled={!input.trim()}
+						>
 							Verify
 						</Button>
 					)}
@@ -206,7 +212,7 @@ function VitalsEntry({ vitals, onChange }: VitalsEntryProps) {
 			{(["baseline", "fifteenMin", "end"] as VitalsTimePoint[]).map(point => (
 				<div key={point}>
 					<p className="mb-3 text-sm font-medium">{VITALS_LABELS[point]}</p>
-					<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 						{fields.map(f => (
 							<div key={f.key} className="space-y-1">
 								<Label className="text-xs">{f.label}</Label>
@@ -260,10 +266,15 @@ function MatchSummary({ patientScan, productScan, orderScan }: MatchSummaryProps
 					{ label: "Blood Product", scan: productScan },
 					{ label: "CPOE Order", scan: orderScan },
 				].map(({ label, scan }) => (
-					<div key={label} className="flex items-center justify-between">
+					<div
+						key={label}
+						className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+					>
 						<span className="text-sm">{label}</span>
-						<div className="flex items-center gap-2">
-							<span className="text-muted-foreground font-mono text-xs">{scan.value || "—"}</span>
+						<div className="flex min-w-0 items-center gap-2">
+							<span className="text-muted-foreground min-w-0 truncate font-mono text-xs">
+								{scan.value || "—"}
+							</span>
 							{scan.status === "pass" ? (
 								<Badge className="bg-green-600 text-white">✓ Match</Badge>
 							) : scan.status === "fail" ? (
@@ -350,7 +361,7 @@ export function TransfusionVerification({ onComplete, onCancel }: TransfusionVer
 	return (
 		<div className="space-y-6">
 			{/* Header */}
-			<div className="flex items-center justify-between">
+			<div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
 				<div>
 					<h2 className="text-lg font-semibold">Bedside Transfusion Verification</h2>
 					<p className="text-muted-foreground text-sm">
@@ -421,7 +432,11 @@ export function TransfusionVerification({ onComplete, onCancel }: TransfusionVer
 						</CardContent>
 					</Card>
 					<div className="flex justify-end">
-						<Button onClick={handleFinish} disabled={!vitals.baseline.bp || !vitals.baseline.hr}>
+						<Button
+							className="h-10 w-full sm:w-auto"
+							onClick={handleFinish}
+							disabled={!vitals.baseline.bp || !vitals.baseline.hr}
+						>
 							Complete &amp; Save Transfusion Record
 						</Button>
 					</div>

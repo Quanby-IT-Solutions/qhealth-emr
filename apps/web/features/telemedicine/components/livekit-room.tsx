@@ -1029,7 +1029,7 @@ function LiveKitVideoRoomSession({
 			response={joinRoom.data}
 			choices={choices}
 			className={cn(
-				"qhealth-livekit-room",
+				"juanmeds-livekit-room",
 				fullViewport ? "flex h-full min-h-0 flex-1 flex-col" : "min-h-[520px]"
 			)}
 			onDisconnected={handleDisconnected}

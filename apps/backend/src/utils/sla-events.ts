@@ -4,7 +4,8 @@ import { encounterStatusEvents } from "@repo/db/schema"
 
 import { type db } from "@/common/database/database.client"
 
-type DbClient = typeof db
+type DbTransaction = Parameters<Parameters<(typeof db)["transaction"]>[0]>[0]
+type DbClient = typeof db | DbTransaction
 
 /**
  * Closes the most recent open SLA step for an encounter + workflow pair by

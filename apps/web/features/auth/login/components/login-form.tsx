@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useForm } from "@tanstack/react-form"
 import { AnimatePresence, motion, type Variants } from "framer-motion"
 
+import { LogoIcon } from "@/core/components/logo"
 import { buttonVariants } from "@/core/components/ui/button"
 import { Card, CardContent } from "@/core/components/ui/card"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/core/components/ui/field"
@@ -154,7 +155,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 					<CardContent className="grid min-h-[600px] p-0 md:grid-cols-2">
 						{/* Left Panel: Form */}
 						<form
-							className="flex flex-col justify-center p-6 md:p-10"
+							className="flex flex-col justify-start p-6 pt-12 md:justify-center md:p-10"
 							onSubmit={e => {
 								e.preventDefault()
 								form.handleSubmit()
@@ -170,6 +171,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 									variants={itemVariants}
 									className="flex flex-col items-center gap-2 text-center"
 								>
+									<LogoIcon className="mb-8 h-12 md:hidden" priority />
 									<h1 className="text-foreground font-serif text-3xl font-bold tracking-tight">
 										Welcome back
 									</h1>

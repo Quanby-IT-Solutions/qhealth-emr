@@ -73,7 +73,6 @@ export default function EncounterChartLayout({
 	const pathname = usePathname()
 	const permSet = usePermissionSet()
 	const { data: profile } = useMyProfile()
-	const activeRoleName = (profile?.activeRole?.name ?? "").toLowerCase()
 	const canViewClinicalSummary = can(permSet, "clinical_docs", "view")
 	const canViewVitals = can(permSet, "nursing", "view") || can(permSet, "surgical", "view")
 	const { isOnline } = useOfflineSync()
@@ -84,7 +83,6 @@ export default function EncounterChartLayout({
 		error?.message?.includes(BREAK_GLASS_REQUIRED_MESSAGE) ||
 		String(error).includes(BREAK_GLASS_REQUIRED_MESSAGE)
 	const base = `/patients/${patientId}/encounters/${encounterId}`
-	const isDeathReportRoute = pathname.startsWith(`${base}/death-report`)
 
 	// Break-Glass state
 	const [breakGlassOpen, setBreakGlassOpen] = useState(false)
@@ -141,35 +139,18 @@ export default function EncounterChartLayout({
 		return () => window.clearTimeout(timeoutId)
 	}, [activeBreakGlass?.accessExpiresAt, refetchActiveBreakGlass, refetchEncounter])
 
-	// Each tab declares which permission it needs. Summary is always shown.
-	// Tabs are omitted entirely when the role lacks the required permission —
-	// the backend still enforces access; this is a UX-only filter.
+	// Community health service chart: keep only the tabs used by clinic coordinators
+	// for patient summary, diagnosis/allergy capture, orders, and e-prescriptions.
 	const tabs = [
 		{ label: "Summary", href: base, show: true },
 		{
 			label: "Problems & Allergies",
 			href: `${base}/problems-allergies`,
-			// Problem list and allergy management is for all clinicians who author clinical documentation
-			// (Physicians, Nurses, Surgeons, Anesthesiologists). Ancillary and billing staff are excluded.
-			show:
-				(can(permSet, "clinical_docs", "view") || can(permSet, "orders", "view")) &&
-				!can(permSet, "radiology", "view") &&
-				!can(permSet, "laboratory", "view") &&
-				!can(permSet, "billing", "create"), // Exclude Billers - they review CF4, not problem lists
-		},
-		{
-			label: "Documentation",
-			href: `${base}/documentation`,
-			// Documentation is for clinical staff, not ancillary (Lab/Rad) staff
-			show:
-				can(permSet, "clinical_docs", "view") &&
-				!can(permSet, "radiology", "view") &&
-				!can(permSet, "laboratory", "view"),
+			show: can(permSet, "clinical_docs", "view") || can(permSet, "orders", "view"),
 		},
 		{
 			label: "Orders",
 			href: `${base}/orders`,
-			// Orders tab is for clinical staff and ancillary staff (Lab/Rad view imaging/lab orders)
 			show:
 				can(permSet, "orders", "view") ||
 				can(permSet, "radiology", "view") ||
@@ -178,90 +159,8 @@ export default function EncounterChartLayout({
 		{
 			label: "e-Prescription",
 			href: `${base}/e-prescription`,
-			// TOR: Clinicians, Surgeons, and Anesthesiologists can generate legally compliant e-Rx.
 			show: can(permSet, "orders", "sign"),
 		},
-		{
-			label: "Surgical",
-			href: `${base}/surgical`,
-			show: can(permSet, "surgical", "view"),
-		},
-		{
-			label: "Nursing",
-			href: `${base}/nursing`,
-			// Nursing workflows are nurse-owned. Clinicians get vitals/clinical
-			// context from Summary, Orders, and Documentation instead.
-			show:
-				can(permSet, "nursing", "view") &&
-				!can(permSet, "surgical", "view") &&
-				!can(permSet, "clinical_docs", "sign"),
-		},
-		{
-			label: "Nutrition",
-			href: `${base}/nutrition`,
-			show: can(permSet, "nutrition", "view"),
-		},
-		{
-			label: "Billing",
-			href: `${base}/billing`,
-			// Billing workspace belongs to Billing/MSW/Auditor-style review roles, not
-			// clinicians documenting care. Physicians trigger clinical completion and
-			// May Go Home from the Discharge tab.
-			show: can(permSet, "billing", "view") && !can(permSet, "clinical_docs", "sign"),
-		},
-		{
-			label: "MSW",
-			href: `${base}/msw`,
-			show: can(permSet, "msw", "view"),
-		},
-		{
-			label: "Consents",
-			href: `${base}/consents`,
-			// Consent tracking is for HIM/records staff, not clinical or ancillary staff
-			// HIM has clinical_docs:edit but NOT sign - they review, not author
-			show:
-				(can(permSet, "clinical_docs", "edit") || can(permSet, "adt", "view")) &&
-				!can(permSet, "clinical_docs", "sign") && // Exclude clinicians who sign notes
-				!can(permSet, "radiology", "view") &&
-				!can(permSet, "laboratory", "view") &&
-				!can(permSet, "billing", "create"), // Exclude Billers
-		},
-		{
-			label: "Death Report",
-			href: `${base}/death-report`,
-			// Death reporting is triggered by a deceased/expired disposition.
-			// Keep the tab visible while completing the required modal-launched route.
-			show:
-				can(permSet, "death_reporting", "view") &&
-				(visibleEncounter?.disposition === "deceased" || isDeathReportRoute),
-		},
-		{
-			label: "Transfers",
-			href: `${base}/transfers`,
-			// Transfer history viewing is administrative - requires adt:edit (not just view)
-			show: can(permSet, "adt", "edit"),
-		},
-		{
-			label: "Audit Trail",
-			href: `${base}/audit-trail`,
-			show: can(permSet, "audit", "view"),
-		},
-		...(visibleEncounter?.status === "active" &&
-		visibleEncounter?.encounterType !== "outpatient" &&
-		can(permSet, "adt", "edit")
-			? [{ label: "Transfer Patient", href: `${base}/transfer`, show: true }]
-			: []),
-		...((visibleEncounter?.status === "active" ||
-			visibleEncounter?.status === "pending_discharge") &&
-		(can(permSet, "adt", "edit") || can(permSet, "clinical_docs", "sign"))
-			? [
-					{
-						label: visibleEncounter?.encounterType === "outpatient" ? "Close" : "Discharge",
-						href: `${base}/discharge`,
-						show: true,
-					},
-				]
-			: []),
 	].filter(tab => tab.show)
 	const canRenderEncounterContent = Boolean(visibleEncounter && !chartAccessBlocked && !isError)
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
@@ -26,6 +26,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/core/components/ui/card"
+import { DatePicker } from "@/core/components/ui/date-picker"
 import {
 	Dialog,
 	DialogContent,
@@ -38,6 +39,7 @@ import { Label } from "@/core/components/ui/label"
 import { Separator } from "@/core/components/ui/separator"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { isCoordinatorRole } from "@/features/app-shell/lib/navigation"
 import { useCreateEncounterMutation } from "@/features/encounters/api/encounters.hooks"
 import { useOfflinePatients } from "@/features/offline-cache/lib/use-offline-patients"
 import { LinkTriageBanner } from "@/features/opd-triage/components/link-triage-banner"
@@ -45,6 +47,8 @@ import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
 import { PatientListCard } from "@/features/patients/components/patient-list-page"
 import { PatientRegistrationForm } from "@/features/patients/components/patient-registration-form"
 import { PatientRegistrationShell } from "@/features/patients/components/patient-registration-shell"
+
+const DATE_OF_BIRTH_END_YEAR = new Date().getFullYear()
 
 // ============================================================================
 // Helpers
@@ -182,7 +186,10 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 	const isBreakGlassEnforced = permissions.some(
 		permission => permission.module === "audit" && permission.action === "create"
 	)
-	const shouldStartAtForm = canOpenRegistrationWorkflow && !canSearchPatients
+	const isClinicCoordinator = isCoordinatorRole(profile?.activeRole?.name)
+	const shouldUseDirectOpdRegistration = isClinicCoordinator && !pendingTriageId
+	const shouldStartAtForm =
+		shouldUseDirectOpdRegistration || (canOpenRegistrationWorkflow && !canSearchPatients)
 
 	const [wizardStep, setWizardStep] = useState<"search" | "form">(
 		shouldStartAtForm ? "form" : "search"
@@ -217,6 +224,12 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 
 	const createEncounter = useCreateEncounterMutation()
 	const { isOnline, offlinePatients, cachedAt } = useOfflinePatients()
+
+	useEffect(() => {
+		if (shouldUseDirectOpdRegistration) {
+			setWizardStep("form")
+		}
+	}, [shouldUseDirectOpdRegistration])
 
 	const { data, isLoading, isFetching } = usePatientSearchQuery(
 		committedParams ?? {
@@ -302,8 +315,14 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 	if (wizardStep === "form") {
 		return (
 			<PatientRegistrationForm
-				mode={pendingTriageId ? "triage-linked" : "standalone"}
-				onBack={() => setWizardStep("search")}
+				mode={
+					pendingTriageId
+						? "triage-linked"
+						: shouldUseDirectOpdRegistration
+							? "opd-direct"
+							: "standalone"
+				}
+				onBack={() => (shouldUseDirectOpdRegistration ? onClose() : setWizardStep("search"))}
 			/>
 		)
 	}
@@ -379,12 +398,12 @@ function RegistrationWizard({ onClose }: { onClose: () => void }) {
 								</SearchField>
 
 								<SearchField htmlFor="patient-birthdate" label="Date of birth" icon={CalendarDays}>
-									<Input
+									<DatePicker
 										id="patient-birthdate"
-										type="date"
 										value={birthdateFilter}
 										className="border-border/60 bg-background h-11 rounded-xl"
-										onChange={e => setBirthdateFilter(e.target.value)}
+										onChange={setBirthdateFilter}
+										endYear={DATE_OF_BIRTH_END_YEAR}
 									/>
 								</SearchField>
 							</div>
@@ -698,6 +717,7 @@ export function PatientRegisterPageContent() {
 	const canCreatePatient = permissions.some(
 		permission => permission.module === "patients" && permission.action === "create"
 	)
+	const isClinicCoordinator = isCoordinatorRole(profile?.activeRole?.name)
 
 	// Auto-open the wizard when a triage intake is pending
 	const [isDialogOpen, setIsDialogOpen] = useState(!!pendingTriageId)
@@ -706,20 +726,21 @@ export function PatientRegisterPageContent() {
 		<div className="flex min-h-svh flex-col">
 			<header className="bg-background/80 supports-backdrop-filter:bg-background/60 sticky top-0 z-10 border-b backdrop-blur">
 				<div className="flex h-14 items-center gap-3 px-4">
-					<div className="flex-1">
-						<h1 className="text-base font-semibold tracking-tight">Patient Management</h1>
+					<div className="min-w-0 flex-1">
+						<h1 className="truncate text-base font-semibold tracking-tight">Patient Management</h1>
 					</div>
 					{canCreatePatient && (
-						<Button size="sm" onClick={() => setIsDialogOpen(true)}>
+						<Button size="sm" className="shrink-0" onClick={() => setIsDialogOpen(true)}>
 							<UserRoundPlus className="size-4" />
-							Register new patient
+							<span className="hidden sm:inline">Register new patient</span>
+							<span className="sm:hidden">Register</span>
 						</Button>
 					)}
 				</div>
 			</header>
 
 			<main className="flex-1 space-y-5 p-4 md:p-6">
-				<PatientListCard />
+				<PatientListCard showCoordinatorFilters={isClinicCoordinator} />
 			</main>
 
 			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

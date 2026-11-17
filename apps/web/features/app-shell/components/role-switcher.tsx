@@ -26,7 +26,7 @@ export function RoleSwitcher() {
 
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger className="hover:bg-accent flex items-center gap-2 rounded-md px-2 py-1 text-sm">
+			<DropdownMenuTrigger className="hover:border-accent/30 hover:bg-accent/10 hover:text-accent flex items-center gap-2 rounded-md border border-transparent px-2 py-1 text-sm transition-colors">
 				<HugeiconsIcon icon={ArrowTurnBackwardFreeIcons} className="size-4" />
 				<span className="max-w-[120px] truncate">{activeRole?.name ?? "No Role"}</span>
 			</DropdownMenuTrigger>
@@ -47,7 +47,7 @@ export function RoleSwitcher() {
 					>
 						<span className="flex-1 truncate">{role.name}</span>
 						{role.id === activeRole?.id && (
-							<HugeiconsIcon icon={CheckmarkCircle01FreeIcons} className="text-primary size-4" />
+							<HugeiconsIcon icon={CheckmarkCircle01FreeIcons} className="text-accent size-4" />
 						)}
 						{role.isPrimary && (
 							<Badge variant="secondary" className="ml-1 text-[10px]">

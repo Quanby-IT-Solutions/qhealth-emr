@@ -22,6 +22,13 @@ import {
 	DialogTitle,
 } from "@/core/components/ui/dialog"
 import { Input } from "@/core/components/ui/input"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/core/components/ui/select"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { orpc } from "@/services/orpc/client"
 import { BreakGlassForm } from "@/features/audit/components/break-glass-form"
@@ -30,6 +37,17 @@ import { usePatientSearchQuery } from "@/features/patients/api/patients.hooks"
 
 const BREAK_GLASS_REQUIRED_MESSAGE = "Break-glass required for this patient chart."
 const PATIENTS_PAGE_SIZE = 8
+
+type PatientStatusFilter = "active" | "inactive"
+
+const patientStatusFilterLabels: Record<PatientStatusFilter, string> = {
+	active: "Active",
+	inactive: "Inactive",
+}
+
+const coordinatorFilterFieldClassName = "flex min-w-0 flex-col gap-1"
+const coordinatorFilterLabelClassName = "text-muted-foreground h-4 text-xs font-medium leading-4"
+const coordinatorFilterControlClassName = "h-8 w-full rounded-full px-4"
 
 function isBreakGlassRequiredError(error: unknown) {
 	if (!error || typeof error !== "object") return false
@@ -83,9 +101,17 @@ function isNewborn(dateOfBirth: string): boolean {
 // PatientListCard — self-contained patient list with break-glass support
 // ============================================================================
 
-export function PatientListCard() {
+interface PatientListCardProps {
+	showCoordinatorFilters?: boolean
+}
+
+export function PatientListCard({ showCoordinatorFilters = false }: PatientListCardProps = {}) {
 	const facilityId = useActiveFacilityId() ?? ""
 	const [filter, setFilter] = useState("")
+	const [patientStatusFilter, setPatientStatusFilter] = useState<PatientStatusFilter>("active")
+	const [mrnFilter, setMrnFilter] = useState("")
+	const [dateOfBirthFilter, setDateOfBirthFilter] = useState("")
+	const [philhealthFilter, setPhilhealthFilter] = useState("")
 	const [page, setPage] = useState(1)
 	const [breakGlassPatientId, setBreakGlassPatientId] = useState<string | null>(null)
 	const [checkingPatientId, setCheckingPatientId] = useState<string | null>(null)
@@ -110,17 +136,39 @@ export function PatientListCard() {
 
 	const { isOnline, offlinePatients, cachedAt } = useOfflinePatients()
 
-	const trimmed = filter.trim().toLowerCase()
+	const trimmedSearch = filter.trim()
+	const normalizedSearch = trimmedSearch.toLowerCase()
+	const trimmedMrnFilter = mrnFilter.trim()
+	const normalizedMrnFilter = trimmedMrnFilter.toLowerCase()
+	const trimmedPhilhealthFilter = philhealthFilter.trim()
+	const normalizedPhilhealthFilter = trimmedPhilhealthFilter.toLowerCase()
+	const isActiveFilter = patientStatusFilter === "active"
+	const hasCoordinatorFilters =
+		showCoordinatorFilters &&
+		(patientStatusFilter !== "active" ||
+			!!trimmedMrnFilter ||
+			!!dateOfBirthFilter ||
+			!!trimmedPhilhealthFilter)
+	const hasVisibleFilters = !!trimmedSearch || hasCoordinatorFilters
 
 	useEffect(() => {
 		setPage(1)
-	}, [trimmed])
+	}, [
+		dateOfBirthFilter,
+		isActiveFilter,
+		normalizedMrnFilter,
+		normalizedPhilhealthFilter,
+		normalizedSearch,
+	])
 
 	const { data, isLoading, isFetching } = usePatientSearchQuery(
 		{
 			facilityId,
-			isActive: true,
-			search: trimmed || undefined,
+			isActive: isActiveFilter,
+			search: trimmedSearch || undefined,
+			mrn: showCoordinatorFilters ? trimmedMrnFilter || undefined : undefined,
+			dateOfBirth: showCoordinatorFilters ? dateOfBirthFilter || undefined : undefined,
+			philhealthMemberId: showCoordinatorFilters ? trimmedPhilhealthFilter || undefined : undefined,
 			page,
 			limit: PATIENTS_PAGE_SIZE,
 		},
@@ -128,13 +176,55 @@ export function PatientListCard() {
 	)
 
 	const offlineFiltered = useMemo(() => {
-		if (!trimmed) return offlinePatients
 		return offlinePatients.filter(p => {
 			const name = formatPatientName(p).toLowerCase()
 			const mrn = (p.mrn ?? "").toLowerCase()
-			return name.includes(trimmed) || mrn.includes(trimmed)
+			const matchesSearch =
+				!normalizedSearch || name.includes(normalizedSearch) || mrn.includes(normalizedSearch)
+
+			if (!showCoordinatorFilters) return matchesSearch
+
+			const matchesStatus = p.isActive === isActiveFilter
+			const matchesMrn = !normalizedMrnFilter || mrn.includes(normalizedMrnFilter)
+			const matchesDateOfBirth = !dateOfBirthFilter || p.dateOfBirth === dateOfBirthFilter
+			const matchesPhilhealth = !normalizedPhilhealthFilter
+
+			return matchesSearch && matchesStatus && matchesMrn && matchesDateOfBirth && matchesPhilhealth
 		})
-	}, [offlinePatients, trimmed])
+	}, [
+		dateOfBirthFilter,
+		isActiveFilter,
+		normalizedMrnFilter,
+		normalizedPhilhealthFilter,
+		normalizedSearch,
+		offlinePatients,
+		showCoordinatorFilters,
+	])
+
+	const filterDescriptions = useMemo(() => {
+		const descriptions: string[] = []
+		if (trimmedSearch) descriptions.push(`matching "${trimmedSearch}"`)
+		if (showCoordinatorFilters && patientStatusFilter === "inactive") {
+			descriptions.push("inactive records")
+		}
+		if (showCoordinatorFilters && trimmedMrnFilter) {
+			descriptions.push(`MRN "${trimmedMrnFilter}"`)
+		}
+		if (showCoordinatorFilters && dateOfBirthFilter) {
+			descriptions.push(`DOB ${formatDate(dateOfBirthFilter)}`)
+		}
+		if (showCoordinatorFilters && trimmedPhilhealthFilter) {
+			descriptions.push(`PhilHealth "${trimmedPhilhealthFilter}"`)
+		}
+		return descriptions
+	}, [
+		dateOfBirthFilter,
+		patientStatusFilter,
+		showCoordinatorFilters,
+		trimmedMrnFilter,
+		trimmedPhilhealthFilter,
+		trimmedSearch,
+	])
 
 	const totalPatients = isOnline ? (data?.total ?? 0) : offlineFiltered.length
 	const totalPages = Math.max(
@@ -153,6 +243,22 @@ export function PatientListCard() {
 	const hasNextPage = currentPage < totalPages
 	const pageStart = totalPatients === 0 ? 0 : (currentPage - 1) * PATIENTS_PAGE_SIZE + 1
 	const pageEnd = Math.min(currentPage * PATIENTS_PAGE_SIZE, totalPatients)
+	const filterSummary = filterDescriptions.length > 0 ? ` ${filterDescriptions.join(", ")}` : ""
+	const emptyListMessage = hasVisibleFilters
+		? showCoordinatorFilters
+			? "No patients match the selected filters."
+			: `No patients match "${filter}".`
+		: isActiveFilter
+			? "No active patients found."
+			: "No inactive patients found."
+
+	const clearCoordinatorFilters = () => {
+		setFilter("")
+		setPatientStatusFilter("active")
+		setMrnFilter("")
+		setDateOfBirthFilter("")
+		setPhilhealthFilter("")
+	}
 
 	return (
 		<>
@@ -179,22 +285,106 @@ export function PatientListCard() {
 						<div className="space-y-1">
 							<CardTitle className="tracking-tight">Patient List</CardTitle>
 							<CardDescription>
-								Browse all active patients. Search by name or MRN to open a chart.
+								{showCoordinatorFilters
+									? "Browse patient records. Filter by name, MRN, date of birth, PhilHealth, or status."
+									: "Browse all active patients. Search by name or MRN to open a chart."}
 							</CardDescription>
 						</div>
 					</div>
 				</CardHeader>
 
 				<CardContent className="space-y-3 pt-3">
-					<div className="relative">
-						<Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-						<Input
-							placeholder="Filter by name or MRN…"
-							value={filter}
-							onChange={e => setFilter(e.target.value)}
-							className="border-border/60 bg-background h-9 rounded-xl pl-9"
-						/>
-					</div>
+					{showCoordinatorFilters ? (
+						<div className="bg-muted/25 rounded-lg border px-4 py-5">
+							<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[minmax(220px,1.4fr)_minmax(130px,0.8fr)_minmax(130px,0.8fr)_minmax(140px,0.8fr)_minmax(170px,1fr)_auto] xl:items-start">
+								<div className={coordinatorFilterFieldClassName}>
+									<label className={coordinatorFilterLabelClassName}>Search</label>
+									<Input
+										value={filter}
+										onChange={event => setFilter(event.target.value)}
+										placeholder="Patient name"
+										aria-label="Search patients"
+										className={coordinatorFilterControlClassName}
+									/>
+								</div>
+								<div className={coordinatorFilterFieldClassName}>
+									<label className={coordinatorFilterLabelClassName}>Status</label>
+									<Select
+										value={patientStatusFilter}
+										onValueChange={value => setPatientStatusFilter(value as PatientStatusFilter)}
+									>
+										<SelectTrigger
+											aria-label="Filter patient status"
+											className={coordinatorFilterControlClassName}
+										>
+											<SelectValue>{patientStatusFilterLabels[patientStatusFilter]}</SelectValue>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="active">Active</SelectItem>
+											<SelectItem value="inactive">Inactive</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+								<div className={coordinatorFilterFieldClassName}>
+									<label className={coordinatorFilterLabelClassName}>MRN</label>
+									<Input
+										value={mrnFilter}
+										onChange={event => setMrnFilter(event.target.value)}
+										placeholder="Any MRN"
+										aria-label="Filter by MRN"
+										className={coordinatorFilterControlClassName}
+									/>
+								</div>
+								<div className={coordinatorFilterFieldClassName}>
+									<label className={coordinatorFilterLabelClassName}>Date of Birth</label>
+									<Input
+										type="date"
+										value={dateOfBirthFilter}
+										onChange={event => setDateOfBirthFilter(event.target.value)}
+										aria-label="Filter by date of birth"
+										className={coordinatorFilterControlClassName}
+									/>
+								</div>
+								<div className={coordinatorFilterFieldClassName}>
+									<label className={coordinatorFilterLabelClassName}>PhilHealth</label>
+									<Input
+										value={philhealthFilter}
+										onChange={event => setPhilhealthFilter(event.target.value)}
+										placeholder="Any ID"
+										aria-label="Filter by PhilHealth ID"
+										className={coordinatorFilterControlClassName}
+									/>
+								</div>
+								<div className={coordinatorFilterFieldClassName}>
+									<label
+										className={`${coordinatorFilterLabelClassName} invisible`}
+										aria-hidden="true"
+									>
+										Actions
+									</label>
+									<Button
+										type="button"
+										variant="outline"
+										onClick={clearCoordinatorFilters}
+										disabled={!hasVisibleFilters}
+										className="h-8 w-full rounded-full px-5 xl:w-fit"
+									>
+										Clear
+									</Button>
+								</div>
+							</div>
+						</div>
+					) : (
+						<div className="relative">
+							<Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+							<Input
+								placeholder="Filter by name or MRN…"
+								value={filter}
+								onChange={e => setFilter(e.target.value)}
+								className="border-border/60 bg-background h-9 rounded-xl pl-9"
+							/>
+						</div>
+					)}
 
 					{isLoading && isOnline ? (
 						<div className="border-border/60 bg-secondary/40 text-muted-foreground rounded-2xl border border-dashed px-6 py-10 text-center text-sm">
@@ -202,14 +392,14 @@ export function PatientListCard() {
 						</div>
 					) : pagePatients.length === 0 ? (
 						<div className="border-border/60 bg-secondary/40 text-muted-foreground rounded-2xl border border-dashed px-6 py-10 text-center text-sm">
-							{trimmed ? `No patients match "${filter}".` : "No active patients found."}
+							{emptyListMessage}
 						</div>
 					) : (
 						<>
 							<p className="text-muted-foreground px-0.5 text-xs">
 								Showing {pageStart}-{pageEnd} of {totalPatients}{" "}
 								{totalPatients === 1 ? "patient" : "patients"}
-								{trimmed && ` matching "${filter}"`}
+								{filterSummary}
 								{isFetching && isOnline && " · Updating..."}
 							</p>
 							<div className="border-border/60 bg-background divide-border/60 divide-y overflow-hidden rounded-2xl border">
@@ -275,11 +465,11 @@ export function PatientListCard() {
 									)
 								})}
 							</div>
-							<div className="flex items-center justify-between gap-3 px-0.5">
+							<div className="flex flex-col gap-3 px-0.5 sm:flex-row sm:items-center sm:justify-between">
 								<p className="text-muted-foreground text-xs">
 									Page {currentPage} of {totalPages}
 								</p>
-								<div className="flex items-center gap-2">
+								<div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
 									<Button
 										variant="outline"
 										size="sm"

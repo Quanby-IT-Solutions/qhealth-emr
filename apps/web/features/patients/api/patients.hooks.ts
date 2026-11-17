@@ -109,10 +109,14 @@ export function useRegisterPatientWithOpdEncounterMutation() {
 
 	return useMutation(
 		orpc.patient.registerWithOpdEncounter.mutationOptions({
-			onSuccess: () =>
-				queryClient.invalidateQueries({
+			onSuccess: () => {
+				void queryClient.invalidateQueries({
 					queryKey: orpc.patient.key(),
-				}),
+				})
+				void queryClient.invalidateQueries({
+					queryKey: orpc.scheduling.getClinicQueue.key(),
+				})
+			},
 		})
 	)
 }

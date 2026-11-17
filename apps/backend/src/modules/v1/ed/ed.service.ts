@@ -850,7 +850,7 @@ export class EdService {
 			workflowType: "ed" as const,
 			staffId: null,
 			slaTargetMinutes: queueStatusSlaMins,
-			notes: `ED queue: ${fromStatus ?? "none"} → ${input.queueStatus}`,
+			notes: `ED queue: ${fromStatus ?? "none"} -> ${input.queueStatus}`,
 			occurredAt: new Date(),
 		})
 

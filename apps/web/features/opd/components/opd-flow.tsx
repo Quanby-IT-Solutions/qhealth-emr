@@ -18,6 +18,7 @@ import {
 import { Separator } from "@/core/components/ui/separator"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { COORDINATOR_ROLE_NAMES, roleNameMatches } from "@/features/app-shell/lib/navigation"
 
 // ============================================================================
 // Permission Helpers
@@ -107,6 +108,10 @@ export function canRoleActOnOpdStep(
 	activeRoleName: string | null | undefined,
 	step: OpdStep
 ) {
+	if (roleNameMatches(activeRoleName, COORDINATOR_ROLE_NAMES)) {
+		return can(permSet, step.requiredPermission.module, step.requiredPermission.action)
+	}
+
 	const roleCanOwnStep =
 		activeRoleName === step.responsibleRole ||
 		(step.responsibleRole === "Physician" && activeRoleName === "Surgeon")

@@ -32,6 +32,10 @@ export const IoTypeEnum = z.enum(["intake", "output"])
 
 export const NewsRiskLevelEnum = z.enum(["low", "medium", "high"])
 
+export const ConsciousnessLevelEnum = z.enum(["A", "C", "V", "P", "U"])
+
+export const Spo2ScaleEnum = z.enum(["scale1", "scale2"])
+
 export const HandoffStatusEnum = z.enum(["draft", "signed"])
 
 export const HaiTypeEnum = z.enum(["clabsi", "cauti", "vap", "ssi", "cdiff"])
@@ -53,9 +57,13 @@ export const VitalSignSchema = z.object({
 	heartRate: z.number().int().nullable(),
 	respiratoryRate: z.number().int().nullable(),
 	spo2: z.string().nullable(),
-	painScore: z.number().int().nullable(),
+	spo2Scale: Spo2ScaleEnum,
+	oxygenTherapy: z.boolean(),
+	oxygenDeliveryDevice: z.string().nullable(),
+	oxygenFlowRate: z.string().nullable(),
 	weight: z.string().nullable(),
 	height: z.string().nullable(),
+	consciousnessLevel: ConsciousnessLevelEnum,
 	newsScore: z.number().int().nullable(),
 	newsRiskLevel: NewsRiskLevelEnum.nullable(),
 	recordedByStaffId: z.string().uuid(),
@@ -73,9 +81,13 @@ export const CreateVitalSignSchema = z.object({
 	heartRate: z.coerce.number().int().optional(),
 	respiratoryRate: z.coerce.number().int().optional(),
 	spo2: z.coerce.number().optional(),
-	painScore: z.coerce.number().int().min(0).max(10).optional(),
+	spo2Scale: Spo2ScaleEnum.default("scale1"),
+	oxygenTherapy: z.coerce.boolean().default(false),
+	oxygenDeliveryDevice: z.string().optional(),
+	oxygenFlowRate: z.coerce.number().optional(),
 	weight: z.coerce.number().optional(),
 	height: z.coerce.number().optional(),
+	consciousnessLevel: ConsciousnessLevelEnum.default("A"),
 })
 
 export const VitalSignListSchema = PaginationInputSchema.extend({
@@ -89,6 +101,86 @@ export const VitalSignListResponseSchema = PaginatedResponseSchema.extend({
 })
 
 export const VitalSignIdSchema = z.object({ id: z.string().uuid() })
+
+export const FaceScanGenderEnum = z.enum(["male", "female"])
+
+export const FaceScanTokenInputSchema = z.object({
+	clientId: z.string().uuid(),
+	age: z.coerce.number().int().min(0).max(150).optional(),
+	gender: FaceScanGenderEnum.optional(),
+	smoking: z.boolean().optional(),
+	heightCm: z.coerce.number().min(50).max(300).optional(),
+	weightKg: z.coerce.number().min(10).max(500).optional(),
+})
+
+export const FaceScanTokenResponseSchema = z.object({
+	videoIframeUrl: z.string(),
+	enabled: z.boolean(),
+})
+
+export const FaceScanStatusResponseSchema = z.object({
+	enabled: z.boolean(),
+})
+
+export const FaceScanPhoneSessionStatusEnum = z.enum(["pending", "complete", "expired"])
+
+export const FaceScanPhoneVitalsSchema = z.object({
+	bpSystolic: z.number().nullable(),
+	bpDiastolic: z.number().nullable(),
+	heartRate: z.number().nullable(),
+	respiratoryRate: z.number().nullable(),
+	spo2: z.number().nullable(),
+	heightCm: z.number().optional(),
+	weightKg: z.number().optional(),
+})
+
+export const CreateFaceScanPhoneSessionSchema = z.object({
+	facilityId: z.string().uuid().optional(),
+	encounterId: z.string().uuid().optional(),
+	patientId: z.string().uuid().optional(),
+	age: z.coerce.number().int().min(0).max(150).optional(),
+	gender: FaceScanGenderEnum.optional(),
+	smoking: z.boolean().optional(),
+})
+
+export const FaceScanPhoneSessionIdSchema = z.object({
+	id: z.string().uuid(),
+})
+
+export const FaceScanPhoneSessionTokenSchema = z.object({
+	token: z.string().min(32).max(128),
+})
+
+export const FaceScanPhoneSessionResponseSchema = z.object({
+	id: z.string().uuid(),
+	token: z.string().optional(),
+	status: FaceScanPhoneSessionStatusEnum,
+	expiresAt: z.string(),
+	completedAt: z.string().nullable(),
+	vitals: FaceScanPhoneVitalsSchema.nullable(),
+})
+
+export const FaceScanPhoneSessionPreviewSchema = z.object({
+	enabled: z.boolean(),
+	status: FaceScanPhoneSessionStatusEnum,
+	expiresAt: z.string(),
+	requiresAge: z.boolean(),
+	requiresGender: z.boolean(),
+	requiresSmoking: z.boolean(),
+})
+
+export const CreateFaceScanPhoneTokenSchema = FaceScanPhoneSessionTokenSchema.extend({
+	clientId: z.string().uuid(),
+	age: z.coerce.number().int().min(0).max(150).optional(),
+	gender: FaceScanGenderEnum.optional(),
+	smoking: z.boolean().optional(),
+	heightCm: z.coerce.number().min(50).max(300).optional(),
+	weightKg: z.coerce.number().min(10).max(500).optional(),
+})
+
+export const CompleteFaceScanPhoneSessionSchema = FaceScanPhoneSessionTokenSchema.extend({
+	vitals: FaceScanPhoneVitalsSchema,
+})
 
 // ============================================================================
 // MAR Entries
@@ -443,6 +535,8 @@ export const ConsentRecordIdSchema = z.object({ id: z.string().uuid() })
 
 export type VitalSign = z.infer<typeof VitalSignSchema>
 export type CreateVitalSign = z.infer<typeof CreateVitalSignSchema>
+export type FaceScanPhoneVitals = z.infer<typeof FaceScanPhoneVitalsSchema>
+export type FaceScanPhoneSessionResponse = z.infer<typeof FaceScanPhoneSessionResponseSchema>
 export type MarEntry = z.infer<typeof MarEntrySchema>
 export type AdministerMar = z.infer<typeof AdministerMarSchema>
 export type TarEntry = z.infer<typeof TarEntrySchema>

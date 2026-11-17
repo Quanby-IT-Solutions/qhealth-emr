@@ -269,7 +269,9 @@ export function NbsScreeningForm({
 						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
 							Barcode
 						</p>
-						<p className="font-mono text-sm">{existing.specimenBarcode ?? "—"}</p>
+						<p className="truncate font-mono text-sm" title={existing.specimenBarcode ?? undefined}>
+							{existing.specimenBarcode ?? "—"}
+						</p>
 					</div>
 					<div>
 						<p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
@@ -374,6 +376,8 @@ export function NbsScreeningForm({
 									id="specimenBarcode"
 									placeholder="Scan or type barcode"
 									value={specimenBarcode}
+									className="font-mono"
+									autoComplete="off"
 									onChange={e => setSpecimenBarcode(e.target.value)}
 								/>
 							</div>
@@ -547,8 +551,8 @@ export function NbsScreeningForm({
 						</div>
 					)}
 
-					<div className="flex gap-2">
-						<Button type="submit" disabled={isPending}>
+					<div className="flex flex-col gap-2 sm:flex-row">
+						<Button className="h-10 w-full sm:w-auto" type="submit" disabled={isPending}>
 							{isPending ? "Saving…" : "Save"}
 						</Button>
 					</div>

@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/core/components/ui/t
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { PacsLink } from "@/features/orders/components/pacs-link"
 import { RadiologyReport } from "@/features/orders/components/radiology-report"
+import { formatImagingModalityLabel } from "@/features/orders/lib/imaging-modality"
 import {
 	useImagingDashboardQuery,
 	type ImagingDashboardOrder,
@@ -146,7 +147,7 @@ function ImagingOrderRow({
 				<TableCell className="text-muted-foreground text-xs">
 					{order.encounterId ? `${order.encounterId.slice(0, 8)}…` : "—"}
 				</TableCell>
-				<TableCell className="font-medium uppercase">{order.modality}</TableCell>
+				<TableCell className="font-medium">{formatImagingModalityLabel(order.modality)}</TableCell>
 				<TableCell>{order.bodyPart}</TableCell>
 				<TableCell>
 					<div className="max-w-[220px]">

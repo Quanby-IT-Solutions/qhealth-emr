@@ -8,6 +8,7 @@ import {
 	AppointmentSchema,
 	AvailableSlotsQuerySchema,
 	AvailableSlotsResponseSchema,
+	CallNextQueuePatientSchema,
 	CheckInAppointmentSchema,
 	CheckInResponseSchema,
 	ClinicQueueQuerySchema,
@@ -163,9 +164,19 @@ export const schedulingContract = {
 		.route({
 			method: "PUT",
 			path: "/encounters/{id}/queue-status",
-			summary: "Update walk-in OPD encounter queue status (waiting→in_progress→completed)",
+			summary: "Update OPD encounter queue status (waiting→in_progress→completed/no_show)",
 			tags: ["Scheduling"],
 		})
 		.input(UpdateEncounterQueueStatusSchema)
+		.output(UpdateEncounterQueueStatusResponseSchema),
+
+	callNextQueuePatient: oc
+		.route({
+			method: "POST",
+			path: "/queue/call-next",
+			summary: "Atomically claim the next waiting OPD queue patient for the current coordinator",
+			tags: ["Scheduling"],
+		})
+		.input(CallNextQueuePatientSchema)
 		.output(UpdateEncounterQueueStatusResponseSchema),
 }

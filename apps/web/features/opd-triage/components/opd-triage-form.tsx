@@ -10,6 +10,8 @@ import { Label } from "@/core/components/ui/label"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useActiveFacilityId } from "@/core/hooks/use-active-facility"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { FaceScanVitalsButton } from "@/features/face-scan/components/face-scan-vitals-button"
+import { toOpdTriageFields } from "@/features/face-scan/lib/face-scan-vitals"
 import { useCreateOpdTriageMutation } from "@/features/opd-triage/api/opd-triage.hooks"
 
 interface OpdTriageFormProps {
@@ -38,6 +40,20 @@ export function OpdTriageForm({ patientId }: OpdTriageFormProps) {
 	})
 
 	const update = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }))
+
+	function applyFaceScanVitals(vitals: Parameters<typeof toOpdTriageFields>[0]) {
+		const mapped = toOpdTriageFields(vitals)
+		setForm(prev => ({
+			...prev,
+			...(mapped.systolicBp ? { systolicBp: mapped.systolicBp } : {}),
+			...(mapped.diastolicBp ? { diastolicBp: mapped.diastolicBp } : {}),
+			...(mapped.heartRateBpm ? { heartRateBpm: mapped.heartRateBpm } : {}),
+			...(mapped.respiratoryRate ? { respiratoryRate: mapped.respiratoryRate } : {}),
+			...(mapped.oxygenSatPct ? { oxygenSatPct: mapped.oxygenSatPct } : {}),
+			...(mapped.heightCm ? { heightCm: mapped.heightCm } : {}),
+			...(mapped.weightKg ? { weightKg: mapped.weightKg } : {}),
+		}))
+	}
 
 	const parseOptionalInt = (v: string) => (v.trim() !== "" ? parseInt(v, 10) : undefined)
 	const parseOptionalFloat = (v: string) => (v.trim() !== "" ? parseFloat(v) : undefined)
@@ -104,8 +120,13 @@ export function OpdTriageForm({ patientId }: OpdTriageFormProps) {
 			</Card>
 
 			<Card>
-				<CardHeader>
+				<CardHeader className="flex flex-row items-center justify-between space-y-0">
 					<CardTitle>Vital Signs</CardTitle>
+					<FaceScanVitalsButton
+						facilityId={facilityId ?? undefined}
+						patientId={patientId}
+						onComplete={applyFaceScanVitals}
+					/>
 				</CardHeader>
 				<CardContent className="grid grid-cols-2 gap-4">
 					<div className="space-y-1">

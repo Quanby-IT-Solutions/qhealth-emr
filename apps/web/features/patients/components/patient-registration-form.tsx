@@ -32,6 +32,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/core/components/ui/card"
+import { DatePicker } from "@/core/components/ui/date-picker"
 import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import {
@@ -52,8 +53,10 @@ import {
 } from "@/features/patients/api/patients.hooks"
 import { PatientRegistrationShell } from "@/features/patients/components/patient-registration-shell"
 
+const DATE_OF_BIRTH_END_YEAR = new Date().getFullYear()
+
 interface PatientRegistrationFormProps {
-	mode?: "standalone" | "triage-linked"
+	mode?: "standalone" | "triage-linked" | "opd-direct"
 	onBack?: () => void
 }
 
@@ -147,6 +150,7 @@ export function PatientRegistrationForm({
 	const searchParams = useSearchParams()
 	const pendingTriageId = searchParams.get("pendingTriageId") ?? ""
 	const isStandaloneRegistration = mode === "standalone"
+	const isDirectOpdRegistration = mode === "opd-direct"
 	const backToSearchHref = buildBackToSearchHref({ pendingTriageId })
 	const fieldClassName = "h-11 rounded-xl border-border/60 bg-background"
 	const primaryButtonClassName = "bg-foreground text-background hover:bg-foreground/90"
@@ -197,6 +201,34 @@ export function PatientRegistrationForm({
 		nextOfKinName: "",
 		nextOfKinRelationship: "",
 	})
+
+	const resetForm = () => {
+		setErrors({})
+		setClinicianStaffId("")
+		setCreatedPatientResult(null)
+		setRegQueueResult(null)
+		createPatient.reset()
+		registerPatient.reset()
+		setForm({
+			firstName: "",
+			lastName: "",
+			middleName: "",
+			dateOfBirth: "",
+			sex: "",
+			addressLine1: "",
+			addressLine2: "",
+			city: "",
+			province: "",
+			zipCode: "",
+			phone: "",
+			email: "",
+			philhealthMemberId: "",
+			emergencyContactName: "",
+			emergencyContactPhone: "",
+			nextOfKinName: "",
+			nextOfKinRelationship: "",
+		})
+	}
 
 	const { data: cliniciansData } = useListCliniciansQuery(facilityId ?? undefined)
 	const clinicianOptions = cliniciansData?.data ?? []
@@ -253,12 +285,12 @@ export function PatientRegistrationForm({
 			return
 		}
 
-		if (!clinicianStaffId) return
+		if (!isDirectOpdRegistration && !clinicianStaffId) return
 
 		const reg = await registerPatient.mutateAsync({
 			...result.data,
 			admittingStaffId: staffId || undefined,
-			clinicianStaffId,
+			clinicianStaffId: clinicianStaffId || undefined,
 			pendingTriageId: pendingTriageId || undefined,
 		})
 
@@ -373,7 +405,7 @@ export function PatientRegistrationForm({
 		)
 	}
 
-	if (!isStandaloneRegistration && !pendingTriageId) {
+	if (!isStandaloneRegistration && !isDirectOpdRegistration && !pendingTriageId) {
 		return (
 			<PatientRegistrationShell
 				step="register"
@@ -445,7 +477,13 @@ export function PatientRegistrationForm({
 							<Button
 								variant="outline"
 								className="border-border/60 bg-background"
-								onClick={() => (onBack ? onBack() : router.push("/patients/register"))}
+								onClick={() =>
+									isDirectOpdRegistration
+										? resetForm()
+										: onBack
+											? onBack()
+											: router.push("/patients/register")
+								}
 							>
 								Register another
 							</Button>
@@ -453,11 +491,13 @@ export function PatientRegistrationForm({
 								className={primaryButtonClassName}
 								onClick={() =>
 									router.push(
-										`/patients/${regQueueResult.patientId}/encounters/${regQueueResult.encounterId}`
+										isDirectOpdRegistration
+											? `/scheduling/queue?encounterId=${encodeURIComponent(regQueueResult.encounterId)}`
+											: `/patients/${regQueueResult.patientId}/encounters/${regQueueResult.encounterId}`
 									)
 								}
 							>
-								View encounter
+								{isDirectOpdRegistration ? "Open OPD queue" : "View encounter"}
 							</Button>
 						</div>
 					</CardContent>
@@ -473,7 +513,9 @@ export function PatientRegistrationForm({
 			subtitle={
 				isStandaloneRegistration
 					? "Enter the patient details exactly as provided. The chart will be created and an MRN will be assigned immediately after saving."
-					: "Complete the registration details below. The triage intake will be linked automatically and the patient will be queued under the selected clinician."
+					: isDirectOpdRegistration
+						? "Enter the patient details exactly as provided. The chart will be created, an MRN assigned, and the patient placed in the OPD queue."
+						: "Complete the registration details below. The triage intake will be linked automatically and the patient will be queued under the selected clinician."
 			}
 			notice={
 				!isStandaloneRegistration && pendingTriageId ? (
@@ -556,13 +598,14 @@ export function PatientRegistrationForm({
 									required
 									error={errors.dateOfBirth}
 								>
-									<Input
+									<DatePicker
 										id="dateOfBirth"
-										type="date"
 										required
 										value={form.dateOfBirth}
 										className={cn(fieldClassName, errors.dateOfBirth && "border-destructive")}
-										onChange={e => update("dateOfBirth", e.target.value)}
+										aria-invalid={Boolean(errors.dateOfBirth)}
+										onChange={value => update("dateOfBirth", value)}
+										endYear={DATE_OF_BIRTH_END_YEAR}
 									/>
 								</FormField>
 
@@ -733,7 +776,7 @@ export function PatientRegistrationForm({
 							</div>
 						</FormSection>
 
-						{!isStandaloneRegistration && (
+						{!isStandaloneRegistration && !isDirectOpdRegistration && (
 							<>
 								<Separator className="bg-border/60" />
 
@@ -788,7 +831,7 @@ export function PatientRegistrationForm({
 								onClick={() => (onBack ? onBack() : router.push(backToSearchHref))}
 							>
 								<ArrowLeft className="size-4" />
-								Back to search
+								{isDirectOpdRegistration ? "Cancel" : "Back to search"}
 							</Button>
 
 							<Button
@@ -798,7 +841,7 @@ export function PatientRegistrationForm({
 									!facilityId ||
 									(isStandaloneRegistration
 										? createPatient.isPending
-										: registerPatient.isPending || !clinicianStaffId)
+										: registerPatient.isPending || (!isDirectOpdRegistration && !clinicianStaffId))
 								}
 							>
 								<BadgeCheck className="size-4" />

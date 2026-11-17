@@ -54,9 +54,13 @@ interface VitalSign {
 	heartRate: number | null
 	respiratoryRate: number | null
 	spo2: string | null
-	painScore: number | null
+	spo2Scale: "scale1" | "scale2"
+	oxygenTherapy: boolean
+	oxygenDeliveryDevice: string | null
+	oxygenFlowRate: string | null
 	weight: string | null
 	height: string | null
+	consciousnessLevel: "A" | "C" | "V" | "P" | "U"
 	newsScore: number | null
 	newsRiskLevel: "low" | "medium" | "high" | null
 	recordedByStaffId: string
@@ -239,9 +243,13 @@ interface CreateVitalInput {
 	heartRate?: number
 	respiratoryRate?: number
 	spo2?: number
-	painScore?: number
+	spo2Scale?: "scale1" | "scale2"
+	oxygenTherapy?: boolean
+	oxygenDeliveryDevice?: string
+	oxygenFlowRate?: number
 	weight?: number
 	height?: number
+	consciousnessLevel?: "A" | "C" | "V" | "P" | "U"
 }
 
 export function useCreateVitalMutation() {
@@ -249,6 +257,7 @@ export function useCreateVitalMutation() {
 		endpoint: `${API_BASE}/vitals`,
 		method: "POST",
 		recordType: "vital_sign",
+		invalidateKeys: [["nursing"], ["clinical-docs"]],
 		describe: d => {
 			const parts: string[] = []
 			if (d.bpSystolic && d.bpDiastolic) parts.push(`BP ${d.bpSystolic}/${d.bpDiastolic}`)
@@ -637,6 +646,7 @@ export function useUpdateHaiTagMutation() {
 interface NewsScoreInput {
 	respiratoryRate: number
 	spo2: number
+	spo2Scale?: "scale1" | "scale2"
 	isOnSupplementalOxygen: boolean
 	temperature: number
 	bpSystolic: number
@@ -667,7 +677,7 @@ interface NewsScoreResult {
 export function calculateNewsScore(input: NewsScoreInput): NewsScoreResult {
 	const scores = {
 		respiratoryRate: getRespiratoryRateScore(input.respiratoryRate),
-		spo2: getSpo2Score(input.spo2),
+		spo2: getSpo2Score(input.spo2, input.spo2Scale, input.isOnSupplementalOxygen),
 		supplementalOxygen: input.isOnSupplementalOxygen ? 2 : 0,
 		temperature: getTempScore(input.temperature),
 		systolicBp: getSystolicBpScore(input.bpSystolic),
@@ -715,7 +725,22 @@ function getRespiratoryRateScore(rr: number): number {
 	return 3
 }
 
-function getSpo2Score(spo2: number): number {
+function getSpo2Score(
+	spo2: number,
+	spo2Scale: "scale1" | "scale2" = "scale1",
+	isOnSupplementalOxygen = false
+): number {
+	if (spo2Scale === "scale2") {
+		if (spo2 <= 83) return 3
+		if (spo2 <= 85) return 2
+		if (spo2 <= 87) return 1
+		if (spo2 <= 92) return 0
+		if (!isOnSupplementalOxygen) return 0
+		if (spo2 <= 94) return 1
+		if (spo2 <= 96) return 2
+		return 3
+	}
+
 	if (spo2 <= 91) return 3
 	if (spo2 <= 93) return 2
 	if (spo2 <= 95) return 1

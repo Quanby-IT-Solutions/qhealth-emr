@@ -52,18 +52,19 @@ describe("CreateProblemSchema", () => {
 		expect(result.success).toBe(true)
 	})
 
-	it("rejects when both icd10Code and snomedCode are absent", () => {
+	it("accepts a text-only custom diagnosis when codes are absent", () => {
 		const result = CreateProblemSchema.safeParse({
 			facilityId: FACILITY_ID,
 			patientId: PATIENT_ID,
 			description: "Some problem description",
 		})
 
-		expect(result.success).toBe(false)
-		expect(result.error?.issues[0]?.path).toEqual(["icd10Code"])
-		expect(result.error?.issues[0]?.message).toContain(
-			"At least one of ICD-10 or SNOMED CT code is required."
-		)
+		expect(result.success).toBe(true)
+		if (result.success) {
+			expect(result.data.icd10Code).toBeUndefined()
+			expect(result.data.snomedCode).toBeUndefined()
+			expect(result.data.status).toBe("active")
+		}
 	})
 
 	it("rejects an empty description", () => {

@@ -21,6 +21,7 @@ import {
 	DispenseLogListSchema,
 	DispenseLogSchema,
 	DispenseOrderInputSchema,
+	GenerateOrderAccessTokenSchema,
 	GetHighAlertVerificationSchema,
 	HighAlertVerificationSchema,
 	ImagingOrderIdSchema,
@@ -43,6 +44,7 @@ import {
 	OpdPrescriptionListResponseSchema,
 	OpdPrescriptionSchema,
 	OpdPrescriptionSearchSchema,
+	OrderAccessTokenResponseSchema,
 	ParentOrderIdSchema,
 	PdeaLicenseCheckSchema,
 	PdeaLicenseStatusSchema,
@@ -50,6 +52,7 @@ import {
 	PrescriptionListResponseSchema,
 	PrescriptionListSchema,
 	PrescriptionSchema,
+	PublicOrderAccessDocumentSchema,
 	SaveCounselingLogInputSchema,
 	SendPrescriptionSchema,
 	SignImagingReportSchema,
@@ -63,6 +66,7 @@ import {
 	VerificationQueueResponseSchema,
 	VerificationQueueSchema,
 	VerificationSchema,
+	VerifyOrderAccessTokenSchema,
 	VerifyOrderSchema,
 } from "./orders.schema.js"
 
@@ -332,6 +336,30 @@ export const ordersContract = {
 		})
 		.input(SendPrescriptionSchema)
 		.output(PrescriptionSchema),
+
+	// ========================================================================
+	// Patient QR Access
+	// ========================================================================
+
+	generateOrderAccessToken: oc
+		.route({
+			method: "POST",
+			path: "/patient-access",
+			summary: "Generate a patient QR access link for an order document",
+			tags: ["Orders — Patient Access"],
+		})
+		.input(GenerateOrderAccessTokenSchema)
+		.output(OrderAccessTokenResponseSchema),
+
+	verifyOrderAccessToken: oc
+		.route({
+			method: "POST",
+			path: "/patient-access/{token}/verify",
+			summary: "Verify patient demographics before revealing an order document",
+			tags: ["Orders — Patient Access"],
+		})
+		.input(VerifyOrderAccessTokenSchema)
+		.output(PublicOrderAccessDocumentSchema),
 
 	// ========================================================================
 	// Active Orders (cross-module)

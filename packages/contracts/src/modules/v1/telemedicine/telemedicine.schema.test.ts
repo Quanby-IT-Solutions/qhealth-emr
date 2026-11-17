@@ -106,7 +106,7 @@ describe("telemedicine appointment schema", () => {
 				scheduledTime: "10:00:00",
 				durationMinutes: 30,
 				clinicianName: "Dr. Reyes",
-				facilityName: "QHealth General Hospital",
+				facilityName: "JuanMeds General Hospital",
 				joinWindowStartsAt: "2026-05-19T01:30:00.000Z",
 				joinWindowEndsAt: "2026-05-19T04:30:00.000Z",
 			}).success
@@ -192,7 +192,7 @@ describe("telemedicine e-prescription schema", () => {
 			clinicianPrcNumber: "PRC-100001",
 			clinicianPtrNumber: "PTR-100001",
 			clinicianSignature: "Dr. Reyes",
-			facilityName: "QHealth General Hospital",
+			facilityName: "JuanMeds General Hospital",
 			facilityAddress: "Manila",
 			prescriptionDate: "2026-05-18",
 			validUntil: "2026-06-17",

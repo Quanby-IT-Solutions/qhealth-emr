@@ -425,7 +425,7 @@ export default function ProcedureLoggingPage() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-start justify-between">
+			<div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
 				<div>
 					<h1 className="text-2xl font-semibold">Ancillary Procedure Logging</h1>
 					<p className="text-muted-foreground text-sm">
@@ -433,13 +433,17 @@ export default function ProcedureLoggingPage() {
 						tracking.
 					</p>
 				</div>
-				<div className="flex items-center gap-3">
-					<Button variant="outline" onClick={() => openScanModal()}>
+				<div className="flex w-full items-center gap-3 sm:w-auto">
+					<Button
+						className="h-10 w-full sm:w-auto"
+						variant="outline"
+						onClick={() => openScanModal()}
+					>
 						<Scan className="mr-2 size-4" />
 						Open scan modal
 					</Button>
 					<Dialog open={scanModalOpen} onOpenChange={setScanModalOpen}>
-						<DialogContent className="max-w-md">
+						<DialogContent className="max-h-[calc(100svh-1rem)] w-[calc(100vw-1rem)] max-w-none overflow-y-auto sm:max-w-lg">
 							<DialogHeader>
 								<DialogTitle>Patient Barcode Scan</DialogTitle>
 							</DialogHeader>
@@ -468,7 +472,7 @@ export default function ProcedureLoggingPage() {
 													<Badge variant="outline">Not Recorded</Badge>
 												)}
 											</div>
-											<div className="grid grid-cols-2 gap-3 text-xs">
+											<div className="grid gap-3 text-xs sm:grid-cols-2">
 												<div>
 													<div className="text-muted-foreground">Clearance ID</div>
 													<div className="truncate font-mono">
@@ -560,7 +564,7 @@ export default function ProcedureLoggingPage() {
 									</Button>
 								)}
 
-								<div className="flex items-center justify-between gap-3">
+								<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 									<div className="flex items-center gap-2">
 										<Checkbox
 											id="mark-end"
@@ -573,7 +577,7 @@ export default function ProcedureLoggingPage() {
 										</label>
 									</div>
 									<Button
-										className="min-w-32 bg-green-600 text-white hover:bg-green-500"
+										className="h-10 w-full min-w-32 bg-green-600 text-white hover:bg-green-500 sm:w-auto"
 										size="sm"
 										type="submit"
 										disabled={!canSubmitScan}
@@ -608,7 +612,7 @@ export default function ProcedureLoggingPage() {
 				</div>
 			</div>
 
-			<div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 				<Card>
 					<CardContent>
 						<div className="text-muted-foreground text-xs">IN PROGRESS</div>
@@ -643,7 +647,7 @@ export default function ProcedureLoggingPage() {
 					<CardTitle className="text-base">Procedure log</CardTitle>
 				</CardHeader>
 				<CardContent>
-					<Table>
+					<Table className="min-w-[920px]">
 						<TableHeader>
 							<TableRow>
 								<TableHead>Clearance ID</TableHead>

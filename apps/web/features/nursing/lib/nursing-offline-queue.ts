@@ -8,7 +8,7 @@
  * the nurse can review both versions before proceeding.
  */
 
-const DB_NAME = "qhealth_nursing_offline"
+const DB_NAME = "juanmeds_nursing_offline"
 const DB_VERSION = 1
 const QUEUE_STORE = "queue"
 const CONFLICT_STORE = "conflicts"

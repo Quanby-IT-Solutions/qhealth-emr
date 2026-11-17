@@ -32,8 +32,10 @@ export function UserMenu() {
 					<DropdownMenuTrigger
 						render={<SidebarMenuButton size="lg" tooltip={user?.name ?? "Account"} />}
 					>
-						<Avatar className="size-6">
-							<AvatarFallback className="text-xs">{initials}</AvatarFallback>
+						<Avatar className="ring-accent/25 size-6 ring-1">
+							<AvatarFallback className="bg-primary/10 text-primary text-xs">
+								{initials}
+							</AvatarFallback>
 						</Avatar>
 						<div className="flex flex-col text-left leading-tight">
 							<span className="truncate text-sm font-medium">{user?.name ?? "User"}</span>

@@ -136,7 +136,7 @@ describe("schema callback coverage", () => {
 			clinicianStaffId: OTHER_ID,
 		}
 
-		expect(RegisterPatientWithOpdEncounterInputSchema.safeParse(registration).success).toBe(false)
+		expect(RegisterPatientWithOpdEncounterInputSchema.safeParse(registration).success).toBe(true)
 		expect(
 			RegisterPatientWithOpdEncounterInputSchema.safeParse({
 				...registration,
@@ -184,7 +184,7 @@ describe("schema callback coverage", () => {
 		for (const timestamp of [ISO_TIMESTAMP, DATE_TIMESTAMP]) {
 			const facility = FacilitySchema.parse({
 				id: ID,
-				name: "QHealth General Hospital",
+				name: "JuanMeds General Hospital",
 				facilityType: "tertiary",
 				address: null,
 				dohLicenseNumber: null,

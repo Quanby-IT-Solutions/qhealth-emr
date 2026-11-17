@@ -6,6 +6,7 @@ import {
 	NotFoundException,
 	UnauthorizedException,
 } from "@nestjs/common"
+import { createHash, randomBytes } from "node:crypto"
 import { and, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 
 import {
@@ -18,6 +19,7 @@ import {
 	drugGenerics,
 	encounters,
 	encounterStatusEvents,
+	facilities,
 	formularyItems,
 	highAlertVerifications,
 	icd10Codes,
@@ -26,6 +28,7 @@ import {
 	loincCodes,
 	marEntries,
 	medicationOrders,
+	orderAccessTokens,
 	orderVerifications,
 	patients,
 	preEncounters,
@@ -60,6 +63,8 @@ type CreateHighAlertVerificationInput = V1Inputs["orders"]["createHighAlertVerif
 type PrescriptionListInput = V1Inputs["orders"]["listPrescriptions"]
 type CreatePrescriptionInput = V1Inputs["orders"]["createPrescription"]
 type SendPrescriptionInput = V1Inputs["orders"]["sendPrescription"]
+type GenerateOrderAccessTokenInput = V1Inputs["orders"]["generateOrderAccessToken"]
+type VerifyOrderAccessTokenInput = V1Inputs["orders"]["verifyOrderAccessToken"]
 type ActiveOrdersInput = V1Inputs["orders"]["getActiveOrders"]
 type PdeaLicenseCheckInput = V1Inputs["orders"]["checkPdeaLicense"]
 type TranchePreviewInput = V1Inputs["orders"]["previewTranches"]
@@ -75,6 +80,25 @@ type CounselingLogListInput = V1Inputs["orders"]["listCounselingLogs"]
 
 const PDEA_TRANCHE_DAYS = 30
 const PDEA_MAX_CONTROLLED_DAYS = 90
+const ORDER_ACCESS_TOKEN_DAYS = 30
+
+const IMAGING_MODALITY_LABELS: Record<string, string> = {
+	xray: "X-Ray / Radiography",
+	ct: "CT Scan",
+	mri: "MRI",
+	ultrasound: "Ultrasound",
+	mammography: "Mammography",
+	fluoroscopy: "Fluoroscopy",
+	nuclear_medicine: "Nuclear Medicine",
+	pet_ct: "PET / PET-CT",
+	dexa: "DEXA / Bone Density",
+	interventional_radiology: "Interventional Radiology",
+	other: "Other",
+}
+
+function formatImagingModalityLabel(modality: string) {
+	return IMAGING_MODALITY_LABELS[modality] ?? modality.replaceAll("_", " ")
+}
 
 @Injectable()
 export class OrdersService {
@@ -89,6 +113,10 @@ export class OrdersService {
 			.replace(/[^a-z0-9]+/g, " ")
 			.replace(/\s+/g, " ")
 			.trim()
+	}
+
+	private sanitizeDrugDisplayName(value: string) {
+		return value.trim().replace(/\s+/g, " ")
 	}
 
 	private allergyClassRules = [
@@ -164,7 +192,7 @@ export class OrdersService {
 		formularyItemId?: string
 		genericName: string
 	}) {
-		const requestedGenericName = input.genericName.trim()
+		const requestedGenericName = this.sanitizeDrugDisplayName(input.genericName)
 
 		if (input.formularyItemId) {
 			const [formularySelection] = await db
@@ -234,9 +262,7 @@ export class OrdersService {
 			.limit(1)
 
 		if (!genericMatch) {
-			throw new BadRequestException(
-				"Select an active generic drug name from Drug Search before signing the medication order."
-			)
+			return requestedGenericName
 		}
 
 		return genericMatch.genericName
@@ -1241,7 +1267,7 @@ export class OrdersService {
 				pdeaTrancheNumber: input.pdeaTrancheNumber ?? null,
 				pdeaTrancheTotal: input.pdeaTrancheTotal ?? null,
 				noRefillInscribed: isControlledOrder,
-				status: "pending_verification",
+				status: "verified",
 				orderingStaffId: staff.id,
 				cdsAlerts: evaluatedCdsAlerts,
 				cdsOverrides: input.cdsOverrides ?? null,
@@ -1381,6 +1407,9 @@ export class OrdersService {
 					specimenType: labOrders.specimenType,
 					orderingStaffId: labOrders.orderingStaffId,
 					orderingStaffName: users.name,
+					orderingStaffPrcLicenseNumber: staffProfiles.prcLicenseNumber,
+					orderingStaffPtrNumber: staffProfiles.ptrNumber,
+					orderingStaffPdeaS2License: staffProfiles.pdeaS2License,
 					patientId: patients.id,
 					patientFirstName: patients.firstName,
 					patientLastName: patients.lastName,
@@ -1445,6 +1474,9 @@ export class OrdersService {
 				specimenType: labOrders.specimenType,
 				orderingStaffId: labOrders.orderingStaffId,
 				orderingStaffName: users.name,
+				orderingStaffPrcLicenseNumber: staffProfiles.prcLicenseNumber,
+				orderingStaffPtrNumber: staffProfiles.ptrNumber,
+				orderingStaffPdeaS2License: staffProfiles.pdeaS2License,
 				patientId: patients.id,
 				patientFirstName: patients.firstName,
 				patientLastName: patients.lastName,
@@ -1553,23 +1585,21 @@ export class OrdersService {
 		}
 
 		const loincCode = input.loincCode?.trim()
-		if (!loincCode) {
-			throw new BadRequestException("Select an active LOINC lab test before signing a lab order.")
-		}
+		if (loincCode) {
+			const [loincMatch] = await db
+				.select({ loincNum: loincCodes.loincNum })
+				.from(loincCodes)
+				.where(and(eq(loincCodes.loincNum, loincCode), eq(loincCodes.isActive, true)))
+				.limit(1)
 
-		const [loincMatch] = await db
-			.select({ loincNum: loincCodes.loincNum })
-			.from(loincCodes)
-			.where(and(eq(loincCodes.loincNum, loincCode), eq(loincCodes.isActive, true)))
-			.limit(1)
-
-		if (!loincMatch) {
-			throw new BadRequestException("Select an active LOINC lab test before signing a lab order.")
+			if (!loincMatch) {
+				throw new BadRequestException("Select an active LOINC lab test before signing a lab order.")
+			}
 		}
 
 		const icd10Code = input.indicationIcd10Code?.trim()
 		if (!icd10Code) {
-			throw new BadRequestException("ICD-10 indication is required before signing a lab order.")
+			return
 		}
 
 		const [icd10Match] = await db
@@ -1650,6 +1680,9 @@ export class OrdersService {
 					status: imagingOrders.status,
 					orderingStaffId: imagingOrders.orderingStaffId,
 					orderingStaffName: users.name,
+					orderingStaffPrcLicenseNumber: staffProfiles.prcLicenseNumber,
+					orderingStaffPtrNumber: staffProfiles.ptrNumber,
+					orderingStaffPdeaS2License: staffProfiles.pdeaS2License,
 					patientId: patients.id,
 					patientFirstName: patients.firstName,
 					patientLastName: patients.lastName,
@@ -1712,6 +1745,9 @@ export class OrdersService {
 				status: imagingOrders.status,
 				orderingStaffId: imagingOrders.orderingStaffId,
 				orderingStaffName: users.name,
+				orderingStaffPrcLicenseNumber: staffProfiles.prcLicenseNumber,
+				orderingStaffPtrNumber: staffProfiles.ptrNumber,
+				orderingStaffPdeaS2License: staffProfiles.pdeaS2License,
 				patientId: patients.id,
 				patientFirstName: patients.firstName,
 				patientLastName: patients.lastName,
@@ -1803,7 +1839,7 @@ export class OrdersService {
 				workflowType: "ancillary" as const,
 				staffId: staff.id,
 				slaTargetMinutes: slaMins,
-				notes: `Imaging order: ${input.modality} — ${input.bodyPart}`,
+				notes: `Imaging order: ${formatImagingModalityLabel(input.modality)} - ${input.bodyPart}`,
 				occurredAt: new Date(),
 			})
 		}
@@ -1821,9 +1857,7 @@ export class OrdersService {
 
 		const icd10Code = input.indicationIcd10Code?.trim()
 		if (!icd10Code) {
-			throw new BadRequestException(
-				"ICD-10 indication is required before signing an imaging order."
-			)
+			return
 		}
 
 		const [icd10Match] = await db
@@ -2597,6 +2631,253 @@ export class OrdersService {
 		return prescription
 	}
 
+	private generateOrderAccessTokenValue() {
+		return randomBytes(32).toString("base64url")
+	}
+
+	private hashOrderAccessToken(token: string) {
+		return createHash("sha256").update(token).digest("hex")
+	}
+
+	private buildOrderAccessUrl(
+		documentType: GenerateOrderAccessTokenInput["documentType"],
+		token: string
+	) {
+		const pathByType = {
+			prescription: "prescriptions",
+			lab_order: "lab-requests",
+			imaging_order: "imaging-requests",
+		} satisfies Record<GenerateOrderAccessTokenInput["documentType"], string>
+
+		return `/${pathByType[documentType]}/${token}`
+	}
+
+	private async resolveOrderAccessDocument(
+		documentType: GenerateOrderAccessTokenInput["documentType"],
+		documentId: string
+	) {
+		if (documentType === "prescription") {
+			const [row] = await db
+				.select({
+					id: prescriptions.id,
+					facilityId: prescriptions.facilityId,
+					patientId: prescriptions.patientId,
+					createdAt: prescriptions.createdAt,
+				})
+				.from(prescriptions)
+				.where(eq(prescriptions.id, documentId))
+				.limit(1)
+			return row
+		}
+
+		if (documentType === "lab_order") {
+			const [row] = await db
+				.select({
+					id: labOrders.id,
+					facilityId: labOrders.facilityId,
+					patientId: encounters.patientId,
+					createdAt: labOrders.createdAt,
+				})
+				.from(labOrders)
+				.leftJoin(encounters, eq(labOrders.encounterId, encounters.id))
+				.where(eq(labOrders.id, documentId))
+				.limit(1)
+			return row?.patientId ? row : undefined
+		}
+
+		const [row] = await db
+			.select({
+				id: imagingOrders.id,
+				facilityId: imagingOrders.facilityId,
+				patientId: encounters.patientId,
+				createdAt: imagingOrders.createdAt,
+			})
+			.from(imagingOrders)
+			.leftJoin(encounters, eq(imagingOrders.encounterId, encounters.id))
+			.where(eq(imagingOrders.id, documentId))
+			.limit(1)
+		return row?.patientId ? row : undefined
+	}
+
+	async generateOrderAccessToken(input: GenerateOrderAccessTokenInput, userId: string) {
+		const document = await this.resolveOrderAccessDocument(input.documentType, input.documentId)
+		if (!document) throw new NotFoundException("Order document not found")
+
+		const staff = await this.getOrderingStaffProfile(userId, document.facilityId)
+		const token = this.generateOrderAccessTokenValue()
+		const expiresAt = new Date()
+		expiresAt.setDate(expiresAt.getDate() + ORDER_ACCESS_TOKEN_DAYS)
+
+		await db.insert(orderAccessTokens).values({
+			documentType: input.documentType,
+			documentId: input.documentId,
+			patientId: document.patientId as string,
+			facilityId: document.facilityId,
+			tokenHash: this.hashOrderAccessToken(token),
+			expiresAt,
+			createdByStaffId: staff.id,
+		})
+
+		return {
+			documentType: input.documentType,
+			documentId: input.documentId,
+			token,
+			url: this.buildOrderAccessUrl(input.documentType, token),
+			expiresAt,
+		}
+	}
+
+	private normalizeAccessCheckValue(value: string) {
+		return value.trim().toLowerCase()
+	}
+
+	private normalizeDateOnly(value: string | Date | null | undefined) {
+		if (!value) return ""
+		if (value instanceof Date) return value.toISOString().slice(0, 10)
+		const parsed = new Date(value)
+		if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
+		return value.slice(0, 10)
+	}
+
+	private async getVerifiedOrderAccessToken(input: VerifyOrderAccessTokenInput) {
+		const [tokenRow] = await db
+			.select({
+				id: orderAccessTokens.id,
+				documentType: orderAccessTokens.documentType,
+				documentId: orderAccessTokens.documentId,
+				patientId: orderAccessTokens.patientId,
+				facilityId: orderAccessTokens.facilityId,
+				expiresAt: orderAccessTokens.expiresAt,
+				revokedAt: orderAccessTokens.revokedAt,
+				patientFirstName: patients.firstName,
+				patientLastName: patients.lastName,
+				patientMrn: patients.mrn,
+				patientDateOfBirth: patients.dateOfBirth,
+				patientSex: patients.sex,
+			})
+			.from(orderAccessTokens)
+			.innerJoin(patients, eq(orderAccessTokens.patientId, patients.id))
+			.where(eq(orderAccessTokens.tokenHash, this.hashOrderAccessToken(input.token)))
+			.limit(1)
+
+		if (!tokenRow || tokenRow.revokedAt || tokenRow.expiresAt.getTime() < Date.now()) {
+			throw new NotFoundException("This access link is invalid or expired.")
+		}
+
+		const lastNameMatches =
+			this.normalizeAccessCheckValue(tokenRow.patientLastName) ===
+			this.normalizeAccessCheckValue(input.lastName)
+		const dobMatches =
+			this.normalizeDateOnly(tokenRow.patientDateOfBirth) ===
+			this.normalizeDateOnly(input.dateOfBirth)
+
+		if (!lastNameMatches || !dobMatches) {
+			throw new UnauthorizedException("Patient verification failed.")
+		}
+
+		await db
+			.update(orderAccessTokens)
+			.set({ lastViewedAt: new Date() })
+			.where(eq(orderAccessTokens.id, tokenRow.id))
+
+		return tokenRow
+	}
+
+	async verifyOrderAccessToken(input: VerifyOrderAccessTokenInput) {
+		const tokenRow = await this.getVerifiedOrderAccessToken(input)
+
+		const base = {
+			documentType: tokenRow.documentType,
+			documentId: tokenRow.documentId,
+			patientName: `${tokenRow.patientLastName}, ${tokenRow.patientFirstName}`,
+			patientMrn: tokenRow.patientMrn,
+			patientDateOfBirth: tokenRow.patientDateOfBirth,
+			patientSex: tokenRow.patientSex,
+			expiresAt: tokenRow.expiresAt,
+		}
+
+		if (tokenRow.documentType === "prescription") {
+			const [row] = await db
+				.select({
+					facilityName: facilities.name,
+					createdAt: prescriptions.createdAt,
+					status: prescriptions.status,
+					signedAt: prescriptions.signedAt,
+					prescriberStaffName: users.name,
+					prcLicenseNumber: prescriptions.prcLicenseNumber,
+					ptrNumber: prescriptions.ptrNumber,
+					pdeaS2License: prescriptions.pdeaS2License,
+					prescriptionContent: prescriptions.prescriptionContent,
+				})
+				.from(prescriptions)
+				.leftJoin(facilities, eq(prescriptions.facilityId, facilities.id))
+				.leftJoin(staffProfiles, eq(prescriptions.prescriberStaffId, staffProfiles.id))
+				.leftJoin(users, eq(staffProfiles.userId, users.id))
+				.where(eq(prescriptions.id, tokenRow.documentId))
+				.limit(1)
+
+			if (!row) throw new NotFoundException("Prescription not found")
+			return { ...base, facilityName: row.facilityName, createdAt: row.createdAt, data: row }
+		}
+
+		if (tokenRow.documentType === "lab_order") {
+			const [row] = await db
+				.select({
+					facilityName: facilities.name,
+					createdAt: labOrders.createdAt,
+					testName: labOrders.testName,
+					panelName: labOrders.panelName,
+					loincCode: labOrders.loincCode,
+					priority: labOrders.priority,
+					status: labOrders.status,
+					specimenType: labOrders.specimenType,
+					clinicalIndication: labOrders.clinicalIndication,
+					indicationIcd10Code: labOrders.indicationIcd10Code,
+					indicationIcd10Display: labOrders.indicationIcd10Display,
+					orderingStaffName: users.name,
+					orderingStaffPrcLicenseNumber: staffProfiles.prcLicenseNumber,
+					orderingStaffPtrNumber: staffProfiles.ptrNumber,
+					orderingStaffPdeaS2License: staffProfiles.pdeaS2License,
+				})
+				.from(labOrders)
+				.leftJoin(facilities, eq(labOrders.facilityId, facilities.id))
+				.leftJoin(staffProfiles, eq(labOrders.orderingStaffId, staffProfiles.id))
+				.leftJoin(users, eq(staffProfiles.userId, users.id))
+				.where(eq(labOrders.id, tokenRow.documentId))
+				.limit(1)
+
+			if (!row) throw new NotFoundException("Lab order not found")
+			return { ...base, facilityName: row.facilityName, createdAt: row.createdAt, data: row }
+		}
+
+		const [row] = await db
+			.select({
+				facilityName: facilities.name,
+				createdAt: imagingOrders.createdAt,
+				modality: imagingOrders.modality,
+				bodyPart: imagingOrders.bodyPart,
+				priority: imagingOrders.priority,
+				status: imagingOrders.status,
+				scheduledDatetime: imagingOrders.scheduledDatetime,
+				clinicalIndication: imagingOrders.clinicalIndication,
+				indicationIcd10Code: imagingOrders.indicationIcd10Code,
+				indicationIcd10Display: imagingOrders.indicationIcd10Display,
+				orderingStaffName: users.name,
+				orderingStaffPrcLicenseNumber: staffProfiles.prcLicenseNumber,
+				orderingStaffPtrNumber: staffProfiles.ptrNumber,
+				orderingStaffPdeaS2License: staffProfiles.pdeaS2License,
+			})
+			.from(imagingOrders)
+			.leftJoin(facilities, eq(imagingOrders.facilityId, facilities.id))
+			.leftJoin(staffProfiles, eq(imagingOrders.orderingStaffId, staffProfiles.id))
+			.leftJoin(users, eq(staffProfiles.userId, users.id))
+			.where(eq(imagingOrders.id, tokenRow.documentId))
+			.limit(1)
+
+		if (!row) throw new NotFoundException("Imaging order not found")
+		return { ...base, facilityName: row.facilityName, createdAt: row.createdAt, data: row }
+	}
+
 	// ========================================================================
 	// Active Orders (cross-module)
 	// ========================================================================
@@ -2959,7 +3240,7 @@ export class OrdersService {
 				pdeaTrancheTotal: totalTranches,
 				noRefillInscribed: true,
 				parentOrderId: null,
-				status: "pending_verification",
+				status: "verified",
 				orderingStaffId: staff.id,
 				cdsAlerts: evaluatedCdsAlerts,
 				cdsOverrides: input.cdsOverrides ?? null,
@@ -3012,7 +3293,7 @@ export class OrdersService {
 					pdeaTrancheTotal: totalTranches,
 					noRefillInscribed: true,
 					parentOrderId: parentRow.id,
-					status: "pending_verification",
+					status: "verified",
 					orderingStaffId: staff.id,
 					cdsAlerts: buildTrancheCdsAlerts(tranche.startDate),
 					cdsOverrides: input.cdsOverrides ?? null,

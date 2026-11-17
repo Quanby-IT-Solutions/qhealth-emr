@@ -40,10 +40,17 @@
 		"studio": "pnpm build && drizzle-kit studio",
 		"generate": "pnpm build && drizzle-kit generate",
 		"migrate": "pnpm build && drizzle-kit migrate",
-		"seed:formulary": "tsx src/seed-formulary.ts"
+		"seed:formulary": "tsx src/seed-formulary.ts",
+		"seed:icd10-cm": "tsx src/seed-icd10-cm.ts",
+		"seed:icd10-cm:dry": "tsx src/seed-icd10-cm.ts --dry-run",
+		"seed:loinc": "tsx src/seed-loinc.ts",
+		"seed:loinc:dry": "tsx src/seed-loinc.ts --dry-run",
+		"seed:rxnorm-generics": "tsx src/seed-rxnorm-generics.ts",
+		"seed:rxnorm-generics:dry": "tsx src/seed-rxnorm-generics.ts --dry-run"
 	},
 	"dependencies": {
 		"drizzle-orm": "catalog:",
+		"fflate": "catalog:",
 		"pg": "catalog:"
 	},
 	"devDependencies": {

@@ -2,8 +2,12 @@
 
 import { AdminDashboard } from "@/features/admin/components/admin-dashboard"
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
+import { ClinicCoordinatorDashboard } from "@/features/app-shell/components/clinic-coordinator-dashboard"
 import { DashboardWidgets } from "@/features/app-shell/components/dashboard-widgets"
-import { getDashboardWidgetsForPermissions } from "@/features/app-shell/lib/navigation"
+import {
+	getDashboardWidgetsForPermissions,
+	isCoordinatorRole,
+} from "@/features/app-shell/lib/navigation"
 import { NurseRoleDashboard } from "@/features/nursing/components/nurse-role-dashboard"
 import { DietitianDashboard } from "@/features/nutrition/components/dietitian-dashboard"
 import { PharmacyDashboard } from "@/features/pharmacy/components/pharmacy-dashboard"
@@ -18,6 +22,7 @@ export default function DashboardPage() {
 		permissions.map((p: { module: string; action: string }) => `${p.module}:${p.action}`)
 	)
 	const widgetIds = getDashboardWidgetsForPermissions(permissions)
+	const canViewCoordinatorDashboard = isCoordinatorRole(profile?.activeRole?.name)
 	const canViewAdminDashboard = permSet.has("admin:view")
 	const canViewNursingDashboard = permSet.has("nursing:view") && !permSet.has("clinical_docs:sign")
 	const canViewPharmacyDashboard = permSet.has("orders:verify")
@@ -41,6 +46,10 @@ export default function DashboardPage() {
 				</div>
 			</div>
 		)
+	}
+
+	if (canViewCoordinatorDashboard) {
+		return <ClinicCoordinatorDashboard />
 	}
 
 	if (canViewAdminDashboard) {

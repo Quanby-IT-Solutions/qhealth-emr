@@ -7,84 +7,54 @@ import { Input } from "@/core/components/ui/input"
 import { Label } from "@/core/components/ui/label"
 import {
 	useIcd10ProblemSearchQuery,
-	useSnomedCtProblemSearchQuery,
 	type Icd10SearchResult,
-	type SnomedCtSearchResult,
 } from "@/features/problems-allergies/api/problems-allergies.hooks"
 
 export interface ProblemCodeValue {
 	icd10Code: string
 	icd10Display: string
-	snomedCode: string
-	snomedDisplay: string
 }
 
 interface ProblemCodeFieldsProps {
+	inputId: string
 	value: ProblemCodeValue
 	onChange: (value: ProblemCodeValue) => void
 	icd10Search: string
 	onIcd10SearchChange: (value: string) => void
-	snomedSearch: string
-	onSnomedSearchChange: (value: string) => void
 	onDescriptionSuggestion?: (description: string) => void
 	disabledIcd10Codes?: Set<string>
-	disabledSnomedCodes?: Set<string>
 }
 
 export function ProblemCodeFields({
+	inputId,
 	value,
 	onChange,
 	icd10Search,
 	onIcd10SearchChange,
-	snomedSearch,
-	onSnomedSearchChange,
 	onDescriptionSuggestion,
 	disabledIcd10Codes = new Set(),
-	disabledSnomedCodes = new Set(),
 }: ProblemCodeFieldsProps) {
 	const [icd10Open, setIcd10Open] = useState(false)
-	const [snomedOpen, setSnomedOpen] = useState(false)
 	const icd10Query = useIcd10ProblemSearchQuery({
 		search: icd10Search,
 		limit: 8,
 		includeEmptySearch: icd10Open,
 	})
-	const snomedQuery = useSnomedCtProblemSearchQuery({
-		search: snomedSearch,
-		limit: 8,
-		includeEmptySearch: snomedOpen,
-	})
 	const icd10Results = icd10Query.data?.data ?? []
-	const snomedResults = snomedQuery.data?.data ?? []
 	const canShowIcd10Results = icd10Open
-	const canShowSnomedResults = snomedOpen
 
 	function closeIcd10Search() {
 		setIcd10Open(false)
 		onIcd10SearchChange("")
 	}
 
-	function closeSnomedSearch() {
-		setSnomedOpen(false)
-		onSnomedSearchChange("")
-	}
-
 	function closeIcd10SearchAfterSelectionChance() {
 		window.setTimeout(closeIcd10Search, 100)
-	}
-
-	function closeSnomedSearchAfterSelectionChance() {
-		window.setTimeout(closeSnomedSearch, 100)
 	}
 
 	function clearIcd10() {
 		onChange({ ...value, icd10Code: "", icd10Display: "" })
 		onIcd10SearchChange("")
-	}
-
-	function clearSnomed() {
-		onChange({ ...value, snomedCode: "", snomedDisplay: "" })
-		onSnomedSearchChange("")
 	}
 
 	function selectIcd10(result: Icd10SearchResult) {
@@ -99,26 +69,14 @@ export function ProblemCodeFields({
 		setIcd10Open(false)
 	}
 
-	function selectSnomed(result: SnomedCtSearchResult) {
-		if (disabledSnomedCodes.has(result.conceptId)) return
-		onChange({
-			...value,
-			snomedCode: result.conceptId,
-			snomedDisplay: result.preferredTerm,
-		})
-		onDescriptionSuggestion?.(result.preferredTerm)
-		onSnomedSearchChange("")
-		setSnomedOpen(false)
-	}
-
 	return (
 		<div className="grid gap-4">
 			<div className="space-y-2">
 				<div className="flex items-end justify-between gap-3">
 					<div className="space-y-1">
-						<Label>ICD-10 Code</Label>
+						<Label htmlFor={inputId}>ICD-10 Code</Label>
 						<p className="text-muted-foreground text-xs">
-							Select one ICD-10 code for this problem.
+							Optional. Select one ICD-10 code when it matches the diagnosis.
 						</p>
 					</div>
 					{value.icd10Code && (
@@ -127,6 +85,7 @@ export function ProblemCodeFields({
 				</div>
 				<div className="relative">
 					<Input
+						id={inputId}
 						value={icd10Search}
 						onChange={event => {
 							onIcd10SearchChange(event.target.value)
@@ -183,7 +142,9 @@ export function ProblemCodeFields({
 									)
 								})
 							) : (
-								<div className="text-muted-foreground px-3 py-3">No ICD-10 matches</div>
+								<div className="text-muted-foreground px-3 py-3">
+									No ICD-10 matches. Save the diagnosis as text-only if needed.
+								</div>
 							)}
 						</div>
 					)}
@@ -200,100 +161,6 @@ export function ProblemCodeFields({
 							variant="ghost"
 							className="h-6 shrink-0 px-2 text-xs"
 							onClick={clearIcd10}
-						>
-							Clear
-						</Button>
-					</div>
-				)}
-			</div>
-
-			<div className="space-y-2">
-				<div className="flex items-end justify-between gap-3">
-					<div className="space-y-1">
-						<Label>SNOMED CT Code</Label>
-						<p className="text-muted-foreground text-xs">
-							Select one SNOMED CT concept for this problem.
-						</p>
-					</div>
-					{value.snomedCode && (
-						<span className="text-muted-foreground shrink-0 text-xs">Selected</span>
-					)}
-				</div>
-				<div className="relative">
-					<Input
-						value={snomedSearch}
-						onChange={event => {
-							onSnomedSearchChange(event.target.value)
-							setSnomedOpen(true)
-						}}
-						onFocus={() => setSnomedOpen(true)}
-						onBlur={closeSnomedSearchAfterSelectionChance}
-						onKeyDown={event => {
-							if (event.key === "Escape") closeSnomedSearch()
-							const firstSelectable = snomedResults.find(
-								result => !disabledSnomedCodes.has(result.conceptId)
-							)
-							if (event.key === "Enter" && firstSelectable) {
-								event.preventDefault()
-								selectSnomed(firstSelectable)
-							}
-						}}
-						placeholder={
-							value.snomedCode
-								? "Search to replace selected SNOMED CT"
-								: "Search SNOMED CT by code or term"
-						}
-						aria-label="Search SNOMED CT codes"
-						aria-expanded={canShowSnomedResults}
-						autoComplete="off"
-					/>
-					{canShowSnomedResults && (
-						<div className="bg-popover text-popover-foreground ring-foreground/10 absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border p-1 text-sm shadow-md ring-1">
-							{snomedQuery.isFetching ? (
-								<div className="text-muted-foreground px-3 py-3">Searching SNOMED CT...</div>
-							) : snomedResults.length ? (
-								snomedResults.map(result => {
-									const disabled = disabledSnomedCodes.has(result.conceptId)
-									return (
-										<button
-											key={result.id}
-											type="button"
-											disabled={disabled}
-											className="hover:bg-muted focus:bg-muted disabled:text-muted-foreground block w-full rounded-sm px-3 py-2 text-left outline-hidden disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-transparent"
-											onMouseDown={event => event.preventDefault()}
-											onClick={() => selectSnomed(result)}
-										>
-											<span className="flex items-center justify-between gap-2">
-												<span className="font-mono text-xs font-semibold">{result.conceptId}</span>
-												{disabled && <span className="text-xs">Already active</span>}
-											</span>
-											<span className="block">{result.preferredTerm}</span>
-											{result.semanticTag && (
-												<span className="text-muted-foreground block text-xs">
-													{result.semanticTag}
-												</span>
-											)}
-										</button>
-									)
-								})
-							) : (
-								<div className="text-muted-foreground px-3 py-3">No SNOMED CT matches</div>
-							)}
-						</div>
-					)}
-				</div>
-				{value.snomedCode && (
-					<div className="bg-primary/5 border-primary/20 flex items-start justify-between gap-3 rounded-md border px-3 py-2 text-sm">
-						<p className="min-w-0">
-							<span className="font-mono text-xs font-semibold">{value.snomedCode}</span>
-							<span className="text-muted-foreground"> - {value.snomedDisplay}</span>
-						</p>
-						<Button
-							type="button"
-							size="sm"
-							variant="ghost"
-							className="h-6 shrink-0 px-2 text-xs"
-							onClick={clearSnomed}
 						>
 							Clear
 						</Button>

@@ -18,6 +18,8 @@ import { Button } from "@/core/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card"
 import { Separator } from "@/core/components/ui/separator"
 import { useEncounterListQuery } from "@/features/encounters/api/encounters.hooks"
+import { FaceScanVitalsButton } from "@/features/face-scan/components/face-scan-vitals-button"
+import { toTelemedicineFields } from "@/features/face-scan/lib/face-scan-vitals"
 import { usePatientSummaryQuery } from "@/features/problems-allergies/api/problems-allergies.hooks"
 import {
 	useCreateEncounterMutation,
@@ -362,6 +364,13 @@ export function TelemedicineEncounterForm({
 		}
 	}
 
+	function applyFaceScanVitals(vitals: Parameters<typeof toTelemedicineFields>[0]) {
+		const mapped = toTelemedicineFields(vitals)
+		if (mapped.bloodPressure) patch("bloodPressure", mapped.bloodPressure)
+		if (mapped.heartRate) patch("heartRate", mapped.heartRate)
+		if (mapped.oxygenSaturation) patch("oxygenSaturation", mapped.oxygenSaturation)
+	}
+
 	function inputClass(field: FieldKey, extra = ""): string {
 		const base =
 			"border-input bg-background w-full rounded-md border px-3 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:outline-none"
@@ -578,11 +587,18 @@ export function TelemedicineEncounterForm({
 
 						{/* Vitals */}
 						<div className="space-y-2">
-							<div>
-								<label className="text-sm font-medium">Vital Signs</label>
-								<p className="text-muted-foreground text-xs">
-									Optional. Leave blank if not measured during the call.
-								</p>
+							<div className="flex items-start justify-between gap-2">
+								<div>
+									<label className="text-sm font-medium">Vital Signs</label>
+									<p className="text-muted-foreground text-xs">
+										Optional. Leave blank if not measured during the call.
+									</p>
+								</div>
+								<FaceScanVitalsButton
+									facilityId={facilityId}
+									patientId={patientId}
+									onComplete={applyFaceScanVitals}
+								/>
 							</div>
 							<div className="xs:grid-cols-2 grid grid-cols-1 gap-3 lg:grid-cols-5">
 								{[

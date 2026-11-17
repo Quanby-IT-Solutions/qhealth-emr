@@ -1,5 +1,15 @@
 import { Badge } from "@/core/components/ui/badge"
 
+export type AcvpuLevel = "A" | "C" | "V" | "P" | "U"
+
+export const ACVPU_OPTIONS: { level: AcvpuLevel; label: string }[] = [
+	{ level: "A", label: "Alert" },
+	{ level: "C", label: "New confusion" },
+	{ level: "V", label: "Voice response" },
+	{ level: "P", label: "Pain response" },
+	{ level: "U", label: "Unresponsive" },
+]
+
 interface NewsScoreBadgeProps {
 	score: number | null | undefined
 	riskLevel: "low" | "medium" | "high" | null | undefined
@@ -37,10 +47,12 @@ export function NewsScoreBadge({ score, riskLevel, showScore = true }: NewsScore
 export function computeNewsScore(params: {
 	respiratoryRate?: number | null
 	spo2?: number | null
+	spo2Scale?: "scale1" | "scale2" | null
+	oxygenTherapy?: boolean | null
 	temperature?: number | null
 	bpSystolic?: number | null
 	heartRate?: number | null
-	consciousnessAlert?: boolean
+	consciousnessLevel?: AcvpuLevel | null
 }): { score: number; riskLevel: "low" | "medium" | "high" } {
 	let total = 0
 
@@ -57,11 +69,25 @@ export function computeNewsScore(params: {
 	// SpO2
 	if (params.spo2 != null) {
 		const s = params.spo2
-		if (s <= 91) total += 3
-		else if (s <= 93) total += 2
-		else if (s <= 95) total += 1
-		else total += 0
+		if (params.spo2Scale === "scale2") {
+			if (s <= 83) total += 3
+			else if (s <= 85) total += 2
+			else if (s <= 87) total += 1
+			else if (s <= 92) total += 0
+			else if (params.oxygenTherapy) {
+				if (s <= 94) total += 1
+				else if (s <= 96) total += 2
+				else total += 3
+			}
+		} else {
+			if (s <= 91) total += 3
+			else if (s <= 93) total += 2
+			else if (s <= 95) total += 1
+			else total += 0
+		}
 	}
+
+	if (params.oxygenTherapy) total += 2
 
 	// Temperature
 	if (params.temperature != null) {
@@ -94,8 +120,8 @@ export function computeNewsScore(params: {
 		else total += 3
 	}
 
-	// Consciousness (AVPU: true = Alert = 0, false = any other = 3)
-	if (params.consciousnessAlert === false) {
+	// Consciousness (ACVPU: A = 0, C/V/P/U = 3)
+	if (params.consciousnessLevel != null && params.consciousnessLevel !== "A") {
 		total += 3
 	}
 

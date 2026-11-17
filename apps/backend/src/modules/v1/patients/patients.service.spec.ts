@@ -111,6 +111,19 @@ function createCountBuilder(result: unknown) {
 	}
 }
 
+function createReturningInsertBuilder(result: unknown) {
+	return {
+		values: jest.fn().mockReturnThis(),
+		returning: jest.fn().mockResolvedValue(result),
+	}
+}
+
+function createValuesInsertBuilder() {
+	return {
+		values: jest.fn().mockResolvedValue(undefined),
+	}
+}
+
 describe("PatientsService", () => {
 	let service: PatientsService
 	let mockDb: MockDb
@@ -191,5 +204,79 @@ describe("PatientsService", () => {
 		})
 
 		expect(result.data[0]?.dateOfBirth).toBe("1985-01-15")
+	})
+
+	it("registers a direct OPD walk-in as arrived and waiting without triage or clinician assignment", async () => {
+		const tx = {
+			select: jest.fn(() => createCountBuilder([{ maxQueue: 2 }])),
+			insert: jest
+				.fn()
+				.mockImplementationOnce(() =>
+					createReturningInsertBuilder([
+						{
+							id: "650e8400-e29b-41d4-a716-446655440001",
+						},
+					])
+				)
+				.mockImplementationOnce(() =>
+					createReturningInsertBuilder([
+						{
+							id: "650e8400-e29b-41d4-a716-446655440002",
+						},
+					])
+				),
+			update: jest.fn(),
+		}
+		const statusEventInsert = createValuesInsertBuilder()
+
+		mockDb.select.mockImplementationOnce(() => createCountBuilder([{ count: 0 }]))
+		mockDb.transaction.mockImplementation(async callback => callback(tx))
+		mockDb.insert.mockImplementation(() => statusEventInsert)
+
+		const result = await service.registerWithOpdEncounter({
+			facilityId: "550e8400-e29b-41d4-a716-446655440000",
+			firstName: "Ana",
+			lastName: "Santos",
+			dateOfBirth: "1980-01-01",
+			sex: "female",
+		})
+
+		expect(result).toMatchObject({
+			patientId: "650e8400-e29b-41d4-a716-446655440001",
+			mrn: expect.stringMatching(/^MRN-\d{8}-0001$/),
+			encounterId: "650e8400-e29b-41d4-a716-446655440002",
+			queueNumber: 3,
+			clinicianStaffId: null,
+		})
+		expect(tx.select).toHaveBeenCalledTimes(1)
+		expect(tx.update).not.toHaveBeenCalled()
+
+		const encounterInsertBuilder = (tx.insert as jest.Mock).mock.results[1]?.value
+		expect(encounterInsertBuilder.values).toHaveBeenCalledWith(
+			expect.objectContaining({
+				encounterType: "outpatient",
+				queueNumber: 3,
+				queueStatus: "waiting",
+				clinicianStaffId: null,
+			})
+		)
+		expect(statusEventInsert.values).toHaveBeenNthCalledWith(
+			1,
+			expect.objectContaining({
+				fromStatus: null,
+				toStatus: "arrived",
+				workflowType: "opd",
+				notes: "OPD arrival: registration completed",
+			})
+		)
+		expect(statusEventInsert.values).toHaveBeenNthCalledWith(
+			2,
+			expect.objectContaining({
+				fromStatus: "arrived",
+				toStatus: "waiting",
+				workflowType: "opd",
+				notes: "OPD registration: placed in waiting queue",
+			})
+		)
 	})
 })

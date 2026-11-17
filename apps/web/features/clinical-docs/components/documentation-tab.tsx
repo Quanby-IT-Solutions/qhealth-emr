@@ -65,6 +65,7 @@ export function DocumentationTab({
 					key={`fpe-${selectedTemplate.id ?? "default"}`}
 					encounterId={encounterId}
 					facilityId={facilityId}
+					patientId={patientId}
 					onBack={() => {
 						setSelectedTemplate(null)
 						setMode(editorBackMode)

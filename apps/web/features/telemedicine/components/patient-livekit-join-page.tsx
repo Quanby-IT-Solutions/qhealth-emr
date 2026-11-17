@@ -346,7 +346,7 @@ function PatientLiveKitConferenceShell({
 					key={`patient-livekit:${rejoinCount}`}
 					response={response}
 					choices={choices}
-					className="qhealth-livekit-room flex h-full min-h-0 flex-1 flex-col"
+					className="juanmeds-livekit-room flex h-full min-h-0 flex-1 flex-col"
 					onDisconnected={onDisconnected}
 					fullViewport
 				/>

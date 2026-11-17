@@ -12,6 +12,7 @@ const mockUsePrescriptionListQuery = vi.fn()
 const mockUseDiscontinueMedOrderMutation = vi.fn()
 const mockUseCreatePrescriptionMutation = vi.fn()
 const mockUseSignPrescriptionMutation = vi.fn()
+const mockUseGenerateOrderAccessTokenMutation = vi.fn()
 
 vi.mock("@/features/app-shell/api/rbac.hooks", () => ({
 	useMyProfile: (...args: unknown[]) => mockUseMyProfile(...args),
@@ -26,6 +27,8 @@ vi.mock("@/features/orders/api/orders.hooks", () => ({
 		mockUseDiscontinueMedOrderMutation(...args),
 	useCreatePrescriptionMutation: (...args: unknown[]) => mockUseCreatePrescriptionMutation(...args),
 	useSignPrescriptionMutation: (...args: unknown[]) => mockUseSignPrescriptionMutation(...args),
+	useGenerateOrderAccessTokenMutation: (...args: unknown[]) =>
+		mockUseGenerateOrderAccessTokenMutation(...args),
 }))
 
 vi.mock("./create-med-order-dialog", () => ({
@@ -135,6 +138,10 @@ describe("OrdersTab", () => {
 			isPending: false,
 		})
 		mockUseSignPrescriptionMutation.mockReturnValue({
+			mutate: vi.fn(),
+			isPending: false,
+		})
+		mockUseGenerateOrderAccessTokenMutation.mockReturnValue({
 			mutate: vi.fn(),
 			isPending: false,
 		})

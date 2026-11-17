@@ -14,6 +14,8 @@ import {
 } from "@/core/components/ui/select"
 import { Textarea } from "@/core/components/ui/textarea"
 import { useCreatePreEncounterMutation } from "@/features/ed/api/ed.hooks"
+import { FaceScanVitalsButton } from "@/features/face-scan/components/face-scan-vitals-button"
+import { toEdTriageFields } from "@/features/face-scan/lib/face-scan-vitals"
 
 type AcuityScale = "esi" | "ats" | "ctas"
 
@@ -111,6 +113,17 @@ export function TriageForm({ facilityId, triageStaffId, onSuccess }: TriageFormP
 		setVitals(current => ({ ...current, [field]: value }))
 	}
 
+	function applyFaceScanVitals(vitals: Parameters<typeof toEdTriageFields>[0]) {
+		const mapped = toEdTriageFields(vitals)
+		if (mapped.bpSystolic) updateVital("bpSystolic", mapped.bpSystolic)
+		if (mapped.bpDiastolic) updateVital("bpDiastolic", mapped.bpDiastolic)
+		if (mapped.heartRate) updateVital("heartRate", mapped.heartRate)
+		if (mapped.respiratoryRate) updateVital("respiratoryRate", mapped.respiratoryRate)
+		if (mapped.spo2) updateVital("spo2", mapped.spo2)
+		if (mapped.height) updateVital("height", mapped.height)
+		if (mapped.weight) updateVital("weight", mapped.weight)
+	}
+
 	function handleSubmit(e: React.FormEvent) {
 		e.preventDefault()
 		createPreEncounter.mutate(
@@ -195,6 +208,11 @@ export function TriageForm({ facilityId, triageStaffId, onSuccess }: TriageFormP
 					onChange={e => setChiefComplaint(e.target.value)}
 					rows={3}
 				/>
+			</div>
+
+			<div className="flex items-center justify-between gap-2">
+				<Label className="text-base font-medium">Vital Signs</Label>
+				<FaceScanVitalsButton facilityId={facilityId} onComplete={applyFaceScanVitals} />
 			</div>
 
 			<div className="grid grid-cols-2 gap-3">

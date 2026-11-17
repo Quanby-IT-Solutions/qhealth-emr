@@ -215,7 +215,22 @@ export const imagingOrders = createTable(
 		preEncounterId: t
 			.uuid("pre_encounter_id")
 			.references(() => preEncounters.id, { onDelete: "set null" }),
-		modality: t.text("modality").notNull().$type<"xray" | "ct" | "mri" | "ultrasound" | "other">(),
+		modality: t
+			.text("modality")
+			.notNull()
+			.$type<
+				| "xray"
+				| "ct"
+				| "mri"
+				| "ultrasound"
+				| "mammography"
+				| "fluoroscopy"
+				| "nuclear_medicine"
+				| "pet_ct"
+				| "dexa"
+				| "interventional_radiology"
+				| "other"
+			>(),
 		bodyPart: t.text("body_part").notNull(),
 		clinicalIndication: t.text("clinical_indication"),
 		indicationIcd10Code: t.text("indication_icd10_code"),
@@ -513,5 +528,39 @@ export const prescriptions = createTable(
 		index("prescriptions_facility_id_idx").on(t.facilityId),
 		index("prescriptions_encounter_id_idx").on(t.encounterId),
 		index("prescriptions_patient_id_idx").on(t.patientId),
+	]
+)
+
+export const orderAccessTokens = createTable(
+	"order_access_tokens",
+	t => ({
+		id: t.uuid("id").primaryKey().defaultRandom(),
+		documentType: t
+			.text("document_type")
+			.notNull()
+			.$type<"prescription" | "lab_order" | "imaging_order">(),
+		documentId: t.uuid("document_id").notNull(),
+		patientId: t
+			.uuid("patient_id")
+			.notNull()
+			.references(() => patients.id, { onDelete: "cascade" }),
+		facilityId: t
+			.uuid("facility_id")
+			.notNull()
+			.references(() => facilities.id, { onDelete: "restrict" }),
+		tokenHash: t.text("token_hash").notNull(),
+		expiresAt: t.timestamp("expires_at").notNull(),
+		revokedAt: t.timestamp("revoked_at"),
+		createdByStaffId: t.uuid("created_by_staff_id").references(() => staffProfiles.id, {
+			onDelete: "set null",
+		}),
+		lastViewedAt: t.timestamp("last_viewed_at"),
+		createdAt: t.timestamp("created_at").notNull().defaultNow(),
+	}),
+	t => [
+		uniqueIndex("order_access_tokens_hash_uniq").on(t.tokenHash),
+		index("order_access_tokens_document_idx").on(t.documentType, t.documentId),
+		index("order_access_tokens_patient_id_idx").on(t.patientId),
+		index("order_access_tokens_expires_at_idx").on(t.expiresAt),
 	]
 )

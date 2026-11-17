@@ -349,55 +349,51 @@ export class PatientsService {
 			const mrn = await this.generateMrn(input.facilityId)
 			try {
 				const result = await db.transaction(async tx => {
-					// PS-044: defence-in-depth — OPD registration always requires prior triage
-					// (also enforced at contract level); prevents creating ghost encounters.
-					if (!input.pendingTriageId) {
-						throw new BadRequestException(
-							"Outpatient registration requires a pending triage intake (TOR Flow 1 Step 1)"
-						)
-					}
-
-					// PS-041: Validate triage intake before proceeding — prevents forged, stale,
-					// or cross-facility IDs from creating an OPD encounter and ARTA events.
 					let triageIntakeChiefComplaint: string | null = null
-					const [intake] = await tx
-						.select({
-							id: opdTriageIntakes.id,
-							facilityId: opdTriageIntakes.facilityId,
-							status: opdTriageIntakes.status,
-							chiefComplaint: opdTriageIntakes.chiefComplaint, // PS-045
-						})
-						.from(opdTriageIntakes)
-						.where(eq(opdTriageIntakes.id, input.pendingTriageId))
-					if (!intake) {
-						throw new NotFoundException(`Triage intake ${input.pendingTriageId} not found`)
-					}
-					if (intake.facilityId !== input.facilityId) {
-						throw new BadRequestException(`Triage intake does not belong to this facility`)
-					}
-					if (intake.status !== "pending_registration") {
-						// PS-043
-						throw new BadRequestException(
-							`Triage intake is no longer eligible for registration (status: ${intake.status})`
-						)
-					}
-					triageIntakeChiefComplaint = intake.chiefComplaint // PS-045
 
-					// PS-048: validate clinicianStaffId belongs to this facility and is active
-					const [clinician] = await tx
-						.select({ id: staffProfiles.id })
-						.from(staffProfiles)
-						.where(
-							and(
-								eq(staffProfiles.id, input.clinicianStaffId),
-								eq(staffProfiles.facilityId, input.facilityId),
-								eq(staffProfiles.isActive, true)
+					if (input.pendingTriageId) {
+						// PS-041: Validate triage intake when reconciling an existing intake.
+						const [intake] = await tx
+							.select({
+								id: opdTriageIntakes.id,
+								facilityId: opdTriageIntakes.facilityId,
+								status: opdTriageIntakes.status,
+								chiefComplaint: opdTriageIntakes.chiefComplaint, // PS-045
+							})
+							.from(opdTriageIntakes)
+							.where(eq(opdTriageIntakes.id, input.pendingTriageId))
+						if (!intake) {
+							throw new NotFoundException(`Triage intake ${input.pendingTriageId} not found`)
+						}
+						if (intake.facilityId !== input.facilityId) {
+							throw new BadRequestException(`Triage intake does not belong to this facility`)
+						}
+						if (intake.status !== "pending_registration") {
+							// PS-043
+							throw new BadRequestException(
+								`Triage intake is no longer eligible for registration (status: ${intake.status})`
 							)
-						)
-					if (!clinician) {
-						throw new BadRequestException(
-							"The selected clinician is not a valid active staff member for this facility"
-						)
+						}
+						triageIntakeChiefComplaint = intake.chiefComplaint
+					}
+
+					if (input.clinicianStaffId) {
+						// PS-048: validate clinicianStaffId belongs to this facility and is active
+						const [clinician] = await tx
+							.select({ id: staffProfiles.id })
+							.from(staffProfiles)
+							.where(
+								and(
+									eq(staffProfiles.id, input.clinicianStaffId),
+									eq(staffProfiles.facilityId, input.facilityId),
+									eq(staffProfiles.isActive, true)
+								)
+							)
+						if (!clinician) {
+							throw new BadRequestException(
+								"The selected clinician is not a valid active staff member for this facility"
+							)
+						}
 					}
 
 					// 1. Insert patient with generated MRN
@@ -413,14 +409,15 @@ export class PatientsService {
 					const tomorrowStart = new Date(todayStart)
 					tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1)
 
-					// PS-036: clinicianStaffId is required — always scope queue to clinic
 					const queueConditions: Parameters<typeof and>[0][] = [
 						eq(encounters.facilityId, input.facilityId),
 						eq(encounters.encounterType, sql`'outpatient'`),
 						gte(encounters.admissionDatetime, todayStart),
 						lt(encounters.admissionDatetime, tomorrowStart),
-						eq(encounters.clinicianStaffId, input.clinicianStaffId),
 					]
+					if (input.clinicianStaffId) {
+						queueConditions.push(eq(encounters.clinicianStaffId, input.clinicianStaffId))
+					}
 
 					const [maxResult] = await tx
 						.select({ maxQueue: max(encounters.queueNumber) })
@@ -477,7 +474,7 @@ export class PatientsService {
 								metadata: {
 									workflow: "opd_registration",
 									pendingTriageId: input.pendingTriageId ?? null,
-									clinicianStaffId: input.clinicianStaffId,
+									clinicianStaffId: input.clinicianStaffId ?? null,
 								},
 							},
 							{ tx }
@@ -489,7 +486,7 @@ export class PatientsService {
 						mrn,
 						encounterId: encounter.id,
 						queueNumber,
-						clinicianStaffId: input.clinicianStaffId,
+						clinicianStaffId: input.clinicianStaffId ?? null,
 					}
 				})
 
@@ -537,6 +534,17 @@ export class PatientsService {
 						facilityId: input.facilityId,
 						encounterId: result.encounterId,
 						fromStatus: null,
+						toStatus: "arrived",
+						workflowType: "opd",
+						staffId: input.admittingStaffId ?? null,
+						slaTargetMinutes: arrivalTarget,
+						notes: "OPD arrival: registration completed",
+						occurredAt: new Date(),
+					})
+					await db.insert(encounterStatusEvents).values({
+						facilityId: input.facilityId,
+						encounterId: result.encounterId,
+						fromStatus: "arrived",
 						toStatus: "waiting",
 						workflowType: "opd",
 						staffId: input.admittingStaffId ?? null,

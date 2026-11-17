@@ -85,6 +85,21 @@ export class FormularyService {
 		return input.trim().replace(/\s+/g, " ").toLowerCase()
 	}
 
+	private drugGenericSearchRank(search: string) {
+		const normalizedSearch = this.normalizeDrugGenericName(search)
+		const normalizedGenericName = sql`lower(regexp_replace(trim(${drugGenerics.genericName}), '\s+', ' ', 'g'))`
+
+		return sql`
+			case
+				when ${normalizedGenericName} = ${normalizedSearch} then 0
+				when ${normalizedGenericName} like ${`${normalizedSearch}%`} then 1
+				when ${normalizedGenericName} like ${`% / ${normalizedSearch}%`} then 2
+				when ${normalizedGenericName} like ${`%${normalizedSearch}%`} then 3
+				else 4
+			end
+		`
+	}
+
 	private async findDrugGenericByNormalizedName(genericName: string, excludeId?: string) {
 		const normalizedName = this.normalizeDrugGenericName(genericName)
 		if (!normalizedName) return null
@@ -133,13 +148,16 @@ export class FormularyService {
 		}
 
 		const whereClause = conditions.length > 0 ? and(...conditions) : undefined
+		const orderBy = filter.search
+			? [this.drugGenericSearchRank(filter.search), drugGenerics.genericName]
+			: [drugGenerics.genericName]
 
 		const [data, totalResult] = await Promise.all([
 			db
 				.select()
 				.from(drugGenerics)
 				.where(whereClause)
-				.orderBy(drugGenerics.genericName)
+				.orderBy(...orderBy)
 				.limit(limit)
 				.offset(offset),
 			db.select({ count: count() }).from(drugGenerics).where(whereClause),

@@ -1,7 +1,8 @@
 import { Controller } from "@nestjs/common"
+import { Throttle } from "@nestjs/throttler"
 import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
-import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
+import { AllowAnonymous, Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
 import { RequireAnyPermissions, RequirePermission } from "@/modules/v1/rbac/rbac.guard"
@@ -43,6 +44,68 @@ export class NursingController {
 	async createVital(@Session() session: UserSession) {
 		return implement(v1.nursing.createVital).handler(async ({ input }) => {
 			return this.nursingService.createVital(input, session.user.id)
+		})
+	}
+
+	@RequireAnyPermissions([
+		{ module: "nursing", action: "view" },
+		{ module: "nursing", action: "create" },
+	])
+	@Implement(v1.nursing.getFaceScanStatus)
+	async getFaceScanStatus() {
+		return implement(v1.nursing.getFaceScanStatus).handler(async () => {
+			return this.nursingService.getFaceScanStatus()
+		})
+	}
+
+	@RequirePermission("nursing", "create")
+	@Implement(v1.nursing.createFaceScanToken)
+	async createFaceScanToken() {
+		return implement(v1.nursing.createFaceScanToken).handler(async ({ input }) => {
+			return this.nursingService.createFaceScanToken(input)
+		})
+	}
+
+	@RequirePermission("nursing", "create")
+	@Implement(v1.nursing.createFaceScanPhoneSession)
+	async createFaceScanPhoneSession(@Session() session: UserSession) {
+		return implement(v1.nursing.createFaceScanPhoneSession).handler(async ({ input }) => {
+			return this.nursingService.createFaceScanPhoneSession(input, session.user.id)
+		})
+	}
+
+	@RequirePermission("nursing", "create")
+	@Implement(v1.nursing.getFaceScanPhoneSession)
+	async getFaceScanPhoneSession(@Session() session: UserSession) {
+		return implement(v1.nursing.getFaceScanPhoneSession).handler(async ({ input }) => {
+			return this.nursingService.getFaceScanPhoneSession(input.id, session.user.id)
+		})
+	}
+
+	@AllowAnonymous()
+	@Throttle({ default: { limit: 30, ttl: 60000 } })
+	@Implement(v1.nursing.getFaceScanPhoneSessionPreview)
+	async getFaceScanPhoneSessionPreview() {
+		return implement(v1.nursing.getFaceScanPhoneSessionPreview).handler(async ({ input }) => {
+			return this.nursingService.getFaceScanPhoneSessionPreview(input)
+		})
+	}
+
+	@AllowAnonymous()
+	@Throttle({ default: { limit: 10, ttl: 60000 } })
+	@Implement(v1.nursing.createFaceScanPhoneToken)
+	async createFaceScanPhoneToken() {
+		return implement(v1.nursing.createFaceScanPhoneToken).handler(async ({ input }) => {
+			return this.nursingService.createFaceScanPhoneToken(input)
+		})
+	}
+
+	@AllowAnonymous()
+	@Throttle({ default: { limit: 10, ttl: 60000 } })
+	@Implement(v1.nursing.completeFaceScanPhoneSession)
+	async completeFaceScanPhoneSession() {
+		return implement(v1.nursing.completeFaceScanPhoneSession).handler(async ({ input }) => {
+			return this.nursingService.completeFaceScanPhoneSession(input)
 		})
 	}
 

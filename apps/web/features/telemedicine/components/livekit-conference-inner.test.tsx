@@ -204,7 +204,7 @@ describe("LiveKitConferenceInner", () => {
 		renderRoom()
 
 		expect(screen.getByTestId("livekit-room")).toHaveStyle({ minHeight: "560px" })
-		expect(screen.getByTestId("livekit-room")).toHaveClass("qhealth-livekit-custom-room")
+		expect(screen.getByTestId("livekit-room")).toHaveClass("juanmeds-livekit-custom-room")
 		expect(screen.getByTestId("livekit-spotlight-stage")).toBeVisible()
 		expect(screen.getByTestId("main-video-stage")).toBeVisible()
 		expect(screen.getByTestId("participant-video-tile")).toBeVisible()

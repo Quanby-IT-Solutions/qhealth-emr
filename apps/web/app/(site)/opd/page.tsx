@@ -19,6 +19,7 @@ import {
 	useClinicQueueQuery,
 	type UnifiedQueueEntry,
 } from "@/features/scheduling/api/scheduling.hooks"
+import { todayIsoInManila } from "@/features/scheduling/lib/queue-date"
 
 function usePermissionSet() {
 	const { data: profile } = useMyProfile()
@@ -46,10 +47,6 @@ function getActiveStaffProfile(
 	)
 }
 
-function todayIso() {
-	return new Date().toISOString().slice(0, 10)
-}
-
 function formatTime(time: string | null | undefined) {
 	if (!time) return "-"
 	const parts = time.includes("T") ? time.slice(11, 16) : time.slice(0, 5)
@@ -59,9 +56,19 @@ function formatTime(time: string | null | undefined) {
 	return `${hour}:${(m ?? 0).toString().padStart(2, "0")} ${period}`
 }
 
+function formatTimestampTime(timestamp: string | null | undefined) {
+	if (!timestamp) return "-"
+	return new Intl.DateTimeFormat("en-PH", {
+		hour: "numeric",
+		minute: "2-digit",
+		timeZone: "Asia/Manila",
+	}).format(new Date(timestamp))
+}
+
 function queueStatusLabel(status: UnifiedQueueEntry["status"]) {
 	if (status === "in_progress") return "With Doctor"
 	if (status === "completed") return "Done"
+	if (status === "no_show") return "No show"
 	return "Waiting"
 }
 
@@ -88,7 +95,7 @@ export default function OpdPage() {
 	const [search, setSearch] = useState("")
 	const trimmedSearch = search.trim().toLowerCase()
 	const queueQuery = useClinicQueueQuery(
-		{ facilityId, clinicianStaffId, date: todayIso() },
+		{ facilityId, clinicianStaffId, date: todayIsoInManila() },
 		{ refetchInterval: 20_000 }
 	)
 
@@ -204,7 +211,7 @@ export default function OpdPage() {
 													? `Scheduled ${formatTime(entry.slotTime)}`
 													: "No scheduled time"}
 												{" - "}
-												Checked in {formatTime(entry.checkInTime)}
+												Checked in {formatTimestampTime(entry.checkInTime)}
 											</p>
 										</div>
 

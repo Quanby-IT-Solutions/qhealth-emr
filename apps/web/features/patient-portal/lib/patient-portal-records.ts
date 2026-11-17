@@ -3,6 +3,7 @@ import "server-only"
 import { createHmac, timingSafeEqual } from "node:crypto"
 import { Pool } from "pg"
 
+import { formatImagingExamName } from "@/features/orders/lib/imaging-modality"
 import type { PatientPortalDocument } from "@/features/patient-portal/lib/static-summary"
 import { env } from "@/env"
 
@@ -218,6 +219,167 @@ type PrescriptionRow = {
 	created_at: string
 }
 
+export type PortalPrescriptionDetail = {
+	id: string
+	prescriberName: string
+	prcLicenseNumber: string
+	ptrNumber: string
+	pdeaS2License: string | null
+	status: string
+	signedAt: string | null
+	createdAt: string
+	genericName: string
+	brandName: string | null
+	dose: string
+	doseUnit: string
+	doseForm: string
+	route: string
+	frequency: string
+	durationDays: number | null
+	specialInstructions: string | null
+	isPrn: boolean
+	prnReason: string | null
+	isControlledSubstance: boolean
+	pdeaSchedule: string | null
+	noRefillInscribed: boolean
+	pdeaTrancheNumber: number | null
+	pdeaTrancheTotal: number | null
+	pdeaDispenseDate: string | null
+	pdeaDispensingInstructions: string | null
+}
+
+export type PortalLabRequestDetail = {
+	id: string
+	patientName: string
+	patientMrn: string
+	patientDateOfBirth: string
+	testName: string
+	panelName: string | null
+	loincCode: string | null
+	panelCode: string | null
+	clinicalIndication: string | null
+	indicationIcd10Code: string | null
+	indicationIcd10Display: string | null
+	priority: string
+	status: string
+	specimenType: string | null
+	orderingStaffName: string
+	orderingStaffPrcLicenseNumber: string | null
+	orderingStaffPtrNumber: string | null
+	orderingStaffPdeaS2License: string | null
+	location: string | null
+	collectionDatetime: string | null
+	resultedDatetime: string | null
+	createdAt: string
+}
+
+export type PortalImagingRequestDetail = {
+	id: string
+	patientName: string
+	patientMrn: string
+	patientDateOfBirth: string
+	modality: string
+	bodyPart: string
+	examName: string
+	clinicalIndication: string | null
+	indicationIcd10Code: string | null
+	indicationIcd10Display: string | null
+	priority: string
+	status: string
+	orderingStaffName: string
+	orderingStaffPrcLicenseNumber: string | null
+	orderingStaffPtrNumber: string | null
+	orderingStaffPdeaS2License: string | null
+	scheduledDatetime: string | null
+	completedDatetime: string | null
+	report: string | null
+	createdAt: string
+}
+
+type PortalPrescriptionRow = {
+	id: string
+	prescriber_name: string | null
+	prc_license_number: string
+	ptr_number: string
+	pdea_s2_license: string | null
+	prescription_content: unknown
+	status: string
+	signed_at: string | null
+	created_at: string
+}
+
+type PortalLabRequestRow = {
+	id: string
+	patient_name: string | null
+	patient_mrn: string
+	patient_date_of_birth: string
+	test_name: string
+	panel_name: string | null
+	loinc_code: string | null
+	panel_code: string | null
+	clinical_indication: string | null
+	indication_icd10_code: string | null
+	indication_icd10_display: string | null
+	priority: string
+	status: string
+	specimen_type: string | null
+	ordering_staff_name: string | null
+	ordering_staff_prc_license_number: string | null
+	ordering_staff_ptr_number: string | null
+	ordering_staff_pdea_s2_license: string | null
+	location: string | null
+	collection_datetime: string | null
+	resulted_datetime: string | null
+	created_at: string
+}
+
+type PortalImagingRequestRow = {
+	id: string
+	patient_name: string | null
+	patient_mrn: string
+	patient_date_of_birth: string
+	modality: string
+	body_part: string
+	clinical_indication: string | null
+	indication_icd10_code: string | null
+	indication_icd10_display: string | null
+	priority: string
+	status: string
+	ordering_staff_name: string | null
+	ordering_staff_prc_license_number: string | null
+	ordering_staff_ptr_number: string | null
+	ordering_staff_pdea_s2_license: string | null
+	scheduled_datetime: string | null
+	completed_datetime: string | null
+	report: string | null
+	created_at: string
+}
+
+type PortalRequestOwnerRow = {
+	patient_id: string
+}
+
+type PrescriptionContent = {
+	genericName?: string
+	brandName?: string | null
+	dose?: string
+	doseUnit?: string
+	doseForm?: string
+	route?: string
+	frequency?: string
+	durationDays?: number | null
+	specialInstructions?: string | null
+	isPrn?: boolean
+	prnReason?: string | null
+	isControlledSubstance?: boolean
+	pdeaSchedule?: string | null
+	noRefillInscribed?: boolean
+	pdeaTrancheNumber?: number | null
+	pdeaTrancheTotal?: number | null
+	pdeaDispenseDate?: string | null
+	pdeaDispensingInstructions?: string | null
+}
+
 type InvoiceRow = {
 	invoice_number: string
 	subtotal: string
@@ -426,7 +588,7 @@ export async function getPatientPortalRecord(
 			isActive: patient.is_active,
 			createdAt: patient.created_at,
 			updatedAt: patient.updated_at,
-			facilityName: patient.facility_name ?? "Quanby Solutions, Inc.",
+			facilityName: patient.facility_name ?? "Quanby",
 		},
 		snapshot: {
 			generatedAt: formatDateTime(new Date().toISOString()),
@@ -495,7 +657,7 @@ export async function getPatientPortalRecord(
 			status: lab.status === "resulted" || lab.status === "completed" ? "released" : "attention",
 		})),
 		imaging: imaging.map(order => ({
-			label: `${order.modality.toUpperCase()} · ${order.body_part}`,
+			label: formatImagingExamName(order.modality, order.body_part),
 			value: order.report || order.status,
 			detail: [
 				order.clinical_indication ? `Indication: ${order.clinical_indication}` : null,
@@ -609,6 +771,258 @@ export async function getPatientPortalRecord(
 			status: request.status === "rejected" ? "attention" : "released",
 		})),
 	}
+}
+
+export async function getPatientPortalPrescriptions(
+	patientId: string,
+	prescriptionIds: string[]
+): Promise<PortalPrescriptionDetail[]> {
+	if (prescriptionIds.length === 0) {
+		return []
+	}
+
+	const { rows } = await getPool().query<PortalPrescriptionRow>(
+		`
+			select
+				p.id,
+				u.name as prescriber_name,
+				p.prc_license_number,
+				p.ptr_number,
+				p.pdea_s2_license,
+				p.prescription_content,
+				p.status,
+				p.signed_at::text as signed_at,
+				p.created_at::text as created_at
+			from prescriptions p
+			left join staff_profiles sp on sp.id = p.prescriber_staff_id
+			left join users u on u.id = sp.user_id
+			where p.patient_id = $1
+				and p.id = any($2::uuid[])
+				and p.status in ('signed', 'issued')
+			order by coalesce(p.signed_at, p.created_at) desc
+		`,
+		[patientId, prescriptionIds]
+	)
+
+	return rows.map(row => {
+		const content = parsePrescriptionContent(row.prescription_content)
+
+		return {
+			id: row.id,
+			prescriberName: row.prescriber_name ?? "Prescriber not recorded",
+			prcLicenseNumber: row.prc_license_number,
+			ptrNumber: row.ptr_number,
+			pdeaS2License: row.pdea_s2_license,
+			status: row.status,
+			signedAt: row.signed_at,
+			createdAt: row.created_at,
+			genericName: formatValue(content.genericName),
+			brandName: content.brandName ?? null,
+			dose: formatValue(content.dose),
+			doseUnit: formatValue(content.doseUnit),
+			doseForm: formatValue(content.doseForm),
+			route: formatValue(content.route),
+			frequency: formatValue(content.frequency),
+			durationDays: content.durationDays ?? null,
+			specialInstructions: content.specialInstructions ?? null,
+			isPrn: content.isPrn ?? false,
+			prnReason: content.prnReason ?? null,
+			isControlledSubstance: content.isControlledSubstance ?? false,
+			pdeaSchedule: content.pdeaSchedule ?? null,
+			noRefillInscribed: content.noRefillInscribed ?? content.isControlledSubstance ?? false,
+			pdeaTrancheNumber: content.pdeaTrancheNumber ?? null,
+			pdeaTrancheTotal: content.pdeaTrancheTotal ?? null,
+			pdeaDispenseDate: content.pdeaDispenseDate ?? null,
+			pdeaDispensingInstructions: content.pdeaDispensingInstructions ?? null,
+		}
+	})
+}
+
+export async function getPatientPortalLabRequests(
+	patientId: string,
+	labOrderIds: string[]
+): Promise<PortalLabRequestDetail[]> {
+	if (labOrderIds.length === 0) {
+		return []
+	}
+
+	const { rows } = await getPool().query<PortalLabRequestRow>(
+		`
+			select
+				lo.id,
+				concat_ws(' ', p.first_name, p.middle_name, p.last_name) as patient_name,
+				p.mrn as patient_mrn,
+				p.date_of_birth::text as patient_date_of_birth,
+				lo.test_name,
+				lo.panel_name,
+				lo.loinc_code,
+				lo.panel_code,
+				lo.clinical_indication,
+				lo.indication_icd10_code,
+				lo.indication_icd10_display,
+				lo.priority,
+				lo.status,
+				lo.specimen_type,
+				u.name as ordering_staff_name,
+				sp.prc_license_number as ordering_staff_prc_license_number,
+				sp.ptr_number as ordering_staff_ptr_number,
+				sp.pdea_s2_license as ordering_staff_pdea_s2_license,
+				nullif(concat_ws(' / ', w.name, b.bed_number), '') as location,
+				lo.collection_datetime::text as collection_datetime,
+				lo.resulted_datetime::text as resulted_datetime,
+				lo.created_at::text as created_at
+			from lab_orders lo
+			inner join encounters e on e.id = lo.encounter_id
+			inner join patients p on p.id = e.patient_id
+			left join beds b on b.id = e.bed_id
+			left join wards w on w.id = b.ward_id
+			left join staff_profiles sp on sp.id = lo.ordering_staff_id
+			left join users u on u.id = sp.user_id
+			where p.id = $1
+				and lo.id = any($2::uuid[])
+				and lo.status <> 'cancelled'
+			order by lo.created_at desc
+		`,
+		[patientId, labOrderIds]
+	)
+
+	return rows.map(row => ({
+		id: row.id,
+		patientName: row.patient_name ?? "Patient not recorded",
+		patientMrn: row.patient_mrn,
+		patientDateOfBirth: row.patient_date_of_birth,
+		testName: row.test_name,
+		panelName: row.panel_name,
+		loincCode: row.loinc_code,
+		panelCode: row.panel_code,
+		clinicalIndication: row.clinical_indication,
+		indicationIcd10Code: row.indication_icd10_code,
+		indicationIcd10Display: row.indication_icd10_display,
+		priority: row.priority,
+		status: row.status,
+		specimenType: row.specimen_type,
+		orderingStaffName: row.ordering_staff_name ?? "Ordering clinician not recorded",
+		orderingStaffPrcLicenseNumber: row.ordering_staff_prc_license_number,
+		orderingStaffPtrNumber: row.ordering_staff_ptr_number,
+		orderingStaffPdeaS2License: row.ordering_staff_pdea_s2_license,
+		location: row.location,
+		collectionDatetime: row.collection_datetime,
+		resultedDatetime: row.resulted_datetime,
+		createdAt: row.created_at,
+	}))
+}
+
+export async function getPatientPortalLabRequestOwnerId(
+	labOrderIds: string[]
+): Promise<string | null> {
+	if (labOrderIds.length === 0) {
+		return null
+	}
+
+	const { rows } = await getPool().query<PortalRequestOwnerRow>(
+		`
+			select distinct p.id as patient_id
+			from lab_orders lo
+			inner join encounters e on e.id = lo.encounter_id
+			inner join patients p on p.id = e.patient_id
+			where lo.id = any($1::uuid[])
+				and lo.status <> 'cancelled'
+			limit 2
+		`,
+		[labOrderIds]
+	)
+
+	return rows.length === 1 ? (rows[0]?.patient_id ?? null) : null
+}
+
+export async function getPatientPortalImagingRequests(
+	patientId: string,
+	imagingOrderIds: string[]
+): Promise<PortalImagingRequestDetail[]> {
+	if (imagingOrderIds.length === 0) {
+		return []
+	}
+
+	const { rows } = await getPool().query<PortalImagingRequestRow>(
+		`
+			select
+				io.id,
+				concat_ws(' ', p.first_name, p.middle_name, p.last_name) as patient_name,
+				p.mrn as patient_mrn,
+				p.date_of_birth::text as patient_date_of_birth,
+				io.modality,
+				io.body_part,
+				io.clinical_indication,
+				io.indication_icd10_code,
+				io.indication_icd10_display,
+				io.priority,
+				io.status,
+				u.name as ordering_staff_name,
+				sp.prc_license_number as ordering_staff_prc_license_number,
+				sp.ptr_number as ordering_staff_ptr_number,
+				sp.pdea_s2_license as ordering_staff_pdea_s2_license,
+				io.scheduled_datetime::text as scheduled_datetime,
+				io.completed_datetime::text as completed_datetime,
+				io.report,
+				io.created_at::text as created_at
+			from imaging_orders io
+			inner join encounters e on e.id = io.encounter_id
+			inner join patients p on p.id = e.patient_id
+			left join staff_profiles sp on sp.id = io.ordering_staff_id
+			left join users u on u.id = sp.user_id
+			where p.id = $1
+				and io.id = any($2::uuid[])
+				and io.status <> 'cancelled'
+			order by io.created_at desc
+		`,
+		[patientId, imagingOrderIds]
+	)
+
+	return rows.map(row => ({
+		id: row.id,
+		patientName: row.patient_name ?? "Patient not recorded",
+		patientMrn: row.patient_mrn,
+		patientDateOfBirth: row.patient_date_of_birth,
+		modality: row.modality,
+		bodyPart: row.body_part,
+		examName: formatImagingExamName(row.modality, row.body_part),
+		clinicalIndication: row.clinical_indication,
+		indicationIcd10Code: row.indication_icd10_code,
+		indicationIcd10Display: row.indication_icd10_display,
+		priority: row.priority,
+		status: row.status,
+		orderingStaffName: row.ordering_staff_name ?? "Ordering clinician not recorded",
+		orderingStaffPrcLicenseNumber: row.ordering_staff_prc_license_number,
+		orderingStaffPtrNumber: row.ordering_staff_ptr_number,
+		orderingStaffPdeaS2License: row.ordering_staff_pdea_s2_license,
+		scheduledDatetime: row.scheduled_datetime,
+		completedDatetime: row.completed_datetime,
+		report: row.report,
+		createdAt: row.created_at,
+	}))
+}
+
+export async function getPatientPortalImagingRequestOwnerId(
+	imagingOrderIds: string[]
+): Promise<string | null> {
+	if (imagingOrderIds.length === 0) {
+		return null
+	}
+
+	const { rows } = await getPool().query<PortalRequestOwnerRow>(
+		`
+			select distinct p.id as patient_id
+			from imaging_orders io
+			inner join encounters e on e.id = io.encounter_id
+			inner join patients p on p.id = e.patient_id
+			where io.id = any($1::uuid[])
+				and io.status <> 'cancelled'
+			limit 2
+		`,
+		[imagingOrderIds]
+	)
+
+	return rows.length === 1 ? (rows[0]?.patient_id ?? null) : null
 }
 
 export function buildPatientPortalDocuments(record: PatientPortalRecord): PatientPortalDocument[] {
@@ -1097,7 +1511,7 @@ function buildPatientDetails(patient: PatientRow): PortalDetailItem[] {
 		},
 		{
 			label: "Registered facility",
-			value: patient.facility_name ?? "Quanby Solutions, Inc.",
+			value: patient.facility_name ?? "Quanby",
 		},
 		{ label: "Patient record status", value: patient.is_active ? "Active" : "Inactive" },
 		{ label: "Patient record created", value: formatDateTime(patient.created_at) },
@@ -1206,6 +1620,14 @@ function buildDocumentBody(record: PatientPortalRecord) {
 		buildSectionText("Billing", record.billing),
 		buildSectionText("Medical Records Requests", record.recordsRequests),
 	].join("\n")
+}
+
+function parsePrescriptionContent(raw: unknown): PrescriptionContent {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+		return {}
+	}
+
+	return raw as PrescriptionContent
 }
 
 function buildSectionDocument(

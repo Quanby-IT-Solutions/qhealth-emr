@@ -53,6 +53,10 @@ import {
 	useUpdateImagingOrderMutation,
 	type ImagingOrder,
 } from "@/features/orders/api/orders.hooks"
+import {
+	formatImagingExamName,
+	formatImagingModalityLabel,
+} from "@/features/orders/lib/imaging-modality"
 
 type ReportStatus = "draft" | "signed"
 type WorklistTab = "pending" | "in_progress" | "completed"
@@ -315,9 +319,14 @@ function RadiologyWorklist({
 		if (classifyOrder(order) !== tab) return false
 		if (!normalizedSearch) return true
 
-		return [order.patientName, order.patientMrn, order.modality, order.bodyPart, order.id].some(
-			value => value?.toLowerCase().includes(normalizedSearch)
-		)
+		return [
+			order.patientName,
+			order.patientMrn,
+			order.modality,
+			formatImagingModalityLabel(order.modality),
+			order.bodyPart,
+			order.id,
+		].some(value => value?.toLowerCase().includes(normalizedSearch))
 	})
 
 	return (
@@ -401,7 +410,9 @@ function RadiologyWorklist({
 											</div>
 										</TableCell>
 										<TableCell className="px-4 py-4">
-											<div className="font-medium uppercase">{order.modality}</div>
+											<div className="font-medium">
+												{formatImagingModalityLabel(order.modality)}
+											</div>
 											<div className="text-muted-foreground mt-0.5 text-xs">{order.bodyPart}</div>
 										</TableCell>
 										<TableCell className="px-4 py-4">
@@ -579,7 +590,7 @@ function RadiologyReportEditor({
 						<div>
 							<div className="flex flex-wrap items-center gap-2">
 								<h2 className="text-xl font-semibold">
-									{order.modality.toUpperCase()} {order.bodyPart}
+									{formatImagingExamName(order.modality, order.bodyPart)}
 								</h2>
 								<Badge variant={orderStatusVariant(order.status)}>
 									{orderStatusLabel(order.status)}

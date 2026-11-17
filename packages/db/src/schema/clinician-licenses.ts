@@ -3,7 +3,7 @@ import { index } from "drizzle-orm/pg-core"
 import { createTable } from "../utils/table.js"
 import { staffProfiles } from "./rbac.js"
 
-export type LicenseType = "PRC" | "PTR" | "S2"
+export type LicenseType = string
 export type LicenseStatus = "pending" | "verified" | "expired"
 
 export const clinicianLicenses = createTable(

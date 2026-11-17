@@ -121,12 +121,55 @@ export const LAB_TECH_ROLE_NAMES = ["Lab Technologist", "Lab Technician", "Lab T
 export const BLOOD_BANK_ROLE_NAMES = ["Blood Bank Technician", "Blood Bank Officer"]
 export const NURSE_ROLE_NAMES = ["Nurse"]
 export const RADIOLOGIST_ROLE_NAMES = ["Radiologist"]
+export const COORDINATOR_ROLE_NAMES = ["Clinic Coordinator"]
 
 export function roleNameMatches(roleName: string | null | undefined, allowedRoleNames: string[]) {
 	const normalizedRoleName = roleName?.trim().toLowerCase()
 	if (!normalizedRoleName) return false
 
 	return allowedRoleNames.some(allowed => allowed.trim().toLowerCase() === normalizedRoleName)
+}
+
+export function isCoordinatorRole(roleName: string | null | undefined) {
+	return roleNameMatches(roleName, COORDINATOR_ROLE_NAMES)
+}
+
+/** Clinicians who sign notes are excluded from nurse/billing tabs unless Clinic Coordinator. */
+export function excludeClinicalSignerFromEncounterTab(
+	roleName: string | null | undefined,
+	isClinicalSigner: boolean
+) {
+	return isClinicalSigner && !isCoordinatorRole(roleName)
+}
+
+export function hasPermission(permSet: Set<string>, module: string, action: string) {
+	return permSet.has(`${module}:${action}`)
+}
+
+export function canManageOwnLicenses(
+	_permissions: Array<{ module: string; action: string }>,
+	options: { staffProfileCount: number; roleName?: string | null }
+) {
+	if (options.staffProfileCount === 0) return false
+	return isCoordinatorRole(options.roleName)
+}
+
+/** Permission check with optional role-name gate; Clinic Coordinator bypasses the role gate. */
+export function canAccessRoleGatedModule(
+	roleName: string | null | undefined,
+	allowedRoleNames: string[],
+	permSet: Set<string>,
+	module: string,
+	action: string
+) {
+	if (!hasPermission(permSet, module, action)) return false
+	if (isCoordinatorRole(roleName)) return true
+	return roleNameMatches(roleName, allowedRoleNames)
+}
+
+export function canActAsClinicalClinician(roleName: string | null | undefined) {
+	const normalized = (roleName ?? "").trim().toLowerCase()
+	return normalized.includes("physician") || normalized === "surgeon" || isCoordinatorRole(roleName)
 }
 
 /**
@@ -789,6 +832,15 @@ interface Permission {
 export function getDefaultPatientsHref(permissions: Permission[]): string {
 	const permSet = new Set(permissions.map(p => `${p.module}:${p.action}`))
 
+	// Unified front-office roles land on registration, not triage or clinician search.
+	if (
+		permSet.has("patients:create") &&
+		permSet.has("scheduling:view") &&
+		permSet.has("adt:create")
+	) {
+		return "/patients/register"
+	}
+
 	if (
 		TRIAGE_ROLE_BUNDLE.every(permission => permSet.has(`${permission.module}:${permission.action}`))
 	) {
@@ -827,22 +879,37 @@ export function filterNavItems(
 	roleName?: string | null
 ): NavItemConfig[] {
 	const permSet = new Set(permissions.map(p => `${p.module}:${p.action}`))
+	const isCoordinator = roleNameMatches(roleName, COORDINATOR_ROLE_NAMES)
 
 	return items.filter(item => {
-		if (item.allowedRoleNames?.length && !roleNameMatches(roleName, item.allowedRoleNames)) {
-			return false
-		}
-
-		// Check excludes first (takes precedence over includes)
-		if (item.excludePermissions?.some(p => permSet.has(`${p.module}:${p.action}`))) {
-			return false
+		if (isCoordinator) {
+			return (
+				item.href === "/dashboard" ||
+				(item.title === "Patient Management" && item.href === "/patients/register") ||
+				item.href === "/scheduling/queue"
+			)
 		}
 
 		if (
-			item.excludeAllPermissions?.length &&
-			item.excludeAllPermissions.every(p => permSet.has(`${p.module}:${p.action}`))
+			item.allowedRoleNames?.length &&
+			!isCoordinator &&
+			!roleNameMatches(roleName, item.allowedRoleNames)
 		) {
 			return false
+		}
+
+		if (!isCoordinator) {
+			// Check excludes first (takes precedence over includes)
+			if (item.excludePermissions?.some(p => permSet.has(`${p.module}:${p.action}`))) {
+				return false
+			}
+
+			if (
+				item.excludeAllPermissions?.length &&
+				item.excludeAllPermissions.every(p => permSet.has(`${p.module}:${p.action}`))
+			) {
+				return false
+			}
 		}
 
 		// AND logic: all listed permissions must be present
@@ -855,6 +922,16 @@ export function filterNavItems(
 
 		if (item.requiredPermissions.length === 0) return true
 		return item.requiredPermissions.some(p => permSet.has(`${p.module}:${p.action}`))
+	})
+}
+
+/** Collapse duplicate sidebar links (same href) — first definition wins. */
+export function dedupeNavItems(items: NavItemConfig[]): NavItemConfig[] {
+	const seen = new Set<string>()
+	return items.filter(item => {
+		if (seen.has(item.href)) return false
+		seen.add(item.href)
+		return true
 	})
 }
 
@@ -884,6 +961,7 @@ export const ROLE_DASHBOARD_WIDGETS: Record<string, string[]> = {
 	"nurse": ["my-patient-list", "pending-orders", "alerts", "quick-stats"],
 	"pharmacist": ["pending-orders", "alerts", "quick-stats"],
 	"billing officer": ["quick-stats", "alerts"],
+	"clinic coordinator": ["quick-stats", "alerts"],
 }
 
 export function getDashboardWidgetsForPermissions(permissions: PermissionLike[]): string[] {

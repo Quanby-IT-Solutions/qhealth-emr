@@ -1,7 +1,7 @@
 "use client"
 
 import { useMyProfile } from "@/features/app-shell/api/rbac.hooks"
-import { LAB_TECH_ROLE_NAMES, roleNameMatches } from "@/features/app-shell/lib/navigation"
+import { canAccessRoleGatedModule, LAB_TECH_ROLE_NAMES } from "@/features/app-shell/lib/navigation"
 import { LabDashboard } from "@/features/lab/components/lab-dashboard"
 
 function useAccessContext() {
@@ -15,14 +15,10 @@ function useAccessContext() {
 	}
 }
 
-function can(permSet: Set<string>, module: string, action: string) {
-	return permSet.has(`${module}:${action}`)
-}
-
 export default function LaboratoryPage() {
 	const { permSet, roleName } = useAccessContext()
 
-	if (!can(permSet, "laboratory", "view") || !roleNameMatches(roleName, LAB_TECH_ROLE_NAMES)) {
+	if (!canAccessRoleGatedModule(roleName, LAB_TECH_ROLE_NAMES, permSet, "laboratory", "view")) {
 		return (
 			<div className="text-muted-foreground flex items-center justify-center p-8">
 				You do not have permission to access laboratory.

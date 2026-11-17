@@ -5,7 +5,7 @@ import {
 	Logger,
 	NotFoundException,
 } from "@nestjs/common"
-import { and, count, desc, eq, inArray, isNull } from "drizzle-orm"
+import { and, count, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm"
 
 import {
 	allergies,
@@ -1081,6 +1081,18 @@ export class ClinicalDocsService {
 
 		if (!encounter) throw new NotFoundException("Encounter not found")
 
+		const vitalHasMeasurement = or(
+			isNotNull(vitalSigns.temperature),
+			isNotNull(vitalSigns.bpSystolic),
+			isNotNull(vitalSigns.bpDiastolic),
+			isNotNull(vitalSigns.heartRate),
+			isNotNull(vitalSigns.respiratoryRate),
+			isNotNull(vitalSigns.spo2),
+			isNotNull(vitalSigns.painScore),
+			isNotNull(vitalSigns.weight),
+			isNotNull(vitalSigns.height)
+		)
+
 		const [latestVitals, activeAllergies, recentLabs] = await Promise.all([
 			db
 				.select({
@@ -1099,7 +1111,7 @@ export class ClinicalDocsService {
 					recordedAt: vitalSigns.recordedAt,
 				})
 				.from(vitalSigns)
-				.where(eq(vitalSigns.encounterId, input.encounterId))
+				.where(and(eq(vitalSigns.encounterId, input.encounterId), vitalHasMeasurement))
 				.orderBy(desc(vitalSigns.recordedAt))
 				.limit(1),
 			db

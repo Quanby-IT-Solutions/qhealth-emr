@@ -10,6 +10,7 @@ import {
 	CreateMedOrderSchema,
 	CreateTranchedOrdersSchema,
 	HighAlertVerificationSchema,
+	ImagingModalityEnum,
 	ImagingOrderSchema,
 	LabOrderSchema,
 	MedOrderSchema,
@@ -201,6 +202,16 @@ describe("CreateLabOrderSchema", () => {
 		expect(result.success).toBe(true)
 	})
 
+	it("accepts a signed lab requisition with text-only clinical indication", () => {
+		const result = CreateLabOrderSchema.safeParse({
+			...baseValid,
+			indicationIcd10Code: undefined,
+			indicationIcd10Display: undefined,
+		})
+
+		expect(result.success).toBe(true)
+	})
+
 	it("accepts pre-encounter lab orders for pre-arrival order sets", () => {
 		const result = CreateLabOrderSchema.safeParse({
 			...baseValid,
@@ -270,6 +281,27 @@ describe("CreateImagingOrderSchema", () => {
 
 	it("accepts a signed imaging requisition with free-text and ICD-10 indication", () => {
 		const result = CreateImagingOrderSchema.safeParse(baseValid)
+
+		expect(result.success).toBe(true)
+	})
+
+	it("accepts the supported imaging modalities", () => {
+		for (const modality of ImagingModalityEnum.options) {
+			const result = CreateImagingOrderSchema.safeParse({
+				...baseValid,
+				modality,
+			})
+
+			expect(result.success).toBe(true)
+		}
+	})
+
+	it("accepts a signed imaging requisition with text-only clinical indication", () => {
+		const result = CreateImagingOrderSchema.safeParse({
+			...baseValid,
+			indicationIcd10Code: undefined,
+			indicationIcd10Display: undefined,
+		})
 
 		expect(result.success).toBe(true)
 	})

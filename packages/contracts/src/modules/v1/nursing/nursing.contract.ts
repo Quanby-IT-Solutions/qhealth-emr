@@ -3,16 +3,26 @@ import { oc } from "@orpc/contract"
 import {
 	AdministerMarSchema,
 	AdministerTarSchema,
+	CompleteFaceScanPhoneSessionSchema,
 	ConsentRecordIdSchema,
 	ConsentRecordListResponseSchema,
 	ConsentRecordListSchema,
 	ConsentRecordSchema,
 	CreateConsentRecordSchema,
+	CreateFaceScanPhoneSessionSchema,
+	CreateFaceScanPhoneTokenSchema,
 	CreateHaiTagSchema,
 	CreateIoEntrySchema,
 	CreateShiftHandoffSchema,
 	CreateTarEntrySchema,
 	CreateVitalSignSchema,
+	FaceScanPhoneSessionIdSchema,
+	FaceScanPhoneSessionPreviewSchema,
+	FaceScanPhoneSessionResponseSchema,
+	FaceScanPhoneSessionTokenSchema,
+	FaceScanStatusResponseSchema,
+	FaceScanTokenInputSchema,
+	FaceScanTokenResponseSchema,
 	FinalizeHandoffSchema,
 	FlowsheetListResponseSchema,
 	FlowsheetListSchema,
@@ -80,6 +90,75 @@ export const nursingContract = {
 		})
 		.input(CreateVitalSignSchema)
 		.output(VitalSignSchema),
+
+	getFaceScanStatus: oc
+		.route({
+			method: "GET",
+			path: "/face-scan/status",
+			summary: "Check whether face scan vitals is enabled",
+			tags: ["Nursing — Vitals"],
+		})
+		.output(FaceScanStatusResponseSchema),
+
+	createFaceScanToken: oc
+		.route({
+			method: "POST",
+			path: "/face-scan/token",
+			summary: "Get Insight-Genie iframe URL for vitals face scan",
+			tags: ["Nursing — Vitals"],
+		})
+		.input(FaceScanTokenInputSchema)
+		.output(FaceScanTokenResponseSchema),
+
+	createFaceScanPhoneSession: oc
+		.route({
+			method: "POST",
+			path: "/face-scan/phone-sessions",
+			summary: "Create short-lived QR session for phone face scan",
+			tags: ["Nursing — Vitals"],
+		})
+		.input(CreateFaceScanPhoneSessionSchema)
+		.output(FaceScanPhoneSessionResponseSchema),
+
+	getFaceScanPhoneSession: oc
+		.route({
+			method: "GET",
+			path: "/face-scan/phone-sessions/{id}",
+			summary: "Poll a phone face scan session",
+			tags: ["Nursing — Vitals"],
+		})
+		.input(FaceScanPhoneSessionIdSchema)
+		.output(FaceScanPhoneSessionResponseSchema),
+
+	getFaceScanPhoneSessionPreview: oc
+		.route({
+			method: "GET",
+			path: "/face-scan/phone-sessions/public/{token}",
+			summary: "Get public phone face scan session status",
+			tags: ["Nursing — Vitals"],
+		})
+		.input(FaceScanPhoneSessionTokenSchema)
+		.output(FaceScanPhoneSessionPreviewSchema),
+
+	createFaceScanPhoneToken: oc
+		.route({
+			method: "POST",
+			path: "/face-scan/phone-sessions/public/{token}/token",
+			summary: "Get Insight-Genie iframe URL for public phone face scan",
+			tags: ["Nursing — Vitals"],
+		})
+		.input(CreateFaceScanPhoneTokenSchema)
+		.output(FaceScanTokenResponseSchema),
+
+	completeFaceScanPhoneSession: oc
+		.route({
+			method: "POST",
+			path: "/face-scan/phone-sessions/public/{token}/complete",
+			summary: "Complete a phone face scan session with returned vitals",
+			tags: ["Nursing — Vitals"],
+		})
+		.input(CompleteFaceScanPhoneSessionSchema)
+		.output(FaceScanPhoneSessionResponseSchema),
 
 	// ========================================================================
 	// MAR Entries

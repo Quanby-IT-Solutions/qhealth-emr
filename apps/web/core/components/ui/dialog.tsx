@@ -39,7 +39,7 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
 }
 
 const dialogContentVariants = cva(
-	"bg-background data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl p-4 text-sm ring-1 duration-100 outline-none",
+	"bg-background data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100svh-1rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto overscroll-contain rounded-xl p-4 text-sm ring-1 duration-100 outline-none",
 	{
 		variants: {
 			size: {
@@ -48,6 +48,8 @@ const dialogContentVariants = cva(
 				lg: "sm:max-w-2xl",
 				xl: "sm:max-w-5xl",
 				full: "sm:max-w-[min(1100px,calc(100vw-2rem))]",
+				viewport:
+					"h-[min(90svh,calc(100svh-1rem))] w-[min(90vw,calc(100vw-1rem))] max-w-[90vw] overflow-hidden sm:max-w-[90vw]",
 				stepper:
 					"max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-[min(1100px,calc(100vw-2rem))]",
 			},
@@ -63,17 +65,22 @@ function DialogContent({
 	children,
 	size = "default",
 	showCloseButton = true,
+	elevated = false,
 	...props
 }: DialogPrimitive.Popup.Props & {
 	size?: VariantProps<typeof dialogContentVariants>["size"]
 	showCloseButton?: boolean
+	/** Renders above another open dialog (e.g. face scan over vitals entry). */
+	elevated?: boolean
 }) {
+	const layerClass = elevated ? "z-[60]" : undefined
+
 	return (
 		<DialogPortal>
-			<DialogOverlay />
+			<DialogOverlay className={layerClass} />
 			<DialogPrimitive.Popup
 				data-slot="dialog-content"
-				className={cn(dialogContentVariants({ size }), className)}
+				className={cn(dialogContentVariants({ size }), layerClass, className)}
 				{...props}
 			>
 				{children}

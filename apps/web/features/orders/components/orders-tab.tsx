@@ -35,13 +35,22 @@ import {
 	useMedOrderListQuery,
 	usePrescriptionListQuery,
 	useSignPrescriptionMutation,
+	type LabOrder,
 } from "@/features/orders/api/orders.hooks"
 
+import { formatImagingExamName } from "../lib/imaging-modality"
 import { CreateImagingOrderDialog } from "./create-imaging-order-dialog"
 import { CreateLabOrderDialog } from "./create-lab-order-dialog"
 import { CreateMedOrderDialog } from "./create-med-order-dialog"
 import { CreateOrderSetDialog } from "./create-order-set-dialog"
 import { ImagingDashboard } from "./imaging-dashboard"
+import { LabOrderPrintDialog } from "./lab-order-print-dialog"
+import { OrderAccessQrButton } from "./order-access-qr-button"
+import {
+	formatOrderDateTime,
+	getCurrentOrderLocalDayRangeMs,
+	getOrderLocalDateTimeMs,
+} from "./order-date-format"
 import { OrderGroupRow } from "./order-group-row"
 import { PrescriptionPrintDialog } from "./prescription-print-dialog"
 
@@ -55,17 +64,6 @@ function usePermissionSet() {
 
 function can(permSet: Set<string>, module: string, action: string) {
 	return permSet.has(`${module}:${action}`)
-}
-
-function formatDateTime(dateStr: string | null | undefined) {
-	if (!dateStr) return "--"
-	return new Date(dateStr).toLocaleString("en-PH", {
-		year: "numeric",
-		month: "short",
-		day: "numeric",
-		hour: "2-digit",
-		minute: "2-digit",
-	})
 }
 
 function formatDate(dateStr: string | null | undefined) {
@@ -108,21 +106,6 @@ function priorityVariant(priority: string) {
 			return "secondary" as const
 		default:
 			return "outline" as const
-	}
-}
-
-function formatImagingOrderName(modality: string, bodyPart: string) {
-	switch (modality) {
-		case "xray":
-			return `X-Ray - ${bodyPart}`
-		case "ct":
-			return `CT - ${bodyPart}`
-		case "mri":
-			return `MRI - ${bodyPart}`
-		case "ultrasound":
-			return `Ultrasound - ${bodyPart}`
-		default:
-			return `${modality} - ${bodyPart}`
 	}
 }
 
@@ -254,17 +237,13 @@ function matchesPriority(priority: string | null | undefined, filter: OrderPrior
 function matchesDate(createdAt: string | null | undefined, filter: DateFilter) {
 	if (filter === "any") return true
 	if (!createdAt) return false
-	const date = new Date(createdAt)
-	const today = new Date()
-	today.setHours(0, 0, 0, 0)
-	const endOfToday = new Date(today)
-	endOfToday.setHours(23, 59, 59, 999)
+	const dateMs = getOrderLocalDateTimeMs(createdAt)
+	if (dateMs === null) return false
+	const { startMs, endMs } = getCurrentOrderLocalDayRangeMs()
 
-	if (filter === "today") return date >= today && date <= endOfToday
+	if (filter === "today") return dateMs >= startMs && dateMs <= endMs
 
-	const last7Days = new Date(today)
-	last7Days.setDate(today.getDate() - 6)
-	return date >= last7Days && date <= endOfToday
+	return dateMs >= startMs - 6 * 24 * 60 * 60 * 1000 && dateMs <= endMs
 }
 
 function pageCount(total: number) {
@@ -546,7 +525,7 @@ function MedOrdersView({
 										parent={parent}
 										tranches={tranches}
 										statusBadge={medStatusVariant}
-										formatDate={formatDateTime}
+										formatDate={formatOrderDateTime}
 										onDiscontinue={onDiscontinue}
 										onGenerateRx={onGenerateRx}
 										discontinuePending={discontinuePending}
@@ -586,7 +565,7 @@ function MedOrdersView({
 									</p>
 									<p>
 										<span className="text-muted-foreground">Date: </span>
-										{formatDateTime(parent.createdAt)}
+										{formatOrderDateTime(parent.createdAt)}
 									</p>
 								</div>
 							</div>
@@ -619,6 +598,8 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 	const [createImagingOpen, setCreateImagingOpen] = useState(false)
 	const [createOrderSetOpen, setCreateOrderSetOpen] = useState(false)
 	const [rxPrintOpen, setRxPrintOpen] = useState(false)
+	const [labPrintOrder, setLabPrintOrder] = useState<LabOrder | null>(null)
+	const [labPrintOpen, setLabPrintOpen] = useState(false)
 	const [showLicenseAlert, setShowLicenseAlert] = useState(true)
 	const [allSearch, setAllSearch] = useState("")
 	const [allTypeFilter, setAllTypeFilter] = useState<"all" | "Medication" | "Lab" | "Imaging">(
@@ -712,13 +693,16 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 				...(imagingOrders.data?.data ?? []).map(order => ({
 					id: order.id,
 					type: "Imaging" as const,
-					name: formatImagingOrderName(order.modality, order.bodyPart),
+					name: formatImagingExamName(order.modality, order.bodyPart),
 					priority: order.priority,
 					status: order.status,
 					orderedBy: order.orderingStaffName,
 					createdAt: order.createdAt,
 				})),
-			].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+			].sort(
+				(a, b) =>
+					(getOrderLocalDateTimeMs(b.createdAt) ?? 0) - (getOrderLocalDateTimeMs(a.createdAt) ?? 0)
+			),
 		[imagingOrders.data?.data, labOrdersData, medOrdersData]
 	)
 	const allStatusOptions = useMemo(
@@ -834,6 +818,11 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 	const pagedAllOrders = paginate(filteredAllOrders, allPage)
 	const pagedLabOrders = paginate(filteredLabOrders, labPage)
 	const pagedPrescriptions = paginate(filteredPrescriptions, rxPage)
+
+	function openLabPrint(order: LabOrder) {
+		setLabPrintOrder(order)
+		setLabPrintOpen(true)
+	}
 
 	function handleGenerateRx(medicationOrderId: string) {
 		if (!canPrescribe) return
@@ -1068,8 +1057,8 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 															</p>
 														</TableCell>
 														<TableCell className={cn(tableCellClassName, "overflow-hidden")}>
-															<p className="truncate" title={formatDateTime(order.createdAt)}>
-																{formatDateTime(order.createdAt)}
+															<p className="truncate" title={formatOrderDateTime(order.createdAt)}>
+																{formatOrderDateTime(order.createdAt)}
 															</p>
 														</TableCell>
 													</TableRow>
@@ -1092,7 +1081,7 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 															{order.name}
 														</p>
 														<p className="text-muted-foreground mt-1 text-xs">
-															{order.orderedBy ?? "--"} - {formatDateTime(order.createdAt)}
+															{order.orderedBy ?? "--"} - {formatOrderDateTime(order.createdAt)}
 														</p>
 													</div>
 													<div className="flex flex-col items-end gap-1">
@@ -1303,8 +1292,11 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 													<TableHead className={cn(tableHeadClassName, "w-[10%]")}>
 														Status
 													</TableHead>
-													<TableHead className={cn(tableHeadClassName, "w-[22%]")}>
+													<TableHead className={cn(tableHeadClassName, "w-[16%]")}>
 														Ordered
+													</TableHead>
+													<TableHead className={cn(tableHeadClassName, "w-[6%] text-right")}>
+														<span className="sr-only">Actions</span>
 													</TableHead>
 												</TableRow>
 											</TableHeader>
@@ -1382,10 +1374,29 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 																</p>
 																<p
 																	className="text-muted-foreground truncate text-xs"
-																	title={formatDateTime(lab.createdAt)}
+																	title={formatOrderDateTime(lab.createdAt)}
 																>
-																	{formatDateTime(lab.createdAt)}
+																	{formatOrderDateTime(lab.createdAt)}
 																</p>
+															</TableCell>
+															<TableCell className={cn(tableCellClassName, "text-right")}>
+																<div className="flex items-center justify-end gap-1">
+																	<OrderAccessQrButton
+																		documentType="lab_order"
+																		documentId={lab.id}
+																	/>
+																	<Button
+																		type="button"
+																		variant="ghost"
+																		size="sm"
+																		className="h-8 px-2"
+																		title="Print lab request"
+																		onClick={() => openLabPrint(lab)}
+																	>
+																		<Printer className="mr-1 size-3.5" />
+																		Print
+																	</Button>
+																</div>
 															</TableCell>
 														</TableRow>
 													)
@@ -1421,8 +1432,20 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 															</p>
 														)}
 														<p className="text-muted-foreground text-xs">
-															{lab.orderingStaffName ?? "--"} - {formatDateTime(lab.createdAt)}
+															{lab.orderingStaffName ?? "--"} - {formatOrderDateTime(lab.createdAt)}
 														</p>
+													</div>
+													<div className="mt-3 flex justify-end gap-2">
+														<OrderAccessQrButton documentType="lab_order" documentId={lab.id} />
+														<Button
+															type="button"
+															variant="outline"
+															size="sm"
+															onClick={() => openLabPrint(lab)}
+														>
+															<Printer className="mr-1 size-3.5" />
+															Print Request
+														</Button>
 													</div>
 												</div>
 											)
@@ -1628,34 +1651,40 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 																</p>
 															</TableCell>
 															<TableCell className={cn(tableCellClassName, "overflow-hidden")}>
-																<p className="truncate" title={formatDateTime(rx.createdAt)}>
-																	{formatDateTime(rx.createdAt)}
+																<p className="truncate" title={formatOrderDateTime(rx.createdAt)}>
+																	{formatOrderDateTime(rx.createdAt)}
 																</p>
 															</TableCell>
 															<TableCell className={cn(tableCellClassName, "text-right")}>
-																{rx.status === "draft" && canSignOrders && (
-																	<Button
-																		variant="outline"
-																		size="sm"
-																		title="Sign prescription"
-																		disabled={signPrescription.isPending}
-																		onClick={() => signPrescription.mutate(rx.id)}
-																	>
-																		<PenLine className="mr-1 size-3.5" />
-																		Sign
-																	</Button>
-																)}
-																{rx.status === "signed" && canSignOrders && (
-																	<Button
-																		variant="outline"
-																		size="sm"
-																		title="Print prescription"
-																		onClick={() => setRxPrintOpen(true)}
-																	>
-																		<Printer className="mr-1 size-3.5" />
-																		Print
-																	</Button>
-																)}
+																<div className="flex items-center justify-end gap-1">
+																	<OrderAccessQrButton
+																		documentType="prescription"
+																		documentId={rx.id}
+																	/>
+																	{rx.status === "draft" && canSignOrders && (
+																		<Button
+																			variant="outline"
+																			size="sm"
+																			title="Sign prescription"
+																			disabled={signPrescription.isPending}
+																			onClick={() => signPrescription.mutate(rx.id)}
+																		>
+																			<PenLine className="mr-1 size-3.5" />
+																			Sign
+																		</Button>
+																	)}
+																	{rx.status === "signed" && canSignOrders && (
+																		<Button
+																			variant="outline"
+																			size="sm"
+																			title="Print prescription"
+																			onClick={() => setRxPrintOpen(true)}
+																		>
+																			<Printer className="mr-1 size-3.5" />
+																			Print
+																		</Button>
+																	)}
+																</div>
 															</TableCell>
 														</TableRow>
 													)
@@ -1695,30 +1724,33 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 														<div className="text-muted-foreground text-xs">
 															{isControlledPrescription && <p>No Refill</p>}
 															<p>{rx.prescriberStaffName ?? "--"}</p>
-															<p>{formatDateTime(rx.createdAt)}</p>
+															<p>{formatOrderDateTime(rx.createdAt)}</p>
 														</div>
-														{rx.status === "draft" && canSignOrders && (
-															<Button
-																variant="outline"
-																size="sm"
-																aria-label="Sign prescription"
-																disabled={signPrescription.isPending}
-																onClick={() => signPrescription.mutate(rx.id)}
-															>
-																Sign
-															</Button>
-														)}
-														{rx.status === "signed" && canSignOrders && (
-															<Button
-																variant="outline"
-																size="sm"
-																aria-label="Print prescription"
-																onClick={() => setRxPrintOpen(true)}
-															>
-																<Printer className="mr-1 size-3.5" />
-																Print
-															</Button>
-														)}
+														<div className="flex flex-wrap justify-end gap-2">
+															<OrderAccessQrButton documentType="prescription" documentId={rx.id} />
+															{rx.status === "draft" && canSignOrders && (
+																<Button
+																	variant="outline"
+																	size="sm"
+																	aria-label="Sign prescription"
+																	disabled={signPrescription.isPending}
+																	onClick={() => signPrescription.mutate(rx.id)}
+																>
+																	Sign
+																</Button>
+															)}
+															{rx.status === "signed" && canSignOrders && (
+																<Button
+																	variant="outline"
+																	size="sm"
+																	aria-label="Print prescription"
+																	onClick={() => setRxPrintOpen(true)}
+																>
+																	<Printer className="mr-1 size-3.5" />
+																	Print
+																</Button>
+															)}
+														</div>
 													</div>
 												</div>
 											)
@@ -1762,6 +1794,14 @@ export function OrdersTab({ encounterId, facilityId, patientId, encounterType }:
 				onOpenChange={setCreateOrderSetOpen}
 				encounterId={encounterId}
 				facilityId={facilityId}
+			/>
+			<LabOrderPrintDialog
+				open={labPrintOpen}
+				onOpenChange={open => {
+					setLabPrintOpen(open)
+					if (!open) setLabPrintOrder(null)
+				}}
+				order={labPrintOrder}
 			/>
 			<PrescriptionPrintDialog
 				open={rxPrintOpen}

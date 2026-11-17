@@ -183,7 +183,13 @@ export const encounters = createTable(
 			.uuid("clinician_staff_id")
 			.references(() => staffProfiles.id, { onDelete: "set null" }),
 		// PS-003: Walk-in OPD queue status on the clinic queue board
-		queueStatus: t.text("queue_status").$type<"waiting" | "in_progress" | "completed">(),
+		queueStatus: t
+			.text("queue_status")
+			.$type<"waiting" | "in_progress" | "completed" | "no_show">(),
+		queueCalledByStaffId: t
+			.uuid("queue_called_by_staff_id")
+			.references(() => staffProfiles.id, { onDelete: "set null" }),
+		queueCalledAt: t.timestamp("queue_called_at"),
 		createdAt: t.timestamp("created_at").notNull().defaultNow(),
 		updatedAt: t.timestamp("updated_at").notNull().defaultNow(),
 	}),
@@ -192,6 +198,7 @@ export const encounters = createTable(
 		index("encounters_patient_id_idx").on(t.patientId),
 		index("encounters_status_idx").on(t.status),
 		index("encounters_admission_datetime_idx").on(t.admissionDatetime),
+		index("encounters_queue_called_by_staff_id_idx").on(t.queueCalledByStaffId),
 	]
 )
 

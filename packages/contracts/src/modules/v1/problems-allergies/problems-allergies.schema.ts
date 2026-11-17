@@ -28,9 +28,6 @@ export const ProblemStatusEnum = z.enum(["active", "resolved", "entered_in_error
 export const AllergenTypeEnum = z.enum(["medication", "food", "environmental"])
 export const AllergySeverityEnum = z.enum(["mild", "moderate", "severe"])
 
-const hasClinicalCode = (value: { icd10Code?: string | null; snomedCode?: string | null }) =>
-	Boolean(value.icd10Code?.trim() || value.snomedCode?.trim())
-
 // ============================================================================
 // Problem Schemas
 // ============================================================================
@@ -55,29 +52,19 @@ export const ProblemSchema = z.object({
 
 export type Problem = z.infer<typeof ProblemSchema>
 
-export const CreateProblemSchema = z
-	.object({
-		facilityId: z.string().uuid(),
-		patientId: z.string().uuid(),
-		icd10Code: z.string().max(20).optional(),
-		icd10Display: z.string().max(500).optional(),
-		snomedCode: z.string().max(20).optional(),
-		snomedDisplay: z.string().max(500).optional(),
-		description: z.string().min(1).max(2000),
-		onsetDate: z.string().optional(),
-		resolutionDate: z.string().optional(),
-		status: ProblemStatusEnum.default("active"),
-		notes: z.string().max(2000).optional(),
-	})
-	.superRefine((value, ctx) => {
-		if (!hasClinicalCode(value)) {
-			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
-				message: "At least one of ICD-10 or SNOMED CT code is required.",
-				path: ["icd10Code"],
-			})
-		}
-	})
+export const CreateProblemSchema = z.object({
+	facilityId: z.string().uuid(),
+	patientId: z.string().uuid(),
+	icd10Code: z.string().max(20).optional(),
+	icd10Display: z.string().max(500).optional(),
+	snomedCode: z.string().max(20).optional(),
+	snomedDisplay: z.string().max(500).optional(),
+	description: z.string().min(1).max(2000),
+	onsetDate: z.string().optional(),
+	resolutionDate: z.string().optional(),
+	status: ProblemStatusEnum.default("active"),
+	notes: z.string().max(2000).optional(),
+})
 
 export type CreateProblemInput = z.infer<typeof CreateProblemSchema>
 

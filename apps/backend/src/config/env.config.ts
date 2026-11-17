@@ -60,6 +60,12 @@ export const env = createEnv({
 		/** Deploy image tag, injected by the deploy compose file / env; reported as the Sentry release. */
 		IMAGE_TAG: z.string().optional(),
 
+		// Insight-Genie face scan vitals
+		INSIGHT_GENIE_BASE_URL: z.string().url().default("https://api.insightgenie.ai"),
+		INSIGHT_GENIE_API_KEY: optionalString,
+		INSIGHT_GENIE_API_SECRET: optionalString,
+		FACE_SCAN_ENABLED: z.coerce.boolean().default(true),
+
 		// Database
 		DATABASE_URL: z.string(),
 

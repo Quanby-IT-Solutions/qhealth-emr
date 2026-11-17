@@ -8,9 +8,9 @@
 
 import type { OfflineSummarySnapshot } from "@repo/contracts"
 
-const CACHE_KEY_PREFIX = "qhealth_offline_patients_"
+const CACHE_KEY_PREFIX = "juanmeds_offline_patients_"
 const CACHE_VERSION = 2
-const ENCOUNTER_CACHE_KEY_PREFIX = "qhealth_offline_encounter_summary_"
+const ENCOUNTER_CACHE_KEY_PREFIX = "juanmeds_offline_encounter_summary_"
 const ENCOUNTER_CACHE_VERSION = 2
 
 export interface OfflinePatientSummary {

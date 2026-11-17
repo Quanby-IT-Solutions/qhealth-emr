@@ -5,7 +5,7 @@ import { useEffect } from "react"
 import { env } from "@/env"
 
 const SW_URL = "/offline-sw.js"
-const OFFLINE_CACHE_PREFIX = "qhealth-emr-offline-"
+const OFFLINE_CACHE_PREFIX = "juanmeds-emr-offline-"
 
 async function unregisterStaleWorkers() {
 	if (!("serviceWorker" in navigator)) return

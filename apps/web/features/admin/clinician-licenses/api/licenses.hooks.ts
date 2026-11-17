@@ -35,6 +35,15 @@ export function useGetClinicianLicensesQuery(staffProfileId: string, enabled = t
 	)
 }
 
+export function useUpdateLicenseMutation() {
+	const queryClient = useQueryClient()
+	return useMutation(
+		orpc.clinicianLicenses.update.mutationOptions({
+			onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.clinicianLicenses.key() }),
+		})
+	)
+}
+
 export function useAddLicenseMutation() {
 	const queryClient = useQueryClient()
 	return useMutation(

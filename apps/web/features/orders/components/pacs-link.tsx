@@ -12,6 +12,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/core/components/ui/dialog"
+import { formatImagingModalityLabel } from "@/features/orders/lib/imaging-modality"
 
 interface PacsLinkProps {
 	orderId: string
@@ -51,7 +52,7 @@ export function PacsLink({ orderId: _orderId, pacsUrl, modality, bodyPart }: Pac
 						<DialogDescription>
 							You are about to open an external PACS viewer for{" "}
 							<strong>
-								{modality} — {bodyPart}
+								{formatImagingModalityLabel(modality)} - {bodyPart}
 							</strong>
 							. This will open in a new browser tab. Ensure you are on a secure, authorized
 							workstation before proceeding.
