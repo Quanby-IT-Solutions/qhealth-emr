@@ -26,8 +26,11 @@ import {
 	Icd10IndicationPicker,
 	type DiagnosisEntry,
 } from "@/features/orders/components/create-lab-order-dialog"
+import {
+	IMAGING_MODALITY_OPTIONS,
+	type ImagingModality,
+} from "@/features/orders/lib/imaging-modality"
 
-type ImagingModality = "xray" | "ct" | "mri" | "ultrasound" | "other"
 type OrderPriority = "routine" | "urgent" | "stat"
 
 interface CreateImagingOrderDialogProps {
@@ -65,7 +68,7 @@ export function CreateImagingOrderDialog({
 	}
 
 	function handleSubmit() {
-		if (!modality || !bodyPart.trim() || !clinicalIndication.trim() || !indicationDiagnosis) return
+		if (!modality || !bodyPart.trim() || !clinicalIndication.trim()) return
 
 		createImagingOrder.mutate(
 			{
@@ -74,8 +77,8 @@ export function CreateImagingOrderDialog({
 				modality,
 				bodyPart: bodyPart.trim(),
 				clinicalIndication: clinicalIndication.trim(),
-				indicationIcd10Code: indicationDiagnosis.code,
-				indicationIcd10Display: indicationDiagnosis.description,
+				indicationIcd10Code: indicationDiagnosis?.code,
+				indicationIcd10Display: indicationDiagnosis?.description,
 				priority,
 			},
 			{
@@ -105,11 +108,11 @@ export function CreateImagingOrderDialog({
 								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="xray">X-Ray</SelectItem>
-								<SelectItem value="ct">CT Scan</SelectItem>
-								<SelectItem value="mri">MRI</SelectItem>
-								<SelectItem value="ultrasound">Ultrasound</SelectItem>
-								<SelectItem value="other">Other</SelectItem>
+								{IMAGING_MODALITY_OPTIONS.map(option => (
+									<SelectItem key={option.value} value={option.value}>
+										{option.label}
+									</SelectItem>
+								))}
 							</SelectContent>
 						</Select>
 					</div>
@@ -164,7 +167,6 @@ export function CreateImagingOrderDialog({
 							!modality ||
 							!bodyPart.trim() ||
 							!clinicalIndication.trim() ||
-							!indicationDiagnosis ||
 							createImagingOrder.isPending
 						}
 						onClick={handleSubmit}

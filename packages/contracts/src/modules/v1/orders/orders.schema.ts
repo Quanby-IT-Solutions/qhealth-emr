@@ -69,7 +69,21 @@ export const ImagingOrderStatusEnum = z.enum([
 
 export const OrderPriorityEnum = z.enum(["routine", "urgent", "stat"])
 
-export const ImagingModalityEnum = z.enum(["xray", "ct", "mri", "ultrasound", "other"])
+export const ImagingModalityValues = [
+	"xray",
+	"ct",
+	"mri",
+	"ultrasound",
+	"mammography",
+	"fluoroscopy",
+	"nuclear_medicine",
+	"pet_ct",
+	"dexa",
+	"interventional_radiology",
+	"other",
+] as const
+
+export const ImagingModalityEnum = z.enum(ImagingModalityValues)
 
 export const VerificationActionEnum = z.enum(["approved", "rejected", "modified"])
 
@@ -304,6 +318,9 @@ export const LabOrderSchema = z.object({
 	specimenType: z.string().nullable(),
 	orderingStaffId: z.string().uuid(),
 	orderingStaffName: z.string().nullable(),
+	orderingStaffPrcLicenseNumber: z.string().nullable().optional(),
+	orderingStaffPtrNumber: z.string().nullable().optional(),
+	orderingStaffPdeaS2License: z.string().nullable().optional(),
 	collectionDatetime: dateOrString.nullable(),
 	resultedDatetime: dateOrString.nullable(),
 	results: z.unknown(),
@@ -390,6 +407,9 @@ export const ImagingOrderSchema = z.object({
 	status: ImagingOrderStatusEnum,
 	orderingStaffId: z.string().uuid(),
 	orderingStaffName: z.string().nullable(),
+	orderingStaffPrcLicenseNumber: z.string().nullable().optional(),
+	orderingStaffPtrNumber: z.string().nullable().optional(),
+	orderingStaffPdeaS2License: z.string().nullable().optional(),
 	scheduledDatetime: dateOrString.nullable(),
 	completedDatetime: dateOrString.nullable(),
 	report: z.string().nullable(),
@@ -443,7 +463,7 @@ export const CreateImagingOrderSchema = z
 		modality: ImagingModalityEnum,
 		bodyPart: z.string().min(1),
 		clinicalIndication: z.string().trim().min(1),
-		indicationIcd10Code: z.string().trim().min(1),
+		indicationIcd10Code: z.string().trim().min(1).optional(),
 		indicationIcd10Display: z.string().trim().min(1).optional(),
 		priority: OrderPriorityEnum.optional(),
 	})
@@ -574,6 +594,44 @@ export const PrescriptionListSchema = PaginationInputSchema.extend({
 
 export const PrescriptionListResponseSchema = PaginatedResponseSchema.extend({
 	data: z.array(PrescriptionSchema),
+})
+
+// ============================================================================
+// Patient QR Access Schemas
+// ============================================================================
+
+export const OrderAccessDocumentTypeEnum = z.enum(["prescription", "lab_order", "imaging_order"])
+
+export const GenerateOrderAccessTokenSchema = z.object({
+	documentType: OrderAccessDocumentTypeEnum,
+	documentId: z.string().uuid(),
+})
+
+export const OrderAccessTokenResponseSchema = z.object({
+	documentType: OrderAccessDocumentTypeEnum,
+	documentId: z.string().uuid(),
+	token: z.string(),
+	url: z.string(),
+	expiresAt: dateOrString,
+})
+
+export const VerifyOrderAccessTokenSchema = z.object({
+	token: z.string().trim().min(20),
+	lastName: z.string().trim().min(1),
+	dateOfBirth: z.string().trim().min(1),
+})
+
+export const PublicOrderAccessDocumentSchema = z.object({
+	documentType: OrderAccessDocumentTypeEnum,
+	documentId: z.string().uuid(),
+	facilityName: z.string().nullable(),
+	patientName: z.string(),
+	patientMrn: z.string(),
+	patientDateOfBirth: dateOrString,
+	patientSex: z.enum(["male", "female", "other"]),
+	createdAt: dateOrString,
+	expiresAt: dateOrString,
+	data: z.unknown(),
 })
 
 // ============================================================================

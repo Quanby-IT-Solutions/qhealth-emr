@@ -71,11 +71,11 @@ function LoincTestPicker({
 			<div className="flex flex-wrap items-center gap-2">
 				<Label htmlFor="labTestName">Test Name *</Label>
 				<Badge variant="secondary" className="text-xs">
-					LOINC required
+					LOINC optional
 				</Badge>
 			</div>
 			<p className="text-muted-foreground text-xs">
-				Search the active lab catalog. Selecting a test fills the LOINC code.
+				Search the active lab catalog or type a custom lab test name.
 			</p>
 			<div className="relative z-30">
 				<Input
@@ -135,7 +135,7 @@ function LoincTestPicker({
 							))
 						) : (
 							<div className="text-muted-foreground px-3 py-3">
-								No active lab test found. Check the lab catalog or use an approved order set.
+								No active lab test found. Continue with the typed test name if needed.
 							</div>
 						)}
 					</div>
@@ -174,9 +174,9 @@ export function Icd10IndicationPicker({
 	return (
 		<div className="space-y-2">
 			<div className="flex flex-wrap items-center gap-2">
-				<Label>ICD-10 Indication *</Label>
+				<Label>ICD-10 Code / Diagnosis</Label>
 				<Badge variant="secondary" className="text-xs">
-					Required before signing
+					Optional
 				</Badge>
 			</div>
 			<div className="relative z-20">
@@ -216,7 +216,9 @@ export function Icd10IndicationPicker({
 								</button>
 							))
 						) : (
-							<div className="text-muted-foreground px-3 py-3">No ICD-10 matches</div>
+							<div className="text-muted-foreground px-3 py-3">
+								No ICD-10 matches. Use the clinical indication text if needed.
+							</div>
 						)}
 					</div>
 				)}
@@ -309,11 +311,7 @@ export function CreateLabOrderDialog({
 	}
 
 	const canSubmit = Boolean(
-		testName.trim() &&
-		loincCode.trim() &&
-		clinicalIndication.trim() &&
-		indicationDiagnosis &&
-		!createLabOrder.isPending
+		testName.trim() && clinicalIndication.trim() && !createLabOrder.isPending
 	)
 
 	return (
@@ -330,7 +328,12 @@ export function CreateLabOrderDialog({
 					<div className="grid gap-4 sm:grid-cols-2">
 						<div className="space-y-2">
 							<Label htmlFor="labLoincCode">LOINC Code</Label>
-							<Input id="labLoincCode" value={loincCode} readOnly placeholder="Select a lab test" />
+							<Input
+								id="labLoincCode"
+								value={loincCode}
+								readOnly
+								placeholder="Optional; filled when a catalog test is selected"
+							/>
 						</div>
 						<div className="space-y-2">
 							<Label htmlFor="labSpecimenType">Specimen Type</Label>

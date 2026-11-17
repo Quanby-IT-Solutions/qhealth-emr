@@ -5,6 +5,9 @@ import { Clock, FileText } from "lucide-react"
 import { Badge } from "@/core/components/ui/badge"
 import { Button } from "@/core/components/ui/button"
 import { Separator } from "@/core/components/ui/separator"
+import { formatImagingModalityLabel } from "@/features/orders/lib/imaging-modality"
+
+import { formatOrderDateTime } from "./order-date-format"
 
 interface ReportAttachment {
 	id: string
@@ -42,17 +45,6 @@ function parseStructuredResults(raw: unknown): StructuredReport | null {
 	return raw as StructuredReport
 }
 
-function formatDate(dateStr: string | null | undefined): string | null {
-	if (!dateStr) return null
-	return new Date(dateStr).toLocaleString("en-PH", {
-		year: "numeric",
-		month: "short",
-		day: "numeric",
-		hour: "2-digit",
-		minute: "2-digit",
-	})
-}
-
 function formatFileSize(bytes: number) {
 	if (bytes < 1024) return `${bytes} B`
 	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -83,6 +75,7 @@ export function RadiologyReport({
 			!!structured?.attachments?.length)
 	const hasReport = !!report || hasStructuredReport
 	const diagnosis = [indicationIcd10Code, indicationIcd10Display].filter(Boolean).join(" - ")
+	const modalityLabel = formatImagingModalityLabel(modality)
 
 	if (!hasReport) {
 		return (
@@ -90,7 +83,7 @@ export function RadiologyReport({
 				<Clock className="text-muted-foreground size-8" />
 				<p className="text-muted-foreground text-sm font-medium">Report Pending</p>
 				<p className="text-muted-foreground text-xs">
-					The radiology report has not yet been filed for this {modality.toLowerCase()} of{" "}
+					The radiology report has not yet been filed for this {modalityLabel.toLowerCase()} of{" "}
 					{bodyPart.toLowerCase()}.
 				</p>
 			</div>
@@ -103,11 +96,11 @@ export function RadiologyReport({
 			<div className="flex flex-wrap items-start justify-between gap-2">
 				<div>
 					<h4 className="font-semibold">
-						{modality} — {bodyPart}
+						{modalityLabel} - {bodyPart}
 					</h4>
 					{completedDatetime && (
 						<p className="text-muted-foreground text-xs">
-							Completed: {formatDate(completedDatetime)}
+							Completed: {formatOrderDateTime(completedDatetime)}
 						</p>
 					)}
 				</div>
@@ -205,7 +198,7 @@ export function RadiologyReport({
 					{structured?.radiologistName
 						? `Reported by ${structured.radiologistName}`
 						: "Radiologist not specified"}
-					{structured?.reportedAt && ` · ${formatDate(structured.reportedAt)}`}
+					{structured?.reportedAt && ` · ${formatOrderDateTime(structured.reportedAt)}`}
 				</p>
 			</div>
 		</div>

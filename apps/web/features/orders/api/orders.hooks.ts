@@ -25,6 +25,8 @@ type RawActiveOrdersResponse = V1Outputs["orders"]["getActiveOrders"]
 type RawTranchedOrdersResponse = V1Outputs["orders"]["createTranchedOrders"]
 type RawPdeaLicenseStatus = V1Outputs["orders"]["checkPdeaLicense"]
 type RawChildOrdersResponse = V1Outputs["orders"]["getChildOrders"]
+type RawOrderAccessTokenResponse = V1Outputs["orders"]["generateOrderAccessToken"]
+type RawPublicOrderAccessDocument = V1Outputs["orders"]["verifyOrderAccessToken"]
 
 function serializeDate(value: Date | string | null | undefined): string | null {
 	if (!value) return null
@@ -107,6 +109,11 @@ export interface LabOrder {
 	facilityId: string
 	encounterId: string | null
 	preEncounterId: string | null
+	patientId?: string | null
+	patientName?: string | null
+	patientMrn?: string | null
+	wardName?: string | null
+	bedNumber?: string | null
 	loincCode: string | null
 	panelCode: string | null
 	testName: string
@@ -119,6 +126,9 @@ export interface LabOrder {
 	specimenType: string | null
 	orderingStaffId: string
 	orderingStaffName: string | null
+	orderingStaffPrcLicenseNumber?: string | null
+	orderingStaffPtrNumber?: string | null
+	orderingStaffPdeaS2License?: string | null
 	collectionDatetime: string | null
 	resultedDatetime: string | null
 	results: unknown
@@ -145,6 +155,9 @@ export interface ImagingOrder {
 	status: string
 	orderingStaffId: string
 	orderingStaffName: string | null
+	orderingStaffPrcLicenseNumber?: string | null
+	orderingStaffPtrNumber?: string | null
+	orderingStaffPdeaS2License?: string | null
 	scheduledDatetime: string | null
 	studyStartedAt: string | null
 	imagingOrderReceivedAt: string | null
@@ -194,6 +207,20 @@ export interface Prescription {
 	status: string
 	signedAt: string | null
 	createdAt: string
+}
+
+export interface OrderAccessTokenResponse extends Omit<RawOrderAccessTokenResponse, "expiresAt"> {
+	expiresAt: string
+}
+
+export interface PublicOrderAccessDocument extends Omit<
+	RawPublicOrderAccessDocument,
+	"createdAt" | "expiresAt" | "patientDateOfBirth"
+> {
+	patientDateOfBirth: string
+	patientSex: "male" | "female" | "other"
+	createdAt: string
+	expiresAt: string
 }
 
 export interface PaginatedResponse<T> {
@@ -322,6 +349,33 @@ function mapPdeaLicenseStatus(response: RawPdeaLicenseStatus): PdeaLicenseStatus
 
 function mapChildOrders(response: RawChildOrdersResponse): MedOrder[] {
 	return response.map(mapMedOrder)
+}
+
+function mapOrderAccessTokenResponse(
+	response: RawOrderAccessTokenResponse
+): OrderAccessTokenResponse {
+	return {
+		...response,
+		expiresAt: serializeRequiredDate(response.expiresAt),
+	}
+}
+
+function mapPublicOrderAccessDocument(
+	response: RawPublicOrderAccessDocument
+): PublicOrderAccessDocument {
+	const publicResponse = response as RawPublicOrderAccessDocument & {
+		patientDateOfBirth?: Date | string
+		patientSex?: "male" | "female" | "other"
+	}
+	return {
+		...response,
+		patientDateOfBirth: publicResponse.patientDateOfBirth
+			? serializeRequiredDate(publicResponse.patientDateOfBirth)
+			: "",
+		patientSex: publicResponse.patientSex ?? "other",
+		createdAt: serializeRequiredDate(response.createdAt),
+		expiresAt: serializeRequiredDate(response.expiresAt),
+	}
 }
 
 export const orderKeys = {
@@ -522,7 +576,6 @@ export function useImagingOrderDetailQuery(id: string, facilityId?: string) {
 	)
 }
 
-type CreateImagingOrderData = V1Inputs["orders"]["createImagingOrder"]
 export type UpdateImagingOrderData = V1Inputs["orders"]["updateImagingOrder"]
 
 export function useCreateImagingOrderMutation() {
@@ -699,6 +752,27 @@ export function useSendPrescriptionMutation() {
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: orpc.orders.key() })
+		},
+	})
+}
+
+type GenerateOrderAccessTokenInput = V1Inputs["orders"]["generateOrderAccessToken"]
+type VerifyOrderAccessTokenInput = V1Inputs["orders"]["verifyOrderAccessToken"]
+
+export function useGenerateOrderAccessTokenMutation() {
+	return useMutation<OrderAccessTokenResponse, Error, GenerateOrderAccessTokenInput>({
+		mutationFn: async input => {
+			const result = await orpc.orders.generateOrderAccessToken.call(input)
+			return mapOrderAccessTokenResponse(result)
+		},
+	})
+}
+
+export function useVerifyOrderAccessTokenMutation() {
+	return useMutation<PublicOrderAccessDocument, Error, VerifyOrderAccessTokenInput>({
+		mutationFn: async input => {
+			const result = await orpc.orders.verifyOrderAccessToken.call(input)
+			return mapPublicOrderAccessDocument(result)
 		},
 	})
 }

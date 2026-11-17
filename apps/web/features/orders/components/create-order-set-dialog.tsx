@@ -26,11 +26,8 @@ import {
 	useCreateImagingOrderMutation,
 	useCreateLabOrderMutation,
 } from "@/features/orders/api/orders.hooks"
-import {
-	ORDER_SETS,
-	type OrderSetImagingModality,
-	type OrderSetOrder,
-} from "@/features/orders/lib/order-sets"
+import { formatImagingModalityLabel } from "@/features/orders/lib/imaging-modality"
+import { ORDER_SETS, type OrderSetOrder } from "@/features/orders/lib/order-sets"
 
 interface CreateOrderSetDialogProps {
 	open: boolean
@@ -39,24 +36,9 @@ interface CreateOrderSetDialogProps {
 	facilityId: string
 }
 
-function formatModalityLabel(modality: OrderSetImagingModality) {
-	switch (modality) {
-		case "xray":
-			return "X-Ray"
-		case "ct":
-			return "CT"
-		case "mri":
-			return "MRI"
-		case "ultrasound":
-			return "Ultrasound"
-		default:
-			return "Other"
-	}
-}
-
 function getOrderPreviewLabel(order: OrderSetOrder) {
 	if (order.type === "lab") return order.payload.testName
-	return `${formatModalityLabel(order.payload.modality)} - ${order.payload.bodyPart}`
+	return `${formatImagingModalityLabel(order.payload.modality)} - ${order.payload.bodyPart}`
 }
 
 export function CreateOrderSetDialog({
@@ -95,12 +77,6 @@ export function CreateOrderSetDialog({
 		try {
 			for (const order of selectedSet.orders) {
 				if (order.type === "lab") {
-					if (!order.payload.loincCode || !order.payload.indicationIcd10Code) {
-						throw new Error(
-							`${order.payload.testName} is missing required LOINC or ICD-10 metadata.`
-						)
-					}
-
 					await createLabOrder.mutateAsync({
 						facilityId,
 						encounterId,

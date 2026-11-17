@@ -29,7 +29,14 @@ const portalAssurances = [
 	},
 ]
 
-export default function PatientPortalLoginPage() {
+export default async function PatientPortalLoginPage({
+	searchParams,
+}: {
+	searchParams: Promise<{ returnTo?: string }>
+}) {
+	const { returnTo } = await searchParams
+	const safeReturnTo = returnTo?.startsWith("/patient-portal/") ? returnTo : undefined
+
 	return (
 		<section className="mx-auto grid min-h-[calc(100vh-73px)] max-w-6xl gap-8 px-4 py-8 md:grid-cols-[minmax(0,1fr)_420px] md:items-center lg:px-6">
 			<div className="space-y-8">
@@ -72,7 +79,7 @@ export default function PatientPortalLoginPage() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<PatientPortalLoginForm />
+					<PatientPortalLoginForm returnTo={safeReturnTo} />
 					<p className="text-muted-foreground mt-4 text-xs leading-5">
 						After identity matching, the portal loads patient-facing details from the connected
 						database record.

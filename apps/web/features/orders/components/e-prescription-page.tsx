@@ -28,6 +28,7 @@ import {
 	useSignPrescriptionMutation,
 } from "@/features/orders/api/orders.hooks"
 
+import { OrderAccessQrButton } from "./order-access-qr-button"
 import { PrescriptionPrintDialog } from "./prescription-print-dialog"
 
 // ============================================================================
@@ -343,7 +344,8 @@ function PrescriptionCard({
 						<p className="text-muted-foreground">S-2 Lic.: {rx.pdeaS2License}</p>
 					)}
 				</div>
-				<div className="shrink-0 text-right">
+				<div className="flex shrink-0 flex-col items-end gap-2 text-right">
+					<OrderAccessQrButton documentType="prescription" documentId={rx.id} />
 					{isSigned ? (
 						<div className="text-xs">
 							<p className="mb-1 flex items-center justify-end gap-1 text-green-700 dark:text-green-400">

@@ -10,7 +10,11 @@ import { Label } from "@/core/components/ui/label"
 
 type AccessMode = "patient" | "proxy"
 
-export function PatientPortalLoginForm() {
+interface PatientPortalLoginFormProps {
+	returnTo?: string
+}
+
+export function PatientPortalLoginForm({ returnTo }: PatientPortalLoginFormProps) {
 	const router = useRouter()
 	const [accessMode, setAccessMode] = useState<AccessMode>("patient")
 	const [mrn, setMrn] = useState("")
@@ -21,6 +25,9 @@ export function PatientPortalLoginForm() {
 	const hasEnteredIdentity = mrn.trim().length > 0 && dateOfBirth.length > 0
 	const canSubmit = hasEnteredIdentity && !isSubmitting
 	const showIdentityMismatch = error.length > 0
+	const safeReturnTo = returnTo?.startsWith("/patient-portal/")
+		? returnTo
+		: "/patient-portal/summary"
 	let submitLabel = "Match patient to continue"
 
 	if (isSubmitting) {
@@ -58,7 +65,7 @@ export function PatientPortalLoginForm() {
 				return
 			}
 
-			router.push("/patient-portal/summary")
+			router.push(safeReturnTo)
 			router.refresh()
 		} catch {
 			setError("Unable to verify the patient record right now.")

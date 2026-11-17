@@ -1,5 +1,7 @@
+import type { ImagingModality } from "./imaging-modality"
+
 export type OrderSetPriority = "routine" | "urgent" | "stat"
-export type OrderSetImagingModality = "xray" | "ct" | "mri" | "ultrasound" | "other"
+export type OrderSetImagingModality = ImagingModality
 
 export interface OrderSetLabPayload {
 	testName: string

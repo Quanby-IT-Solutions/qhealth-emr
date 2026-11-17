@@ -1,7 +1,7 @@
 import { Controller } from "@nestjs/common"
 import { Implement } from "@orpc/nest"
 import { implement } from "@orpc/server"
-import { Session, type UserSession } from "@thallesp/nestjs-better-auth"
+import { AllowAnonymous, Session, type UserSession } from "@thallesp/nestjs-better-auth"
 
 import { v1 } from "@/config/api-versions.config"
 import {
@@ -250,6 +250,22 @@ export class OrdersController {
 	async sendPrescription(@Session() session: UserSession) {
 		return implement(v1.orders.sendPrescription).handler(async ({ input }) => {
 			return this.ordersService.sendPrescription(input, session.user.id)
+		})
+	}
+
+	@RequirePermission("orders", "create")
+	@Implement(v1.orders.generateOrderAccessToken)
+	async generateOrderAccessToken(@Session() session: UserSession) {
+		return implement(v1.orders.generateOrderAccessToken).handler(async ({ input }) => {
+			return this.ordersService.generateOrderAccessToken(input, session.user.id)
+		})
+	}
+
+	@AllowAnonymous()
+	@Implement(v1.orders.verifyOrderAccessToken)
+	async verifyOrderAccessToken() {
+		return implement(v1.orders.verifyOrderAccessToken).handler(async ({ input }) => {
+			return this.ordersService.verifyOrderAccessToken(input)
 		})
 	}
 

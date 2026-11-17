@@ -16,6 +16,7 @@ import {
 	DialogTitle,
 } from "@/core/components/ui/dialog"
 import { Separator } from "@/core/components/ui/separator"
+import { getAppUrl } from "@/core/lib/utils"
 import { useEncounterDetailQuery } from "@/features/encounters/api/encounters.hooks"
 import {
 	usePrescriptionListQuery,
@@ -115,7 +116,7 @@ interface PrintData {
 	patientMrn: string
 	patientAge: number | null
 	patientSex: string
-	encounterDate: string
+	datePrescribed: string
 	prescriptions: RxPrintItem[]
 }
 
@@ -134,51 +135,86 @@ function cleanField(value: unknown, fallback = "--"): string {
 	return hasValue(value) ? String(value).trim() : fallback
 }
 
+function formatDoseForm(rx: RxPrintItem) {
+	return `${[rx.dose, rx.doseUnit].filter(value => value.trim()).join(" ")} - ${rx.doseForm}`
+}
+
+function formatMedicineNotes(rx: RxPrintItem) {
+	const notes = [
+		rx.specialInstructions,
+		rx.pdeaTrancheNumber && rx.pdeaTrancheTotal
+			? `PDEA tranche: ${rx.pdeaTrancheNumber} of ${rx.pdeaTrancheTotal}`
+			: null,
+		rx.pdeaDispenseDate ? `Earliest dispense: ${rx.pdeaDispenseDate}` : null,
+		rx.pdeaDispensingInstructions,
+	].filter(hasValue)
+
+	return notes.length > 0 ? notes.map(note => escapeHtml(note)).join("<br>") : "--"
+}
+
 function openPrintWindow(data: PrintData, options: PrintWindowOptions): void {
+	const printedAt = formatDateTime(new Date())
 	const rxBlocksHtml = data.prescriptions
 		.map(
 			(rx, i) => `
     <div class="rx-block">
+      <div class="rx-symbol">Rx</div>
       <div class="rx-number">Rx ${i + 1}</div>
-      <div class="rx-drug">
-        <span class="generic">${escapeHtml(rx.genericName)}</span>
-        ${rx.brandName ? `<span class="brand"> (${escapeHtml(rx.brandName)})</span>` : ""}
-      </div>
-      <table class="rx-table">
-        <tr><td class="label">Dose / Form</td><td>${escapeHtml(rx.dose)} ${escapeHtml(rx.doseUnit)} - ${escapeHtml(rx.doseForm)}</td></tr>
-        <tr><td class="label">Route</td><td>${escapeHtml(rx.route)}</td></tr>
-        <tr><td class="label">Frequency</td><td>${escapeHtml(rx.frequency)}${rx.isPrn ? ` (PRN: ${escapeHtml(rx.prnReason ?? "as needed")})` : ""}</td></tr>
-        ${rx.durationDays ? `<tr><td class="label">Duration</td><td>${rx.durationDays} day(s)</td></tr>` : ""}
-        ${rx.pdeaSchedule ? `<tr><td class="label">PDEA Schedule</td><td>${escapeHtml(rx.pdeaSchedule)}</td></tr>` : ""}
-        ${rx.pdeaTrancheNumber && rx.pdeaTrancheTotal ? `<tr><td class="label">PDEA Tranche</td><td>${rx.pdeaTrancheNumber} of ${rx.pdeaTrancheTotal}</td></tr>` : ""}
-        ${rx.pdeaDispenseDate ? `<tr><td class="label">Earliest Dispense</td><td>${escapeHtml(rx.pdeaDispenseDate)}</td></tr>` : ""}
-        ${rx.pdeaDispensingInstructions ? `<tr><td class="label">PDEA Instructions</td><td>${escapeHtml(rx.pdeaDispensingInstructions)}</td></tr>` : ""}
-        ${rx.specialInstructions ? `<tr><td class="label">Instructions</td><td>${escapeHtml(rx.specialInstructions)}</td></tr>` : ""}
+      <table class="medicine-table">
+        <thead>
+          <tr>
+            <th>Medicine</th>
+            <th>Dose / Form</th>
+            <th>Route</th>
+            <th>Frequency</th>
+            <th>Duration</th>
+            <th>Instructions / Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <div class="medicine-name">${escapeHtml(rx.genericName)}</div>
+              ${rx.brandName ? `<div class="medicine-subtext">Brand: ${escapeHtml(rx.brandName)}</div>` : ""}
+              ${rx.pdeaSchedule ? `<div class="medicine-subtext">PDEA Schedule: ${escapeHtml(rx.pdeaSchedule)}</div>` : ""}
+            </td>
+            <td>${escapeHtml(formatDoseForm(rx))}</td>
+            <td>${escapeHtml(rx.route)}</td>
+            <td>${escapeHtml(rx.frequency)}${rx.isPrn ? `<br><span class="medicine-subtext">PRN: ${escapeHtml(rx.prnReason ?? "as needed")}</span>` : ""}</td>
+            <td>${rx.durationDays ? `${rx.durationDays} day(s)` : "--"}</td>
+            <td>${formatMedicineNotes(rx)}</td>
+          </tr>
+        </tbody>
       </table>
       ${rx.noRefill ? `<div class="no-refill-stamp">NO REFILL</div>` : ""}
-      <div class="rx-sig">
-        <div>
+      <div class="signature-section">
+        <div class="signature-block">
           <div class="sig-line">&nbsp;</div>
-          <div class="sig-label">${escapeHtml(rx.prescriberName)}</div>
-          <div class="sig-label">PRC Lic. No.: ${escapeHtml(rx.prcNumber)}</div>
-          <div class="sig-label">PTR No.: ${escapeHtml(rx.ptrNumber)}</div>
-          ${rx.pdeaS2License ? `<div class="sig-label">S2 Lic.: ${escapeHtml(rx.pdeaS2License)}</div>` : ""}
+          <div class="sig-caption">Provider / Prescriber's Signature</div>
+          <div class="prescriber-name">Provider: ${escapeHtml(rx.prescriberName)}</div>
+          <div class="credential-row">
+            <span>PRC Lic. No.: ${escapeHtml(rx.prcNumber)}</span>
+            <span>PTR No.: ${escapeHtml(rx.ptrNumber)}</span>
+            ${rx.pdeaS2License ? `<span>S2 Lic.: ${escapeHtml(rx.pdeaS2License)}</span>` : ""}
+          </div>
         </div>
-        <div class="dispensing-note">${rx.noRefill ? "For single dispensing only. PDEA controlled substance." : "For single dispensing only unless otherwise indicated."}</div>
+        <div class="signature-meta">
+          <div class="electronic-signature">Electronically signed: ${escapeHtml(rx.signedAt)}</div>
+          <div class="dispensing-note">${rx.noRefill ? "For single dispensing only. PDEA controlled substance." : "For single dispensing only unless otherwise indicated."}</div>
+        </div>
       </div>
-      <div class="signed-note">Electronically signed: ${escapeHtml(rx.signedAt)}</div>
     </div>`
 		)
 		.join("")
-	const verificationHtml = options.qrLink
+	const onlineAccessHtml = options.qrLink
 		? `
-  <div class="verification-section">
+  <div class="online-access-section">
     <div>
-      <div class="verification-title">e-Prescription Verification</div>
-      <div class="verification-note">Scan the QR code or use the encoded fallback link to verify the signed prescription reference.</div>
-      <div class="verification-link">${escapeHtml(options.qrLink)}</div>
+      <div class="online-access-title">Patient Portal QR Code</div>
+      <div class="online-access-note">Scan this QR code to open the prescription online. Patient portal login is required before the prescription is shown.</div>
+      <div class="online-access-link">${escapeHtml(options.qrLink)}</div>
     </div>
-    ${options.qrDataUrl ? `<img class="verification-qr" src="${escapeHtml(options.qrDataUrl)}" alt="Signed e-Prescription QR">` : ""}
+    ${options.qrDataUrl ? `<img class="online-access-qr" src="${escapeHtml(options.qrDataUrl)}" alt="Patient portal prescription QR">` : ""}
   </div>`
 		: ""
 
@@ -186,62 +222,72 @@ function openPrintWindow(data: PrintData, options: PrintWindowOptions): void {
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>e-Prescription - ${escapeHtml(data.patientName)}</title>
+  <title></title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #000; padding: 2cm; }
-    .header { text-align: center; margin-bottom: 16px; }
-    .header h1 { font-size: 15pt; font-weight: bold; text-transform: uppercase; }
-    .header h2 { font-size: 12pt; font-weight: normal; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #000; padding: 1.4cm; }
+    .brand { display: flex; justify-content: center; margin-bottom: 12px; }
+    .brand img { display: block; width: 140px; height: auto; }
     .doc-title { font-size: 13pt; font-weight: bold; text-align: center; border: 2px solid #000;
       padding: 6px 0; margin: 12px 0 16px; text-transform: uppercase; letter-spacing: 2px; }
-    .patient-section { margin-bottom: 16px; padding: 10px 12px; border: 1px solid #bbb; }
+    .patient-section { margin-bottom: 14px; padding: 10px 12px; border: 1px solid #bbb; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
     .field .label { font-size: 9pt; font-weight: bold; text-transform: uppercase; color: #555; display: block; }
     .field .value { font-size: 11pt; border-bottom: 1px solid #bbb; padding-bottom: 1px; min-height: 18px; }
+    .rx-symbol { font-size: 22pt; font-weight: bold; line-height: 1; margin-bottom: 4px; }
     .rx-block { border: 1px solid #000; padding: 12px; margin-bottom: 14px; page-break-inside: avoid; }
     .rx-number { font-size: 9pt; color: #777; margin-bottom: 4px; }
-    .rx-drug { font-size: 13pt; font-weight: bold; margin-bottom: 8px; }
-    .brand { font-weight: normal; font-size: 11pt; }
-    .rx-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-    .rx-table td { padding: 3px 6px; font-size: 10.5pt; vertical-align: top; }
-    .rx-table .label { font-weight: bold; width: 120px; color: #444; }
+    .medicine-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 10px; }
+    .medicine-table th { border: 1px solid #777; background: #f3f4f6; padding: 5px 6px; font-size: 8.5pt; text-align: left; text-transform: uppercase; }
+    .medicine-table td { border: 1px solid #777; padding: 6px; font-size: 9.5pt; vertical-align: top; overflow-wrap: anywhere; }
+    .medicine-table th:nth-child(1), .medicine-table td:nth-child(1) { width: 24%; }
+    .medicine-table th:nth-child(2), .medicine-table td:nth-child(2) { width: 16%; }
+    .medicine-table th:nth-child(3), .medicine-table td:nth-child(3) { width: 11%; }
+    .medicine-table th:nth-child(4), .medicine-table td:nth-child(4) { width: 17%; }
+    .medicine-table th:nth-child(5), .medicine-table td:nth-child(5) { width: 10%; }
+    .medicine-table th:nth-child(6), .medicine-table td:nth-child(6) { width: 22%; }
+    .medicine-name { font-weight: bold; font-size: 10pt; }
+    .medicine-subtext { color: #555; font-size: 8.5pt; margin-top: 2px; }
     .no-refill-stamp { display: inline-block; border: 2px solid #dc2626; color: #dc2626; font-weight: 900; font-size: 10pt; letter-spacing: 2px; padding: 3px 9px; text-transform: uppercase; margin-top: 4px; }
-    .rx-sig { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px; padding-top: 10px; border-top: 1px solid #bbb; }
-    .sig-line { border-bottom: 1px solid #000; min-width: 180px; margin-bottom: 4px; height: 30px; }
-    .sig-label { font-size: 9.5pt; }
-    .dispensing-note { font-size: 9pt; color: #555; max-width: 200px; text-align: right; }
-    .signed-note { font-size: 8pt; color: #888; text-align: right; margin-top: 6px; }
-    .verification-section { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border: 1px solid #000; padding: 10px 12px; margin-top: 16px; page-break-inside: avoid; }
-    .verification-title { font-size: 10pt; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; }
-    .verification-note { font-size: 9pt; color: #444; margin-bottom: 6px; }
-    .verification-link { font-size: 7.5pt; line-height: 1.3; overflow-wrap: anywhere; word-break: break-word; }
-    .verification-qr { width: 105px; height: 105px; object-fit: contain; border: 1px solid #bbb; padding: 4px; }
+    .signature-section { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(170px, 0.8fr); gap: 18px; align-items: end; margin-top: 12px; padding-top: 12px; border-top: 1px solid #bbb; }
+    .signature-block { min-width: 0; }
+    .sig-line { border-bottom: 1px solid #000; min-width: 220px; max-width: 320px; margin-bottom: 4px; height: 34px; }
+    .sig-caption { font-size: 8.5pt; color: #555; text-transform: uppercase; margin-bottom: 6px; }
+    .prescriber-name { font-size: 10pt; font-weight: bold; margin-bottom: 2px; }
+    .credential-row { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 9pt; }
+    .signature-meta { text-align: right; }
+    .electronic-signature { font-size: 8.5pt; color: #333; margin-bottom: 8px; }
+    .dispensing-note { font-size: 9pt; color: #555; }
+    .online-access-section { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border: 1px solid #000; padding: 10px 12px; margin-top: 16px; page-break-inside: avoid; }
+    .online-access-title { font-size: 10pt; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; }
+    .online-access-note { font-size: 9pt; color: #444; margin-bottom: 6px; }
+    .online-access-link { font-size: 7.5pt; line-height: 1.3; overflow-wrap: anywhere; word-break: break-word; }
+    .online-access-qr { width: 105px; height: 105px; object-fit: contain; border: 1px solid #bbb; padding: 4px; }
     @media print {
-      @page { size: A4; margin: 2cm; }
-      body { padding: 0; }
+      @page { size: A4; margin: 0; }
+      body { padding: 1.4cm; }
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>Electronic Prescription (e-Rx)</h1>
-    <h2>Outpatient Department</h2>
+  <div class="brand">
+    <img src="/juanmedslogo.svg" alt="JuanMeds Care OS">
   </div>
 
-  <div class="doc-title">Electronic Prescription</div>
+  <div class="doc-title">Electronic Prescription (e-Rx)</div>
 
   <div class="patient-section">
     <div class="grid-2">
       <div class="field"><span class="label">Patient Name</span><span class="value">${escapeHtml(data.patientName)}</span></div>
       <div class="field"><span class="label">MRN</span><span class="value">${escapeHtml(data.patientMrn)}</span></div>
       <div class="field"><span class="label">Age / Sex</span><span class="value">${data.patientAge !== null ? `${data.patientAge} yrs` : "--"} / ${escapeHtml(data.patientSex)}</span></div>
-      <div class="field"><span class="label">Date Prescribed</span><span class="value">${escapeHtml(data.encounterDate)}</span></div>
+      <div class="field"><span class="label">Date Prescribed</span><span class="value">${escapeHtml(data.datePrescribed)}</span></div>
+      <div class="field"><span class="label">Date Printed</span><span class="value">${escapeHtml(printedAt)}</span></div>
     </div>
   </div>
 
   ${rxBlocksHtml}
-  ${verificationHtml}
+  ${onlineAccessHtml}
 
 </body>
 </html>`
@@ -272,11 +318,16 @@ function openPrintWindow(data: PrintData, options: PrintWindowOptions): void {
 		setTimeout(() => frame.remove(), 500)
 	}
 	frameWindow.onafterprint = removeFrame
-	setTimeout(() => {
+	let hasPrinted = false
+	const printFrame = () => {
+		if (hasPrinted) return
+		hasPrinted = true
 		frameWindow.focus()
 		frameWindow.print()
 		removeFrame()
-	}, 500)
+	}
+	frameWindow.addEventListener("load", () => setTimeout(printFrame, 100), { once: true })
+	setTimeout(printFrame, 800)
 }
 
 interface PrescriptionPrintDialogProps {
@@ -323,7 +374,13 @@ export function PrescriptionPrintDialog({
 						: encounter.patientSex === "female"
 							? "Female"
 							: "Other",
-				encounterDate: formatDate(encounter.admissionDatetime),
+				datePrescribed: formatDate(
+					signedPrescriptions
+						.map(rx => rx.signedAt)
+						.filter(Boolean)
+						.sort((a, b) => new Date(String(a)).getTime() - new Date(String(b)).getTime())[0] ??
+						encounter.admissionDatetime
+				),
 				prescriptions: signedPrescriptions.map(rx => {
 					const content = parsePrescriptionContent(rx.prescriptionContent)
 					const isControlled = Boolean(content.isControlledSubstance)
@@ -374,28 +431,11 @@ export function PrescriptionPrintDialog({
 		printData?.prescriptions.some(rx => rx.missingFields.length > 0) ?? false
 	const canSendPrescription =
 		printData !== null && printData.prescriptions.length > 0 && !hasIncompletePrescriptions
-	const qrPayload =
-		printData === null
-			? ""
-			: JSON.stringify({
-					patientName: printData.patientName,
-					patientMrn: printData.patientMrn,
-					prescriptionIds: printData.prescriptions.map(rx => rx.id),
-					prescriptions: printData.prescriptions.map(rx => ({
-						id: rx.id,
-						genericName: rx.genericName,
-						dose: `${rx.dose} ${rx.doseUnit}`.trim(),
-						prescriberPrc: rx.prcNumber,
-						prescriberPtr: rx.ptrNumber,
-						pdeaSchedule: rx.pdeaSchedule,
-						pdeaDispenseDate: rx.pdeaDispenseDate,
-						pdeaTrancheNumber: rx.pdeaTrancheNumber,
-						pdeaTrancheTotal: rx.pdeaTrancheTotal,
-						noRefill: rx.noRefill,
-						signedAt: rx.signedAt,
-					})),
-				})
-	const qrLink = qrPayload ? `qhealth://eprescription?payload=${encodeURIComponent(qrPayload)}` : ""
+	const prescriptionIds = printData?.prescriptions.map(rx => rx.id) ?? []
+	const qrLink =
+		prescriptionIds.length > 0
+			? `${getAppUrl().replace(/\/$/, "")}/patient-portal/prescriptions?ids=${encodeURIComponent(prescriptionIds.join(","))}`
+			: ""
 
 	useEffect(() => {
 		let cancelled = false
@@ -620,13 +660,17 @@ export function PrescriptionPrintDialog({
 
 						{showQr && canSendPrescription && (
 							<div className="space-y-3 rounded-md border p-4">
-								<p className="text-sm font-medium">Signed e-Prescription QR</p>
+								<p className="text-sm font-medium">Patient Portal Prescription QR</p>
+								<p className="text-muted-foreground text-xs">
+									Scanning opens the online prescription page. Patient portal login is required
+									before the prescription is shown.
+								</p>
 								<div className="flex justify-center">
 									{qrDataUrl ? (
 										// eslint-disable-next-line @next/next/no-img-element
 										<img
 											src={qrDataUrl}
-											alt="Signed e-Prescription QR"
+											alt="Patient portal prescription QR"
 											className="size-56 rounded-md border bg-white p-2"
 										/>
 									) : (
@@ -637,7 +681,7 @@ export function PrescriptionPrintDialog({
 								</div>
 								<div className="space-y-2">
 									<p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-										Encoded fallback
+										Online prescription link
 									</p>
 									<a
 										href={qrLink}
